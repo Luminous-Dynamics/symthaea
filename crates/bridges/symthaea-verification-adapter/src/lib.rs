@@ -18,6 +18,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use symthaea_epistemic_types::{
     ClaimControllerDocumentIdentity, ClaimControllerIdentity, ClaimVerificationMethod,
+    FederationDependency,
     ControllerDocumentDereferenceAttestation, ControllerDocumentResolutionSource,
     ControllerDocumentSnapshotScope, VerificationFailure, VerificationMethodLifecycle,
     VerificationMethodResolution, VerificationRequest,
@@ -164,12 +165,22 @@ impl JsonControllerDocumentSnapshotAdapter {
     ) -> Result<VerificationMethodResolution, SnapshotError> {
         request.validate_structure()?;
 
-        let mut file = fs::File::open(&self.path).map_err(|error| {
-            SnapshotError::Io {
-                path: self.path.clone(),
-                message: error.to_string(),
+        let mut file = match fs::File::open(&self.path) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Err(SnapshotError::Unresolved(vec![
+                    FederationDependency::ControllerDocument(
+                        request.controller_document_ref()?,
+                    ),
+                ]));
             }
-        })?;
+            Err(error) => {
+                return Err(SnapshotError::Io {
+                    path: self.path.clone(),
+                    message: error.to_string(),
+                });
+            }
+        };
         let mut bytes = Vec::new();
         file.take(MAX_SNAPSHOT_ENVELOPE_BYTES + 1)
             .read_to_end(&mut bytes)
@@ -305,6 +316,7 @@ impl JsonControllerDocumentSnapshotAdapter {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SnapshotError {
     Io { path: PathBuf, message: String },
+    Unresolved(Vec<FederationDependency>),
     Malformed(String),
     SnapshotReferenceMismatch { expected: String, actual: String },
     Verification(VerificationFailure),
@@ -315,6 +327,9 @@ impl std::fmt::Display for SnapshotError {
         match self {
             Self::Io { path, message } => {
                 write!(formatter, "snapshot I/O failed for {}: {message}", path.display())
+            }
+            Self::Unresolved(dependencies) => {
+                write!(formatter, "durable snapshot dependencies unresolved: {dependencies:?}")
             }
             Self::Malformed(message) => formatter.write_str(message),
             Self::SnapshotReferenceMismatch { expected, actual } => write!(
@@ -1079,6 +1094,24 @@ mod tests {
             adapter.resolve_snapshot(&request, snapshot),
             Err(SnapshotError::Malformed(message))
                 if message.contains("unsupported controller-document snapshot media type")
+        ));
+    }
+
+    #[test]
+    fn missing_snapshot_is_unresolved_not_invalid() {
+        let request = request();
+        let adapter = JsonControllerDocumentSnapshotAdapter::new(
+            "/tmp/symthaea-verification-adapter-missing-snapshot.json",
+            snapshot().snapshot_reference().unwrap(),
+        )
+        .unwrap();
+
+        assert!(matches!(
+            adapter.resolve(&request),
+            Err(SnapshotError::Unresolved(dependencies))
+                if dependencies == vec![FederationDependency::ControllerDocument(
+                    "https://example.test/controller".into()
+                )]
         ));
     }
 
