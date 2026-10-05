@@ -1,0 +1,84 @@
+# Focused qualification for NixOS effect-boundary compatibility surfaces.
+#
+# This workflow intentionally runs on draft pull requests: a security-boundary
+# regression is evidence-bearing before a PR is promoted out of draft.
+name: Nixward Effect Boundary Focused
+
+on:
+  pull_request:
+    paths:
+      - "src/action/nixos_patterns.rs"
+      - "crates/domains/symthaea-spore/src/bin/ssh_relay.rs"
+      - ".github/workflows/nixward-effect-boundary-focused.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  root-legacy-nixos-executor:
+    name: Root legacy NixOS executor boundary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-nixward-root-authority-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-nixward-root-authority-
+
+      - name: Check formatting
+        run: cargo fmt --check -- src/action/nixos_patterns.rs
+
+      - name: Run mutation fail-closed tests
+        run: cargo test -p symthaea --lib test_legacy_executor_
+
+      - name: Run rollback constructor test
+        run: cargo test -p symthaea --lib test_rollback_commands_never_mint_legacy_shell_effects
+
+  spore-service-boundary:
+    name: Spore relay service-action boundary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-nixward-spore-service-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-nixward-spore-service-
+
+      - name: Check formatting
+        run: cargo fmt --check -- crates/domains/symthaea-spore/src/bin/ssh_relay.rs
+
+      - name: Run shell-free service-action test
+        run: cargo test -p symthaea-spore --features server --bin ssh-relay service_action_argv_is_shell_free
+
