@@ -50,10 +50,6 @@ impl ClaimVerificationRelationship {
         &self.0
     }
 
-    fn controller_document_integrity_digest(&self) -> String {
-        self.resolution.controller_document_integrity.identity_digest()
-    }
-
     pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
         if self.0.trim().is_empty() {
             Err(VerificationFailure::Structural(
@@ -967,6 +963,10 @@ impl VerificationEvidence {
         let bytes = serde_json::to_vec(&encoded)
             .expect("verification evidence is serializable");
         crate::sha256_hex(&bytes)
+    }
+
+    fn controller_document_integrity_digest(&self) -> String {
+        self.resolution.controller_document_integrity.identity_digest()
     }
 
     pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
