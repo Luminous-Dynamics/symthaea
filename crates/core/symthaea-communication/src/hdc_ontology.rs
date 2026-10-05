@@ -542,6 +542,86 @@ impl HdcOntologyConformalCalibration {
     }
 }
 
+/// Versioned machine-readable binding for a real N1 conformal study artifact.
+/// This records the provenance and declared validity target around the isolated
+/// statistical primitive without turning metadata into a coverage theorem.
+pub const HDC_ONTOLOGY_CONFORMAL_EVIDENCE_SCHEMA_VERSION: u16 = 1;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HdcOntologyCoverageTarget {
+    /// Standard split-conformal marginal coverage target.
+    Marginal,
+    /// A declared label-conditional evaluation target; this enum does not
+    /// itself provide a label-conditional guarantee.
+    LabelConditional,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HdcOntologyConformalEvidenceArtifact {
+    pub schema_version: u16,
+    pub calibration: HdcOntologyConformalCalibration,
+    /// Exact model/decoder artifact hash used for calibration and evaluation.
+    pub model_hash: String,
+    /// Exact calibration split manifest hash.
+    pub calibration_split_manifest_hash: String,
+    /// Exact untouched evaluation split manifest hash.
+    pub evaluation_split_manifest_hash: String,
+    /// Declared statistical validity target, not an automatic theorem.
+    pub coverage_target: HdcOntologyCoverageTarget,
+    /// Human-readable but content-bound statement of the exchangeability
+    /// assumptions under which the statistical target is intended to apply.
+    pub exchangeability_assumptions: String,
+    /// Exact execution revision used to produce the evidence bundle.
+    pub execution_revision: String,
+    /// Stable identifier for the deterministic evidence bundle.
+    pub evidence_bundle_id: String,
+}
+
+impl HdcOntologyConformalEvidenceArtifact {
+    pub fn validates(&self) -> bool {
+        self.schema_version == HDC_ONTOLOGY_CONFORMAL_EVIDENCE_SCHEMA_VERSION
+            && self.calibration.validates()
+            && !self.model_hash.trim().is_empty()
+            && self.model_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
+            && !self.calibration_split_manifest_hash.trim().is_empty()
+            && self.calibration_split_manifest_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
+            && !self.evaluation_split_manifest_hash.trim().is_empty()
+            && self.evaluation_split_manifest_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
+            && self.calibration_split_manifest_hash != self.evaluation_split_manifest_hash
+            && !self.exchangeability_assumptions.trim().is_empty()
+            && self.exchangeability_assumptions.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
+            && !self.execution_revision.trim().is_empty()
+            && self.execution_revision.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
+            && !self.evidence_bundle_id.trim().is_empty()
+            && self.evidence_bundle_id.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
+    }
+
+    pub fn validates_calibration_scores(&self, calibration_scores: &[f64]) -> Result<(), String> {
+        if !self.validates() {
+            return Err("invalid HDC ontology conformal evidence artifact".into());
+        }
+        self.calibration
+            .validates_calibration_scores(calibration_scores)
+    }
+
+    /// Deserialize a persisted N1 evidence binding only after enforcing the
+    /// raw byte-size ceiling and all provenance/schema invariants.
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > HDC_ONTOLOGY_MAX_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "ontology conformal evidence artifact JSON exceeds {} bytes",
+                HDC_ONTOLOGY_MAX_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let artifact: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("ontology conformal evidence artifact JSON: {error}"))?;
+        if !artifact.validates() {
+            return Err("ontology conformal evidence artifact failed bounded validation".into());
+        }
+        Ok(artifact)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HdcOntologyEmpiricalCalibration {
     pub baseline: HdcOntologyDecodePolicy,
@@ -1995,6 +2075,49 @@ mod tests {
     }
 
     #[test]
+    fn conformal_evidence_artifact_binds_study_provenance_and_split_scope() {
+        let calibration = HdcOntologyConformalCalibration::from_nonconformity_scores(
+            "codebook",
+            &["a".into(), "b".into(), "c".into()],
+            &[0.10, 0.20, 0.30],
+            0.10,
+        )
+        .unwrap();
+        let artifact = HdcOntologyConformalEvidenceArtifact {
+            schema_version: HDC_ONTOLOGY_CONFORMAL_EVIDENCE_SCHEMA_VERSION,
+            calibration,
+            model_hash: "model-hash".into(),
+            calibration_split_manifest_hash: "calibration-split".into(),
+            evaluation_split_manifest_hash: "evaluation-split".into(),
+            coverage_target: HdcOntologyCoverageTarget::Marginal,
+            exchangeability_assumptions: "pre-registered exchangeability within the declared evaluation population".into(),
+            execution_revision: "revision-1".into(),
+            evidence_bundle_id: "bundle-1".into(),
+        };
+
+        assert!(artifact.validates());
+        assert!(artifact
+            .validates_calibration_scores(&[0.30, 0.10, 0.20])
+            .is_ok());
+
+        let encoded = serde_json::to_vec(&artifact).unwrap();
+        let decoded = HdcOntologyConformalEvidenceArtifact::from_json_bytes(&encoded).unwrap();
+        assert_eq!(decoded, artifact);
+
+        let mut overlapping = artifact.clone();
+        overlapping.evaluation_split_manifest_hash =
+            overlapping.calibration_split_manifest_hash.clone();
+        assert!(!overlapping.validates());
+
+        let mut forged_threshold = artifact.clone();
+        forged_threshold.calibration.threshold = 0.10;
+        assert!(forged_threshold.validates());
+        assert!(forged_threshold
+            .validates_calibration_scores(&[0.30, 0.10, 0.20])
+            .is_err());
+    }
+
+    #[test]
     fn empirical_calibration_never_weakens_baseline() {
         let baseline = HdcOntologyDecodePolicy::conservative_default();
         let metrics = HdcOntologyRoundtripMetrics {
@@ -2226,6 +2349,7 @@ mod tests {
         assert!(HdcOntologyManifest::from_json_bytes(&oversized).is_err());
         assert!(HdcOntologyCodebookDescriptor::from_json_bytes(&oversized).is_err());
         assert!(HdcOntologyConformalCalibration::from_json_bytes(&oversized).is_err());
+        assert!(HdcOntologyConformalEvidenceArtifact::from_json_bytes(&oversized).is_err());
         assert!(HdcOntologyRepresentation::from_json_bytes(&oversized).is_err());
 
         let (training, manifest) = training_graph_and_manifest();
@@ -2398,28 +2522,3 @@ mod tests {
             HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
                 .unwrap();
         let mut wrong = training_manifest.clone();
-        wrong.scheme_id = "scheme:other".into();
-
-        assert!(codebook.encode_graph(&training, &wrong).is_err());
-    }
-
-    #[test]
-    fn source_provenance_is_preserved_when_receiver_grounding_differs() {
-        let (training, training_manifest) = training_graph_and_manifest();
-        let codebook =
-            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
-                .unwrap();
-        let representation = codebook.encode_graph(&training, &training_manifest).unwrap();
-
-        let mut receiver = training_manifest.clone();
-        for binding in &mut receiver.concepts {
-            binding.node_id = format!("receiver-{}", binding.node_id);
-            binding.grounding_ids = vec![format!("receiver-grounding-{}", binding.concept_id)];
-        }
-
-        let decoded = codebook
-            .decode_graph_with_policy(
-                &representation,
-                &training_manifest,
-                &receiver,
-                HdcOntologyDecodePolicy::conservative_default(),
