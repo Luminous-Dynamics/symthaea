@@ -109,8 +109,21 @@ jobs:
               report = json.loads(report_path.read_text())
               assert report.get("execution_revision") == checked_out, report_path
 
-          codec_report = json.loads(Path("target/communication-evidence/neurosemantic_hdc_codec_n0.json").read_text())
-          assert codec_report["binary_frame_roundtrip_exact"] is True
+          report = json.loads(Path("target/communication-evidence/neurosemantic_n0.json").read_text())
+          assert report["exact_graph_roundtrip"] is True
+          assert report["authorization_valid"] is True
+          assert report["first_packet_accepted"] is True
+          assert report["exact_replay_detected"] is True
+          assert report["tamper_detected"] is True
+          assert report["unauthorized_channel_blocked"] is True
+          assert report["expired_lease_blocked"] is True
+          assert report["cross_jurisdiction_blocked"] is True
+          assert report["persistence_after_expiry_blocked"] is True
+          assert report["secondary_research_blocked"] is True
+          assert report["sensitivity_escalation_blocked"] is True
+          assert report["insufficient_capability_blocked"] is True
+
+          codec_report          assert codec_report["binary_frame_roundtrip_exact"] is True
           assert codec_report["deterministic_repeat_exact"] is True
           assert codec_report["semantic_decoder_invoked"] is False
           assert codec_report["codec_descriptor"]["codec_id"] == "symthaea.hdc.continuous-sign-v1"
