@@ -127,6 +127,8 @@ pub struct PhonologicalPlan {
     /// Relative pitch-range multiplier inherited from the speech-production plan.
     /// 1.0 is neutral; the realization layer must not reinterpret it as speaker base F0.
     pub pitch_range: f32,
+    /// Desired prominence of the focus constituent, inherited without re-inference.
+    pub prominence: f32,
     pub rate: f32,
     pub pause_weight: f32,
     pub segments: Vec<PhonemeSlot>,
@@ -146,6 +148,7 @@ impl PhonologicalPlan {
             focus_role: frame.focus_role.clone(),
             intonation: frame.prosody.intonation,
             pitch_range: frame.prosody.pitch_range,
+            prominence: frame.prosody.prominence,
             rate: sanitize_rate(frame.prosody.rate),
             pause_weight: sanitize_unit(frame.prosody.pause_weight),
             segments: Vec::new(),
@@ -169,6 +172,7 @@ impl PhonologicalPlan {
                 || self.focus_role != frame.focus_role
                 || self.intonation != frame.prosody.intonation
                 || self.pitch_range != frame.prosody.pitch_range
+                || self.prominence != frame.prosody.prominence
                 || self.rate != sanitize_rate(frame.prosody.rate)
                 || self.pause_weight != sanitize_unit(frame.prosody.pause_weight)
             || self.realization_authorized != frame.ready_for_phonology())
@@ -247,6 +251,9 @@ impl PhonologicalPlan {
         }
         if !self.pitch_range.is_finite() || !(0.65..=1.45).contains(&self.pitch_range) {
             return Err(PhonologicalPlanError::InvalidPitchRange);
+        }
+        if !self.prominence.is_finite() || !(0.0..=1.0).contains(&self.prominence) {
+            return Err(PhonologicalPlanError::InvalidProminence);
         }
         if !self.rate.is_finite() || !(0.55..=1.35).contains(&self.rate) {
             return Err(PhonologicalPlanError::InvalidRate);
@@ -330,6 +337,7 @@ impl PhonologicalPlan {
             self.focus_role.as_deref().unwrap_or("NONE"),
             self.intonation,
             self.pitch_range,
+            self.prominence,
             self.rate,
             self.pause_weight,
             self.syllables.len(),
@@ -345,6 +353,7 @@ pub enum PhonologicalPlanError {
     EmptySourceIntent,
     InvalidRate,
     InvalidPitchRange,
+    InvalidProminence,
     InvalidPauseWeight,
     FocusRoleWithoutSegments,
     FocusSegmentsWithoutRole,
@@ -372,6 +381,7 @@ impl std::fmt::Display for PhonologicalPlanError {
             Self::EmptySourceIntent => write!(f, "phonological plan source intent must be non-empty"),
             Self::InvalidRate => write!(f, "phonological plan rate is outside the supported range"),
             Self::InvalidPitchRange => write!(f, "phonological plan pitch range is outside the supported range"),
+            Self::InvalidProminence => write!(f, "phonological plan prominence is outside the supported range"),
             Self::InvalidPauseWeight => write!(f, "phonological plan pause weight is outside [0, 1]"),
             Self::FocusRoleWithoutSegments => write!(f, "a focus role requires focused phonemes"),
             Self::FocusSegmentsWithoutRole => write!(f, "focused phonemes require a focus role"),
@@ -585,6 +595,23 @@ mod tests {
                 .validate()
                 .expect_err("out-of-range pitch must fail closed"),
             PhonologicalPlanError::InvalidPitchRange
+        );
+    }
+
+    #[test]
+    fn prominence_is_carried_from_speech_plan_and_validated() {
+        let mut speech_plan = plan();
+        speech_plan.prosody.prominence = 0.73;
+
+        let mut phonological = PhonologicalPlan::from_speech_plan(&speech_plan);
+        assert!((phonological.prominence - 0.73).abs() < f32::EPSILON);
+
+        phonological.prominence = 1.5;
+        assert_eq!(
+            phonological
+                .validate()
+                .expect_err("out-of-range prominence must fail closed"),
+            PhonologicalPlanError::InvalidProminence
         );
     }
 
