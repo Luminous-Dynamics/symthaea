@@ -10982,6 +10982,106 @@ mod tests {
     }
 
     #[test]
+    fn legacy_attempt_ledgers_also_block_identity_reuse() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-legacy-identity-history-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action_a=EpistemicAction::new(
+            "legacy-history-a","effect",super::super::ActionRisk::Critical
+        );
+        let action_b=EpistemicAction::new(
+            "legacy-history-b","effect",super::super::ActionRisk::Critical
+        );
+        let digest_a=action_a.canonical_action_digest();
+        let digest_b=action_b.canonical_action_digest();
+        let witness_a=ActionAuthorizationWitness {
+            operation_id:Some("operation:legacy-history".into()),
+            authorization_instance:"legacy-history-a".into(),
+            action_id:action_a.id.clone(),
+            action_digest:digest_a.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support-a".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:00Z".into(),
+            expires_at:Some("2026-10-04T10:00:00Z".into()),
+            authority_epoch:1,
+        };
+        let witness_b=ActionAuthorizationWitness {
+            operation_id:Some("operation:legacy-history".into()),
+            authorization_instance:"legacy-history-b".into(),
+            action_id:action_b.id.clone(),
+            action_digest:digest_b,
+            frame:"frame@1".into(),
+            support_digest:"sha256:support-b".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:01Z".into(),
+            expires_at:Some("2026-10-04T10:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness_a.authorization_instance.clone(),
+            action_a.id.clone(),
+            digest_a,
+            witness_a.support_digest.clone(),
+            witness_a.policy.clone(),
+            1,
+            1,
+        )).unwrap();
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness_b.authorization_instance.clone(),
+            action_b.id.clone(),
+            witness_b.action_digest.clone(),
+            witness_b.support_digest.clone(),
+            witness_b.policy.clone(),
+            1,
+            1,
+        )).unwrap();
+
+        let conn=store.connection().unwrap();
+        conn.execute(
+            "INSERT INTO authorization_receipts(
+                authorization_instance,action_id,attempt_id,phase,outcome,action_digest,
+                authority_epoch,operation_id)
+             VALUES(
+                'legacy-history-a','legacy-action','attempt:legacy-history','indeterminate','indeterminate',
+                'legacy-digest',1,'operation:legacy-history'
+             )",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO authorization_status_checks(
+                authorization_instance,attempt_id,phase,operation_id,status_identifier,
+                status_source_digest,status_observed_at,status_valid_until,status_evidence_digest)
+             VALUES(
+                'legacy-history-a','attempt:legacy-history','pre_entry','operation:legacy-history',
+                'status:legacy-history','sha256:source','2026-10-03T10:00:00Z',
+                '2026-10-03T10:30:00Z','sha256:evidence'
+             )",
+            [],
+        ).unwrap();
+        drop(conn);
+
+        assert!(matches!(
+            store.prepare_for_execution_bound_with_operation(
+                &witness_b,
+                &action_b,
+                "frame@1",
+                "attempt:legacy-history",
+                "boundary-legacy-history",
+                "operation:legacy-history",
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn prepared_operation_id_cannot_be_reused_across_authorizations() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-auth-operation-reuse-{}.db",std::process::id()
