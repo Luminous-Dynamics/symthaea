@@ -3039,6 +3039,48 @@ mod tests {
     }
 
     #[test]
+    fn field_burden_evidence_cannot_promote_lower_tier_functional_evidence() {
+        let mut c = candidate(
+            "field-burden-only",
+            PathwayKind::ProcessSubstitution,
+            1.0,
+            1.0,
+            vec![
+                evidence(
+                    "field-a",
+                    "field-authority-a",
+                    EvidenceKind::FieldObserved,
+                    EvidenceStance::Supports,
+                    0.95,
+                ),
+                evidence(
+                    "field-b",
+                    "field-authority-b",
+                    EvidenceKind::FieldObserved,
+                    EvidenceStance::Supports,
+                    0.95,
+                ),
+            ],
+        );
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["field-a".into(), "field-b".into()];
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_ne!(
+            result.candidates[0].qualification,
+            QualificationState::FieldQualified
+        );
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
+    }
+
+    #[test]
     fn assessment_is_order_independent() {
         let a = candidate(
             "a",
