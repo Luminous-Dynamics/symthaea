@@ -103,6 +103,9 @@ impl ScientificHypothesisHandoff {
         if self.schema_revision != HYPOTHESIS_HANDOFF_SCHEMA {
             return Err("unsupported hypothesis handoff schema revision".into());
         }
+        self.physical_type
+            .validate()
+            .map_err(|error| format!("invalid carried physical type: {}", error.reason))?;
         if self.physical_type_digest != self.physical_type.digest_hex() {
             return Err("physical_type_digest does not match carried physical_type".into());
         }
