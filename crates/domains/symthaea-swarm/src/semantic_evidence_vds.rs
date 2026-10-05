@@ -4704,6 +4704,41 @@ mod tests {
     }
 
     #[test]
+    fn rfc9942_receipt_collection_preserves_nested_resource_taxonomy() {
+        let mut oversized_nested_receipt = Vec::new();
+        cbor_tag(&mut oversized_nested_receipt, COSE_SIGN1_TAG);
+        cbor_array_len(&mut oversized_nested_receipt, 4);
+        cbor_bytes(&mut oversized_nested_receipt, &vec![0u8; 4097]);
+        cbor_map_len(&mut oversized_nested_receipt, 0);
+        oversized_nested_receipt.push(0xf6);
+        cbor_bytes(&mut oversized_nested_receipt, &[0xAA; 64]);
+
+        let mut collection = Vec::new();
+        cbor_array_len(&mut collection, 1);
+        cbor_bytes(&mut collection, &oversized_nested_receipt);
+
+        let mut protected = Vec::new();
+        cbor_map_len(&mut protected, 1);
+        cbor_int(&mut protected, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected, COSE_ES256_ALGORITHM_ID);
+
+        let mut outer = Vec::new();
+        cbor_tag(&mut outer, COSE_SIGN1_TAG);
+        cbor_array_len(&mut outer, 4);
+        cbor_bytes(&mut outer, &protected);
+        cbor_map_len(&mut outer, 1);
+        cbor_int(&mut outer, RFC9942_RECEIPTS_HEADER_LABEL);
+        outer.extend_from_slice(&collection);
+        outer.push(0xf6);
+        cbor_bytes(&mut outer, &[0xBB; 64]);
+
+        assert_eq!(
+            Rfc9942SignatureWithReceipts::from_cbor(&outer),
+            Err(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded)
+        );
+    }
+
+    #[test]
     fn rfc9942_signature_with_receipts_preserves_protected_bytes() {
         let mut protected=Vec::new();
         cbor_map_len(&mut protected,2);
