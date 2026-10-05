@@ -122,6 +122,15 @@ fn main() -> Result<(), String> {
         .data_policy
         .handling
         .verify_policy_provenance_bytes(b"synthetic-policy-record-1");
+    let mut provenance_mismatch = message.clone();
+    provenance_mismatch.packet.data_policy.handling.policy_provenance_hash =
+        symthaea_communication::content_hash(b"synthetic-policy-record-2");
+    provenance_mismatch.packet.refresh_hashes()?;
+    let handling_policy_provenance_mismatch_blocked = !provenance_mismatch
+        .packet
+        .data_policy
+        .handling
+        .verify_policy_provenance_bytes(b"synthetic-policy-record-1");
     message.validate_for_handling(
         &lease,
         "ZA",
