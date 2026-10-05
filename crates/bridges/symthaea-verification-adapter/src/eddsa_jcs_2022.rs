@@ -22,6 +22,30 @@ use crate::{ResolvedVerificationMethod, ResolvedVerificationMethodMaterial, Snap
 pub const EDDSA_JCS_2022: &str = "eddsa-jcs-2022";
 const DATA_INTEGRITY_PROOF: &str = "DataIntegrityProof";
 
+/// Verify a wire-format JSON document using a strict I-JSON parser before
+/// entering the JCS/Data Integrity pipeline.
+///
+/// The ordinary `Value` entry point remains useful for trusted programmatic
+/// values, but raw network/storage JSON must enter through this function so
+/// duplicate object member names cannot be collapsed by the parser before
+/// verification. JCS requires I-JSON input, which forbids duplicate names.
+pub fn verify_eddsa_jcs_2022_json(
+    request: &VerificationRequest,
+    resolution: &VerificationMethodResolution,
+    resolved_method: &ResolvedVerificationMethod,
+    secured_document_json: &[u8],
+) -> Result<CryptographicVerificationReceipt, SnapshotError> {
+    let secured_document = parse_strict_json(secured_document_json)?;
+    verify_eddsa_jcs_2022(
+        request,
+        resolution,
+        resolved_method,
+        &secured_document,
+    )
+}
+
+
+
 /// Verify one secured JSON document containing exactly one
 /// `DataIntegrityProof` using the already-resolved Multikey material.
 ///
@@ -299,6 +323,108 @@ pub fn verify_eddsa_jcs_2022_evidence(
     )?;
     VerificationEvidence::from_adapter_attestation(request, resolution.clone(), receipt)
         .map_err(SnapshotError::Verification)
+}
+
+struct StrictJsonValue;
+
+impl<'de> serde::de::DeserializeSeed<'de> for StrictJsonValue {
+    type Value = Value;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(StrictJsonValueVisitor)
+    }
+}
+
+struct StrictJsonValueVisitor;
+
+impl<'de> serde::de::Visitor<'de> for StrictJsonValueVisitor {
+    type Value = Value;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("valid JSON value with unique object member names")
+    }
+
+    fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+        Ok(Value::Bool(value))
+    }
+
+    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
+        Ok(Value::Number(value.into()))
+    }
+
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
+        Ok(Value::Number(value.into()))
+    }
+
+    fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E> {
+        serde_json::Number::from_f64(value)
+            .map(Value::Number)
+            .ok_or_else(|| serde::de::Error::custom("JSON number is not finite"))
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
+        Ok(Value::String(value.to_owned()))
+    }
+
+    fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
+        Ok(Value::String(value))
+    }
+
+    fn visit_none<E>(self) -> Result<Self::Value, E> {
+        Ok(Value::Null)
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E> {
+        Ok(Value::Null)
+    }
+
+    fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::SeqAccess<'de>,
+    {
+        let mut values = Vec::new();
+        while let Some(value) = sequence.next_element_seed(StrictJsonValue)? {
+            values.push(value);
+        }
+        Ok(Value::Array(values))
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::MapAccess<'de>,
+    {
+        let mut object = Map::new();
+        while let Some(key) = map.next_key::<String>()? {
+            if object.contains_key(&key) {
+                return Err(serde::de::Error::custom(format!(
+                    "duplicate JSON object member name: {key}"
+                )));
+            }
+            let value = map.next_value_seed(StrictJsonValue)?;
+            object.insert(key, value);
+        }
+        Ok(Value::Object(object))
+    }
+}
+
+fn parse_strict_json(bytes: &[u8]) -> Result<Value, SnapshotError> {
+    let mut deserializer = serde_json::Deserializer::from_slice(bytes);
+    let value = StrictJsonValue
+        .deserialize(&mut deserializer)
+        .map_err(|error| {
+            SnapshotError::Verification(VerificationFailure::Structural(format!(
+                "strict JSON parsing failed: {error}"
+            )))
+        })?;
+    deserializer.end().map_err(|error| {
+        SnapshotError::Verification(VerificationFailure::Structural(format!(
+            "strict JSON parsing rejected trailing data: {error}"
+        )))
+    })?;
+    Ok(value)
 }
 
 fn required_string(
@@ -587,6 +713,69 @@ mod tests {
             request.claim_representation_digest
         );
         assert!(evidence.validate_structure().is_ok());
+    }
+
+    #[test]
+    fn rejects_duplicate_wire_object_member_names() {
+        let request = vector_request();
+        let (resolution, resolved_method) = resolved_vector(&request);
+        let duplicate = br#"{"proof":{"type":"DataIntegrityProof"},"proof":{"type":"DataIntegrityProof"}}"#;
+
+        assert!(matches!(
+            verify_eddsa_jcs_2022_json(
+                &request,
+                &resolution,
+                &resolved_method,
+                duplicate,
+            ),
+            Err(SnapshotError::Verification(
+                VerificationFailure::Structural(message)
+            )) if message.contains("duplicate JSON object member name")
+        ));
+    }
+
+    #[test]
+    fn rejects_trailing_wire_data() {
+        let request = vector_request();
+        let (resolution, resolved_method) = resolved_vector(&request);
+        let mut document = serde_json::to_vec(&secured_document()).unwrap();
+        document.extend_from_slice(br#"null"#);
+
+        assert!(matches!(
+            verify_eddsa_jcs_2022_json(
+                &request,
+                &resolution,
+                &resolved_method,
+                &document,
+            ),
+            Err(SnapshotError::Verification(
+                VerificationFailure::Structural(message)
+            )) if message.contains("trailing data")
+        ));
+    }
+
+    #[test]
+    fn strict_wire_entry_point_matches_value_entry_point() {
+        let request = vector_request();
+        let (resolution, resolved_method) = resolved_vector(&request);
+        let document = secured_document();
+
+        let from_value = verify_eddsa_jcs_2022(
+            &request,
+            &resolution,
+            &resolved_method,
+            &document,
+        )
+        .unwrap();
+        let wire = verify_eddsa_jcs_2022_json(
+            &request,
+            &resolution,
+            &resolved_method,
+            &serde_json::to_vec(&document).unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(from_value, wire);
     }
 
     #[test]
