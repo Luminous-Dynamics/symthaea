@@ -1581,7 +1581,8 @@ impl OpenFoamPassiveBoundaryAdapter {
     }
 
     /// Construct an input-evidence adapter that also cross-checks the exact
-    /// owner list cardinality against the exact global face list.
+    /// owner cardinality against the global face list and rejects internal-face
+    /// owner/neighbour self-loops.
     pub fn new_with_complete_mesh_topology(
         source_bytes: impl Into<Vec<u8>>,
         faces_source_bytes: impl Into<Vec<u8>>,
