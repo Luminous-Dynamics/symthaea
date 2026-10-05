@@ -1090,6 +1090,7 @@ pub const VERIFICATION_CONTEXT_V5_VERSION: &str =
 /// Versioned annotation/provenance record for evaluator, trust-root, and authorization identities.
 pub const EVALUATION_CONTEXT_SUPPLEMENT_VERSION: &str =
     "symthaea-observation-evaluation-context-supplement-v1";
+pub const EVALUATION_CONTEXT_SUPPLEMENT_ATTACHMENT_PHASE: &str = "post-evaluation";
 /// Future evaluation representation that separates execution context from supplemental annotations.
 pub const EVIDENCE_EVALUATION_V9_VERSION: &str =
     "symthaea-observation-evaluation-v9";
@@ -1365,6 +1366,8 @@ impl VerificationContextV5 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvaluationContextSupplement {
     pub supplement_version: &'static str,
+    /// This v1 supplement is explicitly an annotation attached after evaluation.
+    pub attachment_phase: &'static str,
     /// Exact execution-context identity this annotation applies to.
     pub applies_to_context_fingerprint: Option<String>,
     pub evaluator_identity_fingerprint: Option<String>,
@@ -1376,6 +1379,7 @@ impl EvaluationContextSupplement {
     pub fn empty() -> Self {
         Self {
             supplement_version: EVALUATION_CONTEXT_SUPPLEMENT_VERSION,
+            attachment_phase: EVALUATION_CONTEXT_SUPPLEMENT_ATTACHMENT_PHASE,
             applies_to_context_fingerprint: None,
             evaluator_identity_fingerprint: None,
             trust_root_fingerprint: None,
@@ -1405,6 +1409,7 @@ impl EvaluationContextSupplement {
 
     pub fn is_well_formed(&self) -> bool {
         self.supplement_version == EVALUATION_CONTEXT_SUPPLEMENT_VERSION
+            && self.attachment_phase == EVALUATION_CONTEXT_SUPPLEMENT_ATTACHMENT_PHASE
             && self
                 .evaluator_identity_fingerprint
                 .as_deref()
@@ -1439,6 +1444,7 @@ impl EvaluationContextSupplement {
             b"symthaea:observation-evaluation-context-supplement:v1\n",
         );
         write_string(&mut bytes, self.supplement_version);
+        write_string(&mut bytes, self.attachment_phase);
         write_option(
             &mut bytes,
             self.applies_to_context_fingerprint.as_deref(),
@@ -6129,6 +6135,33 @@ mod tests {
         );
         assert!(report.execution_trace.is_well_formed());
     }
+    #[test]
+    fn evidence_evaluation_v9_freezes_supplements_as_post_evaluation_annotations() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let evaluation = report
+            .try_to_evidence_evaluation_v9_with_supplement(
+                EvaluationContextSupplement::empty(),
+            )
+            .expect("v9 evaluation");
+
+        assert_eq!(
+            evaluation.supplement.attachment_phase,
+            EVALUATION_CONTEXT_SUPPLEMENT_ATTACHMENT_PHASE
+        );
+
+        let mut tampered = evaluation;
+        tampered.supplement.attachment_phase = "concurrent";
+        tampered.supplement_fingerprint = tampered.supplement.fingerprint();
+        assert!(!tampered.is_well_formed());
+    }
+
     #[test]
     fn evidence_evaluation_v9_separates_execution_context_from_supplement() {
         let (envelope, signing_key, receipt) = envelope_and_key();
