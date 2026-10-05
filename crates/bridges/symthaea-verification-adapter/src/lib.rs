@@ -325,7 +325,11 @@ impl JsonControllerDocumentSnapshotAdapter {
             ));
         }
 
-        let resolved_method = extract_verification_method(request, object)?;
+        let resolved_method = extract_verification_method(
+            request,
+            object,
+            &snapshot.controller_document_ref,
+        )?;
         let resolved_method_controller = resolved_method.controller.clone();
         let verification_method_type = resolved_method.method_type().to_owned();
         let verification_method_material_digest =
@@ -613,11 +617,28 @@ fn required_string<'a>(
         })
 }
 
+fn resolve_document_url(
+    base: &url::Url,
+    value: &str,
+    field: &str,
+) -> Result<String, SnapshotError> {
+    base.join(value)
+        .map(|url| url.to_string())
+        .map_err(|_| {
+            SnapshotError::Malformed(format!(
+                "controller document {field} must be a valid URL reference"
+            ))
+        })
+}
+
 fn extract_verification_method(
     request: &VerificationRequest,
     document: &serde_json::Map<String, Value>,
+    document_ref: &str,
 ) -> Result<ResolvedVerificationMethod, SnapshotError> {
     let requested_id = request.verification_method.as_str();
+    let base = url::Url::parse(document_ref)
+        .map_err(|_| SnapshotError::Malformed("controller document id must be a valid URL".into()))?;
     let mut candidates = Vec::new();
 
     if let Some(methods) = document
@@ -631,13 +652,14 @@ fn extract_verification_method(
                     "controller document verificationMethod entries must be objects".into(),
                 )
             })?;
-            let id = required_string(object, "id")?.to_owned();
-            if !all_ids.insert(id.clone()) {
+            let id = required_string(object, "id")?;
+            let absolute_id = resolve_document_url(&base, id, "verificationMethod id")?;
+            if !all_ids.insert(absolute_id.clone()) {
                 return Err(SnapshotError::Malformed(
-                    "controller document verificationMethod identifiers must be unique".into(),
+                    "controller document verificationMethod identifiers must be unique after URL resolution".into(),
                 ));
             }
-            if id == requested_id {
+            if absolute_id == requested_id {
                 candidates.push(object);
             }
         }
@@ -650,7 +672,8 @@ fn extract_verification_method(
         for entry in entries {
             if let Some(object) = entry.as_object() {
                 let id = required_string(object, "id")?;
-                if id == requested_id {
+                let absolute_id = resolve_document_url(&base, id, "verification relationship member id")?;
+                if absolute_id == requested_id {
                     candidates.push(object);
                 }
             }
@@ -668,6 +691,7 @@ fn extract_verification_method(
         resolved.push(parse_verification_method_definition(
             request.verification_method.clone(),
             object,
+            &base,
         )?);
     }
 
@@ -687,10 +711,12 @@ fn extract_verification_method(
 
 fn parse_verification_method_definition(
     expected_method: ClaimVerificationMethod,
-    object: &serde_json::Map<String, Value>,
+    object: &std::collections::Map<String, Value>,
+    base: &url::Url,
 ) -> Result<ResolvedVerificationMethod, SnapshotError> {
-    let id = required_string(object, "id")?.to_owned();
-    let method_id = ClaimVerificationMethod::new(id.clone())
+    let id = required_string(object, "id")?;
+    let absolute_id = resolve_document_url(base, id, "verification method id")?;
+    let method_id = ClaimVerificationMethod::new(absolute_id)
         .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
     if method_id != expected_method {
         return Err(SnapshotError::Verification(
@@ -730,7 +756,8 @@ fn parse_verification_method_definition(
     };
 
     let controller = required_string(object, "controller")?;
-    let controller = ClaimControllerIdentity::new(controller.to_owned())
+    let controller = resolve_document_url(base, controller, "verification method controller")?;
+    let controller = ClaimControllerIdentity::new(controller)
         .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
     let expires = optional_timestamp(object, "expires")?;
     let revoked = optional_timestamp(object, "revoked")?;
@@ -812,7 +839,7 @@ fn extract_relationship_methods(
                 }
             }
             if relationship_expires.is_some() || relationship_revoked.is_some() {
-                let resolved_method = extract_verification_method(request, document)?;
+                let resolved_method = extract_verification_method(request, document, document_ref)?;
                 let method_controller = resolved_method.controller;
                 let lifecycle = resolved_method.lifecycle;
                 if let Some(expires) = relationship_expires {
@@ -1310,6 +1337,92 @@ mod tests {
             .verification_method_material_digest
             .len()
             == 64);
+    }
+
+    #[test]
+    fn relative_embedded_relationship_method_can_supply_the_definition() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "assertionMethod": [{
+                "id": "#key-1",
+                "type": "Multikey",
+                "controller": "https://example.test/controller",
+                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+            }]
+        }"##.into();
+
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+        let resolution = adapter.resolve_snapshot(&request, snapshot).unwrap();
+
+        assert_eq!(resolution.verification_method, request.verification_method);
+        assert_eq!(
+            resolution.resolved_verification_method_controller.as_str(),
+            "https://example.test/controller"
+        );
+    }
+
+    #[test]
+    fn verification_method_identifier_aliases_are_unique_after_url_resolution() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "verificationMethod": [
+                {
+                    "id": "#key-1",
+                    "type": "Multikey",
+                    "controller": "https://example.test/controller",
+                    "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+                },
+                {
+                    "id": "https://example.test/controller#key-1",
+                    "type": "Multikey",
+                    "controller": "https://example.test/controller",
+                    "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+                }
+            ],
+            "assertionMethod": ["#key-1"]
+        }"##.into();
+
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("unique after URL resolution")
+        ));
+    }
+
+    #[test]
+    fn relative_verification_method_controller_is_resolved_to_document_url() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "verificationMethod": [{
+                "id": "#key-1",
+                "type": "Multikey",
+                "controller": "controller",
+                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+            }],
+            "assertionMethod": ["#key-1"]
+        }"##.into();
+
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+        let resolution = adapter.resolve_snapshot(&request, snapshot).unwrap();
+
+        assert_eq!(
+            resolution.resolved_verification_method_controller.as_str(),
+            "https://example.test/controller"
+        );
     }
 
     #[test]
