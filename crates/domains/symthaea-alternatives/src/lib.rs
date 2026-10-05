@@ -3091,6 +3091,7 @@ mod tests {
                     .unwrap(),
                 unit: estimate.unit,
                 scope: estimate.scope,
+                basis: estimate.basis,
                 evidence_ids: estimate.evidence_ids,
             },
         );
