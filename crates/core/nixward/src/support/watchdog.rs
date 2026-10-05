@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 
 use symthaea_core::hdc::ContinuousHV;
 
+use crate::action::executor::NixOSExecutor;
 use crate::action::generation_manager::GenerationManager;
 use crate::encoding::{NixCodebook, SystemStateEncoder, SystemStateSnapshot};
 use crate::observe::SystemObserver;
@@ -81,6 +82,18 @@ pub enum WatchdogVerdict {
     Error { message: String },
 }
 
+/// Verify the observed active generation matches the generation targeted by rollback.
+fn verify_active_generation(pre_gen: u64, observed: Result<u32, std::io::Error>) -> Result<(), String> {
+    match observed {
+        Ok(generation) if generation as u64 == pre_gen => Ok(()),
+        Ok(generation) => Err(format!(
+            "expected active generation {}, observed {}",
+            pre_gen, generation
+        )),
+        Err(error) => Err(format!("could not observe active generation: {}", error)),
+    }
+}
+
 /// Post-rebuild consciousness monitor.
 pub struct Watchdog {
     config: WatchdogConfig,
@@ -102,7 +115,7 @@ impl Watchdog {
         }
     }
 
-    /// Monitor the system after a rebuild. Blocks until a verdict is reached.
+    /// Monitor the system after a rebuild until a verdict is reached.
     ///
     /// # Arguments
     /// * `codebook` — shared codebook for encoding system state as HDC vectors
@@ -112,7 +125,7 @@ impl Watchdog {
     /// # Returns
     /// A `WatchdogVerdict` indicating whether the system stabilized, degraded,
     /// or was reverted.
-    pub fn monitor(
+    pub async fn monitor(
         &self,
         codebook: &mut NixCodebook,
         baseline_hv: &ContinuousHV,
@@ -135,7 +148,7 @@ impl Watchdog {
             }
 
             // Wait for check interval
-            std::thread::sleep(self.config.check_interval);
+            tokio::time::sleep(self.config.check_interval).await;
             checks_performed += 1;
 
             // Take a snapshot
@@ -192,9 +205,17 @@ impl Watchdog {
                             };
                         }
                         AutonomyLevel::DryRun => {
-                            let cmd = GenerationManager::switch_to(pre_gen as u32);
-                            let (bin, args) = cmd.to_command();
-                            let cmd_str = format!("{} {}", bin, args.join(" "));
+                            let select_cmd = GenerationManager::switch_to(pre_gen as u32);
+                            let activate_cmd = GenerationManager::activate(pre_gen as u32);
+                            let (select_bin, select_args) = select_cmd.to_command();
+                            let (activate_bin, activate_args) = activate_cmd.to_command();
+                            let cmd_str = format!(
+                                "{} {}; then {} {}",
+                                select_bin,
+                                select_args.join(" "),
+                                activate_bin,
+                                activate_args.join(" ")
+                            );
                             return WatchdogVerdict::Degraded {
                                 reason: format!("{}; would run: {}", reason, cmd_str),
                                 surprise: last_surprise,
@@ -203,28 +224,82 @@ impl Watchdog {
                             };
                         }
                         AutonomyLevel::FullAutonomous => {
-                            let cmd = GenerationManager::switch_to(pre_gen as u32);
-                            let (bin, args) = cmd.to_command();
-                            let result = std::process::Command::new(&bin).args(&args).status();
-                            match result {
-                                Ok(status) if status.success() => {
-                                    return WatchdogVerdict::Reverted { reason, pre_gen };
+                            let select_cmd = GenerationManager::switch_to(pre_gen as u32);
+                            let activate_cmd = GenerationManager::activate(pre_gen as u32);
+                            let mut executor = NixOSExecutor::new();
+                            // FullAutonomous is the explicit watchdog authorization; the
+                            // execute_confirmed API records the supplied value only and does
+                            // not pretend that Phi itself authorizes the rollback.
+                            let select_result = executor.execute_confirmed(select_cmd, 0.0).await;
+                            match select_result {
+                                crate::action::executor::ExecutionResult::Success { .. } => {
+                                    let activate_result = executor.execute_confirmed(activate_cmd, 0.0).await;
+                                    match activate_result {
+                                        crate::action::executor::ExecutionResult::Success { .. } => {
+                                            let observed = tokio::task::spawn_blocking(
+                                                GenerationManager::current_generation,
+                                            )
+                                            .await
+                                            .map_err(|e| format!("generation observer join failed: {e}"))
+                                            .and_then(|result| result.map_err(|e| e.to_string()));
+
+                                            match verify_active_generation(pre_gen, observed) {
+                                                Ok(()) => {
+                                                    return WatchdogVerdict::Reverted { reason, pre_gen };
+                                                }
+                                                Err(observation_error) => {
+                                                    return WatchdogVerdict::Degraded {
+                                                        reason: format!(
+                                                            "{}; rollback commands succeeded but post-state verification failed: {}",
+                                                            reason, observation_error
+                                                        ),
+                                                        surprise: last_surprise,
+                                                        health: last_health,
+                                                        checks_performed,
+                                                    };
+                                                }
+                                            }
+                                        }
+                                        crate::action::executor::ExecutionResult::Blocked { reason: block_reason, .. }
+                                        | crate::action::executor::ExecutionResult::FailedNoRollback {
+                                            error: block_reason,
+                                            ..
+                                        }
+                                        | crate::action::executor::ExecutionResult::RolledBack {
+                                            error: block_reason,
+                                            ..
+                                        }
+                                        | crate::action::executor::ExecutionResult::PendingConfirmation {
+                                            confidence: block_reason,
+                                            ..
+                                        } => {
+                                            return WatchdogVerdict::Degraded {
+                                                reason: format!(
+                                                    "{}; generation selected but runtime activation failed: {}",
+                                                    reason, block_reason
+                                                ),
+                                                surprise: last_surprise,
+                                                health: last_health,
+                                                checks_performed,
+                                            };
+                                        }
+                                    }
                                 }
-                                Ok(status) => {
-                                    return WatchdogVerdict::Degraded {
-                                        reason: format!(
-                                            "{}; rollback failed (exit {})",
-                                            reason,
-                                            status.code().unwrap_or(-1)
-                                        ),
-                                        surprise: last_surprise,
-                                        health: last_health,
-                                        checks_performed,
-                                    };
+                                crate::action::executor::ExecutionResult::Blocked { reason: block_reason, .. }
+                                | crate::action::executor::ExecutionResult::FailedNoRollback {
+                                    error: block_reason,
+                                    ..
                                 }
-                                Err(e) => {
+                                | crate::action::executor::ExecutionResult::RolledBack {
+                                    error: block_reason,
+                                    ..
+                                }
+                                | crate::action::executor::ExecutionResult::PendingConfirmation {
+                                    confidence: block_reason,
+                                    ..
+                                } => {
                                     return WatchdogVerdict::Degraded {
-                                        reason: format!("{}; rollback exec error: {}", reason, e),
+                                        reason: format!("{}; governed generation selection failed: {}", reason, block_reason),
                                         surprise: last_surprise,
                                         health: last_health,
                                         checks_performed,
@@ -263,6 +338,20 @@ impl Watchdog {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_post_rollback_generation_verification_is_fail_closed() {
+        assert!(verify_active_generation(42, Ok(42)).is_ok());
+        let mismatch = verify_active_generation(42, Ok(41)).unwrap_err();
+        assert!(mismatch.contains("expected active generation 42"));
+        assert!(mismatch.contains("observed 41"));
+        let unavailable = verify_active_generation(
+            42,
+            Err(std::io::Error::other("observer unavailable")),
+        )
+        .unwrap_err();
+        assert!(unavailable.contains("could not observe active generation"));
+    }
+
     use super::*;
 
     #[test]

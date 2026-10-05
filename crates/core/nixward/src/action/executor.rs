@@ -34,6 +34,10 @@ pub enum NixOSCommand {
         flake: Option<String>,
         extra_args: Vec<String>,
     },
+    /// Switch the NixOS system profile to an exact existing generation.
+    SwitchGeneration { generation: u32 },
+    /// Activate an exact NixOS system generation in the running system.
+    ActivateGeneration { generation: u32 },
     /// nix-env -i (user package install)
     EnvInstall { packages: Vec<String> },
     /// nix-env -e (user package remove)
@@ -163,6 +167,9 @@ impl NixOSCommand {
 
             Self::RebuildTest { .. } => SafetyLevel::SystemModify,
             Self::RebuildBoot { .. } => SafetyLevel::SystemModify,
+            Self::SwitchGeneration { .. } | Self::ActivateGeneration { .. } => {
+                SafetyLevel::SystemCritical
+            }
 
             Self::RebuildSwitch { .. } => SafetyLevel::SystemCritical,
 
@@ -176,10 +183,9 @@ impl NixOSCommand {
     pub fn rollback_command(&self) -> Option<NixOSCommand> {
         match self {
             Self::RebuildSwitch { .. } | Self::RebuildTest { .. } | Self::RebuildBoot { .. } => {
-                Some(NixOSCommand::Custom {
-                    command: "nixos-rebuild".to_string(),
-                    args: vec!["switch".to_string(), "--rollback".to_string()],
-                    safety_level: SafetyLevel::SystemCritical,
+                Some(NixOSCommand::RebuildSwitch {
+                    flake: None,
+                    extra_args: vec!["--rollback".to_string()],
                 })
             }
             Self::EnvInstall { .. } | Self::EnvRemove { .. } => {
@@ -235,6 +241,21 @@ impl NixOSCommand {
                 args.extend(extra_args.iter().cloned());
                 ("nixos-rebuild".to_string(), args)
             }
+            Self::SwitchGeneration { generation } => (
+                "nix-env".to_string(),
+                vec![
+                    "--profile".to_string(),
+                    "/nix/var/nix/profiles/system".to_string(),
+                    "--switch-generation".to_string(),
+                    generation.to_string(),
+                ],
+            ),
+            Self::ActivateGeneration { generation } => (
+                format!(
+                    "/nix/var/nix/profiles/system-{generation}-link/bin/switch-to-configuration"
+                ),
+                vec!["switch".to_string()],
+            ),
             Self::EnvInstall { packages } => {
                 let mut args = Vec::with_capacity(1 + packages.len());
                 args.push("-iA".to_string());
@@ -681,6 +702,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_switch_generation_is_system_critical_and_typed() {
+        let command = NixOSCommand::SwitchGeneration { generation: 42 };
+        assert_eq!(command.safety_level(), SafetyLevel::SystemCritical);
+        let (bin, args) = command.to_command();
+        assert_eq!(bin, "nix-env");
+        assert_eq!(
+            args,
+            vec![
+                "--profile",
+                "/nix/var/nix/profiles/system",
+                "--switch-generation",
+                "42",
+            ]
+        );
+    }
+
+    #[test]
+    fn test_activate_generation_is_system_critical_and_typed() {
+        let command = NixOSCommand::ActivateGeneration { generation: 42 };
+        assert_eq!(command.safety_level(), SafetyLevel::SystemCritical);
+        let (bin, args) = command.to_command();
+        assert_eq!(
+            bin,
+            "/nix/var/nix/profiles/system-42-link/bin/switch-to-configuration"
+        );
+        assert_eq!(args, vec!["switch"]);
+    }
+
+    #[test]
     fn test_command_safety_levels() {
         let search = NixOSCommand::Search {
             query: "vim".to_string(),
@@ -722,6 +772,19 @@ mod tests {
         let (cmd, args) = search.to_command();
         assert_eq!(cmd, "nix");
         assert_eq!(args, vec!["search", "nixpkgs", "editor", "--json"]);
+    }
+
+    #[test]
+    fn test_rebuild_rollback_is_typed() {
+        let rebuild = NixOSCommand::RebuildSwitch {
+            flake: None,
+            extra_args: vec![],
+        };
+        let rollback = rebuild.rollback_command().expect("rollback");
+        assert!(matches!(rollback, NixOSCommand::RebuildSwitch { .. }));
+        let (bin, args) = rollback.to_command();
+        assert_eq!(bin, "nixos-rebuild");
+        assert_eq!(args, vec!["switch", "--rollback"]);
     }
 
     #[test]

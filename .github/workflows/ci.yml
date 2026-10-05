@@ -42,6 +42,28 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  nixward-watchdog-typed-rollback-focused:
+    name: Nixward Watchdog Typed Rollback Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check watchdog authority formatting
+        run: cargo fmt --check -- crates/core/nixward/src/action/executor.rs crates/core/nixward/src/action/generation_manager.rs crates/core/nixward/src/support/watchdog.rs crates/core/nixward/src/bin/nixward.rs
+
+      - name: Run typed generation regressions
+        run: |
+          cargo test -p nixward test_switch_to_is_typed_system_generation_operation --lib
+          cargo test -p nixward test_activate_generation_is_typed_system_activation --lib
+          cargo test -p nixward test_post_rollback_generation_verification_is_fail_closed --lib
+
   nixward-custom-authority-focused:
     name: Nixward Custom Authority Focused
     runs-on: ubuntu-latest

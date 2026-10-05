@@ -73,24 +73,19 @@ impl GenerationManager {
 
     /// Generate a command to switch to a specific generation.
     pub fn switch_to(generation: u32) -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "nix-env".to_string(),
-            args: vec![
-                "--switch-generation".to_string(),
-                generation.to_string(),
-                "-p".to_string(),
-                "/nix/var/nix/profiles/system".to_string(),
-            ],
-            safety_level: SafetyLevel::SystemCritical,
-        }
+        NixOSCommand::SwitchGeneration { generation }
+    }
+
+    /// Generate the typed runtime activation for an exact system generation.
+    pub fn activate(generation: u32) -> NixOSCommand {
+        NixOSCommand::ActivateGeneration { generation }
     }
 
     /// Generate a rollback command (switch to previous generation).
     pub fn rollback() -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "nixos-rebuild".to_string(),
-            args: vec!["switch".to_string(), "--rollback".to_string()],
-            safety_level: SafetyLevel::SystemCritical,
+        NixOSCommand::RebuildSwitch {
+            flake: None,
+            extra_args: vec!["--rollback".to_string()],
         }
     }
 
@@ -298,6 +293,29 @@ mod tests {
         let (bin, args) = cmd.to_command();
         assert_eq!(bin, "nix-env");
         assert!(args.contains(&"42".to_string()));
+        assert_eq!(cmd.safety_level(), SafetyLevel::SystemCritical);
+    }
+
+    #[test]
+    fn test_switch_to_is_typed_system_generation_operation() {
+        let cmd = GenerationManager::switch_to(42);
+        assert!(matches!(cmd, NixOSCommand::SwitchGeneration { generation: 42 }));
+        let (bin, args) = cmd.to_command();
+        assert_eq!(bin, "nix-env");
+        assert!(args.contains(&"--switch-generation".to_string()));
+        assert!(args.contains(&"42".to_string()));
+    }
+
+    #[test]
+    fn test_activate_generation_is_typed_system_activation() {
+        let cmd = GenerationManager::activate(42);
+        assert!(matches!(cmd, NixOSCommand::ActivateGeneration { generation: 42 }));
+        let (bin, args) = cmd.to_command();
+        assert_eq!(
+            bin,
+            "/nix/var/nix/profiles/system-42-link/bin/switch-to-configuration"
+        );
+        assert_eq!(args, vec!["switch"]);
         assert_eq!(cmd.safety_level(), SafetyLevel::SystemCritical);
     }
 
