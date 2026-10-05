@@ -733,7 +733,11 @@ impl Rfc9942ReceiptEnvelope {
         let mut reader=CborReader::new(bytes);
         if reader.read_tag().map_err(|_|Rfc9942VdpError::InvalidEncoding)?!=COSE_SIGN1_TAG{return Err(Rfc9942VdpError::InvalidStructure);}
         let indefinite_array = reader.read_array_len_exact(4).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-        let protected=reader.read_bstr_bounded(4096).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        let protected=reader.read_bstr_bounded(4096).map_err(|error|match error {
+            Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+            Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+            _=>Rfc9942VdpError::InvalidEncoding,
+        })?;
         let mut ph=CborReader::new(&protected);
         let protected_entries=if protected.is_empty(){Vec::new()}else{
             let entries=ph.read_map_entries_bounded(32).map_err(|error|match error{
@@ -832,7 +836,11 @@ impl Rfc9942ReceiptEnvelope {
         };
         let signature_start = reader.offset;
         let unprotected_bytes = reader.bytes[unprotected_start..payload_start].to_vec();
-        let signature=reader.read_bstr_bounded(64*1024).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        let signature=reader.read_bstr_bounded(64*1024).map_err(|error|match error {
+            Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+            Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+            _=>Rfc9942VdpError::InvalidEncoding,
+        })?;
         debug_assert!(signature_start >= payload_start);
         reader.finish_indefinite_array(indefinite_array).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
@@ -1190,7 +1198,11 @@ impl Rfc9942SignatureWithReceipts {
             .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
 
         let protected_bytes = reader.read_bstr_bounded(4096)
-            .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            .map_err(|error|match error {
+                Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+                _=>Rfc9942VdpError::InvalidEncoding,
+            })?;
         let mut protected_reader = CborReader::new(&protected_bytes);
         let protected_entries = if protected_bytes.is_empty() {
             Vec::new()
@@ -1321,7 +1333,11 @@ impl Rfc9942SignatureWithReceipts {
         };
         let unprotected_bytes=reader.bytes[unprotected_start..payload_start].to_vec();
         let signature=reader.read_bstr_bounded(64*1024)
-            .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            .map_err(|error|match error {
+                Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+                _=>Rfc9942VdpError::InvalidEncoding,
+            })?;
         reader.finish_indefinite_array(indefinite_array).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
 
