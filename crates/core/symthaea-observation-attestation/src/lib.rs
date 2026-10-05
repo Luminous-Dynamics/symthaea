@@ -6279,6 +6279,45 @@ mod tests {
     }
 
     #[test]
+    fn v2_supplement_fingerprint_independently_binds_report_identity() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report_a = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let mut envelope_b = envelope.clone();
+        envelope_b.domain = Some("different-domain".into());
+        sign_envelope(&mut envelope_b, &signing_key, "did:example:attester-a#key-1")
+            .expect("resign");
+        let report_b = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope_b, &receipt);
+
+        let base_context = VerificationContextV5::from_report(&report_a);
+        assert_eq!(
+            base_context.fingerprint(),
+            VerificationContextV5::from_report(&report_b).fingerprint()
+        );
+        assert_ne!(report_a.fingerprint(), report_b.fingerprint());
+
+        let supplement_a = EvaluationContextSupplement::empty()
+            .with_trust_root_fingerprint(blake3::hash(b"trust-root").to_hex().to_string())
+            .bind_to_evaluation(&base_context, &report_a.fingerprint());
+        let supplement_b = EvaluationContextSupplement::empty()
+            .with_trust_root_fingerprint(blake3::hash(b"trust-root").to_hex().to_string())
+            .bind_to_evaluation(&base_context, &report_b.fingerprint());
+
+        assert!(supplement_a.is_well_formed());
+        assert!(supplement_b.is_well_formed());
+        assert_ne!(supplement_a.fingerprint(), supplement_b.fingerprint());
+    }
+
+    #[test]
     fn v9_supplement_contract_uses_explicit_v2_identity() {
         assert_eq!(
             EVALUATION_CONTEXT_SUPPLEMENT_VERSION,
