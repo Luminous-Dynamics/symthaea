@@ -23,8 +23,8 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 pub const VERIFICATION_REQUEST_SCHEMA_VERSION: u16 = 1;
-pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 2;
-pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 3;
+pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 3;
+pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 4;
 
 /// Typed identifier for the verification relationship under which a verification
 /// method is permitted to validate a proof.
@@ -252,6 +252,89 @@ impl VerificationMethodLifecycle {
     }
 }
 
+/// States whether the resolved controller-document facts describe only the current
+/// document state or a historical state tied to a specific evaluation instant.
+///
+/// A current mutable document is never silently treated as evidence about an earlier
+/// proof. Historical evaluation requires an explicit historical snapshot reference.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ControllerDocumentSnapshotScope {
+    Current {
+        resolved_at: String,
+    },
+    HistoricalAt {
+        state_at: String,
+        snapshot_reference: String,
+        resolved_at: String,
+    },
+}
+
+impl ControllerDocumentSnapshotScope {
+    pub fn current(resolved_at: impl Into<String>) -> Result<Self, VerificationFailure> {
+        let scope = Self::Current {
+            resolved_at: resolved_at.into(),
+        };
+        scope.validate_structure()?;
+        Ok(scope)
+    }
+
+    pub fn historical_at(
+        state_at: impl Into<String>,
+        snapshot_reference: impl Into<String>,
+        resolved_at: impl Into<String>,
+    ) -> Result<Self, VerificationFailure> {
+        let scope = Self::HistoricalAt {
+            state_at: state_at.into(),
+            snapshot_reference: snapshot_reference.into(),
+            resolved_at: resolved_at.into(),
+        };
+        scope.validate_structure()?;
+        Ok(scope)
+    }
+
+    pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
+        match self {
+            Self::Current { resolved_at } => {
+                parse_timestamp("controller document resolved at", resolved_at)?;
+            }
+            Self::HistoricalAt {
+                state_at,
+                snapshot_reference,
+                resolved_at,
+            } => {
+                parse_timestamp("controller document state at", state_at)?;
+                parse_timestamp("controller document resolved at", resolved_at)?;
+                if snapshot_reference.trim().is_empty() {
+                    return Err(VerificationFailure::Structural(
+                        "historical controller document snapshot reference must be non-empty"
+                            .into(),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Require the snapshot to describe the exact state relevant to lifecycle evaluation.
+    ///
+    /// A current snapshot is usable only for its own resolution instant. Historical
+    /// evaluation requires a historical snapshot explicitly tied to the reference time.
+    pub fn validate_for_reference_time(
+        &self,
+        reference_time: &str,
+    ) -> Result<(), VerificationFailure> {
+        self.validate_structure()?;
+        parse_timestamp("verification method evaluation time", reference_time)?;
+
+        match self {
+            Self::Current { resolved_at } if resolved_at == reference_time => Ok(()),
+            Self::Current { .. } => Err(VerificationFailure::HistoricalStateRequired),
+            Self::HistoricalAt { state_at, .. } if state_at == reference_time => Ok(()),
+            Self::HistoricalAt { .. } => Err(VerificationFailure::HistoricalStateMismatch),
+        }
+    }
+}
+
 /// Temporal and anti-replay inputs supplied by the proof and the verifier.
 ///
 /// The core validates syntax, temporal ordering, and exact domain/challenge matching.
@@ -418,10 +501,11 @@ pub struct VerificationMethodResolution {
     pub controller_document_digest: String,
     pub controller_document_integrity: ControllerDocumentIntegrityAttestation,
     pub verification_method_lifecycle: VerificationMethodLifecycle,
+    pub controller_document_snapshot_scope: ControllerDocumentSnapshotScope,
 }
 
 impl VerificationMethodResolution {
-    pub const SCHEMA_VERSION: u16 = 2;
+    pub const SCHEMA_VERSION: u16 = 3;
 
     pub fn from_controller_document(
         request: &VerificationRequest,
@@ -432,6 +516,7 @@ impl VerificationMethodResolution {
         relationship_methods: &[ClaimVerificationMethod],
         controller_document_digest: impl Into<String>,
         verification_method_lifecycle: VerificationMethodLifecycle,
+        controller_document_snapshot_scope: ControllerDocumentSnapshotScope,
     ) -> Result<Self, VerificationFailure> {
         request.validate_structure()?;
         let controller_document_ref = controller_document_ref.into();
@@ -525,6 +610,9 @@ impl VerificationMethodResolution {
                 &controller_document_digest,
             )?;
         verification_method_lifecycle.validate_structure()?;
+        controller_document_snapshot_scope.validate_for_reference_time(
+            request.freshness.lifecycle_reference_time(),
+        )?;
 
         let resolution = Self {
             schema_version: Self::SCHEMA_VERSION,
@@ -538,6 +626,7 @@ impl VerificationMethodResolution {
             controller_document_digest,
             controller_document_integrity,
             verification_method_lifecycle,
+            controller_document_snapshot_scope,
         };
         resolution.verification_method_lifecycle.validate_for_use_at(
             request.freshness.lifecycle_reference_time(),
@@ -643,6 +732,7 @@ impl VerificationMethodResolution {
             });
         }
         self.verification_method_lifecycle.validate_structure()?;
+        self.controller_document_snapshot_scope.validate_structure()?;
         Ok(())
     }
 
@@ -659,6 +749,7 @@ impl VerificationMethodResolution {
             self.controller_document_digest.as_str(),
             &self.controller_document_integrity,
             &self.verification_method_lifecycle,
+            &self.controller_document_snapshot_scope,
         );
         let bytes = serde_json::to_vec(&encoded)
             .expect("verification method resolution is serializable");
@@ -676,6 +767,10 @@ impl VerificationMethodResolution {
             && self
                 .verification_method_lifecycle
                 .validate_for_use_at(request.freshness.lifecycle_reference_time())
+                .is_ok()
+            && self
+                .controller_document_snapshot_scope
+                .validate_for_reference_time(request.freshness.lifecycle_reference_time())
                 .is_ok()
     }
 }
@@ -1145,6 +1240,8 @@ pub enum VerificationFailure {
     VerificationMethodRevoked {
         at: String,
     },
+    HistoricalStateRequired,
+    HistoricalStateMismatch,
     CryptographicVerificationFailed,
 }
 
@@ -1246,8 +1343,39 @@ mod tests {
             &[request.verification_method.clone()],
             &"11".repeat(32),
             VerificationMethodLifecycle::new(None, None).unwrap(),
+            ControllerDocumentSnapshotScope::historical_at(
+                request.freshness.lifecycle_reference_time(),
+                "snapshot:verification-history",
+                request.freshness.verification_time.as_str(),
+            )
+            .unwrap(),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn snapshot_scope_rejects_current_state_for_historical_evaluation() {
+        let current =
+            ControllerDocumentSnapshotScope::current("2026-10-05T02:00:00Z").unwrap();
+        assert!(matches!(
+            current.validate_for_reference_time("2026-10-05T01:59:59Z"),
+            Err(VerificationFailure::HistoricalStateRequired)
+        ));
+        assert!(current.validate_for_reference_time("2026-10-05T02:00:00Z").is_ok());
+
+        let historical = ControllerDocumentSnapshotScope::historical_at(
+            "2026-10-05T01:00:00Z",
+            "snapshot:2026-10-05T01:00:00Z",
+            "2026-10-05T02:00:00Z",
+        )
+        .unwrap();
+        assert!(historical
+            .validate_for_reference_time("2026-10-05T01:00:00Z")
+            .is_ok());
+        assert!(matches!(
+            historical.validate_for_reference_time("2026-10-05T01:00:01Z"),
+            Err(VerificationFailure::HistoricalStateMismatch)
+        ));
     }
 
     #[test]
@@ -1444,6 +1572,39 @@ mod tests {
         assert!(revoked_later
             .validate_for_use_at(freshness_before_revocation.lifecycle_reference_time())
             .is_ok());
+    }
+
+    #[test]
+    fn resolution_rejects_current_snapshot_for_historical_proof() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let result = VerificationMethodResolution::from_controller_document(
+            &request,
+            "https://example.test/controller",
+            ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
+            request.verification_method.clone(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            &[request.verification_method.clone()],
+            &"11".repeat(32),
+            VerificationMethodLifecycle::new(None, None).unwrap(),
+            ControllerDocumentSnapshotScope::current(
+                request.freshness.verification_time.as_str(),
+            )
+            .unwrap(),
+        );
+
+        assert!(matches!(
+            result,
+            Err(VerificationFailure::HistoricalStateRequired)
+        ));
     }
 
     #[test]
