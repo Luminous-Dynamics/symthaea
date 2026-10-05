@@ -784,19 +784,7 @@ impl WebGpuRenderer {
         let width = canvas.width().max(1);
         let height = canvas.height().max(1);
         let capabilities = surface.get_capabilities(&adapter);
-        // Prefer RGBA for browser presentation when available. Current Chromium/Linux
-        // WebGPU canvas interop has active Vulkan SharedImage failures affecting both
-        // RGBA and BGRA copy paths, so keeping the selected format deterministic and
-        // recording it in qualification evidence makes renderer failures diagnosable.
-        let Some(&format) = capabilities
-            .formats
-            .iter()
-            .find(|format| matches!(
-                format,
-                wgpu::TextureFormat::Rgba8UnormSrgb | wgpu::TextureFormat::Rgba8Unorm
-            ))
-            .or_else(|| capabilities.formats.first())
-        else {
+        let Some(&format) = capabilities.formats.first() else {
             return Err("WebGPU adapter exposed no surface formats".to_string());
         };
         let Some(&alpha_mode) = capabilities.alpha_modes.first() else {
@@ -825,6 +813,27 @@ impl WebGpuRenderer {
             view_formats: vec![],
         };
         surface.configure(&device, &config);
+        #[cfg(feature = "browser-qualification")]
+        {
+            let _ = canvas.set_attribute("data-qualification-surface-format", &format!("{format:?}"));
+            let _ = canvas.set_attribute(
+                "data-qualification-surface-formats",
+                &capabilities
+                    .formats
+                    .iter()
+                    .map(|value| format!("{value:?}"))
+                    .collect::<Vec<_>>()
+                    .join(","),
+            );
+            let _ = canvas.set_attribute(
+                "data-qualification-alpha-mode",
+                &format!("{alpha_mode:?}"),
+            );
+            let _ = canvas.set_attribute(
+                "data-qualification-present-mode",
+                &format!("{present_mode:?}"),
+            );
+        }
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Symthaea WebGPU Canvas Shader"),
@@ -1132,6 +1141,27 @@ impl WebGpuMovieRenderer {
             view_formats: vec![],
         };
         surface.configure(&device, &config);
+        #[cfg(feature = "browser-qualification")]
+        {
+            let _ = canvas.set_attribute("data-qualification-surface-format", &format!("{format:?}"));
+            let _ = canvas.set_attribute(
+                "data-qualification-surface-formats",
+                &capabilities
+                    .formats
+                    .iter()
+                    .map(|value| format!("{value:?}"))
+                    .collect::<Vec<_>>()
+                    .join(","),
+            );
+            let _ = canvas.set_attribute(
+                "data-qualification-alpha-mode",
+                &format!("{alpha_mode:?}"),
+            );
+            let _ = canvas.set_attribute(
+                "data-qualification-present-mode",
+                &format!("{present_mode:?}"),
+            );
+        }
 
         let bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
