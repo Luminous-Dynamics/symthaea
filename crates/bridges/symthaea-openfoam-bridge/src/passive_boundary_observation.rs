@@ -1571,7 +1571,6 @@ mod tests {
     #[test]
     fn patch_geometry_with_neighbour_must_match_candidate_rim() {
         use symthaea_fabrication_kernel::mesh::TriangleMesh;
-        use symthaea_passive_solver_binding::BoundaryEdgeKey;
         use symthaea_passive_void_compiler::{
             BoundaryConditionDomain, InterfacePlane, PortAperture, PortInterface,
             SolverBoundaryIdentity,
@@ -1661,7 +1660,7 @@ mod tests {
         );
         assert_eq!(
             binding.solver_entity_observation_kind(),
-            Some("openfoam-polyMesh-patch-geometry:v1")
+            Some("openfoam-polyMesh-patch-geometry-with-neighbour:v1")
         );
 
         let changed_points = br#"4
@@ -1679,7 +1678,53 @@ mod tests {
             Err(OpenFoamBoundaryObservationError::PatchGeometryMismatch)
         ));
 
-        let _ = BoundaryEdgeKey::new([2.0,0.0,0.0],[0.0,2.0,0.0]).unwrap();
+    }
+
+    #[test]
+    fn boundary_partition_rejects_overlap_and_gaps() {
+        let overlap = vec![
+            OpenFoamBoundaryPatchRecord {
+                patch_name: "inlet".into(),
+                patch_type: "patch".into(),
+                n_faces: 2,
+                start_face: 0,
+            },
+            OpenFoamBoundaryPatchRecord {
+                patch_name: "outlet".into(),
+                patch_type: "patch".into(),
+                n_faces: 2,
+                start_face: 1,
+            },
+        ];
+        assert!(matches!(
+            validate_boundary_patch_partition(&overlap, 0, 3),
+            Err(OpenFoamBoundaryObservationError::BoundaryPatchRangeOverlap {
+                ref patch
+            }) if patch == "outlet"
+        ));
+
+        let gap = vec![
+            OpenFoamBoundaryPatchRecord {
+                patch_name: "inlet".into(),
+                patch_type: "patch".into(),
+                n_faces: 1,
+                start_face: 0,
+            },
+            OpenFoamBoundaryPatchRecord {
+                patch_name: "outlet".into(),
+                patch_type: "patch".into(),
+                n_faces: 1,
+                start_face: 2,
+            },
+        ];
+        assert!(matches!(
+            validate_boundary_patch_partition(&gap, 0, 3),
+            Err(OpenFoamBoundaryObservationError::NonContiguousBoundaryPatchRange {
+                ref patch,
+                expected_start: 1,
+                actual_start: 2,
+            }) if patch == "outlet"
+        ));
     }
 
     #[test]
