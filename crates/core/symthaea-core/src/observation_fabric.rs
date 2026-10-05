@@ -1135,6 +1135,40 @@ impl IndependenceScopeWitnessV3 {
             }
         }
 
+        let source_id = self
+            .records
+            .iter()
+            .find(|record| record.role & INDEPENDENCE_SCOPE_V3_SOURCE_ROLE != 0)
+            .map(|record| record.observation_id.as_str());
+        let target_id = self
+            .records
+            .iter()
+            .find(|record| record.role & INDEPENDENCE_SCOPE_V3_TARGET_ROLE != 0)
+            .map(|record| record.observation_id.as_str());
+        let (Some(source_id), Some(target_id)) = (source_id, target_id) else {
+            return false;
+        };
+
+        let mut reachable = HashSet::new();
+        let mut stack = vec![source_id, target_id];
+        while let Some(observation_id) = stack.pop() {
+            if !reachable.insert(observation_id) {
+                continue;
+            }
+            let Some(record) = by_id.get(observation_id) else {
+                return false;
+            };
+            stack.extend(record.parent_observation_ids.iter().map(String::as_str));
+        }
+        if reachable.len() != self.records.len()
+            || self
+                .records
+                .iter()
+                .any(|record| !reachable.contains(record.observation_id.as_str()))
+        {
+            return false;
+        }
+
         fn visit(
             observation_id: &str,
             by_id: &HashMap<&str, &IndependenceScopeWitnessRecordV3>,
@@ -1511,6 +1545,9 @@ impl IndependenceVerificationReceiptV3 {
     /// contract. No observation graph traversal or producer-side classifier is
     /// invoked here.
     pub fn verify_against_scope_witness(&self, canonical_scope_bytes: &[u8]) -> bool {
+        if !self.verify_integrity() {
+            return false;
+        }
         let Ok(witness) =
             IndependenceScopeWitnessV3::from_canonical_bytes(canonical_scope_bytes)
         else {
@@ -1522,8 +1559,7 @@ impl IndependenceVerificationReceiptV3 {
         let Some((source_id, target_id)) = witness.endpoint_ids() else {
             return false;
         };
-        self.verify_integrity()
-            && source_id == self.source_observation_id
+        source_id == self.source_observation_id
             && target_id == self.target_observation_id
             && classification == self.classification
             && basis == self.basis
@@ -4803,6 +4839,39 @@ mod tests {
         let mut cross = receipt.clone();
         cross.assessment_fingerprint = v2_receipt.assessment_fingerprint;
         assert!(!cross.verify_integrity());
+    }
+
+    #[test]
+    fn independence_v3_scope_witness_requires_exact_endpoint_closure() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let bytes = graph
+            .independence_verification_reachable_scope_canonical_bytes_v3(
+                "obs-001",
+                "obs-002",
+            )
+            .expect("scope bytes");
+        let mut witness =
+            IndependenceScopeWitnessV3::from_canonical_bytes(&bytes).expect("decode witness");
+        witness.records.push(IndependenceScopeWitnessRecordV3 {
+            observation_id: "zzz-orphan".into(),
+            role: INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE,
+            sensor_id: None,
+            coverage: None,
+            platform_id: None,
+            parent_observation_ids: Vec::new(),
+            processing_activity_id: None,
+            asset_identity: None,
+        });
+        assert_eq!(
+            witness.canonical_bytes(),
+            Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3)
+        );
     }
 
     #[test]
