@@ -206,28 +206,22 @@ impl NixOSCommand {
         }
     }
 
-    /// Get the rollback command if available
+    /// Get the rollback command if available.
+    ///
+    /// This legacy executor never mints a free-form rollback command. Mutating
+    /// execution itself is fail-closed outside the governed Nixward authority.
     pub fn rollback_command(&self) -> Option<NixOSCommand> {
         match self {
             Self::RebuildSwitch { .. } | Self::RebuildTest { .. } | Self::RebuildBoot { .. } => {
-                Some(NixOSCommand::Custom {
-                    command: "nixos-rebuild".to_string(),
-                    args: vec!["switch".to_string(), "--rollback".to_string()],
-                    safety_level: SafetyLevel::SystemCritical,
+                Some(NixOSCommand::RebuildSwitch {
+                    flake: None,
+                    extra_args: vec!["--rollback".to_string()],
                 })
             }
             Self::EnvInstall { .. } | Self::EnvRemove { .. } => Some(NixOSCommand::EnvRollback),
-            Self::HomeManagerSwitch { .. } => {
-                // Home-manager rollback is more complex
-                Some(NixOSCommand::Custom {
-                    command: "sh".to_string(),
-                    args: vec![
-                        "-c".to_string(),
-                        "home-manager generations | head -2 | tail -1 | awk '{print $NF}' | xargs -I {} {}/activate".to_string(),
-                    ],
-                    safety_level: SafetyLevel::UserModify,
-                })
-            }
+            // Home-manager rollback previously required an arbitrary shell
+            // pipeline. Do not retain that as an effect-capable command.
+            Self::HomeManagerSwitch { .. } => None,
             _ => None,
         }
     }
@@ -383,6 +377,25 @@ pub enum ExecutionResult {
     },
 }
 
+/// Whether this legacy executor may perform real execution for a command.
+///
+/// The root executor is retained for compatibility and observation, but it is
+/// not an authority boundary. Real mutation therefore fails closed rather than
+/// relying on a caller-supplied safety label or Φ value. The governed Nixward
+/// executor owns mutation-capable execution.
+fn legacy_real_execution_allowed(command: &NixOSCommand) -> bool {
+    matches!(
+        command,
+        NixOSCommand::Search { .. }
+            | NixOSCommand::Channel {
+                operation: ChannelOperation::List
+            }
+            | NixOSCommand::Flake {
+                operation: FlakeOperation::Show
+            }
+    )
+}
+
 /// NixOS-aware command executor with Φ integration
 pub struct NixOSExecutor {
     /// Current system generation (for rollback)
@@ -465,6 +478,16 @@ impl NixOSExecutor {
     pub async fn execute(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
         let safety = command.safety_level();
         let required_phi = safety.required_phi();
+
+        // Φ is not an authority proof. Before consulting the local gate,
+        // reject mutation-capable commands from this legacy executor so that
+        // high Φ cannot turn an ungoverned path into a real effect path.
+        if !self.dry_run && !legacy_real_execution_allowed(&command) {
+            return ExecutionResult::Blocked {
+                reason: "legacy NixOS executor cannot perform real mutation; use governed Nixward execution authority".to_string(),
+                safety_level: safety,
+            };
+        }
 
         // Check if Φ is sufficient
         if phi < required_phi {
@@ -583,6 +606,16 @@ impl NixOSExecutor {
 
     /// Force execution even if Φ is low (for confirmed actions)
     pub async fn execute_confirmed(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
+        let safety = command.safety_level();
+
+        // User confirmation does not manufacture Nixward authority.
+        if !self.dry_run && !legacy_real_execution_allowed(&command) {
+            return ExecutionResult::Blocked {
+                reason: "legacy NixOS executor cannot perform real mutation; use governed Nixward execution authority".to_string(),
+                safety_level: safety,
+            };
+        }
+
         // Skip Φ check since user confirmed
         let (cmd, args) = command.to_command();
 
@@ -728,17 +761,30 @@ mod tests {
     }
 
     #[test]
-    fn test_rollback_commands() {
+    fn test_rollback_commands_never_mint_legacy_shell_effects() {
         let rebuild = NixOSCommand::RebuildSwitch {
             flake: None,
             extra_args: vec![],
         };
-        assert!(rebuild.rollback_command().is_some());
+        let rollback = rebuild.rollback_command().expect("rebuild rollback");
+        assert!(matches!(
+            rollback,
+            NixOSCommand::RebuildSwitch {
+                flake: None,
+                extra_args
+            } if extra_args == vec!["--rollback".to_string()]
+        ));
 
         let install = NixOSCommand::EnvInstall {
             packages: vec!["vim".to_string()],
         };
-        assert!(install.rollback_command().is_some());
+        assert!(matches!(
+            install.rollback_command(),
+            Some(NixOSCommand::EnvRollback)
+        ));
+
+        let home = NixOSCommand::HomeManagerSwitch { flake: None };
+        assert!(home.rollback_command().is_none());
 
         let search = NixOSCommand::Search {
             query: "vim".to_string(),
@@ -748,11 +794,147 @@ mod tests {
     }
 
     #[test]
+    fn test_legacy_real_execution_allowlist_is_structured_and_read_only() {
+        assert!(legacy_real_execution_allowed(&NixOSCommand::Search {
+            query: "vim".to_string(),
+            json: false,
+        }));
+        assert!(legacy_real_execution_allowed(&NixOSCommand::Channel {
+            operation: ChannelOperation::List,
+        }));
+        assert!(legacy_real_execution_allowed(&NixOSCommand::Flake {
+            operation: FlakeOperation::Show,
+        }));
+
+        assert!(!legacy_real_execution_allowed(&NixOSCommand::RebuildSwitch {
+            flake: None,
+            extra_args: vec![],
+        }));
+        assert!(!legacy_real_execution_allowed(&NixOSCommand::EnvInstall {
+            packages: vec!["vim".to_string()],
+        }));
+        assert!(!legacy_real_execution_allowed(&NixOSCommand::Custom {
+            command: "systemctl".to_string(),
+            args: vec!["restart".to_string(), "nginx.service".to_string()],
+            safety_level: SafetyLevel::SystemCritical,
+        }));
+        assert!(!legacy_real_execution_allowed(&NixOSCommand::Custom {
+            command: "sh".to_string(),
+            args: vec![
+                "-c".to_string(),
+                "systemctl restart nginx.service".to_string(),
+            ],
+            safety_level: SafetyLevel::SystemCritical,
+        }));
+        assert!(!legacy_real_execution_allowed(&NixOSCommand::Custom {
+            command: "env".to_string(),
+            args: vec![
+                "systemctl".to_string(),
+                "restart".to_string(),
+                "nginx.service".to_string(),
+            ],
+            safety_level: SafetyLevel::SystemCritical,
+        }));
+    }
+
+    #[test]
     fn test_safety_to_phi() {
         assert_eq!(SafetyLevel::ReadOnly.required_phi(), 0.2);
         assert_eq!(SafetyLevel::UserModify.required_phi(), 0.3);
         assert_eq!(SafetyLevel::SystemCritical.required_phi(), 0.4);
         assert_eq!(SafetyLevel::Destructive.required_phi(), 0.6);
+    }
+
+    #[tokio::test]
+    async fn test_legacy_executor_blocks_mutations_even_with_full_phi() {
+        let mut executor = NixOSExecutor::new().with_dry_run(false);
+
+        let commands = [
+            NixOSCommand::Custom {
+                command: "systemctl".to_string(),
+                args: vec!["restart".to_string(), "nginx.service".to_string()],
+                safety_level: SafetyLevel::SystemCritical,
+            },
+            NixOSCommand::Custom {
+                command: "sh".to_string(),
+                args: vec![
+                    "-c".to_string(),
+                    "systemctl restart nginx.service".to_string(),
+                ],
+                safety_level: SafetyLevel::SystemCritical,
+            },
+            NixOSCommand::Custom {
+                command: "env".to_string(),
+                args: vec![
+                    "systemctl".to_string(),
+                    "restart".to_string(),
+                    "nginx.service".to_string(),
+                ],
+                safety_level: SafetyLevel::SystemCritical,
+            },
+            NixOSCommand::RebuildSwitch {
+                flake: None,
+                extra_args: vec![],
+            },
+            NixOSCommand::EnvInstall {
+                packages: vec!["vim".to_string()],
+            },
+        ];
+
+        for command in commands {
+            match executor.execute(command, 1.0).await {
+                ExecutionResult::Blocked {
+                    reason,
+                    safety_level,
+                } => {
+                    assert!(reason.contains("governed Nixward"));
+                    assert_ne!(safety_level, SafetyLevel::ReadOnly);
+                }
+                other => panic!("expected fail-closed block, got {other:?}"),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_legacy_executor_dry_run_preserves_mutation_preview() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let command = NixOSCommand::Custom {
+            command: "sh".to_string(),
+            args: vec![
+                "-c".to_string(),
+                "systemctl restart nginx.service".to_string(),
+            ],
+            safety_level: SafetyLevel::SystemCritical,
+        };
+
+        match executor.execute(command, 1.0).await {
+            ExecutionResult::Success { stdout, .. } => {
+                assert!(stdout.contains("[DRY-RUN]"));
+                assert!(stdout.contains("systemctl restart nginx.service"));
+            }
+            other => panic!("expected dry-run preview, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_legacy_executor_confirmed_still_blocks_mutation() {
+        let mut executor = NixOSExecutor::new().with_dry_run(false);
+        let command = NixOSCommand::Custom {
+            command: "env".to_string(),
+            args: vec![
+                "systemctl".to_string(),
+                "restart".to_string(),
+                "nginx.service".to_string(),
+            ],
+            safety_level: SafetyLevel::SystemCritical,
+        };
+
+        match executor.execute_confirmed(command, 1.0).await {
+            ExecutionResult::Blocked { reason, .. } => {
+                assert!(reason.contains("governed Nixward"));
+            }
+            other => panic!("expected confirmed path to fail closed, got {other:?}"),
+        }
     }
 
     #[tokio::test]
