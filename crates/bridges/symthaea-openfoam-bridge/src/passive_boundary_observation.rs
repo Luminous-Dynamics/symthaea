@@ -30,6 +30,10 @@ pub enum OpenFoamBoundaryObservationError {
     InvalidNumericField { patch: String, field: &'static str },
     InvalidPatchType(String),
     ArithmeticOverflow,
+    MissingPatchList,
+    DuplicatePatchList,
+    PatchCountMismatch { declared: u64, observed: u64 },
+    UnexpectedPatchListEntry,
     InvalidTolerance,
     InvalidSolverBinding(SolverBindingError),
 }
@@ -85,24 +89,136 @@ impl OpenFoamBoundaryPatchRecord {
 pub fn observe_openfoam_boundary_patch(
     source_bytes: &[u8],
     patch_name: &str,
-) -> Result<(OpenFoamBoundaryPatchRecord, SolverBoundaryEntityObservation), OpenFoamBoundaryObservationError> {
+) -> Result<(OpenFoamBoundaryPatchRecord, OpenFoamBoundaryEntityObservation), OpenFoamBoundaryObservationError> {
     let text = std::str::from_utf8(source_bytes)
         .map_err(|_| OpenFoamBoundaryObservationError::InvalidUtf8)?;
     let stripped = strip_comments(text)?;
     let tokens = tokenize(&stripped)?;
-    let mut matches = Vec::new();
+    let records = parse_boundary_patch_list(&tokens)?;
+
+    match records.iter().find(|record| record.patch_name == patch_name) {
+        Some(record) => Ok((record.clone(), record.observe(source_bytes)?)),
+        None => Err(OpenFoamBoundaryObservationError::PatchNotFound(
+            patch_name.to_string(),
+        )),
+    }
+}
+
+type OpenFoamBoundaryEntityObservation = SolverBoundaryEntityObservation;
+
+fn parse_boundary_patch_list(
+    tokens: &[Token],
+) -> Result<Vec<OpenFoamBoundaryPatchRecord>, OpenFoamBoundaryObservationError> {
+    let mut brace_depth = 0usize;
+    let mut list_start = None;
+    let mut list_count = None;
 
     for index in 0..tokens.len().saturating_sub(1) {
-        let Token::Ident(name) = &tokens[index] else { continue; };
-        if name != patch_name || !matches!(tokens[index + 1], Token::LBrace) { continue; }
-        matches.push(parse_patch_block(&tokens, index + 2, patch_name)?);
+        match tokens[index] {
+            Token::LBrace => brace_depth = brace_depth.checked_add(1).ok_or(
+                OpenFoamBoundaryObservationError::ArithmeticOverflow,
+            )?,
+            Token::RBrace => {
+                brace_depth = brace_depth.checked_sub(1).ok_or(
+                    OpenFoamBoundaryObservationError::UnexpectedEndOfInput,
+                )?
+            }
+            Token::Number(_) | Token::Ident(_) | Token::LParen | Token::RParen
+            | Token::Semi => {}
+        }
+
+        if brace_depth == 0 && matches!(&tokens[index], Token::Number(_))
+            && matches!(tokens[index + 1], Token::LParen)
+        {
+            if list_start.is_some() {
+                return Err(OpenFoamBoundaryObservationError::DuplicatePatchList);
+            }
+            let Token::Number(count) = &tokens[index] else { unreachable!() };
+            let declared = count.parse::<u64>().map_err(|_| {
+                OpenFoamBoundaryObservationError::InvalidNumericField {
+                    patch: "<boundary-list>".to_string(),
+                    field: "patchCount",
+                }
+            })?;
+            list_count = Some(declared);
+            list_start = Some(index + 2);
+        }
     }
 
-    match matches.as_slice() {
-        [] => Err(OpenFoamBoundaryObservationError::PatchNotFound(patch_name.to_string())),
-        [record] => Ok((record.clone(), record.observe(source_bytes)?)),
-        _ => Err(OpenFoamBoundaryObservationError::DuplicatePatch(patch_name.to_string())),
+    let mut index = list_start.ok_or(OpenFoamBoundaryObservationError::MissingPatchList)?;
+    let declared = list_count.expect("list count set with list start");
+    let mut records = Vec::new();
+
+    while index < tokens.len() {
+        if matches!(tokens[index], Token::RParen) {
+            index += 1;
+            break;
+        }
+
+        let Token::Ident(name) = &tokens[index] else {
+            return Err(OpenFoamBoundaryObservationError::UnexpectedPatchListEntry);
+        };
+        if !matches!(tokens.get(index + 1), Some(Token::LBrace)) {
+            return Err(OpenFoamBoundaryObservationError::UnexpectedPatchListEntry);
+        }
+
+        let record = parse_patch_block(tokens, index + 2, name)?;
+        if records.iter().any(|existing: &OpenFoamBoundaryPatchRecord| existing.patch_name == record.patch_name) {
+            return Err(OpenFoamBoundaryObservationError::DuplicatePatch(
+                record.patch_name,
+            ));
+        }
+        records.push(record);
+        index = next_patch_block_end(tokens, index + 2)?;
     }
+
+    if !records.iter().all(|record| !record.patch_name.trim().is_empty()) {
+        return Err(OpenFoamBoundaryObservationError::UnexpectedPatchListEntry);
+    }
+
+    let observed = records.len() as u64;
+    if observed != declared {
+        return Err(OpenFoamBoundaryObservationError::PatchCountMismatch {
+            declared,
+            observed,
+        });
+    }
+
+    if index == tokens.len() {
+        return Ok(records);
+    }
+
+    Err(OpenFoamBoundaryObservationError::UnexpectedPatchListEntry)
+}
+
+fn next_patch_block_end(
+    tokens: &[Token],
+    mut index: usize,
+) -> Result<usize, OpenFoamBoundaryObservationError> {
+    let mut depth = 1usize;
+    while index < tokens.len() {
+        match tokens[index] {
+            Token::LBrace => depth = depth.checked_add(1).ok_or(
+                OpenFoamBoundaryObservationError::ArithmeticOverflow,
+            )?,
+            Token::RBrace => {
+                depth = depth.checked_sub(1).ok_or(
+                    OpenFoamBoundaryObservationError::UnexpectedEndOfInput,
+                )?;
+                if depth == 0 {
+                    return Ok(index + 1);
+                }
+            }
+            Token::Ident(_)
+            | Token::Number(_)
+            | Token::LParen
+            | Token::RParen
+            | Token::Semi => {}
+        }
+        index += 1;
+    }
+
+    Err(OpenFoamBoundaryObservationError::UnexpectedEndOfInput)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
