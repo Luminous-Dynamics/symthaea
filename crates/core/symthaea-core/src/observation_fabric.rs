@@ -2022,6 +2022,121 @@ mod tests {
         IndependenceVerificationReceipt::from_assessment(&assessment)
     }
 
+    // Independent reconstruction of the v3 canonical witness. This intentionally
+    // does not call either production v3 scope helper.
+    fn oracle_v3_scope_bytes(
+        graph: &ObservationGraph,
+        source_observation_id: &str,
+        target_observation_id: &str,
+    ) -> Vec<u8> {
+        use std::collections::{BTreeMap, HashMap, HashSet};
+
+        fn string(bytes: &mut Vec<u8>, value: &str) {
+            bytes.extend_from_slice(&(value.len() as u64).to_le_bytes());
+            bytes.extend_from_slice(value.as_bytes());
+        }
+
+        fn option_string(bytes: &mut Vec<u8>, value: Option<&str>) {
+            match value {
+                Some(value) => {
+                    bytes.push(1);
+                    string(bytes, value);
+                }
+                None => bytes.push(0),
+            }
+        }
+
+        fn coverage(value: ProvenanceCoverage) -> u8 {
+            match value {
+                ProvenanceCoverage::Complete => 0,
+                ProvenanceCoverage::Partial => 1,
+                ProvenanceCoverage::Redacted => 2,
+            }
+        }
+
+        fn ancestors(seed: &str, by_id: &HashMap<&str, &Observation>) -> HashSet<String> {
+            let mut result = HashSet::new();
+            let mut stack = vec![seed.to_string()];
+            while let Some(current) = stack.pop() {
+                let observation = by_id.get(current.as_str()).expect("validated observation");
+                for parent in &observation.provenance.parent_observation_ids {
+                    if result.insert(parent.clone()) {
+                        stack.push(parent.clone());
+                    }
+                }
+            }
+            result
+        }
+
+        let by_id = graph
+            .observations
+            .iter()
+            .map(|observation| (observation.id.as_str(), observation))
+            .collect::<HashMap<_, _>>();
+
+        let mut roles = BTreeMap::<String, u8>::new();
+        roles.insert(source_observation_id.to_string(), 0b001);
+        roles.insert(target_observation_id.to_string(), 0b010);
+        for id in ancestors(source_observation_id, &by_id)
+            .into_iter()
+            .chain(ancestors(target_observation_id, &by_id))
+        {
+            roles
+                .entry(id)
+                .and_modify(|role| *role |= 0b100)
+                .or_insert(0b100);
+        }
+
+        let ids = roles.keys().cloned().collect::<Vec<_>>();
+        let mut bytes = b"symthaea:observation-independence-scope:v3\n".to_vec();
+        bytes.extend_from_slice(&(ids.len() as u64).to_le_bytes());
+
+        for id in ids {
+            string(&mut bytes, &id);
+            let role = roles[&id];
+            bytes.push(role);
+            let observation = by_id[&id.as_str()];
+
+            if role & 0b011 != 0 {
+                string(&mut bytes, &observation.provenance.source.sensor_id);
+                bytes.push(coverage(observation.provenance.coverage));
+                option_string(
+                    &mut bytes,
+                    observation.provenance.source.platform_id.as_deref(),
+                );
+            }
+
+            let mut parents = observation.provenance.parent_observation_ids.clone();
+            parents.sort();
+            bytes.extend_from_slice(&(parents.len() as u64).to_le_bytes());
+            for parent in parents {
+                string(&mut bytes, &parent);
+            }
+
+            option_string(
+                &mut bytes,
+                observation
+                    .provenance
+                    .processing_activity
+                    .as_ref()
+                    .map(|activity| activity.activity_id.as_str()),
+            );
+
+            if role & 0b011 != 0 {
+                match observation.asset.as_ref() {
+                    Some(asset) => {
+                        bytes.push(1);
+                        string(&mut bytes, &asset.hash_algorithm);
+                        string(&mut bytes, &asset.content_hash);
+                    }
+                    None => bytes.push(0),
+                }
+            }
+        }
+
+        bytes
+    }
+
     #[test]
     fn canonical_domain_separators_use_actual_newline_delimiters() {
         for domain in [
@@ -3247,6 +3362,43 @@ mod tests {
             graph.assess_independence("obs-001", "obs-002")
         );
     }
+    #[test]
+    fn independence_v3_scope_bytes_match_independent_oracle() {
+        let mut parent = fixture();
+        parent.id = "parent".into();
+
+        let mut source = fixture();
+        source.provenance.parent_observation_ids = vec!["parent".into()];
+
+        let mut target = fixture();
+        target.id = "obs-002".into();
+        target.provenance.source.sensor_id = "camera-2".into();
+
+        let graph = ObservationGraph {
+            observations: vec![source, target, parent],
+            relations: vec![],
+        };
+
+        let expected = oracle_v3_scope_bytes(&graph, "obs-001", "obs-002");
+        let actual = graph
+            .independence_verification_reachable_scope_canonical_bytes_v3(
+                "obs-001",
+                "obs-002",
+            )
+            .expect("v3 canonical bytes");
+
+        assert_eq!(actual, expected);
+        assert_eq!(
+            blake3::hash(&expected).to_hex().to_string(),
+            graph
+                .independence_verification_reachable_scope_fingerprint_v3(
+                    "obs-001",
+                    "obs-002",
+                )
+                .expect("v3 fingerprint"),
+        );
+    }
+
     #[test]
     fn independence_v3_scope_reaches_only_pair_ancestors_and_preserves_role_identity() {
         let mut parent = fixture();
