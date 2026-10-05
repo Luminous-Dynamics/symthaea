@@ -232,8 +232,10 @@ impl MultiPhysicsRequest {
     /// Validate explicit stage/port topology. Unknown semantics never pass
     /// as compatible because an executable coupling requires a known contract.
     pub fn validate_typed_topology(&self) -> Result<(), SimulationError> {
-        use std::collections::HashMap;
+        use std::collections::{HashMap, HashSet};
         let mut stages = HashMap::new();
+        let mut destinations = HashSet::new();
+        let mut edges = HashSet::new();
         for stage in &self.stages {
             if stage.id.trim().is_empty() {
                 return Err(SimulationError::InvalidRequest(
@@ -281,6 +283,32 @@ impl MultiPhysicsRequest {
         }
 
         for connection in &self.typed_connections {
+            let edge = (
+                connection.producer_stage.as_str(),
+                connection.producer_port.as_str(),
+                connection.consumer_stage.as_str(),
+                connection.consumer_port.as_str(),
+            );
+            if !edges.insert(edge) {
+                return Err(SimulationError::InvalidRequest(format!(
+                    "typed topology contains duplicate connection {}:{} -> {}:{}",
+                    connection.producer_stage,
+                    connection.producer_port,
+                    connection.consumer_stage,
+                    connection.consumer_port
+                )));
+            }
+            let destination = (
+                connection.consumer_stage.as_str(),
+                connection.consumer_port.as_str(),
+            );
+            if !destinations.insert(destination) {
+                return Err(SimulationError::InvalidRequest(format!(
+                    "typed topology has multiple producers for consumer endpoint {}:{}",
+                    connection.consumer_stage, connection.consumer_port
+                )));
+            }
+
             let producer = stages.get(connection.producer_stage.as_str()).ok_or_else(|| {
                 SimulationError::InvalidRequest(format!(
                     "typed connection references missing producer stage {:?}",
@@ -1563,6 +1591,84 @@ mod tests {
         )
         .with_stage(producer)
         .with_stage(consumer);
+
+        assert!(request.validate_typed_topology().is_err());
+    }
+
+    #[test]
+    fn explicit_typed_topology_rejects_duplicate_connections() {
+        let length = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Length,
+            symthaea_types::PhysicalDimension::LENGTH,
+        );
+        let producer = CoupledSimulationStage::new(
+            "producer",
+            EngineeringDomain::Mechanical,
+            SolverKind::FiniteElement,
+        )
+        .typed_produces([TypedPhysicalPort::new("length", length.clone())]);
+        let consumer = CoupledSimulationStage::new(
+            "consumer",
+            EngineeringDomain::Mechanical,
+            SolverKind::MultibodyDynamics,
+        )
+        .typed_consumes([TypedPhysicalPort::new("length", length)]);
+
+        let edge = TypedPhysicalConnection::new(
+            "producer", "length", "consumer", "length",
+        );
+        let request = MultiPhysicsRequest::new(
+            "duplicate-edge",
+            "reject duplicate typed edge identity",
+            CouplingMode::OneWay,
+        )
+        .with_stage(producer)
+        .with_stage(consumer)
+        .with_typed_connection(edge.clone())
+        .with_typed_connection(edge);
+
+        assert!(request.validate_typed_topology().is_err());
+    }
+
+    #[test]
+    fn explicit_typed_topology_rejects_multiple_producers_for_one_input() {
+        let length = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Length,
+            symthaea_types::PhysicalDimension::LENGTH,
+        );
+        let producer_a = CoupledSimulationStage::new(
+            "producer-a",
+            EngineeringDomain::Mechanical,
+            SolverKind::FiniteElement,
+        )
+        .typed_produces([TypedPhysicalPort::new("length", length.clone())]);
+        let producer_b = CoupledSimulationStage::new(
+            "producer-b",
+            EngineeringDomain::Mechanical,
+            SolverKind::MultibodyDynamics,
+        )
+        .typed_produces([TypedPhysicalPort::new("length", length.clone())]);
+        let consumer = CoupledSimulationStage::new(
+            "consumer",
+            EngineeringDomain::Mechanical,
+            SolverKind::MultibodyDynamics,
+        )
+        .typed_consumes([TypedPhysicalPort::new("length", length)]);
+
+        let request = MultiPhysicsRequest::new(
+            "ambiguous-destination",
+            "reject many-to-one typed endpoint",
+            CouplingMode::OneWay,
+        )
+        .with_stage(producer_a)
+        .with_stage(producer_b)
+        .with_stage(consumer)
+        .with_typed_connection(TypedPhysicalConnection::new(
+            "producer-a", "length", "consumer", "length",
+        ))
+        .with_typed_connection(TypedPhysicalConnection::new(
+            "producer-b", "length", "consumer", "length",
+        ));
 
         assert!(request.validate_typed_topology().is_err());
     }
