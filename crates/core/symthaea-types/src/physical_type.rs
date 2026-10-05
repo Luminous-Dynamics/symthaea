@@ -237,6 +237,10 @@ impl PhysicalType {
         *blake3::hash(&self.canonical_bytes()).as_bytes()
     }
 
+    pub fn digest_hex(&self) -> String {
+        blake3::hash(&self.canonical_bytes()).to_hex().to_string()
+    }
+
     /// Fail-closed compatibility judgment for a typed signal/port boundary.
     /// Infer the type of the first derivative with respect to an independent
     /// physical quantity. Higher-order derivatives may be represented by
@@ -395,6 +399,7 @@ mod tests {
         let a = PhysicalType::with_kind(QuantityKind::Energy, PhysicalDimension::ENERGY);
         let b = a.clone();
         assert_eq!(a.digest(), b.digest());
+        assert_eq!(a.digest_hex(), b.digest_hex());
         assert_eq!(a.canonical_bytes(), b.canonical_bytes());
     }
 
