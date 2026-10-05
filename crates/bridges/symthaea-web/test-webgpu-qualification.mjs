@@ -965,6 +965,43 @@ class QualificationError extends Error {
   }
 }
 
+function runHarnessSelfTests() {
+  const healthy = {
+    width: 4,
+    height: 4,
+    opaque_black_pixels: 0,
+    non_opaque_pixels: 0,
+    non_black_pixels: 16,
+    non_black_bounds: { min_x: 0, min_y: 0, max_x: 3, max_y: 3 },
+  };
+  assertCanvasStatistics(healthy, 4, 4, 'harness self-test', 'harness');
+
+  const black = {
+    width: 4,
+    height: 4,
+    opaque_black_pixels: 16,
+    non_opaque_pixels: 0,
+    non_black_pixels: 0,
+    non_black_bounds: null,
+  };
+  let rejectedBlack = false;
+  try {
+    assertCanvasStatistics(black, 4, 4, 'harness self-test black', 'harness');
+  } catch (error) {
+    rejectedBlack = error instanceof QualificationError;
+  }
+  if (!rejectedBlack) {
+    throw new Error('qualification harness self-test failed: black frame was accepted');
+  }
+
+  if (expectedWgpuSurfaceFormat('rgba8unorm') !== 'Rgba8Unorm'
+    || expectedWgpuSurfaceFormat('bgra8unorm') !== 'Bgra8Unorm') {
+    throw new Error('qualification harness self-test failed: browser/wgpu format mapping drift');
+  }
+}
+
+runHarnessSelfTests();
+
 async function runMode(mode) {
   const swiftShaderMode = mode === 'webgpu' || mode === 'webgpu-swiftshader';
   const hardwareMode = mode === 'webgpu-hardware';
