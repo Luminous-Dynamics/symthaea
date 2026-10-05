@@ -458,7 +458,7 @@ impl SolverBoundaryEntityObservation {
     }
 }
 
-/// Solver-side entity evidence returned by a live-capable adapter.
+/// Solver-side or solver-input entity evidence returned by an adapter.
 ///
 /// This is intentionally a provenance claim, not an independent solver proof:
 /// the neutral core verifies the cryptographic binding to the exact candidate
