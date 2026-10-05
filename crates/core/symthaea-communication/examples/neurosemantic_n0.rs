@@ -207,6 +207,7 @@ fn main() -> Result<(), String> {
         ("authorization_valid", true),
         ("handling_policy_provenance_present", handling_policy_provenance_present),
         ("handling_policy_provenance_hash_valid", handling_policy_provenance_hash_valid),
+        ("handling_policy_provenance_mismatch_blocked", handling_policy_provenance_mismatch_blocked),
         ("first_packet_accepted", accepted == ReplayDecision::Accept),
         ("exact_replay_detected", duplicate == ReplayDecision::Duplicate),
         ("expired_replay_state_reclaimed", expired_replay_state_reclaimed),
