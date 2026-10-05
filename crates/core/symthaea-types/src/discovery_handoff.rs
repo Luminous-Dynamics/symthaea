@@ -188,6 +188,21 @@ impl ScientificHypothesisRevisionReceipt {
         Ok(receipt)
     }
 
+    pub fn validate_against(
+        &self,
+        prior: &ScientificHypothesisHandoff,
+        new: &ScientificHypothesisHandoff,
+    ) -> Result<(), String> {
+        self.validate()?;
+        if self.prior_handoff_digest != prior.digest_hex() {
+            return Err("revision receipt references a different prior handoff".into());
+        }
+        if self.new_handoff_digest != new.digest_hex() {
+            return Err("revision receipt references a different new handoff".into());
+        }
+        Ok(())
+    }
+
     pub fn canonical_bytes(&self) -> Vec<u8> {
         serde_json::to_vec(self).expect("hypothesis revision serialization must be infallible")
     }
@@ -326,6 +341,45 @@ impl ScientificInquirySelectionReceipt {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn hypothesis_revision_cross_link_validation_rejects_wrong_handoff() {
+        let energy = energy();
+        let prior = ScientificHypothesisHandoff::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &energy,
+            ModelMaturity::ResearchPrototype,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            1,
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+        let new = ScientificHypothesisHandoff::new(
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            &energy,
+            ModelMaturity::ValidatedNumerical,
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "1111111111111111111111111111111111111111111111111111111111111111",
+            2,
+            "2222222222222222222222222222222222222222222222222222222222222222",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+        let receipt = ScientificHypothesisRevisionReceipt::new(
+            prior.digest_hex(),
+            new.digest_hex(),
+            "3333333333333333333333333333333333333333333333333333333333333333",
+            "4444444444444444444444444444444444444444444444444444444444444444",
+            "new evidence",
+        )
+        .unwrap();
+        assert!(receipt.validate_against(&prior, &new).is_ok());
+        assert!(receipt.validate_against(&new, &prior).is_err());
+    }
+
     #[test]
     fn hypothesis_set_digest_binds_order_and_membership() {
         let a = ScientificHypothesisHandoff::new(
