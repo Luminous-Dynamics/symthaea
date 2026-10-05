@@ -279,7 +279,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_watchdog_uses_typed_generation_switch_effect() {
+    fn watchdog_rollback_uses_typed_generation_switch_effect() {
         let command = NixOSCommand::SwitchGeneration { generation: 42 };
         let (bin, args) = command.to_command();
         assert_eq!(bin, "nix-env");
