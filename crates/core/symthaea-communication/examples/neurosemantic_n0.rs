@@ -138,6 +138,29 @@ fn main() -> Result<(), String> {
         1_500,
     )?;
 
+    let mut inference_escalation = message.clone();
+    inference_escalation
+        .packet
+        .data_policy
+        .handling
+        .permitted_secondary_uses
+        .insert(symthaea_communication::NeurosemanticSecondaryUse::AffectiveInference);
+    inference_escalation.packet.refresh_hashes()?;
+    let mut inference_aware_lease = lease.clone();
+    inference_aware_lease
+        .write_inference_classes
+        .insert(NeurosemanticInferenceClass::AffectiveState);
+    let inference_escalation_blocked = inference_escalation
+        .validate_for_handling(
+            &inference_aware_lease,
+            "ZA",
+            symthaea_communication::NeurosemanticHandlingAction::SecondaryUse(
+                symthaea_communication::NeurosemanticSecondaryUse::AffectiveInference,
+            ),
+            1_500,
+        )
+        .is_err();
+
     let mut replay = NeurosemanticReplayTracker::default();
     let accepted = replay.observe_authorized(&message, &lease, 1_500)?;
     let duplicate = replay.observe_authorized(&message, &lease, 1_500)?;
@@ -208,6 +231,7 @@ fn main() -> Result<(), String> {
         ("handling_policy_provenance_present", handling_policy_provenance_present),
         ("handling_policy_provenance_hash_valid", handling_policy_provenance_hash_valid),
         ("handling_policy_provenance_mismatch_blocked", handling_policy_provenance_mismatch_blocked),
+        ("inference_escalation_blocked", inference_escalation_blocked),
         ("first_packet_accepted", accepted == ReplayDecision::Accept),
         ("exact_replay_detected", duplicate == ReplayDecision::Duplicate),
         ("expired_replay_state_reclaimed", expired_replay_state_reclaimed),
