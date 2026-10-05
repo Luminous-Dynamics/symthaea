@@ -731,8 +731,7 @@ pub enum FrontierBlocker {
         expected_scope: String,
         /// Candidate scope.
         actual_scope: String,
-    }
-
+    },
 /// Candidate-versus-incumbent burden transfer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BurdenTransfer {
@@ -873,6 +872,9 @@ impl std::fmt::Display for AssessmentError {
             Self::NoBurdenData => write!(f, "candidate has no burden data"),
             Self::EmptyBurdenScale => write!(f, "burden unit/scope is empty"),
             Self::EmptyPerformanceScale => write!(f, "performance unit/scope is empty"),
+            Self::EmptyFunctionalConstraints => {
+                write!(f, "functional requirement has no performance constraints")
+            }
             Self::MissingComparisonScale(dimension) => {
                 write!(f, "missing comparison scale for {dimension:?}")
             }
