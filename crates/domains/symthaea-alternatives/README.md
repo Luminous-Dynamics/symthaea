@@ -53,3 +53,7 @@ The current GHG Protocol Product Standard explicitly notes that additional speci
 
 
 Admission is also temporally scoped. When a source carries an admission validity window, the assessment timestamp must fall inside that window; timeless assessments conservatively reject time-bounded admissions. This prevents a once-admitted source authority from remaining silently qualified after its external admission has expired or been superseded.
+
+## Candidate-generation provenance
+
+Candidate generation is a separate provenance surface from evidence provenance. A generated pathway can carry optional reproducible derivation lineage describing the generating activity/method, exact input identities, and configuration hash. The lineage is validated structurally, copied into the candidate assessment, and included in the deterministic assessment receipt. This makes “how was this candidate proposed?” auditable without treating generation provenance as evidence quality, source authority, or physical qualification.
