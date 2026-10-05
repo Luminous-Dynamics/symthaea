@@ -4681,14 +4681,16 @@ fn validate_native_authority_pin_set(
             tx.execute(
                 "INSERT OR IGNORE INTO authorization_receipts
                  (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch,
-                  boundary_id,attempt_scope_digest)
-                 VALUES (?1,?2,?3,'indeterminate','indeterminate',?4,?5,?6,?7)",
+                  operation_id,provider_idempotency_key,boundary_id,attempt_scope_digest)
+                 VALUES (?1,?2,?3,'indeterminate','indeterminate',?4,?5,?6,?7,?8,?9)",
                 params![
                     receipt.authorization_instance,
                     receipt.action_id,
                     receipt.attempt_id,
                     receipt.action_digest,
                     receipt.authority_epoch as i64,
+                    receipt.operation_id.as_deref(),
+                    receipt.provider_idempotency_key.as_str(),
                     lease_boundary,
                     lease_boundary.as_ref().map(|boundary|
                         compute_attempt_scope_digest(boundary.as_str(),&receipt.attempt_id)
@@ -8925,6 +8927,86 @@ mod tests {
             &witness.authorization_instance,"attempt-crash",ExecutionOutcome::Succeeded
         ).unwrap();
         assert_eq!(reconciled.outcome,ExecutionOutcome::Succeeded);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn bound_restart_recovery_preserves_receipt_provenance() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-bound-restart-recovery-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(
+            &path,"rp-bound-restart-recovery"
+        ).unwrap();
+        let effect=super::super::ActionEffectBinding::new(
+            "target-bound-restart","prod","adapter-bound-restart"
+        );
+        let action=EpistemicAction::new(
+            "bound-restart-recovery","effect",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let operation_id="operation:bound-restart";
+        let attempt_id="attempt:bound-restart";
+        let boundary_id="boundary:bound-restart";
+        let witness=ActionAuthorizationWitness {
+            operation_id:Some(operation_id.into()),
+            authorization_instance:"bound-restart-recovery".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:00Z".into(),
+            expires_at:Some("2026-10-04T10:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1
+        )).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,
+            &witness.authorization_instance,
+            attempt_id,
+            &action,
+            &effect,
+            boundary_id,
+            operation_id,
+            "native-bound-restart",
+        ).unwrap();
+        drop(store);
+
+        let reopened=SqliteAuthorizationStore::open_with_relying_party(
+            &path,"rp-bound-restart-recovery"
+        ).unwrap();
+        assert_eq!(reopened.recover_incomplete_attempts().unwrap(),1);
+
+        let conn=reopened.connection().unwrap();
+        let (stored_operation,stored_provider_key):(Option<String>,Option<String>)=conn.query_row(
+            "SELECT operation_id,provider_idempotency_key
+             FROM authorization_receipts
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND phase='indeterminate'",
+            params![record.authorization_instance.as_str(),record.attempt_id.as_str()],
+            |row| Ok((row.get(0)?,row.get(1)?)),
+        ).unwrap();
+        assert_eq!(stored_operation.as_deref(),Some(record.operation_id.as_str()));
+        assert_eq!(stored_provider_key.as_deref(),Some(record.provider_idempotency_key.as_str()));
+
+        let loaded=reopened.connection().unwrap();
+        let receipt = super::load_receipt(
+            &loaded.transaction_with_behavior(TransactionBehavior::Immediate).unwrap(),
+            &record.authorization_instance,
+            &record.attempt_id,
+            "indeterminate",
+        ).unwrap();
+        assert!(receipt.is_some());
+
         let _=std::fs::remove_file(path);
     }
 
