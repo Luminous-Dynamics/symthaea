@@ -210,6 +210,19 @@ jobs:
           test -n "$LEDGER"
           printf "syndrome_coset_ledger=%s\\n" "$LEDGER" >> "$GITHUB_OUTPUT"
 
+      - name: Capture exact minimum-syndrome multiplicity ledger
+        id: multiplicity_invariant
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            minimum_weight_syndrome_multiplicity_matches_nearest_codeword_multiplicity_exhaustively -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^MIN_SYNDROME_MULTIPLICITY_LEDGER=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^MIN_SYNDROME_MULTIPLICITY_LEDGER=//p')"
+          test -n "$LEDGER"
+          printf "minimum_syndrome_multiplicity_ledger=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
       - name: Capture syndrome decoder ledger
         id: decoder_ledger
         run: |
@@ -287,12 +300,14 @@ jobs:
           dependency_lock_sha256=${{ steps.harness.outputs.lock_sha256 }}
           syndrome_coset_ledger_status=${{ steps.coset_invariants.outcome }}
           syndrome_coset_ledger=${{ steps.coset_invariants.outputs.syndrome_coset_ledger }}
+          minimum_syndrome_multiplicity_status=${{ steps.multiplicity_invariant.outcome }}
+          minimum_syndrome_multiplicity_ledger=${{ steps.multiplicity_invariant.outputs.minimum_syndrome_multiplicity_ledger }}
           syndrome_decoder_ledger_status=${{ steps.decoder_ledger.outcome }}
           runner_os=${{ steps.runner.outputs.runner_os }}
           runner_arch=${{ steps.runner.outputs.runner_arch }}
           runner_image=${{ steps.runner.outputs.runner_image }}
           runner_image_version=${{ steps.runner.outputs.runner_image_version }}
-          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
           random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
           random_syndrome_sweep=${{ steps.random_sweep.outputs.random_syndrome_sweep }}
