@@ -148,6 +148,33 @@ maturity != truth
 truth claim != authority
 ```
 
+## Physical units and temperature semantics
+
+The shared PhysicalType layer distinguishes absolute thermodynamic temperature from a temperature difference. They share the same SI base dimension but are different quantity kinds.
+
+```text
+Temperature - Temperature -> TemperatureDifference
+Temperature + TemperatureDifference -> Temperature
+TemperatureDifference + TemperatureDifference -> TemperatureDifference
+TemperatureDifference - Temperature -> INVALID
+```
+
+Affine offsets such as Celsius/Fahrenheit-to-Kelvin are valid for absolute temperature units, but not for a temperature difference. Delta units must use a zero offset and an appropriate scale.
+
+Semantic compatibility and executable numeric transport are also separate:
+
+```text
+semantic compatibility
+    -> same physical meaning / dimension
+
+numeric transport compatibility
+    -> semantic compatibility
+    -> explicit units on both sides or neither
+    -> explicit conversion when units differ
+```
+
+A solver boundary must therefore never infer a numeric unit merely because the dimensions match.
+
 ## Formal verification boundary
 
 Formal proof establishes a theorem about the formalized model when the theorem and implementation are correctly bound.
