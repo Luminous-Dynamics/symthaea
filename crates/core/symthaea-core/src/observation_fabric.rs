@@ -1263,28 +1263,43 @@ impl ObservationGraph {
         let examined_scope_fingerprint =
             self.compute_independence_scope_fingerprint(&by_id, &examined_observation_ids)?;
 
-        let assessment = |classification, basis| {
-            let mut hasher = blake3::Hasher::new();
-            hasher.update(b"symthaea:observation-independence-assessment:v2\n");
-            write_canonical_string(&mut hasher, source_observation_id);
-            write_canonical_string(&mut hasher, target_observation_id);
-            write_canonical_string_vec(&mut hasher, &examined_observation_ids);
-            write_canonical_string(&mut hasher, &examined_scope_fingerprint);
-            write_canonical_string(&mut hasher, IndependenceAssessment::VERIFIER_VERSION);
-            write_canonical_independence(&mut hasher, &classification);
-            write_canonical_independence_basis(&mut hasher, &basis);
-            IndependenceAssessment {
-                source_observation_id: source_observation_id.to_string(),
-                target_observation_id: target_observation_id.to_string(),
-                classification,
-                basis,
-                examined_observation_ids: examined_observation_ids.clone(),
-                verifier_version: IndependenceAssessment::VERIFIER_VERSION,
-                examined_scope_fingerprint: examined_scope_fingerprint.clone(),
-                assessment_fingerprint: hasher.finalize().to_hex().to_string(),
-            }
-        };
+        let (classification, basis) = Self::classify_independence(
+            source_observation_id,
+            target_observation_id,
+            source,
+            target,
+            &by_id,
+        )?;
 
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:observation-independence-assessment:v2\n");
+        write_canonical_string(&mut hasher, source_observation_id);
+        write_canonical_string(&mut hasher, target_observation_id);
+        write_canonical_string_vec(&mut hasher, &examined_observation_ids);
+        write_canonical_string(&mut hasher, &examined_scope_fingerprint);
+        write_canonical_string(&mut hasher, IndependenceAssessment::VERIFIER_VERSION);
+        write_canonical_independence(&mut hasher, &classification);
+        write_canonical_independence_basis(&mut hasher, &basis);
+
+        Ok(IndependenceAssessment {
+            source_observation_id: source_observation_id.to_string(),
+            target_observation_id: target_observation_id.to_string(),
+            classification,
+            basis,
+            examined_observation_ids,
+            verifier_version: IndependenceAssessment::VERIFIER_VERSION,
+            examined_scope_fingerprint,
+            assessment_fingerprint: hasher.finalize().to_hex().to_string(),
+        })
+    }
+
+    fn classify_independence(
+        source_observation_id: &str,
+        target_observation_id: &str,
+        source: &Observation,
+        target: &Observation,
+        by_id: &HashMap<&str, &Observation>,
+    ) -> Result<(EvidenceIndependence, IndependenceBasis), ObservationValidationError> {
         if !matches!(source.provenance.coverage, ProvenanceCoverage::Complete)
             || !matches!(target.provenance.coverage, ProvenanceCoverage::Complete)
         {
@@ -1293,14 +1308,14 @@ impl ObservationGraph {
             } else {
                 target.provenance.coverage
             };
-            return Ok(assessment(
+            return Ok((
                 EvidenceIndependence::Unknown,
                 IndependenceBasis::InsufficientProvenance { coverage },
             ));
         }
 
         if source.provenance.source.sensor_id == target.provenance.source.sensor_id {
-            return Ok(assessment(
+            return Ok((
                 EvidenceIndependence::SharedUpstream,
                 IndependenceBasis::SharedSensor {
                     sensor_id: source.provenance.source.sensor_id.clone(),
@@ -1313,7 +1328,7 @@ impl ObservationGraph {
             target.provenance.source.platform_id.as_ref(),
         ) && source_platform == target_platform
         {
-            return Ok(assessment(
+            return Ok((
                 EvidenceIndependence::SharedUpstream,
                 IndependenceBasis::SharedPlatform {
                     platform_id: source_platform.clone(),
@@ -1321,10 +1336,10 @@ impl ObservationGraph {
             ));
         }
 
-        let source_ancestors = Self::ancestor_ids(source_observation_id, &by_id)?;
-        let target_ancestors = Self::ancestor_ids(target_observation_id, &by_id)?;
+        let source_ancestors = Self::ancestor_ids(source_observation_id, by_id)?;
+        let target_ancestors = Self::ancestor_ids(target_observation_id, by_id)?;
         if let Some(shared_ancestor) = source_ancestors.intersection(&target_ancestors).min() {
-            return Ok(assessment(
+            return Ok((
                 EvidenceIndependence::SharedUpstream,
                 IndependenceBasis::SharedAncestor {
                     observation_id: shared_ancestor.clone(),
@@ -1357,7 +1372,7 @@ impl ObservationGraph {
             })
             .collect::<HashSet<_>>();
         if let Some(shared_activity) = source_activities.intersection(&target_activities).min() {
-            return Ok(assessment(
+            return Ok((
                 EvidenceIndependence::SharedUpstream,
                 IndependenceBasis::SharedProcessingActivity {
                     activity_id: (*shared_activity).to_string(),
@@ -1369,7 +1384,7 @@ impl ObservationGraph {
             && source_asset.hash_algorithm == target_asset.hash_algorithm
             && source_asset.content_hash == target_asset.content_hash
         {
-            return Ok(assessment(
+            return Ok((
                 EvidenceIndependence::SharedUpstream,
                 IndependenceBasis::IdenticalAsset {
                     hash_algorithm: source_asset.hash_algorithm.clone(),
@@ -1378,7 +1393,7 @@ impl ObservationGraph {
             ));
         }
 
-        Ok(assessment(
+        Ok((
             EvidenceIndependence::VerifiedIndependent,
             IndependenceBasis::NoSharedProvenance,
         ))
