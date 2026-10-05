@@ -27,6 +27,10 @@ use symthaea_core::genesis::GenesisSeed;
 const SCHEMA_VERSION: u32 = 1;
 const SEED: &str = "broca-lexical-binding-audit-v1";
 
+fn is_blake3_token(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 #[derive(Debug, Serialize)]
 struct AuditReport {
     schema_version: u32,
@@ -687,7 +691,11 @@ fn main() -> Result<()> {
         .is_some_and(|case| case.passed && case.semantic_items > 0);
     let provenance_pass = cases.iter().all(|case| {
         case.polarity == "negative"
-            || (case.passed && case.provenance_token.as_ref().is_some_and(|token| token.len() == 64))
+            || (case.passed
+                && case
+                    .provenance_token
+                    .as_ref()
+                    .is_some_and(|token| is_blake3_token(token)))
     });
     let grammar_pass = cases
         .iter()
