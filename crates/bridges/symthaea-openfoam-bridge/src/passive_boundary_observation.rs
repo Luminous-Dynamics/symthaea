@@ -596,6 +596,45 @@ mod tests {
     }
 
     #[test]
+    fn declared_patch_count_must_match_observed_entries() {
+        let source = br#"3
+(
+    inlet { type patch; nFaces 1; startFace 0; }
+    outlet { type patch; nFaces 1; startFace 1; }
+)
+"#;
+        assert!(matches!(
+            observe_openfoam_boundary_patch(source, "inlet"),
+            Err(OpenFoamBoundaryObservationError::PatchCountMismatch {
+                declared: 3,
+                observed: 2
+            })
+        ));
+    }
+
+    #[test]
+    fn nested_same_named_block_cannot_shadow_boundary_patch() {
+        let source = br#"1
+(
+    inlet
+    {
+        type patch;
+        nFaces 1;
+        startFace 0;
+        nested
+        {
+            inlet { type fake; nFaces 9; startFace 9; }
+        }
+    }
+)
+"#;
+        let (record, _) = observe_openfoam_boundary_patch(source, "inlet").unwrap();
+        assert_eq!(record.patch_type, "patch");
+        assert_eq!(record.n_faces, 1);
+        assert_eq!(record.start_face, 0);
+    }
+
+    #[test]
     fn malformed_comment_fails_closed() {
         let source = br#"/* never closed 1 ( inlet { type patch; nFaces 1; startFace 0; } )"#;
         assert!(matches!(observe_openfoam_boundary_patch(source, "inlet"), Err(OpenFoamBoundaryObservationError::UnterminatedBlockComment)));
