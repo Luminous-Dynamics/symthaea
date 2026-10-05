@@ -235,6 +235,14 @@ fn parse_face_list(
         }
         index += 1;
 
+        // Bound attacker-controlled allocation by the number of tokens that
+        // actually remain in the source. A huge declared vertex count must
+        // fail before Vec::with_capacity can attempt an unbounded allocation.
+        let remaining_tokens = tokens.len().saturating_sub(index);
+        if vertex_count > remaining_tokens {
+            return Err(OpenFoamBoundaryObservationError::InvalidFaceRecord { face_index });
+        }
+
         let mut face = Vec::with_capacity(vertex_count);
         for _ in 0..vertex_count {
             let Token::Number(point) = tokens.get(index).ok_or(
@@ -1999,6 +2007,22 @@ mod tests {
                 start_face: 2,
                 n_faces: 2,
                 face_count: 3
+            })
+        ));
+    }
+
+    #[test]
+    fn oversized_face_vertex_count_fails_before_allocation() {
+        let source = br#"1
+(
+    1000000000(0 1 2)
+)
+"#;
+
+        assert!(matches!(
+            parse_face_list(source),
+            Err(OpenFoamBoundaryObservationError::InvalidFaceRecord {
+                face_index: 0
             })
         ));
     }
