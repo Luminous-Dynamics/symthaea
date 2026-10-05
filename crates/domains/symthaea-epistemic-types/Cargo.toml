@@ -9,6 +9,8 @@ description = "Canonical epistemic types shared between Symthaea, Mycelix, and t
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
 serde_json = "1.0"
+bs58 = { workspace = true }
+hex = { workspace = true }
 chrono = { version = "0.4", features = ["serde"] }
 url = "2.5"
 
