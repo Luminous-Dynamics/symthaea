@@ -1066,6 +1066,7 @@ fn discover_invariants_autonomous_with_mode(
             mean_value: mean,
             complexity: expr.complexity(),
             symbolically_proven: proven,
+            discovery_mode,
         });
 
         if results.len() >= 10 {
