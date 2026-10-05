@@ -447,13 +447,13 @@ mod tests {
     #[test]
     fn handoff_is_deterministic_and_binds_type_identity() {
         let h = ScientificHypothesisHandoff::new(
-            "candidate-1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             &energy(),
             ModelMaturity::ResearchPrototype,
-            "obs-1",
-            "search-1",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             42,
-            "manifest-1",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
             7,
             "ramanujan",
             vec!["not an empirical confirmation".into()],
