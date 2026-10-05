@@ -2682,6 +2682,7 @@ impl<'a> CborReader<'a> {
                         max_bstr_len,
                         max_array_items,
                         limit_end,
+                        resource_limits,
                     )?;
                 }
                 Ok(())
@@ -2748,6 +2749,7 @@ impl<'a> CborReader<'a> {
                         max_bstr_len,
                         max_array_items,
                         limit_end,
+                        resource_limits,
                     )?;
                     if self.offset >= limit_end {
                         return Err(Rfc9162ProofDecodeError::InvalidStructure);
@@ -2757,6 +2759,7 @@ impl<'a> CborReader<'a> {
                         max_bstr_len,
                         max_array_items,
                         limit_end,
+                        resource_limits,
                     )?;
                 }
                 Ok(())
