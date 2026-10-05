@@ -18754,8 +18754,13 @@ version = "0.1.0"
 name = "symthaea-epistemic-types"
 version = "0.1.0"
 dependencies = [
+ "bs58",
+ "chrono",
+ "hex",
  "serde",
  "serde_json",
+ "sha2",
+ "url",
 ]
 
 [[package]]
@@ -20152,6 +20157,19 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "symthaea-verification-adapter"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "serde",
+ "serde_json",
+ "sha2",
+ "symthaea-epistemic-types",
+ "tempfile",
+ "url",
 ]
 
 [[package]]
