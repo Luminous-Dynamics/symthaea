@@ -9,7 +9,8 @@ The model is:
 1. Define the function that must be satisfied.
 2. Represent candidate material/process/product pathways.
 3. Declare an explicit comparison scale (unit + functional/lifecycle scope) for every burden dimension; candidates cannot define their own cohort.
-4. Keep multi-axis burdens separate.
+4. Represent functional-performance values as evidence-linked, scoped measurements rather than bare claims.
+5. Keep multi-axis burdens separate.
 5. Evaluate hard constraints fail-closed.
 6. Compute a conservative Pareto frontier without an aggregate sustainability score.
 7. Preserve evidence kind, confidence, provenance, source identity, and contradictions.
@@ -17,7 +18,7 @@ The model is:
 9. Emit a deterministic assessment receipt.
 10. Identify a conservative next-measurement target from unresolved uncertainty.
 
-The design is intended to compose later with Mycelix manufacturing/BOM/routing records and a federated evidence graph, while remaining independent of Holochain versioning. The Pareto frontier is a candidate comparison set, not a recommendation or deployment authorization.
+The design is intended to compose later with Mycelix manufacturing/BOM/routing records and a federated evidence graph, while remaining independent of Holochain versioning. The Pareto frontier is a candidate comparison set, not a recommendation or deployment authorization. Time-bounded evidence is ignored by timeless assessments and evaluated only when the caller supplies an explicit assessment timestamp.
 
 ## Safety boundary
 
