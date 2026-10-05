@@ -60,10 +60,63 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake
 
+      - name: Verify Cargo.lock is current
+        id: cargo-lock-integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/broca-measurements/lock-diagnostic
+          cp Cargo.lock target/broca-measurements/lock-diagnostic/Cargo.lock.checked-in
+
+          set +e
+          cargo metadata --locked --format-version=1 --no-deps \
+            > target/broca-measurements/lock-diagnostic/cargo-metadata-locked.stdout.log \
+            2> target/broca-measurements/lock-diagnostic/cargo-metadata-locked.stderr.log
+          status=$?
+          set -e
+
+          if [[ "$status" -eq 0 ]]; then
+            printf '%s\n' "locked metadata resolution: PASS" \
+              > target/broca-measurements/lock-diagnostic/result.txt
+            exit 0
+          fi
+
+          printf '%s\n' "locked metadata resolution: FAIL (exit $status)" \
+            > target/broca-measurements/lock-diagnostic/result.txt
+
+          set +e
+          cargo generate-lockfile \
+            > target/broca-measurements/lock-diagnostic/cargo-generate-lockfile.stdout.log \
+            2> target/broca-measurements/lock-diagnostic/cargo-generate-lockfile.stderr.log
+          regen_status=$?
+          set -e
+
+          if [[ -f Cargo.lock ]]; then
+            cp Cargo.lock target/broca-measurements/lock-diagnostic/Cargo.lock.generated
+            diff -u \
+              target/broca-measurements/lock-diagnostic/Cargo.lock.checked-in \
+              target/broca-measurements/lock-diagnostic/Cargo.lock.generated \
+              > target/broca-measurements/lock-diagnostic/Cargo.lock.diff || true
+          else
+            : > target/broca-measurements/lock-diagnostic/Cargo.lock.generated-missing
+          fi
+
+          cp target/broca-measurements/lock-diagnostic/Cargo.lock.checked-in Cargo.lock
+
+          {
+            echo "metadata_status=$status"
+            echo "regeneration_status=$regen_status"
+            echo "generated_lock_present=$(test -f target/broca-measurements/lock-diagnostic/Cargo.lock.generated && echo yes || echo no)"
+          } > target/broca-measurements/lock-diagnostic/status.env
+
+          exit "$status"
+
       - name: Generate Broca measurement artifacts
+        if: steps.cargo-lock-integrity.outcome == 'success'
         run: scripts/broca_measurement_artifacts.sh target/broca-measurements
 
       - name: Upload Broca measurement artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: broca-measurements-${{ github.sha }}
