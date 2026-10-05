@@ -1096,6 +1096,12 @@ impl VocalTractPipeline {
 mod tests {
     use super::*;
 
+    use crate::controller::SpeakerProfile;
+    use crate::encoder::VoiceCognitiveState;
+    use crate::fep::VocalTractObservation;
+    use crate::types::FormantFrame;
+    use symthaea_core::genesis::GenesisSeed;
+
     #[test]
     fn test_pitch_range_is_independent_of_arousal() {
         let base = FormantFrame {
@@ -1104,7 +1110,7 @@ mod tests {
             ..FormantFrame::silent(0.0)
         };
 
-        let mut narrow = ProsodyContext {
+        let narrow = ProsodyContext {
             utterance_progress: 0.0,
             phoneme_progress: 0.5,
             base_f0: 200.0,
@@ -1123,11 +1129,11 @@ mod tests {
         assert!(narrow_frame.f0.is_finite() && wide_frame.f0.is_finite());
         assert!(wide_frame.f0 > narrow_frame.f0);
 
-        let mut narrow_a2 = ProsodyContext {
+        let narrow_a2 = ProsodyContext {
             arousal: 0.2,
             ..narrow
         };
-        let mut narrow_b2 = ProsodyContext {
+        let narrow_b2 = ProsodyContext {
             arousal: 0.8,
             ..narrow
         };
@@ -1144,11 +1150,6 @@ mod tests {
             "pitch range must not depend on arousal: a={pitch_shape_narrow_a}, b={pitch_shape_narrow_b}"
         );
     }
-    use crate::controller::SpeakerProfile;
-    use crate::encoder::VoiceCognitiveState;
-    use crate::fep::VocalTractObservation;
-    use crate::types::FormantFrame;
-    use symthaea_core::genesis::GenesisSeed;
 
     #[test]
     fn test_pipeline_time_tracking() {
