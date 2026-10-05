@@ -205,10 +205,50 @@ jobs:
               + (b"\x00" * 64)
           )
 
+          vdp_65 = b"\\xa1\\x20\\x18\\x41" + b"".join(
+              b"\\x58\\x26" + proof for _ in range(65)
+          )
+          # Exercise the VDP array admission ceiling itself. The outer VDP map
+          # scanner is bounded at 256 array members, so 257 must fail closed
+          # before attempting to allocate/parse individual proof payloads.
+          vdp_257 = b"\\xa1\\x20\\x98\\x01\\x01" + b"".join(
+              b"\\x40" for _ in range(257)
+          )
+
+          # Exercise the outer receipt-collection count ceiling with small
+          # opaque receipt values. The collection limit is 16, while the
+          # enclosing COSE map scanner permits the array to reach this boundary.
+          receipt_count_17 = (
+              b"\\xd2\\x84"
+              + b"\\x41\\xa0"
+              + b"\\xa1\\x19\\x01\\x8a\\x91"
+              + (b"\\x40" * 17)
+              + b"\\xf6"
+              + b"\\x40"
+          )
+
+          # Exercise the bounded indefinite-bstr chunk-count ceiling with
+          # 4097 zero-length chunks. This is distinct from the large definite
+          # bstr seed: it reaches the MAX_CBOR_BSTR_CHUNKS admission path.
+          indefinite_bstr_4097_chunks = (
+              b"\\xd2\\x84"
+              + b"\\x41\\xa0"
+              + b"\\xa1\\x18\\x1e\\x5f"
+              + (b"\\x40" * 4097)
+              + b"\\xff"
+              + b"\\xf6"
+              + b"\\x40"
+          )
+
           generated = {
               "fuzz_rfc9942_proofs/seed-65-proof-vdp.cbor": vdp_65,
+              "fuzz_rfc9942_proofs/seed-257-proof-vdp.cbor": vdp_257,
               "fuzz_rfc9942_signature_with_receipts/seed-tagged-large-opaque.cbor":
                   large_tagged_outer,
+              "fuzz_rfc9942_signature_with_receipts/seed-17-receipts.cbor":
+                  receipt_count_17,
+              "fuzz_rfc9942_signature_with_receipts/seed-indefinite-bstr-4097-chunks.cbor":
+                  indefinite_bstr_4097_chunks,
           }
           for relative, data in generated.items():
               path = Path("corpus") / relative
