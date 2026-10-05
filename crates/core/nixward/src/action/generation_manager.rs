@@ -7,7 +7,7 @@
 //! Produces `NixOSCommand` values for anything that modifies state;
 //! read-only queries (list, diff) run directly.
 
-use super::executor::NixOSCommand;
+use super::executor::{NixOSCommand, SafetyLevel};
 use std::process::Command;
 
 /// Manages NixOS generations: switch, rollback, delete, and boot configuration.
