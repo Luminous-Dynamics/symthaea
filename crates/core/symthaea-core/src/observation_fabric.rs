@@ -439,6 +439,10 @@ fn read_canonical_string_vec_le(
 ) -> Result<Vec<String>, ObservationValidationError> {
     let length = usize::try_from(read_u64_le(bytes, cursor)?)
         .map_err(|_| ObservationValidationError::InvalidIndependenceScopeWitnessV3)?;
+    let remaining = bytes.len().saturating_sub(*cursor);
+    if length > remaining / 8 {
+        return Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3);
+    }
     let mut values = Vec::with_capacity(length);
     for _ in 0..length {
         values.push(read_canonical_string_le(bytes, cursor)?);
@@ -1122,7 +1126,63 @@ impl IndependenceScopeWitnessV3 {
             }
         }
 
-        source_role_count == 1 && target_role_count == 1
+        if source_role_count != 1 || target_role_count != 1 {
+            return false;
+        }
+
+        let by_id = self
+            .records
+            .iter()
+            .map(|record| (record.observation_id.as_str(), record))
+            .collect::<HashMap<_, _>>();
+
+        for record in &self.records {
+            for parent_id in &record.parent_observation_ids {
+                let Some(parent) = by_id.get(parent_id.as_str()) else {
+                    return false;
+                };
+                if parent.role & INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE == 0 {
+                    return false;
+                }
+            }
+        }
+
+        fn visit(
+            observation_id: &str,
+            by_id: &HashMap<&str, &IndependenceScopeWitnessRecordV3>,
+            visiting: &mut HashSet<String>,
+            visited: &mut HashSet<String>,
+        ) -> bool {
+            if visited.contains(observation_id) {
+                return true;
+            }
+            if !visiting.insert(observation_id.to_string()) {
+                return false;
+            }
+            let record = match by_id.get(observation_id) {
+                Some(record) => record,
+                None => return false,
+            };
+            for parent_id in &record.parent_observation_ids {
+                if !visit(parent_id, by_id, visiting, visited) {
+                    return false;
+                }
+            }
+            visiting.remove(observation_id);
+            visited.insert(observation_id.to_string());
+            true
+        }
+
+        let mut visiting = HashSet::new();
+        let mut visited = HashSet::new();
+        self.records.iter().all(|record| {
+            visit(
+                &record.observation_id,
+                &by_id,
+                &mut visiting,
+                &mut visited,
+            )
+        })
     }
 
     pub fn observation_ids(&self) -> Vec<String> {
@@ -1130,6 +1190,155 @@ impl IndependenceScopeWitnessV3 {
             .iter()
             .map(|record| record.observation_id.clone())
             .collect()
+    }
+
+    pub fn endpoint_ids(&self) -> Option<(&str, &str)> {
+        let source = self
+            .records
+            .iter()
+            .find(|record| record.role & INDEPENDENCE_SCOPE_V3_SOURCE_ROLE != 0)
+            .map(|record| record.observation_id.as_str())?;
+        let target = self
+            .records
+            .iter()
+            .find(|record| record.role & INDEPENDENCE_SCOPE_V3_TARGET_ROLE != 0)
+            .map(|record| record.observation_id.as_str())?;
+        Some((source, target))
+    }
+
+    fn ancestor_ids_from(&self, observation_id: &str) -> HashSet<String> {
+        let by_id = self
+            .records
+            .iter()
+            .map(|record| (record.observation_id.as_str(), record))
+            .collect::<HashMap<_, _>>();
+
+        let mut ancestors = HashSet::new();
+        let mut stack = by_id[observation_id]
+            .parent_observation_ids
+            .clone();
+        while let Some(parent_id) = stack.pop() {
+            if !ancestors.insert(parent_id.clone()) {
+                continue;
+            }
+            if let Some(parent) = by_id.get(parent_id.as_str()) {
+                stack.extend(parent.parent_observation_ids.iter().cloned());
+            }
+        }
+        ancestors
+    }
+
+    /// Reconstruct the bounded v3 decision from the portable scope witness alone.
+    ///
+    /// This is intentionally independent of ObservationGraph and provides a
+    /// downstream verification path that consumes only the canonical v3 witness.
+    pub fn assess_independence(
+        &self,
+    ) -> Result<(EvidenceIndependence, IndependenceBasis), ObservationValidationError> {
+        if !self.is_well_formed() {
+            return Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3);
+        }
+
+        let by_id = self
+            .records
+            .iter()
+            .map(|record| (record.observation_id.as_str(), record))
+            .collect::<HashMap<_, _>>();
+        let (source_id, target_id) = self
+            .endpoint_ids()
+            .ok_or(ObservationValidationError::InvalidIndependenceScopeWitnessV3)?;
+        let source = by_id
+            .get(source_id)
+            .expect("well-formed source endpoint");
+        let target = by_id
+            .get(target_id)
+            .expect("well-formed target endpoint");
+
+        if source.coverage != Some(ProvenanceCoverage::Complete)
+            || target.coverage != Some(ProvenanceCoverage::Complete)
+        {
+            let coverage = source
+                .coverage
+                .filter(|coverage| *coverage != ProvenanceCoverage::Complete)
+                .or_else(|| target.coverage.filter(|coverage| *coverage != ProvenanceCoverage::Complete))
+                .expect("at least one endpoint is incomplete");
+            return Ok((
+                EvidenceIndependence::Unknown,
+                IndependenceBasis::InsufficientProvenance { coverage },
+            ));
+        }
+
+        if source.sensor_id == target.sensor_id {
+            return Ok((
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedSensor {
+                    sensor_id: source.sensor_id.clone().expect("well-formed source"),
+                },
+            ));
+        }
+
+        if let (Some(source_platform), Some(target_platform)) =
+            (source.platform_id.as_ref(), target.platform_id.as_ref())
+            && source_platform == target_platform
+        {
+            return Ok((
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedPlatform {
+                    platform_id: source_platform.clone(),
+                },
+            ));
+        }
+
+        let source_ancestors = self.ancestor_ids_from(source_id);
+        let target_ancestors = self.ancestor_ids_from(target_id);
+        if let Some(shared_ancestor) = source_ancestors.intersection(&target_ancestors).min() {
+            return Ok((
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedAncestor {
+                    observation_id: shared_ancestor.clone(),
+                },
+            ));
+        }
+
+        let source_activities = source_ancestors
+            .iter()
+            .filter_map(|id| by_id.get(id.as_str()))
+            .chain(std::iter::once(source))
+            .filter_map(|record| record.processing_activity_id.as_deref())
+            .collect::<HashSet<_>>();
+        let target_activities = target_ancestors
+            .iter()
+            .filter_map(|id| by_id.get(id.as_str()))
+            .chain(std::iter::once(target))
+            .filter_map(|record| record.processing_activity_id.as_deref())
+            .collect::<HashSet<_>>();
+        if let Some(shared_activity) = source_activities.intersection(&target_activities).min() {
+            return Ok((
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedProcessingActivity {
+                    activity_id: (*shared_activity).to_string(),
+                },
+            ));
+        }
+
+        if let (Some(source_asset), Some(target_asset)) =
+            (source.asset_identity.as_ref(), target.asset_identity.as_ref())
+            && source_asset.hash_algorithm == target_asset.hash_algorithm
+            && source_asset.content_hash == target_asset.content_hash
+        {
+            return Ok((
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::IdenticalAsset {
+                    hash_algorithm: source_asset.hash_algorithm.clone(),
+                    content_hash: source_asset.content_hash.clone(),
+                },
+            ));
+        }
+
+        Ok((
+            EvidenceIndependence::VerifiedIndependent,
+            IndependenceBasis::NoSharedProvenance,
+        ))
     }
 
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, ObservationValidationError> {
@@ -1319,7 +1528,17 @@ impl IndependenceVerificationReceiptV3 {
         else {
             return false;
         };
+        let Ok((classification, basis)) = witness.assess_independence() else {
+            return false;
+        };
+        let Some((source_id, target_id)) = witness.endpoint_ids() else {
+            return false;
+        };
         self.verify_integrity()
+            && source_id == self.source_observation_id
+            && target_id == self.target_observation_id
+            && classification == self.classification
+            && basis == self.basis
             && blake3::hash(canonical_scope_bytes).to_hex().to_string()
                 == self.examined_scope_fingerprint
             && witness.fingerprint().ok() == Some(self.examined_scope_fingerprint.clone())
@@ -4671,7 +4890,21 @@ mod tests {
             )
             .expect("v3 scope bytes");
 
+        let witness =
+            IndependenceScopeWitnessV3::from_canonical_bytes(&scope).expect("decode scope");
+        assert_eq!(
+            witness.assess_independence().expect("witness assessment"),
+            (receipt.classification.clone(), receipt.basis.clone())
+        );
         assert!(receipt.verify_against_scope_witness(&scope));
+
+        let mut forged = receipt.clone();
+        forged.classification = EvidenceIndependence::Unknown;
+        forged.basis = IndependenceBasis::InsufficientProvenance {
+            coverage: ProvenanceCoverage::Complete,
+        };
+        forged.assessment_fingerprint = forged.fingerprint_for_testing();
+        assert!(!forged.verify_against_scope_witness(&scope));
 
         let mut mutated = scope.clone();
         mutated.push(0);
