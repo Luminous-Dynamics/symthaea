@@ -378,6 +378,21 @@ impl HdcOntologyConformalCalibration {
 
     /// Convert bounded cosine similarity into a [0, 1] nonconformity score.
     /// Similarity +1 is perfect conformity and -1 is maximal nonconformity.
+    /// Verify that an external calibration-score collection matches the exact
+    /// multiset that produced this serialized calibration artifact.
+    pub fn validates_calibration_scores(&self, calibration_scores: &[f64]) -> Result<(), String> {
+        if !self.validates() {
+            return Err("invalid HDC ontology conformal calibration".into());
+        }
+        if calibration_scores.len() != self.calibration_case_count {
+            return Err("conformal calibration score count does not match artifact".into());
+        }
+        if calibration_scores_hash(calibration_scores)? != self.calibration_scores_hash {
+            return Err("conformal calibration score hash does not match artifact".into());
+        }
+        Ok(())
+    }
+
     pub fn nonconformity_from_cosine(similarity: f64) -> Result<f64, String> {
         if !similarity.is_finite() || !(-1.0..=1.0).contains(&similarity) {
             return Err("HDC cosine similarity must be finite and within [-1, 1]".into());
@@ -1693,6 +1708,9 @@ mod tests {
         assert!(calibration.accepts(0.30));
         assert!(!calibration.accepts(0.31));
         assert!(calibration.validates());
+        assert!(calibration.validates_calibration_scores(&[0.30, 0.10, 0.20]).is_ok());
+        assert!(calibration.validates_calibration_scores(&[0.30, 0.10]).is_err());
+        assert!(calibration.validates_calibration_scores(&[0.30, 0.10, 0.21]).is_err());
     }
 
     #[test]
