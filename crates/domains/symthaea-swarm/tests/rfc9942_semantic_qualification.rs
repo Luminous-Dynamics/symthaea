@@ -255,6 +255,20 @@ fn rfc9162_inclusion_and_consistency_path_bounds_are_tree_size_derived() {
 
 
 #[test]
+fn rfc9942_vdp_resource_limit_is_not_collapsed_into_encoding_error() {
+    let mut encoded = vec![0xa1, 0x20];
+    encoded.extend(std::iter::repeat_n(0xc0, 17));
+    encoded.push(0x01);
+
+    // The outer VDP scanner hits its recursion ceiling before interpreting
+    // the VDP value. That is a resource admission failure, not malformed CBOR.
+    assert_eq!(
+        Rfc9942Vdp::from_cbor(&encoded),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
+
+#[test]
 fn rfc9942_crit_rejects_unknown_critical_header() {
     // Protected = {2: [999], 999: {bstr(0): 0}}.
     // The extension itself is understood as opaque, but a critical extension
