@@ -81,6 +81,47 @@ fn parity_check_is_full_rank_and_annihilates_code_space() {
 }
 
 #[test]
+fn parity_check_annihilation_and_row_independence_hold_by_exhaustive_small_fixture() {
+    let code = boundary_code();
+    let parity_check = ParityCheckMatrix::from_code(&code).expect("parity-check matrix");
+    let rows = parity_check.rows();
+
+    for codeword in code.enumerate() {
+        for row in rows {
+            let parity = row
+                .words()
+                .iter()
+                .zip(codeword.words())
+                .map(|(left, right)| (left & right).count_ones() as usize)
+                .sum::<usize>()
+                % 2;
+            assert_eq!(parity, 0, "generator/codeword was not annihilated by H");
+        }
+    }
+
+    assert!(rows.len() < usize::BITS as usize);
+    for mask in 1usize..(1usize << rows.len()) {
+        let mut combination = BinaryCodeword::zero(parity_check.dimension());
+        for (index, row) in rows.iter().enumerate() {
+            if (mask >> index) & 1 == 1 {
+                combination.xor_assign(row);
+            }
+        }
+        assert_ne!(
+            combination.weight(),
+            0,
+            "non-empty parity-check row combination collapsed to zero: mask={mask:#x}"
+        );
+    }
+
+    println!(
+        "PARITY_CHECK_EXHAUSTIVE=rows={};nonzero_row_combinations={}",
+        rows.len(),
+        (1usize << rows.len()) - 1,
+    );
+}
+
+#[test]
 fn parity_check_derivation_is_deterministic_for_same_code() {
     let a = RandomLinearCode::generate(73, 8, 0xC0DE);
     let b = RandomLinearCode::generate(73, 8, 0xC0DE);
