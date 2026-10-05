@@ -303,9 +303,7 @@ impl BoundedDistanceSyndromeDecoder {
         }
 
         (
-            BoundedDistanceDecode::NoMatchWithinBound {
-                max_error_weight,
-            },
+            BoundedDistanceDecode::NoMatchWithinBound { max_error_weight },
             work,
         )
     }
