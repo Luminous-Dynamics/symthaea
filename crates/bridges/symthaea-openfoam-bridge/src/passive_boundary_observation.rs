@@ -287,7 +287,7 @@ fn parse_neighbour_list_count(
         )? else {
             return Err(OpenFoamBoundaryObservationError::InvalidNeighbourListEntry);
         };
-        value.parse::<i64>().map_err(|_| {
+        value.parse::<u64>().map_err(|_| {
             OpenFoamBoundaryObservationError::InvalidNeighbourListEntry
         })?;
         observed = observed
@@ -400,6 +400,8 @@ fn observe_openfoam_patch_geometry(
 
     let mut edge_occurrences =
         std::collections::BTreeMap::<symthaea_passive_solver_binding::BoundaryEdgeKey, u32>::new();
+    let mut edge_origins =
+        std::collections::BTreeMap::<symthaea_passive_solver_binding::BoundaryEdgeKey, (u64, u64)>::new();
 
     for (offset, face) in faces[start..end].iter().enumerate() {
         if face.len() < 3 {
@@ -443,6 +445,18 @@ fn observe_openfoam_patch_geometry(
             let b_mm = scaled_point_to_f32(*b, point_scale_mm_per_unit)?;
             let edge = symthaea_passive_solver_binding::BoundaryEdgeKey::new(a_mm, b_mm)
                 .map_err(|_| OpenFoamBoundaryObservationError::PatchGeometryMismatch)?;
+            let topology_edge = if a_index <= b_index {
+                (a_index, b_index)
+            } else {
+                (b_index, a_index)
+            };
+            if let Some(existing) = edge_origins.get(&edge) {
+                if *existing != topology_edge {
+                    return Err(OpenFoamBoundaryObservationError::PatchGeometryMismatch);
+                }
+            } else {
+                edge_origins.insert(edge, topology_edge);
+            }
             let entry = edge_occurrences.entry(edge).or_insert(0);
             *entry = entry.checked_add(1).ok_or(
                 OpenFoamBoundaryObservationError::ArithmeticOverflow,
@@ -1781,6 +1795,19 @@ mod tests {
                 boundary, faces, points, "inlet", &interface, &candidate, 0.05, 1.0
             ),
             Err(OpenFoamBoundaryObservationError::InvalidFaceRecord { face_index: 0 })
+        ));
+    }
+
+    #[test]
+    fn negative_neighbour_label_fails_closed() {
+        let source = br#"-1
+(
+    -3
+)
+"#;
+        assert!(matches!(
+            parse_neighbour_list_count(source),
+            Err(OpenFoamBoundaryObservationError::InvalidNeighbourListEntry)
         ));
     }
 
