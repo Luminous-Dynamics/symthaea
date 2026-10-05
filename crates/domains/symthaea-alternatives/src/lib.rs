@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 20;
+pub const SCHEMA_VERSION: u16 = 21;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-unit-v29";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-v30";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -385,6 +385,8 @@ pub struct ObservationProvenanceRef {
     pub calibration_chain_refs: Vec<String>,
     /// Optional experimental-design identity that caused this observation to be collected.
     pub experimental_design_id: Option<String>,
+    /// Optional exact discrimination target within that experimental design.
+    pub experimental_target_id: Option<String>,
 }
 
 impl ObservationProvenanceRef {
@@ -409,7 +411,14 @@ impl ObservationProvenanceRef {
                 .experimental_design_id
                 .as_ref()
                 .is_some_and(String::is_empty)
+            || self
+                .experimental_target_id
+                .as_ref()
+                .is_some_and(String::is_empty)
         {
+            return Err(AssessmentError::InvalidObservationProvenance);
+        }
+        if self.experimental_target_id.is_some() && self.experimental_design_id.is_none() {
             return Err(AssessmentError::InvalidObservationProvenance);
         }
         Ok(())
@@ -1808,6 +1817,8 @@ impl ExperimentalDecisionRuleRef {
 pub struct ExperimentalDiscriminationTarget {
     /// Stable identity of the target.
     pub target_id: String,
+    /// Exact measurand identity intended to discriminate the candidate pair.
+    pub measurand_id: String,
     /// Left-hand candidate identity.
     pub left_candidate_id: String,
     /// Right-hand candidate identity.
@@ -1822,6 +1833,7 @@ impl ExperimentalDiscriminationTarget {
     /// Validate the candidate relationship and rule/surface identities.
     pub fn validate(&self) -> Result<(), AssessmentError> {
         if self.target_id.is_empty()
+            || self.measurand_id.is_empty()
             || self.left_candidate_id.is_empty()
             || self.right_candidate_id.is_empty()
             || self.left_candidate_id == self.right_candidate_id
@@ -2229,6 +2241,33 @@ pub enum AssessmentError {
     InvalidExperimentalDiscriminationTarget,
     /// An observation references an experimental design that is not present in the assessment.
     OrphanedExperimentalDesignObservation(String),
+    /// An observation carries a target identity without a corresponding design identity.
+    OrphanedExperimentalDesignTarget(String),
+    /// An observation references a target that is not declared by its design.
+    ExperimentalDesignTargetMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Referenced target identity.
+        target_id: String,
+    },
+    /// An observation is attributed to a design target for a different candidate.
+    ExperimentalDesignTargetCandidateMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Candidate carrying the observation.
+        candidate_id: String,
+        /// Target identity referenced by the observation.
+        target_id: String,
+    },
+    /// An observation's measurand differs from the exact target measurand.
+    ExperimentalDesignMeasurandMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Expected measurand identity.
+        expected_measurand_id: String,
+        /// Actual observation measurand identity.
+        actual_measurand_id: String,
+    },
     /// An observation references a different experimental design from the assessment.
     ExperimentalDesignObservationMismatch {
         /// Evidence identifier carrying the observation.
@@ -2409,6 +2448,30 @@ impl std::fmt::Display for AssessmentError {
             Self::OrphanedExperimentalDesignObservation(id) => write!(
                 f,
                 "observation references experimental design {id} but no design was supplied"
+            ),
+            Self::OrphanedExperimentalDesignTarget(id) => write!(
+                f,
+                "evidence {id} references an experimental target without a design"
+            ),
+            Self::ExperimentalDesignTargetMismatch { evidence_id, target_id } => write!(
+                f,
+                "evidence {evidence_id} references undeclared experimental target {target_id}"
+            ),
+            Self::ExperimentalDesignTargetCandidateMismatch {
+                evidence_id,
+                candidate_id,
+                target_id,
+            } => write!(
+                f,
+                "evidence {evidence_id} on candidate {candidate_id} is outside experimental target {target_id}"
+            ),
+            Self::ExperimentalDesignMeasurandMismatch {
+                evidence_id,
+                expected_measurand_id,
+                actual_measurand_id,
+            } => write!(
+                f,
+                "evidence {evidence_id} measurand {actual_measurand_id} does not match target measurand {expected_measurand_id}"
             ),
             Self::ExperimentalDesignObservationMismatch {
                 evidence_id,
@@ -2620,6 +2683,59 @@ impl AlternativesEngine {
             }
         }
 
+        for candidate in candidates {
+            for evidence in &candidate.evidence {
+                let Some(observation) = &evidence.observation else {
+                    continue;
+                };
+                let Some(design_id) = &observation.experimental_design_id else {
+                    if observation.experimental_target_id.is_some() {
+                        return Err(AssessmentError::OrphanedExperimentalDesignTarget(
+                            evidence.id.clone(),
+                        ));
+                    }
+                    continue;
+                };
+                if design_id != &experimental_design.design_id {
+                    return Err(AssessmentError::ExperimentalDesignObservationMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected_design_id: experimental_design.design_id.clone(),
+                        actual_design_id: design_id.clone(),
+                    });
+                }
+                let Some(target_id) = &observation.experimental_target_id else {
+                    return Err(AssessmentError::OrphanedExperimentalDesignTarget(
+                        evidence.id.clone(),
+                    ));
+                };
+                let Some(target) = experimental_design
+                    .expected_discrimination
+                    .iter()
+                    .find(|target| &target.target_id == target_id)
+                else {
+                    return Err(AssessmentError::ExperimentalDesignTargetMismatch {
+                        evidence_id: evidence.id.clone(),
+                        target_id: target_id.clone(),
+                    });
+                };
+                if candidate.id != target.left_candidate_id && candidate.id != target.right_candidate_id {
+                    return Err(AssessmentError::ExperimentalDesignTargetCandidateMismatch {
+                        evidence_id: evidence.id.clone(),
+                        candidate_id: candidate.id.clone(),
+                        target_id: target.target_id.clone(),
+                    });
+                }
+                let observation_measurand = &observation.measurand_id;
+                if observation_measurand != &target.measurand_id {
+                    return Err(AssessmentError::ExperimentalDesignMeasurandMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected_measurand_id: target.measurand_id.clone(),
+                        actual_measurand_id: observation_measurand.clone(),
+                    });
+                }
+            }
+        }
+
         let mut result = self.assess_at_with_freshness_internal(
             requirement,
             candidates,
@@ -2726,6 +2842,11 @@ impl AlternativesEngine {
                 if let Some(observation) = &evidence.observation
                     && let Some(design_id) = &observation.experimental_design_id
                 {
+                    if observation.experimental_target_id.is_none() {
+                        return Err(AssessmentError::OrphanedExperimentalDesignTarget(
+                            evidence.id.clone(),
+                        ));
+                    }
                     match allowed_experimental_design_id {
                         None => {
                             return Err(AssessmentError::OrphanedExperimentalDesignObservation(
@@ -5230,6 +5351,7 @@ mod tests {
             measurement_system_id: Some("system".into()),
             calibration_chain_refs: vec!["calibration".into()],
             experimental_design_id: Some("design:water-v1".into()),
+            experimental_target_id: Some("target:water-v1".into()),
         };
         observation.validate().unwrap();
         observation.experimental_design_id = Some(String::new());
