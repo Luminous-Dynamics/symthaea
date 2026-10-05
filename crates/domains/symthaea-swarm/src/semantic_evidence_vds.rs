@@ -234,7 +234,10 @@ impl Rfc9942Es256CoseKey {
                     kty=Some(match value_reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)? {
                         0 | 1 => value_reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?,
                         3 => {
-                            let value=value_reader.read_text_bounded(16).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                            let value=value_reader.read_text_bounded(16).map_err(|error|match error {
+                                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidEs256CoseKey,
+                                _=>Rfc9942VdpError::InvalidEncoding,
+                            })?;
                             if value==b"EC2" { COSE_EC2_KTY } else { return Err(Rfc9942VdpError::InvalidEs256CoseKey); }
                         }
                         _ => return Err(Rfc9942VdpError::InvalidEs256CoseKey),
@@ -251,7 +254,10 @@ impl Rfc9942Es256CoseKey {
                     match value_reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)? {
                         0 | 1 => alg=Some(value_reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?),
                         3 => {
-                            let value=value_reader.read_text_bounded(32).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                            let value=value_reader.read_text_bounded(32).map_err(|error|match error {
+                                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidEs256CoseKey,
+                                _=>Rfc9942VdpError::InvalidEncoding,
+                            })?;
                             if value==b"ES256" { alg=Some(COSE_ES256_ALGORITHM_ID); }
                             else { return Err(Rfc9942VdpError::Es256CoseKeyAlgorithmMismatch); }
                         }
@@ -298,19 +304,28 @@ impl Rfc9942Es256CoseKey {
                     crv=Some(match value_reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)? {
                         0 | 1 => value_reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?,
                         3 => {
-                            let value=value_reader.read_text_bounded(16).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                            let value=value_reader.read_text_bounded(16).map_err(|error|match error {
+                                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidEs256CoseKey,
+                                _=>Rfc9942VdpError::InvalidEncoding,
+                            })?;
                             if value==b"P-256" { COSE_P256_CRV } else { return Err(Rfc9942VdpError::InvalidEs256CoseKey); }
                         }
                         _ => return Err(Rfc9942VdpError::InvalidEs256CoseKey),
                     });
                 }
                 CborLabelKey::Integer(-2) => {
-                    let value=value_reader.read_bstr_bounded(32).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                    let value=value_reader.read_bstr_bounded(32).map_err(|error|match error {
+                        Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidEs256CoseKey,
+                        _=>Rfc9942VdpError::InvalidEncoding,
+                    })?;
                     if value.len()!=32 { return Err(Rfc9942VdpError::InvalidEs256CoseKey); }
                     let mut out=[0u8;32]; out.copy_from_slice(&value); x=Some(out);
                 }
                 CborLabelKey::Integer(-3) => {
-                    let value=value_reader.read_bstr_bounded(32).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                    let value=value_reader.read_bstr_bounded(32).map_err(|error|match error {
+                        Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidEs256CoseKey,
+                        _=>Rfc9942VdpError::InvalidEncoding,
+                    })?;
                     if value.len()!=32 { return Err(Rfc9942VdpError::InvalidEs256CoseKey); }
                     let mut out=[0u8;32]; out.copy_from_slice(&value); y=Some(out);
                 }
@@ -4875,6 +4890,37 @@ mod tests {
             Rfc9942SignatureWithReceipts::from_cbor(&bytes),
             Err(Rfc9942VdpError::InvalidEncoding)
         );
+    }
+
+    #[test]
+    fn rfc9942_es256_key_fixed_field_overflows_are_semantic() {
+        for (label, value) in [
+            (COSE_KTY_LABEL, vec![b'x'; 17]),
+            (COSE_KEY_ALG_LABEL, vec![b'x'; 33]),
+            (-1, vec![b'x'; 17]),
+        ] {
+            let mut key = Vec::new();
+            cbor_map_len(&mut key, 1);
+            cbor_int(&mut key, label);
+            cbor_text(&mut key, &value);
+            assert_eq!(
+                Rfc9942Es256CoseKey::from_cbor(&key),
+                Err(Rfc9942VdpError::InvalidEs256CoseKey),
+                "fixed text field overflow must remain a semantic key error"
+            );
+        }
+
+        for label in [-2, -3] {
+            let mut key = Vec::new();
+            cbor_map_len(&mut key, 1);
+            cbor_int(&mut key, label);
+            cbor_bytes(&mut key, &vec![0u8; 33]);
+            assert_eq!(
+                Rfc9942Es256CoseKey::from_cbor(&key),
+                Err(Rfc9942VdpError::InvalidEs256CoseKey),
+                "fixed coordinate overflow must remain a semantic key error"
+            );
+        }
     }
 
     #[test]
