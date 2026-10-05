@@ -21,6 +21,8 @@ pub const MAX_NEUROSEMANTIC_ID_BYTES: usize = 4096;
 
 /// Maximum serialized packet/authorization artifact size before JSON materialization.
 pub const MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES: usize = MAX_NEUROSEMANTIC_PAYLOAD_BYTES;
+pub const MAX_NEUROSEMANTIC_JURISDICTION_ID_BYTES: usize = 64;
+pub const MAX_NEUROSEMANTIC_SECONDARY_USE_CLASSES: usize = 16;
 
 /// Representation channel used for routing and authorization.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -79,7 +81,109 @@ pub enum NeurosemanticInferenceClass {
     Identity,
 }
 
-pub const NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION: u16 = 2;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum NeurosemanticSecondaryUse {
+    Research,
+    ModelTraining,
+    ProductDevelopment,
+    CommercialAnalytics,
+    BehavioralProfiling,
+    AffectiveInference,
+    IdentityInference,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum NeurosemanticRetentionPolicy {
+    Ephemeral,
+    UntilUnixS(u64),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum NeurosemanticHandlingAction {
+    Transmit,
+    Persist,
+    SecondaryUse(NeurosemanticSecondaryUse),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticHandlingPolicy {
+    pub schema_version: u16,
+    /// Jurisdiction identifier asserted for the originating data/controller context.
+    /// This is an interoperable policy identifier, not a legal determination.
+    pub origin_jurisdiction: String,
+    /// Explicit destination allow-list. Empty means deny-all.
+    #[serde(default)]
+    pub permitted_destination_jurisdictions: BTreeSet<String>,
+    /// Explicitly authorized downstream uses beyond the packet's primary purpose.
+    /// Empty means no secondary use.
+    #[serde(default)]
+    pub permitted_secondary_uses: BTreeSet<NeurosemanticSecondaryUse>,
+    pub retention: NeurosemanticRetentionPolicy,
+}
+
+impl Default for NeurosemanticHandlingPolicy {
+    fn default() -> Self {
+        Self {
+            schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
+            origin_jurisdiction: String::new(),
+            permitted_destination_jurisdictions: BTreeSet::new(),
+            permitted_secondary_uses: BTreeSet::new(),
+            retention: NeurosemanticRetentionPolicy::Ephemeral,
+        }
+    }
+}
+
+impl NeurosemanticHandlingPolicy {
+    pub fn validates(&self) -> bool {
+        self.schema_version == NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION
+            && valid_jurisdiction_id(&self.origin_jurisdiction)
+            && !self.permitted_destination_jurisdictions.is_empty()
+            && self.permitted_destination_jurisdictions.len() <= MAX_NEUROSEMANTIC_SECONDARY_USE_CLASSES
+            && self
+                .permitted_destination_jurisdictions
+                .iter()
+                .all(|jurisdiction| valid_jurisdiction_id(jurisdiction))
+            && self.permitted_destination_jurisdictions.contains(&self.origin_jurisdiction)
+            && self.permitted_secondary_uses.len() <= MAX_NEUROSEMANTIC_SECONDARY_USE_CLASSES
+            && matches!(
+                self.retention,
+                NeurosemanticRetentionPolicy::Ephemeral
+                    | NeurosemanticRetentionPolicy::UntilUnixS(_)
+            )
+    }
+
+    pub fn allows_destination(&self, destination_jurisdiction: &str) -> bool {
+        self.validates()
+            && valid_jurisdiction_id(destination_jurisdiction)
+            && self
+                .permitted_destination_jurisdictions
+                .contains(destination_jurisdiction)
+    }
+
+    pub fn allows_action(&self, action: NeurosemanticHandlingAction, now_unix_s: u64) -> bool {
+        if !self.validates() {
+            return false;
+        }
+
+        match action {
+            NeurosemanticHandlingAction::Transmit => true,
+            NeurosemanticHandlingAction::Persist => self.retention_allows_persistence(now_unix_s),
+            NeurosemanticHandlingAction::SecondaryUse(secondary_use) => {
+                self.retention_allows_persistence(now_unix_s)
+                    && self.permitted_secondary_uses.contains(&secondary_use)
+            }
+        }
+    }
+
+    pub fn retention_allows_persistence(&self, now_unix_s: u64) -> bool {
+        match self.retention {
+            NeurosemanticRetentionPolicy::Ephemeral => false,
+            NeurosemanticRetentionPolicy::UntilUnixS(expires_at) => now_unix_s < expires_at,
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NeurosemanticDataPolicy {
@@ -89,6 +193,8 @@ pub struct NeurosemanticDataPolicy {
     pub inference_classes: BTreeSet<NeurosemanticInferenceClass>,
     #[serde(default)]
     pub permitted_purposes: BTreeSet<CommunicationPurpose>,
+    #[serde(default)]
+    pub handling: NeurosemanticHandlingPolicy,
 }
 
 impl Default for NeurosemanticDataPolicy {
@@ -98,6 +204,7 @@ impl Default for NeurosemanticDataPolicy {
             data_class: NeurosemanticDataClass::Unknown,
             inference_classes: BTreeSet::new(),
             permitted_purposes: BTreeSet::new(),
+            handling: NeurosemanticHandlingPolicy::default(),
         }
     }
 }
@@ -118,10 +225,22 @@ impl NeurosemanticDataPolicy {
             && !self.inference_classes.is_empty()
             && !self.inference_classes.contains(&NeurosemanticInferenceClass::Unknown)
             && !self.permitted_purposes.is_empty()
+            && self.handling.validates()
     }
 
     pub fn allows_purpose(&self, purpose: CommunicationPurpose) -> bool {
         self.validates() && self.permitted_purposes.contains(&purpose)
+    }
+
+    pub fn allows_handling(
+        &self,
+        destination_jurisdiction: &str,
+        action: NeurosemanticHandlingAction,
+        now_unix_s: u64,
+    ) -> bool {
+        self.validates()
+            && self.handling.allows_destination(destination_jurisdiction)
+            && self.handling.allows_action(action, now_unix_s)
     }
 }
 
@@ -369,7 +488,7 @@ impl NeurosemanticPacket {
         payload: NeurosemanticPayload,
     ) -> Result<Self, String> {
         if !data_policy.validates() || !data_policy.transportable() {
-            return Err("neurosemantic data policy is invalid or not transportable in protocol v1".into());
+            return Err("neurosemantic data policy is invalid or not transportable in protocol v2".into());
         }
         if payload.intrinsic_data_class() != Some(data_policy.data_class) {
             return Err("neurosemantic payload type does not match its declared data class".into());
@@ -516,6 +635,31 @@ impl AuthorizedNeurosemanticMessage {
 
         Ok(())
     }
+
+    /// Apply the declared handling policy to a concrete downstream request.
+    /// Mycelix/another policy authority must supply the deployment context and
+    /// independently authenticate the policy provenance; this method does not
+    /// establish legal compliance or signed authorization by itself.
+    pub fn validate_for_handling(
+        &self,
+        lease: &CognitiveConsentLease,
+        destination_jurisdiction: &str,
+        action: NeurosemanticHandlingAction,
+        now_unix_s: u64,
+    ) -> Result<(), String> {
+        self.validate(lease, now_unix_s)?;
+        if !self.packet.data_policy.allows_handling(
+            destination_jurisdiction,
+            action,
+            now_unix_s,
+        ) {
+            return Err(
+                "neurosemantic handling request exceeds destination, retention, or secondary-use policy"
+                    .into(),
+            );
+        }
+        Ok(())
+    }
 }
 
 /// Persistent per-lease sequence guard for replay/collision detection.
@@ -614,6 +758,14 @@ fn valid_identifier(value: &str) -> bool {
     !value.trim().is_empty() && value.len() <= MAX_NEUROSEMANTIC_ID_BYTES
 }
 
+fn valid_jurisdiction_id(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() == 2
+        && bytes[0].is_ascii_uppercase()
+        && bytes[1].is_ascii_uppercase()
+        && bytes.len() <= MAX_NEUROSEMANTIC_JURISDICTION_ID_BYTES
+}
+
 fn validate_payload(payload: &NeurosemanticPayload) -> Result<(), String> {
     match payload {
         NeurosemanticPayload::DerivedNeuralFeature(values)
@@ -651,6 +803,13 @@ mod tests {
             data_class: NeurosemanticDataClass::SemanticRepresentation,
             inference_classes: BTreeSet::from([NeurosemanticInferenceClass::SemanticContent]),
             permitted_purposes: BTreeSet::from([CommunicationPurpose::HumanCollaboration]),
+            handling: NeurosemanticHandlingPolicy {
+                schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
+                origin_jurisdiction: "ZA".into(),
+                permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
+                permitted_secondary_uses: BTreeSet::new(),
+                retention: NeurosemanticRetentionPolicy::UntilUnixS(200),
+            },
         }
     }
 
@@ -759,6 +918,139 @@ mod tests {
         ] {
             assert_eq!(serde_json::to_string(&class).unwrap(), format!("\"{expected}\""));
         }
+    }
+
+    #[test]
+    fn handling_policy_defaults_to_deny() {
+        let policy = NeurosemanticHandlingPolicy::default();
+        assert!(!policy.validates());
+        assert!(!policy.allows_destination("ZA"));
+        assert!(!policy.allows_action(NeurosemanticHandlingAction::Persist, 1));
+        assert!(!policy.allows_action(
+            NeurosemanticHandlingAction::SecondaryUse(NeurosemanticSecondaryUse::Research),
+            1
+        ));
+    }
+
+    #[test]
+    fn handling_policy_requires_explicit_destination_and_retention() {
+        let policy = NeurosemanticHandlingPolicy {
+            schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
+            origin_jurisdiction: "ZA".into(),
+            permitted_destination_jurisdictions: BTreeSet::from(["ZA".into(), "GB".into()]),
+            permitted_secondary_uses: BTreeSet::from([NeurosemanticSecondaryUse::Research]),
+            retention: NeurosemanticRetentionPolicy::UntilUnixS(200),
+        };
+        assert!(policy.validates());
+        assert!(policy.allows_destination("GB"));
+        assert!(!policy.allows_destination("US"));
+        assert!(policy.allows_action(NeurosemanticHandlingAction::Persist, 150));
+        assert!(!policy.allows_action(NeurosemanticHandlingAction::Persist, 200));
+        assert!(policy.allows_action(
+            NeurosemanticHandlingAction::SecondaryUse(NeurosemanticSecondaryUse::Research),
+            150
+        ));
+        assert!(!policy.allows_action(
+            NeurosemanticHandlingAction::SecondaryUse(NeurosemanticSecondaryUse::ModelTraining),
+            150
+        ));
+    }
+
+    #[test]
+    fn handling_policy_rejects_noncanonical_jurisdictions() {
+        let mut policy = NeurosemanticHandlingPolicy {
+            schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
+            origin_jurisdiction: "za".into(),
+            permitted_destination_jurisdictions: BTreeSet::from(["za".into()]),
+            permitted_secondary_uses: BTreeSet::new(),
+            retention: NeurosemanticRetentionPolicy::Ephemeral,
+        };
+        assert!(!policy.validates());
+        policy.origin_jurisdiction = "ZA".into();
+        policy.permitted_destination_jurisdictions = BTreeSet::from(["ZA".into()]);
+        assert!(policy.validates());
+    }
+
+    #[test]
+    fn authorized_handling_respects_secondary_use_jurisdiction_and_retention() {
+        let lease = lease();
+        let packet = NeurosemanticPacket::new_with_policy(
+            107,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            semantic_policy(),
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: lease.consent_epoch,
+            lease_id: lease.lease_id.clone(),
+        };
+
+        assert!(message
+            .validate_for_handling(
+                &lease,
+                "ZA",
+                NeurosemanticHandlingAction::Transmit,
+                150
+            )
+            .is_ok());
+        assert!(message
+            .validate_for_handling(
+                &lease,
+                "GB",
+                NeurosemanticHandlingAction::Transmit,
+                150
+            )
+            .is_err());
+        assert!(message
+            .validate_for_handling(
+                &lease,
+                "ZA",
+                NeurosemanticHandlingAction::Persist,
+                200
+            )
+            .is_err());
+
+        let mut secondary_policy = semantic_policy();
+        secondary_policy.handling.permitted_secondary_uses =
+            BTreeSet::from([NeurosemanticSecondaryUse::Research]);
+        let packet = NeurosemanticPacket::new_with_policy(
+            108,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            secondary_policy,
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: lease.consent_epoch,
+            lease_id: lease.lease_id,
+        };
+        assert!(message
+            .validate_for_handling(
+                &lease,
+                "ZA",
+                NeurosemanticHandlingAction::SecondaryUse(
+                    NeurosemanticSecondaryUse::Research
+                ),
+                150
+            )
+            .is_ok());
     }
 
     #[test]
