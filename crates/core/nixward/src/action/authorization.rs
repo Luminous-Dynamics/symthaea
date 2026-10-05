@@ -972,6 +972,118 @@ mod tests {
     }
 
     #[test]
+    fn new_typed_effect_variants_are_exactly_described_and_scoped() {
+        let switch_generation = NixOSCommand::EnvSwitchGeneration { generation: 42 };
+        let descriptor = NixActionDescriptorV1::try_from(&switch_generation).unwrap();
+        assert_eq!(
+            descriptor,
+            NixActionDescriptorV1::EnvSwitchGeneration { generation: 42 }
+        );
+        assert_eq!(
+            minimum_scope_for_action(&descriptor),
+            NixActionScopeV1::SystemCritical
+        );
+
+        let delete_count = NixOSCommand::EnvDeleteGenerations { keep_last: 5 };
+        let descriptor = NixActionDescriptorV1::try_from(&delete_count).unwrap();
+        assert_eq!(
+            descriptor,
+            NixActionDescriptorV1::EnvDeleteGenerations { keep_last: 5 }
+        );
+        assert_eq!(
+            minimum_scope_for_action(&descriptor),
+            NixActionScopeV1::Destructive
+        );
+
+        let delete_age = NixOSCommand::EnvDeleteGenerationsOlderThan { days: 30 };
+        let descriptor = NixActionDescriptorV1::try_from(&delete_age).unwrap();
+        assert_eq!(
+            descriptor,
+            NixActionDescriptorV1::EnvDeleteGenerationsOlderThan { days: 30 }
+        );
+        assert_eq!(
+            minimum_scope_for_action(&descriptor),
+            NixActionScopeV1::Destructive
+        );
+
+        let init = NixOSCommand::Flake {
+            operation: FlakeOperation::Init {
+                template: Some("templates#minimal".to_string()),
+            },
+        };
+        let descriptor = NixActionDescriptorV1::try_from(&init).unwrap();
+        assert_eq!(
+            descriptor,
+            NixActionDescriptorV1::FlakeInit {
+                template: Some("templates#minimal".to_string())
+            }
+        );
+        assert_eq!(
+            minimum_scope_for_action(&descriptor),
+            NixActionScopeV1::UserModify
+        );
+    }
+
+    #[test]
+    fn typed_effect_parameter_changes_produce_distinct_authority_digests() {
+        let a = NixActionIntentV1::from_command(
+            "host:x",
+            Some("generation:42".to_string()),
+            &NixOSCommand::EnvSwitchGeneration { generation: 42 },
+        )
+        .unwrap();
+        let b = NixActionIntentV1::from_command(
+            "host:x",
+            Some("generation:42".to_string()),
+            &NixOSCommand::EnvSwitchGeneration { generation: 43 },
+        )
+        .unwrap();
+        assert_ne!(a.digest().unwrap(), b.digest().unwrap());
+
+        let c = NixActionIntentV1::from_command(
+            "host:x",
+            Some("generation:42".to_string()),
+            &NixOSCommand::Flake {
+                operation: FlakeOperation::Init {
+                    template: Some("templates#a".to_string()),
+                },
+            },
+        )
+        .unwrap();
+        let d = NixActionIntentV1::from_command(
+            "host:x",
+            Some("generation:42".to_string()),
+            &NixOSCommand::Flake {
+                operation: FlakeOperation::Init {
+                    template: Some("templates#b".to_string()),
+                },
+            },
+        )
+        .unwrap();
+        assert_ne!(c.digest().unwrap(), d.digest().unwrap());
+    }
+
+    #[test]
+    fn invalid_new_typed_effect_parameters_fail_closed() {
+        assert!(validate_action_shape(&NixActionDescriptorV1::EnvSwitchGeneration {
+            generation: 0,
+        })
+        .is_err());
+        assert!(validate_action_shape(&NixActionDescriptorV1::EnvDeleteGenerations {
+            keep_last: 0,
+        })
+        .is_err());
+        assert!(validate_action_shape(
+            &NixActionDescriptorV1::EnvDeleteGenerationsOlderThan { days: 0 }
+        )
+        .is_err());
+        assert!(validate_action_shape(&NixActionDescriptorV1::FlakeInit {
+            template: Some(String::new()),
+        })
+        .is_err());
+    }
+
+    #[test]
     fn action_intent_digest_is_deterministic_and_not_serde_based() {
         let intent = NixActionIntentV1::from_command(
             "host:workstation",
