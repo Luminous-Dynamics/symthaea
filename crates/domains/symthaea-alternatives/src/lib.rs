@@ -1746,6 +1746,8 @@ pub struct ExperimentalProtocolRef {
     pub protocol_revision: String,
     /// Digest of the exact protocol document or canonical protocol payload.
     pub protocol_digest: String,
+    /// Exact documented measurement procedure identity prescribed by this protocol.
+    pub procedure_id: String,
     /// Exact comparison/metrology basis the protocol is intended to satisfy.
     pub basis: ComparisonBasisRef,
 }
@@ -1756,6 +1758,7 @@ impl ExperimentalProtocolRef {
         if self.protocol_id.is_empty()
             || self.protocol_revision.is_empty()
             || self.protocol_digest.is_empty()
+            || self.procedure_id.is_empty()
         {
             return Err(AssessmentError::InvalidExperimentalDesign);
         }
@@ -2297,6 +2300,15 @@ pub enum AssessmentError {
         /// Target identity referenced by the observation.
         target_id: String,
     },
+    /// An observation's procedure differs from the exact procedure prescribed by the design protocol.
+    ExperimentalDesignProcedureMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Expected procedure identity.
+        expected_procedure_id: String,
+        /// Actual procedure identity.
+        actual_procedure_id: String,
+    },
     /// An observation's measurand differs from the exact target measurand.
     ExperimentalDesignMeasurandMismatch {
         /// Evidence identifier carrying the observation.
@@ -2513,6 +2525,14 @@ impl std::fmt::Display for AssessmentError {
             } => write!(
                 f,
                 "evidence {evidence_id} on candidate {candidate_id} is outside experimental target {target_id}"
+            ),
+            Self::ExperimentalDesignProcedureMismatch {
+                evidence_id,
+                expected_procedure_id,
+                actual_procedure_id,
+            } => write!(
+                f,
+                "evidence {evidence_id} procedure {actual_procedure_id} does not match protocol procedure {expected_procedure_id}"
             ),
             Self::ExperimentalDesignMeasurandMismatch {
                 evidence_id,
@@ -2789,6 +2809,13 @@ impl AlternativesEngine {
                     });
                 }
                 let observation_measurand = &observation.measurand_id;
+                if observation.procedure_id != experimental_design.protocol.procedure_id {
+                    return Err(AssessmentError::ExperimentalDesignProcedureMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected_procedure_id: experimental_design.protocol.procedure_id.clone(),
+                        actual_procedure_id: observation.procedure_id.clone(),
+                    });
+                }
                 if observation_measurand != &target.measurand_id {
                     return Err(AssessmentError::ExperimentalDesignMeasurandMismatch {
                         evidence_id: evidence.id.clone(),
@@ -5203,6 +5230,7 @@ mod tests {
                 protocol_id: "protocol:water-test-v1".into(),
                 protocol_revision: "v1".into(),
                 protocol_digest: "protocol-digest-v1".into(),
+            procedure_id: "fixture-measurement-procedure-v1".into(),
                 basis: basis.clone(),
             },
             stopping_criteria: ExperimentalStoppingCriteria {
@@ -5257,6 +5285,7 @@ mod tests {
                 protocol_id: "p".into(),
                 protocol_revision: "v1".into(),
                 protocol_digest: "d".into(),
+            procedure_id: "fixture-measurement-procedure-v1".into(),
                 basis: basis.clone(),
             },
             stopping_criteria: ExperimentalStoppingCriteria {
@@ -5323,6 +5352,7 @@ mod tests {
                 protocol_id: "protocol".into(),
                 protocol_revision: "v1".into(),
                 protocol_digest: "digest".into(),
+            procedure_id: "fixture-measurement-procedure-v1".into(),
                 basis: basis.clone(),
             },
             stopping_criteria: ExperimentalStoppingCriteria {
@@ -5393,6 +5423,7 @@ mod tests {
                 protocol_id: "protocol".into(),
                 protocol_revision: "v1".into(),
                 protocol_digest: "digest".into(),
+            procedure_id: "fixture-measurement-procedure-v1".into(),
                 basis: basis.clone(),
             },
             stopping_criteria: ExperimentalStoppingCriteria {
@@ -5441,6 +5472,7 @@ mod tests {
                 protocol_id: "protocol".into(),
                 protocol_revision: "v1".into(),
                 protocol_digest: "digest".into(),
+            procedure_id: "fixture-measurement-procedure-v1".into(),
                 basis: wrong_basis,
             },
             stopping_criteria: ExperimentalStoppingCriteria {
@@ -5531,6 +5563,7 @@ mod tests {
                 protocol_id: "protocol".into(),
                 protocol_revision: "v1".into(),
                 protocol_digest: "digest".into(),
+            procedure_id: "fixture-measurement-procedure-v1".into(),
                 basis: basis.clone(),
             },
             stopping_criteria: ExperimentalStoppingCriteria {
@@ -5602,6 +5635,7 @@ mod tests {
                 protocol_id: "protocol".into(),
                 protocol_revision: "v1".into(),
                 protocol_digest: "digest".into(),
+            procedure_id: "fixture-measurement-procedure-v1".into(),
                 basis: basis.clone(),
             },
             stopping_criteria: ExperimentalStoppingCriteria {
