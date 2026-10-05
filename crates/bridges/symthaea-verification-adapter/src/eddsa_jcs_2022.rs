@@ -752,6 +752,10 @@ mod tests {
         );
         assert_eq!(receipt.proof_value_multibase, PROOF_VALUE);
         assert_eq!(receipt.cryptosuite, EDDSA_JCS_2022);
+        assert_eq!(
+            receipt.cryptographic_input_digest,
+            "953c5ff7db5ca4e543ede6262df2676fd21f9a4dbba7db0ad9266bda28020325"
+        );
 
         let evidence = verify_eddsa_jcs_2022_evidence(
             &request,
@@ -880,6 +884,31 @@ mod tests {
         .unwrap();
 
         assert_eq!(from_value, wire);
+    }
+
+    #[test]
+    fn wire_json_formatting_does_not_change_the_verified_receipt() {
+        let request = vector_request();
+        let (resolution, resolved_method) = resolved_vector(&request);
+        let canonical = serde_jcs::to_string(&secured_document()).unwrap();
+        let formatted = serde_json::to_string_pretty(&secured_document()).unwrap();
+
+        let canonical_receipt = verify_eddsa_jcs_2022_json(
+            &request,
+            &resolution,
+            &resolved_method,
+            canonical.as_bytes(),
+        )
+        .unwrap();
+        let formatted_receipt = verify_eddsa_jcs_2022_json(
+            &request,
+            &resolution,
+            &resolved_method,
+            formatted.as_bytes(),
+        )
+        .unwrap();
+
+        assert_eq!(canonical_receipt, formatted_receipt);
     }
 
     #[test]
