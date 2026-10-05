@@ -500,67 +500,118 @@ fn extract_verification_method(
     ),
     SnapshotError,
 > {
-    let methods = document
+    let requested_id = request.verification_method.as_str();
+    let mut candidates = Vec::new();
+
+    if let Some(methods) = document
         .get("verificationMethod")
         .and_then(Value::as_array)
-        .ok_or_else(|| {
-            SnapshotError::Malformed(
-                "controller document verificationMethod must be an array".into(),
-            )
-        })?;
-
-    let mut matching = Vec::new();
-    let mut all_ids = std::collections::HashSet::new();
-
-    for method in methods {
-        let object = method.as_object().ok_or_else(|| {
-            SnapshotError::Malformed(
-                "controller document verificationMethod entries must be objects".into(),
-            )
-        })?;
-        let id = required_string(object, "id")?.to_owned();
-        if !all_ids.insert(id.clone()) {
-            return Err(SnapshotError::Malformed(
-                "controller document verificationMethod identifiers must be unique".into(),
-            ));
+    {
+        let mut all_ids = std::collections::HashSet::new();
+        for method in methods {
+            let object = method.as_object().ok_or_else(|| {
+                SnapshotError::Malformed(
+                    "controller document verificationMethod entries must be objects".into(),
+                )
+            })?;
+            let id = required_string(object, "id")?.to_owned();
+            if !all_ids.insert(id.clone()) {
+                return Err(SnapshotError::Malformed(
+                    "controller document verificationMethod identifiers must be unique".into(),
+                ));
+            }
+            if id == requested_id {
+                candidates.push(object);
+            }
         }
+    }
 
-        let method_id = ClaimVerificationMethod::new(id)
-            .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
-        if method_id != request.verification_method {
-            continue;
+    if let Some(entries) = document
+        .get(request.expected_verification_relationship.as_str())
+        .and_then(Value::as_array)
+    {
+        for entry in entries {
+            if let Some(object) = entry.as_object() {
+                let id = required_string(object, "id")?;
+                if id == requested_id {
+                    candidates.push(object);
+                }
+            }
         }
+    }
 
-        let method_type = required_string(object, "type")?;
-        let material_digest = verification_method_material_digest(
-            &method_id,
-            method_type,
-            object,
-        )?;
-
-        let controller = required_string(object, "controller")?;
-        let controller = ClaimControllerIdentity::new(controller.to_owned())
-            .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
-        let expires = optional_timestamp(object, "expires")?;
-        let revoked = optional_timestamp(object, "revoked")?;
-        let lifecycle = VerificationMethodLifecycle::new(expires.as_deref(), revoked.as_deref())?;
-        matching.push((
-            controller,
-            method_type.to_owned(),
-            material_digest,
-            lifecycle,
+    if candidates.is_empty() {
+        return Err(SnapshotError::Verification(
+            VerificationFailure::VerificationMethodNotFound,
         ));
     }
 
-    match matching.len() {
-        0 => Err(SnapshotError::Verification(
-            VerificationFailure::VerificationMethodNotFound,
-        )),
-        1 => Ok(matching.remove(0)),
-        _ => Err(SnapshotError::Malformed(
-            "controller document must contain exactly one requested verification method".into(),
-        )),
+    let mut resolved = Vec::new();
+    for object in candidates {
+        resolved.push(parse_verification_method_definition(
+            request.verification_method.clone(),
+            object,
+        )?);
     }
+
+    let first = resolved
+        .first()
+        .cloned()
+        .expect("non-empty candidate set");
+
+    if resolved.iter().any(|candidate| candidate != &first) {
+        return Err(SnapshotError::Malformed(
+            "verification method has conflicting embedded definitions".into(),
+        ));
+    }
+
+    Ok(first)
+}
+
+fn parse_verification_method_definition(
+    expected_method: ClaimVerificationMethod,
+    object: &serde_json::Map<String, Value>,
+) -> Result<
+    (
+        ClaimControllerIdentity,
+        String,
+        String,
+        VerificationMethodLifecycle,
+    ),
+    SnapshotError,
+> {
+    let id = required_string(object, "id")?.to_owned();
+    let method_id = ClaimVerificationMethod::new(id.clone())
+        .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
+    if method_id != expected_method {
+        return Err(SnapshotError::Verification(
+            VerificationFailure::VerificationMethodMismatch {
+                expected: expected_method,
+                actual: method_id,
+            },
+        ));
+    }
+
+    let method_type = required_string(object, "type")?;
+    let material_digest = verification_method_material_digest(
+        &method_id,
+        method_type,
+        object,
+    )?;
+
+    let controller = required_string(object, "controller")?;
+    let controller = ClaimControllerIdentity::new(controller.to_owned())
+        .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
+    let expires = optional_timestamp(object, "expires")?;
+    let revoked = optional_timestamp(object, "revoked")?;
+    let lifecycle = VerificationMethodLifecycle::new(expires.as_deref(), revoked.as_deref())?;
+
+    Ok((
+        controller,
+        method_type.to_owned(),
+        material_digest,
+        lifecycle,
+    ))
 }
 
 fn extract_relationship_methods(
