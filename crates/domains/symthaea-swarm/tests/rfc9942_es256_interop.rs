@@ -115,7 +115,7 @@ fn cose_sign1_accepts_empty_protected_bstr_and_empty_map() {
     zero_length.splice(2..6, [0x40]);
     let parsed = Rfc9942SignatureWithReceipts::from_cbor(&zero_length)
         .expect("zero-length protected bstr must parse");
-    assert_eq!(parsed.protected_header_bytes(), &[]);
+    assert_eq!(parsed.protected_header_bytes(), Vec::<u8>::new());
     assert_eq!(
         parsed.verify_es256(&sec1_public_key(), &[], None),
         Err(Rfc9942VdpError::InvalidStructure)
