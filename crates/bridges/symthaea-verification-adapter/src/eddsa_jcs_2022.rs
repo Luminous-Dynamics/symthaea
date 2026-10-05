@@ -8,6 +8,11 @@
 //! The implementation follows the W3C 2025 Recommendation's JCS suite recipe:
 //! JCS canonicalization, SHA-256 over the proof configuration and transformed
 //! document, concatenation in that order, and pure Ed25519 verification.
+//!
+//! The numeric check below is an explicit Symthaea interoperability hardening
+//! profile. RFC 7493 states the binary64 constraint as a SHOULD NOT rather than
+//! a universal MUST, so this stricter rejection is deliberately not presented as
+//! a generic claim of I-JSON conformance.
 
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde_json::{Map, Value};
@@ -26,10 +31,10 @@ const MAX_SECURED_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
 /// Verify a wire-format JSON document using a strict I-JSON parser before
 /// entering the JCS/Data Integrity pipeline.
 ///
-/// The ordinary `Value` entry point remains useful for trusted programmatic
-/// values, but raw network/storage JSON must enter through this function so
-/// duplicate object member names cannot be collapsed by the parser before
-/// verification. JCS requires I-JSON input, which forbids duplicate names.
+/// The ordinary `Value` entry point is subject to the same strict validation
+/// before JCS, while raw network/storage JSON additionally enters through the
+/// duplicate-name-aware parser. JCS requires adaptation to I-JSON; Symthaea
+/// additionally applies a stronger numeric interoperability profile.
 pub fn verify_eddsa_jcs_2022_json(
     request: &VerificationRequest,
     resolution: &VerificationMethodResolution,
