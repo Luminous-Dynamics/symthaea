@@ -122,6 +122,12 @@ directives/characters rather than guessing. This is important because the curren
 release is OpenFOAM 14, and its input language continues to evolve; unsupported dictionary constructs
 must not silently become evidence.
 
+Parser resource usage is also fail-closed at attacker-controlled collection boundaries. In particular,
+a face's declared vertex count is checked against the number of tokens actually remaining before any
+capacity allocation is attempted. A tiny crafted input therefore cannot request an unbounded polygon
+allocation merely by declaring an enormous vertex count; the regression
+oversized_face_vertex_count_fails_before_allocation locks this invariant.
+
 
 The transition is sealed by `promote_solver_entity_attestation` and `bind_with_adapter_and_entity_attestation`; callers cannot directly construct a stronger binding by setting an evidence flag.
 
