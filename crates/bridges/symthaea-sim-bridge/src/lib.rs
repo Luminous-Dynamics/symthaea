@@ -17,6 +17,7 @@ use std::time::{Duration, Instant};
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::seed_from_name;
 use thiserror::Error;
+use symthaea_types::{ModelMaturity, PhysicalType, TypeJudgement};
 
 /// Simple deterministic text embedding for HDC space.
 pub fn embed_text(text: &str, dimension: usize) -> ContinuousHV {
@@ -82,6 +83,21 @@ pub enum CouplingMode {
 
 /// One stage in a coupled multi-physics workflow.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TypedPhysicalPort {
+    /// Stable signal/field name shared across coupled stages.
+    pub name: String,
+    /// Canonical physical semantics for the signal.
+    pub physical_type: PhysicalType,
+}
+
+impl TypedPhysicalPort {
+    pub fn new(name: impl Into<String>, physical_type: PhysicalType) -> Self {
+        Self { name: name.into(), physical_type }
+    }
+}
+
+/// One stage in a coupled multi-physics workflow.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CoupledSimulationStage {
     /// Stage identifier unique within the request.
     pub id: String,
@@ -89,10 +105,16 @@ pub struct CoupledSimulationStage {
     pub domain: EngineeringDomain,
     /// Solver family used by the stage.
     pub solver: SolverKind,
-    /// Outputs from previous stages consumed by this stage.
+    /// Legacy name-only inputs retained for compatibility.
     pub consumes: Vec<String>,
-    /// Metrics or fields emitted for later stages.
+    /// Legacy name-only outputs retained for compatibility.
     pub produces: Vec<String>,
+    /// Typed inputs used for semantic compatibility checking.
+    #[serde(default)]
+    pub typed_consumes: Vec<TypedPhysicalPort>,
+    /// Typed outputs used for semantic compatibility checking.
+    #[serde(default)]
+    pub typed_produces: Vec<TypedPhysicalPort>,
 }
 
 impl CoupledSimulationStage {
@@ -104,6 +126,8 @@ impl CoupledSimulationStage {
             solver,
             consumes: Vec::new(),
             produces: Vec::new(),
+            typed_consumes: Vec::new(),
+            typed_produces: Vec::new(),
         }
     }
 
@@ -116,6 +140,18 @@ impl CoupledSimulationStage {
     /// Declare outputs produced by this stage.
     pub fn produces(mut self, outputs: impl IntoIterator<Item = impl Into<String>>) -> Self {
         self.produces = outputs.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// Declare typed physical inputs consumed from previous stages.
+    pub fn typed_consumes(mut self, inputs: impl IntoIterator<Item = TypedPhysicalPort>) -> Self {
+        self.typed_consumes = inputs.into_iter().collect();
+        self
+    }
+
+    /// Declare typed physical outputs emitted by this stage.
+    pub fn typed_produces(mut self, outputs: impl IntoIterator<Item = TypedPhysicalPort>) -> Self {
+        self.typed_produces = outputs.into_iter().collect();
         self
     }
 }
@@ -156,6 +192,50 @@ impl MultiPhysicsRequest {
         self.stages.push(stage);
         self
     }
+
+    /// Validate typed producer/consumer edges. Unknown semantics never pass
+    /// as compatible because an executable coupling requires a known contract.
+    pub fn validate_typed_connections(&self) -> Result<(), SimulationError> {
+        use std::collections::HashMap;
+        let mut producers = HashMap::<&str, &PhysicalType>::new();
+        for stage in &self.stages {
+            for port in &stage.typed_produces {
+                if port.name.trim().is_empty() {
+                    return Err(SimulationError::InvalidRequest("typed output name cannot be empty".into()));
+                }
+                producers.insert(port.name.as_str(), &port.physical_type);
+            }
+        }
+        for stage in &self.stages {
+            for port in &stage.typed_consumes {
+                if port.name.trim().is_empty() {
+                    return Err(SimulationError::InvalidRequest("typed input name cannot be empty".into()));
+                }
+                let Some(source) = producers.get(port.name.as_str()) else {
+                    return Err(SimulationError::InvalidRequest(format!(
+                        "typed input {:?} has no declared producer",
+                        port.name
+                    )));
+                };
+                match source.judge_compatibility(&port.physical_type) {
+                    TypeJudgement::Valid(()) => {}
+                    TypeJudgement::Invalid(error) => {
+                        return Err(SimulationError::InvalidRequest(format!(
+                            "typed coupling {:?} is incompatible: {}",
+                            port.name, error.reason
+                        )));
+                    }
+                    TypeJudgement::Unknown(reason) => {
+                        return Err(SimulationError::InvalidRequest(format!(
+                            "typed coupling {:?} is unknown: {}",
+                            port.name, reason
+                        )));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 /// A scalar or categorical model parameter with unit/provenance metadata.
@@ -167,6 +247,9 @@ pub struct ModelParameter {
     pub value: f64,
     /// Unit string in the source model's convention.
     pub unit: String,
+    /// Canonical physical semantics when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub physical_type: Option<PhysicalType>,
     /// Source or assumption label for auditability.
     pub provenance: String,
     /// Optional quantified uncertainty for the parameter.
@@ -313,6 +396,7 @@ impl SimulationRequest {
             name: name.into(),
             value,
             unit: unit.into(),
+            physical_type: None,
             provenance: provenance.into(),
             uncertainty: None,
         });
@@ -399,6 +483,9 @@ pub struct SimulationMetric {
     pub value: f64,
     /// Unit string.
     pub unit: String,
+    /// Canonical physical semantics when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub physical_type: Option<PhysicalType>,
     /// Optional uncertainty estimate for this metric.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uncertainty: Option<UncertaintyEstimate>,
