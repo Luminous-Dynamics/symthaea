@@ -18,6 +18,7 @@ use crate::{
     ClaimAuthorIdentity, ClaimControllerIdentity, ClaimProofPurpose, ClaimVerificationMethod,
     FederatedClaim, FederationDependency,
 };
+use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 
 pub const VERIFICATION_REQUEST_SCHEMA_VERSION: u16 = 1;
@@ -62,6 +63,157 @@ fn is_hex_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
+/// Temporal and anti-replay inputs supplied by the proof and the verifier.
+///
+/// The core validates syntax, temporal ordering, and exact domain/challenge matching.
+/// It does not maintain a challenge-consumption store; one-time challenge tracking
+/// remains an adapter/application responsibility.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerificationFreshnessContext {
+    pub proof_created: Option<String>,
+    pub proof_expires: Option<String>,
+    pub proof_domain: Option<String>,
+    pub proof_challenge: Option<String>,
+    pub verification_time: String,
+    pub expected_domain: Option<String>,
+    pub expected_challenge: Option<String>,
+}
+
+impl VerificationFreshnessContext {
+    pub fn validate(&self) -> Result<(), VerificationFailure> {
+        let verification_time = parse_timestamp("verification time", &self.verification_time)?;
+
+        let created = self
+            .proof_created
+            .as_deref()
+            .map(|value| parse_timestamp("proof created", value))
+            .transpose()?;
+
+        let expires = self
+            .proof_expires
+            .as_deref()
+            .map(|value| parse_timestamp("proof expires", value))
+            .transpose()?;
+
+        if let (Some(created), Some(expires)) = (created, expires) {
+            if expires < created {
+                return Err(VerificationFailure::InvalidValidityWindow);
+            }
+        }
+
+        if created.is_some_and(|created| created > verification_time) {
+            return Err(VerificationFailure::ProofCreatedInFuture);
+        }
+
+        if expires.is_some_and(|expires| verification_time >= expires) {
+            return Err(VerificationFailure::ProofExpired);
+        }
+
+        for (name, value) in [
+            ("proof domain", self.proof_domain.as_deref()),
+            ("proof challenge", self.proof_challenge.as_deref()),
+            ("expected domain", self.expected_domain.as_deref()),
+            ("expected challenge", self.expected_challenge.as_deref()),
+        ] {
+            if value.is_some_and(|value| value.trim().is_empty()) {
+                return Err(VerificationFailure::Structural(format!(
+                    "{name} must be non-empty when present"
+                )));
+            }
+        }
+
+        if let Some(expected_domain) = &self.expected_domain {
+            if self.proof_domain.as_deref() != Some(expected_domain.as_str()) {
+                return Err(VerificationFailure::DomainMismatch {
+                    expected: expected_domain.clone(),
+                    actual: self.proof_domain.clone(),
+                });
+            }
+        }
+
+        if let Some(expected_challenge) = &self.expected_challenge {
+            if self.proof_challenge.as_deref() != Some(expected_challenge.as_str()) {
+                return Err(VerificationFailure::ChallengeMismatch {
+                    expected: expected_challenge.clone(),
+                    actual: self.proof_challenge.clone(),
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn replay_context_digest(&self) -> String {
+        let encoded = (
+            "symthaea:verification-freshness:v1",
+            &self.proof_domain,
+            &self.proof_challenge,
+            &self.expected_domain,
+            &self.expected_challenge,
+        );
+        let bytes = serde_json::to_vec(&encoded)
+            .expect("verification freshness context is serializable");
+        crate::sha256_hex(&bytes)
+    }
+}
+
+fn parse_timestamp(
+    field: &'static str,
+    value: &str,
+) -> Result<DateTime<FixedOffset>, VerificationFailure> {
+    DateTime::parse_from_rfc3339(value).map_err(|_| {
+        VerificationFailure::InvalidTimestamp {
+            field,
+            value: value.to_owned(),
+        }
+    })
+}
+
+    #[test]
+    fn freshness_context_rejects_future_expiry_and_mismatched_replay_inputs() {
+        let valid = default_freshness();
+        assert!(valid.validate().is_ok());
+
+        let mut future_created = valid.clone();
+        future_created.proof_created = Some("2026-10-05T04:00:00Z".into());
+        assert!(matches!(
+            future_created.validate(),
+            Err(VerificationFailure::ProofCreatedInFuture)
+        ));
+
+        let mut expired = valid.clone();
+        expired.proof_expires = Some("2026-10-05T02:00:00Z".into());
+        assert!(matches!(
+            expired.validate(),
+            Err(VerificationFailure::ProofExpired)
+        ));
+
+        let mut wrong_domain = valid.clone();
+        wrong_domain.proof_domain = Some("other.example".into());
+        assert!(matches!(
+            wrong_domain.validate(),
+            Err(VerificationFailure::DomainMismatch { .. })
+        ));
+
+        let mut wrong_challenge = valid;
+        wrong_challenge.proof_challenge = Some("challenge-2".into());
+        assert!(matches!(
+            wrong_challenge.validate(),
+            Err(VerificationFailure::ChallengeMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn replay_context_digest_changes_when_domain_or_challenge_changes() {
+        let base = default_freshness();
+        let mut domain = base.clone();
+        domain.proof_domain = Some("other.example".into());
+        let mut challenge = base.clone();
+        challenge.proof_challenge = Some("challenge-2".into());
+        assert_ne!(base.replay_context_digest(), domain.replay_context_digest());
+        assert_ne!(base.replay_context_digest(), challenge.replay_context_digest());
+    }
+
 /// The exact structural and identity inputs an external verification adapter must
 /// operate over before it can return cryptographic/controller evidence.
 ///
@@ -77,6 +229,7 @@ pub struct VerificationRequest {
     pub verification_method: ClaimVerificationMethod,
     pub expected_controller: ClaimControllerIdentity,
     pub expected_verification_relationship: ClaimVerificationRelationship,
+    pub freshness: VerificationFreshnessContext,
 }
 
 impl VerificationRequest {
@@ -91,10 +244,12 @@ impl VerificationRequest {
         expected_purpose: ClaimProofPurpose,
         expected_controller: ClaimControllerIdentity,
         expected_verification_relationship: ClaimVerificationRelationship,
+        freshness: VerificationFreshnessContext,
     ) -> Result<Self, VerificationFailure> {
         claim
             .validate_structure()
             .map_err(|reason| VerificationFailure::Structural(reason.to_owned()))?;
+        freshness.validate()?;
 
         let authorship = claim
             .authorship_binding()
@@ -142,6 +297,7 @@ impl VerificationRequest {
             verification_method,
             expected_controller,
             expected_verification_relationship,
+            freshness,
         })
     }
 
@@ -218,6 +374,7 @@ pub struct VerificationEvidence {
     pub controller_document_ref: String,
     pub controller_document_digest: String,
     pub cryptosuite: String,
+    pub freshness: VerificationFreshnessContext,
     pub signed_payload_digest: String,
     pub proof_digest: String,
 }
@@ -330,6 +487,10 @@ impl VerificationEvidence {
             &self.cryptosuite,
             &self.signed_payload_digest,
             &self.proof_digest,
+            &self.freshness.replay_context_digest(),
+            &self.freshness.verification_time,
+            &self.freshness.proof_created,
+            &self.freshness.proof_expires,
         );
         let bytes = serde_json::to_vec(&encoded)
             .expect("verification evidence is serializable");
@@ -351,8 +512,13 @@ impl VerificationEvidence {
             verification_method: self.verification_method.clone(),
             expected_controller: self.controller.clone(),
             expected_verification_relationship: self.verification_relationship.clone(),
+            freshness: self.freshness.clone(),
         };
         request.validate_structure()?;
+        self.freshness.validate()?;
+        if self.freshness != request.freshness {
+            return Err(VerificationFailure::FreshnessMismatch);
+        }
         self.resolved_verification_method_controller.validate_structure()?;
         self.controller_document_verification_method.validate_structure()?;
         if self.resolved_verification_method_controller != self.controller {
@@ -404,6 +570,7 @@ impl VerificationEvidence {
             && self.resolved_verification_method_controller == request.expected_controller
             && self.controller_document_verification_method == request.verification_method
             && self.verification_relationship == request.expected_verification_relationship
+            && self.freshness == request.freshness
     }
 }
 
@@ -447,6 +614,22 @@ pub enum VerificationFailure {
         expected: ClaimVerificationRelationship,
         actual: ClaimVerificationRelationship,
     },
+    InvalidTimestamp {
+        field: &'static str,
+        value: String,
+    },
+    InvalidValidityWindow,
+    ProofCreatedInFuture,
+    ProofExpired,
+    DomainMismatch {
+        expected: String,
+        actual: Option<String>,
+    },
+    ChallengeMismatch {
+        expected: String,
+        actual: Option<String>,
+    },
+    FreshnessMismatch,
     CryptographicVerificationFailed,
 }
 
@@ -457,6 +640,38 @@ mod tests {
         CanonicalAdmissionReceipt, ProvenanceRelation, ProvenanceRelationKind,
         ProvenanceValidationReport, ProvenanceView,
     };
+
+    fn freshness(
+        proof_created: Option<&str>,
+        proof_expires: Option<&str>,
+        proof_domain: Option<&str>,
+        proof_challenge: Option<&str>,
+        verification_time: &str,
+        expected_domain: Option<&str>,
+        expected_challenge: Option<&str>,
+    ) -> VerificationFreshnessContext {
+        VerificationFreshnessContext {
+            proof_created: proof_created.map(str::to_owned),
+            proof_expires: proof_expires.map(str::to_owned),
+            proof_domain: proof_domain.map(str::to_owned),
+            proof_challenge: proof_challenge.map(str::to_owned),
+            verification_time: verification_time.to_owned(),
+            expected_domain: expected_domain.map(str::to_owned),
+            expected_challenge: expected_challenge.map(str::to_owned),
+        }
+    }
+
+    fn default_freshness() -> VerificationFreshnessContext {
+        freshness(
+            Some("2026-10-05T00:00:00Z"),
+            Some("2026-10-05T03:00:00Z"),
+            Some("example.test"),
+            Some("challenge-1"),
+            "2026-10-05T02:00:00Z",
+            Some("example.test"),
+            Some("challenge-1"),
+        )
+    }
 
     fn fixture_claim() -> FederatedClaim {
         let relation = ProvenanceRelation {
@@ -514,6 +729,7 @@ mod tests {
             ClaimProofPurpose::new("assertionMethod").unwrap(),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
         )
         .unwrap();
 
@@ -538,6 +754,7 @@ mod tests {
             ClaimProofPurpose::new("authentication").unwrap(),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
         )
         .unwrap_err();
         assert!(matches!(
@@ -550,6 +767,7 @@ mod tests {
             ClaimProofPurpose::new("assertionMethod").unwrap(),
             ClaimControllerIdentity::new("https://example.test/other").unwrap(),
             ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
         )
         .unwrap_err();
         assert!(matches!(
@@ -566,6 +784,7 @@ mod tests {
             ClaimProofPurpose::new("assertionMethod").unwrap(),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
         )
         .unwrap();
 
@@ -595,6 +814,7 @@ mod tests {
             ClaimProofPurpose::new("assertionMethod").unwrap(),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
         )
         .unwrap();
 
@@ -622,6 +842,7 @@ mod tests {
             ClaimProofPurpose::new("assertionMethod").unwrap(),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
         )
         .unwrap();
 
@@ -649,6 +870,7 @@ mod tests {
             ClaimProofPurpose::new("assertionMethod").unwrap(),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
         )
         .unwrap();
 
@@ -678,6 +900,7 @@ mod tests {
             ClaimProofPurpose::new("assertionMethod").unwrap(),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
         )
         .unwrap();
 
@@ -707,6 +930,7 @@ mod tests {
             ClaimProofPurpose::new("assertionMethod").unwrap(),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
         )
         .unwrap();
         let a = VerificationEvidence::from_adapter_attestation(
@@ -744,6 +968,7 @@ mod tests {
             ClaimProofPurpose::new("assertionMethod").unwrap(),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
         )
         .unwrap();
         let c = VerificationEvidence::from_adapter_attestation(
