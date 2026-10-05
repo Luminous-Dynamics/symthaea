@@ -110,6 +110,12 @@ fn main() -> Result<(), String> {
         lease_id: lease.lease_id.clone(),
     };
     message.validate(&lease, 1_500)?;
+    let handling_policy_provenance_present = !message
+        .packet
+        .data_policy
+        .handling
+        .policy_provenance_ref
+        .is_empty();
     message.validate_for_handling(
         &lease,
         "ZA",
@@ -178,6 +184,7 @@ fn main() -> Result<(), String> {
     let report = BTreeMap::from([
         ("exact_graph_roundtrip", exact_roundtrip),
         ("authorization_valid", true),
+        ("handling_policy_provenance_present", handling_policy_provenance_present),
         ("first_packet_accepted", accepted == ReplayDecision::Accept),
         ("exact_replay_detected", duplicate == ReplayDecision::Duplicate),
         ("tamper_detected", tamper_detected),
