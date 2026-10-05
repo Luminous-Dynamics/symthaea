@@ -7,6 +7,8 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/domains/symthaea-broca/**"
+      - "src/voice/broca_realization.rs"
+      - "src/voice/live_voice.rs"
       - ".github/workflows/broca-feature-matrix.yml"
   workflow_dispatch:
 
@@ -42,6 +44,8 @@ jobs:
             command: cargo test -p symthaea-broca --lib evaluation::tests::test_canonical_eval_dataset_loads
           - name: canonical-quality-gate
             command: cargo test -p symthaea-broca --lib evaluation::tests::test_quality_gate_thresholds_fail
+          - name: root-live-voice-ssm-language
+            command: cargo test -p symthaea --features "live-voice,ssm_language" --lib voice::live_voice::tests
 
     steps:
       - uses: actions/checkout@v4
@@ -64,7 +68,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake
+          sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake libasound2-dev
 
       - name: Run feature check
         run: ${{ matrix.command }}
