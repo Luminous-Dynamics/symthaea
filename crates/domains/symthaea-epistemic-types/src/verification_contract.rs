@@ -1694,6 +1694,14 @@ impl VerificationEvidence {
         if !self.resolution.matches_request(&request) {
             return Err(VerificationFailure::ResolutionRequestMismatch);
         }
+        if self.expected_transformed_document_digest
+            != request.expected_transformed_document_digest
+        {
+            return Err(VerificationFailure::TransformedDocumentDigestMismatch {
+                expected: request.expected_transformed_document_digest.clone(),
+                actual: self.expected_transformed_document_digest.clone(),
+            });
+        }
         if self.resolution.controller_document_ref != self.controller_document_ref
             || self.resolution.controller_document_digest != self.controller_document_digest
             || self.resolution.verification_method != self.controller_document_verification_method
@@ -1749,6 +1757,8 @@ impl VerificationEvidence {
             && self.statement_digest == request.statement_digest
             && self.author == request.author
             && self.proof_purpose == request.proof_purpose
+            && self.expected_transformed_document_digest
+                == request.expected_transformed_document_digest
             && self.verification_method == request.verification_method
             && self.controller == request.expected_controller
             && self.resolved_verification_method_controller == request.expected_controller
@@ -3212,6 +3222,36 @@ mod tests {
         controller.resolved_verification_method_controller =
             ClaimControllerIdentity::new("https://example.test/other").unwrap();
         assert_ne!(controller.evidence_digest(), method.evidence_digest());
+    }
+
+    #[test]
+    fn evidence_rejects_top_level_transformed_document_binding_substitution() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap()
+        .with_expected_transformed_document_digest("22".repeat(32))
+        .unwrap();
+
+        let resolution = resolved_method(&request);
+        let receipt = test_cryptographic_receipt(&request, &resolution);
+        let mut evidence =
+            VerificationEvidence::from_adapter_attestation(&request, resolution, receipt).unwrap();
+
+        evidence.expected_transformed_document_digest = Some("33".repeat(32));
+
+        assert!(matches!(
+            evidence.validate_structure(),
+            Err(VerificationFailure::TransformedDocumentDigestMismatch {
+                expected: Some(expected),
+                actual: Some(actual),
+            }) if expected == "22".repeat(32) && actual == "33".repeat(32)
+        ));
     }
 
     #[test]
