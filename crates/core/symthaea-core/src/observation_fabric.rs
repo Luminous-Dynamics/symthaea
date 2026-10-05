@@ -792,8 +792,24 @@ pub struct IndependenceVerifierContract {
 }
 
 impl IndependenceVerifierContract {
+    /// Historical v2 contract retained for durable receipt reproducibility.
     pub const CURRENT: Self = Self {
         version: "observation-fabric-independence-v2",
+        predicates: &[
+            IndependenceVerifierPredicate::SensorIdentity,
+            IndependenceVerifierPredicate::PlatformIdentity,
+            IndependenceVerifierPredicate::AncestralLineage,
+            IndependenceVerifierPredicate::ProcessingActivityIdentity,
+            IndependenceVerifierPredicate::AssetIdentity,
+        ],
+        requires_closed_world: true,
+    };
+
+    /// Forward contract for the corrected v4 independence semantics.
+    ///
+    /// This does not alter the historical v2 contract exposed as CURRENT.
+    pub const V4: Self = Self {
+        version: INDEPENDENCE_VERIFIER_VERSION_V4,
         predicates: &[
             IndependenceVerifierPredicate::SensorIdentity,
             IndependenceVerifierPredicate::PlatformIdentity,
@@ -5265,6 +5281,23 @@ mod tests {
             graph.assess_independence("obs-001", "obs-002")
         );
     }
+    #[test]
+    fn independence_verifier_contract_exposes_versioned_v4_without_rewriting_v2() {
+        assert_eq!(
+            IndependenceVerifierContract::CURRENT.version,
+            "observation-fabric-independence-v2"
+        );
+        assert_eq!(
+            IndependenceVerifierContract::V4.version,
+            INDEPENDENCE_VERIFIER_VERSION_V4
+        );
+        assert_eq!(
+            IndependenceVerifierContract::V4.predicates,
+            IndependenceVerifierContract::CURRENT.predicates
+        );
+        assert!(IndependenceVerifierContract::V4.requires_closed_world);
+    }
+
     #[test]
     fn independence_v4_corrects_endpoint_ancestry_in_both_directions() {
         let mut source = fixture();
