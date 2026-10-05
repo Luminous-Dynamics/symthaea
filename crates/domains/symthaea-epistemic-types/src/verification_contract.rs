@@ -23,8 +23,8 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 pub const VERIFICATION_REQUEST_SCHEMA_VERSION: u16 = 1;
-pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 3;
-pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 4;
+pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 4;
+pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 5;
 
 /// Typed identifier for the verification relationship under which a verification
 /// method is permitted to validate a proof.
@@ -48,6 +48,22 @@ impl ClaimVerificationRelationship {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    pub fn with_controller_document_dereference(
+        mut self,
+        dereference: ControllerDocumentDereferenceAttestation,
+        request: &VerificationRequest,
+    ) -> Result<Self, VerificationFailure> {
+        dereference.validate_against_request(request)?;
+        if !dereference.matches_document(
+            &self.controller_document_ref,
+            &self.controller_document_digest,
+        ) {
+            return Err(VerificationFailure::ControllerDocumentDereferenceMismatch);
+        }
+        self.controller_document_dereference = Some(dereference);
+        Ok(self)
     }
 
     pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
@@ -249,6 +265,190 @@ impl VerificationMethodLifecycle {
         }
 
         Ok(())
+    }
+}
+
+/// Network/dereferencing controls bound to a verification request.
+///
+/// These are application security policy, not W3C protocol requirements. The default
+/// derived from the controller-document URL permits only that URL scheme, forbids
+/// redirects, and caps the response size so a future network adapter has a fail-closed
+/// baseline instead of inheriting an ambient HTTP client policy.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ControllerDocumentNetworkPolicy {
+    pub allowed_schemes: Vec<String>,
+    pub max_response_bytes: u64,
+    pub max_redirects: u16,
+    pub require_effective_url_match: bool,
+}
+
+impl ControllerDocumentNetworkPolicy {
+    pub fn strict_for_url(url: &str) -> Result<Self, VerificationFailure> {
+        let parsed =
+            Url::parse(url).map_err(|_| VerificationFailure::InvalidControllerDocumentUrl)?;
+        Ok(Self {
+            allowed_schemes: vec![parsed.scheme().to_ascii_lowercase()],
+            max_response_bytes: 4 * 1024 * 1024,
+            max_redirects: 0,
+            require_effective_url_match: true,
+        })
+    }
+
+    pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
+        if self.allowed_schemes.is_empty() {
+            return Err(VerificationFailure::Structural(
+                "controller document network policy must allow at least one URL scheme".into(),
+            ));
+        }
+        let mut schemes = self.allowed_schemes.clone();
+        for scheme in &mut schemes {
+            if scheme.trim().is_empty() {
+                return Err(VerificationFailure::Structural(
+                    "controller document network policy scheme must be non-empty".into(),
+                ));
+            }
+            *scheme = scheme.to_ascii_lowercase();
+        }
+        schemes.sort();
+        schemes.dedup();
+        if schemes != self.allowed_schemes.iter().map(|s| s.to_ascii_lowercase()).collect::<Vec<_>>() {
+            return Err(VerificationFailure::Structural(
+                "controller document network policy schemes must be canonical sorted unique values"
+                    .into(),
+            ));
+        }
+        if self.max_response_bytes == 0 {
+            return Err(VerificationFailure::Structural(
+                "controller document network policy max response bytes must be non-zero".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn allows_scheme(&self, scheme: &str) -> bool {
+        self.allowed_schemes
+            .iter()
+            .any(|allowed| allowed.eq_ignore_ascii_case(scheme))
+    }
+}
+
+/// Source from which an adapter obtained the controller-document bytes.
+///
+/// This is provenance about resolution, not proof of document integrity by itself;
+/// the content digest and controller-document identity checks remain mandatory.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ControllerDocumentResolutionSource {
+    Network,
+    Cache,
+    HistoricalRegistry,
+    ApplicationSnapshot,
+}
+
+impl ControllerDocumentResolutionSource {
+    pub fn validate_structure(&self) {}
+}
+
+/// Adapter attestation for the concrete controller-document dereference performed
+/// for a verification-method resolution.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ControllerDocumentDereferenceAttestation {
+    pub requested_url: String,
+    pub effective_url: String,
+    pub response_media_type: String,
+    pub response_size_bytes: u64,
+    pub redirect_count: u16,
+    pub resolved_at: String,
+    pub source: ControllerDocumentResolutionSource,
+    pub document_digest: String,
+}
+
+impl ControllerDocumentDereferenceAttestation {
+    pub fn from_adapter(
+        request: &VerificationRequest,
+        effective_url: impl Into<String>,
+        response_media_type: impl Into<String>,
+        response_size_bytes: u64,
+        redirect_count: u16,
+        resolved_at: impl Into<String>,
+        source: ControllerDocumentResolutionSource,
+        document_digest: impl Into<String>,
+    ) -> Result<Self, VerificationFailure> {
+        request.validate_structure()?;
+        let requested_url = request.controller_document_ref()?;
+        let value = Self {
+            requested_url,
+            effective_url: effective_url.into(),
+            response_media_type: response_media_type.into(),
+            response_size_bytes,
+            redirect_count,
+            resolved_at: resolved_at.into(),
+            source,
+            document_digest: document_digest.into(),
+        };
+        value.validate_against_request(request)?;
+        Ok(value)
+    }
+
+    pub fn validate_against_request(
+        &self,
+        request: &VerificationRequest,
+    ) -> Result<(), VerificationFailure> {
+        request.controller_document_network_policy.validate_structure()?;
+        let expected_url = request.controller_document_ref()?;
+        if self.requested_url != expected_url {
+            return Err(VerificationFailure::ControllerDocumentMismatch {
+                expected: expected_url,
+                actual: self.requested_url.clone(),
+            });
+        }
+
+        let requested =
+            Url::parse(&self.requested_url).map_err(|_| VerificationFailure::InvalidControllerDocumentUrl)?;
+        let effective =
+            Url::parse(&self.effective_url).map_err(|_| VerificationFailure::InvalidControllerDocumentUrl)?;
+        if !request
+            .controller_document_network_policy
+            .allows_scheme(requested.scheme())
+            || !request
+                .controller_document_network_policy
+                .allows_scheme(effective.scheme())
+        {
+            return Err(VerificationFailure::ControllerDocumentNetworkPolicyViolation);
+        }
+        if request
+            .controller_document_network_policy
+            .require_effective_url_match
+            && effective.as_str() != requested.as_str()
+        {
+            return Err(VerificationFailure::ControllerDocumentEffectiveUrlMismatch);
+        }
+        if self.redirect_count > request.controller_document_network_policy.max_redirects {
+            return Err(VerificationFailure::ControllerDocumentRedirectLimitExceeded);
+        }
+        if self.response_size_bytes
+            > request.controller_document_network_policy.max_response_bytes
+        {
+            return Err(VerificationFailure::ControllerDocumentResponseTooLarge);
+        }
+        if self.response_media_type.trim().is_empty() {
+            return Err(VerificationFailure::Structural(
+                "controller document response media type must be non-empty".into(),
+            ));
+        }
+        parse_timestamp("controller document resolved at", &self.resolved_at)?;
+        if !is_hex_digest(&self.document_digest) {
+            return Err(VerificationFailure::Structural(
+                "controller document dereference digest must be a 64-character hexadecimal digest"
+                    .into(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn matches_document(&self, document_url: &str, document_digest: &str) -> bool {
+        self.requested_url == document_url
+            && self.effective_url == document_url
+            && self.document_digest == document_digest
     }
 }
 
@@ -524,10 +724,11 @@ pub struct VerificationMethodResolution {
     pub controller_document_integrity: ControllerDocumentIntegrityAttestation,
     pub verification_method_lifecycle: VerificationMethodLifecycle,
     pub controller_document_snapshot_scope: ControllerDocumentSnapshotScope,
+    pub controller_document_dereference: Option<ControllerDocumentDereferenceAttestation>,
 }
 
 impl VerificationMethodResolution {
-    pub const SCHEMA_VERSION: u16 = 3;
+    pub const SCHEMA_VERSION: u16 = 4;
 
     pub fn from_controller_document(
         request: &VerificationRequest,
@@ -649,6 +850,7 @@ impl VerificationMethodResolution {
             controller_document_integrity,
             verification_method_lifecycle,
             controller_document_snapshot_scope,
+            controller_document_dereference: None,
         };
         resolution.verification_method_lifecycle.validate_for_use_at(
             request.freshness.lifecycle_reference_time(),
@@ -755,6 +957,50 @@ impl VerificationMethodResolution {
         }
         self.verification_method_lifecycle.validate_structure()?;
         self.controller_document_snapshot_scope.validate_structure()?;
+        let dereference = self
+            .controller_document_dereference
+            .as_ref()
+            .ok_or(VerificationFailure::MissingControllerDocumentDereference)?;
+        let policy = ControllerDocumentNetworkPolicy::strict_for_url(
+            &self.controller_document_ref,
+        )?;
+        policy.validate_structure()?;
+        let requested =
+            Url::parse(&dereference.requested_url)
+                .map_err(|_| VerificationFailure::InvalidControllerDocumentUrl)?;
+        let effective =
+            Url::parse(&dereference.effective_url)
+                .map_err(|_| VerificationFailure::InvalidControllerDocumentUrl)?;
+        if dereference.requested_url != self.controller_document_ref
+            || dereference.document_digest != self.controller_document_digest
+        {
+            return Err(VerificationFailure::ControllerDocumentDereferenceMismatch);
+        }
+        if !policy.allows_scheme(requested.scheme())
+            || !policy.allows_scheme(effective.scheme())
+        {
+            return Err(VerificationFailure::ControllerDocumentNetworkPolicyViolation);
+        }
+        if policy.require_effective_url_match && effective.as_str() != requested.as_str() {
+            return Err(VerificationFailure::ControllerDocumentEffectiveUrlMismatch);
+        }
+        if dereference.redirect_count > policy.max_redirects {
+            return Err(VerificationFailure::ControllerDocumentRedirectLimitExceeded);
+        }
+        if dereference.response_size_bytes > policy.max_response_bytes {
+            return Err(VerificationFailure::ControllerDocumentResponseTooLarge);
+        }
+        dereference.source.validate_structure();
+        parse_timestamp(
+            "controller document resolved at",
+            &dereference.resolved_at,
+        )?;
+        if !is_hex_digest(&dereference.document_digest) {
+            return Err(VerificationFailure::Structural(
+                "controller document dereference digest must be a 64-character hexadecimal digest"
+                    .into(),
+            ));
+        }
         Ok(())
     }
 
@@ -772,6 +1018,7 @@ impl VerificationMethodResolution {
             &self.controller_document_integrity,
             &self.verification_method_lifecycle,
             &self.controller_document_snapshot_scope,
+            &self.controller_document_dereference,
         );
         let bytes = serde_json::to_vec(&encoded)
             .expect("verification method resolution is serializable");
@@ -794,6 +1041,10 @@ impl VerificationMethodResolution {
                 .controller_document_snapshot_scope
                 .validate_for_reference_time(request.freshness.lifecycle_reference_time())
                 .is_ok()
+            && self
+                .controller_document_dereference
+                .as_ref()
+                .is_some_and(|value| value.validate_against_request(request).is_ok())
     }
 }
 
@@ -813,6 +1064,7 @@ pub struct VerificationRequest {
     pub expected_controller: ClaimControllerIdentity,
     pub expected_verification_relationship: ClaimVerificationRelationship,
     pub controller_document_integrity_policy: ControllerDocumentIntegrityPolicy,
+    pub controller_document_network_policy: ControllerDocumentNetworkPolicy,
     pub freshness: VerificationFreshnessContext,
 }
 
@@ -882,8 +1134,21 @@ impl VerificationRequest {
             expected_controller,
             expected_verification_relationship,
             controller_document_integrity_policy: ControllerDocumentIntegrityPolicy::Unpinned,
+            controller_document_network_policy:
+                ControllerDocumentNetworkPolicy::strict_for_url(
+                    &format!("{verification_method}"),
+                )?,
             freshness,
         })
+    }
+
+    pub fn with_controller_document_network_policy(
+        mut self,
+        policy: ControllerDocumentNetworkPolicy,
+    ) -> Result<Self, VerificationFailure> {
+        policy.validate_structure()?;
+        self.controller_document_network_policy = policy;
+        Ok(self)
     }
 
     pub fn with_controller_document_integrity(
@@ -948,6 +1213,7 @@ impl VerificationRequest {
             .map_err(|reason| VerificationFailure::Structural(reason.to_owned()))?;
         self.expected_verification_relationship.validate_structure()?;
         self.controller_document_integrity_policy.validate_structure()?;
+        self.controller_document_network_policy.validate_structure()?;
         self.freshness.validate()?;
         Ok(())
     }
@@ -1111,6 +1377,16 @@ impl VerificationEvidence {
                         ..
                     } => ControllerDocumentIntegrityPolicy::Sha256Digest(expected_digest.clone()),
                 },
+            controller_document_network_policy:
+                self
+                    .resolution
+                    .controller_document_dereference
+                    .as_ref()
+                    .map(|_| ControllerDocumentNetworkPolicy::strict_for_url(
+                        &self.resolution.controller_document_ref,
+                    ))
+                    .transpose()?
+                    .ok_or(VerificationFailure::MissingControllerDocumentDereference)?,
             freshness: self.freshness.clone(),
         };
         request.validate_structure()?;
@@ -1265,6 +1541,13 @@ pub enum VerificationFailure {
     HistoricalStateRequired,
     HistoricalStateMismatch,
     InvalidSnapshotOrdering,
+    InvalidControllerDocumentUrl,
+    ControllerDocumentNetworkPolicyViolation,
+    ControllerDocumentEffectiveUrlMismatch,
+    ControllerDocumentRedirectLimitExceeded,
+    ControllerDocumentResponseTooLarge,
+    MissingControllerDocumentDereference,
+    ControllerDocumentDereferenceMismatch,
     CryptographicVerificationFailed,
 }
 
