@@ -3583,6 +3583,36 @@ mod tests {
             uncertainty_m: 5.0,
         });
         ancestor.quality.confidence = 0.41;
+        ancestor
+            .provenance
+            .processing_activity
+            .as_mut()
+            .expect("activity")
+            .process_id = "transform-v2".into();
+        ancestor
+            .provenance
+            .processing_activity
+            .as_mut()
+            .expect("activity")
+            .started_at_unix_ns = Some(10);
+        ancestor
+            .provenance
+            .processing_activity
+            .as_mut()
+            .expect("activity")
+            .ended_at_unix_ns = Some(20);
+        ancestor
+            .provenance
+            .processing_activity
+            .as_mut()
+            .expect("activity")
+            .agent_id = Some("worker-9".into());
+        ancestor
+            .provenance
+            .processing_activity
+            .as_mut()
+            .expect("activity")
+            .activity_fingerprint = Some("activity-config-v2".into());
         ancestor.asset = Some(AssetRef::blake3(b"changed"));
         assert_eq!(
             ancestor_unread_change
