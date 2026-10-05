@@ -637,8 +637,8 @@ pub fn classify_remote_command_capability(
 
     match program.as_str() {
         "pwd" | "echo" | "true" | "false" | "date" | "whoami" | "id" | "uname" | "hostname"
-        | "printenv" | "env" | "ls" | "cat" | "head" | "tail" | "stat" | "which" | "rg"
-        | "grep" | "find" | "journalctl" | "ps" | "df" | "du" | "free" | "sleep" => {
+        | "printenv" | "ls" | "cat" | "head" | "tail" | "stat" | "which" | "rg"
+        | "grep" | "journalctl" | "ps" | "df" | "du" | "free" | "sleep" => {
             Ok(RemoteCommandCapability::ReadOnly)
         }
         "git" => match arg0.as_deref() {
@@ -1703,6 +1703,24 @@ mod remote_command_capability_tests {
     }
 
     #[test]
+    #[test]
+    fn test_remote_command_capability_rejects_wrapper_escape_programs() {
+        for (program, args) in [
+            ("env", vec!["systemctl".into(), "restart".into(), "sshd.service".into()]),
+            (
+                "find",
+                vec!["/tmp".into(), "-exec".into(), "systemctl".into(), "restart".into(), "sshd.service".into(), ";".into()],
+            ),
+        ] {
+            let err = classify_remote_command_capability(program, &args)
+                .expect_err("wrapper/second-stage programs must not be read-only");
+            assert!(
+                err.contains("allowlist"),
+                "expected capability rejection for {program}, got {err}"
+            );
+        }
+    }
+
     fn test_remote_command_capability_rejects_unknown_program() {
         let err = classify_remote_command_capability("python", &["-c".into(), "print(1)".into()])
             .expect_err("python should not be allowlisted");
