@@ -1414,6 +1414,12 @@ mod tests {
             &[],
             &"11".repeat(32),
             VerificationMethodLifecycle::new(None, None).unwrap(),
+            ControllerDocumentSnapshotScope::historical_at(
+                request.freshness.lifecycle_reference_time(),
+                "snapshot:verification-history",
+                request.freshness.verification_time.as_str(),
+            )
+            .unwrap(),
         );
 
         assert!(matches!(
@@ -1518,6 +1524,12 @@ mod tests {
             &[request.verification_method.clone()],
             &"11".repeat(32),
             VerificationMethodLifecycle::new(None, None).unwrap(),
+            ControllerDocumentSnapshotScope::historical_at(
+                request.freshness.lifecycle_reference_time(),
+                "snapshot:verification-history",
+                request.freshness.verification_time.as_str(),
+            )
+            .unwrap(),
         )
         .unwrap();
         assert!(resolution
@@ -1536,6 +1548,12 @@ mod tests {
                 &[request.verification_method.clone()],
                 &"22".repeat(32),
                 VerificationMethodLifecycle::new(None, None).unwrap(),
+                ControllerDocumentSnapshotScope::historical_at(
+                    request.freshness.lifecycle_reference_time(),
+                    "snapshot:verification-history",
+                    request.freshness.verification_time.as_str(),
+                )
+                .unwrap(),
             ),
             Err(VerificationFailure::ControllerDocumentIntegrityMismatch { .. })
         ));
@@ -1630,6 +1648,12 @@ mod tests {
             VerificationMethodLifecycle::new(
                 Some("2026-10-05T00:30:00Z"),
                 None,
+            )
+            .unwrap(),
+            ControllerDocumentSnapshotScope::historical_at(
+                request.freshness.lifecycle_reference_time(),
+                "snapshot:verification-history",
+                request.freshness.verification_time.as_str(),
             )
             .unwrap(),
         );
