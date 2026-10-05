@@ -103,6 +103,26 @@ fn power_scalar(base: ScalarDomain, exponent: ScalarDomain) -> ScalarDomain {
     }
 }
 
+fn abs_scalar(input: ScalarDomain) -> ScalarDomain {
+    match input {
+        ScalarDomain::Unknown => ScalarDomain::Unknown,
+        ScalarDomain::Complex => ScalarDomain::Real,
+        ScalarDomain::ApproximateReal => ScalarDomain::ApproximateReal,
+        other => other,
+    }
+}
+
+fn floor_scalar(input: ScalarDomain) -> Option<ScalarDomain> {
+    match input {
+        ScalarDomain::Unknown => None,
+        ScalarDomain::Complex => None,
+        ScalarDomain::Integer => Some(ScalarDomain::Integer),
+        ScalarDomain::Rational => Some(ScalarDomain::Integer),
+        ScalarDomain::Real => Some(ScalarDomain::Real),
+        ScalarDomain::ApproximateReal => Some(ScalarDomain::ApproximateReal),
+    }
+}
+
 fn additive_result(
     left: &PhysicalType,
     right: &PhysicalType,
@@ -146,11 +166,7 @@ fn additive_result(
     } else {
         PhysicalType::with_kind(result_kind, left_dimension)
     };
-    if !(result_kind == left.kind && operation == BinOp::Add)
-        && !(result_kind == right.kind && operation == BinOp::Add)
-    {
-        result.scalar = combine_scalar(left.scalar, right.scalar, false);
-    }
+    result.scalar = combine_scalar(left.scalar, right.scalar, false);
 
     // Subtracting two absolute temperatures yields a temperature difference.
     // Do not carry a Celsius/Fahrenheit affine offset into the delta result.
@@ -317,7 +333,33 @@ where
                         )
                     }
                 }
-                UnaryFn::Abs | UnaryFn::Floor => valid(arg_ty),
+                UnaryFn::Abs => {
+                    let mut result = arg_ty;
+                    result.scalar = abs_scalar(result.scalar);
+                    if result.scalar == ScalarDomain::Unknown {
+                        TypeJudgement::Unknown("absolute value requires a known scalar domain".into())
+                    } else {
+                        valid(result)
+                    }
+                }
+                UnaryFn::Floor => {
+                    let mut result = arg_ty;
+                    match floor_scalar(result.scalar) {
+                        Some(scalar) => {
+                            result.scalar = scalar;
+                            valid(result)
+                        }
+                        None if result.scalar == ScalarDomain::Unknown => {
+                            TypeJudgement::Unknown(
+                                "floor requires a non-complex known scalar domain".into(),
+                            )
+                        }
+                        None => TypeJudgement::Invalid(PhysicalTypeError {
+                            operation: "floor".into(),
+                            reason: "floor is undefined for complex scalar domains".into(),
+                        }),
+                    }
+                }
             }
         }
 
@@ -441,6 +483,14 @@ where
                                         .into(),
                             });
                         }
+                        if rounded < 0.0
+                            && b.scalar != ScalarDomain::Complex
+                            && !b.has_refinement(Refinement::NonZero)
+                        {
+                            return TypeJudgement::Unknown(
+                                "negative power requires a nonzero base refinement".into(),
+                            );
+                        }
                         match dimension.scale(rounded as i8) {
                             Some(d) => {
                                 let mut result = PhysicalType::with_kind(Unknown, d);
@@ -463,19 +513,26 @@ where
                         }
                     } else if (*k - 0.5).abs() < 1e-9 {
                         let a = dimension.as_array();
-                        if a.iter().all(|e| e % 2 == 0) {
-                            let mut result = PhysicalType::with_kind(
-                                Unknown,
-                                PhysicalDimension::from_array(a.map(|e| e / 2)),
-                            );
-                            result.scalar = analytic_scalar(b.scalar);
-                            valid(result)
-                        } else {
-                            TypeJudgement::Invalid(PhysicalTypeError {
+                        if !a.iter().all(|e| e % 2 == 0) {
+                            return TypeJudgement::Invalid(PhysicalTypeError {
                                 operation: "pow".into(),
                                 reason: "square-root exponent requires even dimensions".into(),
-                            })
+                            });
                         }
+                        if b.scalar != ScalarDomain::Complex
+                            && !b.has_refinement(Refinement::NonNegative)
+                        {
+                            return TypeJudgement::Unknown(
+                                "real square-root power requires a nonnegative base refinement"
+                                    .into(),
+                            );
+                        }
+                        let mut result = PhysicalType::with_kind(
+                            Unknown,
+                            PhysicalDimension::from_array(a.map(|e| e / 2)),
+                        );
+                        result.scalar = analytic_scalar(b.scalar);
+                        valid(result)
                     } else if dimension.is_dimensionless() {
                         let mut result = PhysicalType::dimensionless();
                         result.scalar = analytic_scalar(b.scalar);
@@ -510,6 +567,15 @@ where
                             operation: "pow".into(),
                             reason: "variable exponent requires dimensionless base".into(),
                         });
+                    }
+
+                    if b.scalar != ScalarDomain::Complex
+                        && !b.has_refinement(Refinement::Positive)
+                        && exponent_ty.scalar != ScalarDomain::Complex
+                    {
+                        return TypeJudgement::Unknown(
+                            "variable real power requires a positive base refinement".into(),
+                        );
                     }
 
                     let mut result = PhysicalType::dimensionless();
@@ -813,6 +879,93 @@ mod tests {
             }
             other => panic!("unexpected judgment: {other:?}"),
         }
+    }
+
+    #[test]
+    fn same_kind_addition_preserves_widest_scalar_domain() {
+        let mut real =
+            PhysicalType::with_kind(QuantityKind::Energy, PhysicalDimension::ENERGY);
+        real.scalar = ScalarDomain::Real;
+        let mut complex = real.clone();
+        complex.scalar = ScalarDomain::Complex;
+        let expr = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Var("real".into())),
+            Box::new(Expr::Var("complex".into())),
+        );
+        let variables = HashMap::from([
+            ("real".into(), real),
+            ("complex".into(), complex),
+        ]);
+
+        match infer_expr_type_with_variables(&expr, &variables) {
+            TypeJudgement::Valid(result) => {
+                assert_eq!(result.scalar, ScalarDomain::Complex);
+            }
+            other => panic!("unexpected judgment: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn complex_abs_returns_real_scalar_domain() {
+        let mut input = PhysicalType::dimensionless();
+        input.scalar = ScalarDomain::Complex;
+        let expr = Expr::Func(UnaryFn::Abs, Box::new(Expr::Var("z".into())));
+        let variables = HashMap::from([("z".into(), input)]);
+
+        match infer_expr_type_with_variables(&expr, &variables) {
+            TypeJudgement::Valid(result) => assert_eq!(result.scalar, ScalarDomain::Real),
+            other => panic!("unexpected judgment: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn complex_floor_is_invalid() {
+        let mut input = PhysicalType::dimensionless();
+        input.scalar = ScalarDomain::Complex;
+        let expr = Expr::Func(UnaryFn::Floor, Box::new(Expr::Var("z".into())));
+        let variables = HashMap::from([("z".into(), input)]);
+
+        assert!(matches!(
+            infer_expr_type_with_variables(&expr, &variables),
+            TypeJudgement::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn square_root_power_requires_nonnegative_real_base() {
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(0.5)),
+        );
+        let variables = HashMap::from([(
+            "x".into(),
+            PhysicalType::dimensionless(),
+        )]);
+
+        assert!(matches!(
+            infer_expr_type_with_variables(&expr, &variables),
+            TypeJudgement::Unknown(_)
+        ));
+    }
+
+    #[test]
+    fn negative_power_requires_nonzero_base() {
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(-1.0)),
+        );
+        let variables = HashMap::from([(
+            "x".into(),
+            PhysicalType::dimensionless(),
+        )]);
+
+        assert!(matches!(
+            infer_expr_type_with_variables(&expr, &variables),
+            TypeJudgement::Unknown(_)
+        ));
     }
 
     #[test]
