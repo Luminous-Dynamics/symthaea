@@ -1400,6 +1400,27 @@ mod tests {
     }
 
     #[test]
+    fn policy_provenance_ref_is_bound_to_packet_integrity() {
+        let mut packet = NeurosemanticPacket::new_with_policy(
+            17,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            semantic_policy(),
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        assert!(packet.validate_integrity().is_ok());
+        packet.data_policy.handling.policy_provenance_ref = "synthetic-policy-record-2".into();
+        assert!(packet.validate_integrity().is_err());
+    }
+
+    #[test]
     fn packet_hashes_detect_tampering() {
         let mut packet = NeurosemanticPacket::new(
             1,
