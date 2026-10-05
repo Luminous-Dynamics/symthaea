@@ -982,11 +982,21 @@ async function runMode(mode) {
       diagnostics.surface_configuration = await page.evaluate(() => {
         const read = selector => {
           const canvas = document.querySelector(selector);
+          const format = canvas?.getAttribute('data-qualification-surface-format') || null;
+          const formats = (canvas?.getAttribute('data-qualification-surface-formats') || '')
+            .split(',')
+            .map(value => value.trim())
+            .filter(Boolean);
+          const alphaMode = canvas?.getAttribute('data-qualification-alpha-mode') || null;
+          const presentMode = canvas?.getAttribute('data-qualification-present-mode') || null;
           return {
-            format: canvas?.getAttribute('data-qualification-surface-format') || null,
-            formats: canvas?.getAttribute('data-qualification-surface-formats') || null,
-            alpha_mode: canvas?.getAttribute('data-qualification-alpha-mode') || null,
-            present_mode: canvas?.getAttribute('data-qualification-present-mode') || null,
+            format,
+            formats,
+            alpha_mode: alphaMode,
+            present_mode: presentMode,
+            selected_format_advertised: !!format && formats.includes(format),
+            selected_alpha_advertised: !!alphaMode,
+            selected_present_mode_advertised: !!presentMode,
           };
         };
         return {
@@ -994,6 +1004,16 @@ async function runMode(mode) {
           movie: read('#webgpu-movie-canvas'),
         };
       });
+      for (const [canvas, configuration] of Object.entries(diagnostics.surface_configuration)) {
+        if (!configuration.selected_format_advertised
+          || !configuration.selected_alpha_advertised
+          || !configuration.selected_present_mode_advertised) {
+          throw new QualificationError(
+            `WebGPU ${canvas} surface configuration is inconsistent with advertised capabilities: ${JSON.stringify(configuration)}`,
+            'capability',
+          );
+        }
+      }
 
       await page.screenshot({
         path: path.join(SCREENSHOT_DIR, \`${mode}-preassert.png\`),
