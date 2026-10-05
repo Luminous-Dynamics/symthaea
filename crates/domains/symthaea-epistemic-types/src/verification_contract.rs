@@ -494,7 +494,7 @@ impl VerificationEvidence {
             });
         }
 
-        for (name, value) [
+        for (name, value) in [
             ("controller document reference", self.controller_document_ref.as_str()),
             ("verification relationship", self.verification_relationship.as_str()),
             ("cryptosuite", self.cryptosuite.as_str()),
