@@ -1,4 +1,48 @@
 use super::*;
+use symthaea_types::{
+    ModelMaturity, PhysicalType, ScientificHypothesisHandoff,
+};
+
+fn candidate_identity_digest(conjecture: &Conjecture) -> String {
+    // Candidate identity binds only the discovered mathematical object and its
+    // source/domain identity. Mutable confidence and downstream evidence are
+    // deliberately excluded so qualification cannot retroactively mutate it.
+    let canonical = format!(
+        "formula={}|source={}|domain={:?}|complexity={}",
+        conjecture.formula, conjecture.source, conjecture.domain, conjecture.complexity
+    );
+    blake3::hash(canonical.as_bytes()).to_hex().to_string()
+}
+
+impl Conjecture {
+    /// Export this conjecture as an evidence-neutral scientific hypothesis.
+    ///
+    /// EUREKA is intentionally not consulted here: this is a one-way identity
+    /// handoff, not a qualification call.
+    pub fn scientific_hypothesis_handoff(
+        &self,
+        physical_type: &PhysicalType,
+        model_maturity: ModelMaturity,
+        source_observation_digest: impl Into<String>,
+        search_configuration_digest: impl Into<String>,
+        search_seed: u64,
+        discovery_manifest_digest: impl Into<String>,
+        non_claims: Vec<String>,
+    ) -> ScientificHypothesisHandoff {
+        ScientificHypothesisHandoff::new(
+            candidate_identity_digest(self),
+            physical_type,
+            model_maturity,
+            source_observation_digest,
+            search_configuration_digest,
+            search_seed,
+            discovery_manifest_digest,
+            self.complexity as u64,
+            "ramanujan",
+            non_claims,
+        )
+    }
+}
 
 pub fn conjecture_has_verified_eml_backend(conjecture: &Conjecture) -> bool {
     conjecture.eml_compiled.is_some()
@@ -154,6 +198,75 @@ static EML_METADATA_CACHE: Lazy<RwLock<std::collections::HashMap<String, EmlMeta
     Lazy::new(|| RwLock::new(std::collections::HashMap::new()));
 
 #[cfg(test)]
+mod hypothesis_handoff_tests {
+    use super::*;
+    use symthaea_types::{PhysicalDimension, QuantityKind};
+
+    #[test]
+    fn handoff_is_independent_of_mutable_confidence() {
+        let formula = Expr::Var("n".into());
+        let mut a = Conjecture {
+            formula: formula.clone(),
+            formula_str: "n".into(),
+            source: "test-seq".into(),
+            domain: MathDomain::Physics,
+            training_mse: 0.0,
+            complexity: 1,
+            fitness: 0.0,
+            status: ConjectureStatus::Proposed,
+            confidence: 0.1,
+            macro_promotion_tier: MacroPromotionTier::RecurrentNumerical,
+            eml_compiled: None,
+            eml_metrics: None,
+            eml_verified_real: None,
+            eml_real_domain: None,
+            eml_verified_complex: None,
+            eml_constructive_compiled: None,
+            eml_constructive_metrics: None,
+            eml_verified_constructive_real: None,
+        };
+        let mut b = a.clone();
+        b.confidence = 0.99;
+
+        let energy = PhysicalType::with_kind(QuantityKind::Energy, PhysicalDimension::ENERGY);
+        let ha = a.scientific_hypothesis_handoff(
+            &energy,
+            ModelMaturity::ResearchPrototype,
+            "obs",
+            "search",
+            7,
+            "manifest",
+            vec!["not qualification".into()],
+        );
+        let hb = b.scientific_hypothesis_handoff(
+            &energy,
+            ModelMaturity::ResearchPrototype,
+            "obs",
+            "search",
+            7,
+            "manifest",
+            vec!["not qualification".into()],
+        );
+        assert_eq!(ha.candidate_digest, hb.candidate_digest);
+        assert_eq!(ha.physical_type_digest, energy.digest_hex());
+        assert!(ha.validate().is_ok());
+        a.confidence = 0.77;
+        assert_eq!(
+            a.scientific_hypothesis_handoff(
+                &energy,
+                ModelMaturity::ResearchPrototype,
+                "obs",
+                "search",
+                7,
+                "manifest",
+                vec!["not qualification".into()],
+            )
+            .candidate_digest,
+            ha.candidate_digest
+        );
+    }
+}
+
 pub(crate) fn clear_eml_metadata_cache() {
     EML_METADATA_CACHE.write().clear();
 }
