@@ -3806,7 +3806,7 @@ mod tests {
         let mut reader=CborReader::new(&wire);
         assert_eq!(
             reader.read_map_entries_bounded(3),
-            Err(Rfc9162ProofDecodeError::InvalidStructure)
+            Err(Rfc9162ProofDecodeError::ResourceLimitExceeded)
         );
     }
 
@@ -3841,7 +3841,7 @@ mod tests {
         let mut reader=CborReader::new(&wire);
         assert_eq!(
             reader.read_array_items_bounded(2),
-            Err(Rfc9162ProofDecodeError::InvalidStructure)
+            Err(Rfc9162ProofDecodeError::ResourceLimitExceeded)
         );
     }
 
@@ -4126,7 +4126,7 @@ mod tests {
         let mut reader = CborReader::new(&rejected);
         assert_eq!(
             reader.read_map_entries_bounded(1),
-            Err(Rfc9162ProofDecodeError::InvalidStructure)
+            Err(Rfc9162ProofDecodeError::ResourceLimitExceeded)
         );
     }
 
