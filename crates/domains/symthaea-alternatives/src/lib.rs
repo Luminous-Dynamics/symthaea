@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 1;
+pub const SCHEMA_VERSION: u16 = 2;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-v1";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-explicit-cohort-v2";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
