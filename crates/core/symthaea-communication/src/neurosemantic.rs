@@ -148,6 +148,22 @@ impl Default for NeurosemanticHandlingPolicy {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NeurosemanticPolicyProvenanceBinding {
+    policy_provenance_ref: String,
+    policy_provenance_hash: String,
+}
+
+impl NeurosemanticPolicyProvenanceBinding {
+    pub fn reference(&self) -> &str {
+        &self.policy_provenance_ref
+    }
+
+    pub fn digest(&self) -> &str {
+        &self.policy_provenance_hash
+    }
+}
+
 impl NeurosemanticHandlingPolicy {
     pub fn validates(&self) -> bool {
         self.schema_version == NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION
@@ -169,15 +185,33 @@ impl NeurosemanticHandlingPolicy {
             )
     }
 
-    /// Verify the stored provenance digest against the exact externally supplied
-    /// policy/consent record bytes and the exact provenance reference.
-    /// This authenticates the reference+record binding, but does not authenticate
-    /// the issuing authority or its signature.
+    /// Bind the exact supplied policy record to the packet's declared provenance
+    /// reference and digest. The returned token proves only this cryptographic
+    /// binding; it is not an issuer/authority credential.
+    pub fn bind_policy_provenance_bytes(
+        &self,
+        record_bytes: &[u8],
+    ) -> Result<NeurosemanticPolicyProvenanceBinding, String> {
+        if !self.validates() {
+            return Err("neurosemantic policy provenance state is invalid".into());
+        }
+        if record_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err("neurosemantic policy provenance record exceeds the serialized artifact limit".into());
+        }
+        if compute_policy_provenance_hash(&self.policy_provenance_ref, record_bytes)
+            != self.policy_provenance_hash
+        {
+            return Err("neurosemantic policy provenance reference/record binding mismatch".into());
+        }
+        Ok(NeurosemanticPolicyProvenanceBinding {
+            policy_provenance_ref: self.policy_provenance_ref.clone(),
+            policy_provenance_hash: self.policy_provenance_hash.clone(),
+        })
+    }
+
+    /// Convenience predicate for callers that only need a boolean result.
     pub fn verify_policy_provenance_bytes(&self, record_bytes: &[u8]) -> bool {
-        self.validates()
-            && record_bytes.len() <= MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
-            && compute_policy_provenance_hash(&self.policy_provenance_ref, record_bytes)
-                == self.policy_provenance_hash
+        self.bind_policy_provenance_bytes(record_bytes).is_ok()
     }
 
     pub fn allows_destination(&self, destination_jurisdiction: &str) -> bool {
@@ -707,10 +741,18 @@ impl AuthorizedNeurosemanticMessage {
     pub fn validate_for_handling(
         &self,
         lease: &CognitiveConsentLease,
+        provenance: &NeurosemanticPolicyProvenanceBinding,
         destination_jurisdiction: &str,
         action: NeurosemanticHandlingAction,
         now_unix_s: u64,
     ) -> Result<(), String> {
+        if provenance.policy_provenance_ref
+            != self.packet.data_policy.handling.policy_provenance_ref
+            || provenance.policy_provenance_hash
+                != self.packet.data_policy.handling.policy_provenance_hash
+        {
+            return Err("policy provenance binding does not match the packet handling policy".into());
+        }
         self.validate(lease, now_unix_s)?;
         if !self.packet.data_policy.allows_handling(
             destination_jurisdiction,
@@ -918,6 +960,13 @@ mod tests {
                 retention: NeurosemanticRetentionPolicy::UntilUnixS(200),
             },
         }
+    }
+
+    fn policy_provenance_binding() -> NeurosemanticPolicyProvenanceBinding {
+        semantic_policy()
+            .handling
+            .bind_policy_provenance_bytes(b"synthetic-policy-record-1")
+            .unwrap()
     }
 
     fn lease() -> CognitiveConsentLease {
@@ -1209,6 +1258,7 @@ mod tests {
         assert!(message
             .validate_for_handling(
                 &lease,
+                &policy_provenance_binding(),
                 "ZA",
                 NeurosemanticHandlingAction::SecondaryUse(
                     NeurosemanticSecondaryUse::AffectiveInference
@@ -1243,6 +1293,7 @@ mod tests {
         assert!(message
             .validate_for_handling(
                 &lease,
+                &policy_provenance_binding(),
                 "ZA",
                 NeurosemanticHandlingAction::SecondaryUse(
                     NeurosemanticSecondaryUse::AffectiveInference
@@ -1278,6 +1329,7 @@ mod tests {
         assert!(message
             .validate_for_handling(
                 &lease,
+                &policy_provenance_binding(),
                 "ZA",
                 NeurosemanticHandlingAction::Transmit,
                 150
@@ -1286,6 +1338,7 @@ mod tests {
         assert!(message
             .validate_for_handling(
                 &lease,
+                &policy_provenance_binding(),
                 "GB",
                 NeurosemanticHandlingAction::Transmit,
                 150
@@ -1294,6 +1347,7 @@ mod tests {
         assert!(message
             .validate_for_handling(
                 &lease,
+                &policy_provenance_binding(),
                 "ZA",
                 NeurosemanticHandlingAction::Persist,
                 200
@@ -1325,6 +1379,7 @@ mod tests {
         assert!(message
             .validate_for_handling(
                 &lease,
+                &policy_provenance_binding(),
                 "ZA",
                 NeurosemanticHandlingAction::SecondaryUse(
                     NeurosemanticSecondaryUse::Research

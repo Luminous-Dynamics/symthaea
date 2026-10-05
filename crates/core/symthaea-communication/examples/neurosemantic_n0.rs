@@ -7,6 +7,7 @@ use symthaea_communication::{
     NeurosemanticPacket, NeurosemanticPayload, NeurosemanticReplayTracker, RepresentationFamily,
     NeurosemanticDataClass, NeurosemanticDataPolicy, NeurosemanticInferenceClass,
     NeurosemanticHandlingPolicy, NeurosemanticRetentionPolicy, ReplayDecision,
+    NeurosemanticPolicyProvenanceBinding,
 };
 
 fn main() -> Result<(), String> {
@@ -114,6 +115,11 @@ fn main() -> Result<(), String> {
         lease_id: lease.lease_id.clone(),
     };
     message.validate(&lease, 1_500)?;
+    let policy_provenance_binding: NeurosemanticPolicyProvenanceBinding = message
+        .packet
+        .data_policy
+        .handling
+        .bind_policy_provenance_bytes(b"synthetic-policy-record-1")?;
     let handling_policy_provenance_present = !message
         .packet
         .data_policy
@@ -152,6 +158,7 @@ fn main() -> Result<(), String> {
         .verify_policy_provenance_bytes(b"synthetic-policy-record-1");
     message.validate_for_handling(
         &lease,
+        &policy_provenance_binding,
         "ZA",
         symthaea_communication::NeurosemanticHandlingAction::Transmit,
         1_500,
@@ -205,6 +212,7 @@ fn main() -> Result<(), String> {
     let cross_jurisdiction_blocked = message
         .validate_for_handling(
             &lease,
+            &policy_provenance_binding,
             "GB",
             symthaea_communication::NeurosemanticHandlingAction::Transmit,
             1_500,
@@ -213,6 +221,7 @@ fn main() -> Result<(), String> {
     let persistence_after_expiry_blocked = message
         .validate_for_handling(
             &lease,
+            &policy_provenance_binding,
             "ZA",
             symthaea_communication::NeurosemanticHandlingAction::Persist,
             2_000,
@@ -221,6 +230,7 @@ fn main() -> Result<(), String> {
     let secondary_research_blocked = message
         .validate_for_handling(
             &lease,
+            &policy_provenance_binding,
             "ZA",
             symthaea_communication::NeurosemanticHandlingAction::SecondaryUse(
                 symthaea_communication::NeurosemanticSecondaryUse::Research,
