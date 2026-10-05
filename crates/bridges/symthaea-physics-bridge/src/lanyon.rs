@@ -86,9 +86,9 @@ pub struct LanyonSystemSpec {
 impl LanyonSystemSpec {
     pub fn validate(&self) -> Result<(), String> {
         validate_symbol(&self.name)?;
-        validate_names("coordinate", &self.coordinates)?;
-        validate_names("state", &self.state)?;
-        validate_names("parameter", &self.parameters)?;
+        validate_names("coordinate", &self.coordinates, false)?;
+        validate_names("state", &self.state, false)?;
+        validate_names("parameter", &self.parameters, true)?;
         reject_duplicates("coordinate", &self.coordinates)?;
         reject_duplicates("state", &self.state)?;
         reject_duplicates("parameter", &self.parameters)?;
@@ -133,18 +133,41 @@ pub fn expr_to_lanyon_form(expr: &Expr) -> Result<LanyonForm, String> {
         Expr::Var(name) => LanyonForm::symbol(name),
         Expr::Const(value) => LanyonForm::number(*value),
         Expr::BinOp(op, left, right) => {
-            let operator = match op {
-                BinOp::Add => "+",
-                BinOp::Sub => "-",
-                BinOp::Mul => "*",
-                BinOp::Div => "/",
-                BinOp::Pow => "^",
-            };
-            Ok(LanyonForm::list([
-                LanyonForm::symbol(operator)?,
-                expr_to_lanyon_form(left)?,
-                expr_to_lanyon_form(right)?,
-            ]))
+            match op {
+                BinOp::Pow => {
+                    let Expr::Const(exponent) = right.as_ref() else {
+                        return Err(
+                            "variable powers have no stable mapping in the observed public Lanyon subset"
+                                .into(),
+                        );
+                    };
+                    if !exponent.is_finite() || (exponent - exponent.round()).abs() >= 1e-9 {
+                        return Err(
+                            "only finite integer powers have a lossless mapping in the observed public Lanyon subset"
+                                .into(),
+                        );
+                    }
+                    let n = exponent.round();
+                    if !(-32.0..=32.0).contains(&n) {
+                        return Err("integer power outside adapter expansion bound".into());
+                    }
+                    integer_power_to_form(left, n as i32)
+                }
+                _ => {
+                    let operator = match op {
+                        BinOp::Add => "+",
+                        BinOp::Sub => "-",
+                        BinOp::Mul => "*",
+                        BinOp::Div => "/",
+                        BinOp::Pow => unreachable!(),
+                    };
+                    Ok(LanyonForm::list([
+                        LanyonForm::symbol(operator)?,
+                        expr_to_lanyon_form(left)?,
+                        expr_to_lanyon_form(right)?,
+                    ]))
+                }
+            }
         }
         Expr::Func(function, arg) => {
             let name = match function {
@@ -163,6 +186,48 @@ pub fn expr_to_lanyon_form(expr: &Expr) -> Result<LanyonForm, String> {
         }
         Expr::Sum(_, _) => Err("Expr::Sum has no stable mapping in the observed public Lanyon subset".into()),
     }
+}
+
+fn integer_power_to_form(base: &Expr, exponent: i32) -> Result<LanyonForm, String> {
+    let base = expr_to_lanyon_form(base)?;
+    match exponent {
+        0 => LanyonForm::number(1.0),
+        1 => Ok(base),
+        n if n > 1 => {
+            let mut result = base.clone();
+            for _ in 1..n {
+                result = LanyonForm::list([
+                    LanyonForm::symbol("*")?,
+                    result,
+                    base.clone(),
+                ]);
+            }
+            Ok(result)
+        }
+        n => {
+            let positive = integer_power_to_form_inner(base, -n)?;
+            Ok(LanyonForm::list([
+                LanyonForm::symbol("/")?,
+                LanyonForm::number(1.0)?,
+                positive,
+            ]))
+        }
+    }
+}
+
+fn integer_power_to_form_inner(base: LanyonForm, exponent: i32) -> Result<LanyonForm, String> {
+    if exponent == 0 {
+        return LanyonForm::number(1.0);
+    }
+    let mut result = base.clone();
+    for _ in 1..exponent {
+        result = LanyonForm::list([
+            LanyonForm::symbol("*")?,
+            result,
+            base.clone(),
+        ]);
+    }
+    Ok(result)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -423,6 +488,26 @@ mod tests {
             )),
         );
         assert_eq!(expr_to_lanyon_form(&expr).unwrap().render(), "(* 0.5 (^ v 2.0))");
+    }
+
+    #[test]
+    fn integer_power_exports_using_observed_core_operators() {
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(2.0)),
+        );
+        assert_eq!(expr_to_lanyon_form(&expr).unwrap().render(), "(* x x)");
+    }
+
+    #[test]
+    fn fractional_power_fails_closed_in_exporter() {
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(0.5)),
+        );
+        assert!(expr_to_lanyon_form(&expr).is_err());
     }
 
     #[test]
