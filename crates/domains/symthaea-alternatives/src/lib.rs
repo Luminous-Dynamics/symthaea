@@ -1155,6 +1155,18 @@ mod tests {
                 ("service_life_years".into(), RequirementBound::AtLeast(10.0)),
                 ("throughput_per_hour".into(), RequirementBound::AtLeast(100.0)),
             ]),
+            comparison_scales: Dimension::ALL
+                .into_iter()
+                .map(|dimension| {
+                    (
+                        dimension,
+                        ComparisonScale {
+                            unit: "unit".into(),
+                            scope: "synthetic functional unit".into(),
+                        },
+                    )
+                })
+                .collect(),
         }
     }
 
@@ -1403,7 +1415,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn single_field_observation_cannot_promote_entire_candidate() {
         let mut c = candidate(
             "field",
@@ -1515,6 +1526,62 @@ mod tests {
             result.candidates[0].qualification,
             QualificationState::EvidenceSupported
         );
+    }
+
+    #[test]
+    fn requirement_must_declare_every_comparison_scale() {
+        let mut requirement = fixture_requirement();
+        requirement.comparison_scales.remove(&Dimension::Water);
+
+        let error = AlternativesEngine
+            .assess(&requirement, &[], None)
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            AssessmentError::MissingComparisonScale(Dimension::Water)
+        ));
+    }
+
+    #[test]
+    fn candidate_cannot_define_its_own_comparison_scale() {
+        let mut c = candidate(
+            "cohort-authority",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "x1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let water = c.burdens.get_mut(&Dimension::Water).unwrap();
+        water.unit = "candidate-defined-unit".into();
+        water.evidence_ids.clear();
+
+        let result = AlternativesEngine::assess(&fixture_requirement(), &[c], None).unwrap();
+
+        assert!(matches!(
+            result.frontier_blockers["cohort-authority"][0],
+            FrontierBlocker::IncompatibleScale {
+                dimension: Dimension::Water,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn overlapping_intervals_remain_incomparable() {
+        let a = Interval::new(1.0, 3.0).unwrap();
+        let b = Interval::new(2.0, 4.0).unwrap();
+
+        assert!(!a.clearly_no_worse_than(&b));
+        assert!(!b.clearly_no_worse_than(&a));
+        assert!(!a.clearly_better_than(&b));
+        assert!(!b.clearly_better_than(&a));
     }
 
     #[test]
