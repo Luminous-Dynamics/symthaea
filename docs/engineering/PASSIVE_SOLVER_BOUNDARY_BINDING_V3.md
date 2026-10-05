@@ -98,9 +98,11 @@ With the exact `constant/polyMesh/faces` artifact, it parses the referenced face
 declared patch range against actual serialized faces. With the exact `constant/polyMesh/points` artifact
 and an explicit coordinate-unit scale, it derives the exposed perimeter edges of the referenced patch
 faces and requires that perimeter to equal the candidate's independently certified interface rim.
-The combined observation commits to the exact source artifacts and scale. This remains
-`SolverInputEntityAttested`: it is not a claim that a live solver loaded or accepted the files, nor
-that numerical physics is valid. A live-capable adapter may still use the higher
+The combined observation commits to the exact source artifacts and scale. When the exact
+`neighbour` artifact is also supplied, the observer derives the internal-face count and requires
+the declared boundary patches to form a non-overlapping, contiguous partition of the global boundary
+face suffix. This is still input-artifact evidence only: it is not a claim that a live solver loaded
+or accepted the files, nor that numerical physics is valid. A live-capable adapter may still use the higher
 `SolverEntityAttested` rung after inspecting actual solver state.
 The OpenFOAM input observer is deliberately conservative: it accepts only the declared patch-list
 grammar it can parse, requires the declared patch count to equal the number of parsed patch entries,
