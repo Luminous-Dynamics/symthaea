@@ -2492,10 +2492,20 @@ impl std::fmt::Display for AssessmentError {
                 actual.basis_id,
                 expected.basis_id
             ),
+            Self::InvalidExperimentalStoppingCriteria => {
+                write!(f, "experimental stopping criteria are invalid")
+            }
             Self::EmptyAssessmentSubject => write!(f, "assessment subject identity is incomplete"),
             Self::EmptySourceAdmissionReference => {
                 write!(f, "source admission reference is incomplete")
             }
+            Self::SourceAdmissionAuthorityMismatch {
+                source_authority_id,
+                admission_authority_id,
+            } => write!(
+                f,
+                "source authority {source_authority_id} does not match admission authority {admission_authority_id}"
+            ),
             Self::EmptyFreshnessPolicyIdentity => {
                 write!(f, "freshness policy identity is incomplete")
             }
