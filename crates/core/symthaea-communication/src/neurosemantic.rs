@@ -111,6 +111,10 @@ pub enum NeurosemanticHandlingAction {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NeurosemanticHandlingPolicy {
     pub schema_version: u16,
+    /// Opaque reference to the externally authoritative policy/consent record.
+    /// Symthaea binds this reference into packet integrity but does not authenticate
+    /// the authority; the deployment policy layer remains responsible for verification.
+    pub policy_provenance_ref: String,
     /// Jurisdiction identifier asserted for the originating data/controller context.
     /// This is an interoperable policy identifier, not a legal determination.
     pub origin_jurisdiction: String,
@@ -128,6 +132,7 @@ impl Default for NeurosemanticHandlingPolicy {
     fn default() -> Self {
         Self {
             schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
+            policy_provenance_ref: String::new(),
             origin_jurisdiction: String::new(),
             permitted_destination_jurisdictions: BTreeSet::new(),
             permitted_secondary_uses: BTreeSet::new(),
@@ -139,6 +144,7 @@ impl Default for NeurosemanticHandlingPolicy {
 impl NeurosemanticHandlingPolicy {
     pub fn validates(&self) -> bool {
         self.schema_version == NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION
+            && valid_identifier(&self.policy_provenance_ref)
             && valid_jurisdiction_id(&self.origin_jurisdiction)
             && !self.permitted_destination_jurisdictions.is_empty()
             && self.permitted_destination_jurisdictions.len() <= MAX_NEUROSEMANTIC_DESTINATION_JURISDICTIONS
@@ -982,6 +988,21 @@ mod tests {
             NeurosemanticHandlingAction::SecondaryUse(NeurosemanticSecondaryUse::Research),
             1
         ));
+    }
+
+    #[test]
+    fn handling_policy_provenance_reference_is_bounded() {
+        let mut policy = NeurosemanticHandlingPolicy {
+            schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
+            policy_provenance_ref: "x".repeat(MAX_NEUROSEMANTIC_ID_BYTES + 1),
+            origin_jurisdiction: "ZA".into(),
+            permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
+            permitted_secondary_uses: BTreeSet::new(),
+            retention: NeurosemanticRetentionPolicy::Ephemeral,
+        };
+        assert!(!policy.validates());
+        policy.policy_provenance_ref = "synthetic-policy-record-1".into();
+        assert!(policy.validates());
     }
 
     #[test]
