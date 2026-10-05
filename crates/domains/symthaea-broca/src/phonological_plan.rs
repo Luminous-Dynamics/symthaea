@@ -9,6 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::lexical_binding::LexicalMorphosyntacticBinding;
 use crate::linguistic_frame::LinguisticFrame;
 use crate::speech_plan::{IntonationIntent, SpeechPlan};
 
@@ -188,6 +189,44 @@ impl PhonologicalPlan {
         Self::from_linguistic_frame(&frame)
     }
 
+    /// Bind phonology using the exact provenance identity of an existing lexical binding.
+    ///
+    /// The lexical binding remains the authority for lexical identity; this method only carries
+    /// its deterministic token into the downstream phonological plan.
+    pub fn bind_lexical_segments_from_binding(
+        &mut self,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        segments: Vec<PhonemeSlot>,
+    ) -> Result<(), PhonologicalPlanError> {
+        binding
+            .validate_against_frame(frame)
+            .map_err(|_| PhonologicalPlanError::LexicalBindingMismatch)?;
+        self.validate_against_frame(frame)?;
+        self.bind_lexical_segments(segments, binding.provenance_token())
+    }
+
+    /// Validate that this lexicalized phonological plan carries the exact supplied binding.
+    pub fn validate_against_lexical_binding(
+        &self,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+    ) -> Result<(), PhonologicalPlanError> {
+        binding
+            .validate_against_frame(frame)
+            .map_err(|_| PhonologicalPlanError::LexicalBindingMismatch)?;
+        self.validate_against_frame(frame)?;
+
+        let expected_provenance = binding.provenance_token();
+        if self.content_binding != ContentBindingStatus::LexicallyBound
+            || self.lexical_provenance.as_deref() != Some(expected_provenance.as_str())
+        {
+            return Err(PhonologicalPlanError::LexicalBindingMismatch);
+        }
+
+        Ok(())
+    }
+
     /// Bind an explicit phoneme sequence without changing the upstream speech plan.
     ///
     /// LexicallyBound is permitted only when the caller has separately retained lexical
@@ -348,6 +387,7 @@ pub enum PhonologicalPlanError {
     NonContiguousSyllableIndex { expected: usize, found: usize },
     LexicalBindingWithoutSegments,
     LexicalBindingWithoutProvenance,
+    LexicalBindingMismatch,
     EmptyLexicalProvenance,
     InvalidLexicalProvenanceFormat,
     NonLexicalProvenance,
@@ -387,6 +427,9 @@ impl std::fmt::Display for PhonologicalPlanError {
             }
             Self::LexicalBindingWithoutProvenance => {
                 write!(f, "lexically bound plans require explicit lexical provenance")
+            }
+            Self::LexicalBindingMismatch => {
+                write!(f, "phonological plan does not match the supplied lexical binding")
             }
             Self::EmptyLexicalProvenance => {
                 write!(f, "lexically bound plans require non-empty lexical provenance")
