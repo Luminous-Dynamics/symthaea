@@ -159,10 +159,10 @@ impl UnitTransform {
     }
 
     pub fn validate(self) -> Result<(), PhysicalTypeError> {
-        if !self.scale.is_valid() || self.scale.numerator == 0 {
+        if !self.scale.is_valid() || self.scale.numerator <= 0 {
             return Err(PhysicalTypeError {
                 operation: "unit_transform".into(),
-                reason: "unit scale must have a positive denominator and non-zero numerator".into(),
+                reason: "unit scale must have a positive denominator and strictly positive numerator".into(),
             });
         }
         if !self.offset.is_valid() {
@@ -828,6 +828,22 @@ mod tests {
             )),
             TypeJudgement::Invalid(_)
         ));
+    }
+
+    #[test]
+    fn negative_unit_scale_is_rejected() {
+        let unit = UnitRef {
+            symbol: "reverse_m".into(),
+            transform_to_si: UnitTransform::new(
+                RationalScale { numerator: -1, denominator: 1 },
+                RationalScale { numerator: 0, denominator: 1 },
+            ),
+            semantic_id: None,
+        };
+        let typed =
+            PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH)
+                .with_unit(unit);
+        assert!(typed.validate().is_err());
     }
 
     #[test]
