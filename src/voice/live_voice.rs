@@ -320,12 +320,20 @@ impl LiveVoice {
             frames
         };
 
-        let total_frames = plan
+        let segment_frame_counts = plan
             .segments
             .iter()
             .enumerate()
             .map(|(index, segment)| scheduled_frames_for(index, segment))
-            .sum::<usize>();
+            .collect::<Vec<_>>();
+
+        let mut segment_frame_offsets = Vec::with_capacity(segment_frame_counts.len() + 1);
+        segment_frame_offsets.push(0);
+        for &frames in &segment_frame_counts {
+            let next = segment_frame_offsets.last().copied().unwrap_or(0).saturating_add(frames);
+            segment_frame_offsets.push(next);
+        }
+        let total_frames = *segment_frame_offsets.last().unwrap_or(&0);
 
         let samples_per_frame = (self.sample_rate() / FRAME_RATE.max(1)) as usize;
         let mut all_samples =
@@ -336,7 +344,7 @@ impl LiveVoice {
             // Pause weight is only realized when the phonological plan explicitly encodes
             // a silence segment; this prevents inventing pause locations from an abstract
             // scalar alone.
-            let frames = scheduled_frames_for(index, segment);
+            let frames = segment_frame_counts[index];
 
             let phoneme = if segment.symbol.eq_ignore_ascii_case("SIL") {
                 None
@@ -345,8 +353,6 @@ impl LiveVoice {
             };
             let state = self.cognitive_state.lock().clone();
             let segment_count = plan.segments.len();
-            let utterance_progress =
-                index as f32 / segment_count.saturating_sub(1).max(1) as f32;
             let phrase_index = plan.segments[..index]
                 .iter()
                 .filter(|slot| slot.phrase_boundary_after)
@@ -362,9 +368,21 @@ impl LiveVoice {
                 .position(|slot| slot.phrase_boundary_after)
                 .map(|offset| index + offset)
                 .unwrap_or(segment_count.saturating_sub(1));
-            let phrase_span = phrase_end.saturating_sub(phrase_start).max(1);
-            let phrase_progress =
-                index.saturating_sub(phrase_start) as f32 / phrase_span as f32;
+            let phrase_start_frame = segment_frame_offsets
+                .get(phrase_start)
+                .copied()
+                .unwrap_or(0);
+            let phrase_end_frame = segment_frame_offsets
+                .get(phrase_end.saturating_add(1))
+                .copied()
+                .unwrap_or(total_frames);
+            let phrase_span_frames = phrase_end_frame
+                .saturating_sub(phrase_start_frame)
+                .max(1);
+            let segment_start_frame = segment_frame_offsets
+                .get(index)
+                .copied()
+                .unwrap_or(0);
             let intonation = match plan.intonation {
                 symthaea_broca::IntonationIntent::Statement => Intonation::Statement,
                 symthaea_broca::IntonationIntent::Question => Intonation::Question,
@@ -377,6 +395,19 @@ impl LiveVoice {
                 } else {
                     0.0
                 };
+                let global_frame = segment_start_frame.saturating_add(frame_index);
+                let utterance_progress = if total_frames > 1 {
+                    global_frame as f32 / (total_frames - 1) as f32
+                } else {
+                    0.0
+                };
+                let phrase_progress = if phrase_span_frames > 1 {
+                    global_frame.saturating_sub(phrase_start_frame) as f32
+                        / (phrase_span_frames - 1) as f32
+                } else {
+                    0.0
+                };
+
                 let prosody = ProsodyContext {
                     utterance_progress: utterance_progress.clamp(0.0, 1.0),
                     phoneme_progress: progress,
