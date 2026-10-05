@@ -24,7 +24,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 6;
+pub const SCHEMA_VERSION: u16 = 7;
 /// Assessment algorithm version.
 pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-diversity-v12";
 
@@ -2718,6 +2718,48 @@ mod tests {
 
         assert_eq!(first, second);
         assert_eq!(first.pareto_frontier, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn source_admission_changes_assessment_identity() {
+        let mut evidence = evidence(
+            "admitted",
+            "authority",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        let mut c = candidate(
+            "admitted-candidate",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence.clone()],
+        );
+        let baseline = AlternativesEngine
+            .assess(&fixture_requirement(), &[c.clone()], None)
+            .unwrap()
+            .receipt
+            .payload_hash;
+
+        evidence.source.admission = Some(SourceAdmissionRef {
+            policy_id: "policy".into(),
+            policy_revision: "r1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission".into(),
+            authority_epoch: "epoch-1".into(),
+            fault_domain_id: Some("domain-a".into()),
+            valid_from_epoch_seconds: Some(100),
+            valid_until_epoch_seconds: Some(200),
+        });
+        c.evidence[0] = evidence;
+
+        let admitted = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap()
+            .receipt
+            .payload_hash;
+        assert_ne!(baseline, admitted);
     }
 
     #[test]
