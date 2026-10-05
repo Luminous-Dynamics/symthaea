@@ -55,6 +55,7 @@ pub struct PhonologicalPlanRealizationReceipt {
     pub schema_version: u32,
     pub plan_version: String,
     pub plan_grounding_blake3: String,
+    pub realization_authorized: bool,
     pub segment_count: usize,
     pub scheduler_frames: usize,
     pub sample_count: usize,
@@ -78,6 +79,9 @@ impl PhonologicalPlanRealizationReceipt {
         }
         if self.plan_version != plan.version {
             anyhow::bail!("realization receipt plan version does not match plan");
+        }
+        if !self.realization_authorized || !plan.realization_authorized {
+            anyhow::bail!("realization receipt or plan is not authorized");
         }
 
         let expected_grounding =
@@ -416,6 +420,7 @@ impl LiveVoice {
             plan_grounding_blake3: blake3::hash(plan_grounding.as_bytes())
                 .to_hex()
                 .to_string(),
+            realization_authorized: plan.realization_authorized,
             segment_count: plan.segments.len(),
             scheduler_frames: total_frames,
             sample_count: all_samples.len(),
@@ -986,6 +991,7 @@ mod tests {
 
         assert_eq!(receipt.schema_version, 1);
         assert_eq!(receipt.plan_version, plan.version);
+        assert!(receipt.realization_authorized);
         assert_eq!(
             receipt.plan_grounding_blake3,
             blake3::hash(plan.grounding_surface().as_bytes())
@@ -1039,6 +1045,9 @@ mod tests {
             .synthesize_phonological_plan(&plan)
             .expect("plan-native receipt should be emitted");
         assert!(receipt.verify_against_plan(&plan).is_ok());
+        let mut unauthorized_receipt = receipt.clone();
+        unauthorized_receipt.realization_authorized = false;
+        assert!(unauthorized_receipt.verify_against_plan(&plan).is_err());
         assert!(receipt.verify_samples(&samples));
 
         let mut tampered = plan.clone();
