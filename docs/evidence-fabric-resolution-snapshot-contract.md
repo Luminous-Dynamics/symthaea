@@ -6,6 +6,21 @@ A verification report that records a resolver snapshot must bind the resolved ve
 
 The snapshot is evidence about the resolver state consulted by verification. It is not a claim that the underlying attestation, observation, or external-world fact is true.
 
+## Execution context versus evaluation annotations
+
+The v8 Evidence Fabric representation retains evaluator identity, trust-root identity, and authorization-policy identity inside the historical VerificationContext representation for compatibility. Those fields are supplemental: VerificationContext::matches_report() deliberately excludes them from execution binding.
+
+The additive v9 representation makes this distinction structural rather than relying on reader interpretation:
+
+- VerificationContextV5 contains only execution-bound appraisal context: policy, verifier identity/version, environment, procedure, resolver snapshot, and evaluation time.
+- EvaluationContextSupplement contains evaluator identity, trust-root, and authorization-policy fingerprints as separately versioned provenance annotations.
+- The context and supplement each have independent canonical encodings and BLAKE3 fingerprints.
+- EvidenceEvaluationV9 includes the two fingerprints separately and uses a distinct v9 evidence domain, so the v8 durable identity is not silently rewritten.
+
+The split does **not** establish evaluator independence, trust-root correctness, or authorization correctness. Those remain separate claims that require their own evidence and appraisal policy.
+
+This structure follows the RATS architecture's distinction between verifier-side evidence appraisal inputs and later relying-party appraisal. Current RATS Attestation Result work likewise models contextual information as part of the appraisal result while keeping the relying party's subsequent policy decision distinct.
+
 ## Attestation payload binding
 
 Current v5 verification reports also bind a fingerprint of the exact attestation payload whose detached proof was evaluated.
