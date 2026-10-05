@@ -903,7 +903,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn rejects_unicode_noncharacters_in_wire_values_and_member_names() {
         let request = vector_request();
         let (resolution, resolved_method) = resolved_vector(&request);
