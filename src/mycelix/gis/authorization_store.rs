@@ -9045,3 +9045,2574 @@ mod tests {
                 _expected_source_digest:Option<&str>,
             ) -> Result<ProviderStatusEvidence,ProviderStatusVerificationError> {
                 let conn=Connection::open(&self.path)
+                    .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                conn.execute(
+                    "UPDATE authorization_store_metadata
+                     SET value='sha256:tampered-status-implementation'
+                     WHERE key='provider_status_verifier_implementation_digest'",
+                    []
+                ).map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                let observed=trusted_utc_now()
+                    .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                Ok(ProviderStatusEvidence {
+                    status_identifier:status_identifier.to_owned(),
+                    status_source_digest:"sha256:test-status-source".into(),
+                    status_observed_at:observed.to_rfc3339_opts(SecondsFormat::Secs,true),
+                    status_valid_until:(observed+Duration::seconds(1800))
+                        .to_rfc3339_opts(SecondsFormat::Secs,true),
+                    status_evidence_digest:format!("sha256:status:{native_authorization_id}"),
+                })
+            }
+        }
+
+        let err=store.mark_dispatch_pending_bound_from_pinned_native_authority(
+            &witness.authorization_instance,
+            "attempt-status-verifier-drift",
+            &action,
+            &effect,
+            "boundary-drift",
+            "operation:status-verifier-drift",
+            "issuer.drift",
+            "native-status-drift",
+            "status:native-status-drift",
+            &MutatingStatusVerifier { path:path.clone() },
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderStatusVerificationRequired
+            )
+        ));
+        let state:String=store.connection().unwrap().query_row(
+            "SELECT state FROM authorization_leases WHERE authorization_instance=?1",
+            params![witness.authorization_instance],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(state,"prepared");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn native_authority_pin_drift_after_admission_verification_is_rejected() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-native-pin-admission-drift-{}.db",
+            std::process::id()
+        ));
+        let store = SqliteAuthorizationStore::open_with_relying_party(
+            &path,
+            "rp-native-pin-admission",
+        )
+        .unwrap();
+        store
+            .pin_native_authority_namespace(
+                "issuer.native-admission",
+                "issuer.native-admission/authority/v1",
+            )
+            .unwrap();
+        store
+            .pin_provider_status_source_digest("sha256:test-status-source")
+            .unwrap();
+        store
+            .pin_provider_status_verifier_configuration(
+                &TestProviderStatusVerifier.configuration(),
+            )
+            .unwrap();
+        store
+            .pin_provider_adapter_configuration(&ProviderAdapterConfiguration::new(
+                "adapter-native-admission",
+                "test-adapter/v1",
+                "sha256:test-adapter-implementation",
+            ))
+            .unwrap();
+
+        let effect = ActionEffectBinding::new(
+            "target-native-admission",
+            "prod",
+            "adapter-native-admission",
+        );
+        let action = EpistemicAction::new(
+            "native-pin-admission",
+            "intervention",
+            super::super::ActionRisk::Critical,
+        )
+        .with_effect_binding(effect.clone());
+        let digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            operation_id: None,
+            action_id: action.id.clone(),
+            authorization_instance: "native-pin-admission".into(),
+            action_digest: digest.clone(),
+            frame: "frame@1".into(),
+            support_digest: "support".into(),
+            policy: "policy@1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:20:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+        store
+            .register_lease(&AuthorizationLease::new_with_instance(
+                witness.authorization_instance.clone(),
+                action.id.clone(),
+                digest,
+                witness.support_digest.clone(),
+                witness.policy.clone(),
+                1,
+                1,
+            ))
+            .unwrap();
+        store
+            .prepare_for_execution_bound(
+                &witness,
+                &action,
+                "frame@1",
+                "attempt-native-pin-admission",
+                "boundary-native-pin-admission",
+            )
+            .unwrap();
+
+        struct MutatingNativePinStatusVerifier {
+            path: std::path::PathBuf,
+        }
+
+        impl ProviderStatusVerifier for MutatingNativePinStatusVerifier {
+            fn configuration(&self) -> ProviderStatusVerifierConfiguration {
+                TestProviderStatusVerifier.configuration()
+            }
+
+            fn verify_current_status(
+                &self,
+                _purpose: ProviderStatusVerificationPurpose,
+                _issuer: &str,
+                _authority_namespace: &str,
+                native_authorization_id: &str,
+                status_identifier: &str,
+                _action_digest: &str,
+                _target_identity: &str,
+                _audience: &str,
+                _adapter: &str,
+                _expected_source_digest: Option<&str>,
+            ) -> Result<ProviderStatusEvidence, ProviderStatusVerificationError> {
+                let connection = Connection::open(&self.path)
+                    .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                connection
+                    .execute(
+                        "UPDATE authorization_native_authority_pins
+                         SET authority_namespace='issuer.native-admission/tampered'
+                         WHERE issuer='issuer.native-admission'",
+                        [],
+                    )
+                    .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                let observed = trusted_utc_now()
+                    .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                Ok(ProviderStatusEvidence {
+                    status_identifier: status_identifier.to_owned(),
+                    status_source_digest: "sha256:test-status-source".into(),
+                    status_observed_at: observed.to_rfc3339_opts(SecondsFormat::Secs, true),
+                    status_valid_until: (observed + Duration::seconds(1800))
+                        .to_rfc3339_opts(SecondsFormat::Secs, true),
+                    status_evidence_digest: format!(
+                        "sha256:status:{native_authorization_id}"
+                    ),
+                })
+            }
+        }
+
+        let err = store
+            .mark_dispatch_pending_bound_from_pinned_native_authority(
+                &witness.authorization_instance,
+                "attempt-native-pin-admission",
+                &action,
+                &effect,
+                "boundary-native-pin-admission",
+                "operation:native-pin-admission",
+                "issuer.native-admission",
+                "native-native-pin-admission",
+                "status:native-native-pin-admission",
+                &MutatingNativePinStatusVerifier { path: path.clone() },
+            )
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidNativeReplayProvenance
+            )
+        ));
+        assert_eq!(
+            store
+                .connection()
+                .unwrap()
+                .query_row::<i64, _, _>(
+                    "SELECT COUNT(*) FROM authorization_dispatches",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap(),
+            0
+        );
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn status_source_pin_drift_after_admission_verification_is_rejected() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-status-source-admission-drift-{}.db",
+            std::process::id()
+        ));
+        let store =
+            SqliteAuthorizationStore::open_with_relying_party(&path, "rp-status-source-admission")
+                .unwrap();
+        store
+            .pin_native_authority_namespace(
+                "issuer.source-admission",
+                "issuer.source-admission/authority/v1",
+            )
+            .unwrap();
+        store
+            .pin_provider_status_source_digest("sha256:test-status-source")
+            .unwrap();
+        store
+            .pin_provider_status_verifier_configuration(
+                &TestProviderStatusVerifier.configuration(),
+            )
+            .unwrap();
+        store
+            .pin_provider_adapter_configuration(&ProviderAdapterConfiguration::new(
+                "adapter-source-admission",
+                "test-adapter/v1",
+                "sha256:test-adapter-implementation",
+            ))
+            .unwrap();
+
+        let effect = ActionEffectBinding::new(
+            "target-source-admission",
+            "prod",
+            "adapter-source-admission",
+        );
+        let action = EpistemicAction::new(
+            "status-source-admission",
+            "intervention",
+            super::super::ActionRisk::Critical,
+        )
+        .with_effect_binding(effect.clone());
+        let digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            operation_id: None,
+            action_id: action.id.clone(),
+            authorization_instance: "status-source-admission".into(),
+            action_digest: digest,
+            frame: "frame@1".into(),
+            support_digest: "support".into(),
+            policy: "policy@1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:20:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+        store
+            .register_lease(&AuthorizationLease::new_with_instance(
+                witness.authorization_instance.clone(),
+                action.id.clone(),
+                witness.action_digest.clone(),
+                witness.support_digest.clone(),
+                witness.policy.clone(),
+                1,
+                1,
+            ))
+            .unwrap();
+        store
+            .prepare_for_execution_bound(
+                &witness,
+                &action,
+                "frame@1",
+                "attempt-status-source-admission",
+                "boundary-source-admission",
+            )
+            .unwrap();
+
+        struct MutatingAdmissionStatusSourceVerifier {
+            path: std::path::PathBuf,
+        }
+
+        impl ProviderStatusVerifier for MutatingAdmissionStatusSourceVerifier {
+            fn configuration(&self) -> ProviderStatusVerifierConfiguration {
+                TestProviderStatusVerifier.configuration()
+            }
+
+            fn verify_current_status(
+                &self,
+                _purpose: ProviderStatusVerificationPurpose,
+                _issuer: &str,
+                _authority_namespace: &str,
+                native_authorization_id: &str,
+                status_identifier: &str,
+                _action_digest: &str,
+                _target_identity: &str,
+                _audience: &str,
+                _adapter: &str,
+                _expected_source_digest: Option<&str>,
+            ) -> Result<ProviderStatusEvidence, ProviderStatusVerificationError> {
+                let connection = Connection::open(&self.path)
+                    .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                connection
+                    .execute(
+                        "UPDATE authorization_store_metadata
+                         SET value='sha256:tampered-status-source'
+                         WHERE key='provider_status_source_digest'",
+                        [],
+                    )
+                    .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                let observed = trusted_utc_now()
+                    .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                Ok(ProviderStatusEvidence {
+                    status_identifier: status_identifier.to_owned(),
+                    status_source_digest: "sha256:test-status-source".into(),
+                    status_observed_at: observed.to_rfc3339_opts(SecondsFormat::Secs, true),
+                    status_valid_until: (observed + Duration::seconds(1800))
+                        .to_rfc3339_opts(SecondsFormat::Secs, true),
+                    status_evidence_digest: format!(
+                        "sha256:status:{native_authorization_id}"
+                    ),
+                })
+            }
+        }
+
+        let err = store
+            .mark_dispatch_pending_bound_from_pinned_native_authority(
+                &witness.authorization_instance,
+                "attempt-status-source-admission",
+                &action,
+                &effect,
+                "boundary-source-admission",
+                "operation:status-source-admission",
+                "issuer.source-admission",
+                "native-status-source-admission",
+                "status:native-status-source-admission",
+                &MutatingAdmissionStatusSourceVerifier { path: path.clone() },
+            )
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderStatusVerificationRequired
+            )
+        ));
+        assert_eq!(
+            store
+                .connection()
+                .unwrap()
+                .query_row::<i64, _, _>(
+                    "SELECT COUNT(*) FROM authorization_dispatches",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap(),
+            0
+        );
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn status_source_pin_drift_after_pre_entry_verification_is_rejected() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-status-source-drift-{}.db",
+            std::process::id()
+        ));
+        let store =
+            SqliteAuthorizationStore::open_with_relying_party(&path, "rp-status-source-drift")
+                .unwrap();
+        store
+            .pin_native_authority_namespace("issuer.source-drift", "issuer.source-drift/authority/v1")
+            .unwrap();
+        store
+            .pin_provider_status_source_digest("sha256:test-status-source")
+            .unwrap();
+        store
+            .pin_provider_status_verifier_configuration(
+                &TestProviderStatusVerifier.configuration(),
+            )
+            .unwrap();
+        store
+            .pin_provider_adapter_configuration(&ProviderAdapterConfiguration::new(
+                "adapter-source-drift",
+                "test-adapter/v1",
+                "sha256:test-adapter-implementation",
+            ))
+            .unwrap();
+
+        let effect = ActionEffectBinding::new(
+            "target-source-drift",
+            "prod",
+            "adapter-source-drift",
+        );
+        let action = EpistemicAction::new(
+            "status-source-drift",
+            "intervention",
+            super::super::ActionRisk::Critical,
+        )
+        .with_effect_binding(effect.clone());
+        let digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            operation_id: None,
+            action_id: action.id.clone(),
+            authorization_instance: "status-source-drift".into(),
+            action_digest: digest.clone(),
+            frame: "frame@1".into(),
+            support_digest: "support".into(),
+            policy: "policy@1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:20:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+        store
+            .register_lease(&AuthorizationLease::new_with_instance(
+                witness.authorization_instance.clone(),
+                action.id.clone(),
+                digest,
+                witness.support_digest.clone(),
+                witness.policy.clone(),
+                1,
+                1,
+            ))
+            .unwrap();
+        store
+            .prepare_for_execution_bound(
+                &witness,
+                &action,
+                "frame@1",
+                "attempt-status-source-drift",
+                "boundary-source-drift",
+            )
+            .unwrap();
+
+        let record = store
+            .mark_dispatch_pending_bound_from_pinned_native_authority(
+                &witness.authorization_instance,
+                "attempt-status-source-drift",
+                &action,
+                &effect,
+                "boundary-source-drift",
+                "operation:status-source-drift",
+                "issuer.source-drift",
+                "native-status-source-drift",
+                "status:native-status-source-drift",
+                &TestProviderStatusVerifier,
+            )
+            .unwrap();
+
+        struct MutatingStatusSourceVerifier {
+            path: std::path::PathBuf,
+        }
+
+        impl ProviderStatusVerifier for MutatingStatusSourceVerifier {
+            fn configuration(&self) -> ProviderStatusVerifierConfiguration {
+                TestProviderStatusVerifier.configuration()
+            }
+
+            fn verify_current_status(
+                &self,
+                _purpose: ProviderStatusVerificationPurpose,
+                _issuer: &str,
+                _authority_namespace: &str,
+                native_authorization_id: &str,
+                status_identifier: &str,
+                _action_digest: &str,
+                _target_identity: &str,
+                _audience: &str,
+                _adapter: &str,
+                _expected_source_digest: Option<&str>,
+            ) -> Result<ProviderStatusEvidence, ProviderStatusVerificationError> {
+                let connection = Connection::open(&self.path)
+                    .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                connection
+                    .execute(
+                        "UPDATE authorization_store_metadata
+                         SET value='sha256:tampered-status-source'
+                         WHERE key='provider_status_source_digest'",
+                        [],
+                    )
+                    .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+
+                let observed = trusted_utc_now()
+                    .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                Ok(ProviderStatusEvidence {
+                    status_identifier: status_identifier.to_owned(),
+                    status_source_digest: "sha256:test-status-source".into(),
+                    status_observed_at: observed.to_rfc3339_opts(SecondsFormat::Secs, true),
+                    status_valid_until: (observed + Duration::seconds(1800))
+                        .to_rfc3339_opts(SecondsFormat::Secs, true),
+                    status_evidence_digest: format!(
+                        "sha256:status:{native_authorization_id}"
+                    ),
+                })
+            }
+        }
+
+        let err = store
+            .mark_invoked_bound(
+                &record,
+                &MutatingStatusSourceVerifier { path: path.clone() },
+            )
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderStatusVerificationRequired
+            )
+        ));
+        assert_eq!(
+            store
+                .connection()
+                .unwrap()
+                .query_row::<String, _, _>(
+                    "SELECT state FROM authorization_dispatches
+                     WHERE authorization_instance=?1 AND attempt_id=?2",
+                    params![
+                        record.authorization_instance.as_str(),
+                        record.attempt_id.as_str()
+                    ],
+                    |row| row.get(0),
+                )
+                .unwrap(),
+            "dispatch_pending"
+        );
+        assert_eq!(
+            store
+                .connection()
+                .unwrap()
+                .query_row::<String, _, _>(
+                    "SELECT state FROM authorization_leases WHERE authorization_instance=?1",
+                    params![record.authorization_instance.as_str()],
+                    |row| row.get(0),
+                )
+                .unwrap(),
+            "dispatch_pending"
+        );
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn status_lookup_is_not_attempted_before_structural_dispatch_validation() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-status-ordering-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(
+            &path,"rp-status-ordering"
+        ).unwrap();
+        store.pin_native_authority_namespace(
+            "issuer.ordering","issuer.ordering/authority/v1"
+        ).unwrap();
+
+        let effect=ActionEffectBinding::new(
+            "target-status-ordering","prod","adapter"
+        );
+        let action=EpistemicAction::new(
+            "status-ordering","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            authorization_instance:"status-ordering".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"support".into(),
+            policy:"policy@1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:00:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "status-ordering",action.id.clone(),digest,
+            "support","policy@1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-status-ordering","boundary-status"
+        ).unwrap();
+
+        let wrong_effect=ActionEffectBinding::new(
+            "target-different","prod","adapter"
+        );
+        assert!(matches!(
+            store.mark_dispatch_pending_bound_from_pinned_native_authority(
+                "status-ordering","attempt-status-ordering",
+                &action,&wrong_effect,"boundary-status","operation:status-ordering",
+                "issuer.ordering","native-status-ordering",
+                "status:native-status-ordering",&AdmissionStatusFailsVerifier
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+
+        let state:String=store.connection().unwrap().query_row(
+            "SELECT state FROM authorization_leases
+             WHERE authorization_instance=?1",
+            params![witness.authorization_instance],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(state,"prepared");
+
+        let dispatches:i64=store.connection().unwrap().query_row(
+            "SELECT COUNT(*) FROM authorization_dispatches
+             WHERE authorization_instance=?1",
+            params![witness.authorization_instance],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(dispatches,0);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn admission_status_failure_releases_prepared_reservation_without_dispatch() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-status-admission-failure-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(
+            &path,"rp-status-admission-failure"
+        ).unwrap();
+        store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
+        store.pin_provider_status_verifier_configuration(
+            &ProviderStatusVerifierConfiguration::new(
+                "test-status-verifier/v1","test-status-verifier/rev1",
+                "test-status-verifier","sha256:test-status-verifier-implementation",
+                "sha256:test-status-verifier-config"
+            )
+        ).unwrap();
+        store.pin_native_authority_namespace(
+            "issuer.status-admission","issuer.status-admission/authority/v1"
+        ).unwrap();
+
+        let effect=ActionEffectBinding::new(
+            "target-status-admission-failure","prod","adapter"
+        );
+        let action=EpistemicAction::new(
+            "status-admission-failure","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            authorization_instance:"status-admission-failure".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"support".into(),
+            policy:"policy@1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:00:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "status-admission-failure",action.id.clone(),digest,
+            "support","policy@1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-status-admission-failure","boundary-status"
+        ).unwrap();
+
+        assert!(matches!(
+            store.mark_dispatch_pending_bound_from_pinned_native_authority(
+                "status-admission-failure","attempt-status-admission-failure",
+                &action,&effect,"boundary-status","operation:status-admission-failure",
+                "issuer.status-admission","native-status-admission-failure",
+                "status:native-status-admission-failure",&AdmissionStatusFailsVerifier
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderStatusVerificationRequired
+            ))
+        ));
+
+        let state:String=store.connection().unwrap().query_row(
+            "SELECT state FROM authorization_leases
+             WHERE authorization_instance=?1",
+            params![witness.authorization_instance],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(state,"ready");
+
+        let dispatches:i64=store.connection().unwrap().query_row(
+            "SELECT COUNT(*) FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![witness.authorization_instance,"attempt-status-admission-failure"],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(dispatches,0);
+
+        let marker:String=store.connection().unwrap().query_row(
+            "SELECT marker FROM authorization_recovery_markers
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![witness.authorization_instance,"attempt-status-admission-failure"],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(marker,"not_entered_status");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn pre_entry_status_failure_closes_attempt_without_provider_entry() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-status-failure-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(
+            &path,"rp-status-failure"
+        ).unwrap();
+        store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
+        store.pin_provider_status_verifier_configuration(
+            &ProviderStatusVerifierConfiguration::new(
+                "test-status-verifier/v1","test-status-verifier/rev1",
+                "test-status-verifier","sha256:test-status-verifier-implementation",
+                "sha256:test-status-verifier-config"
+            )
+        ).unwrap();
+        store.pin_native_authority_namespace("issuer.status","issuer.status/authority/v1").unwrap();
+
+        let effect=ActionEffectBinding::new("target-status-failure","prod","adapter");
+        let action=EpistemicAction::new(
+            "status-failure","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            authorization_instance:"status-failure".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"support".into(),
+            policy:"policy@1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:00:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "status-failure",action.id.clone(),digest,"support","policy@1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-status-failure","boundary-status"
+        ).unwrap();
+        let record=store.mark_dispatch_pending_bound_from_pinned_native_authority(
+            "status-failure","attempt-status-failure",&action,&effect,"boundary-status",
+            "operation:status-failure","issuer.status","native-status-failure",
+            "status:native-status-failure",&TestProviderStatusVerifier
+        ).unwrap();
+
+        assert!(matches!(
+            store.mark_invoked_bound(&record,&AdmissionStatusFailsVerifier),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderStatusVerificationRequired
+            ))
+        ));
+
+        let state:String=store.connection().unwrap().query_row(
+            "SELECT state FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(state,"not_entered");
+
+        let marker:String=store.connection().unwrap().query_row(
+            "SELECT marker FROM authorization_recovery_markers
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(marker,"not_entered_status");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn executed_action_instance_remains_closed_to_fresh_authority() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-action-closed-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-closed").unwrap();
+        store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
+        store.pin_provider_status_verifier_configuration(&ProviderStatusVerifierConfiguration::new(
+            "test-status-verifier/v1","test-status-verifier/rev1",
+            "test-status-verifier","sha256:test-status-verifier-implementation",
+            "sha256:test-status-verifier-config")).unwrap();
+        store.pin_native_authority_namespace("issuer.closed","issuer.closed/authority/v1").unwrap();
+
+        let effect=ActionEffectBinding::new("target-closed","prod","adapter-closed");
+        let action=EpistemicAction::new("closed-action","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+
+        let witness_a=ActionAuthorizationWitness {
+            operation_id: None,
+            authorization_instance:"closed-a".into(), action_id:action.id.clone(),
+            action_digest:digest.clone(), support_digest:"support-a".into(),
+            frame:"frame@1".into(), policy:"policy@1".into(), decision:"execute".into(),
+            issued_at:"2026-10-03T06:30:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "closed-a",action.id.clone(),digest.clone(),"support-a","policy@1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness_a,&action,"frame@1","attempt-closed-a","boundary-A"
+        ).unwrap();
+        let record_a=store.mark_dispatch_pending_bound_from_pinned_native_authority(
+            "closed-a","attempt-closed-a",&action,&effect,"boundary-A",
+            "operation:closed-a","issuer.closed","native-closed-a",
+            "status:native-closed-a",&TestProviderStatusVerifier
+        ).unwrap();
+        store.mark_invoked_bound(&record_a, &TestProviderStatusVerifier).unwrap();
+        store.commit_bound_verified(
+            &record_a,
+            &verified_evidence(&record_a,ExecutionOutcome::Succeeded),
+            &TestProviderVerifierForRp { relying_party_id: store.relying_party_id().to_owned() },
+        ).unwrap();
+
+        let witness_b=ActionAuthorizationWitness {
+            operation_id: None,
+            authorization_instance:"closed-b".into(), action_id:action.id.clone(),
+            action_digest:record_a.action_digest.clone(), support_digest:"support-b".into(),
+            frame:"frame@1".into(), policy:"policy@1".into(), decision:"execute".into(),
+            issued_at:"2026-10-03T06:30:01Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "closed-b",action.id.clone(),record_a.action_digest.clone(),"support-b","policy@1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness_b,&action,"frame@1","attempt-closed-b","boundary-B"
+        ).unwrap();
+        assert!(matches!(
+            store.mark_dispatch_pending_bound_from_pinned_native_authority(
+                "closed-b","attempt-closed-b",&action,&effect,"boundary-B",
+                "operation:closed-b","issuer.closed","native-closed-b",
+                "status:native-closed-b",&TestProviderStatusVerifier
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ActionAlreadyClosed
+            ))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn native_replay_identity_cannot_be_reserved_twice() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-native-replay-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
+
+        let action_a=EpistemicAction::new("native-a","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let action_b=EpistemicAction::new("native-b","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let witness_a=ActionAuthorizationWitness {
+            operation_id: None,
+            authorization_instance:"native-a".into(), action_id:action_a.id.clone(),
+            action_digest:action_a.canonical_action_digest(), support_digest:"support-a".into(),
+            frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
+        };
+        let witness_b=ActionAuthorizationWitness {
+            operation_id: None,
+            authorization_instance:"native-b".into(), action_id:action_b.id.clone(),
+            action_digest:action_b.canonical_action_digest(), support_digest:"support-b".into(),
+            frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness_a.authorization_instance.clone(), witness_a.action_id.clone(),
+            witness_a.action_digest.clone(), witness_a.support_digest.clone(),
+            witness_a.policy.clone(), witness_a.authority_epoch, 1
+        )).unwrap();
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness_b.authorization_instance.clone(), witness_b.action_id.clone(),
+            witness_b.action_digest.clone(), witness_b.support_digest.clone(),
+            witness_b.policy.clone(), witness_b.authority_epoch, 1
+        )).unwrap();
+        store.prepare_for_execution_bound(&witness_a,&action_a,"frame@1","attempt-native-a","boundary-A").unwrap();
+        store.prepare_for_execution_bound(&witness_b,&action_b,"frame@1","attempt-native-b","boundary-A").unwrap();
+        mark_dispatch_pending_bound_for_test(&store,
+            &witness_a.authorization_instance,"attempt-native-a",&action_a,&effect,"boundary-A",
+            "operation:native-a","native-replay:shared"
+        ).unwrap();
+        let duplicate=mark_dispatch_pending_bound_for_test(&store,
+            &witness_b.authorization_instance,"attempt-native-b",&action_b,&effect,"boundary-A",
+            "operation:native-b","native-replay:shared"
+        );
+        assert!(matches!(duplicate,Err(AuthorizationStoreError::Sqlite(_))));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn legacy_transitions_cannot_bypass_boundary_owned_attempts() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-boundary-legacy-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=EpistemicAction::new("boundary-legacy-fence","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action.id.clone(), authorization_instance:"approval-legacy-fence".into(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:09:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "approval-legacy-fence",action.id.clone(),digest,"sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-legacy-fence","boundary-A"
+        ).unwrap();
+        assert!(matches!(
+            store.mark_dispatch_pending("approval-legacy-fence","attempt-legacy-fence"),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+
+        let record=mark_dispatch_pending_bound_for_test(&store,
+            "approval-legacy-fence","attempt-legacy-fence",&action,&effect,"boundary-A"
+        ,
+            format!("operation:{}", "attempt-legacy-fence"),
+            format!("native-replay:{}", "approval-legacy-fence")).unwrap();
+        assert!(matches!(
+            store.mark_invoked("approval-legacy-fence","attempt-legacy-fence"),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+        store.mark_invoked_bound(&record, &TestProviderStatusVerifier).unwrap();
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn stale_recovery_authorization_is_rejected_before_state_change() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-recovery-validity-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action=EpistemicAction::new(
+            "recovery-validity","intervention",super::super::ActionRisk::Critical
+        );
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action.id.clone(),
+            authorization_instance:"recovery-validity".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"support".into(),
+            policy:"policy@1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:00Z".into(),
+            expires_at:Some("2026-10-04T10:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "recovery-validity",action.id.clone(),digest.clone(),"support","policy@1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-recovery-validity","boundary-A"
+        ).unwrap();
+
+        let stale=RecoveryAuthorizationWitness {
+            authorization_instance:witness.authorization_instance.clone(),
+            attempt_id:"attempt-recovery-validity".into(),
+            operation_id:"".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:digest.clone(),
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2020-01-01T00:00:00Z".into(),
+        };
+        assert!(matches!(
+            store.recover_pre_dispatch_attempt(&stale),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::AuthorizationValidityWindowFailed
+            ))
+        ));
+        let state:String=store.connection().unwrap().query_row(
+            "SELECT state FROM authorization_leases WHERE authorization_instance=?1",
+            params![witness.authorization_instance],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(state,"prepared");
+
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn operation_bound_recovery_requires_matching_operation_identity() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-operation-recovery-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action=EpistemicAction::new(
+            "operation-recovery","intervention",super::super::ActionRisk::Critical
+        );
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action.id.clone(),
+            authorization_instance:"operation-recovery".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:00Z".into(),
+            expires_at:Some("2026-10-04T10:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "operation-recovery",action.id.clone(),digest.clone(),
+            "sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound_with_operation(
+            &witness,&action,"frame@1","attempt-operation-recovery","boundary-A","operation-A"
+        ).unwrap();
+
+        let missing_operation=RecoveryAuthorizationWitness {
+            authorization_instance:witness.authorization_instance.clone(),
+            attempt_id:"attempt-operation-recovery".into(),
+            operation_id:"".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:digest.clone(),
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-03T10:00:01Z".into(),
+        };
+        assert!(matches!(
+            store.recover_pre_dispatch_attempt(&missing_operation),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+
+        let wrong_operation=RecoveryAuthorizationWitness {
+            operation_id:"operation-B".into(),
+            ..missing_operation.clone()
+        };
+        assert!(matches!(
+            store.recover_pre_dispatch_attempt(&wrong_operation),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+
+        let correct=RecoveryAuthorizationWitness {
+            operation_id:"operation-A".into(),
+            ..missing_operation
+        };
+        assert!(store.recover_pre_dispatch_attempt(&correct).unwrap());
+
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn pre_dispatch_recovery_releases_prepared_attempt_and_records_marker() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-pre-recovery-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action=EpistemicAction::new("pre-recovery","intervention",super::super::ActionRisk::Critical);
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action.id.clone(), authorization_instance:"approval-pre-recovery".into(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:13:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "approval-pre-recovery",action.id.clone(),digest.clone(),
+            "sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-pre","boundary-A"
+        ).unwrap();
+
+        let recovery=RecoveryAuthorizationWitness {
+            authorization_instance:witness.authorization_instance.clone(),
+            attempt_id:"attempt-pre".into(),
+            operation_id:"".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:digest,
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-02T20:14:00Z".into(),
+        };
+        assert!(store.recover_pre_dispatch_attempt(&recovery).unwrap());
+        assert!(!store.recover_pre_dispatch_attempt(&recovery).unwrap());
+        assert_eq!(store.recover_incomplete_attempts().unwrap(),0);
+        assert_eq!(store.recover_incomplete_attempts_for_boundary("boundary-A").unwrap(),0);
+
+        let old_attempt=mark_dispatch_pending_bound_for_test(&store,
+            &witness.authorization_instance,"attempt-pre",&action,
+            &ActionEffectBinding::new("target-A","prod","adapter-A"),
+            "boundary-A"
+        ,
+            format!("operation:{}", "attempt-pre"),
+            format!("native-replay:{}", &witness.authorization_instance));
+        assert!(old_attempt.is_err());
+
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-pre-retry","boundary-A"
+        ).unwrap();
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn pre_dispatch_recovery_rejects_tampered_scope_and_digest() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-pre-recovery-fence-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action=EpistemicAction::new("pre-recovery-fence","intervention",super::super::ActionRisk::Critical);
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action.id.clone(), authorization_instance:"approval-pre-fence".into(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:15:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "approval-pre-fence",action.id.clone(),digest.clone(),
+            "sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-pre-fence","boundary-A"
+        ).unwrap();
+
+        let wrong_boundary=RecoveryAuthorizationWitness {
+            authorization_instance:"approval-pre-fence".into(),
+            attempt_id:"attempt-pre-fence".into(),
+            operation_id:"".into(),
+            boundary_id:"boundary-B".into(),
+            action_digest:digest.clone(),
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-02T20:16:00Z".into(),
+        };
+        assert!(matches!(
+            store.recover_pre_dispatch_attempt(&wrong_boundary),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+
+        let wrong_policy=RecoveryAuthorizationWitness {
+            authorization_instance:"approval-pre-fence".into(),
+            attempt_id:"attempt-pre-fence".into(),
+            operation_id:"".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:"sha256:action".into(),
+            policy:"forged-recovery-policy".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-02T20:16:00Z".into(),
+        };
+        assert!(matches!(
+            store.recover_pre_dispatch_attempt(&wrong_policy),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+
+        let wrong_digest=RecoveryAuthorizationWitness {
+            authorization_instance:"approval-pre-fence".into(),
+            attempt_id:"attempt-pre-fence".into(),
+            operation_id:"".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:"sha256:forged".into(),
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-02T20:16:01Z".into(),
+        };
+        assert!(matches!(
+            store.recover_pre_dispatch_attempt(&wrong_digest),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+
+        let correct=RecoveryAuthorizationWitness {
+            authorization_instance:"approval-pre-fence".into(),
+            attempt_id:"attempt-pre-fence".into(),
+            operation_id:"".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:digest,
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-02T20:16:02Z".into(),
+        };
+        assert!(store.recover_pre_dispatch_attempt(&correct).unwrap());
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn pre_dispatch_recovery_cannot_release_after_dispatch_pending() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-pre-recovery-after-dispatch-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=EpistemicAction::new("pre-recovery-after-dispatch","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action.id.clone(), authorization_instance:"approval-after-dispatch".into(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:17:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "approval-after-dispatch",action.id.clone(),digest.clone(),
+            "sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-after-dispatch","boundary-A"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(&store,
+            "approval-after-dispatch","attempt-after-dispatch",&action,&effect,"boundary-A"
+        ,
+            format!("operation:{}", "attempt-after-dispatch"),
+            format!("native-replay:{}", "approval-after-dispatch")).unwrap();
+
+        let recovery=RecoveryAuthorizationWitness {
+            authorization_instance:"approval-after-dispatch".into(),
+            attempt_id:"attempt-after-dispatch".into(),
+            operation_id:"".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:digest,
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-02T20:18:00Z".into(),
+        };
+        assert!(matches!(
+            store.recover_pre_dispatch_attempt(&recovery),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::PreDispatchRecoveryNotAllowed
+            ))
+        ));
+        assert_eq!(record.boundary_id,"boundary-A");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn boundary_scoped_recovery_cannot_claim_another_boundary() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-boundary-recovery-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=EpistemicAction::new("boundary-recovery-action","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action.id.clone(), authorization_instance:"approval-boundary".into(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:10:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            "sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-boundary","boundary-A"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(&store,
+            &witness.authorization_instance,"attempt-boundary",&action,&effect,"boundary-A"
+        ,
+            format!("operation:{}", "attempt-boundary"),
+            format!("native-replay:{}", &witness.authorization_instance)).unwrap();
+        drop(store);
+
+        let boundary_b=SqliteAuthorizationStore::open(&path).unwrap();
+        assert_eq!(boundary_b.recover_incomplete_attempts().unwrap(),0);
+        assert_eq!(
+            boundary_b
+                .recover_incomplete_attempt_for_boundary("boundary-B","attempt-boundary")
+                .unwrap(),
+            0
+        );
+
+        let mut wrong=record.clone();
+        wrong.boundary_id="boundary-B".into();
+        assert!(matches!(
+            boundary_b.reconcile_indeterminate_bound_verified(&wrong,&verified_evidence(&wrong,ExecutionOutcome::Succeeded),&TestProviderVerifier),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+
+        let boundary_a=SqliteAuthorizationStore::open(&path).unwrap();
+        assert_eq!(
+            boundary_a
+                .recover_incomplete_attempt_for_boundary("boundary-A","attempt-boundary")
+                .unwrap(),
+            1
+        );
+        let receipt=boundary_a.reconcile_indeterminate_bound_verified(&record,&verified_evidence(&record,ExecutionOutcome::Succeeded),&TestProviderVerifier).unwrap();
+        assert_eq!(receipt.outcome,ExecutionOutcome::Succeeded);
+        assert_eq!(receipt.authorization_instance,"approval-boundary");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn boundary_bulk_recovery_does_not_convert_prepared_to_indeterminate() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-boundary-bulk-prepared-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action=EpistemicAction::new(
+            "boundary-bulk-prepared",
+            "intervention",
+            super::super::ActionRisk::Critical
+        );
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action.id.clone(),
+            authorization_instance:"approval-bulk-prepared".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-04T07:10:00Z".into(),
+            expires_at:Some("2026-10-05T07:10:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,
+            &action,
+            "frame@1",
+            "attempt-bulk-prepared",
+            "boundary-bulk-prepared"
+        ).unwrap();
+
+        assert_eq!(
+            store.recover_incomplete_attempts_for_boundary("boundary-bulk-prepared").unwrap(),
+            0
+        );
+        assert_eq!(
+            store.connection().unwrap().query_row::<String,_,_>(
+                "SELECT state FROM authorization_leases
+                 WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0)
+            ).unwrap(),
+            "prepared"
+        );
+        assert_eq!(
+            store.connection().unwrap().query_row::<i64,_,_>(
+                "SELECT COUNT(*) FROM authorization_receipts
+                 WHERE authorization_instance=?1 AND attempt_id=?2",
+                params![witness.authorization_instance.as_str(),"attempt-bulk-prepared"],
+                |row| row.get(0)
+            ).unwrap(),
+            0
+        );
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn boundary_ownership_survives_crash_before_dispatch_record() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-boundary-prepared-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action=EpistemicAction::new("boundary-prepared","intervention",super::super::ActionRisk::Critical);
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action.id.clone(), authorization_instance:"approval-prepared".into(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:12:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "approval-prepared",action.id.clone(),digest.clone(),
+            "sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-prepared","boundary-A"
+        ).unwrap();
+        drop(store);
+
+        let reopened=SqliteAuthorizationStore::open(&path).unwrap();
+        assert_eq!(reopened.recover_incomplete_attempts().unwrap(),0);
+        assert_eq!(
+            reopened
+                .recover_incomplete_attempt_for_boundary("boundary-A","attempt-prepared")
+                .unwrap(),
+            0
+        );
+
+        let recovery=RecoveryAuthorizationWitness {
+            authorization_instance:witness.authorization_instance.clone(),
+            attempt_id:"attempt-prepared".into(),
+            operation_id:"".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:digest,
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-02T20:12:30Z".into(),
+        };
+        assert!(reopened.recover_pre_dispatch_attempt(&recovery).unwrap());
+        assert!(matches!(
+            mark_dispatch_pending_bound_for_test(&reopened,
+                &witness.authorization_instance,"attempt-prepared",&action,
+                &ActionEffectBinding::new("target-A","prod","adapter-A"),
+                "boundary-A"
+            ,
+            format!("operation:{}", "attempt-prepared"),
+            format!("native-replay:{}", &witness.authorization_instance)),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::AttemptMismatch))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+
+    #[test]
+    fn prepared_operation_id_cannot_be_reused_across_authorizations() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-operation-reuse-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action_a=EpistemicAction::new(
+            "operation-a","a",super::super::ActionRisk::Critical
+        );
+        let action_b=EpistemicAction::new(
+            "operation-b","b",super::super::ActionRisk::Critical
+        );
+        let digest_a=action_a.canonical_action_digest();
+        let digest_b=action_b.canonical_action_digest();
+        let witness_a=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action_a.id.clone(),
+            authorization_instance:"operation-approval-a".into(),
+            action_digest:digest_a.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        let witness_b=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action_b.id.clone(),
+            authorization_instance:"operation-approval-b".into(),
+            action_digest:digest_b.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:01Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness_a.authorization_instance.clone(),action_a.id.clone(),digest_a,
+            witness_a.support_digest.clone(),witness_a.policy.clone(),1,1
+        )).unwrap();
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness_b.authorization_instance.clone(),action_b.id.clone(),digest_b,
+            witness_b.support_digest.clone(),witness_b.policy.clone(),1,1
+        )).unwrap();
+
+        store.prepare_for_execution_bound_with_operation(
+            &witness_a,&action_a,"frame@1","attempt-operation-a",
+            "boundary-A","operation-shared"
+        ).unwrap();
+        assert!(matches!(
+            store.prepare_for_execution_bound_with_operation(
+                &witness_b,&action_b,"frame@1","attempt-operation-b",
+                "boundary-B","operation-shared"
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn attempt_scope_digest_is_stable_and_boundary_sensitive() {
+        let same_a = compute_attempt_scope_digest("boundary-A","attempt-1").unwrap();
+        let same_b = compute_attempt_scope_digest("boundary-A","attempt-1").unwrap();
+        let other_boundary = compute_attempt_scope_digest("boundary-B","attempt-1").unwrap();
+        let other_attempt = compute_attempt_scope_digest("boundary-A","attempt-2").unwrap();
+        assert_eq!(same_a, same_b);
+        assert_ne!(same_a, other_boundary);
+        assert_ne!(same_a, other_attempt);
+        assert!(same_a.starts_with("sha256:"));
+    }
+
+
+    #[test]
+    fn status_check_boundary_scope_is_repaired_from_authoritative_dispatch() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-status-scope-backfill-{}.db",std::process::id()
+        ));
+        {
+            let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-status").unwrap();
+            let conn=store.connection().unwrap();
+            conn.execute(
+                "INSERT INTO authorization_dispatches(
+                    authorization_instance,attempt_id,operation_id,native_replay_identity,
+                    action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,
+                    adapter_revision,adapter_implementation_digest,boundary_id,
+                    attempt_binding_digest,state)
+                 VALUES(
+                    'auth-status','attempt-status','op-status','replay-status',
+                    'action-status','digest-status','provider-status','target-status','aud-status','adapter-status',
+                    'adapter/v1','sha256:impl','boundary-authoritative',
+                    'sha256:binding','dispatch_pending'
+                 )",
+                [],
+            ).unwrap();
+            conn.execute(
+                "INSERT INTO authorization_status_checks(
+                    authorization_instance,attempt_id,phase,status_identifier,status_source_digest,
+                    status_observed_at,status_valid_until,status_evidence_digest)
+                 VALUES(
+                    'auth-status','attempt-status','pre_entry','status:attempt-status','sha256:source',
+                    '2026-10-03T10:00:00Z','2026-10-03T10:30:00Z','sha256:evidence'
+                 )",
+                [],
+            ).unwrap();
+        }
+
+        let reopened=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-status").unwrap();
+        let conn=reopened.connection().unwrap();
+        let (boundary,scope):(String,String)=conn.query_row(
+            "SELECT boundary_id,attempt_scope_digest
+             FROM authorization_status_checks
+             WHERE authorization_instance='auth-status' AND attempt_id='attempt-status'",
+            [],
+            |row| Ok((row.get(0)?,row.get(1)?)),
+        ).unwrap();
+        assert_eq!(boundary,"boundary-authoritative");
+        assert_eq!(
+            scope,
+            compute_attempt_scope_digest("boundary-authoritative","attempt-status").unwrap()
+        );
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn startup_rejects_forged_persisted_attempt_scope() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-attempt-scope-startup-{}.db",std::process::id()
+        ));
+        {
+            let store=SqliteAuthorizationStore::open(&path).unwrap();
+            store.connection().unwrap().execute(
+                "INSERT INTO authorization_leases(
+                    authorization_instance,action_id,action_digest,support_digest,policy,
+                    authority_epoch,remaining_executions,state,attempt_id,operation_id,
+                    boundary_id,attempt_scope_digest
+                 ) VALUES(
+                    'startup-auth','startup-action','startup-digest','startup-support','startup-policy',
+                    1,1,'prepared','startup-attempt','startup-operation','startup-boundary','sha256:forged-scope'
+                 )",
+                [],
+            ).unwrap();
+        }
+        assert!(matches!(
+            SqliteAuthorizationStore::open(&path),
+            Err(AuthorizationStoreError::InvalidState(message))
+                if message.contains("attempt scope digest mismatch")
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn cross_table_attempt_boundary_splice_is_rejected() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-cross-table-boundary-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-cross-table").unwrap();
+        let effect=ActionEffectBinding::new(
+            "target-cross","audience-cross","adapter-cross"
+        );
+        let action=EpistemicAction::new(
+            "cross-table-action","effect",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action.id.clone(),
+            authorization_instance:"approval-cross-table".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,"attempt-cross-table",&action,&effect,
+            "boundary-A","operation-cross-table","native-cross-table"
+        ).unwrap();
+
+        let boundary_b_scope=
+            compute_attempt_scope_digest("boundary-B",&record.attempt_id).unwrap();
+        store.connection().unwrap().execute(
+            "INSERT INTO authorization_receipts(
+                authorization_instance,action_id,attempt_id,phase,outcome,action_digest,
+                authority_epoch,provider_idempotency_key,boundary_id,attempt_scope_digest
+             ) VALUES(?1,?2,?3,'indeterminate','indeterminate',?4,?5,?6,?7,?8)",
+            params![
+                record.authorization_instance,
+                record.action_id,
+                record.attempt_id,
+                record.action_digest,
+                witness.authority_epoch as i64,
+                record.provider_idempotency_key,
+                "boundary-B",
+                boundary_b_scope,
+            ],
+        ).unwrap();
+
+        let mut connection=store.connection().unwrap();
+        let tx=connection.transaction_with_behavior(TransactionBehavior::Immediate).unwrap();
+        let err=store.validate_persisted_dispatch_record(&tx,&record).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
+        ));
+        tx.rollback().unwrap();
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn startup_rejects_cross_table_attempt_boundary_splice() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-cross-table-startup-{}.db",std::process::id()
+        ));
+        {
+            let store=SqliteAuthorizationStore::open_with_relying_party(
+                &path,"rp-cross-table-startup"
+            ).unwrap();
+            let effect=ActionEffectBinding::new(
+                "target-cross-startup","audience-cross-startup","adapter-cross-startup"
+            );
+            let action=EpistemicAction::new(
+                "cross-table-startup-action",
+                "effect",
+                super::super::ActionRisk::Critical,
+            ).with_effect_binding(effect.clone());
+            let digest=action.canonical_action_digest();
+            let witness=ActionAuthorizationWitness {
+                operation_id: None,
+                action_id:action.id.clone(),
+                authorization_instance:"approval-cross-table-startup".into(),
+                action_digest:digest.clone(),
+                frame:"frame@1".into(),
+                support_digest:"sha256:support".into(),
+                policy:"policy-v1".into(),
+                decision:"execute".into(),
+                issued_at:"2026-10-03T10:00:00Z".into(),
+                expires_at:Some("2026-10-04T12:00:00Z".into()),
+                authority_epoch:1,
+            };
+            store.register_lease(&AuthorizationLease::new_with_instance(
+                witness.authorization_instance.clone(),
+                action.id.clone(),
+                digest,
+                witness.support_digest.clone(),
+                witness.policy.clone(),
+                1,
+                1,
+            )).unwrap();
+            let record=mark_dispatch_pending_bound_for_test(
+                &store,
+                &witness.authorization_instance,
+                "attempt-cross-table-startup",
+                &action,
+                &effect,
+                "boundary-A",
+                "operation-cross-table-startup",
+                "native-cross-table-startup",
+            ).unwrap();
+
+            let boundary_b_scope=
+                compute_attempt_scope_digest("boundary-B",&record.attempt_id).unwrap();
+            store.connection().unwrap().execute(
+                "INSERT INTO authorization_receipts(
+                    authorization_instance,action_id,attempt_id,phase,outcome,action_digest,
+                    authority_epoch,provider_idempotency_key,boundary_id,attempt_scope_digest
+                 ) VALUES(?1,?2,?3,'indeterminate','indeterminate',?4,?5,?6,?7,?8)",
+                params![
+                    record.authorization_instance,
+                    record.action_id,
+                    record.attempt_id,
+                    record.action_digest,
+                    witness.authority_epoch as i64,
+                    record.provider_idempotency_key,
+                    "boundary-B",
+                    boundary_b_scope,
+                ],
+            ).unwrap();
+        }
+
+        assert!(matches!(
+            SqliteAuthorizationStore::open_with_relying_party(
+                &path,
+                "rp-cross-table-startup",
+            ),
+            Err(AuthorizationStoreError::InvalidState(message))
+                if message.contains("attempt boundary mismatch")
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn persisted_attempt_scope_tampering_is_rejected() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-attempt-scope-tamper-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-scope").unwrap();
+        let effect=ActionEffectBinding::new("target-scope","prod","adapter-scope");
+        let action=EpistemicAction::new("attempt-scope-action","effect",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action.id.clone(), authorization_instance:"approval-scope".into(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "approval-scope",action.id.clone(),digest.clone(),"sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound_with_operation(
+            &witness,&action,"frame@1","attempt-scope","boundary-scope","operation-scope"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,"approval-scope","attempt-scope",&action,&effect,"boundary-scope",
+            "operation-scope","native-scope"
+        ).unwrap();
+
+        let mut connection=store.connection().unwrap();
+        let tx=connection.transaction_with_behavior(TransactionBehavior::Immediate).unwrap();
+        tx.execute(
+            "UPDATE authorization_dispatches
+             SET attempt_scope_digest='sha256:tampered-scope'
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+            params![
+                record.authorization_instance,
+                record.attempt_id,
+                record.boundary_id,
+            ],
+        ).unwrap();
+        let err=store.validate_persisted_dispatch_record(&tx,&record).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding)
+        ));
+        tx.rollback().unwrap();
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn bound_attempt_id_cannot_be_reused_across_boundaries() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-attempt-scope-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action_a=EpistemicAction::new("scope-a","a",super::super::ActionRisk::Critical);
+        let action_b=EpistemicAction::new("scope-b","b",super::super::ActionRisk::Critical);
+        let digest_a=action_a.canonical_action_digest();
+        let digest_b=action_b.canonical_action_digest();
+        let witness_a=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action_a.id.clone(), authorization_instance:"scope-approval-a".into(),
+            action_digest:digest_a.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:11:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
+        };
+        let witness_b=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action_b.id.clone(), authorization_instance:"scope-approval-b".into(),
+            action_digest:digest_b.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:11:01Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "scope-approval-a",action_a.id.clone(),digest_a,"sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "scope-approval-b",action_b.id.clone(),digest_b,"sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness_a,&action_a,"frame@1","attempt-reused","boundary-A"
+        ).unwrap();
+        assert!(matches!(
+            store.prepare_for_execution_bound(
+                &witness_b,&action_b,"frame@1","attempt-reused","boundary-B"
+            ),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn recovery_treats_invoked_as_indeterminate() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-invoked-recovery-{}.db",std::process::id()));
+        let (store,action,witness)=fixture(&path);
+        store.prepare_for_execution(&witness,&action,"frame@1","attempt-crash").unwrap();
+        store.mark_dispatch_pending(&witness.authorization_instance,"attempt-crash").unwrap();
+        store.mark_invoked(&witness.authorization_instance,"attempt-crash").unwrap();
+        drop(store);
+
+        let reopened=SqliteAuthorizationStore::open(&path).unwrap();
+        assert_eq!(reopened.recover_incomplete_attempts().unwrap(),1);
+        assert!(matches!(
+            reopened.prepare_for_execution(&witness,&action,"frame@1","attempt-retry"),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::IndeterminateRequiresReconciliation
+            ))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn crash_recovery_rejects_tampered_bound_dispatch_provenance() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-recovery-provenance-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-recovery").unwrap();
+        let effect=ActionEffectBinding::new("target-recovery","prod","adapter-recovery");
+        let action=EpistemicAction::new(
+            "recovery-provenance-action","effect",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action.id.clone(),
+            authorization_instance:"recovery-provenance-approval".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "recovery-provenance-approval",action.id.clone(),digest.clone(),
+            "sha256:support","policy-v1",1,1
+        )).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,"recovery-provenance-approval","attempt-recovery",
+            &action,&effect,"boundary-recovery","operation-recovery","native-recovery"
+        ).unwrap();
+
+        {
+            let mut connection=store.connection().unwrap();
+            let tx=connection.transaction_with_behavior(TransactionBehavior::Immediate).unwrap();
+            tx.execute(
+                "UPDATE authorization_dispatches
+                 SET provider_idempotency_key='forged-provider-key'
+                 WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+                params![
+                    record.authorization_instance,
+                    record.attempt_id,
+                    record.boundary_id,
+                ],
+            ).unwrap();
+            tx.commit().unwrap();
+        }
+
+        let err=store.recover_incomplete_attempts_for_boundary("boundary-recovery").unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding)
+        ));
+
+        let connection=store.connection().unwrap();
+        let state:String=connection.query_row(
+            "SELECT state FROM authorization_leases
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |row| row.get(0),
+        ).unwrap();
+        assert_eq!(state,"dispatch_pending");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn dispatch_pending_wrong_attempt_is_fenced() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-dispatch-fence-{}.db",std::process::id()));
+        let (store,action,witness)=fixture(&path);
+        store.prepare_for_execution(&witness,&action,"frame@1","attempt-1").unwrap();
+        assert_eq!(
+            store.mark_dispatch_pending(&witness.authorization_instance,"attempt-2").unwrap_err().to_string(),
+            "authorization consumption error: AttemptMismatch"
+        );
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn relying_party_scope_is_pinned_per_store() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-rp-scope-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-A").unwrap();
+        assert_eq!(store.relying_party_id(),"rp-A");
+        drop(store);
+
+        let same=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-A").unwrap();
+        assert_eq!(same.relying_party_id(),"rp-A");
+        assert!(matches!(
+            SqliteAuthorizationStore::open_with_relying_party(&path,"rp-B"),
+            Err(AuthorizationStoreError::InvalidState(_))
+        ));
+        assert!(matches!(
+            SqliteAuthorizationStore::open_with_relying_party(&path,""),
+            Err(AuthorizationStoreError::InvalidState(_))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn same_action_fence_is_scoped_to_pinned_relying_party_domain() {
+        let path_a=std::env::temp_dir().join(format!("symthaea-gis-auth-rp-a-{}.db",std::process::id()));
+        let path_b=std::env::temp_dir().join(format!("symthaea-gis-auth-rp-b-{}.db",std::process::id()));
+        let store_a=SqliteAuthorizationStore::open_with_relying_party(&path_a,"rp-A").unwrap();
+        let store_b=SqliteAuthorizationStore::open_with_relying_party(&path_b,"rp-B").unwrap();
+        let effect=ActionEffectBinding::new("target-cross-rp","prod","adapter-A");
+        let action=EpistemicAction::new("rp-scoped-action","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+
+        for (store,instance,attempt,boundary,operation,native) in [
+            (&store_a,"rp-approval-a","attempt-rp-a","boundary-A","operation-rp-a","native-rp-a"),
+            (&store_b,"rp-approval-b","attempt-rp-b","boundary-B","operation-rp-b","native-rp-b"),
+        ] {
+            let witness=ActionAuthorizationWitness {
+                operation_id: None,
+                authorization_instance:instance.into(),
+                action_id:action.id.clone(),
+                action_digest:digest.clone(),
+                frame:"frame@1".into(),
+                support_digest:"support".into(),
+                policy:"policy@1".into(),
+                decision:"execute".into(),
+                issued_at:"2026-10-03T06:00:00Z".into(),
+                expires_at:Some("2026-10-04T12:00:00Z".into()),
+                authority_epoch:1,
+            };
+            store.register_lease(&AuthorizationLease::new_with_instance(
+                instance,action.id.clone(),digest.clone(),"support","policy@1",1,1
+            )).unwrap();
+            store.prepare_for_execution_bound(&witness,&action,"frame@1",attempt,boundary).unwrap();
+            let record=mark_dispatch_pending_bound_for_test(&store,
+                instance,attempt,&action,&effect,boundary,operation,native
+            ).unwrap();
+            assert_eq!(record.target_identity,"target-cross-rp");
+            let persisted_rp:String=store.connection().unwrap().query_row(
+                "SELECT relying_party_id FROM authorization_dispatches
+                 WHERE authorization_instance=?1 AND attempt_id=?2",
+                params![instance,attempt],
+                |row| row.get(0)
+            ).unwrap();
+            assert_eq!(persisted_rp,store.relying_party_id());
+        }
+
+        let _=std::fs::remove_file(path_a);
+        let _=std::fs::remove_file(path_b);
+    }
+
+    #[test]
+    fn current_instance_store_is_upgraded_with_boundary_columns_and_indexes() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-boundary-migrate-{}.db",std::process::id()));
+        {
+            let connection=Connection::open(&path).unwrap();
+            connection.execute_batch(
+                "CREATE TABLE authorization_leases (
+                   authorization_instance TEXT PRIMARY KEY, action_id TEXT NOT NULL,
+                   action_digest TEXT NOT NULL, support_digest TEXT NOT NULL,
+                   policy TEXT NOT NULL, authority_epoch INTEGER NOT NULL,
+                   remaining_executions INTEGER NOT NULL, state TEXT NOT NULL, attempt_id TEXT
+                 );
+                 CREATE TABLE authorization_receipts (
+                   authorization_instance TEXT NOT NULL, action_id TEXT NOT NULL,
+                   attempt_id TEXT NOT NULL, phase TEXT NOT NULL, outcome TEXT NOT NULL,
+                   action_digest TEXT NOT NULL, authority_epoch INTEGER NOT NULL,
+                   PRIMARY KEY(authorization_instance,attempt_id,phase)
+                 );
+                 CREATE TABLE authorization_dispatches (
+                   authorization_instance TEXT NOT NULL, attempt_id TEXT NOT NULL,
+                   action_id TEXT NOT NULL, action_digest TEXT NOT NULL,
+                   provider_idempotency_key TEXT NOT NULL, target_identity TEXT NOT NULL,
+                   audience TEXT NOT NULL, adapter TEXT NOT NULL, boundary_id TEXT NOT NULL,
+                   state TEXT NOT NULL, PRIMARY KEY(authorization_instance,attempt_id)
+                 );",
+            ).unwrap();
+        }
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let lease=store.connection().unwrap();
+
+        let lease_boundary:String=lease.query_row(
+            "SELECT name FROM pragma_table_info('authorization_leases')
+             WHERE name='boundary_id'",
+            [], |row| row.get(0)
+        ).unwrap();
+        let receipt_boundary:String=lease.query_row(
+            "SELECT name FROM pragma_table_info('authorization_receipts')
+             WHERE name='boundary_id'",
+            [], |row| row.get(0)
+        ).unwrap();
+        assert_eq!(lease_boundary,"boundary_id");
+        assert_eq!(receipt_boundary,"boundary_id");
+
+        let rp_count:i64=lease.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('authorization_dispatches') WHERE name='relying_party_id'",
+            [], |row| row.get(0)
+        ).unwrap();
+        assert_eq!(rp_count,1);
+
+        let pin_table_count:i64=lease.query_row(
+            "SELECT COUNT(*) FROM sqlite_master
+             WHERE type='table' AND name='authorization_native_authority_pins'",
+            [], |row| row.get(0)
+        ).unwrap();
+        assert_eq!(pin_table_count,1);
+
+        let metadata:String=lease.query_row(
+            "SELECT value FROM authorization_store_metadata WHERE key='relying_party_id'",
+            [], |row| row.get(0)
+        ).unwrap();
+        assert_eq!(metadata,"legacy-local");
+
+        for table in ["authorization_dispatches","authorization_terminal_evidence"] {
+            for column in [
+                "native_authority_namespace",
+                "native_authorization_id",
+                "native_replay_derivation_digest",
+            ] {
+                let count:i64=lease.query_row(
+                    &format!("SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name=?1"),
+                    params![column],
+                    |row| row.get(0),
+                ).unwrap();
+                assert_eq!(count,1,"{table}.{column} missing after migration");
+            }
+        }
+
+        let index_count:i64=lease.query_row(
+            "SELECT COUNT(*) FROM sqlite_master
+             WHERE type='index' AND name IN
+             ('authorization_lease_attempt_id_uq','authorization_dispatch_attempt_id_uq')",
+            [], |row| row.get(0)
+        ).unwrap();
+        assert_eq!(index_count,2);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn legacy_action_keyed_store_is_migrated_to_explicit_instances() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-migrate-{}.db",std::process::id()));
+        {
+            let connection=Connection::open(&path).unwrap();
+            connection.execute_batch(
+                "CREATE TABLE authorization_leases (
+                   action_id TEXT PRIMARY KEY, action_digest TEXT NOT NULL,
+                   support_digest TEXT NOT NULL, policy TEXT NOT NULL,
+                   authority_epoch INTEGER NOT NULL, remaining_executions INTEGER NOT NULL,
+                   state TEXT NOT NULL, attempt_id TEXT
+                 );
+                 CREATE TABLE authorization_receipts (
+                   action_id TEXT NOT NULL, attempt_id TEXT NOT NULL, phase TEXT NOT NULL,
+                   outcome TEXT NOT NULL, action_digest TEXT NOT NULL,
+                   authority_epoch INTEGER NOT NULL,
+                   PRIMARY KEY(action_id,attempt_id,phase)
+                 );
+                 INSERT INTO authorization_leases VALUES
+                   ('legacy-action','sha256:action','sha256:support','policy-v1',1,1,'ready',NULL);",
+            ).unwrap();
+        }
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let lease=store.connection().unwrap();
+        let instance:String=lease.query_row(
+            "SELECT authorization_instance FROM authorization_leases WHERE action_id='legacy-action'",
+            [], |row| row.get(0)
+        ).unwrap();
+        assert_eq!(instance,"legacy-action");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn concurrent_prepare_has_one_winner() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-concurrent-{}.db",std::process::id()));
+        let (store,action,witness)=fixture(&path);
+        let second=SqliteAuthorizationStore::open(&path).unwrap();
+        let barrier=Arc::new(std::sync::Barrier::new(2));
+        let a2=action.clone(); let w2=witness.clone();
+        let b1=barrier.clone(); let b2=barrier.clone();
+        let t1=thread::spawn(move||{b1.wait();store.prepare_for_execution(&witness,&action,"frame@1","a")});
+        let t2=thread::spawn(move||{b2.wait();second.prepare_for_execution(&w2,&a2,"frame@1","b")});
+        let r1=t1.join().unwrap(); let r2=t2.join().unwrap();
+        assert_ne!(r1.is_ok(),r2.is_ok());
+        let _=std::fs::remove_file(path);
+    }
+    #[test]
+    fn bound_preparation_rejects_contradictory_witness_operation_metadata() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-operation-witness-consistency-{}.db",
+            std::process::id()
+        ));
+        let (store, action, witness) = fixture(&path);
+        let mut contradictory = witness.clone();
+        contradictory.operation_id = Some("operation-B".into());
+
+        assert!(matches!(
+            store.prepare_for_execution_bound_with_operation(
+                &contradictory,
+                &action,
+                "frame@1",
+                "attempt-operation",
+                "boundary-A",
+                "operation-A",
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+
+        let connection = store.connection().unwrap();
+        let state: String = connection
+            .query_row(
+                "SELECT state FROM authorization_leases WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(state, "ready");
+
+        let operation: Option<String> = connection
+            .query_row(
+                "SELECT operation_id FROM authorization_leases WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(operation.is_none());
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn bound_dispatch_rejects_operation_identity_substitution() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-operation-binding-{}.db",
+            std::process::id()
+        ));
+        let (store, action, witness) = fixture(&path);
+        let effect = ActionEffectBinding::new(
+            "target-operation",
+            "prod",
+            "adapter-A",
+        );
+        let action = action.with_effect_binding(effect.clone());
+        let witness = ActionAuthorizationWitness {
+            operation_id: None,
+            action_id: action.id.clone(),
+            authorization_instance: witness.authorization_instance.clone(),
+            action_digest: action.canonical_action_digest(),
+            frame: witness.frame,
+            support_digest: witness.support_digest,
+            policy: witness.policy,
+            decision: witness.decision,
+            issued_at: witness.issued_at,
+            expires_at: witness.expires_at,
+            authority_epoch: witness.authority_epoch,
+        };
+        store.prepare_for_execution_bound_with_operation(
+            &witness,
+            &action,
+            "frame@1",
+            "attempt-operation",
+            "boundary-A",
+            "operation-A",
+        ).unwrap();
+        assert!(matches!(
+            store.validate_bound_dispatch_preconditions(
+                &witness.authorization_instance,
+                "attempt-operation",
+                &action,
+                &effect,
+                "boundary-A",
+                "operation-B",
+                "https://issuer.example",
+                "native-auth-1",
+                "authority:issuer.example",
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn bound_receipt_replays_preserve_native_provider_identity() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-receipt-provider-key-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=ActionEffectBinding::new(
+            "target-receipt-provider-key","prod","adapter-receipt"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action.id.clone(),
+            authorization_instance:"receipt-provider-key".into(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-03T07:10:00Z".into(),
+            expires_at:Some("2026-10-04T07:10:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-receipt-provider-key","boundary-receipt"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,"attempt-receipt-provider-key",
+            &action,&effect,"boundary-receipt",
+            "operation:receipt-provider-key","native-receipt-provider-key"
+        ).unwrap();
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        let first=store.commit_bound_verified(
+            &record,&evidence,&TestProviderVerifier
+        ).unwrap();
+        assert_eq!(first.provider_idempotency_key,record.provider_idempotency_key);
+
+        let second=store.commit_bound_verified(
+            &record,&evidence,&TestProviderVerifier
+        ).unwrap();
+        assert_eq!(second.provider_idempotency_key,record.provider_idempotency_key);
+        assert_ne!(
+            second.provider_idempotency_key,
+            AuthorizationLease::new_with_instance(
+                record.authorization_instance.clone(),
+                record.action_id.clone(),
+                record.action_digest.clone(),
+                String::new(),
+                String::new(),
+                1,
+                1,
+            ).provider_idempotency_key()
+        );
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn bound_receipt_identity_tampering_is_rejected_on_read() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-receipt-tamper-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=ActionEffectBinding::new(
+            "target-receipt-tamper","prod","adapter-receipt-tamper"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            action_id:action.id.clone(),
+            authorization_instance:"receipt-tamper".into(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-03T07:20:00Z".into(),
+            expires_at:Some("2026-10-04T07:20:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1,
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-receipt-tamper","boundary-receipt-tamper"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,"attempt-receipt-tamper",
+            &action,&effect,"boundary-receipt-tamper",
+            "operation:receipt-tamper","native-receipt-tamper"
+        ).unwrap();
+
+        let tampered_scope=compute_attempt_scope_digest(
+            &record.boundary_id,&record.attempt_id
+        ).unwrap();
+        store.connection().unwrap().execute(
+            "INSERT INTO authorization_receipts(
+                authorization_instance,action_id,attempt_id,phase,outcome,action_digest,
+                authority_epoch,provider_idempotency_key,boundary_id,attempt_scope_digest
+             ) VALUES(?1,?2,?3,'final','succeeded',?4,?5,?6,?7,?8)",
+            params![
+                record.authorization_instance,
+                record.action_id,
+                record.attempt_id,
+                "forged-action-digest",
+                witness.authority_epoch as i64,
+                record.provider_idempotency_key,
+                record.boundary_id,
+                tampered_scope,
+            ],
+        ).unwrap();
+
+        let mut connection=store.connection().unwrap();
+        let tx=connection.transaction_with_behavior(TransactionBehavior::Immediate).unwrap();
+        let err=load_receipt(
+            &tx,
+            &record.authorization_instance,
+            &record.attempt_id,
+            "final",
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
+        ));
+        tx.rollback().unwrap();
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn terminal_record_splicing_is_rejected_before_settlement() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-record-splice-{}.db",
+            std::process::id()
+        ));
+        let store = SqliteAuthorizationStore::open_with_relying_party(&path, "rp-test").unwrap();
+        let mut connection = store.connection().unwrap();
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate).unwrap();
+        tx.execute(
+            "INSERT INTO authorization_dispatches
+             (authorization_instance,attempt_id,operation_id,native_replay_identity,
+              native_issuer,native_authority_namespace,native_authorization_id,
+              action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,
+              boundary_id,state,relying_party_id)
+             VALUES ('auth','attempt','op-A','replay-A','issuer','ns','native-A',
+                     'action','digest','provider-key-A','target-A','audience-A','adapter-A',
+                     'boundary','invoked','rp-test')",
+            [],
+        ).unwrap();
+
+        let record = DurableDispatchRecord {
+            authorization_instance: "auth".into(),
+            attempt_id: "attempt".into(),
+            operation_id: "op-B".into(),
+            native_replay_identity: "replay-A".into(),
+            native_issuer: "issuer".into(),
+            native_authority_namespace: "ns".into(),
+            native_authorization_id: "native-A".into(),
+            native_replay_derivation_digest: "derivation".into(),
+            status_identifier: "status".into(),
+            status_source_digest: "source".into(),
+            status_observed_at: "2026-10-03T10:00:00Z".into(),
+            status_valid_until: "2026-10-03T11:00:00Z".into(),
+            status_evidence_digest: "status-digest".into(),
+            action_id: "action".into(),
+            action_digest: "digest".into(),
+            provider_idempotency_key: "provider-key-A".into(),
+            target_identity: "target-A".into(),
+            audience: "audience-A".into(),
+            adapter: "adapter-A".into(),
+            adapter_revision: "test-adapter/v1".into(),
+            adapter_implementation_digest: "sha256:test-adapter-implementation".into(),
+            boundary_id: "boundary".into(),
+            attempt_binding_digest: "sha256:forged-binding".into(),
+        };
+
+        let err = store.validate_persisted_dispatch_record(&tx, &record).unwrap_err();
+        assert!(matches!(err, AuthorizationStoreError::Consumption(
+            AuthorizationConsumptionError::InvalidBinding
+        )));
+        tx.rollback().unwrap();
+        let _ = std::fs::remove_file(path);
+    }
+
+}
+    #[test]
+    fn persisted_status_tampering_is_rejected_by_attempt_binding() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-status-binding-tamper-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let record=DurableDispatchRecord {
+            authorization_instance:"auth-status".into(),
+            attempt_id:"attempt-status".into(),
+            operation_id:"op-status".into(),
+            native_replay_identity:"replay-status".into(),
+            native_issuer:"issuer-status".into(),
+            native_authority_namespace:"ns-status".into(),
+            native_authorization_id:"native-status".into(),
+            native_replay_derivation_digest:"derivation-status".into(),
+            status_identifier:"status-A".into(),
+            status_source_digest:"source-A".into(),
+            status_observed_at:"2026-10-03T10:00:00Z".into(),
+            status_valid_until:"2026-10-03T11:00:00Z".into(),
+            status_evidence_digest:"evidence-A".into(),
+            action_id:"action-status".into(),
+            action_digest:"digest-status".into(),
+            provider_idempotency_key:"provider-status".into(),
+            target_identity:"target-status".into(),
+            audience:"audience-status".into(),
+            adapter:"adapter-status".into(),
+            adapter_revision:"test-adapter/v1".into(),
+            adapter_implementation_digest:"sha256:test-adapter-implementation".into(),
+            boundary_id:"boundary-status".into(),
+            attempt_binding_digest:"sha256:binding-status".into(),
+        };
+        let mut connection=store.connection().unwrap();
+        let tx=connection.transaction_with_behavior(TransactionBehavior::Immediate).unwrap();
+        tx.execute(
+            "INSERT INTO authorization_dispatches(
+                authorization_instance,attempt_id,operation_id,native_replay_identity,
+                native_issuer,native_authority_namespace,native_authorization_id,
+                native_replay_derivation_digest,native_authority_pin_set_id,
+                native_authority_pin_set_digest,relying_party_id,action_id,action_digest,
+                provider_idempotency_key,target_identity,audience,adapter,boundary_id,
+                attempt_binding_digest,status_identifier,status_source_digest,status_observed_at,
+                status_valid_until,status_evidence_digest,validity_issued_at,validity_expires_at,
+                validity_policy_digest,state
+             ) VALUES(
+                ?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,
+                ?19,?20,?21,?22,?23,?24,?25,?26,?27,?28
+             )",
+            params![
+                record.authorization_instance,record.attempt_id,record.operation_id,
+                record.native_replay_identity,record.native_issuer,record.native_authority_namespace,
+                record.native_authorization_id,"derivation-status","pinset-status","digest-status",
+                store.relying_party_id(),record.action_id,record.action_digest,record.provider_idempotency_key,
+                record.target_identity,record.audience,record.adapter,record.boundary_id,
+                record.attempt_binding_digest,record.status_identifier,record.status_source_digest,
+                record.status_observed_at,record.status_valid_until,record.status_evidence_digest,
+                "",Option::<String>::None,"", "dispatch_pending"
+            ],
+        ).unwrap();
+
+        tx.execute(
+            "UPDATE authorization_dispatches
+             SET status_evidence_digest='tampered-evidence'
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+        ).unwrap();
+
+        let err=store.validate_persisted_dispatch_record(&tx,&record).unwrap_err();
+        assert!(matches!(err,AuthorizationStoreError::Consumption(
+            AuthorizationConsumptionError::InvalidBinding
+        )));
+        tx.rollback().unwrap();
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn persisted_attempt_binding_tampering_is_rejected() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-attempt-binding-tamper-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let effect=ActionEffectBinding::new("target-A","audience-A","adapter-A");
+        let record=DurableDispatchRecord {
+            authorization_instance:"auth".into(),
+            attempt_id:"attempt".into(),
+            operation_id:"op-A".into(),
+            native_replay_identity:"replay-A".into(),
+            native_issuer:"issuer".into(),
+            native_authority_namespace:"ns".into(),
+            native_authorization_id:"native-A".into(),
+            status_identifier:"status-A".into(),
+            status_source_digest:"source-A".into(),
+            status_observed_at:"2026-10-03T10:00:00Z".into(),
+            status_valid_until:"2026-10-03T11:00:00Z".into(),
+            status_evidence_digest:"status-digest-A".into(),
+            action_id:"action-A".into(),
+            action_digest:"digest-A".into(),
+            provider_idempotency_key:"provider-key-A".into(),
+            target_identity:effect.target_identity.clone(),
+            audience:effect.audience.clone(),
+            adapter:effect.adapter.clone(),
+            adapter_revision:"test-adapter/v1".into(),
+            adapter_implementation_digest:"sha256:test-adapter-implementation".into(),
+            boundary_id:"boundary-A".into(),
+            attempt_binding_digest:"sha256:uncomputed".into(),
+        };
+
+        let mut connection=store.connection().unwrap();
+        let tx=connection.transaction_with_behavior(TransactionBehavior::Immediate).unwrap();
+        tx.execute(
+            "INSERT INTO authorization_dispatches(
+                authorization_instance,attempt_id,operation_id,native_replay_identity,
+                native_issuer,native_authority_namespace,native_authorization_id,
+                native_replay_derivation_digest,native_authority_pin_set_id,
+                native_authority_pin_set_digest,relying_party_id,action_id,action_digest,
+                provider_idempotency_key,target_identity,audience,adapter,boundary_id,
+                attempt_binding_digest,state
+             ) VALUES(
+                ?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20
+             )",
+            params![
+                record.authorization_instance,record.attempt_id,record.operation_id,
+                record.native_replay_identity,record.native_issuer,record.native_authority_namespace,
+                record.native_authorization_id,"derivation-A","pinset-A","digest-A",
+                store.relying_party_id(),record.action_id,record.action_digest,
+                record.provider_idempotency_key,record.target_identity,record.audience,record.adapter,
+                record.boundary_id,record.attempt_binding_digest,"dispatch_pending"
+            ],
+        ).unwrap();
+
+        let digest=compute_attempt_binding_digest(
+            &record.authorization_instance,&record.attempt_id,&record.operation_id,
+            &record.native_replay_identity,&record.native_issuer,&record.native_authority_namespace,
+            &record.native_authorization_id,"derivation-A","pinset-A","digest-A",
+            store.relying_party_id(),&record.action_id,&record.action_digest,
+            &record.provider_idempotency_key,&record.target_identity,&record.audience,&record.adapter,
+            &record.status_identifier,&record.status_source_digest,&record.status_observed_at,
+            &record.status_valid_until,&record.status_evidence_digest,"",None,""
+        );
+
+        tx.execute(
+            "UPDATE authorization_dispatches
+             SET attempt_binding_digest=?3
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id,digest],
+        ).unwrap();
+
+        tx.execute(
+            "UPDATE authorization_dispatches SET target_identity='target-B'
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+        ).unwrap();
+
+        let err=store.validate_persisted_dispatch_record(&tx,&DurableDispatchRecord {
+            target_identity:"target-A".into(),
+            attempt_binding_digest:digest,
+            ..record
+        }).unwrap_err();
+        assert!(matches!(err, AuthorizationStoreError::Consumption(
+            AuthorizationConsumptionError::InvalidBinding
+        )));
+        tx.rollback().unwrap();
+        let _=std::fs::remove_file(path);
+}
