@@ -842,7 +842,8 @@ mod tests {
             permitted_purposes: BTreeSet::from([CommunicationPurpose::HumanCollaboration]),
             handling: NeurosemanticHandlingPolicy {
                 schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
-                origin_jurisdiction: "ZA".into(),
+                policy_provenance_ref: "synthetic-policy-record-1".into(),
+            origin_jurisdiction: "ZA".into(),
                 permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
                 permitted_secondary_uses: BTreeSet::new(),
                 retention: NeurosemanticRetentionPolicy::UntilUnixS(200),
@@ -987,6 +988,7 @@ mod tests {
     fn handling_policy_requires_explicit_destination_and_retention() {
         let policy = NeurosemanticHandlingPolicy {
             schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
+            policy_provenance_ref: "synthetic-policy-record-1".into(),
             origin_jurisdiction: "ZA".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into(), "GB".into()]),
             permitted_secondary_uses: BTreeSet::from([NeurosemanticSecondaryUse::Research]),
