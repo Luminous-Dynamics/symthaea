@@ -213,6 +213,28 @@ jobs:
           vdp_65 = b"\xa1\x20\x98\x41" + b"".join(
               b"\x58\x26" + proof for _ in range(65)
           )
+
+          # Exercise the latest fixed-field and label taxonomy boundaries.
+          key_kid_257 = b"\xa1\x02\x59\x01\x01" + (b"\x00" * 257)
+          key_label_257 = b"\xa1\x79\x01\x01" + (b"x" * 257) + b"\x00"
+          key_x_33 = b"\xa1\x21\x58\x21" + (b"\x00" * 33)
+
+          receipt_payload_33 = (
+              b"\xd2\x84"
+              + b"\x58\x06\xa2\x01\x26\x19\x01\x8b"
+              + b"\xa1\x18\x8c\xa1\x20\x81\x58\x26" + proof
+              + b"\x58\x21" + (b"\x00" * 33)
+              + b"\x58\x40" + (b"\x00" * 64)
+          )
+
+          outer_label_257 = (
+              b"\xd2\x84"
+              + b"\x58\x10\xa1\x79\x01\x01" + (b"x" * 257) + b"\x00"
+              + b"\xa0"
+              + b"\xf6"
+              + b"\x58\x40" + (b"\x00" * 64)
+          )
+
           large_tagged_outer = (
               b"\xd2\x84"
               + b"\x41\xa0"
@@ -267,6 +289,11 @@ jobs:
           )
 
           generated = {
+              "fuzz_cose_key_es256/seed-kid-257.cbor": key_kid_257,
+              "fuzz_cose_key_es256/seed-label-257.cbor": key_label_257,
+              "fuzz_cose_key_es256/seed-x-33.cbor": key_x_33,
+              "fuzz_rfc9942_receipt/seed-attached-payload-33.cbor": receipt_payload_33,
+              "fuzz_rfc9942_signature_with_receipts/seed-label-257.cbor": outer_label_257,
               "fuzz_rfc9942_proofs/seed-65-proof-vdp.cbor": vdp_65,
               "fuzz_rfc9942_proofs/seed-257-proof-vdp.cbor": vdp_257,
               "fuzz_rfc9942_signature_with_receipts/seed-tagged-large-opaque.cbor":
