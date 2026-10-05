@@ -1178,7 +1178,7 @@ fn rfc9942_round_trip_preserves_unprotected_header_entry_order() {
         let mut out = vec![0xd2, 0x84];
         out.extend_from_slice(&bstr(&protected));
         out.extend_from_slice(&unprotected);
-        out.extend_from_slice(&[0x46, b'p', b'a', b'y', b'l', b'o', b'a', b'd']);
+        out.extend_from_slice(&[0x47, b'p', b'a', b'y', b'l', b'o', b'a', b'd']);
         out.extend_from_slice(&[0x58, 0x40]);
         out.extend_from_slice(&[0xBB; 64]);
         out
