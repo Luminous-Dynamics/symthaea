@@ -193,9 +193,17 @@ impl Watchdog {
                             };
                         }
                         AutonomyLevel::DryRun => {
-                            let cmd = GenerationManager::switch_to(pre_gen as u32);
-                            let (bin, args) = cmd.to_command();
-                            let cmd_str = format!("{} {}", bin, args.join(" "));
+                            let select_cmd = GenerationManager::switch_to(pre_gen as u32);
+                            let activate_cmd = GenerationManager::activate(pre_gen as u32);
+                            let (select_bin, select_args) = select_cmd.to_command();
+                            let (activate_bin, activate_args) = activate_cmd.to_command();
+                            let cmd_str = format!(
+                                "{} {}; then {} {}",
+                                select_bin,
+                                select_args.join(" "),
+                                activate_bin,
+                                activate_args.join(" ")
+                            );
                             return WatchdogVerdict::Degraded {
                                 reason: format!("{}; would run: {}", reason, cmd_str),
                                 surprise: last_surprise,
@@ -204,15 +212,44 @@ impl Watchdog {
                             };
                         }
                         AutonomyLevel::FullAutonomous => {
-                            let cmd = GenerationManager::switch_to(pre_gen as u32);
+                            let select_cmd = GenerationManager::switch_to(pre_gen as u32);
+                            let activate_cmd = GenerationManager::activate(pre_gen as u32);
                             let mut executor = NixOSExecutor::new();
                             // FullAutonomous is the explicit watchdog authorization; the
                             // execute_confirmed API records the supplied value only and does
                             // not pretend that Phi itself authorizes the rollback.
-                            let result = executor.execute_confirmed(cmd, 0.0).await;
-                            match result {
+                            let select_result = executor.execute_confirmed(select_cmd, 0.0).await;
+                            match select_result {
                                 crate::action::executor::ExecutionResult::Success { .. } => {
-                                    return WatchdogVerdict::Reverted { reason, pre_gen };
+                                    let activate_result = executor.execute_confirmed(activate_cmd, 0.0).await;
+                                    match activate_result {
+                                        crate::action::executor::ExecutionResult::Success { .. } => {
+                                            return WatchdogVerdict::Reverted { reason, pre_gen };
+                                        }
+                                        crate::action::executor::ExecutionResult::Blocked { reason: block_reason, .. }
+                                        | crate::action::executor::ExecutionResult::FailedNoRollback {
+                                            error: block_reason,
+                                            ..
+                                        }
+                                        | crate::action::executor::ExecutionResult::RolledBack {
+                                            error: block_reason,
+                                            ..
+                                        }
+                                        | crate::action::executor::ExecutionResult::PendingConfirmation {
+                                            confidence: block_reason,
+                                            ..
+                                        } => {
+                                            return WatchdogVerdict::Degraded {
+                                                reason: format!(
+                                                    "{}; generation selected but runtime activation failed: {}",
+                                                    reason, block_reason
+                                                ),
+                                                surprise: last_surprise,
+                                                health: last_health,
+                                                checks_performed,
+                                            };
+                                        }
+                                    }
                                 }
                                 crate::action::executor::ExecutionResult::Blocked { reason: block_reason, .. }
                                 | crate::action::executor::ExecutionResult::FailedNoRollback {
@@ -228,7 +265,7 @@ impl Watchdog {
                                     ..
                                 } => {
                                     return WatchdogVerdict::Degraded {
-                                        reason: format!("{}; governed rollback failed: {}", reason, block_reason),
+                                        reason: format!("{}; governed generation selection failed: {}", reason, block_reason),
                                         surprise: last_surprise,
                                         health: last_health,
                                         checks_performed,
