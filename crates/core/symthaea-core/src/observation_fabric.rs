@@ -2468,17 +2468,16 @@ impl ObservationGraph {
         Ok(reachable)
     }
 
-    /// Return canonical bytes for the predicate-relative v3 independence scope.
+    /// Materialize the predicate-relative v3 scope as a typed witness.
     ///
-    /// v3 is additive: the frozen v2 scope and existing v2 receipts are untouched.
-    /// Only observations reachable from the requested source/target pair are included.
-    /// Source/target observations include fields directly consumed by the predicate;
-    /// ancestor-only observations include only lineage traversal and activity identity.
-    pub fn independence_verification_reachable_scope_canonical_bytes_v3(
+    /// The witness is the single serializer contract for v3. The graph only
+    /// selects the reachable records and their predicate-relative fields; the
+    /// witness type owns canonical byte encoding and standalone decoding.
+    pub fn independence_scope_witness_v3(
         &self,
         source_observation_id: &str,
         target_observation_id: &str,
-    ) -> Result<Vec<u8>, ObservationValidationError> {
+    ) -> Result<IndependenceScopeWitnessV3, ObservationValidationError> {
         let roles =
             self.independence_reachable_scope_roles(source_observation_id, target_observation_id)?;
 
@@ -2491,62 +2490,67 @@ impl ObservationGraph {
         let mut examined_observation_ids = roles.keys().cloned().collect::<Vec<_>>();
         examined_observation_ids.sort();
 
-        let mut bytes = Vec::new();
-        bytes.extend_from_slice(INDEPENDENCE_SCOPE_V3_DOMAIN_SEPARATOR);
-        write_canonical_string_vec_bytes(&mut bytes, &examined_observation_ids);
+        let records = examined_observation_ids
+            .into_iter()
+            .map(|observation_id| {
+                let role = *roles.get(&observation_id).ok_or_else(|| {
+                    ObservationValidationError::MissingRelationEndpoint(observation_id.clone())
+                })?;
+                let observation = by_id.get(observation_id.as_str()).ok_or_else(|| {
+                    ObservationValidationError::MissingRelationEndpoint(observation_id.clone())
+                })?;
 
-        for observation_id in examined_observation_ids {
-            write_canonical_string_bytes(&mut bytes, &observation_id);
-            let role = *roles
-                .get(&observation_id)
-                .expect("role collected with every observation id");
-            bytes.push(role);
-            let observation = by_id.get(observation_id.as_str()).ok_or_else(|| {
-                ObservationValidationError::MissingRelationEndpoint(observation_id.clone())
-            })?;
+                let endpoint =
+                    role & (INDEPENDENCE_SCOPE_V3_SOURCE_ROLE | INDEPENDENCE_SCOPE_V3_TARGET_ROLE)
+                        != 0;
 
-            if role
-                & (INDEPENDENCE_SCOPE_V3_SOURCE_ROLE | INDEPENDENCE_SCOPE_V3_TARGET_ROLE)
-                != 0 {
-                write_canonical_string_bytes(&mut bytes, &observation.provenance.source.sensor_id);
-                write_canonical_provenance_coverage_bytes(
-                    &mut bytes,
-                    &observation.provenance.coverage,
-                );
-                write_canonical_string_option_bytes(
-                    &mut bytes,
-                    observation.provenance.source.platform_id.as_deref(),
-                );
-            }
+                let mut parent_observation_ids =
+                    observation.provenance.parent_observation_ids.clone();
+                parent_observation_ids.sort();
 
-            let mut parent_ids = observation.provenance.parent_observation_ids.clone();
-            parent_ids.sort();
-            write_canonical_string_vec_bytes(&mut bytes, &parent_ids);
+                Ok(IndependenceScopeWitnessRecordV3 {
+                    observation_id,
+                    role,
+                    sensor_id: endpoint
+                        .then(|| observation.provenance.source.sensor_id.clone()),
+                    coverage: endpoint.then_some(observation.provenance.coverage),
+                    platform_id: endpoint
+                        .then(|| observation.provenance.source.platform_id.clone())
+                        .flatten(),
+                    parent_observation_ids,
+                    processing_activity_id: observation
+                        .provenance
+                        .processing_activity
+                        .as_ref()
+                        .map(|activity| activity.activity_id.clone()),
+                    asset_identity: endpoint
+                        .then(|| {
+                            observation.asset.as_ref().map(|asset| {
+                                IndependenceScopeAssetV3 {
+                                    hash_algorithm: asset.hash_algorithm.clone(),
+                                    content_hash: asset.content_hash.clone(),
+                                }
+                            })
+                        })
+                        .flatten(),
+                })
+            })
+            .collect::<Result<Vec<_>, ObservationValidationError>>()?;
 
-            write_canonical_string_option_bytes(
-                &mut bytes,
-                observation
-                    .provenance
-                    .processing_activity
-                    .as_ref()
-                    .map(|activity| activity.activity_id.as_str()),
-            );
+        Ok(IndependenceScopeWitnessV3 { records })
+    }
 
-            if role
-                & (INDEPENDENCE_SCOPE_V3_SOURCE_ROLE | INDEPENDENCE_SCOPE_V3_TARGET_ROLE)
-                != 0 {
-                match observation.asset.as_ref() {
-                    Some(asset) => {
-                        bytes.push(1);
-                        write_canonical_string_bytes(&mut bytes, &asset.hash_algorithm);
-                        write_canonical_string_bytes(&mut bytes, &asset.content_hash);
-                    }
-                    None => bytes.push(0),
-                }
-            }
-        }
-
-        Ok(bytes)
+    /// Return canonical bytes for the predicate-relative v3 independence scope.
+    ///
+    /// This delegates byte encoding to the typed v3 scope witness without
+    /// changing the established v3 wire representation.
+    pub fn independence_verification_reachable_scope_canonical_bytes_v3(
+        &self,
+        source_observation_id: &str,
+        target_observation_id: &str,
+    ) -> Result<Vec<u8>, ObservationValidationError> {
+        self.independence_scope_witness_v3(source_observation_id, target_observation_id)?
+            .canonical_bytes()
     }
 
     /// Compute the predicate-relative v3 independence-scope fingerprint.
@@ -4715,6 +4719,55 @@ mod tests {
             graph.assess_independence("obs-001", "obs-002")
         );
     }
+    #[test]
+    fn independence_v3_typed_scope_witness_is_exact_wire_serializer() {
+        let mut parent = fixture();
+        parent.id = "parent".into();
+
+        let mut source = fixture();
+        source.provenance.parent_observation_ids = vec!["parent".into()];
+
+        let mut target = fixture();
+        target.id = "obs-002".into();
+        target.provenance.source.sensor_id = "camera-2".into();
+
+        let graph = ObservationGraph {
+            observations: vec![target, parent, source],
+            relations: vec![],
+        };
+
+        let witness = graph
+            .independence_scope_witness_v3("obs-001", "obs-002")
+            .expect("typed witness");
+        assert!(witness.is_well_formed());
+        assert_eq!(
+            witness
+                .canonical_bytes()
+                .expect("typed witness bytes"),
+            graph
+                .independence_verification_reachable_scope_canonical_bytes_v3(
+                    "obs-001",
+                    "obs-002",
+                )
+                .expect("graph scope bytes")
+        );
+        assert_eq!(
+            witness.fingerprint().expect("typed witness fingerprint"),
+            graph
+                .independence_verification_reachable_scope_fingerprint_v3(
+                    "obs-001",
+                    "obs-002",
+                )
+                .expect("graph scope fingerprint")
+        );
+
+        let oracle = oracle_v3_scope_bytes(&graph, "obs-001", "obs-002");
+        assert_eq!(
+            witness.canonical_bytes().expect("canonical bytes"),
+            oracle
+        );
+    }
+
     #[test]
     fn independence_v3_scope_bytes_match_independent_oracle() {
         let mut parent = fixture();
