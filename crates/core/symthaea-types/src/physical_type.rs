@@ -725,6 +725,36 @@ mod tests {
     }
 
     #[test]
+    fn temperature_difference_fahrenheit_uses_scale_without_offset() {
+        let delta_f = PhysicalType::with_kind(
+            QuantityKind::TemperatureDifference,
+            PhysicalDimension::TEMPERATURE,
+        )
+        .with_unit(UnitRef {
+            symbol: "delta_degF".into(),
+            transform_to_si: UnitTransform::new(
+                RationalScale { numerator: 5, denominator: 9 },
+                RationalScale { numerator: 0, denominator: 1 },
+            ),
+            semantic_id: None,
+        });
+        let delta_k = PhysicalType::with_kind(
+            QuantityKind::TemperatureDifference,
+            PhysicalDimension::TEMPERATURE,
+        )
+        .with_unit(UnitRef {
+            symbol: "delta_K".into(),
+            transform_to_si: UnitTransform::IDENTITY,
+            semantic_id: None,
+        });
+
+        match delta_f.convert_value_to(18.0, &delta_k) {
+            TypeJudgement::Valid(value) => assert!((value - 10.0).abs() < 1e-12),
+            other => panic!("unexpected temperature-difference conversion: {other:?}"),
+        }
+    }
+
+    #[test]
     fn unit_conversion_is_unknown_when_units_are_missing() {
         let metres = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH);
         let feet = metres.clone().with_unit(UnitRef {
