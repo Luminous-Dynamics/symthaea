@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 16;
+pub const SCHEMA_VERSION: u16 = 17;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-v25";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-v26";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -373,6 +373,10 @@ pub struct ObservationProvenanceRef {
     pub subject_id: String,
     /// Stable identity of the measurement/test activity.
     pub activity_id: String,
+    /// Stable identity of the measurand/quantity actually subject to measurement.
+    pub measurand_id: String,
+    /// Stable identity of the documented measurement/test procedure.
+    pub procedure_id: String,
     /// Digest of the underlying measurement record or canonical observation payload.
     pub record_digest: String,
     /// Optional measurement-system identity.
@@ -387,6 +391,8 @@ impl ObservationProvenanceRef {
         if self.observation_id.is_empty()
             || self.subject_id.is_empty()
             || self.activity_id.is_empty()
+            || self.measurand_id.is_empty()
+            || self.procedure_id.is_empty()
             || self.record_digest.is_empty()
             || self.calibration_chain_refs.is_empty()
             || self.calibration_chain_refs.iter().any(String::is_empty)
@@ -2780,6 +2786,8 @@ mod tests {
                 observation_id: format!("observation:{id}"),
                 subject_id: format!("fixture-subject:{id}"),
                 activity_id: format!("fixture-activity:{id}"),
+                measurand_id: format!("fixture-measurand:{id}"),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
                 record_digest: format!("fixture-record-digest:{id}"),
                 measurement_system_id: Some("fixture-measurement-system-v1".into()),
                 calibration_chain_refs: vec!["fixture-calibration-chain-v1".into()],
@@ -3030,6 +3038,35 @@ mod tests {
             updated.candidates[0].evidence_digest
         );
         assert_ne!(baseline.receipt.payload_hash, updated.receipt.payload_hash);
+    }
+
+    #[test]
+    fn observation_provenance_requires_measurand_and_procedure() {
+        let mut e = evidence(
+            "observation-metadata",
+            "source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        e.observation.as_mut().unwrap().measurand_id.clear();
+        assert_eq!(
+            e.validate().unwrap_err(),
+            AssessmentError::InvalidObservationProvenance
+        );
+
+        let mut e = evidence(
+            "observation-procedure",
+            "source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        e.observation.as_mut().unwrap().procedure_id.clear();
+        assert_eq!(
+            e.validate().unwrap_err(),
+            AssessmentError::InvalidObservationProvenance
+        );
     }
 
     #[test]
