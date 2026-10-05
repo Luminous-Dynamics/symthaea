@@ -580,7 +580,7 @@ fn cose_key_rejects_wrong_coordinate_length() {
     bytes.remove(pos + 4);
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&bytes),
-        Err(Rfc9942VdpError::InvalidEncoding)
+        Err(Rfc9942VdpError::InvalidEs256CoseKey)
     );
 }
 
