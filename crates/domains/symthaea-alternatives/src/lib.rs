@@ -5124,6 +5124,7 @@ mod tests {
             candidate_ids: vec!["direct-substitute".into(), "process-substitute".into()],
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "water-discrimination".into(),
+            measurand_id: "fixture-measurand:Water".into(),
                 left_candidate_id: "direct-substitute".into(),
                 right_candidate_id: "process-substitute".into(),
                 surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
@@ -5176,6 +5177,7 @@ mod tests {
             candidate_ids: vec!["does-not-exist".into(), "does-not-exist-2".into()],
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "invalid-target".into(),
+            measurand_id: "fixture-measurand:Water".into(),
                 left_candidate_id: "does-not-exist".into(),
                 right_candidate_id: "does-not-exist-2".into(),
                 surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
@@ -5228,6 +5230,7 @@ mod tests {
             candidate_ids: vec!["direct-substitute".into(), "process-substitute".into()],
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
+            measurand_id: "fixture-measurand:Water".into(),
                 left_candidate_id: "direct-substitute".into(),
                 right_candidate_id: "process-substitute".into(),
                 surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
@@ -5294,6 +5297,7 @@ mod tests {
             candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
+            measurand_id: "fixture-measurand:Water".into(),
                 left_candidate_id: "product-redesign".into(),
                 right_candidate_id: "process-substitute".into(),
                 surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
