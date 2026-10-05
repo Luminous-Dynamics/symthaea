@@ -104,9 +104,45 @@ pub fn select_most_informative_experiment<'a, H, E>(
         .map(|(_, experiment, value)| (experiment, value))
 }
 
+
+/// Select an experiment and emit an evidence-neutral reproducibility receipt.
+pub fn select_most_informative_experiment_with_receipt<'a, H, E, P, D>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    predict: P,
+    hypothesis_handoff_digest: impl Into<String>,
+    hypothesis_set_digest: impl Into<String>,
+    challenge_space_digest: impl Into<String>,
+    selector_revision: impl Into<String>,
+    selection_seed: u64,
+    challenge_digest: D,
+) -> Result<Option<(&'a E, ScientificInquirySelectionReceipt)>, String>
+where
+    P: Fn(&H, &E) -> Option<f64> + Copy,
+    D: Fn(&E) -> String,
+{
+    let Some((selected, predicted)) =
+        select_most_informative_experiment(candidates, hypotheses, predict)
+    else {
+        return Ok(None);
+    };
+
+    let receipt = ScientificInquirySelectionReceipt::new(
+        hypothesis_handoff_digest,
+        hypothesis_set_digest,
+        challenge_space_digest,
+        challenge_digest(selected),
+        selector_revision,
+        selection_seed,
+        predicted,
+    )?;
+    Ok(Some((selected, receipt)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+use symthaea_types::ScientificInquirySelectionReceipt;
     use crate::hdc::conjecture_engine::Expr;
 
     #[test]
