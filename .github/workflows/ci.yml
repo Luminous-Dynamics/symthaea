@@ -42,6 +42,41 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  nixward-typed-effect-migration-focused:
+    name: Nixward Typed Effect Migration Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check typed-effect formatting
+        run: cargo fmt --check -- crates/core/nixward/src/action/executor.rs crates/core/nixward/src/action/service_manager.rs crates/core/nixward/src/action/generation_manager.rs crates/core/nixward/src/action/flake_ops.rs crates/core/nixward/src/bin/nixward_daemon.rs
+
+      - name: Compile Nixward features and run typed-effect regressions
+        run: |
+          cargo check -p nixward --features cli
+          cargo check -p nixward --features daemon
+          cargo test -p nixward test_command_safety_levels --lib
+          cargo test -p nixward test_rollback_all_rebuild_variants --lib
+          cargo test -p nixward test_init_command --lib
+
+      - name: Confirm core producers no longer manufacture Custom effects
+        shell: bash
+        run: |
+          if rg -n 'NixOSCommand::Custom' \
+            crates/core/nixward/src/action/service_manager.rs \
+            crates/core/nixward/src/action/generation_manager.rs \
+            crates/core/nixward/src/action/flake_ops.rs \
+            crates/core/nixward/src/bin/nixward_daemon.rs; then
+            echo 'A migrated core producer still manufactures an ungoverned Custom effect.' >&2
+            exit 1
+          fi
   nixward-typed-effects-focused:
     name: Nixward Typed Effects Focused
     runs-on: ubuntu-latest
