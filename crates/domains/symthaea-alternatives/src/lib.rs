@@ -404,11 +404,56 @@ impl ObservationProvenanceRef {
     }
 }
 
+/// Quantitative uncertainty statement attached to an observation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum MeasurementUncertaintyStatement {
+    /// Combined standard uncertainty.
+    Standard { value: f64, unit: String },
+    /// Expanded uncertainty with an explicit coverage factor.
+    Expanded { value: f64, unit: String, coverage_factor: f64 },
+}
+
+impl MeasurementUncertaintyStatement {
+    /// Validate the quantitative uncertainty statement.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        match self {
+            Self::Standard { value, unit } => {
+                if !value.is_finite() || *value < 0.0 || unit.is_empty() {
+                    return Err(AssessmentError::InvalidMeasurementUncertainty);
+                }
+            }
+            Self::Expanded {
+                value,
+                unit,
+                coverage_factor,
+            } => {
+                if !value.is_finite()
+                    || *value < 0.0
+                    || unit.is_empty()
+                    || !coverage_factor.is_finite()
+                    || *coverage_factor <= 0.0
+                {
+                    return Err(AssessmentError::InvalidMeasurementUncertainty);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn unit(&self) -> &str {
+        match self {
+            Self::Standard { unit, .. } | Self::Expanded { unit, .. } => unit,
+        }
+    }
+}
+
 /// Machine-readable reference to the uncertainty analysis accompanying an observation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MeasurementUncertaintyRef {
     /// Stable identity of the uncertainty statement.
     pub uncertainty_id: String,
+    /// Quantitative statement reported with the observation.
+    pub statement: MeasurementUncertaintyStatement,
     /// Method used to evaluate the stated uncertainty.
     pub method_id: String,
     /// References to the uncertainty components or source records considered.
@@ -418,7 +463,7 @@ pub struct MeasurementUncertaintyRef {
 }
 
 impl MeasurementUncertaintyRef {
-    /// Validate the structural uncertainty-analysis reference.
+    /// Validate the structural and quantitative uncertainty statement.
     pub fn validate(&self) -> Result<(), AssessmentError> {
         if self.uncertainty_id.is_empty()
             || self.method_id.is_empty()
@@ -428,6 +473,7 @@ impl MeasurementUncertaintyRef {
         {
             return Err(AssessmentError::InvalidMeasurementUncertainty);
         }
+        self.statement.validate()?;
         Ok(())
     }
 }
@@ -493,7 +539,18 @@ impl EvidenceRecord {
             (None, false) => {}
         }
         match (&self.uncertainty, observation_required) {
-            (Some(uncertainty), _) => uncertainty.validate()?,
+            (Some(uncertainty), _) => {
+                uncertainty.validate()?;
+                if let Some(unit) = &self.unit {
+                    if uncertainty.statement.unit() != unit {
+                        return Err(AssessmentError::MeasurementUncertaintyUnitMismatch {
+                            evidence_id: self.id.clone(),
+                            evidence_unit: unit.clone(),
+                            uncertainty_unit: uncertainty.statement.unit().to_string(),
+                        });
+                    }
+                }
+            }
             (None, true) => return Err(AssessmentError::MissingMeasurementUncertainty(self.kind)),
             (None, false) => {}
         }
@@ -1877,6 +1934,15 @@ pub enum AssessmentError {
     MissingMeasurementUncertainty(EvidenceKind),
     /// Measurement-uncertainty reference is structurally incomplete.
     InvalidMeasurementUncertainty,
+    /// Stated measurement uncertainty uses a different unit from the evidence.
+    MeasurementUncertaintyUnitMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Evidence unit.
+        evidence_unit: String,
+        /// Stated uncertainty unit.
+        uncertainty_unit: String,
+    },
     /// A burden references unknown evidence.
     MissingEvidenceReference(String),
     /// Requested incumbent does not exist.
@@ -2004,6 +2070,14 @@ impl std::fmt::Display for AssessmentError {
             Self::InvalidMeasurementUncertainty => {
                 write!(f, "measurement uncertainty reference is incomplete")
             }
+            Self::MeasurementUncertaintyUnitMismatch {
+                evidence_id,
+                evidence_unit,
+                uncertainty_unit,
+            } => write!(
+                f,
+                "evidence {evidence_id} unit {evidence_unit} does not match uncertainty unit {uncertainty_unit}"
+            ),
             Self::MissingEvidenceReference(id) => {
                 write!(f, "missing evidence reference {id}")
             }
@@ -2719,6 +2793,11 @@ mod tests {
             )
             .then(|| MeasurementUncertaintyRef {
                 uncertainty_id: format!("uncertainty:{id}"),
+                statement: MeasurementUncertaintyStatement::Expanded {
+                    value: 0.1,
+                    unit: "unit".into(),
+                    coverage_factor: 2.0,
+                },
                 method_id: "fixture-uncertainty-method-v1".into(),
                 component_refs: vec!["fixture-uncertainty-component-v1".into()],
                 record_digest: format!("fixture-uncertainty-digest:{id}"),
@@ -2967,6 +3046,28 @@ mod tests {
             e.validate().unwrap_err(),
             AssessmentError::MissingMeasurementUncertainty(EvidenceKind::Observed)
         );
+    }
+
+    #[test]
+    fn measurement_uncertainty_unit_mismatch_fails_closed() {
+        let mut e = evidence(
+            "uncertainty-unit-mismatch",
+            "source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        e.uncertainty
+            .as_mut()
+            .unwrap()
+            .statement = MeasurementUncertaintyStatement::Standard {
+            value: 0.1,
+            unit: "different-unit".into(),
+        };
+        assert!(matches!(
+            e.validate().unwrap_err(),
+            AssessmentError::MeasurementUncertaintyUnitMismatch { .. }
+        ));
     }
 
     #[test]
