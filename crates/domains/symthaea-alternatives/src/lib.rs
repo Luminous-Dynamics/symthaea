@@ -530,6 +530,21 @@ impl CandidatePathway {
             .iter()
             .map(|e| e.id.as_str())
             .collect::<BTreeSet<_>>();
+        if evidence_ids.len() != self.evidence.len() {
+            let duplicate = self
+                .evidence
+                .iter()
+                .find(|evidence| {
+                    self.evidence
+                        .iter()
+                        .filter(|other| other.id == evidence.id)
+                        .count()
+                        > 1
+                })
+                .map(|evidence| evidence.id.clone())
+                .unwrap_or_default();
+            return Err(AssessmentError::DuplicateEvidenceId(duplicate));
+        }
         for performance in self.performance.values() {
             for evidence_id in &performance.evidence_ids {
                 let Some(evidence) = self.evidence.iter().find(|e| e.id == *evidence_id) else {
@@ -1229,6 +1244,8 @@ pub enum AssessmentError {
     MissingIncumbent(String),
     /// Two candidates have the same stable identifier.
     DuplicateCandidateId(String),
+    /// Two evidence records within one candidate have the same stable identifier.
+    DuplicateEvidenceId(String),
     /// Evidence provenance source identity is incomplete.
     EmptySourceIdentity,
     /// A requirement set contains no requirements.
@@ -1317,6 +1334,7 @@ impl std::fmt::Display for AssessmentError {
             }
             Self::MissingIncumbent(id) => write!(f, "incumbent {id} not found"),
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate id {id}"),
+            Self::DuplicateEvidenceId(id) => write!(f, "duplicate evidence id {id}"),
             Self::EmptySourceIdentity => write!(f, "evidence source identity is incomplete"),
             Self::EmptyRequirementSet => write!(f, "requirement set is empty"),
             Self::RequirementSetKeyMismatch { key, requirement_id } => write!(
@@ -2630,6 +2648,27 @@ mod tests {
 
         assert_eq!(first, second);
         assert_eq!(first.pareto_frontier, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn duplicate_evidence_id_fails_closed() {
+        let mut c = candidate(
+            "duplicate-evidence",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![
+                evidence("same", "source-a", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("same", "source-b", EvidenceKind::Reported, EvidenceStance::Supports, 0.9),
+            ],
+        );
+
+        let error = AlternativesEngine.assess(&fixture_requirement(), &[c.clone()], None).unwrap_err();
+        assert_eq!(error, AssessmentError::DuplicateEvidenceId("same".into()));
+
+        c.evidence.reverse();
+        let error = AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap_err();
+        assert_eq!(error, AssessmentError::DuplicateEvidenceId("same".into()));
     }
 
     #[test]
