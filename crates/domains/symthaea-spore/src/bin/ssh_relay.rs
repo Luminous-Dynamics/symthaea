@@ -4334,12 +4334,11 @@ echo '}'
                 let wc_config_path = format!("/tmp/symthaea-newconfig-{}.nix", wc_session_id);
                 let wc_script_path = format!("/tmp/symthaea-rebuild-{}.sh", wc_session_id);
                 let wc_log_path = format!("/tmp/symthaea-rebuild-{}.log", wc_session_id);
-                // Upload config as a script that does atomic backup → write → validate → rebuild
-                let upload = format!(
-                    "cat > {} << 'NIXCONF'\n{}\nNIXCONF",
-                    wc_config_path, client_msg.configuration_nix
-                );
-                if let Err(e) = run_cmd(&upload).await {
+                // Stage browser-supplied Nix directly as bytes. Do not
+                // interpolate untrusted configuration into shell heredoc source.
+                if let Err(e) =
+                    tokio::fs::write(&wc_config_path, client_msg.configuration_nix.as_bytes()).await
+                {
                     let _ = ws_tx
                         .send(Message::Text(
                             RelayMessage::error(&format!("Upload failed: {}", e)).to_json(),
