@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 5;
+pub const SCHEMA_VERSION: u16 = 6;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-v9";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-v10";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -228,11 +228,8 @@ impl EvidenceSourceIdentity {
 
     /// Derive the stable identity used when counting independent authorities.
     pub fn independence_id(&self) -> String {
-        let payload = (
-            &self.authority_id,
-            self.issuer_key_fingerprint.as_deref().unwrap_or(""),
-        );
-        let bytes = serde_json::to_vec(&payload).expect("source identity is serializable");
+        let bytes = serde_json::to_vec(&self.authority_id)
+            .expect("source authority identity is serializable");
         let mut hasher = Hasher::new();
         hasher.update(&bytes);
         hasher.finalize().to_hex().to_string()
@@ -2656,6 +2653,10 @@ mod tests {
 
         assert_eq!(a.independence_id(), b.independence_id());
         assert_ne!(a.independence_id(), c.independence_id());
+
+        let mut rotated_key = a.clone();
+        rotated_key.issuer_key_fingerprint = Some("new-key".into());
+        assert_eq!(a.independence_id(), rotated_key.independence_id());
     }
 
     #[test]
