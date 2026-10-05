@@ -118,9 +118,6 @@ pub struct NeurosemanticHandlingPolicy {
     /// BLAKE3-256 digest of the exact externally authoritative policy/consent record bytes
     /// (or its separately specified canonical form). This is a binding, not an authority signature.
     pub policy_provenance_hash: String,
-    /// BLAKE3-256 digest of the exact externally authoritative policy/consent record bytes
-    /// (or its separately specified canonical form). This is a binding, not an authority signature.
-    pub policy_provenance_hash: String,
     /// Jurisdiction identifier asserted for the originating data/controller context.
     /// This is an interoperable policy identifier, not a legal determination.
     pub origin_jurisdiction: String,
