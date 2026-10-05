@@ -3085,7 +3085,19 @@ fi
             // ── Pre-install validation checklist ──
             "pre_install_check" => {
                 eprintln!("[{}] Running pre-install checks...", peer_addr);
-                let disk = client_msg.disk.clone();
+                let disk = if client_msg.disk.is_empty() {
+                    String::new()
+                } else {
+                    match validate_disk_path(&client_msg.disk) {
+                        Ok(disk) => disk,
+                        Err(e) => {
+                            let _ = ws_tx
+                                .send(Message::Text(RelayMessage::error(&e).to_json()))
+                                .await;
+                            continue;
+                        }
+                    }
+                };
                 let check_script = format!(
                     r#"
 echo '{{"checks": ['
