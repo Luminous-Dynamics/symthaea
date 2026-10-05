@@ -248,8 +248,8 @@ pub struct PendingPrediction {
 pub enum AutoResolveType {
     /// Check if a file exists
     FileExists(String),
-    /// Check if a command succeeds
-    CommandSucceeds(String),
+    /// Check if a read-only command succeeds; mutating and unknown commands are rejected.
+    ReadOnlyCommandSucceeds(String),
     /// Check if a port is open
     PortOpen(String, u16),
     /// Check if a service is running
@@ -692,10 +692,15 @@ impl MagiLoopRuntime {
     async fn check_auto_resolve(&self, auto: &AutoResolveType) -> Option<bool> {
         match auto {
             AutoResolveType::FileExists(path) => Some(std::path::Path::new(path).exists()),
-            AutoResolveType::CommandSucceeds(cmd) => {
-                let output = tokio::process::Command::new("sh")
-                    .arg("-c")
-                    .arg(cmd)
+            AutoResolveType::ReadOnlyCommandSucceeds(cmd) => {
+                let (program, args) = crate::action::parse_command_line(cmd).ok()?;
+                if crate::action::classify_remote_command_capability(&program, &args).ok()?
+                    != crate::action::RemoteCommandCapability::ReadOnly
+                {
+                    return None;
+                }
+                let output = tokio::process::Command::new(&program)
+                    .args(&args)
                     .output()
                     .await
                     .ok()?;
