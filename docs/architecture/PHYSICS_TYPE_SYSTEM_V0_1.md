@@ -55,7 +55,7 @@ Reuse the existing seven-base-dimension exponent representation. Multiplication 
 
 ### Unit and scale
 
-Separate coherent SI representation from display/conversion units. Unit conversion must not silently change physical meaning.
+Separate coherent SI representation from display/conversion units. Unit conversion must not silently change physical meaning. A unit descriptor carries an explicit affine transform to the chosen canonical representation. Offset-bearing units must not be modeled as pure multiplicative scales.
 
 ### Scalar domain
 
@@ -167,30 +167,35 @@ No partnership or endorsement is implied by this RFC.
 
 ## First vertical slice
 
-1. PhysicalType data structure.
-2. Quantity-kind enum.
-3. Reuse DimensionalSignature.
-4. TypeJudgement::{Valid, Invalid, Unknown}.
-5. Arithmetic rules for Add/Sub/Mul/Div/Pow.
-6. Basic function/domain checks.
-7. Time-derivative dimension inference.
-8. Integration with random_expr_with_dimension.
-9. Structured diagnostics.
-10. Deterministic serialization/digest for evidence receipts.
+Implemented on the RFC branch through exact head `2be0680b21480ac73d68f47410fdff5d06b61b13`:
+
+1. Shared `symthaea-types::physical_type` kernel with `PhysicalType`.
+2. Quantity-kind enum separated from dimensional signature.
+3. Shared seven-base-dimension `PhysicalDimension`.
+4. `TypeJudgement::{Valid, Invalid, Unknown}`.
+5. Arithmetic rules for Add/Sub/Mul/Div/Pow in the physics bridge expression layer.
+6. Function/domain checks for sin/cos/exp/log/sqrt.
+7. Explicit unknown dimensions; unknown is never encoded as dimensionless.
+8. Explicit quantity annotations so same-dimension quantities such as Energy and Torque remain semantically distinct.
+9. Deterministic canonical JSON bytes plus BLAKE3 digest for physical-type receipts.
+10. Typed simulation quantities and typed multi-physics ports, while preserving legacy string APIs.
+11. Explicit stage-to-stage typed connections so topology is not inferred from a globally unique signal name.
+12. Ontology-neutral semantic identifiers for future QUDT/SysML/domain-catalog mappings.
+13. Rational affine unit transforms, including scale and offset.
+
+Still intentionally outstanding from this list: direct typed differentiation, typed EquationNode, typed-generation integration, and formal/executable equivalence binding.
+
+The shared kernel is deliberately free of solver and AST dependencies. Expression inference remains in `symthaea-physics-bridge`, which consumes the common semantic types.
 
 The success criterion is not a larger unit catalog. It is that the same candidate receives the same physical judgment everywhere it appears.
 
 ## References
 
+- QUDT Catalog, latest published release (3.5.2, September 2026): https://www.qudt.org/catalog/qudt-catalog.html
+- QUDT Quantity Kinds: https://www.qudt.org/doc/2026/09/DOC_VOCAB-QUANTITY-KINDS.html
+- QUDT Dimension Vectors: https://www.qudt.org/doc/2026/09/DOC_VOCAB-DIMENSION-VECTORS.html
+- FMI 3.0.2 Specification, UnitDefinitions: https://fmi-standard.org/docs/3.0.2/
 - Lanyon AI, Our Vision (2026): https://www.lanyon.ai/blog/vision/
-- Lanyon AI, Formulary (2026): https://www.lanyon.ai/research/formulary/
-- Modelica Language Specification, Unit Expressions: https://specification.modelica.org/master/unit-expressions.html
-- uom Rust crate: https://docs.rs/uom/
-- dimensioned Rust crate: https://docs.rs/dimensioned/
-- Bobbin et al., Formalizing dimensional analysis using the Lean theorem prover (2025): https://arxiv.org/abs/2509.13142
-- SAIUnit, Nature Communications (2025): https://www.nature.com/articles/s41467-025-58626-4
-
-
 ## Engineering integration
 
 Engineering is a primary consumer of the physical type system, not a downstream application.
@@ -210,7 +215,7 @@ The existing engineering faculty already contains independent physical models fo
 - digital-twin telemetry;
 - solver-agnostic multi-physics orchestration.
 
-The current interface is partly stringly typed. For example, simulation parameters and metrics use unit strings, and coupled solver stages exchange `consumes`/`produces` names as free-form strings.
+The current interface is partly stringly typed. For example, simulation parameters and metrics use unit strings, and coupled solver stages exchange `consumes`/`produces` names as free-form strings. The transition path is additive: typed fields coexist with legacy fields, so adapters can migrate without a flag-day API break.
 
 The type-system integration should therefore make the physical quantity itself first-class:
 
@@ -224,14 +229,16 @@ TypedQuantity {
 }
 ```
 
-A multi-physics edge should become a typed transformation:
+A multi-physics edge should become an explicit typed topology:
 
 ```text
-producer output
-      -> type judgment
+producer stage + output port
+      -> physical compatibility judgment
       -> optional explicit transform
-      -> consumer input
+      -> consumer stage + input port
 ```
+
+The v0.1 simulation bridge implements this boundary with `TypedPhysicalPort` and `TypedPhysicalConnection`. Unknown semantics fail closed during typed-topology validation.
 
 This prevents physically incompatible coupling from surviving until an external solver is invoked.
 
@@ -338,3 +345,22 @@ ScientificModel {
 Engineering safety gates can require a minimum maturity/evidence class without preventing exploratory research from using lower-maturity models.
 
 Related: #6871.
+## Interoperability design note
+
+QUDT 3.5.2 publishes distinct vocabularies for Quantity Kinds, Units, and Dimension Vectors. FMI 3.0.2 likewise carries unit exponents plus scale factors and offsets in model descriptions.
+
+Symthaea therefore keeps the core representation compact and solver-neutral:
+
+```text
+PhysicalType
+  = quantity kind
+  + optional dimension
+  + optional unit transform
+  + scalar domain
+  + refinements
+  + optional external semantic identifier
+```
+
+A future QUDT adapter can map `SemanticIdentifier { namespace, identifier }` to a QUDT QuantityKind/Unit URI without making QUDT a runtime dependency of the shared type crate.
+
+The current v0.1 dimension representation remains seven-base-SI for compatibility with the existing physics bridge. Angle/radian semantics are represented through `QuantityKind::Angle`; extending the dimension vector with an explicit angle component should be deliberate schema evolution rather than an incidental field addition.
