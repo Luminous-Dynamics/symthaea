@@ -373,6 +373,120 @@ impl LanyonSpecificationBundle {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LanyonVerificationStatus {
+    NotObserved,
+    Passed,
+    Failed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LanyonArtifactKind {
+    LeanProof,
+    CImplementation,
+    Other,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LanyonVerificationArtifact {
+    pub kind: LanyonArtifactKind,
+    pub digest: String,
+    pub locator: String,
+}
+
+impl LanyonVerificationArtifact {
+    pub fn new(
+        kind: LanyonArtifactKind,
+        digest: impl Into<String>,
+        locator: impl Into<String>,
+    ) -> Result<Self, String> {
+        let artifact = Self {
+            kind,
+            digest: digest.into(),
+            locator: locator.into(),
+        };
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        validate_digest(&self.digest)?;
+        if self.locator.trim().is_empty() {
+            return Err("verification artifact locator cannot be empty".into());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LanyonVerificationReceipt {
+    pub schema_revision: String,
+    pub bundle_digest: String,
+    pub status: LanyonVerificationStatus,
+    pub verifier: String,
+    pub verifier_revision: String,
+    pub claims: Vec<String>,
+    pub artifacts: Vec<LanyonVerificationArtifact>,
+}
+
+impl LanyonVerificationReceipt {
+    pub const SCHEMA_REVISION: &str = "LANYON_VERIFICATION_RECEIPT.v1";
+
+    pub fn new(
+        bundle: &LanyonSpecificationBundle,
+        status: LanyonVerificationStatus,
+        verifier: impl Into<String>,
+        verifier_revision: impl Into<String>,
+        claims: Vec<String>,
+        artifacts: Vec<LanyonVerificationArtifact>,
+    ) -> Result<Self, String> {
+        bundle.validate()?;
+        let receipt = Self {
+            schema_revision: Self::SCHEMA_REVISION.into(),
+            bundle_digest: bundle.digest_hex()?,
+            status,
+            verifier: verifier.into(),
+            verifier_revision: verifier_revision.into(),
+            claims,
+            artifacts,
+        };
+        receipt.validate()?;
+        Ok(receipt)
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_revision != Self::SCHEMA_REVISION {
+            return Err("unsupported Lanyon verification receipt schema".into());
+        }
+        validate_digest(&self.bundle_digest)?;
+        if self.verifier.trim().is_empty() || self.verifier_revision.trim().is_empty() {
+            return Err("verification receipt requires verifier identity and revision".into());
+        }
+        if self.claims.is_empty() || self.claims.iter().any(|claim| claim.trim().is_empty()) {
+            return Err("verification receipt requires non-empty claims".into());
+        }
+        for artifact in &self.artifacts {
+            artifact.validate()?;
+        }
+        if self.status == LanyonVerificationStatus::Passed {
+            if !self.artifacts.iter().any(|artifact| artifact.kind == LanyonArtifactKind::LeanProof) {
+                return Err("passed verification requires a Lean proof artifact digest".into());
+            }
+            if !self.artifacts.iter().any(|artifact| artifact.kind == LanyonArtifactKind::CImplementation) {
+                return Err("passed verification requires a C implementation artifact digest".into());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        serde_json::to_vec(self).expect("Lanyon verification receipt serialization is infallible")
+    }
+
+    pub fn digest_hex(&self) -> String {
+        blake3::hash(&self.canonical_bytes()).to_hex().to_string()
+    }
+}
 fn validate_names(kind: &str, names: &[String], allow_empty: bool) -> Result<(), String> {
     if names.is_empty() && !allow_empty {
         return Err(format!("Lanyon {kind} list cannot be empty"));
@@ -619,6 +733,55 @@ mod tests {
     fn sum_rejects_unsupported_ast() {
         let expr = Expr::Sum(Box::new(Expr::Var("f".into())), "k".into());
         assert!(expr_to_lanyon_form(&expr).is_err());
+    }
+
+    #[test]
+    fn verification_receipt_binds_exact_bundle_digest() {
+        let bundle = LanyonSpecificationBundle::new(fixture(), vec![LanyonPhysicalBinding::new(
+            "c",
+            PhysicalType::with_kind(QuantityKind::Velocity, PhysicalDimension::VELOCITY),
+        ).unwrap()]).unwrap();
+
+        let receipt = LanyonVerificationReceipt::new(
+            &bundle,
+            LanyonVerificationStatus::Passed,
+            "lanyon",
+            "public-verifier-v1",
+            vec!["formal verification observed for this exact bundle".into()],
+            vec![
+                LanyonVerificationArtifact::new(
+                    LanyonArtifactKind::LeanProof,
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "artifact://proof",
+                ).unwrap(),
+                LanyonVerificationArtifact::new(
+                    LanyonArtifactKind::CImplementation,
+                    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    "artifact://solver",
+                ).unwrap(),
+            ],
+        ).unwrap();
+
+        assert_eq!(receipt.bundle_digest, bundle.digest_hex().unwrap());
+        assert!(receipt.validate().is_ok());
+    }
+
+    #[test]
+    fn passed_verification_requires_both_public_artifact_classes() {
+        let bundle = LanyonSpecificationBundle::new(fixture(), Vec::new()).unwrap();
+        let result = LanyonVerificationReceipt::new(
+            &bundle,
+            LanyonVerificationStatus::Passed,
+            "lanyon",
+            "public-verifier-v1",
+            vec!["formal verification observed".into()],
+            vec![LanyonVerificationArtifact::new(
+                LanyonArtifactKind::LeanProof,
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "artifact://proof",
+            ).unwrap()],
+        );
+        assert!(result.is_err());
     }
 
     #[test]
