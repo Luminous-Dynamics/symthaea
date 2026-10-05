@@ -1685,62 +1685,11 @@ impl ObservationGraph {
         let bytes = self.independence_verification_scope_canonical_bytes()?;
         Ok(blake3::hash(&bytes).to_hex().to_string())
     }
-    /// Return the observation IDs that can be reached by the bounded independence
-    /// predicate from the requested source/target pair.
-    ///
-    /// This helper is intentionally additive and is not used by the frozen v2
-    /// scope fingerprint. It defines the candidate reachable subject set for the
-    /// next versioned, predicate-relative scope contract:
-    ///
-    /// source + target + recursively reachable parents.
-    ///
-    /// It is still evaluated over the validated closed-world graph so missing
-    /// parents/cycles/duplicate IDs cannot produce a misleading reachable scope.
-    pub fn independence_verification_reachable_scope_observation_ids(
+    fn independence_reachable_scope_roles(
         &self,
         source_observation_id: &str,
         target_observation_id: &str,
-    ) -> Result<Vec<String>, ObservationValidationError> {
-        self.validate()?;
-        if source_observation_id == target_observation_id {
-            return Err(ObservationValidationError::SelfRelation);
-        }
-
-        let by_id = self
-            .observations
-            .iter()
-            .map(|observation| (observation.id.as_str(), observation))
-            .collect::<HashMap<_, _>>();
-
-        by_id.get(source_observation_id).ok_or_else(|| {
-            ObservationValidationError::MissingRelationEndpoint(source_observation_id.to_string())
-        })?;
-        by_id.get(target_observation_id).ok_or_else(|| {
-            ObservationValidationError::MissingRelationEndpoint(target_observation_id.to_string())
-        })?;
-
-        let mut reachable = HashSet::new();
-        reachable.insert(source_observation_id.to_string());
-        reachable.insert(target_observation_id.to_string());
-        reachable.extend(Self::ancestor_ids(source_observation_id, &by_id)?);
-        reachable.extend(Self::ancestor_ids(target_observation_id, &by_id)?);
-
-        let mut reachable = reachable.into_iter().collect::<Vec<_>>();
-        reachable.sort();
-        Ok(reachable)
-    }
-
-    /// Return canonical bytes for the predicate-relative v3 independence scope.
-    ///
-    /// v3 is additive: the frozen v2 scope and existing v2 receipts are untouched.
-    /// Only observations reachable from the requested source/target pair are included.
-    /// Source/target observations include fields directly consumed by the predicate;
-    /// ancestor-only observations include only lineage traversal and activity identity.
-    pub fn independence_verification_reachable_scope_canonical_bytes_v3(
-        &self,
-        source_observation_id: &str,
-        target_observation_id: &str,
-    ) -> Result<Vec<u8>, ObservationValidationError> {
+    ) -> Result<HashMap<String, u8>, ObservationValidationError> {
         self.validate()?;
         if source_observation_id == target_observation_id {
             return Err(ObservationValidationError::SelfRelation);
@@ -1775,6 +1724,52 @@ impl ObservationGraph {
                 .and_modify(|role| *role |= ANCESTOR_ROLE)
                 .or_insert(ANCESTOR_ROLE);
         }
+
+        Ok(roles)
+    }
+
+    /// Return the observation IDs that can be reached by the bounded independence
+    /// predicate from the requested source/target pair.
+    ///
+    /// This helper is intentionally additive and is not used by the frozen v2
+    /// scope fingerprint. It defines the candidate reachable subject set for the
+    /// next versioned, predicate-relative scope contract:
+    ///
+    /// source + target + recursively reachable parents.
+    ///
+    /// It is still evaluated over the validated closed-world graph so missing
+    /// parents/cycles/duplicate IDs cannot produce a misleading reachable scope.
+    pub fn independence_verification_reachable_scope_observation_ids(
+        &self,
+        source_observation_id: &str,
+        target_observation_id: &str,
+    ) -> Result<Vec<String>, ObservationValidationError> {
+        let roles =
+            self.independence_reachable_scope_roles(source_observation_id, target_observation_id)?;
+        let mut reachable = roles.into_keys().collect::<Vec<_>>();
+        reachable.sort();
+        Ok(reachable)
+    }
+
+    /// Return canonical bytes for the predicate-relative v3 independence scope.
+    ///
+    /// v3 is additive: the frozen v2 scope and existing v2 receipts are untouched.
+    /// Only observations reachable from the requested source/target pair are included.
+    /// Source/target observations include fields directly consumed by the predicate;
+    /// ancestor-only observations include only lineage traversal and activity identity.
+    pub fn independence_verification_reachable_scope_canonical_bytes_v3(
+        &self,
+        source_observation_id: &str,
+        target_observation_id: &str,
+    ) -> Result<Vec<u8>, ObservationValidationError> {
+        let roles =
+            self.independence_reachable_scope_roles(source_observation_id, target_observation_id)?;
+
+        let by_id = self
+            .observations
+            .iter()
+            .map(|observation| (observation.id.as_str(), observation))
+            .collect::<HashMap<_, _>>();
 
         let mut examined_observation_ids = roles.keys().cloned().collect::<Vec<_>>();
         examined_observation_ids.sort();
