@@ -18,7 +18,8 @@ The model is:
 10. Derive an explicit qualification ceiling from evidence actually linked to every burden dimension and every required functional metric.
 11. Emit a deterministic assessment receipt, including the assessment timestamp when supplied.
 12. Require reproducible derivation metadata for simulated/derived evidence.
-13. Identify a conservative next-measurement target from unresolved uncertainty.
+13. Intersect eligibility across every required function while keeping each requirement assessment separate and auditable.
+14. Identify a conservative next-measurement target from unresolved uncertainty.
 
 The design is intended to compose later with Mycelix manufacturing/BOM/routing records and a federated evidence graph, while remaining independent of Holochain versioning. The Pareto frontier is a candidate comparison set, not a recommendation or deployment authorization. Functional performance and operating capabilities use conservative intervals rather than midpoint-based pass/fail. A required operating envelope must be fully covered; partial temperature/pressure/load coverage is unresolved or failed rather than extrapolated. Time-bounded evidence is ignored by timeless assessments and evaluated only when the caller supplies an explicit assessment timestamp.
 
