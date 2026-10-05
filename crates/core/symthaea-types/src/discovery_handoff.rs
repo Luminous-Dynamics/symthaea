@@ -401,15 +401,30 @@ impl ScientificInquiryExecutionReceipt {
 
     pub fn new(
         selection_receipt: &ScientificInquirySelectionReceipt,
+        prediction_frame: &PhysicalType,
         execution_manifest_digest: impl Into<String>,
         observation_digest: impl Into<String>,
         observation_physical_type: &PhysicalType,
         evaluator_revision: impl Into<String>,
     ) -> Result<Self, String> {
-        selection_receipt.validate()?;
+        selection_receipt.validate_against_prediction_frame(prediction_frame)?;
         observation_physical_type
             .validate()
             .map_err(|error| format!("invalid observation physical type: {}", error.reason))?;
+        match observation_physical_type.judge_numeric_compatibility(prediction_frame) {
+            TypeJudgement::Valid(()) => {}
+            TypeJudgement::Invalid(error) => {
+                return Err(format!(
+                    "observation physical type is incompatible with prediction frame: {}",
+                    error.reason
+                ));
+            }
+            TypeJudgement::Unknown(reason) => {
+                return Err(format!(
+                    "observation numeric compatibility is unknown: {reason}"
+                ));
+            }
+        }
         let receipt = Self {
             schema_revision: Self::SCHEMA_REVISION.into(),
             selection_receipt_digest: selection_receipt.digest_hex(),
@@ -492,7 +507,12 @@ mod tests {
 
     #[test]
     fn execution_receipt_binds_selection_and_observation_identity() {
-        let frame = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH);
+        let frame = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH)
+            .with_unit(UnitRef {
+                symbol: "m".into(),
+                transform_to_si: UnitTransform::IDENTITY,
+                semantic_id: None,
+            });
         let selection = ScientificInquirySelectionReceipt::new(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -506,8 +526,9 @@ mod tests {
             2,
         )
         .unwrap();
-        let execution = ScientificInquiryExecutionReceipt::new(
+        let observation = ScientificInquiryExecutionReceipt::new(
             &selection,
+            &frame,
             "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
             "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
             &frame,
@@ -515,15 +536,36 @@ mod tests {
         )
         .unwrap();
 
-        assert!(execution.validate().is_ok());
-        assert!(execution.validate_against_selection(&selection).is_ok());
-        assert_eq!(execution.selected_challenge_digest, selection.selected_challenge_digest);
-        assert_eq!(execution.prediction_frame_digest, selection.prediction_frame_digest);
+        assert!(observation.validate().is_ok());
+        assert!(observation.validate_against_selection(&selection).is_ok());
+        assert_eq!(
+            observation.selected_challenge_digest,
+            selection.selected_challenge_digest
+        );
+        assert_eq!(
+            observation.prediction_frame_digest,
+            selection.prediction_frame_digest
+        );
+        assert_ne!(observation.digest_hex(), selection.digest_hex());
 
-        let mut tampered = execution.clone();
-        tampered.selection_receipt_digest = "1111111111111111111111111111111111111111111111111111111111111111".into();
-        assert!(tampered.validate_against_selection(&selection).is_err());
+        let torque = PhysicalType::with_kind(
+            QuantityKind::Torque,
+            PhysicalDimension::ENERGY,
+        );
+        assert!(
+            ScientificInquiryExecutionReceipt::new(
+                &selection,
+                &frame,
+                "1111111111111111111111111111111111111111111111111111111111111111",
+                "2222222222222222222222222222222222222222222222222222222222222222",
+                &torque,
+                "evaluator-v1",
+            )
+            .is_err()
+        );
     }
+
+
     #[test]
     fn handoff_rejects_internally_incoherent_physical_type() {
         let malformed =
