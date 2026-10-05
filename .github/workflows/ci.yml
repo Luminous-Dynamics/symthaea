@@ -339,6 +339,39 @@ jobs:
           crates/domains/symthaea-muse/scripts/dryrun-cognition-study.sh \
             "$PWD/target/debug/cognitive_study"
 
+  alternatives:
+    name: Industrial Alternatives Engine
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-alternatives-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-alternatives-
+
+      # This crate is a standalone decision-support surface. It must be
+      # directly exercised; workspace-wide root tests do not imply that a
+      # newly-added domain crate was compiled or its tests were discovered.
+      - name: Test alternatives engine
+        run: cargo test -p symthaea-alternatives --all-targets
+
+      - name: Clippy alternatives engine
+        run: cargo clippy -p symthaea-alternatives --all-targets -- -D warnings
+
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
