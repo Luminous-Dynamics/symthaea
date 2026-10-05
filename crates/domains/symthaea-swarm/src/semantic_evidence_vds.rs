@@ -4443,6 +4443,16 @@ mod tests {
     }
 
     #[test]
+    fn rfc9942_vdp_accepts_65_wire_proofs_below_container_cap() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let proofs=vec![proof; 65];
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,proofs).unwrap();
+        let decoded=Rfc9942Vdp::from_cbor(&vdp.to_cbor()).unwrap();
+
+        assert_eq!(decoded.proofs().len(),65);
+    }
+
+    #[test]
     fn rfc9942_vdp_enforces_defensive_resource_bounds() {
         let valid=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
         let too_many=vec![valid.clone();MAX_RFC9942_PROOFS+1];
