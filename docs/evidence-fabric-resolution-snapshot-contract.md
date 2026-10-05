@@ -20,6 +20,8 @@ The additive v9 representation makes this distinction structural rather than rel
 The split does **not** establish evaluator independence, trust-root correctness, or authorization correctness. Those remain separate claims that require their own evidence and appraisal policy.
 
 The v9 outer evaluation fingerprint includes the supplement fingerprint, so an annotation change changes the v9 evidence identity without changing the execution-context fingerprint. Consumers that persist a supplement separately SHOULD retain its association with the corresponding v9 subject/report identity; the supplement is provenance metadata, not a portable authority to override another evaluation.
+Additionally, every v9 supplement is bound to the exact execution-context fingerprint it annotates. A structurally valid supplement with a foreign context binding is therefore rejected by v9 self-validation. This establishes association, not contemporaneity, evaluator independence, trust-root correctness, or authorization correctness.
+
 
 This structure follows the RATS architecture's distinction between verifier-side evidence appraisal inputs and later relying-party appraisal. Current RATS Attestation Result work likewise models contextual information as part of the appraisal result while keeping the relying party's subsequent policy decision distinct.
 
