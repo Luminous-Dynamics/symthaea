@@ -930,7 +930,10 @@ pub(crate) fn executor_command_requires_governed_authority(program: &str, args: 
 
         // `find` is observational until its executable actions are enabled;
         // those actions create a second argv execution layer.
-        "find" => args.iter().any(|arg| arg == "-exec" || arg == "-execdir"),
+                "find" => args.iter().any(|arg| matches!(arg.as_str(),
+            "-exec" | "-execdir" | "-ok" | "-okdir" | "-delete" | "-fprint" | "-fprint0"
+                | "-fprintf" | "-fls"
+        )),
 
         // Other well-known system lifecycle/configuration planes should not be
         // smuggled through a generic executable allowlist.
@@ -1871,6 +1874,18 @@ mod executor_authority_tests {
         assert!(executor_command_requires_governed_authority(
             "nix-shell",
             &args(&["-p", "hello", "--run", "systemctl restart sshd.service"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "find",
+            &args(&["/tmp", "-delete"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "find",
+            &args(&["/tmp", "-fprint", "/tmp/out"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "find",
+            &args(&["/tmp", "-ok", "systemctl", "restart", "sshd.service", ";"])
         ));
         assert!(!executor_command_requires_governed_authority(
             "find",
