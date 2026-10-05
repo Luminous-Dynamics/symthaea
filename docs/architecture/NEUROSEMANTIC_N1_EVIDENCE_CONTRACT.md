@@ -66,9 +66,10 @@ where cosine must be finite and lie in [-1, 1]. The score therefore lies in
 [0, 1], with larger values meaning less conformity. Calibration is also bound to
 a canonical hash of the complete candidate universe and its size, plus a hash of
 the exact sorted multiset of calibration scores. At inference, the supplied
-candidate universe must reproduce that hash exactly; a missing, extra, duplicate,
-or reordered candidate set therefore cannot silently reuse the threshold. The
-external calibration scores can be independently checked against their stored
+candidate universe must reproduce that hash exactly. Missing, extra, or duplicate
+candidate IDs therefore cannot silently reuse the threshold; reordering is
+allowed because the canonical universe hash is deliberately order-insensitive.
+The external calibration scores can be independently checked against their stored
 count and hash before an artifact is trusted. The primitive turns that complete,
 deterministic candidate universe into a set-valued prediction by including every
 candidate whose nonconformity is at most the calibrated q. Invalid identifiers or
@@ -89,8 +90,28 @@ candidate pool cannot inherit the intended coverage statement.
 Small calibration sets are structurally weak. At alpha=0.10, at least 19
 calibration cases are needed before the finite-sample rank can fall below the
 maximum observed nonconformity score; at alpha=0.05, the corresponding minimum
-is 39. N1 studies therefore need materially larger, independently generated
-calibration sets rather than the current three-case N0 calibration.
+is 39. The implementation also caps calibration cases and candidate identifiers
+at the same defensive resource boundary used by the N1 candidate universe. N1
+studies therefore need materially larger, independently generated calibration
+sets rather than the current three-case N0 calibration.
+
+### Distribution-shift boundary
+
+The current primitive assumes that the calibration and evaluation examples are
+exchangeable under the experiment's declared sampling design. The exact candidate
+universe requirement is a conservative operational restriction: it prevents a
+caller from silently changing the label/candidate space after calibration, but it
+does not establish robustness to participant, task, modality, temporal, covariate,
+or label shift.
+
+No N1 coverage claim should survive a detected exchangeability violation merely
+because the implementation still returns a prediction set. A future shift-aware
+revision must be preregistered with an explicit shift model, calibration rule,
+and efficiency/coverage evaluation; weighted split-conformal methods are one
+research direction under declared covariate-shift assumptions. Recent 2026 work
+also shows that nominal conformal coverage can degrade under distribution shift,
+which is why this boundary remains explicit here (Siahkali et al., arXiv:2602.14913;
+Pournaderi, arXiv:2609.33456).
 
 A conformal N1 artifact should bind at minimum:
 
