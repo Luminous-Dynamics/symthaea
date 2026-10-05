@@ -826,6 +826,11 @@ fn extract_relationship_methods(
 
         if method == request.verification_method {
             if let Some(controller) = relationship_controller {
+                let controller = resolve_document_url(
+                    &base,
+                    &controller,
+                    "verification relationship member controller",
+                )?;
                 let expected = document_ref;
                 if controller != expected {
                     return Err(SnapshotError::Verification(
@@ -1348,7 +1353,7 @@ mod tests {
             "assertionMethod": [{
                 "id": "#key-1",
                 "type": "Multikey",
-                "controller": "https://example.test/controller",
+                "controller": "controller",
                 "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
             }]
         }"##.into();
