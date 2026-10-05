@@ -577,10 +577,12 @@ mod tests {
             slow_samples > fast_samples,
             "scheduler must consume plan rate: slow={slow_samples}, fast={fast_samples}"
         );
+        let slow_frames = predict_duration("AH", 1, false, true, slow.rate);
+        let samples_per_frame = (voice.sample_rate() / FRAME_RATE) as usize;
         assert_eq!(
-            slow_samples as f64 / voice.sample_rate() as f64,
-            (slow_samples / voice.sample_rate() as usize) as f64,
-            "sample counts remain integral at the configured sample rate"
+            slow_samples,
+            slow_frames * samples_per_frame,
+            "scheduler sample count must equal deterministic frame count"
         );
     }
 
