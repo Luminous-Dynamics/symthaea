@@ -692,7 +692,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[test]
     fn test_switch_generation_is_system_critical_and_typed() {
         let command = NixOSCommand::SwitchGeneration { generation: 42 };
         assert_eq!(command.safety_level(), SafetyLevel::SystemCritical);
@@ -709,6 +708,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn test_command_safety_levels() {
         let search = NixOSCommand::Search {
             query: "vim".to_string(),
@@ -766,6 +766,7 @@ mod tests {
         assert_eq!(args, vec!["switch", "--rollback"]);
     }
 
+    #[test]
     fn test_rollback_commands() {
         let rebuild = NixOSCommand::RebuildSwitch {
             flake: None,
