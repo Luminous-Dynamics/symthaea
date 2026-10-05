@@ -673,6 +673,26 @@ mod tests {
     }
 
     #[test]
+    fn wire_verifier_rejects_negative_zero_before_verification() {
+        let request = vector_request();
+        let (resolution, resolved_method) = resolved_vector(&request);
+        let wire =
+            br#"{"proof":{"type":"DataIntegrityProof","cryptosuite":"eddsa-jcs-2022","verificationMethod":"ignored","proofPurpose":"assertionMethod","proofValue":"ignored"},"amount":-0}"#;
+
+        assert!(matches!(
+            verify_eddsa_jcs_2022_json(
+                &request,
+                &resolution,
+                &resolved_method,
+                wire,
+            ),
+            Err(SnapshotError::Verification(
+                VerificationFailure::Structural(message)
+            )) if message.contains("negative zero")
+        ));
+    }
+
+    #[test]
     fn strict_json_detects_duplicate_keys_after_unicode_escape_decoding() {
         let request = vector_request();
         let (resolution, resolved_method) = resolved_vector(&request);
