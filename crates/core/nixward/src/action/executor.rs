@@ -716,21 +716,8 @@ mod tests {
                 "42",
             ]
         );
-    #[test]
-    fn test_switch_generation_is_system_critical_and_typed() {
-        let command = NixOSCommand::SwitchGeneration { generation: 42 };
-        assert_eq!(command.safety_level(), SafetyLevel::SystemCritical);
-        let (bin, args) = command.to_command();
-        assert_eq!(bin, "nix-env");
-        assert_eq!(
-            args,
-            vec![
-                "--profile",
-                "/nix/var/nix/profiles/system",
-                "--switch-generation",
-                "42",
-            ]
-        );
+    }
+
     #[test]
     fn test_activate_generation_is_system_critical_and_typed() {
         let command = NixOSCommand::ActivateGeneration { generation: 42 };
@@ -741,8 +728,6 @@ mod tests {
             "/nix/var/nix/profiles/system-42-link/bin/switch-to-configuration"
         );
         assert_eq!(args, vec!["switch"]);
-    }
-
     }
 
     #[test]
@@ -789,7 +774,6 @@ mod tests {
         assert_eq!(args, vec!["search", "nixpkgs", "editor", "--json"]);
     }
 
-    #[test]
     #[test]
     fn test_rebuild_rollback_is_typed() {
         let rebuild = NixOSCommand::RebuildSwitch {
