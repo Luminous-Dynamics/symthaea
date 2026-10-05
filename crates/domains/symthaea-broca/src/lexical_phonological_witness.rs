@@ -414,22 +414,27 @@ mod tests {
     }
 
     #[test]
+    #[test]
     fn one_lexical_constituent_may_cover_multiple_segments() {
         let binding = binding();
-        let segments = vec![
-            PhonemeSlot::new("P0A", 0, crate::SyllableStress::Primary, true, false, true),
-            PhonemeSlot::new("P0B", 1, crate::SyllableStress::Primary, false, false, false),
-            PhonemeSlot::new("P1", 2, crate::SyllableStress::Primary, true, false, true),
-            PhonemeSlot::new("P2", 3, crate::SyllableStress::Primary, true, false, true),
-            PhonemeSlot::new("P3", 4, crate::SyllableStress::Primary, true, false, true),
-            PhonemeSlot::new("P4", 5, crate::SyllableStress::Primary, true, false, true),
-        ];
+        let segments = (0..=binding.constituents.len())
+            .map(|index| {
+                PhonemeSlot::new(
+                    format!("P{index}"),
+                    index,
+                    crate::SyllableStress::Primary,
+                    true,
+                    false,
+                    true,
+                )
+            })
+            .collect::<Vec<_>>();
 
         let mut mappings = Vec::new();
         mappings.push(LexicalPhonologicalMapping {
             lexical_position: 0,
             segment_indices: vec![0, 1],
-            symbols: vec!["P0A".into(), "P0B".into()],
+            symbols: vec!["P0".into(), "P1".into()],
         });
         for position in 1..binding.constituents.len() {
             mappings.push(LexicalPhonologicalMapping {
@@ -438,7 +443,6 @@ mod tests {
                 symbols: vec![segments[position + 1].symbol.clone()],
             });
         }
-        mappings.truncate(6);
 
         let witness = LexicalPhonologicalWitness::new(&binding, mappings)
             .expect("multi-segment lexical mapping should validate");
