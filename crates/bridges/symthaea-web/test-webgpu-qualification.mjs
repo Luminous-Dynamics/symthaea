@@ -521,6 +521,110 @@ async function rawWebGpuExecutionCanary(page) {
   });
 }
 
+async function screenshotRedStatistics(page, screenshotBuffer) {
+  const base64 = screenshotBuffer.toString('base64');
+  return page.evaluate(async dataUrl => {
+    const image = new Image();
+    image.src = 'data:image/png;base64,' + dataUrl;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      throw new Error('could not create screenshot probe context');
+    }
+    context.drawImage(image, 0, 0);
+    const rgba = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let nonRedPixels = 0;
+    let minRed = 255;
+    let maxGreen = 0;
+    let maxBlue = 0;
+    let minAlpha = 255;
+    for (let offset = 0; offset < rgba.length; offset += 4) {
+      const r = rgba[offset];
+      const g = rgba[offset + 1];
+      const b = rgba[offset + 2];
+      const a = rgba[offset + 3];
+      minRed = Math.min(minRed, r);
+      maxGreen = Math.max(maxGreen, g);
+      maxBlue = Math.max(maxBlue, b);
+      minAlpha = Math.min(minAlpha, a);
+      if (!(r >= 245 && g <= 10 && b <= 10 && a >= 250)) {
+        nonRedPixels++;
+      }
+    }
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      pixel_count: canvas.width * canvas.height,
+      non_red_pixels: nonRedPixels,
+      min_red: minRed,
+      max_green: maxGreen,
+      max_blue: maxBlue,
+      min_alpha: minAlpha,
+    };
+  }, base64);
+}
+
+async function screenshotPixelDelta(page, leftBuffer, rightBuffer) {
+  const leftBase64 = leftBuffer.toString('base64');
+  const rightBase64 = rightBuffer.toString('base64');
+  return page.evaluate(async ({ leftData, rightData }) => {
+    async function decode(data) {
+      const image = new Image();
+      image.src = 'data:image/png;base64,' + data;
+      await image.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('could not create screenshot comparison context');
+      context.drawImage(image, 0, 0);
+      return {
+        width: canvas.width,
+        height: canvas.height,
+        pixels: context.getImageData(0, 0, canvas.width, canvas.height).data,
+      };
+    }
+
+    const [left, right] = await Promise.all([decode(leftData), decode(rightData)]);
+    if (left.width !== right.width || left.height !== right.height) {
+      return {
+        comparable: false,
+        reason: 'screenshot dimensions differ',
+        width: left.width,
+        height: left.height,
+        right_width: right.width,
+        right_height: right.height,
+      };
+    }
+
+    let differingPixels = 0;
+    let maxChannelDelta = 0;
+    for (let offset = 0; offset < left.pixels.length; offset += 4) {
+      const delta = Math.max(
+        Math.abs(left.pixels[offset] - right.pixels[offset]),
+        Math.abs(left.pixels[offset + 1] - right.pixels[offset + 1]),
+        Math.abs(left.pixels[offset + 2] - right.pixels[offset + 2]),
+        Math.abs(left.pixels[offset + 3] - right.pixels[offset + 3]),
+      );
+      maxChannelDelta = Math.max(maxChannelDelta, delta);
+      if (delta > 2) {
+        differingPixels++;
+      }
+    }
+    return {
+      comparable: true,
+      width: left.width,
+      height: left.height,
+      pixel_count: left.width * left.height,
+      differing_pixels: differingPixels,
+      max_channel_delta: maxChannelDelta,
+    };
+  }, { leftData: leftBase64, rightData: rightBase64 });
+}
+
 async function rawWebGpuCompositorCanary(page) {
   return page.evaluate(async () => {
     if (!navigator.gpu) {
@@ -1092,9 +1196,15 @@ async function runMode(mode) {
           createHash('sha256').update(webgpuShot).digest('hex');
         diagnostics.raw_webgpu_compositor_canary.control_screenshot_hash =
           createHash('sha256').update(controlShot).digest('hex');
+        diagnostics.raw_webgpu_compositor_canary.webgpu_screenshot_red =
+          await screenshotRedStatistics(page, webgpuShot);
+        diagnostics.raw_webgpu_compositor_canary.control_screenshot_red =
+          await screenshotRedStatistics(page, controlShot);
+        diagnostics.raw_webgpu_compositor_canary.screenshot_pixel_delta =
+          await screenshotPixelDelta(page, webgpuShot, controlShot);
         diagnostics.raw_webgpu_compositor_canary.screenshot_matches_2d_control =
-          diagnostics.raw_webgpu_compositor_canary.screenshot_hash
-          === diagnostics.raw_webgpu_compositor_canary.control_screenshot_hash;
+          diagnostics.raw_webgpu_compositor_canary.screenshot_pixel_delta.comparable === true
+          && diagnostics.raw_webgpu_compositor_canary.screenshot_pixel_delta.differing_pixels === 0;
         await page.evaluate(() => {
           document.querySelector('#symthaea-webgpu-compositor-canary')?.remove();
           document.querySelector('#symthaea-webgpu-compositor-control')?.remove();
@@ -1154,9 +1264,19 @@ async function runMode(mode) {
           'renderer',
         );
       }
-      if (diagnostics.raw_webgpu_compositor_canary?.screenshot_bytes <= 0
-        || diagnostics.raw_webgpu_compositor_canary?.control_screenshot_bytes <= 0
-        || diagnostics.raw_webgpu_compositor_canary?.screenshot_matches_2d_control !== true) {
+      const compositor = diagnostics.raw_webgpu_compositor_canary;
+      const webgpuShotRed = compositor?.webgpu_screenshot_red;
+      const controlShotRed = compositor?.control_screenshot_red;
+      const screenshotDelta = compositor?.screenshot_pixel_delta;
+      if (compositor?.screenshot_bytes <= 0
+        || compositor?.control_screenshot_bytes <= 0
+        || !webgpuShotRed
+        || !controlShotRed
+        || webgpuShotRed.non_red_pixels !== 0
+        || controlShotRed.non_red_pixels !== 0
+        || screenshotDelta?.comparable !== true
+        || screenshotDelta?.differing_pixels !== 0
+        || screenshotDelta?.max_channel_delta > 2) {
         throw new QualificationError(
           `Raw WebGPU compositor output does not match the 2D red control: ${JSON.stringify(diagnostics.raw_webgpu_compositor_canary)}`,
           'renderer',
