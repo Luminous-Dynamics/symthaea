@@ -2503,6 +2503,70 @@ mod tests {
     }
 
     #[test]
+    fn zero_tolerance_is_not_silently_widened() {
+        use symthaea_fabrication_kernel::mesh::TriangleMesh;
+        use symthaea_passive_void_compiler::{
+            BoundaryConditionDomain, InterfacePlane, PortAperture, PortInterface,
+            SolverBoundaryIdentity,
+        };
+        use symthaea_passive_void_graph::PortId;
+
+        let interface = PortInterface::new(
+            PortId(10),
+            [0.0, 0.0, 0.0],
+            PortAperture::Circular { radius_mm: 2.0 },
+            [0.0, 0.0, 1.0],
+            InterfacePlane::new([0.0, 0.0, 0.0], [0.0, 0.0, 1.0]).unwrap(),
+            SolverBoundaryIdentity {
+                domain: BoundaryConditionDomain::Fluidic,
+                id: 7,
+            },
+        )
+        .unwrap();
+
+        let boundary = br#"1
+(
+    inlet { type patch; nFaces 1; startFace 0; }
+)
+"#;
+        let faces = br#"1
+(
+    4(0 1 2 3)
+)
+"#;
+        let points = br#"4
+(
+    (2 0 0.0005)
+    (0 2 0.0005)
+    (-2 0 0.0005)
+    (0 -2 0.0005)
+)
+"#;
+        let candidate = TriangleMesh {
+            vertices: vec![
+                [0.0, 0.0, 0.0005],
+                [2.0, 0.0, 0.0005],
+                [0.0, 2.0, 0.0005],
+                [-2.0, 0.0, 0.0005],
+                [0.0, -2.0, 0.0005],
+            ],
+            normals: vec![[0.0, 0.0, 1.0]; 5],
+            indices: vec![[0,1,2],[0,2,3],[0,3,4],[0,4,1]],
+        };
+
+        assert!(matches!(
+            observe_openfoam_patch_geometry(
+                boundary, faces, points, "inlet", &interface, &candidate, 0.0, 1.0,
+            ),
+            Err(OpenFoamBoundaryObservationError::PatchGeometryMismatch)
+        ));
+
+        assert!(observe_openfoam_patch_geometry(
+            boundary, faces, points, "inlet", &interface, &candidate, 0.001, 1.0,
+        ).is_ok());
+    }
+
+    #[test]
     fn internal_face_self_loop_fails_closed() {
         let owners = [3, 7];
         let neighbours = [3, 8];
