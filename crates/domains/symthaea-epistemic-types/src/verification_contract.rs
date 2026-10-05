@@ -769,6 +769,8 @@ impl ClaimControllerDocumentIdentity {
 pub struct VerificationMethodResolution {
     pub schema_version: u16,
     pub verification_method: ClaimVerificationMethod,
+    pub verification_method_type: String,
+    pub verification_method_material_digest: String,
     pub controller_document_ref: String,
     pub controller_document_id: ClaimControllerDocumentIdentity,
     pub resolved_verification_method_controller: ClaimControllerIdentity,
@@ -807,6 +809,8 @@ impl VerificationMethodResolution {
         controller_document_ref: impl Into<String>,
         controller_document_id: ClaimControllerDocumentIdentity,
         resolved_verification_method: ClaimVerificationMethod,
+        verification_method_type: impl Into<String>,
+        verification_method_material_digest: impl Into<String>,
         resolved_verification_method_controller: ClaimControllerIdentity,
         relationship_methods: &[ClaimVerificationMethod],
         controller_document_digest: impl Into<String>,
@@ -815,6 +819,8 @@ impl VerificationMethodResolution {
     ) -> Result<Self, VerificationFailure> {
         request.validate_structure()?;
         let controller_document_ref = controller_document_ref.into();
+        let verification_method_type = verification_method_type.into();
+        let verification_method_material_digest = verification_method_material_digest.into();
         let controller_document_digest = controller_document_digest.into();
 
         let method_url = Url::parse(request.verification_method.as_str())
@@ -899,6 +905,18 @@ impl VerificationMethodResolution {
                 "controller document digest must be a 64-character hexadecimal digest".into(),
             ));
         }
+        if verification_method_type.trim().is_empty() {
+            return Err(VerificationFailure::Structural(
+                "verification method type must be non-empty".into(),
+            ));
+        }
+        if !is_hex_digest(&verification_method_material_digest) {
+            return Err(VerificationFailure::Structural(
+                "verification method material digest must be a 64-character hexadecimal digest"
+                    .into(),
+            ));
+        }
+
         let controller_document_integrity =
             ControllerDocumentIntegrityAttestation::from_policy(
                 &request.controller_document_integrity_policy,
@@ -912,6 +930,8 @@ impl VerificationMethodResolution {
         let resolution = Self {
             schema_version: Self::SCHEMA_VERSION,
             verification_method: request.verification_method.clone(),
+            verification_method_type,
+            verification_method_material_digest,
             controller_document_ref,
             controller_document_id,
             resolved_verification_method_controller,
@@ -940,6 +960,18 @@ impl VerificationMethodResolution {
         }
         Url::parse(self.verification_method.as_str())
             .map_err(|_| VerificationFailure::InvalidVerificationMethodUrl)?;
+
+        if self.verification_method_type.trim().is_empty() {
+            return Err(VerificationFailure::Structural(
+                "verification method type must be non-empty".into(),
+            ));
+        }
+        if !is_hex_digest(&self.verification_method_material_digest) {
+            return Err(VerificationFailure::Structural(
+                "verification method material digest must be a 64-character hexadecimal digest"
+                    .into(),
+            ));
+        }
 
         let mut expected_document_url =
             Url::parse(self.verification_method.as_str())
@@ -1058,6 +1090,8 @@ impl VerificationMethodResolution {
             "symthaea:verification-method-resolution:v1",
             self.schema_version,
             self.verification_method.as_str(),
+            self.verification_method_type.as_str(),
+            self.verification_method_material_digest.as_str(),
             self.controller_document_ref.as_str(),
             self.controller_document_id.as_str(),
             self.resolved_verification_method_controller.as_str(),
@@ -1693,6 +1727,8 @@ mod tests {
             "https://example.test/controller",
             ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
             request.verification_method.clone(),
+            "Multikey",
+            &"44".repeat(32),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             &[request.verification_method.clone()],
             &"11".repeat(32),
@@ -2057,6 +2093,8 @@ mod tests {
                 "https://example.test/controller",
                 ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
                 request.verification_method.clone(),
+                "Multikey",
+                &"44".repeat(32),
                 ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
                 &[request.verification_method.clone()],
                 &"22".repeat(32),
