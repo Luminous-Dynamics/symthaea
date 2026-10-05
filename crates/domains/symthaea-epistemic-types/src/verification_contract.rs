@@ -1225,6 +1225,7 @@ impl VerificationRequest {
             verification_method,
             expected_controller,
             expected_verification_relationship,
+            expected_transformed_document_digest: None,
             controller_document_integrity_policy: ControllerDocumentIntegrityPolicy::Unpinned,
             controller_document_network_policy:
                 ControllerDocumentNetworkPolicy::strict_for_url(
