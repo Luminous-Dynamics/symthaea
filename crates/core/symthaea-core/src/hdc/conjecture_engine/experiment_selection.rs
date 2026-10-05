@@ -92,8 +92,16 @@ pub fn select_most_informative_experiment<'a, H, E>(
 ) -> Option<(&'a E, f64)> {
     candidates
         .iter()
-        .map(|e| (e, epistemic_value(e, hypotheses, predict)))
-        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .enumerate()
+        .map(|(index, experiment)| {
+            (index, experiment, epistemic_value(experiment, hypotheses, predict))
+        })
+        .max_by(|a, b| {
+            a.2.partial_cmp(&b.2)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.0.cmp(&a.0))
+        })
+        .map(|(_, experiment, value)| (experiment, value))
 }
 
 #[cfg(test)]
@@ -149,6 +157,21 @@ mod tests {
             "selector should not pick the point where every hypothesis agrees"
         );
         assert!(value > 0.0);
+    }
+
+    #[test]
+    fn selector_uses_first_candidate_on_exact_tie() {
+        #[derive(Debug, PartialEq)]
+        struct Experiment(u8);
+
+        let hypotheses = [0u8, 1u8];
+        let candidates = [Experiment(1), Experiment(2), Experiment(3)];
+        let predict = |_h: &u8, _e: &Experiment| Some(1.0);
+        let (chosen, value) =
+            select_most_informative_experiment(&candidates, &hypotheses, predict)
+                .expect("non-empty candidate pool");
+        assert_eq!(chosen, &Experiment(1));
+        assert_eq!(value, 0.0);
     }
 
     #[test]
