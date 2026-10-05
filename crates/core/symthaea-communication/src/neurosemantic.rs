@@ -1049,6 +1049,7 @@ mod tests {
     fn handling_policy_rejects_noncanonical_jurisdictions() {
         let mut policy = NeurosemanticHandlingPolicy {
             schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
+            policy_provenance_ref: "synthetic-policy-record-1".into(),
             origin_jurisdiction: "za".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["za".into()]),
             permitted_secondary_uses: BTreeSet::new(),
