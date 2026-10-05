@@ -570,6 +570,43 @@ mod tests {
         assert_eq!(plan.syllables.len(), 0);
     }
 
+    
+    #[test]
+    fn pitch_range_is_carried_from_speech_plan_and_validated() {
+        let mut speech_plan = plan();
+        speech_plan.prosody.pitch_range = 1.25;
+
+        let mut phonological = PhonologicalPlan::from_speech_plan(&speech_plan);
+        assert!((phonological.pitch_range - 1.25).abs() < f32::EPSILON);
+
+        phonological.pitch_range = 2.0;
+        assert_eq!(
+            phonological
+                .validate()
+                .expect_err("out-of-range pitch must fail closed"),
+            PhonologicalPlanError::InvalidPitchRange
+        );
+    }
+
+    #[test]
+    fn pitch_range_mismatch_with_upstream_frame_is_rejected() {
+        let speech_plan = plan();
+        let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+        let mut phonological = PhonologicalPlan::from_linguistic_frame(&frame);
+        phonological.pitch_range = if phonological.pitch_range < 1.0 {
+            1.0
+        } else {
+            0.65
+        };
+
+        assert_eq!(
+            phonological
+                .validate_against_frame(&frame)
+                .expect_err("tampered pitch range must fail lineage validation"),
+            PhonologicalPlanError::UpstreamMismatch
+        );
+    }
+
     #[test]
     fn explicit_segments_bind_without_fabricating_lexical_content() {
         let mut plan = PhonologicalPlan::from_speech_plan(&plan());
