@@ -176,7 +176,7 @@ The handoff binds identities and provenance but preserves each stage's independe
 ## Recommended implementation order
 
 1. Stabilize #6869 PhysicalType semantics.
-2. Define a canonical Ramanujan hypothesis envelope using existing evidence/result infrastructure.
+2. Define a canonical Ramanujan hypothesis envelope using existing evidence/result infrastructure. The initial AST-free `ScientificHypothesisHandoff` prototype now lives in `symthaea-types`.
 3. Add a one-way Ramanujan -> EUREKA handoff receipt.
 4. Make EUREKA experiment selection independent of candidate search ranking.
 5. Add physics-specific discriminative experiments.
@@ -204,3 +204,6 @@ discover
 Ramanujan provides the generative engine.
 EUREKA provides the adversarial scientific discipline around it.
 Neither replaces the other.
+
+
+Implementation note: the first AST-free handoff envelope is now available as `symthaea_types::discovery_handoff::ScientificHypothesisHandoff`. It binds candidate identity, PhysicalType identity, model maturity, observation/search/discovery provenance, complexity, source, explicit non-claims, and an optional immutable EUREKA challenge-manifest commitment. It contains no EUREKA outcome field.
