@@ -2667,7 +2667,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 // Validate extra disks for RAID/ZFS multi-disk layouts.
                 // Any invalid disk aborts the entire install action; do not
                 // merely advance the inner validation loop.
-                let invalid_extra_disk = None;
+                let mut invalid_extra_disk = None;
                 for extra_disk in &client_msg.extra_disks {
                     if let Err(e) = validate_disk_path(extra_disk) {
                         invalid_extra_disk = Some((extra_disk, e));
