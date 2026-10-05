@@ -93,6 +93,7 @@ fn main() -> Result<(), String> {
             permitted_purposes: BTreeSet::from([CommunicationPurpose::HumanCollaboration]),
             handling: NeurosemanticHandlingPolicy {
                 schema_version: symthaea_communication::NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
+                policy_provenance_ref: "synthetic-policy-record-1".into(),
                 origin_jurisdiction: "ZA".into(),
                 permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
                 permitted_secondary_uses: BTreeSet::new(),
