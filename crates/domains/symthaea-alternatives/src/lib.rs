@@ -175,6 +175,10 @@ pub struct EvidenceRecord {
     pub unit: Option<String>,
     /// Optional source timestamp/version label.
     pub as_of: Option<String>,
+    /// Optional Unix timestamp from which this evidence is valid.
+    pub valid_from_epoch_seconds: Option<i64>,
+    /// Optional Unix timestamp through which this evidence is valid.
+    pub valid_until_epoch_seconds: Option<i64>,
 }
 
 impl EvidenceRecord {
@@ -185,6 +189,13 @@ impl EvidenceRecord {
         }
         if self.id.is_empty() || self.source_id.is_empty() || self.scope.is_empty() {
             return Err(AssessmentError::EmptyEvidenceIdentity);
+        }
+        if let (Some(from), Some(until)) = (
+            self.valid_from_epoch_seconds,
+            self.valid_until_epoch_seconds,
+        ) && from > until
+        {
+            return Err(AssessmentError::InvalidEvidenceValidity { from, until });
         }
         Ok(())
     }
@@ -834,6 +845,8 @@ pub enum AssessmentError {
     NoBurdenData,
     /// A burden estimate lacks a comparable unit or scope.
     EmptyBurdenScale,
+    /// Evidence validity bounds are inverted.
+    InvalidEvidenceValidity { from: i64, until: i64 },
     /// A functional requirement contains no performance constraints.
     EmptyFunctionalConstraints,
     /// A performance estimate lacks a comparable unit or scope.
@@ -883,6 +896,9 @@ impl std::fmt::Display for AssessmentError {
             Self::EmptyCandidateIdentity => write!(f, "candidate identity is incomplete"),
             Self::NoBurdenData => write!(f, "candidate has no burden data"),
             Self::EmptyBurdenScale => write!(f, "burden unit/scope is empty"),
+            Self::InvalidEvidenceValidity { from, until } => {
+                write!(f, "evidence validity [{from}, {until}] is inverted")
+            }
             Self::EmptyPerformanceScale => write!(f, "performance unit/scope is empty"),
             Self::EmptyFunctionalConstraints => {
                 write!(f, "functional requirement has no performance constraints")
