@@ -468,6 +468,11 @@ impl ControllerDocumentDereferenceAttestation {
         if self.requested_url != expected_url || self.document_digest != expected_digest {
             return Err(VerificationFailure::ControllerDocumentDereferenceMismatch);
         }
+        if self.response_media_type.trim().is_empty() {
+            return Err(VerificationFailure::Structural(
+                "controller document dereference response media type must be non-empty".into(),
+            ));
+        }
         if !policy.allows_scheme(requested.scheme())
             || !policy.allows_scheme(effective.scheme())
         {
@@ -2277,6 +2282,30 @@ mod tests {
         assert!(matches!(
             decoded.validate_structure(),
             Err(VerificationFailure::ControllerDocumentNetworkPolicyViolation)
+        ));
+    }
+
+    #[test]
+    fn deserialized_dereference_receipt_rejects_empty_media_type() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let resolution = resolved_method(&request);
+        let mut value = serde_json::to_value(&resolution).unwrap();
+        value["controller_document_dereference"]["response_media_type"] = serde_json::json!("   ");
+        let decoded: VerificationMethodResolution = serde_json::from_value(value).unwrap();
+
+        assert!(matches!(
+            decoded.validate_structure(),
+            Err(VerificationFailure::Structural(message))
+                if message.contains("response media type must be non-empty")
         ));
     }
 
