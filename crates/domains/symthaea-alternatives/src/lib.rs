@@ -134,6 +134,8 @@ pub enum EvidenceKind {
     Derived,
     /// Unverified conjecture.
     Hypothesis,
+    /// Observation from manufacturing-scale operation.
+    ManufacturingObserved,
     /// Observation from field deployment.
     FieldObserved,
     /// Repeated operational monitoring.
@@ -412,23 +414,43 @@ impl CandidatePathway {
                 .map(|estimate| !estimate.evidence_ids.is_empty())
                 .unwrap_or(false)
         });
-        let has_field = self.burdens.values().any(|estimate| {
-            self.linked_evidence(estimate)
-                .any(|e| e.kind == EvidenceKind::FieldObserved)
+        let all_dimensions_field_observed = Dimension::ALL.iter().all(|dimension| {
+            self.burdens
+                .get(dimension)
+                .map(|estimate| {
+                    self.linked_evidence(estimate)
+                        .any(|e| e.kind == EvidenceKind::FieldObserved)
+                })
+                .unwrap_or(false)
         });
-        let has_monitoring = self.burdens.values().any(|estimate| {
+        let all_dimensions_monitored = Dimension::ALL.iter().all(|dimension| {
+            self.burdens
+                .get(dimension)
+                .map(|estimate| {
+                    self.linked_evidence(estimate)
+                        .any(|e| e.kind == EvidenceKind::ContinuouslyMonitored)
+                })
+                .unwrap_or(false)
+        });
+        let has_manufacturing_observation = self.burdens.values().any(|estimate| {
             self.linked_evidence(estimate)
-                .any(|e| e.kind == EvidenceKind::ContinuouslyMonitored)
+                .any(|e| e.kind == EvidenceKind::ManufacturingObserved)
         });
 
-        if has_monitoring {
+        if all_dimensions_monitored {
             QualificationState::ContinuouslyMonitored
-        } else if has_field {
+        } else if all_dimensions_field_observed {
             QualificationState::FieldQualified
-        } else if any_supported_measurement && independent_sources >= 2 && has_all_dimension_evidence
+        } else if any_supported_measurement
+            && independent_sources >= 2
+            && has_all_dimension_evidence
+            && has_manufacturing_observation
         {
             QualificationState::ManufacturingQualified
-        } else if any_supported_measurement && independent_sources >= 2 {
+        } else if any_supported_measurement
+            && independent_sources >= 2
+            && has_all_dimension_evidence
+        {
             QualificationState::LifecycleQualified
         } else if any_supported_measurement {
             QualificationState::EvidenceSupported
@@ -1221,6 +1243,31 @@ mod tests {
         assert_eq!(
             result.next_measurement.as_ref().unwrap().dimension,
             Dimension::Water
+        );
+    }
+
+    #[test]
+    #[test]
+    fn single_field_observation_cannot_promote_entire_candidate() {
+        let mut c = candidate(
+            "field",
+            PathwayKind::ProcessSubstitution,
+            1.0,
+            1.0,
+            vec![
+                evidence("f1", "field-source", EvidenceKind::FieldObserved, EvidenceStance::Supports, 0.95),
+                evidence("f2", "source-a", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("f3", "source-b", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+            ],
+        );
+        c.burdens.values_mut().skip(1).for_each(|estimate| {
+            estimate.evidence_ids = vec!["f2".into(), "f3".into()];
+        });
+
+        let result = AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap();
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::LifecycleQualified
         );
     }
 
