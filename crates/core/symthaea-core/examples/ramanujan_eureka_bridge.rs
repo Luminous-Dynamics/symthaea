@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 use symthaea_core::hdc::conjecture_engine::{
     BinOp, Conjecture, ConjectureStatus, Expr, MathDomain, MacroPromotionTier,
-    select_most_informative_experiment_with_receipt, scientific_hypothesis_set_digest,
+    select_most_discriminative_experiment_with_receipt, scientific_hypothesis_set_digest,
 };
 use symthaea_types::{
     ModelMaturity, PhysicalDimension, PhysicalType, QuantityKind,
@@ -105,7 +105,7 @@ fn main() {
     let handoffs = vec![h1_ref.clone(), h2_ref.clone()];
     let hypothesis_set_digest = scientific_hypothesis_set_digest(&handoffs);
 
-    // Candidate experiments are fresh initial conditions. Prediction
+    // Candidate experiments are fresh initial conditions. Finite prediction
     // disagreement is the selector's criterion; it is not experimental evidence.
     let experiments = vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (2.0, 3.0)];
     let hypotheses = vec![c1.formula.clone(), c2.formula.clone()];
@@ -114,14 +114,14 @@ fn main() {
         value.is_finite().then_some(value)
     };
 
-    let (selected, selection) = select_most_informative_experiment_with_receipt(
+    let (selected, selection) = select_most_discriminative_experiment_with_receipt(
         &experiments,
         &hypotheses,
         predict,
         &h1_ref.digest_hex(),
         &hypothesis_set_digest,
         "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        "ramanujan-eureka-selector-v1",
+        "ramanujan-eureka-selector-v2",
         7,
         |initial| format!("harmonic:{:.6}:{:.6}", initial.0, initial.1),
     )
@@ -170,8 +170,8 @@ fn main() {
     println!("  hypothesis set: {}", summary["hypothesis_set_digest"]);
     println!("  selected challenge: {}", summary["selected_challenge_digest"]);
     println!(
-        "  predicted information value: {:.6}",
-        selection.predicted_information_gain()
+        "  predicted disagreement score: {:.6}",
+        selection.predicted_disagreement_score()
     );
     println!("  selection receipt: {}", selection.digest_hex());
     println!("  revision receipt: {}", revision.digest_hex());
