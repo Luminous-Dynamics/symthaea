@@ -829,6 +829,95 @@ mod tests {
     }
 
     #[test]
+    fn celsius_to_fahrenheit_uses_affine_scale_and_offset() {
+        let celsius = PhysicalType::with_kind(
+            QuantityKind::Temperature,
+            PhysicalDimension::TEMPERATURE,
+        )
+        .with_unit(UnitRef {
+            symbol: "degC".into(),
+            transform_to_si: UnitTransform::new(
+                RationalScale::ONE,
+                RationalScale { numerator: 27315, denominator: 100 },
+            ),
+            semantic_id: None,
+        });
+        let fahrenheit = PhysicalType::with_kind(
+            QuantityKind::Temperature,
+            PhysicalDimension::TEMPERATURE,
+        )
+        .with_unit(UnitRef {
+            symbol: "degF".into(),
+            transform_to_si: UnitTransform::new(
+                RationalScale { numerator: 5, denominator: 9 },
+                RationalScale { numerator: 45967, denominator: 100 },
+            ),
+            semantic_id: None,
+        });
+
+        match celsius.convert_value_to(20.0, &fahrenheit) {
+            TypeJudgement::Valid(value) => assert!((value - 68.0).abs() < 1e-12),
+            other => panic!("unexpected Celsius/Fahrenheit conversion: {other:?}"),
+        }
+
+        match fahrenheit.convert_value_to(50.0, &celsius) {
+            TypeJudgement::Valid(value) => assert!((value - 10.0).abs() < 1e-12),
+            other => panic!("unexpected Fahrenheit/Celsius conversion: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn absolute_and_delta_temperature_kinds_are_not_interchangeable() {
+        let absolute = PhysicalType::with_kind(
+            QuantityKind::Temperature,
+            PhysicalDimension::TEMPERATURE,
+        );
+        let delta = PhysicalType::with_kind(
+            QuantityKind::TemperatureDifference,
+            PhysicalDimension::TEMPERATURE,
+        );
+
+        assert!(matches!(
+            absolute.judge_compatibility(&delta),
+            TypeJudgement::Invalid(_)
+        ));
+        assert!(matches!(
+            absolute.convert_value_to(20.0, &delta),
+            TypeJudgement::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn fahrenheit_delta_to_celsius_delta_is_pure_scale() {
+        let delta_f = PhysicalType::with_kind(
+            QuantityKind::TemperatureDifference,
+            PhysicalDimension::TEMPERATURE,
+        )
+        .with_unit(UnitRef {
+            symbol: "delta_degF".into(),
+            transform_to_si: UnitTransform::new(
+                RationalScale { numerator: 5, denominator: 9 },
+                RationalScale { numerator: 0, denominator: 1 },
+            ),
+            semantic_id: None,
+        });
+        let delta_c = PhysicalType::with_kind(
+            QuantityKind::TemperatureDifference,
+            PhysicalDimension::TEMPERATURE,
+        )
+        .with_unit(UnitRef {
+            symbol: "delta_degC".into(),
+            transform_to_si: UnitTransform::IDENTITY,
+            semantic_id: None,
+        });
+
+        match delta_f.convert_value_to(9.0, &delta_c) {
+            TypeJudgement::Valid(value) => assert!((value - 5.0).abs() < 1e-12),
+            other => panic!("unexpected delta Fahrenheit/Celsius conversion: {other:?}"),
+        }
+    }
+
+    #[test]
     fn temperature_difference_fahrenheit_uses_scale_without_offset() {
         let delta_f = PhysicalType::with_kind(
             QuantityKind::TemperatureDifference,
