@@ -9,6 +9,8 @@ use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 pub const HDC_CODEC_SCHEMA_VERSION: u16 = 1;
+/// Maximum raw JSON byte length accepted by bounded HDC codec artifact parsers.
+pub const HDC_CODEC_MAX_SERIALIZED_ARTIFACT_BYTES: usize = 1_048_576;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HdcCodecDescriptor {
@@ -86,6 +88,21 @@ impl HdcBinaryFrame {
             dimension: BinaryHV::DIM,
             bits: binary.0.to_vec(),
         }
+    }
+
+    /// Deserialize a binary frame only after enforcing the raw byte-size
+    /// ceiling and the exact frame shape.
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > HDC_CODEC_MAX_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "HDC binary frame JSON exceeds {} bytes",
+                HDC_CODEC_MAX_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let frame: Self =
+            serde_json::from_slice(bytes).map_err(|error| format!("HDC binary frame JSON: {error}"))?;
+        frame.to_binary()?;
+        Ok(frame)
     }
 
     pub fn to_binary(&self) -> Result<BinaryHV, String> {
@@ -264,6 +281,18 @@ mod tests {
         let frame = HdcBinaryFrame::from_binary(&binary);
         let restored = frame.to_binary().unwrap();
         assert_eq!(binary, restored);
+
+        let encoded = serde_json::to_vec(&frame).unwrap();
+        let parsed = HdcBinaryFrame::from_json_bytes(&encoded).unwrap();
+        assert_eq!(parsed, frame);
+
+        let oversized = vec![b' '; HDC_CODEC_MAX_SERIALIZED_ARTIFACT_BYTES + 1];
+        assert!(HdcBinaryFrame::from_json_bytes(&oversized).is_err());
+
+        let mut malformed = frame.clone();
+        malformed.bits.pop();
+        let malformed_json = serde_json::to_vec(&malformed).unwrap();
+        assert!(HdcBinaryFrame::from_json_bytes(&malformed_json).is_err());
     }
 
     #[test]
