@@ -2901,6 +2901,24 @@ fn validate_native_authority_pin_set(
             return Err(AuthorizationConsumptionError::ActionAlreadyInFlight.into());
         }
 
+        // Native replay identity is a one-time authority unit. Preflight the
+        // durable uniqueness constraint so a collision is reported as a
+        // semantic binding refusal rather than leaking a raw SQLite error.
+        // The UNIQUE index remains authoritative for races between callers.
+        let replay_owner: Option<(String, String, String)> = tx
+            .query_row(
+                "SELECT authorization_instance,attempt_id,boundary_id
+                 FROM authorization_dispatches
+                 WHERE native_replay_identity=?1
+                 LIMIT 1",
+                params![native_replay_identity],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()?;
+        if replay_owner.is_some() {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
         lease.mark_dispatch_pending(attempt_id)?;
         let (native_authority_pin_set_id, native_authority_pin_set_digest) =
             self.persist_native_authority_pin_set_snapshot(&tx)?;
@@ -10149,7 +10167,29 @@ mod tests {
             &witness_b.authorization_instance,"attempt-native-b",&action_b,&effect,"boundary-A",
             "operation:native-b","native-replay:shared"
         );
-        assert!(matches!(duplicate,Err(AuthorizationStoreError::Sqlite(_))));
+        assert!(matches!(
+            duplicate,
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+
+        let connection=store.connection().unwrap();
+        let state:String=connection.query_row(
+            "SELECT state FROM authorization_leases
+             WHERE authorization_instance=?1",
+            params![witness_b.authorization_instance.as_str()],
+            |row| row.get(0),
+        ).unwrap();
+        assert_eq!(state,"prepared");
+        let dispatches:i64=connection.query_row(
+            "SELECT COUNT(*) FROM authorization_dispatches
+             WHERE native_replay_identity='native-replay:shared'",
+            [],
+            |row| row.get(0),
+        ).unwrap();
+        assert_eq!(dispatches,1);
+
         let _=std::fs::remove_file(path);
     }
 
