@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 7;
+pub const SCHEMA_VERSION: u16 = 8;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-v13";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-v14";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -443,11 +443,43 @@ impl OperatingRequirement {
     }
 }
 
+/// Immutable identity of the product/component/design context being assessed.
+///
+/// This binds an assessment to an exact externally identified subject without
+/// making that identity authoritative inside Symthaea.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AssessmentSubjectRef {
+    /// Stable identifier assigned by the owning system.
+    pub subject_id: String,
+    /// Versioned identity of the subject/profile namespace.
+    pub profile_id: String,
+    /// Revision of the subject/profile namespace.
+    pub profile_revision: String,
+    /// Digest of the exact BOM/design/product/routing context being assessed.
+    pub subject_digest: String,
+}
+
+impl AssessmentSubjectRef {
+    /// Validate the immutable subject identity fields.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.subject_id.is_empty()
+            || self.profile_id.is_empty()
+            || self.profile_revision.is_empty()
+            || self.subject_digest.is_empty()
+        {
+            return Err(AssessmentError::EmptyAssessmentSubject);
+        }
+        Ok(())
+    }
+}
+
 /// The function that must be satisfied independently of the incumbent.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FunctionalRequirement {
     /// Stable requirement identifier.
     pub id: String,
+    /// Exact product/component/design context to which this requirement applies.
+    pub subject: AssessmentSubjectRef,
     /// Human-readable description.
     pub description: String,
     /// Named performance constraints.
@@ -466,6 +498,7 @@ impl FunctionalRequirement {
         if self.id.is_empty() || self.description.is_empty() {
             return Err(AssessmentError::EmptyRequirementIdentity);
         }
+        self.subject.validate()?;
         if self.constraints.is_empty() {
             return Err(AssessmentError::EmptyFunctionalConstraints);
         }
@@ -1307,6 +1340,8 @@ pub enum AssessmentError {
     DuplicateEvidenceId(String),
     /// Evidence provenance source identity is incomplete.
     EmptySourceIdentity,
+    /// Assessment subject identity is incomplete.
+    EmptyAssessmentSubject,
     /// External source admission reference is incomplete.
     EmptySourceAdmissionReference,
     /// External source admission validity bounds are inverted.
@@ -1399,6 +1434,7 @@ impl std::fmt::Display for AssessmentError {
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate id {id}"),
             Self::DuplicateEvidenceId(id) => write!(f, "duplicate evidence id {id}"),
             Self::EmptySourceIdentity => write!(f, "evidence source identity is incomplete"),
+            Self::EmptyAssessmentSubject => write!(f, "assessment subject identity is incomplete"),
             Self::EmptySourceAdmissionReference => {
                 write!(f, "source admission reference is incomplete")
             }
@@ -1961,6 +1997,12 @@ mod tests {
     fn fixture_requirement() -> FunctionalRequirement {
         FunctionalRequirement {
             id: "seal-v1".into(),
+            subject: AssessmentSubjectRef {
+                subject_id: "fixture-product".into(),
+                profile_id: "fixture-product-profile".into(),
+                profile_revision: "v1".into(),
+                subject_digest: "fixture-product-digest".into(),
+            },
             description: "Provide a durable chemical-resistant seal.".into(),
             constraints: BTreeMap::from([
                 ("service_life_years".into(), RequirementBound::AtLeast(10.0)),
@@ -2718,6 +2760,33 @@ mod tests {
 
         assert_eq!(first, second);
         assert_eq!(first.pareto_frontier, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn changing_assessment_subject_changes_receipt_identity() {
+        let requirement = fixture_requirement();
+        let candidate = candidate(
+            "subject-bound",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence("s1", "source", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)],
+        );
+        let baseline = AlternativesEngine
+            .assess(&requirement, &[candidate.clone()], None)
+            .unwrap()
+            .receipt
+            .payload_hash;
+
+        let mut changed_requirement = requirement;
+        changed_requirement.subject.subject_digest = "different-design-digest".into();
+        let changed = AlternativesEngine
+            .assess(&changed_requirement, &[candidate], None)
+            .unwrap()
+            .receipt
+            .payload_hash;
+
+        assert_ne!(baseline, changed);
     }
 
     #[test]
