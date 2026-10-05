@@ -109,7 +109,7 @@ impl ScientificHypothesisHandoff {
 
     /// Verify that the handoff binds the current physical semantic identity.
     pub fn verify_physical_type(&self, physical_type: &PhysicalType) -> bool {
-        self.physical_type_digest == physical_type.digest_hex()
+        physical_type.validate().is_ok() && self.physical_type_digest == physical_type.digest_hex()
     }
 
     /// Validates identity/provenance fields without interpreting scientific truth.
@@ -211,6 +211,8 @@ impl ScientificHypothesisRevisionReceipt {
         new: &ScientificHypothesisHandoff,
     ) -> Result<(), String> {
         self.validate()?;
+        prior.validate()?;
+        new.validate()?;
         if self.prior_handoff_digest != prior.digest_hex() {
             return Err("revision receipt references a different prior handoff".into());
         }
@@ -339,6 +341,7 @@ impl ScientificInquirySelectionReceipt {
         hypothesis_set_digest: &str,
     ) -> Result<(), String> {
         self.validate()?;
+        hypothesis_handoff.validate()?;
         if self.hypothesis_handoff_digest != hypothesis_handoff.digest_hex() {
             return Err("inquiry selection is bound to a different hypothesis handoff".into());
         }
@@ -358,6 +361,9 @@ impl ScientificInquirySelectionReceipt {
         self.validate()?;
         if handoffs.len() < 2 {
             return Err("inquiry selection requires a concrete set of at least two hypotheses".into());
+        }
+        for handoff in handoffs {
+            handoff.validate()?;
         }
         let expected_set_digest = scientific_hypothesis_set_digest(handoffs);
         if self.hypothesis_set_digest != expected_set_digest {
@@ -421,6 +427,90 @@ mod tests {
         );
         let error = handoff.validate().expect_err("malformed physical type must fail");
         assert!(error.contains("invalid carried physical type"));
+    }
+
+    #[test]
+    fn verify_physical_type_rejects_malformed_current_type() {
+        let h = ScientificHypothesisHandoff::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &energy(),
+            ModelMaturity::ResearchPrototype,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            1,
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+        let malformed = PhysicalType::with_kind(QuantityKind::Energy, PhysicalDimension::LENGTH);
+        assert!(!h.verify_physical_type(&malformed));
+    }
+
+    #[test]
+    fn revision_cross_link_validation_rejects_malformed_bound_handoff() {
+        let energy = energy();
+        let prior = ScientificHypothesisHandoff::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &energy,
+            ModelMaturity::ResearchPrototype,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            1,
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+        let mut malformed = prior.clone();
+        malformed.physical_type = PhysicalType::with_kind(
+            QuantityKind::Energy,
+            PhysicalDimension::LENGTH,
+        );
+        let receipt = ScientificHypothesisRevisionReceipt::new(
+            prior.digest_hex(),
+            malformed.digest_hex(),
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            malformed.campaign_digest_hex(),
+            "malformed candidate",
+        )
+        .unwrap();
+        assert!(receipt.validate_against(&prior, &malformed).is_err());
+    }
+
+    #[test]
+    fn selection_set_validation_rejects_malformed_member() {
+        let valid = ScientificHypothesisHandoff::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &energy(),
+            ModelMaturity::ResearchPrototype,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            1,
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+        let mut malformed = valid.clone();
+        malformed.physical_type = PhysicalType::with_kind(
+            QuantityKind::Energy,
+            PhysicalDimension::LENGTH,
+        );
+        let receipt = ScientificInquirySelectionReceipt::new(
+            valid.digest_hex(),
+            scientific_hypothesis_set_digest(&[valid.clone(), malformed.clone()]),
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "selector-v2",
+            1,
+            1.0,
+            2,
+        )
+        .unwrap();
+        assert!(receipt
+            .validate_against_hypothesis_set(&[valid, malformed])
+            .is_err());
     }
 
     #[test]
