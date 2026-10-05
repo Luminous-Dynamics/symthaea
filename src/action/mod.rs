@@ -1855,6 +1855,14 @@ mod executor_authority_tests {
             "find",
             &args(&["/tmp", "-exec", "systemctl", "restart", "sshd.service", ";"])
         ));
+        assert!(executor_command_requires_governed_authority(
+            "find",
+            &args(&["/tmp", "-execdir", "nix-env", "-e", "hello", ";"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "/usr/bin/env",
+            &args(&["nix", "profile", "install", "nixpkgs#hello"])
+        ));
         assert!(!executor_command_requires_governed_authority(
             "find",
             &args(&["/tmp", "-type", "f", "-maxdepth", "1"])
