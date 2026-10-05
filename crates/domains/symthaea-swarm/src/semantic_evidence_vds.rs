@@ -849,7 +849,13 @@ impl Rfc9942ReceiptEnvelope {
         }
         let vdp=vdp.ok_or(Rfc9942VdpError::InvalidStructure)?;
         let payload=match reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)?{
-            2=>{let raw=reader.read_bstr_bounded(32).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;Rfc9942ReceiptPayload::from_bytes(Some(&raw))?}
+            2=>{
+                let raw=reader.read_bstr_bounded(32).map_err(|error|match error {
+                    Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidPayloadLength,
+                    _=>Rfc9942VdpError::InvalidEncoding,
+                })?;
+                Rfc9942ReceiptPayload::from_bytes(Some(&raw))?
+            }
             7=>{reader.read_nil().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;Rfc9942ReceiptPayload::Detached}
             _=>return Err(Rfc9942VdpError::InvalidEncoding),
         };
@@ -4653,6 +4659,34 @@ mod tests {
         assert_eq!(decoded.algorithm_id(),-7); assert_eq!(decoded.vds_id(),1);
         assert_eq!(decoded.to_cbor(),bytes);
     }
+    #[test]
+    fn rfc9942_receipt_envelope_preserves_invalid_attached_payload_length() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+
+        let mut protected=Vec::new();
+        cbor_map_len(&mut protected,2);
+        cbor_int(&mut protected,COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected,COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut protected,RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut protected,RFC9162_VDS_ID);
+
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG);
+        cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected);
+        cbor_map_len(&mut bytes,1);
+        cbor_int(&mut bytes,RFC9942_VDP_HEADER_LABEL);
+        bytes.extend_from_slice(&vdp.to_cbor());
+        cbor_bytes(&mut bytes,&[0u8;33]);
+        cbor_bytes(&mut bytes,&[0xAA;64]);
+
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&bytes),
+            Err(Rfc9942VdpError::InvalidPayloadLength)
+        );
+    }
+
     #[test]
     fn rfc9942_receipt_envelope_round_trips_attached_payload() {
         let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
