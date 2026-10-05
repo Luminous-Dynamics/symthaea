@@ -287,6 +287,23 @@ fn decoder_work_ledger_matches_exact_weight_search_space() {
 }
 
 #[test]
+fn invalid_observation_dimension_is_rejected_without_search() {
+    let code = boundary_code();
+    let decoder = BoundedDistanceSyndromeDecoder::from_code(&code).expect("decoder");
+    let observation = BinaryCodeword::zero(7);
+
+    let (result, work) = decoder.decode_with_work(&observation, 2);
+    assert_eq!(
+        result,
+        BoundedDistanceDecode::InvalidObservationDimension {
+            observation_dimension: 7,
+            dimension: 8,
+        }
+    );
+    assert_eq!(work, Default::default());
+}
+
+#[test]
 fn invalid_decoder_bound_is_rejected_without_search() {
     let code = boundary_code();
     let decoder = BoundedDistanceSyndromeDecoder::from_code(&code).expect("decoder");
