@@ -62,6 +62,10 @@ Candidate generation is a separate provenance surface from evidence provenance. 
 
 Evidence records also carry their own exact `ComparisonBasisRef`. Every evidence record linked to a burden, functional-performance estimate, or operating capability must match the linked estimate's basis exactly. Unit and scope agreement alone is insufficient. A methodology/test-protocol mismatch fails closed during candidate validation, and the evidence basis is included in the canonical evidence digest and assessment receipt.
 
+### Observation provenance
+
+Physical and operational observation evidence (Observed, ManufacturingObserved, FieldObserved, ContinuouslyMonitored) must also carry an ObservationProvenanceRef identifying the exact observed specimen/lot/batch/product/process-run subject, the measurement/test activity, the underlying observation-record digest, the measurement system when applicable, and the declared calibration/traceability chain references. This is a structural traceability reference, not a claim that Symthaea has verified the chain. Missing observation provenance fails closed. This keeps the exact thing measured and the exact measurement activity separate from the source authority and from the comparison methodology.
+
 The assessment receipt also binds a canonical BLAKE3 digest of the complete evidence bundle for each candidate. That prevents a provenance-only mutation—such as an artifact digest, admission reference, observation timestamp, validity window, or evidence derivation change—from becoming invisible merely because the downstream qualification result happens to remain unchanged. Evidence is therefore both evaluated and integrity-bound.
 
 Source admission is authority-bound: an EvidenceSourceIdentity whose admission reference names a different authority is rejected. This keeps authority admission from becoming a detached capability token that could be attached to an unrelated source identity.
