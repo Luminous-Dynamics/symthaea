@@ -130,6 +130,9 @@ fn main() {
 
     assert_eq!(*selected, (2.0, 3.0));
     assert!(selection.validate().is_ok());
+    assert!(selection
+        .validate_against_hypothesis_set(&handoffs)
+        .is_ok());
 
     // A later revision is a new lineage, never a mutation of the original handoff.
     let revised = ScientificHypothesisHandoff::new(
