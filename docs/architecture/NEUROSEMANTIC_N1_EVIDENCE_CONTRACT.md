@@ -126,12 +126,13 @@ representation, or conformal artifact is outside this contract. Conformal artifa
 parsing validates structural state, but score-set verification must additionally
 recompute the threshold from the separately retained calibration scores and alpha.
 
-The repository now provides a versioned machine-readable `HdcOntologyConformalEvidenceArtifact` binding around the isolated conformal primitive. The current artifact schema is v2; older schema-v1 artifacts are intentionally rejected rather than migrated implicitly. It records the model hash, an exact inference-configuration hash, distinct calibration and evaluation split-manifest hashes, the declared coverage target, exchangeability-assumption statement, exact execution revision, and evidence-bundle identity. The inference-configuration hash is required because changing preprocessing, decoder settings, or other runtime configuration can alter the calibration/test score distribution even when the model artifact is unchanged. The execution revision is fail-closed to a canonical 40- or 64-hex Git object ID, so placeholders such as `local` or arbitrary prose cannot satisfy the provenance field. This binding is provenance infrastructure only: selecting `LabelConditional` as a declared target does not create a label-conditional theorem, and distinct split hashes do not by themselves prove that the underlying populations are exchangeable or disjoint.
+The repository now provides a versioned machine-readable `HdcOntologyConformalEvidenceArtifact` binding around the isolated conformal primitive. The current artifact schema is v3; older schema-v1 and schema-v2 artifacts are intentionally rejected rather than migrated implicitly. The artifact also binds a canonical `study_protocol_hash` covering the preregistered evaluation/shift matrix and reporting rules, so changing the study protocol creates a new evidence identity. It records the model hash, an exact inference-configuration hash, distinct calibration and evaluation split-manifest hashes, the declared coverage target, exchangeability-assumption statement, exact execution revision, and evidence-bundle identity. The inference-configuration hash is required because changing preprocessing, decoder settings, or other runtime configuration can alter the calibration/test score distribution even when the model artifact is unchanged. The execution revision is fail-closed to a canonical 40- or 64-hex Git object ID, so placeholders such as `local` or arbitrary prose cannot satisfy the provenance field. This binding is provenance infrastructure only: selecting `LabelConditional` as a declared target does not create a label-conditional theorem, and distinct split hashes do not by themselves prove that the underlying populations are exchangeable or disjoint.
 
 A conformal N1 artifact should bind at minimum:
 
 - exact codebook/model hash;
 - exact inference-configuration hash;
+- exact study protocol hash, including the declared shift/ablation matrix and reporting rules;
 - exact calibration and evaluation split-manifest hashes;
 - the named nonconformity score definition and revision;
 - the exact calibration-score hash;
@@ -142,7 +143,9 @@ A conformal N1 artifact should bind at minimum:
 - exact execution revision and deterministic evidence bundle identity.
 
 The N1 result must report both coverage and efficiency (for example prediction-set
-size or abstention rate). Coverage without efficiency can be made trivially safe
+size or abstention rate). Under realistic deployment shifts, reporting should also
+be stratified by the preregistered shift scenario (including mixed/partial shift
+where applicable) rather than collapsing all conditions into one aggregate number. Coverage without efficiency can be made trivially safe
 by returning an enormous prediction set, while efficiency without coverage does
 not provide the intended statistical guarantee.
 
