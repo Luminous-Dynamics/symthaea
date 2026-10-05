@@ -6309,6 +6309,72 @@ mod tests {
     }
 
     #[test]
+    fn verification_context_v5_fingerprint_matches_independent_oracle() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let context = VerificationContextV5::from_report(&report);
+
+        fn put_string(hasher: &mut blake3::Hasher, value: &str) {
+            hasher.update(&(value.len() as u64).to_be_bytes());
+            hasher.update(value.as_bytes());
+        }
+
+        fn put_option(hasher: &mut blake3::Hasher, value: Option<&str>) {
+            match value {
+                Some(value) => {
+                    hasher.update(&[1]);
+                    put_string(hasher, value);
+                }
+                None => hasher.update(&[0]),
+            }
+        }
+
+        let mut canonical = Vec::new();
+        canonical.extend_from_slice(b"symthaea:observation-verification-context:v5\\n");
+        put_string_bytes(&mut canonical, context.context_version);
+        put_string_bytes(&mut canonical, &context.policy_fingerprint);
+        put_string_bytes(&mut canonical, context.verifier_id);
+        put_string_bytes(&mut canonical, context.verifier_version);
+        put_string_bytes(&mut canonical, &context.environment_fingerprint);
+        put_string_bytes(&mut canonical, context.procedure_id);
+        put_string_bytes(&mut canonical, &context.procedure_fingerprint);
+        put_option_bytes(
+            &mut canonical,
+            context.resolution_snapshot_fingerprint.as_deref(),
+        );
+        canonical.extend_from_slice(&context.evaluated_at_unix_ns.to_be_bytes());
+
+        fn put_string_bytes(bytes: &mut Vec<u8>, value: &str) {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value.as_bytes());
+        }
+
+        fn put_option_bytes(bytes: &mut Vec<u8>, value: Option<&str>) {
+            match value {
+                Some(value) => {
+                    bytes.push(1);
+                    put_string_bytes(bytes, value);
+                }
+                None => bytes.push(0),
+            }
+        }
+
+        let mut expected = blake3::Hasher::new();
+        expected.update(b"symthaea:observation-verification-context:v5\\n");
+        expected.update(&canonical);
+
+        assert_eq!(
+            context.fingerprint(),
+            expected.finalize().to_hex().to_string()
+        );
+    }
+
+    #[test]
     fn v2_supplement_fingerprint_matches_independent_oracle() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let report = Ed25519ReceiptVerifier::new(
