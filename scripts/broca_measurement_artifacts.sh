@@ -11,6 +11,10 @@ mkdir -p "$OUT_DIR"
 export RUSTC_WRAPPER="${RUSTC_WRAPPER:-}"
 export SCCACHE_DISABLE="${SCCACHE_DISABLE:-1}"
 
+# Frozen feature isolation for the attribution harness.
+# The root package default bundle is mutually exclusive with ssm_language.
+readonly BROCA_ATTRIBUTION_FEATURES="ssm_language,vocal-tract"
+
 echo "[broca] writing measurement artifacts to $OUT_DIR"
 
 cargo_locked_args=()
@@ -58,6 +62,7 @@ JSON
   broca_write_runtime_manifest
   echo "broca_skip_exercism=${BROCA_SKIP_EXERCISM:-0}"
   echo "broca_run_attribution_harness=${BROCA_RUN_ATTRIBUTION_HARNESS:-1}"
+  echo "broca_attribution_features=$BROCA_ATTRIBUTION_FEATURES"
   echo "broca_exercism_attempts=${BROCA_EXERCISM_ATTEMPTS:-1}"
   echo "broca_exercism_max_exercises=${BROCA_EXERCISM_MAX_EXERCISES:-0}"
   echo "broca_exercism_timeout=${BROCA_EXERCISM_TIMEOUT:-}"
@@ -103,10 +108,8 @@ fi
 # Broca-only, composed, and composed+feedback conditions.
 # The resulting JSON is also rendered by broca_measurement_summary.py for reviewer-facing evidence.
 if [[ "${BROCA_RUN_ATTRIBUTION_HARNESS:-1}" == "1" ]]; then
-  # The root package defaults to `default-mind` -> `broca_lite`, which is mutually\
-  # exclusive with `ssm_language`. Keep this measurement path explicitly isolated\
-  # from the default mind bundle so the harness tests the intended native Broca stack.\
-  cargo run "${cargo_locked_args[@]}" --no-default-features --features "ssm_language,vocal-tract" --bin broca-attribution-harness -- \
+  # Keep this measurement path explicitly isolated from the default mind bundle.
+  cargo run "${cargo_locked_args[@]}" --no-default-features --features "$BROCA_ATTRIBUTION_FEATURES" --bin broca-attribution-harness -- \
     --json-out "$OUT_DIR/attribution-harness.json"
 else
   cat > "$OUT_DIR/attribution-harness.json" <<'JSON'
