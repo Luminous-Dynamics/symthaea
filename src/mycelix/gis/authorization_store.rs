@@ -81,7 +81,9 @@ impl RecoveryAuthorizationWitness {
                 None => self.operation_id.is_empty(),
             }
             && self.action_digest == lease.action_digest
-            && self.policy == lease.policy
+            // Recovery policy is authenticated by the recovery authority. The
+            // durable store binds the claim to the exact lease/attempt identity,
+            // not to the policy namespace used to authorize recovery itself.
             && self.authority_epoch == lease.authority_epoch
     }
 }
@@ -3971,9 +3973,10 @@ fn validate_native_authority_pin_set(
             let stored_operation_id = marker_operation_id.as_deref().unwrap_or("");
             if lease.authorization_instance == witness.authorization_instance
                 && lease.action_digest == witness.action_digest
-                && lease.policy == witness.policy
+                && !witness.policy.is_empty()
                 && lease.authority_epoch == witness.authority_epoch
                 && stored_operation_id == witness.operation_id
+                && matches!(lease.state, AuthorizationLeaseState::Ready)
                 && boundary_id == witness.boundary_id
                 && action_digest == witness.action_digest
                 && authority_epoch >= 0
@@ -8689,7 +8692,7 @@ mod tests {
                 operation_id: operation_id.into(),
                 boundary_id: boundary_id.into(),
                 action_digest: witness.action_digest.clone(),
-                policy: witness.policy.clone(),
+                policy: "recovery-policy-v1".into(),
                 authority_epoch: witness.authority_epoch,
                 issued_at: "2026-10-03T11:30:00Z".into(),
             })
@@ -8718,7 +8721,7 @@ mod tests {
                     operation_id: operation_id.into(),
                     boundary_id: boundary_id.into(),
                     action_digest: witness.action_digest,
-                    policy: witness.policy,
+                    policy: "recovery-policy-v1".into(),
                     authority_epoch: witness.authority_epoch,
                     issued_at: "2026-10-03T11:45:00Z".into(),
                 })
