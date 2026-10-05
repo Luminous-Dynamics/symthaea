@@ -652,6 +652,7 @@ fn next_patch_block_end(
 enum Token {
     Ident(String),
     Number(String),
+    Quoted(String),
     LBrace,
     RBrace,
     LParen,
@@ -705,7 +706,36 @@ fn tokenize(input: &str) -> Result<Vec<Token>, OpenFoamBoundaryObservationError>
             b'(' => { index += 1; Token::LParen },
             b')' => { index += 1; Token::RParen },
             b';' => { index += 1; Token::Semi },
-            b'#' | b'"' | b'\'' => return Err(OpenFoamBoundaryObservationError::UnexpectedCharacter(byte)),
+            b'#' => return Err(OpenFoamBoundaryObservationError::UnexpectedCharacter(byte)),
+            b'"' => {
+                let mut value = String::new();
+                index += 1;
+                let mut escaped = false;
+                let mut closed = false;
+                while index < bytes.len() {
+                    let byte = bytes[index];
+                    index += 1;
+                    if escaped {
+                        value.push(byte as char);
+                        escaped = false;
+                        continue;
+                    }
+                    if byte == b'\\' {
+                        escaped = true;
+                        continue;
+                    }
+                    if byte == b'"' {
+                        closed = true;
+                        break;
+                    }
+                    value.push(byte as char);
+                }
+                if !closed || escaped {
+                    return Err(OpenFoamBoundaryObservationError::UnexpectedEndOfInput);
+                }
+                Token::Quoted(value)
+            }
+            b'\'' => return Err(OpenFoamBoundaryObservationError::UnexpectedCharacter(byte)),
             _ if is_number_start(byte) => {
                 let start = index; index += 1;
                 while index < bytes.len() && is_number_char(bytes[index]) { index += 1; }
@@ -771,6 +801,10 @@ fn parse_patch_block(tokens: &[Token], mut index: usize, patch_name: &str) -> Re
 
 fn skip_value(tokens: &[Token], index: &mut usize) -> Result<(), OpenFoamBoundaryObservationError> {
     match tokens.get(*index) {
+        Some(Token::Quoted(_)) => {
+            *index += 1;
+            Ok(())
+        }
         Some(Token::LParen) => {
             let mut depth = 1usize; *index += 1;
             while *index < tokens.len() && depth > 0 {
@@ -789,7 +823,10 @@ fn skip_value(tokens: &[Token], index: &mut usize) -> Result<(), OpenFoamBoundar
             if depth != 0 { return Err(OpenFoamBoundaryObservationError::UnexpectedEndOfInput); }
             Ok(())
         }
-        Some(Token::Ident(_) | Token::Number(_)) => { *index += 1; Ok(()) }
+        Some(Token::Ident(_) | Token::Number(_) | Token::Quoted(_)) => {
+            *index += 1;
+            Ok(())
+        }
         Some(Token::RBrace | Token::RParen | Token::Semi) | None => Err(OpenFoamBoundaryObservationError::UnexpectedEndOfInput),
     }
 }
@@ -1054,6 +1091,27 @@ mod tests {
             binding.solver_entity_observation_kind(),
             Some("openfoam-polyMesh-boundary-patch:v1")
         );
+    }
+
+    #[test]
+    fn real_openfoam_style_quoted_header_is_accepted() {
+        let source = br#"FoamFile
+{
+    version 2.0;
+    format ascii;
+    class polyBoundaryMesh;
+    location "constant/polyMesh";
+    object boundary;
+}
+1
+(
+    inlet { type patch; nFaces 1; startFace 0; }
+)
+// ************************************************************************* //
+"#;
+        let (record, _) = observe_openfoam_boundary_patch(source, "inlet").unwrap();
+        assert_eq!(record.patch_name, "inlet");
+        assert_eq!(record.patch_type, "patch");
     }
 
     #[test]
