@@ -6309,6 +6309,76 @@ mod tests {
     }
 
     #[test]
+    fn v2_supplement_fingerprint_matches_independent_oracle() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let context = VerificationContextV5::from_report(&report);
+        let supplement = EvaluationContextSupplement::empty()
+            .with_evaluator_identity_fingerprint(
+                blake3::hash(b"evaluator-a").to_hex().to_string(),
+            )
+            .with_trust_root_fingerprint(
+                blake3::hash(b"trust-root-a").to_hex().to_string(),
+            )
+            .with_relying_party_authorization_policy_fingerprint(
+                blake3::hash(b"rp-policy-a").to_hex().to_string(),
+            )
+            .bind_to_evaluation(&context, &report.fingerprint());
+
+        fn put_string(hasher: &mut blake3::Hasher, value: &str) {
+            hasher.update(&(value.len() as u64).to_be_bytes());
+            hasher.update(value.as_bytes());
+        }
+
+        fn put_option(hasher: &mut blake3::Hasher, value: Option<&str>) {
+            match value {
+                Some(value) => {
+                    hasher.update(&[1]);
+                    put_string(hasher, value);
+                }
+                None => hasher.update(&[0]),
+            }
+        }
+
+        let mut expected = blake3::Hasher::new();
+        expected.update(b"symthaea:observation-evaluation-context-supplement:v2\n");
+        put_string(&mut expected, supplement.supplement_version);
+        put_string(&mut expected, supplement.attachment_phase);
+        put_option(
+            &mut expected,
+            supplement.applies_to_context_fingerprint.as_deref(),
+        );
+        put_option(
+            &mut expected,
+            supplement.applies_to_report_fingerprint.as_deref(),
+        );
+        put_option(
+            &mut expected,
+            supplement.evaluator_identity_fingerprint.as_deref(),
+        );
+        put_option(
+            &mut expected,
+            supplement.trust_root_fingerprint.as_deref(),
+        );
+        put_option(
+            &mut expected,
+            supplement
+                .authorization_policy_fingerprint
+                .as_deref(),
+        );
+
+        assert_eq!(
+            supplement.fingerprint(),
+            expected.finalize().to_hex().to_string()
+        );
+    }
+
+    #[test]
     fn v2_supplement_fingerprint_independently_binds_report_identity() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let report_a = Ed25519ReceiptVerifier::new(
