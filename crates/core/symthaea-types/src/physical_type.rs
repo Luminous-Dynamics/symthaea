@@ -120,6 +120,24 @@ impl RationalScale {
     pub const fn is_valid(self) -> bool {
         self.denominator > 0
     }
+
+    pub fn as_f64(self) -> Result<f64, PhysicalTypeError> {
+        if !self.is_valid() {
+            return Err(PhysicalTypeError {
+                operation: "rational_scale".into(),
+                reason: "rational denominator must be positive".into(),
+            });
+        }
+        let value = self.numerator as f64 / self.denominator as f64;
+        if value.is_finite() {
+            Ok(value)
+        } else {
+            Err(PhysicalTypeError {
+                operation: "rational_scale".into(),
+                reason: "rational value is not finite in f64".into(),
+            })
+        }
+    }
 }
 
 /// Exact affine conversion to SI: si = value * scale + offset.
@@ -155,7 +173,48 @@ impl UnitTransform {
         }
         Ok(())
     }
-}
+
+    pub fn to_si_value(self, value: f64) -> Result<f64, PhysicalTypeError> {
+        if !value.is_finite() {
+            return Err(PhysicalTypeError {
+                operation: "unit_conversion".into(),
+                reason: "value must be finite".into(),
+            });
+        }
+        self.validate()?;
+        let scale = self.scale.as_f64()?;
+        let offset = self.offset.as_f64()?;
+        let si = value * scale + offset;
+        if si.is_finite() {
+            Ok(si)
+        } else {
+            Err(PhysicalTypeError {
+                operation: "unit_conversion".into(),
+                reason: "SI conversion produced a non-finite value".into(),
+            })
+        }
+    }
+
+    pub fn from_si_value(self, si_value: f64) -> Result<f64, PhysicalTypeError> {
+        if !si_value.is_finite() {
+            return Err(PhysicalTypeError {
+                operation: "unit_conversion".into(),
+                reason: "SI value must be finite".into(),
+            });
+        }
+        self.validate()?;
+        let scale = self.scale.as_f64()?;
+        let offset = self.offset.as_f64()?;
+        let value = (si_value - offset) / scale;
+        if value.is_finite() {
+            Ok(value)
+        } else {
+            Err(PhysicalTypeError {
+                operation: "unit_conversion".into(),
+                reason: "conversion from SI produced a non-finite value".into(),
+            })
+        }
+    }
 
 /// Backward-compatible name for multiplicative units.
 pub type UnitScale = RationalScale;
@@ -376,6 +435,49 @@ impl PhysicalType {
         }
         TypeJudgement::Valid(())
     }
+
+    pub fn convert_value_to(
+        &self,
+        value: f64,
+        target: &Self,
+    ) -> TypeJudgement<f64> {
+        if let Err(error) = self.validate() {
+            return TypeJudgement::Invalid(error);
+        }
+        if let Err(error) = target.validate() {
+            return TypeJudgement::Invalid(error);
+        }
+
+        match self.judge_compatibility(target) {
+            TypeJudgement::Invalid(error) => return TypeJudgement::Invalid(error),
+            TypeJudgement::Unknown(reason) => return TypeJudgement::Unknown(reason),
+            TypeJudgement::Valid(()) => {}
+        }
+
+        if !value.is_finite() {
+            return TypeJudgement::Invalid(PhysicalTypeError {
+                operation: "unit_conversion".into(),
+                reason: "value must be finite".into(),
+            });
+        }
+
+        match (&self.unit, &target.unit) {
+            (None, None) => TypeJudgement::Valid(value),
+            (Some(source), Some(destination)) => {
+                let si = match source.transform_to_si.to_si_value(value) {
+                    Ok(value) => value,
+                    Err(error) => return TypeJudgement::Invalid(error),
+                };
+                match destination.transform_to_si.from_si_value(si) {
+                    Ok(value) => TypeJudgement::Valid(value),
+                    Err(error) => TypeJudgement::Invalid(error),
+                }
+            }
+            _ => TypeJudgement::Unknown(
+                "numeric conversion requires explicit units on both sides".into(),
+            ),
+        }
+    }
 }
 
 /// Physical quantity kinds are stricter than dimensions. Energy and Torque,
@@ -533,6 +635,75 @@ mod tests {
             ),
         };
         assert_eq!(celsius.transform_to_si.offset.numerator, 27315);
+    }
+
+    #[test]
+    fn unit_conversion_is_explicit_and_affine() {
+        let length_m = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH)
+            .with_unit(UnitRef {
+                symbol: "m".into(),
+                transform_to_si: UnitTransform::IDENTITY,
+                semantic_id: None,
+            });
+        let length_ft = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH)
+            .with_unit(UnitRef {
+                symbol: "ft".into(),
+                transform_to_si: UnitTransform::new(
+                    RationalScale { numerator: 3048, denominator: 10000 },
+                    RationalScale { numerator: 0, denominator: 1 },
+                ),
+                semantic_id: None,
+            });
+
+        match length_ft.convert_value_to(1.0, &length_m) {
+            TypeJudgement::Valid(value) => assert!((value - 0.3048).abs() < 1e-12),
+            other => panic!("unexpected conversion judgment: {other:?}"),
+        }
+
+        let celsius = PhysicalType::with_kind(
+            QuantityKind::Temperature,
+            PhysicalDimension::TEMPERATURE,
+        )
+        .with_unit(UnitRef {
+            symbol: "degC".into(),
+            transform_to_si: UnitTransform::new(
+                RationalScale::ONE,
+                RationalScale { numerator: 27315, denominator: 100 },
+            ),
+            semantic_id: None,
+        });
+        let kelvin = PhysicalType::with_kind(
+            QuantityKind::Temperature,
+            PhysicalDimension::TEMPERATURE,
+        )
+        .with_unit(UnitRef {
+            symbol: "K".into(),
+            transform_to_si: UnitTransform::IDENTITY,
+            semantic_id: None,
+        });
+
+        match celsius.convert_value_to(0.0, &kelvin) {
+            TypeJudgement::Valid(value) => assert!((value - 273.15).abs() < 1e-12),
+            other => panic!("unexpected affine conversion judgment: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unit_conversion_is_unknown_when_units_are_missing() {
+        let metres = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH);
+        let feet = metres.clone().with_unit(UnitRef {
+            symbol: "ft".into(),
+            transform_to_si: UnitTransform::new(
+                RationalScale { numerator: 3048, denominator: 10000 },
+                RationalScale { numerator: 0, denominator: 1 },
+            ),
+            semantic_id: None,
+        });
+
+        assert!(matches!(
+            metres.convert_value_to(1.0, &feet),
+            TypeJudgement::Unknown(_)
+        ));
     }
 
     #[test]
