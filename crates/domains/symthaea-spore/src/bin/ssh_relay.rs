@@ -686,6 +686,26 @@ fn config_write_commands_heredoc(
     out
 }
 
+fn is_supported_install_layout(layout: &str) -> bool {
+    matches!(
+        layout,
+        ""
+            | "alongside"
+            | "single"
+            | "single-zfs"
+            | "single-luks"
+            | "dual"
+            | "raid1-btrfs"
+            | "raid1-mdadm"
+            | "raid5-mdadm"
+            | "raid6-mdadm"
+            | "raid10-mdadm"
+            | "zfs-mirror"
+            | "zfs-raidz"
+            | "zfs-raidz2"
+    )
+}
+
 fn generate_install_script(msg: &ClientMessage, session_id: u64) -> String {
     // SECURITY: All user inputs (disk, hostname, timezone, keyboard, desktop, gpu_driver)
     // MUST be validated by the caller before reaching this function.
@@ -2564,6 +2584,18 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
 
             "install" => {
                 // ── Validate ALL user inputs before they reach shell commands ──
+                if !is_supported_install_layout(&client_msg.layout) {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Unsupported install layout: {}",
+                                client_msg.layout
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
                 let disk = if client_msg.disk.is_empty() {
                     "/dev/sda".to_string()
                 } else {
@@ -5032,6 +5064,45 @@ echo '}'
     // Cleanup
     tracker.lock().await.release(&peer_addr);
     eprintln!("[{}] WebSocket disconnected", peer_addr);
+}
+
+#[cfg(test)]
+mod layout_validation_tests {
+    use super::is_supported_install_layout;
+
+    #[test]
+    fn supported_layouts_are_exactly_allowlisted() {
+        for layout in [
+            "",
+            "alongside",
+            "single",
+            "single-zfs",
+            "single-luks",
+            "dual",
+            "raid1-btrfs",
+            "raid1-mdadm",
+            "raid5-mdadm",
+            "raid6-mdadm",
+            "raid10-mdadm",
+            "zfs-mirror",
+            "zfs-raidz",
+            "zfs-raidz2",
+        ] {
+            assert!(is_supported_install_layout(layout), "layout={layout}");
+        }
+    }
+
+    #[test]
+    fn unknown_layouts_are_rejected_before_generation() {
+        for layout in [
+            "single;touch /tmp/pwned",
+            "$(touch /tmp/pwned)",
+            "raid1-mdadm' ; id #",
+            "sh -c 'id'",
+        ] {
+            assert!(!is_supported_install_layout(layout), "layout={layout}");
+        }
+    }
 }
 
 fn generate_auth_token() -> String {
