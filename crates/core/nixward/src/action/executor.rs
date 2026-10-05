@@ -498,11 +498,11 @@ enum ExecutionBasisV1 {
 /// but they must never dispatch a service effect. Custom(systemctl ...) is
 /// likewise treated as a legacy representation and cannot recover authority.
 fn legacy_service_effect_requires_live_authority(command: &NixOSCommand) -> bool {
-    matches!(
-        command,
-        NixOSCommand::Service { .. }
-            | NixOSCommand::Custom { command, .. } if command == "systemctl"
-    )
+    match command {
+        NixOSCommand::Service { .. } => true,
+        NixOSCommand::Custom { command, .. } => command == "systemctl",
+        _ => false,
+    }
 }
 
 /// In-memory provenance for an execution that crossed the live Nixward
