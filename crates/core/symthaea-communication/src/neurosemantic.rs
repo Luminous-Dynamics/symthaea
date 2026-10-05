@@ -868,6 +868,7 @@ mod tests {
             expires_at_unix_s: 200,
             consent_epoch: 7,
             revoked: false,
+            revoked_at_unix_s: None,
         }
     }
 
