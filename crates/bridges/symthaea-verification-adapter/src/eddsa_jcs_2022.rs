@@ -144,11 +144,9 @@ pub fn verify_eddsa_jcs_2022(
         return Err(SnapshotError::Verification(
             VerificationFailure::ProofPurposeMismatch {
                 expected: request.proof_purpose.clone(),
-                actual: proof_purpose.to_owned().try_into().map_err(|_| {
-                    VerificationFailure::Structural(
-                        "proof purpose could not be represented by the contract".into(),
-                    )
-                })?,
+                actual: symthaea_epistemic_types::ClaimProofPurpose::new(
+                    proof_purpose.to_owned(),
+                )?,
             },
         ));
     }
@@ -606,7 +604,7 @@ mod tests {
     #[test]
     fn rejects_key_material_substitution_before_signature_check() {
         let request = vector_request();
-        let (mut resolution, mut resolved_method) = resolved_vector(&request);
+        let (resolution, mut resolved_method) = resolved_vector(&request);
         if let ResolvedVerificationMethodMaterial::Multikey {
             public_key_multibase,
         } = &mut resolved_method.material
@@ -624,9 +622,5 @@ mod tests {
                 VerificationFailure::ResolutionEvidenceMismatch
             ))
         ));
-        // Keep the variable mutable above explicit: the receipt's material digest
-        // remains bound to the original resolved material and must not be substituted.
-        resolution.verification_method_material_digest =
-            resolved_method.material_digest.clone();
     }
 }
