@@ -221,6 +221,11 @@ impl StreamingVocalTract {
         self.neural_channel.is_some()
     }
 
+    /// Authoritative speaker base F0 from the controller configuration.
+    pub fn base_f0(&self) -> f32 {
+        self.pipeline.controller.config().base_f0
+    }
+
     /// Run one motor frame and produce audio samples.
     ///
     /// Returns a chunk of audio samples (length = sample_rate / frame_rate).
