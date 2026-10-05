@@ -255,7 +255,10 @@ impl Rfc9942Es256CoseKey {
                 }
                 CborLabelKey::Integer(COSE_KEY_OPS_LABEL) => {
                     key_ops_seen=true;
-                    let items=value_reader.read_array_items_bounded(16).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                    let items=value_reader.read_array_items_bounded(16).map_err(|error|match error {
+                        Rfc9162ProofDecodeError::ResourceLimitExceeded => Rfc9942VdpError::ResourceLimitExceeded,
+                        _ => Rfc9942VdpError::InvalidEncoding,
+                    })?;
                     if items.is_empty() { return Err(Rfc9942VdpError::InvalidEs256CoseKey); }
                     for item in items {
                         let mut item_reader=CborReader::new(&item);
