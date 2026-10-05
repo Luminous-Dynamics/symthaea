@@ -57,6 +57,9 @@ pub struct PhonologicalPlanRealizationReceipt {
     pub plan_grounding_blake3: String,
     pub realization_authorized: bool,
     pub segment_count: usize,
+    /// Exact per-segment motor-frame schedule derived from phoneme identity, stress,
+    /// utterance-final position, rate, and explicitly encoded silence pause weight.
+    pub segment_frame_counts: Vec<usize>,
     pub scheduler_frames: usize,
     pub sample_count: usize,
     pub sample_rate: u32,
@@ -97,6 +100,34 @@ impl PhonologicalPlanRealizationReceipt {
             || self.pause_weight != plan.pause_weight
         {
             anyhow::bail!("realization receipt plan fields do not match plan");
+        }
+
+        let expected_segment_frame_counts = plan
+            .segments
+            .iter()
+            .enumerate()
+            .map(|(index, segment)| {
+                let mut frames = predict_duration(
+                    &segment.symbol,
+                    segment.stress.ordinal(),
+                    false,
+                    index + 1 == plan.segments.len(),
+                    plan.rate,
+                );
+                if segment.symbol.eq_ignore_ascii_case("SIL") {
+                    frames = ((frames as f32) * (1.0 + plan.pause_weight)).round() as usize;
+                }
+                frames
+            })
+            .collect::<Vec<_>>();
+
+        if self.segment_frame_counts != expected_segment_frame_counts {
+            anyhow::bail!("realization receipt segment frame schedule does not match plan");
+        }
+
+        let expected_scheduler_frames = expected_segment_frame_counts.iter().copied().sum::<usize>();
+        if self.scheduler_frames != expected_scheduler_frames {
+            anyhow::bail!("realization receipt scheduler frame total does not match plan");
         }
 
         let samples_per_frame = (self.sample_rate / FRAME_RATE) as usize;
@@ -449,6 +480,7 @@ impl LiveVoice {
                 .to_string(),
             realization_authorized: plan.realization_authorized,
             segment_count: plan.segments.len(),
+            segment_frame_counts: segment_frame_counts.clone(),
             scheduler_frames: total_frames,
             sample_count: all_samples.len(),
             sample_rate: self.streaming.vocoder.sample_rate(),
@@ -1035,6 +1067,7 @@ mod tests {
                 .to_string()
         );
         assert_eq!(receipt.segment_count, 1);
+        assert_eq!(receipt.segment_frame_counts.len(), 1);
         assert_eq!(
             receipt.sample_count,
             receipt.scheduler_frames * (receipt.sample_rate / FRAME_RATE) as usize
@@ -1085,6 +1118,21 @@ mod tests {
         unauthorized_receipt.realization_authorized = false;
         assert!(unauthorized_receipt.verify_against_plan(&plan).is_err());
         assert!(receipt.verify_samples(&samples));
+
+        let mut tampered_schedule = receipt.clone();
+        tampered_schedule.segment_frame_counts[0] =
+            tampered_schedule.segment_frame_counts[0].saturating_add(1);
+        assert!(
+            tampered_schedule.verify_against_plan(&plan).is_err(),
+            "receipt verification must recompute the exact segment schedule"
+        );
+
+        let mut tampered_total = receipt.clone();
+        tampered_total.scheduler_frames = tampered_total.scheduler_frames.saturating_add(1);
+        assert!(
+            tampered_total.verify_against_plan(&plan).is_err(),
+            "receipt verification must bind the total scheduler-frame count"
+        );
 
         let mut tampered = plan.clone();
         tampered.rate = if tampered.rate < 1.0 { 1.2 } else { 0.8 };
