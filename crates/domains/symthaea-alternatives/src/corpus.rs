@@ -596,6 +596,36 @@ mod tests {
     }
 
     #[test]
+    fn future_observation_is_unusable_at_assessment_time() {
+        let case = five_pathway_adversarial_case();
+        let mut future_case = case.clone();
+        for candidate in &mut future_case.candidates {
+            for evidence in &mut candidate.evidence {
+                evidence.observed_at_epoch_seconds = Some(2_000);
+            }
+        }
+
+        let result = AlternativesEngine
+            .assess_at(
+                &future_case.requirement,
+                &future_case.candidates,
+                Some(future_case.incumbent_id),
+                Some(1_000),
+            )
+            .unwrap();
+
+        let direct = result
+            .candidates
+            .iter()
+            .find(|candidate| candidate.candidate_id == "direct-substitute")
+            .unwrap();
+        assert_eq!(direct.qualification, QualificationState::Hypothesis);
+        assert!(result.frontier_blockers["direct-substitute"]
+            .iter()
+            .any(|blocker| matches!(blocker, FrontierBlocker::EvidenceUnavailable(_))));
+    }
+
+    #[test]
     fn five_pathway_case_does_not_make_regrettable_substitution_disappear() {
         let result = run_case(&five_pathway_adversarial_case()).unwrap();
         let direct = result
