@@ -5,7 +5,7 @@
 //! and the seeded entry point for the primed arm
 //! on the Planar Circular Restricted Three-Body Problem (PCR3BP) in two conditions:
 //!
-//! - **cold**: no `extra_seed_templates`
+//! - **cold**: true cold search with the built-in invariant-template library disabled
 //! - **primed**: seeded with Kepler-derived macros (angular momentum
 //!   `x*vy - y*vx`, squared radius `x²+y²`, squared speed `vx²+vy²`,
 //!   inverse distance `1/sqrt(x²+y²)`)
