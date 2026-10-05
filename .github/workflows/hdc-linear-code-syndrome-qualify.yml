@@ -75,6 +75,14 @@ jobs:
           test "$(rustc +1.96.1 --version | awk '{print $2}')" = "1.96.1"
           test "$(cargo +1.96.1 --version | awk '{print $2}')" = "1.96.1"
 
+      - name: Capture runner provenance
+        id: runner
+        run: |
+          echo "runner_os=$RUNNER_OS" >> "$GITHUB_OUTPUT"
+          echo "runner_arch=$RUNNER_ARCH" >> "$GITHUB_OUTPUT"
+          echo "runner_image=$ImageOS" >> "$GITHUB_OUTPUT"
+          echo "runner_image_version=$ImageVersion" >> "$GITHUB_OUTPUT"
+
       - name: Capture source provenance
         id: provenance
         run: |
@@ -233,6 +241,11 @@ jobs:
           strict_clippy_status=${{ steps.clippy.outcome }}
           dependency_lock_sha256=${{ steps.harness.outputs.lock_sha256 }}
           syndrome_decoder_ledger_status=${{ steps.decoder_ledger.outcome }}
+          runner_os=${{ steps.runner.outputs.runner_os }}
+          runner_arch=${{ steps.runner.outputs.runner_arch }}
+          runner_image=${{ steps.runner.outputs.runner_image }}
+          runner_image_version=${{ steps.runner.outputs.runner_image_version }}
+          qualification_status=${{ steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
           random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
           random_syndrome_sweep=${{ steps.random_sweep.outputs.random_syndrome_sweep }}
