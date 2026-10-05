@@ -852,6 +852,12 @@ impl CandidatePathway {
         if !Self::evidence_is_valid_at(evidence, as_of) {
             return false;
         }
+        if let (Some(assessed_at), Some(observed_at)) =
+            (as_of, evidence.observed_at_epoch_seconds)
+            && observed_at > assessed_at
+        {
+            return false;
+        }
 
         let Some(policy) = freshness_policy else {
             return true;
@@ -3099,6 +3105,11 @@ mod tests {
             assessment.qualification,
             QualificationState::ComputationallyPlausible
         );
+        assert!(assessment
+            .constraints
+            .iter()
+            .all(|constraint| constraint.status == ConstraintStatus::Unresolved));
+        assert!(result.frontier_blockers.contains_key("conflict"));
     }
 
     #[test]
