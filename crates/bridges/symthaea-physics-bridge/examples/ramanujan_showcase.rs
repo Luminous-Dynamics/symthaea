@@ -6,7 +6,7 @@
 //!
 //! End-to-end demonstration of the Automated Physicist:
 //!
-//!   ODE → autonomous discovery → symbolic proof → physics catalog recognition →
+//!   ODE → autonomous discovery → symbolic assessment → physics catalog recognition →
 //!         paper-ready LaTeX table
 //!
 //! This example composes Tier 1 (Z3 bridge, LaTeX converter, physics recognition)
@@ -21,7 +21,7 @@
 //! Output:
 //! - Live discovery progress for each canonical problem
 //! - Per-problem recognition annotation against the 128-equation catalog
-//! - Per-problem Z3 verification status
+//! - Per-problem symbolic/numerical verification-evidence status
 //! - One combined LaTeX table ready to paste into papers/latex/ramanujan-protocol/
 
 use symthaea_core::hdc::conjecture_engine::{
@@ -324,7 +324,7 @@ struct DiscoveryResult {
     name: String,
     domain: String,
     best: Option<AutonomousInvariant>,
-    z3_status: String,
+    verification_status: String,
     recognition_headline: String,
     latex_formula: String,
 }
@@ -372,14 +372,14 @@ fn run_problem(
         // Conservation evidence from the symbolic assessor. This is a
         // chain-rule derivation plus six fixed numeric residual samples, not
         // a universal theorem and not a Z3 proof.
-        let z3_status = if inv.symbolic_check_passed {
+        let verification_status = if inv.symbolic_check_passed {
             "Symbolic check + 6-point residual".to_string()
         } else if inv.variance < 1e-6 {
             "Numerical".to_string()
         } else {
             "Approximate".to_string()
         };
-        println!("  ⏵ Status:   {}", z3_status);
+        println!("  ⏵ Status:   {}", verification_status);
 
         // Recognition against the physics catalog — uses the new units-aware
         // path, which feeds dimensional inference into the search query and
@@ -404,7 +404,7 @@ fn run_problem(
             name: name.to_string(),
             domain: domain.to_string(),
             best: Some(inv.clone()),
-            z3_status,
+            verification_status,
             recognition_headline: headline,
             latex_formula: latex,
         }
@@ -414,7 +414,7 @@ fn run_problem(
             name: name.to_string(),
             domain: domain.to_string(),
             best: None,
-            z3_status: "—".to_string(),
+            verification_status: "—".to_string(),
             recognition_headline: "no candidates produced".to_string(),
             latex_formula: "\\text{none}".to_string(),
         }
@@ -460,9 +460,11 @@ fn emit_combined_latex_table(results: &[DiscoveryResult], catalog_size: usize) -
             None => "—".to_string(),
         };
 
-        let status_cell = match (&r.best, r.z3_status.contains("PROVEN")) {
-            (Some(_), true) => "\\textbf{PROVEN}",
-            (Some(_), false) => "Numeric",
+        let status_cell = match (&r.best, r.verification_status.as_str()) {
+            (Some(_), "Symbolic check + 6-point residual") => "Symbolic + sampled",
+            (Some(_), "Numerical") => "Numeric",
+            (Some(_), "Approximate") => "Approximate",
+            (Some(_), _) => "Unspecified",
             (None, _) => "—",
         };
 
@@ -791,7 +793,7 @@ fn main() {
             name: "Triangular Numbers".to_string(),
             domain: "Combinatorics".to_string(),
             best: None, // sequence-based, doesn't fit AutonomousInvariant struct
-            z3_status: z3_str,
+            verification_status: z3_str,
             recognition_headline: report.headline(),
             latex_formula: latex,
         });
