@@ -1523,12 +1523,17 @@ impl ObservationGraph {
                 write_canonical_string_bytes(&mut bytes, &parent_id);
             }
             if let Some(activity) = &observation.provenance.processing_activity {
-                // The bounded independence predicate consumes only activity_id.
-                // Process/configuration/timing/agent/execution realization fields
-                // are validated provenance, but are not read by this predicate and
-                // therefore must remain outside this scope identity.
+                // This is the frozen v2 scope representation. Preserve the historical
+                // processing-activity execution commitment exactly; the next-version
+                // predicate-relative scope will narrow this to activity_id only.
                 bytes.push(1);
                 write_canonical_string_bytes(&mut bytes, &activity.activity_id);
+                if let Some(execution_fingerprint) = &activity.execution_fingerprint {
+                    bytes.push(1);
+                    write_canonical_string_bytes(&mut bytes, execution_fingerprint);
+                } else {
+                    bytes.push(0);
+                }
             } else {
                 bytes.push(0);
             }
@@ -3126,7 +3131,7 @@ mod tests {
         );
     }
     #[test]
-    fn independence_scope_identity_excludes_valid_unread_processing_activity_fields() {
+    fn independence_scope_identity_preserves_historical_processing_activity_commitment() {
         let mut source = fixture();
         source.provenance.processing_activity = Some(ProcessingActivity {
             activity_id: "run-001".into(),
@@ -3173,7 +3178,7 @@ mod tests {
         );
 
         assert!(mutated.validate().is_ok());
-        assert_eq!(
+        assert_ne!(
             mutated
                 .independence_verification_scope_fingerprint()
                 .expect("mutated scope"),
