@@ -456,12 +456,31 @@ impl PhysicalType {
         match self.judge_compatibility(other) {
             TypeJudgement::Invalid(error) => TypeJudgement::Invalid(error),
             TypeJudgement::Unknown(reason) => TypeJudgement::Unknown(reason),
-            TypeJudgement::Valid(()) => match (&self.unit, &other.unit) {
-                (Some(_), Some(_)) | (None, None) => TypeJudgement::Valid(()),
-                _ => TypeJudgement::Unknown(
-                    "numeric transport requires explicit units on both sides or neither side"
-                        .into(),
-                ),
+            TypeJudgement::Valid(()) => {
+                match (&self.unit, &other.unit) {
+                    (Some(_), Some(_)) | (None, None) => {}
+                    _ => {
+                        return TypeJudgement::Unknown(
+                            "numeric transport requires explicit units on both sides or neither side"
+                                .into(),
+                        );
+                    }
+                }
+
+                match (self.scalar, other.scalar) {
+                    (ScalarDomain::Unknown, _) | (_, ScalarDomain::Unknown) => {
+                        TypeJudgement::Unknown(
+                            "numeric transport requires known scalar domains on both sides"
+                                .into(),
+                        )
+                    }
+                    (left, right) if left == right => TypeJudgement::Valid(()),
+                    _ => TypeJudgement::Invalid(PhysicalTypeError {
+                        operation: "numeric_compatibility".into(),
+                        reason: "scalar domains differ; an explicit numeric cast is required"
+                            .into(),
+                    }),
+                }
             },
         }
     }
@@ -818,6 +837,30 @@ mod tests {
         ));
         assert!(matches!(
             metres.judge_numeric_compatibility(&metres_explicit),
+            TypeJudgement::Unknown(_)
+        ));
+    }
+
+    #[test]
+    fn numeric_compatibility_rejects_scalar_domain_mismatch() {
+        let real = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH);
+        let mut complex = real.clone();
+        complex.scalar = ScalarDomain::Complex;
+
+        assert!(matches!(
+            real.judge_numeric_compatibility(&complex),
+            TypeJudgement::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn numeric_compatibility_stays_unknown_for_unknown_scalar_domain() {
+        let real = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH);
+        let mut unknown_scalar = real.clone();
+        unknown_scalar.scalar = ScalarDomain::Unknown;
+
+        assert!(matches!(
+            real.judge_numeric_compatibility(&unknown_scalar),
             TypeJudgement::Unknown(_)
         ));
     }
