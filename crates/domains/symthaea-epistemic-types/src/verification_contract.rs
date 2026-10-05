@@ -1558,6 +1558,9 @@ pub struct VerificationEvidence {
     pub statement_digest: String,
     pub author: ClaimAuthorIdentity,
     pub proof_purpose: ClaimProofPurpose,
+    /// Exact JCS-transformed representation binding carried through the evidence envelope.
+    #[serde(default)]
+    pub expected_transformed_document_digest: Option<String>,
     pub verification_method: ClaimVerificationMethod,
     pub controller: ClaimControllerIdentity,
     /// Controller identity actually read from the resolved verification-method definition.
