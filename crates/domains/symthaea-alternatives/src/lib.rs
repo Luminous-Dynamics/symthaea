@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 9;
+pub const SCHEMA_VERSION: u16 = 10;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-v15";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-v16";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -3177,6 +3177,111 @@ mod tests {
             result.candidates[0].qualification,
             QualificationState::EvidenceSupported
         );
+    }
+
+    #[test]
+    fn comparison_basis_mismatch_blocks_frontier_and_dominance() {
+        let mut c = candidate(
+            "basis-drift",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "basis-evidence",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.burdens
+            .get_mut(&Dimension::Water)
+            .unwrap()
+            .basis
+            .basis_revision = "v2".into();
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c.clone()], None)
+            .unwrap();
+        assert!(result.frontier_blockers["basis-drift"]
+            .iter()
+            .any(|blocker| matches!(
+                blocker,
+                FrontierBlocker::ComparisonBasisMismatch { context, .. }
+                    if context == "burden:Water"
+            )));
+        assert!(!result.pareto_frontier.contains(&"basis-drift".into()));
+
+        let incumbent = candidate(
+            "basis-incumbent",
+            PathwayKind::ProcessSubstitution,
+            4.0,
+            4.0,
+            vec![evidence(
+                "basis-incumbent-evidence",
+                "source-incumbent",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        assert!(!AlternativesEngine::dominates(
+            &c.burdens,
+            &incumbent.burdens
+        ));
+    }
+
+    #[test]
+    fn burden_transfer_ignores_cross_basis_dimension() {
+        let incumbent = candidate(
+            "incumbent-basis",
+            PathwayKind::MaterialSubstitution,
+            10.0,
+            10.0,
+            vec![evidence(
+                "bi",
+                "authority-a",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut candidate = candidate(
+            "candidate-basis",
+            PathwayKind::ProcessSubstitution,
+            3.0,
+            30.0,
+            vec![evidence(
+                "bc",
+                "authority-b",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        candidate
+            .burdens
+            .get_mut(&Dimension::Water)
+            .unwrap()
+            .basis
+            .basis_revision = "v2".into();
+
+        let result = AlternativesEngine
+            .assess(
+                &fixture_requirement(),
+                &[incumbent, candidate],
+                Some("incumbent-basis"),
+            )
+            .unwrap();
+        let transfer = result
+            .burden_transfers
+            .iter()
+            .find(|transfer| transfer.candidate_id == "candidate-basis")
+            .unwrap();
+
+        assert!(transfer.clearly_better.contains(&Dimension::Hazard));
+        assert!(!transfer.clearly_better.contains(&Dimension::Water));
+        assert!(!transfer.clearly_worse.contains(&Dimension::Water));
     }
 
     #[test]
