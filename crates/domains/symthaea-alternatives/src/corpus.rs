@@ -86,7 +86,7 @@ fn candidate(
             (
                 "service_life_years".into(),
                 PerformanceEstimate {
-                    value: 12.0,
+                    interval: Interval::point(12.0).unwrap(),
                     unit: "burden-unit".into(),
                     scope: "benchmark:functional-unit-v1|global".into(),
                     evidence_ids: evidence_ids.iter().map(|id| (*id).into()).collect(),
@@ -95,7 +95,7 @@ fn candidate(
             (
                 "throughput_per_hour".into(),
                 PerformanceEstimate {
-                    value: 120.0,
+                    interval: Interval::point(120.0).unwrap(),
                     unit: "burden-unit".into(),
                     scope: "benchmark:functional-unit-v1|global".into(),
                     evidence_ids: evidence_ids.iter().map(|id| (*id).into()).collect(),
@@ -116,7 +116,7 @@ fn candidate(
 /// and elimination.
 pub fn five_pathway_adversarial_case() -> BenchmarkCase {
     BenchmarkCase {
-        id: "industrial-alternatives/five-pathway-v1",
+        id: "industrial-alternatives/five-pathway-v2",
         purpose: "regrettable substitution + epistemic uncertainty + functional alternatives",
         requirement: FunctionalRequirement {
             id: "seal-v1".into(),
