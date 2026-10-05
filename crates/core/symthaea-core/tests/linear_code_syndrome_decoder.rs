@@ -450,8 +450,9 @@ fn beyond_unique_radius_decoder_matches_nearest_or_no_match_without_claiming_tar
     assert_eq!(nearest_within_bound + nearest_outside_bound, 56);
     assert_eq!(unique_matches + ambiguous_matches, nearest_within_bound);
     assert_eq!(ambiguous_matches, 0);
-    assert_eq!(nearest_outside_bound, 8);
-    assert_eq!(unique_matches, 48);
+    assert_eq!(nearest_within_bound, 8);
+    assert_eq!(nearest_outside_bound, 48);
+    assert_eq!(unique_matches, 8);
 
     println!(
         "BEYOND_RADIUS_LEDGER=observations=56;bound=2;nearest_within_bound={nearest_within_bound};nearest_outside_bound={nearest_outside_bound};unique_matches={unique_matches};ambiguous_matches={ambiguous_matches};intended_target_recovery_claim=false"
