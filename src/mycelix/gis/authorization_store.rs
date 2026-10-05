@@ -4136,7 +4136,7 @@ fn validate_native_authority_pin_set(
             "INSERT INTO authorization_terminal_evidence
              (authorization_instance,attempt_id,operation_id,native_replay_identity,
               native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
-              terminal_pin_set_id,terminal_pin_set_digest,relying_party_id,boundary_id,attempt_scope_digest,
+              native_authority_pin_set_id,native_authority_pin_set_digest,relying_party_id,boundary_id,attempt_scope_digest,
                action_digest,provider_idempotency_key,target_identity,audience,adapter,
               adapter_revision,adapter_implementation_digest,outcome,evidence_id,
               evidence_digest,attempt_binding_digest,verifier_id,verifier_revision,verifier_implementation_id,
