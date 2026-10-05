@@ -7,8 +7,8 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/domains/symthaea-broca/**"
-      - "src/voice/broca_realization.rs"
-      - "src/voice/live_voice.rs"
+      - "crates/domains/symthaea-vocal-tract/**"
+      - "src/voice/**"
       - ".github/workflows/broca-feature-matrix.yml"
   workflow_dispatch:
 
