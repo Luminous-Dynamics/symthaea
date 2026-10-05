@@ -383,6 +383,8 @@ pub struct ObservationProvenanceRef {
     pub measurement_system_id: Option<String>,
     /// Canonical references forming the declared calibration/traceability chain.
     pub calibration_chain_refs: Vec<String>,
+    /// Optional experimental-design identity that caused this observation to be collected.
+    pub experimental_design_id: Option<String>,
 }
 
 impl ObservationProvenanceRef {
@@ -403,6 +405,10 @@ impl ObservationProvenanceRef {
             .measurement_system_id
             .as_ref()
             .is_some_and(String::is_empty)
+            || self
+                .experimental_design_id
+                .as_ref()
+                .is_some_and(String::is_empty)
         {
             return Err(AssessmentError::InvalidObservationProvenance);
         }
@@ -1719,6 +1725,109 @@ impl BurdenTransfer {
     }
 }
 
+/// Exact identity of a documented experimental/measurement protocol.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExperimentalProtocolRef {
+    /// Stable protocol identity.
+    pub protocol_id: String,
+    /// Protocol revision.
+    pub protocol_revision: String,
+    /// Digest of the exact protocol document or canonical protocol payload.
+    pub protocol_digest: String,
+    /// Exact comparison/metrology basis the protocol is intended to satisfy.
+    pub basis: ComparisonBasisRef,
+}
+
+impl ExperimentalProtocolRef {
+    /// Validate protocol identity and comparison basis.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.protocol_id.is_empty()
+            || self.protocol_revision.is_empty()
+            || self.protocol_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidExperimentalDesign);
+        }
+        self.basis.validate()
+    }
+}
+
+/// Explicit stopping rule for a proposed measurement campaign.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExperimentalStoppingCriteria {
+    /// Minimum number of usable observations required before evaluating the stopping rule.
+    pub min_valid_observations: u32,
+    /// Hard maximum number of observations permitted by the protocol.
+    pub max_valid_observations: u32,
+    /// Optional hard wall-clock duration in seconds.
+    pub max_duration_seconds: Option<u64>,
+    /// Optional target interval width for the declared measurand.
+    pub target_uncertainty_width: Option<f64>,
+}
+
+impl ExperimentalStoppingCriteria {
+    /// Validate the stopping rule without deciding whether it is scientifically sufficient.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.min_valid_observations == 0
+            || self.max_valid_observations < self.min_valid_observations
+            || self.max_duration_seconds == Some(0)
+            || self.target_uncertainty_width.is_some_and(|width| !width.is_finite() || width <= 0.0)
+        {
+            return Err(AssessmentError::InvalidExperimentalStoppingCriteria);
+        }
+        Ok(())
+    }
+}
+
+/// Provenance for a proposed experiment/measurement campaign.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExperimentalDesignProvenance {
+    /// Stable identity for this exact proposed campaign.
+    pub design_id: String,
+    /// Exact hypothesis identity.
+    pub hypothesis_id: String,
+    /// Human-readable statement of the hypothesis being tested.
+    pub hypothesis_statement: String,
+    /// Stable identities of unresolved uncertainties this campaign targets.
+    pub unresolved_uncertainty_refs: Vec<String>,
+    /// Exact candidate identities included in the discrimination set.
+    pub candidate_ids: Vec<String>,
+    /// Explicit discrimination targets, e.g. candidate pairs or threshold decisions.
+    pub expected_discrimination: Vec<String>,
+    /// Exact documented protocol identity.
+    pub protocol: ExperimentalProtocolRef,
+    /// Explicit stopping criteria.
+    pub stopping_criteria: ExperimentalStoppingCriteria,
+    /// Exact comparison basis governing comparability of the proposed result.
+    pub comparison_basis: ComparisonBasisRef,
+}
+
+impl ExperimentalDesignProvenance {
+    /// Validate the design's structural identity and deterministic scope.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.design_id.is_empty()
+            || self.hypothesis_id.is_empty()
+            || self.hypothesis_statement.is_empty()
+            || self.unresolved_uncertainty_refs.is_empty()
+            || self.candidate_ids.is_empty()
+            || self.expected_discrimination.is_empty()
+            || self.unresolved_uncertainty_refs.iter().any(String::is_empty)
+            || self.candidate_ids.iter().any(String::is_empty)
+            || self.expected_discrimination.iter().any(String::is_empty)
+        {
+            return Err(AssessmentError::InvalidExperimentalDesign);
+        }
+        let mut ids = self.candidate_ids.clone();
+        ids.sort();
+        ids.dedup();
+        if ids.len() != self.candidate_ids.len() {
+            return Err(AssessmentError::InvalidExperimentalDesign);
+        }
+        self.protocol.validate()?;
+        self.stopping_criteria.validate()?;
+        self.comparison_basis.validate()
+    }
+}
+
 /// Conservative next-measurement target.
 ///
 /// This is explicitly a heuristic rather than a formal expected-value-of-
@@ -1731,6 +1840,12 @@ pub struct MeasurementPriority {
     pub unresolved_candidate_count: usize,
     /// Number of candidates on the current frontier.
     pub frontier_candidate_count: usize,
+    /// Deterministic references to unresolved uncertainty surfaces.
+    pub unresolved_uncertainty_refs: Vec<String>,
+    /// Candidate IDs that the measurement is intended to discriminate.
+    pub candidate_ids: Vec<String>,
+    /// Candidate-pair discrimination targets whose current intervals are not clearly ordered.
+    pub expected_discrimination: Vec<String>,
     /// Rationale.
     pub rationale: String,
 }
@@ -1837,6 +1952,8 @@ pub struct AssessmentResult {
     pub frontier_blockers: BTreeMap<String, Vec<FrontierBlocker>>,
     /// Heuristic next-measurement target.
     pub next_measurement: Option<MeasurementPriority>,
+    /// Explicit experimental-design provenance supplied for the assessment, when available.
+    pub experimental_design: Option<ExperimentalDesignProvenance>,
     /// Deterministic receipt.
     pub receipt: AssessmentReceipt,
 }
@@ -1951,6 +2068,19 @@ pub enum AssessmentError {
     },
     /// A burden references unknown evidence.
     MissingEvidenceReference(String),
+    /// Explicit experimental-design provenance is structurally incomplete.
+    InvalidExperimentalDesign,
+    /// Experimental stopping criteria are structurally invalid.
+    InvalidExperimentalStoppingCriteria,
+    /// An experimental design references a candidate not present in the assessment.
+    ExperimentalDesignCandidateMissing(String),
+    /// An experimental design uses a comparison basis not declared by the assessment requirement.
+    ExperimentalDesignBasisMismatch {
+        /// Expected/declared assessment basis context.
+        expected: ComparisonBasisRef,
+        /// Actual design basis.
+        actual: ComparisonBasisRef,
+    },
     /// Requested incumbent does not exist.
     MissingIncumbent(String),
     /// Two candidates have the same stable identifier.
@@ -2260,6 +2390,63 @@ impl AlternativesEngine {
         incumbent_id: Option<&str>,
     ) -> Result<AssessmentResult, AssessmentError> {
         self.assess_at(requirement, candidates, incumbent_id, None)
+    }
+
+    /// Evaluate candidates with explicit experimental-design provenance.
+    ///
+    /// The design is validated and bound into the deterministic receipt. This
+    /// does not certify the protocol, sample size, power, causal validity, or
+    /// scientific adequacy.
+    pub fn assess_with_experimental_design(
+        &self,
+        requirement: &FunctionalRequirement,
+        candidates: &[CandidatePathway],
+        incumbent_id: Option<&str>,
+        assessed_at_epoch_seconds: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+        experimental_design: ExperimentalDesignProvenance,
+    ) -> Result<AssessmentResult, AssessmentError> {
+        requirement.validate()?;
+        experimental_design.validate()?;
+
+        let basis_declared = requirement
+            .comparison_scales
+            .values()
+            .any(|scale| scale.basis == experimental_design.comparison_basis)
+            || requirement
+                .performance_scales
+                .values()
+                .any(|scale| scale.basis == experimental_design.comparison_basis);
+        if !basis_declared {
+            return Err(AssessmentError::ExperimentalDesignBasisMismatch {
+                expected: requirement
+                    .comparison_scales
+                    .values()
+                    .next()
+                    .map(|scale| scale.basis.clone())
+                    .unwrap_or_else(|| experimental_design.comparison_basis.clone()),
+                actual: experimental_design.comparison_basis.clone(),
+            });
+        }
+
+        for candidate_id in &experimental_design.candidate_ids {
+            if !candidates.iter().any(|candidate| &candidate.id == candidate_id) {
+                return Err(AssessmentError::ExperimentalDesignCandidateMissing(
+                    candidate_id.clone(),
+                ));
+            }
+        }
+
+        let mut result = self.assess_at_with_freshness(
+            requirement,
+            candidates,
+            incumbent_id,
+            assessed_at_epoch_seconds,
+            freshness_policy,
+        )?;
+        result.experimental_design = Some(experimental_design);
+        result.receipt.payload_hash = canonical_payload_hash(&result)?;
+        Ok(result)
     }
 
     /// Evaluate candidates at an explicit Unix timestamp.
@@ -2586,6 +2773,7 @@ impl AlternativesEngine {
             burden_transfers,
             frontier_blockers: blockers,
             next_measurement,
+            experimental_design: None,
             receipt: AssessmentReceipt {
                 schema_version: SCHEMA_VERSION,
                 algorithm_version: ALGORITHM_VERSION.to_string(),
@@ -2698,11 +2886,57 @@ impl AlternativesEngine {
             b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0))
         });
 
-        ranked.first().map(|(dimension, unresolved_count)| MeasurementPriority {
-            dimension: *dimension,
-            unresolved_candidate_count: *unresolved_count,
-            frontier_candidate_count: frontier_assessments.len(),
-            rationale: "heuristic: largest count of unresolved frontier candidates for one dimension; no cross-dimension unit scalarization".to_string(),
+        ranked.first().map(|(dimension, unresolved_count)| {
+            let mut candidate_ids = frontier_assessments
+                .iter()
+                .filter(|candidate| {
+                    candidate.observed_evidence_count[dimension] == 0
+                        || candidate.evidence_conflict
+                })
+                .map(|candidate| candidate.candidate_id.clone())
+                .collect::<Vec<_>>();
+            candidate_ids.sort();
+
+            let mut expected_discrimination = Vec::new();
+            for left in 0..candidate_ids.len() {
+                for right in (left + 1)..candidate_ids.len() {
+                    let a = frontier_assessments
+                        .iter()
+                        .find(|candidate| candidate.candidate_id == candidate_ids[left]);
+                    let b = frontier_assessments
+                        .iter()
+                        .find(|candidate| candidate.candidate_id == candidate_ids[right]);
+                    if let (Some(a), Some(b)) = (a, b) {
+                        if let (Some(a_burden), Some(b_burden)) =
+                            (a.burdens.get(dimension), b.burdens.get(dimension))
+                        {
+                            if !(a_burden.interval.upper < b_burden.interval.lower
+                                || b_burden.interval.upper < a_burden.interval.lower)
+                            {
+                                expected_discrimination.push(format!(
+                                    "{}<->{}:{dimension:?}",
+                                    candidate_ids[left], candidate_ids[right]
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+
+            let unresolved_uncertainty_refs = candidate_ids
+                .iter()
+                .map(|candidate_id| format!("uncertainty:{candidate_id}:{dimension:?}"))
+                .collect();
+
+            MeasurementPriority {
+                dimension: *dimension,
+                unresolved_candidate_count: *unresolved_count,
+                frontier_candidate_count: frontier_assessments.len(),
+                unresolved_uncertainty_refs,
+                candidate_ids,
+                expected_discrimination,
+                rationale: "heuristic: largest count of unresolved frontier candidates for one dimension; discrimination targets are interval-overlap candidates; no cross-dimension unit scalarization".to_string(),
+            }
         })
     }
 }
@@ -2791,6 +3025,7 @@ mod tests {
                 record_digest: format!("fixture-record-digest:{id}"),
                 measurement_system_id: Some("fixture-measurement-system-v1".into()),
                 calibration_chain_refs: vec!["fixture-calibration-chain-v1".into()],
+            experimental_design_id: None
             }),
             uncertainty: matches!(
                 kind,
@@ -4497,4 +4732,107 @@ mod tests {
             FrontierBlocker::MissingDimension(Dimension::Carbon)
         ));
     }
+    #[test]
+    fn experimental_design_requires_protocol_and_stopping_metadata() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:water-v1".into(),
+            hypothesis_id: "hypothesis:water-discrimination-v1".into(),
+            hypothesis_statement: "A direct measurement can discriminate the unresolved water-burden intervals of the selected frontier candidates.".into(),
+            unresolved_uncertainty_refs: vec!["uncertainty:direct-substitute:Water".into()],
+            candidate_ids: vec!["direct-substitute".into(), "process-substitute".into()],
+            expected_discrimination: vec!["direct-substitute<->process-substitute:Water".into()],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol:water-test-v1".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "protocol-digest-v1".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 3,
+                max_valid_observations: 12,
+                max_duration_seconds: Some(86_400),
+                target_uncertainty_width: Some(0.5),
+            },
+            comparison_basis: basis,
+        };
+        let result = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &case.candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                design.clone(),
+            )
+            .unwrap();
+        assert_eq!(result.experimental_design, Some(design));
+        assert!(!result.receipt.payload_hash.is_empty());
+        let next = result.next_measurement.as_ref().unwrap();
+        assert!(!next.unresolved_uncertainty_refs.is_empty());
+        assert!(!next.candidate_ids.is_empty());
+    }
+
+    #[test]
+    fn experimental_design_rejects_unknown_candidate() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:invalid".into(),
+            hypothesis_id: "hypothesis:invalid".into(),
+            hypothesis_statement: "Test.".into(),
+            unresolved_uncertainty_refs: vec!["u".into()],
+            candidate_ids: vec!["does-not-exist".into()],
+            expected_discrimination: vec!["does-not-exist".into()],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "p".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "d".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 1,
+                max_duration_seconds: None,
+                target_uncertainty_width: None,
+            },
+            comparison_basis: basis,
+        };
+        assert_eq!(
+            AlternativesEngine
+                .assess_with_experimental_design(
+                    &case.requirement,
+                    &case.candidates,
+                    Some(case.incumbent_id),
+                    None,
+                    None,
+                    design,
+                )
+                .unwrap_err(),
+            AssessmentError::ExperimentalDesignCandidateMissing("does-not-exist".into())
+        );
+    }
+
+    #[test]
+    fn observation_can_bind_to_experimental_design_identity() {
+        let mut observation = ObservationProvenanceRef {
+            observation_id: "obs".into(),
+            subject_id: "subject".into(),
+            activity_id: "activity".into(),
+            measurand_id: "measurand".into(),
+            procedure_id: "procedure".into(),
+            record_digest: "record".into(),
+            measurement_system_id: Some("system".into()),
+            calibration_chain_refs: vec!["calibration".into()],
+            experimental_design_id: Some("design:water-v1".into()),
+        };
+        observation.validate().unwrap();
+        observation.experimental_design_id = Some(String::new());
+        assert_eq!(
+            observation.validate().unwrap_err(),
+            AssessmentError::InvalidObservationProvenance
+        );
+    }
+
 }
