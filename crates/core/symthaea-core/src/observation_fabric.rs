@@ -945,14 +945,7 @@ impl IndependenceScopeWitnessV3 {
             }
 
             let role = read_u8(bytes, &mut cursor)?;
-            if !matches!(
-                role,
-                INDEPENDENCE_SCOPE_V3_SOURCE_ROLE
-                    | INDEPENDENCE_SCOPE_V3_TARGET_ROLE
-                    | INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE
-                    | (INDEPENDENCE_SCOPE_V3_SOURCE_ROLE | INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE)
-                    | (INDEPENDENCE_SCOPE_V3_TARGET_ROLE | INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE)
-            ) {
+            if !matches!(role, 0b001 | 0b010 | 0b100 | 0b101 | 0b110) {
                 return Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3);
             }
 
@@ -1068,14 +1061,7 @@ impl IndependenceScopeWitnessV3 {
             }
             previous = Some(record.observation_id.as_str());
 
-            if !matches!(
-                record.role,
-                INDEPENDENCE_SCOPE_V3_SOURCE_ROLE
-                    | INDEPENDENCE_SCOPE_V3_TARGET_ROLE
-                    | INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE
-                    | (INDEPENDENCE_SCOPE_V3_SOURCE_ROLE | INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE)
-                    | (INDEPENDENCE_SCOPE_V3_TARGET_ROLE | INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE)
-            ) {
+            if !matches!(record.role, 0b001 | 0b010 | 0b100 | 0b101 | 0b110) {
                 return false;
             }
 
@@ -1083,10 +1069,12 @@ impl IndependenceScopeWitnessV3 {
                 & (INDEPENDENCE_SCOPE_V3_SOURCE_ROLE | INDEPENDENCE_SCOPE_V3_TARGET_ROLE)
                 != 0;
             if endpoint {
-                source_role_count +=
-                    usize::from(record.role & INDEPENDENCE_SCOPE_V3_SOURCE_ROLE != 0);
-                target_role_count +=
-                    usize::from(record.role & INDEPENDENCE_SCOPE_V3_TARGET_ROLE != 0);
+                if record.role & INDEPENDENCE_SCOPE_V3_SOURCE_ROLE != 0 {
+                    source_role_count += 1;
+                }
+                if record.role & INDEPENDENCE_SCOPE_V3_TARGET_ROLE != 0 {
+                    target_role_count += 1;
+                }
                 if record.sensor_id.as_deref().is_none_or(str::is_empty)
                     || record.coverage.is_none()
                 {
@@ -4815,6 +4803,16 @@ mod tests {
         let mut cross = receipt.clone();
         cross.assessment_fingerprint = v2_receipt.assessment_fingerprint;
         assert!(!cross.verify_integrity());
+    }
+
+    #[test]
+    fn independence_v3_scope_witness_rejects_unbounded_declared_counts() {
+        let mut bytes = INDEPENDENCE_SCOPE_V3_DOMAIN_SEPARATOR.to_vec();
+        bytes.extend_from_slice(&u64::MAX.to_le_bytes());
+        assert_eq!(
+            IndependenceScopeWitnessV3::from_canonical_bytes(&bytes),
+            Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3)
+        );
     }
 
     #[test]
