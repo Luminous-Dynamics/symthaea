@@ -425,16 +425,58 @@ fn parse_strict_json(bytes: &[u8]) -> Result<Value, SnapshotError> {
         &mut deserializer,
     )
     .map_err(|error| {
-            SnapshotError::Verification(VerificationFailure::Structural(format!(
-                "strict JSON parsing failed: {error}"
-            )))
-        })?;
+        SnapshotError::Verification(VerificationFailure::Structural(format!(
+            "strict JSON parsing failed: {error}"
+        )))
+    })?;
     deserializer.end().map_err(|error| {
         SnapshotError::Verification(VerificationFailure::Structural(format!(
             "strict JSON parsing rejected trailing data: {error}"
         )))
     })?;
+    validate_strict_ijson_value(&value)?;
     Ok(value)
+}
+
+fn validate_strict_ijson_value(value: &Value) -> Result<(), SnapshotError> {
+    match value {
+        Value::Null | Value::Bool(_) | Value::Number(_) => Ok(()),
+        Value::String(text) => {
+            if text.chars().any(is_ijson_forbidden_code_point) {
+                return Err(SnapshotError::Verification(
+                    VerificationFailure::Structural(
+                        "strict I-JSON parsing rejected a Unicode noncharacter".into(),
+                    ),
+                ));
+            }
+            Ok(())
+        }
+        Value::Array(values) => {
+            for value in values {
+                validate_strict_ijson_value(value)?;
+            }
+            Ok(())
+        }
+        Value::Object(object) => {
+            for (key, value) in object {
+                if key.chars().any(is_ijson_forbidden_code_point) {
+                    return Err(SnapshotError::Verification(
+                        VerificationFailure::Structural(
+                            "strict I-JSON parsing rejected a Unicode noncharacter in an object member name"
+                                .into(),
+                        ),
+                    ));
+                }
+                validate_strict_ijson_value(value)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+fn is_ijson_forbidden_code_point(ch: char) -> bool {
+    let code_point = ch as u32;
+    (0xFDD0..=0xFDEF).contains(&code_point) || (code_point & 0xFFFF) >= 0xFFFE
 }
 
 fn required_string(
@@ -760,6 +802,39 @@ mod tests {
             Err(SnapshotError::Verification(
                 VerificationFailure::Structural(message)
             )) if message.contains("duplicate JSON object member name")
+        ));
+    }
+
+    #[test]
+    #[test]
+    fn rejects_unicode_noncharacters_in_wire_values_and_member_names() {
+        let request = vector_request();
+        let (resolution, resolved_method) = resolved_vector(&request);
+
+        let value_noncharacter = br#"{"proof":{"type":"DataIntegrityProof"},"label":"\uFDD0"}"#;
+        assert!(matches!(
+            verify_eddsa_jcs_2022_json(
+                &request,
+                &resolution,
+                &resolved_method,
+                value_noncharacter,
+            ),
+            Err(SnapshotError::Verification(
+                VerificationFailure::Structural(message)
+            )) if message.contains("Unicode noncharacter")
+        ));
+
+        let key_noncharacter = br#"{"proof":{"type":"DataIntegrityProof"},"\uFFFF":"value"}"#;
+        assert!(matches!(
+            verify_eddsa_jcs_2022_json(
+                &request,
+                &resolution,
+                &resolved_method,
+                key_noncharacter,
+            ),
+            Err(SnapshotError::Verification(
+                VerificationFailure::Structural(message)
+            )) if message.contains("Unicode noncharacter")
         ));
     }
 
