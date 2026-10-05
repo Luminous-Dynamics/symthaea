@@ -572,8 +572,10 @@ impl BurdenTransfer {
 pub struct MeasurementPriority {
     /// Dimension to investigate next.
     pub dimension: Dimension,
-    /// Largest uncertainty width observed on the current frontier.
-    pub uncertainty_width: f64,
+    /// Number of frontier candidates lacking direct observed evidence for this dimension.
+    pub unresolved_candidate_count: usize,
+    /// Number of candidates on the current frontier.
+    pub frontier_candidate_count: usize,
     /// Rationale.
     pub rationale: String,
 }
@@ -918,35 +920,26 @@ impl AlternativesEngine {
         let mut ranked = Dimension::ALL
             .iter()
             .filter_map(|dimension| {
-                let mut max_width = 0.0_f64;
-                let mut unresolved = false;
-                for candidate in &frontier_assessments {
-                    let estimate = candidate.burdens.get(dimension)?;
-                    max_width = max_width.max(estimate.interval.width());
-                    if candidate.observed_evidence_count[dimension] == 0
-                        || candidate.evidence_conflict
-                    {
-                        unresolved = true;
-                    }
-                }
-                if unresolved && max_width > 0.0 {
-                    Some((*dimension, max_width))
-                } else {
-                    None
-                }
+                let unresolved_count = frontier_assessments
+                    .iter()
+                    .filter(|candidate| {
+                        candidate.observed_evidence_count[dimension] == 0
+                            || candidate.evidence_conflict
+                    })
+                    .count();
+                (unresolved_count > 0).then_some((*dimension, unresolved_count))
             })
             .collect::<Vec<_>>();
 
         ranked.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| a.0.cmp(&b.0))
+            b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0))
         });
 
-        ranked.first().map(|(dimension, width)| MeasurementPriority {
+        ranked.first().map(|(dimension, unresolved_count)| MeasurementPriority {
             dimension: *dimension,
-            uncertainty_width: *width,
-            rationale: "heuristic: largest unresolved burden interval on the current Pareto frontier".to_string(),
+            unresolved_candidate_count: *unresolved_count,
+            frontier_candidate_count: frontier_assessments.len(),
+            rationale: "heuristic: largest count of unresolved frontier candidates for one dimension; no cross-dimension unit scalarization".to_string(),
         })
     }
 }
@@ -1243,6 +1236,14 @@ mod tests {
         assert_eq!(
             result.next_measurement.as_ref().unwrap().dimension,
             Dimension::Water
+        );
+        assert_eq!(
+            result
+                .next_measurement
+                .as_ref()
+                .unwrap()
+                .unresolved_candidate_count,
+            1
         );
     }
 
