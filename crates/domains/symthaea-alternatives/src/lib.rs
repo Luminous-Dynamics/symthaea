@@ -3601,6 +3601,30 @@ mod tests {
     }
 
     #[test]
+    fn unadmitted_authority_diversity_cannot_promote_lifecycle_qualification() {
+        let c = candidate(
+            "unadmitted-authorities",
+            PathwayKind::MaterialSubstitution,
+            2.0,
+            2.0,
+            vec![
+                evidence("u1", "authority-a", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("u2", "authority-b", EvidenceKind::Reported, EvidenceStance::Supports, 0.9),
+                evidence("u3", "authority-c", EvidenceKind::LifecycleAssessed, EvidenceStance::Supports, 0.9),
+            ],
+        );
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
+    }
+
+    #[test]
     fn source_diversity_is_based_on_authority_identity() {
         let a = EvidenceSourceIdentity {
             authority_id: "authority-a".into(),
@@ -3626,8 +3650,25 @@ mod tests {
 
         assert_eq!(a.authority_group_id(), b.authority_group_id());
         assert_ne!(a.authority_group_id(), c.authority_group_id());
+        assert_eq!(a.admitted_authority_group_id(), None);
 
-        let mut rotated_key = a.clone();
+        let mut admitted_a = a.clone();
+        admitted_a.admission = Some(SourceAdmissionRef {
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "digest".into(),
+            admission_id: "admission-a".into(),
+            authority_epoch: "epoch-1".into(),
+            fault_domain_id: Some("domain-a".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+        assert_eq!(
+            admitted_a.admitted_authority_group_id(),
+            Some(a.authority_group_id())
+        );
+
+        let mut rotated_key = admitted_a.clone();
         rotated_key.issuer_key_fingerprint = Some("new-key".into());
         assert_eq!(a.authority_group_id(), rotated_key.authority_group_id());
     }
