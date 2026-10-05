@@ -49,6 +49,7 @@ pub mod dimensional_inference;
 pub mod discovery;
 pub mod equation_ast;
 pub mod integrated_discovery;
+pub mod lanyon;
 pub mod lyapunov;
 pub mod noise_robustness;
 pub mod pde_wave_stage_a;
@@ -64,6 +65,11 @@ pub mod types;
 
 // Re-export primary API types.
 pub use bridge::PhysicsBridge;
+pub use lanyon::{
+    expr_to_lanyon_form, LanyonArtifactKind, LanyonForm, LanyonPhysicalBinding,
+    LanyonSemanticEnvelope, LanyonSpecificationBundle, LanyonSystemSpec,
+    LanyonVerificationArtifact, LanyonVerificationReceipt, LanyonVerificationStatus,
+};
 pub use catalog::PhysicsCatalog;
 pub use dimensional::DimensionalEncoder;
 pub use dimensional_inference::{InferenceResult, UnitMap, infer_dimensions};
