@@ -239,6 +239,7 @@ impl GenerationManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::action::executor::SafetyLevel;
 
     const MOCK_GENERATIONS: &str = "\
   45  2025-01-20  NixOS 24.11  linux 6.12.3  (current)
