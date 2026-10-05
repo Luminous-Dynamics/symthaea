@@ -548,7 +548,7 @@ pub struct VerificationEvidence {
     pub verification_relationship: ClaimVerificationRelationship,
     pub controller_document_ref: String,
     pub controller_document_digest: String,
-    pub resolution_digest: String,
+    pub resolution: VerificationMethodResolution,
     pub cryptosuite: String,
     pub freshness: VerificationFreshnessContext,
     pub signed_payload_digest: String,
@@ -560,51 +560,21 @@ impl VerificationEvidence {
     /// resolution and cryptographic checks.
     pub fn from_adapter_attestation(
         request: &VerificationRequest,
-        controller_document_ref: impl Into<String>,
-        controller_document_digest: impl Into<String>,
-        resolved_verification_method_controller: ClaimControllerIdentity,
-        controller_document_verification_method: ClaimVerificationMethod,
-        resolution_digest: impl Into<String>,
-        verification_relationship: impl Into<String>,
+        resolution: VerificationMethodResolution,
         cryptosuite: impl Into<String>,
         signed_payload_digest: impl Into<String>,
         proof_digest: impl Into<String>,
     ) -> Result<Self, VerificationFailure> {
         request.validate_structure()?;
-
-        let controller_document_ref = controller_document_ref.into();
-        let controller_document_digest = controller_document_digest.into();
-        let resolution_digest = resolution_digest.into();
-        let verification_relationship =
-            ClaimVerificationRelationship::new(verification_relationship)?;
-        if verification_relationship != request.expected_verification_relationship {
-            return Err(VerificationFailure::VerificationRelationshipMismatch {
-                expected: request.expected_verification_relationship.clone(),
-                actual: verification_relationship,
-            });
-        }
-        resolved_verification_method_controller.validate_structure()?;
-        controller_document_verification_method.validate_structure()?;
-        if resolved_verification_method_controller != request.expected_controller {
-            return Err(VerificationFailure::ControllerMismatch {
-                expected: request.expected_controller.clone(),
-                actual: resolved_verification_method_controller,
-            });
-        }
-        if controller_document_verification_method != request.verification_method {
-            return Err(VerificationFailure::VerificationMethodMismatch {
-                expected: request.verification_method.clone(),
-                actual: controller_document_verification_method,
-            });
+        resolution.validate_structure()?;
+        if !resolution.matches_request(request) {
+            return Err(VerificationFailure::ResolutionRequestMismatch);
         }
         let cryptosuite = cryptosuite.into();
         let signed_payload_digest = signed_payload_digest.into();
         let proof_digest = proof_digest.into();
 
         for (name, value) in [
-            ("controller document reference", controller_document_ref.as_str()),
-            ("resolution digest", resolution_digest.as_str()),
-            ("verification relationship", verification_relationship.as_str()),
             ("cryptosuite", cryptosuite.as_str()),
         ] {
             if value.trim().is_empty() {
@@ -615,7 +585,6 @@ impl VerificationEvidence {
         }
 
         for (name, value) in [
-            ("controller document digest", controller_document_digest.as_str()),
             ("signed payload digest", signed_payload_digest.as_str()),
             ("proof digest", proof_digest.as_str()),
         ] {
@@ -632,14 +601,15 @@ impl VerificationEvidence {
             statement_digest: request.statement_digest.clone(),
             author: request.author.clone(),
             proof_purpose: request.proof_purpose.clone(),
-            verification_method: request.verification_method.clone(),
+            verification_method: resolution.verification_method.clone(),
             controller: request.expected_controller.clone(),
-            resolved_verification_method_controller,
-            controller_document_verification_method,
-            verification_relationship,
-            controller_document_ref,
-            controller_document_digest,
-            resolution_digest,
+            resolved_verification_method_controller:
+                resolution.resolved_verification_method_controller.clone(),
+            controller_document_verification_method: resolution.verification_method.clone(),
+            verification_relationship: resolution.verification_relationship.clone(),
+            controller_document_ref: resolution.controller_document_ref.clone(),
+            controller_document_digest: resolution.controller_document_digest.clone(),
+            resolution,
             cryptosuite,
             freshness: request.freshness.clone(),
             signed_payload_digest,
@@ -666,6 +636,7 @@ impl VerificationEvidence {
             self.controller_document_verification_method.as_str(),
             &self.controller_document_ref,
             &self.controller_document_digest,
+            &self.resolution.resolution_digest(),
             &self.verification_relationship,
             &self.cryptosuite,
             &self.signed_payload_digest,
@@ -698,6 +669,22 @@ impl VerificationEvidence {
             freshness: self.freshness.clone(),
         };
         request.validate_structure()?;
+        self.resolution.validate_structure()?;
+        if !self.resolution.matches_request(&request) {
+            return Err(VerificationFailure::ResolutionRequestMismatch);
+        }
+        if self.resolution.controller_document_ref != self.controller_document_ref
+            || self.resolution.controller_document_digest != self.controller_document_digest
+            || self.resolution.verification_method != self.controller_document_verification_method
+            || self.resolution.resolved_verification_method_controller
+                != self.resolved_verification_method_controller
+            || self.resolution.verification_relationship != self.verification_relationship
+        {
+            return Err(VerificationFailure::ResolutionEvidenceMismatch);
+        }
+        if self.freshness != request.freshness {
+            return Err(VerificationFailure::FreshnessMismatch);
+        }
         self.freshness.validate()?;
         if self.freshness != request.freshness {
             return Err(VerificationFailure::FreshnessMismatch);
@@ -759,6 +746,7 @@ impl VerificationEvidence {
             && self.controller_document_verification_method == request.verification_method
             && self.verification_relationship == request.expected_verification_relationship
             && self.freshness == request.freshness
+            && self.resolution.matches_request(request)
     }
 }
 
@@ -824,6 +812,8 @@ pub enum VerificationFailure {
         actual: Option<String>,
     },
     FreshnessMismatch,
+    ResolutionRequestMismatch,
+    ResolutionEvidenceMismatch,
     CryptographicVerificationFailed,
 }
 
@@ -927,6 +917,25 @@ mod tests {
         )
         .unwrap()
     }
+
+    fn make_evidence(
+        request: &VerificationRequest,
+        controller_document_digest: &str,
+        cryptosuite: &str,
+        signed_payload_digest: &str,
+        proof_digest: &str,
+    ) -> Result<VerificationEvidence, VerificationFailure> {
+        let mut resolution = resolved_method(request);
+        resolution.controller_document_digest = controller_document_digest.to_owned();
+        VerificationEvidence::from_adapter_attestation(
+            request,
+            resolution,
+            cryptosuite,
+            signed_payload_digest,
+            proof_digest,
+        )
+    }
+
 
 
 
@@ -1068,14 +1077,9 @@ mod tests {
         )
         .unwrap();
 
-        let evidence = VerificationEvidence::from_adapter_attestation(
+        let evidence = make_evidence(
             &request,
-            "https://example.test/controller",
             &"11".repeat(32),
-            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
-            ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
-            &"55".repeat(32),
-            "assertionMethod",
             "ed25519",
             &"22".repeat(32),
             &"33".repeat(32),
@@ -1100,17 +1104,18 @@ mod tests {
         .unwrap();
 
         assert!(matches!(
-            VerificationEvidence::from_adapter_attestation(
-                &request,
-                "https://example.test/controller",
-                "not-a-digest",
-                ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
-                ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
-                "assertionMethod",
-                "ed25519",
-                &"22".repeat(32),
-                &"33".repeat(32),
-            ),
+            {
+            let result = {
+                let mut resolution = resolved_method(&request);
+                resolution.controller_document_digest = "not-a-digest".into();
+                VerificationEvidence::from_adapter_attestation(
+                    &request,
+                    resolution,
+                    "ed25519",
+                    &"22".repeat(32),
+                    &"33".repeat(32),
+                )
+            },
             Err(VerificationFailure::Structural(_))
         ));
     }
@@ -1128,17 +1133,18 @@ mod tests {
         .unwrap();
 
         assert!(matches!(
+            {
+            let mut resolution = resolved_method(&request);
+            resolution.verification_relationship =
+                ClaimVerificationRelationship::new("authentication").unwrap();
             VerificationEvidence::from_adapter_attestation(
                 &request,
-                "https://example.test/controller",
-                &"11".repeat(32),
-                ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
-                ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
-                "authentication",
+                resolution,
                 "ed25519",
                 &"22".repeat(32),
                 &"33".repeat(32),
-            ),
+            )
+        },
             Err(VerificationFailure::VerificationRelationshipMismatch { .. })
         ));
     }
@@ -1217,14 +1223,9 @@ mod tests {
         )
         .unwrap();
 
-        let evidence = VerificationEvidence::from_adapter_attestation(
+        let evidence = make_evidence(
             &request,
-            "https://example.test/controller",
             &"11".repeat(32),
-            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
-            ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
-            &"55".repeat(32),
-            "assertionMethod",
             "ed25519",
             &"22".repeat(32),
             &"33".repeat(32),
@@ -1250,14 +1251,9 @@ mod tests {
         )
         .unwrap();
 
-        let base = VerificationEvidence::from_adapter_attestation(
+        let base = make_evidence(
             &request,
-            "https://example.test/controller",
             &"11".repeat(32),
-            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
-            ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
-            &"55".repeat(32),
-            "assertionMethod",
             "ed25519",
             &"22".repeat(32),
             &"33".repeat(32),
@@ -1285,28 +1281,18 @@ mod tests {
             default_freshness(),
         )
         .unwrap();
-        let a = VerificationEvidence::from_adapter_attestation(
+        let a = make_evidence(
             &request,
-            "https://example.test/controller",
             &"11".repeat(32),
-            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
-            ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
-            &"55".repeat(32),
-            "assertionMethod",
             "ed25519",
             &"22".repeat(32),
             &"33".repeat(32),
         )
         .unwrap();
 
-        let b = VerificationEvidence::from_adapter_attestation(
+        let b = make_evidence(
             &request,
-            "https://example.test/controller",
             &"44".repeat(32),
-            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
-            ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
-            &"55".repeat(32),
-            "assertionMethod",
             "ed25519",
             &"22".repeat(32),
             &"33".repeat(32),
