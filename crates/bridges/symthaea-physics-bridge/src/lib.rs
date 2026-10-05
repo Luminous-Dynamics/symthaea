@@ -79,6 +79,7 @@ pub use typed_generation::random_expr_with_dimension;
 pub use physical_type::{infer_expr_type, infer_expr_type_with_variables, explicit_type};
 pub use symthaea_types::{
     ModelMaturity, PhysicalDimension, PhysicalType, PhysicalTypeError, QuantityKind, Refinement,
-    ScalarDomain, TypeJudgement, UnitRef, UnitScale,
+    ScalarDomain, SemanticIdentifier, TypeJudgement, UnitRef, UnitScale, UnitTransform,
+    RationalScale,
 };
 pub use types::*;
