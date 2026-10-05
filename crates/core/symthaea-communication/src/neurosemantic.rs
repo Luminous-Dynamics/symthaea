@@ -23,6 +23,7 @@ pub const MAX_NEUROSEMANTIC_ID_BYTES: usize = 4096;
 pub const MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES: usize = MAX_NEUROSEMANTIC_PAYLOAD_BYTES;
 pub const MAX_NEUROSEMANTIC_JURISDICTION_ID_BYTES: usize = 64;
 pub const MAX_NEUROSEMANTIC_SECONDARY_USE_CLASSES: usize = 16;
+pub const MAX_NEUROSEMANTIC_DESTINATION_JURISDICTIONS: usize = 16;
 
 /// Representation channel used for routing and authorization.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -140,7 +141,7 @@ impl NeurosemanticHandlingPolicy {
         self.schema_version == NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION
             && valid_jurisdiction_id(&self.origin_jurisdiction)
             && !self.permitted_destination_jurisdictions.is_empty()
-            && self.permitted_destination_jurisdictions.len() <= MAX_NEUROSEMANTIC_SECONDARY_USE_CLASSES
+            && self.permitted_destination_jurisdictions.len() <= MAX_NEUROSEMANTIC_DESTINATION_JURISDICTIONS
             && self
                 .permitted_destination_jurisdictions
                 .iter()
@@ -835,7 +836,7 @@ mod tests {
     }
 
     #[test]
-    fn v1_transport_rejects_raw_and_personalized_data_classes() {
+    fn v2_transport_rejects_raw_and_personalized_data_classes() {
         let mut policy = semantic_policy();
         policy.data_class = NeurosemanticDataClass::RawNeuralRecording;
         assert!(!policy.transportable());
@@ -888,6 +889,19 @@ mod tests {
         let mut decoded_claim = policy;
         decoded_claim.data_class = NeurosemanticDataClass::DecodedClaim;
         assert!(!lease.authorizes_data_policy(ChannelDirection::Read, &decoded_claim));
+    }
+
+    #[test]
+    fn legacy_data_policy_schema_is_rejected_by_v2_validator() {
+        let policy = semantic_policy();
+        let mut value = serde_json::to_value(&policy).unwrap();
+        value
+            .as_object_mut()
+            .unwrap()
+            .insert("schema_version".into(), serde_json::json!(1));
+        let restored: NeurosemanticDataPolicy = serde_json::from_value(value).unwrap();
+        assert!(!restored.validates());
+        assert!(!restored.handling.validates());
     }
 
     #[test]
