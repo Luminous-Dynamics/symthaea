@@ -42,6 +42,57 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  nixward-root-executor-authority-focused:
+    name: Nixward Root Executor Authority Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check root executor formatting
+        run: cargo fmt --check -- src/action/nixos_patterns.rs
+
+      - name: Run root executor authority regressions
+        run: cargo test -p symthaea --lib test_legacy_executor_
+
+  nixward-actionir-authority-chain-focused:
+    name: Nixward ActionIR Authority Chain Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Run ActionIR authority regressions
+        run: cargo test -p symthaea executor_authority_tests --lib
+
+  nixward-legacy-sandbox-authority-focused:
+    name: Nixward Legacy Sandbox Authority Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Run legacy sandbox authority regressions
+        run: cargo test -p symthaea test_real_execution_rejects_authority_sensitive_commands_before_spawn --lib
+
   nixward-custom-risk-focused:
     name: Nixward Custom Risk Focused
     runs-on: ubuntu-latest
