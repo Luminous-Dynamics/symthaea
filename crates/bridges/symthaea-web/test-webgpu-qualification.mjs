@@ -820,6 +820,18 @@ async function runMode(mode) {
     if (gpuMode) {
       diagnostics.raw_webgpu_execution_canary = await rawWebGpuExecutionCanary(page);
       diagnostics.raw_webgpu_canary = await rawWebGpuCanvasCanary(page);
+      const rawExecutionOk = diagnostics.raw_webgpu_execution_canary?.executed_red === true;
+      const rawPresentationOk = diagnostics.raw_webgpu_canary?.painted_red === true;
+      diagnostics.raw_webgpu_boundary = {
+        execution_canary_passed: rawExecutionOk,
+        presentation_canary_passed: rawPresentationOk,
+        implicated_boundary: !rawExecutionOk
+          ? 'webgpu-device-execution-or-driver'
+          : !rawPresentationOk
+            ? 'canvas-presentation-or-browser-platform'
+            : 'application-renderer-or-wgpu-path',
+        interpretation_scope: 'diagnostic-only; qualification remains fail-closed',
+      };
       failOnPageErrors('WebGPU capability preflight');
       if (!capability.navigator_gpu || !capability.adapter || !capability.device) {
         throw new QualificationError(
@@ -947,6 +959,7 @@ async function runMode(mode) {
             : 'forced-gpu-disabled',
         capability,
         raw_webgpu_canary: diagnostics.raw_webgpu_canary || null,
+        raw_webgpu_boundary: diagnostics.raw_webgpu_boundary || null,
         scene_hash: firstSceneHash,
         movie_hash: firstMovieHash,
         semantic_scene_samples: semanticSceneSamples,
