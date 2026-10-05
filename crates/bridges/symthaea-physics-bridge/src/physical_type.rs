@@ -189,6 +189,9 @@ fn kind_from_dimension(d: DimensionalSignature) -> QuantityKind {
     else if d == DimensionalSignature::ACCELERATION { Acceleration }
     else if d == DimensionalSignature::MOMENTUM { Momentum }
     else if d == DimensionalSignature::FORCE { Force }
+    else if d == DimensionalSignature::POWER { Power }
+    else if d == DimensionalSignature::CHARGE { Charge }
+    else if d == DimensionalSignature::FREQUENCY { Frequency }
     else if d == DimensionalSignature::ENERGY { Custom }
     else if d == DimensionalSignature::PRESSURE { Custom }
     else { Custom }
@@ -598,6 +601,49 @@ where
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn dimension_only_derivation_recovers_unique_power_kind() {
+        let value = variable_type("p", &HashMap::from([
+            ("p".into(), DimensionalSignature::POWER),
+        ]));
+        assert_eq!(value.kind, QuantityKind::Power);
+    }
+
+    #[test]
+    fn dimension_only_derivation_recovers_unique_charge_kind() {
+        let value = variable_type("q", &HashMap::from([
+            ("q".into(), DimensionalSignature::CHARGE),
+        ]));
+        assert_eq!(value.kind, QuantityKind::Charge);
+    }
+
+    #[test]
+    fn dimension_only_derivation_recovers_unique_frequency_kind() {
+        let value = variable_type("f", &HashMap::from([
+            ("f".into(), DimensionalSignature::FREQUENCY),
+        ]));
+        assert_eq!(value.kind, QuantityKind::Frequency);
+    }
+
+    #[test]
+    fn dimension_only_derivation_keeps_energy_ambiguous() {
+        let value = variable_type("e", &HashMap::from([
+            ("e".into(), DimensionalSignature::ENERGY),
+        ]));
+        assert_eq!(value.kind, QuantityKind::Custom);
+    }
+
+    #[test]
+    fn dimension_only_derivation_keeps_temperature_ambiguous() {
+        let value = variable_type("t", &HashMap::from([
+            ("t".into(), DimensionalSignature { 
+                mass: 0, length: 0, time: 0, current: 0,
+                temperature: 1, amount: 0, luminous: 0,
+            }),
+        ]));
+        assert_eq!(value.kind, QuantityKind::Custom);
+    }
+
     use super::*;
 
     fn units() -> UnitMap {
