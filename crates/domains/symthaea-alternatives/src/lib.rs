@@ -1404,6 +1404,8 @@ mod tests {
             scope: "synthetic functional unit".into(),
             unit: Some("unit".into()),
             as_of: Some("fixture-v1".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
         }
     }
 
@@ -1500,6 +1502,42 @@ mod tests {
             burdens,
             evidence,
         }
+    }
+
+    #[test]
+    fn expired_evidence_cannot_satisfy_functional_constraint() {
+        let mut c = candidate(
+            "expired",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "e1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.evidence[0].valid_until_epoch_seconds = Some(100);
+
+        let current = AlternativesEngine
+            .assess_at(&fixture_requirement(), &[c.clone()], None, Some(200))
+            .unwrap();
+        assert!(current.frontier_blockers.contains_key("expired"));
+        assert_eq!(
+            current.candidates[0].qualification,
+            QualificationState::Hypothesis
+        );
+
+        let valid = AlternativesEngine
+            .assess_at(&fixture_requirement(), &[c], None, Some(50))
+            .unwrap();
+        assert!(!valid.frontier_blockers.contains_key("expired"));
+        assert_eq!(
+            valid.candidates[0].constraints.iter().all(|c| c.status == ConstraintStatus::Pass),
+            true
+        );
     }
 
     #[test]
