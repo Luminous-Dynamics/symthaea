@@ -695,6 +695,8 @@ pub enum IndependenceVerifierPredicate {
 /// does not evaluate relation semantics, modality, observation time/location,
 /// measurement quality, credential validity, or substantive truth.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub const INDEPENDENCE_SCOPE_VERSION_V3: &str = "observation-fabric-independence-scope-v3";
+
 pub struct IndependenceVerifierContract {
     pub version: &'static str,
     pub predicates: &'static [IndependenceVerifierPredicate],
@@ -1463,6 +1465,122 @@ impl ObservationGraph {
         let mut reachable = reachable.into_iter().collect::<Vec<_>>();
         reachable.sort();
         Ok(reachable)
+    }
+
+    /// Return canonical bytes for the predicate-relative v3 independence scope.
+    ///
+    /// v3 is additive: the frozen v2 scope and existing v2 receipts are untouched.
+    /// Only observations reachable from the requested source/target pair are included.
+    /// Source/target observations include fields directly consumed by the predicate;
+    /// ancestor-only observations include only lineage traversal and activity identity.
+    pub fn independence_verification_reachable_scope_canonical_bytes_v3(
+        &self,
+        source_observation_id: &str,
+        target_observation_id: &str,
+    ) -> Result<Vec<u8>, ObservationValidationError> {
+        self.validate()?;
+        if source_observation_id == target_observation_id {
+            return Err(ObservationValidationError::SelfRelation);
+        }
+
+        let by_id = self
+            .observations
+            .iter()
+            .map(|observation| (observation.id.as_str(), observation))
+            .collect::<HashMap<_, _>>();
+
+        by_id.get(source_observation_id).ok_or_else(|| {
+            ObservationValidationError::MissingRelationEndpoint(source_observation_id.to_string())
+        })?;
+        by_id.get(target_observation_id).ok_or_else(|| {
+            ObservationValidationError::MissingRelationEndpoint(target_observation_id.to_string())
+        })?;
+
+        const SOURCE_ROLE: u8 = 0b001;
+        const TARGET_ROLE: u8 = 0b010;
+        const ANCESTOR_ROLE: u8 = 0b100;
+
+        let mut roles = HashMap::<String, u8>::new();
+        roles.insert(source_observation_id.to_string(), SOURCE_ROLE);
+        roles.insert(target_observation_id.to_string(), TARGET_ROLE);
+
+        let source_ancestors = Self::ancestor_ids(source_observation_id, &by_id)?;
+        let target_ancestors = Self::ancestor_ids(target_observation_id, &by_id)?;
+        for ancestor_id in source_ancestors.into_iter().chain(target_ancestors) {
+            roles
+                .entry(ancestor_id)
+                .and_modify(|role| *role |= ANCESTOR_ROLE)
+                .or_insert(ANCESTOR_ROLE);
+        }
+
+        let mut examined_observation_ids = roles.keys().cloned().collect::<Vec<_>>();
+        examined_observation_ids.sort();
+
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"symthaea:observation-independence-scope:v3\n");
+        write_canonical_string_vec_bytes(&mut bytes, &examined_observation_ids);
+
+        for observation_id in examined_observation_ids {
+            write_canonical_string_bytes(&mut bytes, &observation_id);
+            let role = *roles
+                .get(&observation_id)
+                .expect("role collected with every observation id");
+            bytes.push(role);
+            let observation = by_id.get(observation_id.as_str()).ok_or_else(|| {
+                ObservationValidationError::MissingRelationEndpoint(observation_id.clone())
+            })?;
+
+            if role & (SOURCE_ROLE | TARGET_ROLE) != 0 {
+                write_canonical_string_bytes(&mut bytes, &observation.provenance.source.sensor_id);
+                write_canonical_provenance_coverage_bytes(
+                    &mut bytes,
+                    &observation.provenance.coverage,
+                );
+                write_canonical_string_option_bytes(
+                    &mut bytes,
+                    observation.provenance.source.platform_id.as_deref(),
+                );
+            }
+
+            let mut parent_ids = observation.provenance.parent_observation_ids.clone();
+            parent_ids.sort();
+            write_canonical_string_vec_bytes(&mut bytes, &parent_ids);
+
+            write_canonical_string_option_bytes(
+                &mut bytes,
+                observation
+                    .provenance
+                    .processing_activity
+                    .as_ref()
+                    .map(|activity| activity.activity_id.as_str()),
+            );
+
+            if role & (SOURCE_ROLE | TARGET_ROLE) != 0 {
+                match observation.asset.as_ref() {
+                    Some(asset) => {
+                        bytes.push(1);
+                        write_canonical_string_bytes(&mut bytes, &asset.hash_algorithm);
+                        write_canonical_string_bytes(&mut bytes, &asset.content_hash);
+                    }
+                    None => bytes.push(0),
+                }
+            }
+        }
+
+        Ok(bytes)
+    }
+
+    /// Compute the predicate-relative v3 independence-scope fingerprint.
+    pub fn independence_verification_reachable_scope_fingerprint_v3(
+        &self,
+        source_observation_id: &str,
+        target_observation_id: &str,
+    ) -> Result<String, ObservationValidationError> {
+        let bytes = self.independence_verification_reachable_scope_canonical_bytes_v3(
+            source_observation_id,
+            target_observation_id,
+        )?;
+        Ok(blake3::hash(&bytes).to_hex().to_string())
     }
 
     /// Recompute the provenance-scope commitment for an existing assessment.
