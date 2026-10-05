@@ -416,14 +416,11 @@ impl NixServiceObservedStateV1 {
     /// authorize the operation.
     pub(crate) fn execution_pre_state_identity(
         &self,
-        generation: Option<u64>,
+        generation: u64,
     ) -> Result<String, NixServiceStateErrorV1> {
         let state_digest = self.digest()?;
-        let generation = generation
-            .map(|value| format!("generation={value}"))
-            .unwrap_or_else(|| "generation=none".to_string());
         Ok(format!(
-            "{SERVICE_PRE_STATE_IDENTITY_PREFIX_V1}|{generation}|unit={}|state={state_digest}",
+            "{SERVICE_PRE_STATE_IDENTITY_PREFIX_V1}|generation={generation}|unit={}|state={state_digest}",
             self.unit
         ))
     }
