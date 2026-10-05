@@ -58,6 +58,9 @@ jobs:
       - name: Check watchdog rollback formatting
         run: cargo fmt --check -- crates/core/nixward/src/action/executor.rs crates/core/nixward/src/action/generation_manager.rs crates/core/nixward/src/support/watchdog.rs
 
+      - name: Assert watchdog has no direct subprocess spawn
+        run: '! rg -n "Command::new|process::Command::new" crates/core/nixward/src/support/watchdog.rs'
+
       - name: Run watchdog rollback authority regressions
         run: cargo test -p nixward watchdog_rollback --lib
 
