@@ -1918,8 +1918,27 @@ impl AlternativesEngine {
             }
 
             let frontier_blocked = !candidate_blockers.is_empty();
-d::ContinuouslyMonitored
-                                    )
+            let observed_evidence_count = Dimension::ALL
+                .into_iter()
+                .map(|dimension| {
+                    let count = candidate
+                        .burdens
+                        .get(&dimension)
+                        .map(|estimate| {
+                            candidate
+                                .linked_evidence_at(
+                                    &estimate.evidence_ids,
+                                    assessed_at_epoch_seconds,
+                                    freshness_policy,
+                                )
+                                .filter(|e| {
+                                    matches!(
+                                        e.kind,
+                                        EvidenceKind::Observed
+                                            | EvidenceKind::ManufacturingObserved
+                                            | EvidenceKind::FieldObserved
+                                            | EvidenceKind::ContinuouslyMonitored
+                                    ) && e.stance == EvidenceStance::Supports
                                 })
                                 .count()
                         })
