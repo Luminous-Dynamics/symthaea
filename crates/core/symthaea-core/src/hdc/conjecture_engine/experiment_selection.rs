@@ -89,7 +89,7 @@ pub fn discriminative_value<H, E>(
     experiment: &E,
     hypotheses: &[H],
     predict: impl Fn(&H, &E) -> Option<f64>,
-) -> Option<(f64, u16)> {
+) -> Option<(f64, u32)> {
     let predictions: Vec<f64> = hypotheses
         .iter()
         .filter_map(|h| predict(h, experiment).filter(|value| value.is_finite()))
@@ -100,11 +100,11 @@ pub fn discriminative_value<H, E>(
     }
 
     let score = variance(&predictions);
-    if !score.is_finite() || score < 0.0 || predictions.len() > u16::MAX as usize {
+    if !score.is_finite() || score < 0.0 || predictions.len() > u32::MAX as usize {
         return None;
     }
 
-    Some((score, predictions.len() as u16))
+    Some((score, predictions.len() as u32))
 }
 
 /// Select the candidate experiment that most strongly discriminates between
@@ -117,7 +117,7 @@ pub fn select_most_discriminative_experiment<'a, H, E>(
     candidates: &'a [E],
     hypotheses: &[H],
     predict: impl Fn(&H, &E) -> Option<f64> + Copy,
-) -> Option<(&'a E, f64, u16)> {
+) -> Option<(&'a E, f64, u32)> {
     candidates
         .iter()
         .enumerate()
@@ -351,6 +351,28 @@ use symthaea_types::ScientificInquirySelectionReceipt;
         assert_eq!(*chosen, 2.0);
         assert!(score > 0.0);
         assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn receipt_selector_returns_none_without_two_finite_predictions() {
+        let hypotheses = [0u8, 1u8];
+        let candidates = [0.0f64];
+        let predict = |h: &u8, _x: &f64| (*h == 0).then_some(1.0);
+
+        let result = select_most_discriminative_experiment_with_receipt(
+            &candidates,
+            &hypotheses,
+            predict,
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "selector-v2",
+            17,
+            |x| format!("experiment:{x:.1}"),
+        )
+        .expect("structural selector inputs are valid");
+
+        assert!(result.is_none());
     }
 
     #[test]
