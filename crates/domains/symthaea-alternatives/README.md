@@ -78,7 +78,7 @@ Source admission is authority-bound: an EvidenceSourceIdentity whose admission r
 
 The heuristic next-measurement target is intentionally weaker than an experiment specification. It identifies an unresolved dimension, candidate set, uncertainty references, and interval-overlap discrimination targets without inventing a laboratory protocol.
 
-When an actual measurement campaign is proposed, ExperimentalDesignProvenance can be attached to the assessment. It requires an exact hypothesis, targeted uncertainty identities, candidate identities, explicit discrimination targets, an exact documented protocol identity/digest and comparison basis, and explicit stopping criteria. The assessment receipt commits to that design.
+When an actual measurement campaign is proposed, ExperimentalDesignProvenance can be attached to the assessment. It requires an exact hypothesis, exact requirement identity, targeted uncertainty identities, candidate identities, explicit discrimination targets, an exact documented protocol identity/digest and comparison basis, and explicit stopping criteria. The assessment receipt commits to that design.
 
 An observation may then carry the resulting experimental_design_id, closing the lineage from proposal to observed result. This is provenance, not scientific authorization: Symthaea does not certify protocol adequacy, sample size, statistical power, causal validity, metrological traceability, or experimental safety.
 
