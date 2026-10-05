@@ -297,6 +297,25 @@ function assertSemanticSceneSamples(samples) {
   }
 }
 
+function assertCanvasStatistics(statistics, width, height, label = 'WebGPU', classification = 'renderer') {
+  const expectedPixels = width * height;
+  if (!statistics
+    || statistics.width !== width
+    || statistics.height !== height
+    || statistics.non_opaque_black_pixels !== 0
+    || statistics.non_black_pixels < expectedPixels * 0.95
+    || !statistics.non_black_bounds
+    || statistics.non_black_bounds.min_x !== 0
+    || statistics.non_black_bounds.min_y !== 0
+    || statistics.non_black_bounds.max_x !== width - 1
+    || statistics.non_black_bounds.max_y !== height - 1) {
+    throw new QualificationError(
+      `${label} full-frame paint statistics failed: ${JSON.stringify(statistics)}`,
+      classification,
+    );
+  }
+}
+
 function assertSemanticMovieSamples(samples, label = 'WebGPU', classification = 'renderer') {
   const byName = new Map(samples.map(sample => [sample.name, sample.rgba]));
   const left = byName.get('left');
@@ -979,6 +998,20 @@ async function runMode(mode) {
         blank_hash: blankMovieHash,
         pixel_statistics: await canvasPixelStatistics(page, '#webgpu-movie-canvas'),
       };
+      assertCanvasStatistics(
+        diagnostics.scene.pixel_statistics,
+        512,
+        512,
+        'WebGPU cognitive scene',
+        'renderer',
+      );
+      assertCanvasStatistics(
+        diagnostics.movie.pixel_statistics,
+        192,
+        192,
+        'WebGPU movie',
+        'renderer',
+      );
       diagnostics.surface_configuration = await page.evaluate(() => {
         const read = selector => {
           const canvas = document.querySelector(selector);
@@ -995,6 +1028,7 @@ async function runMode(mode) {
             alpha_mode: alphaMode,
             present_mode: presentMode,
             selected_format_advertised: !!format && formats.includes(format),
+            selected_format_preferred: !!format && formats[0] === format,
             selected_alpha_advertised: !!alphaMode,
             selected_present_mode_advertised: !!presentMode,
           };
@@ -1006,6 +1040,7 @@ async function runMode(mode) {
       });
       for (const [canvas, configuration] of Object.entries(diagnostics.surface_configuration)) {
         if (!configuration.selected_format_advertised
+          || !configuration.selected_format_preferred
           || !configuration.selected_alpha_advertised
           || !configuration.selected_present_mode_advertised) {
           throw new QualificationError(
