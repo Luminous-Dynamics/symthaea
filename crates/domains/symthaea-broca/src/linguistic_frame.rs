@@ -237,6 +237,19 @@ impl LinguisticFrame {
             && self.validate().is_ok()
     }
 
+    /// Canonical full-state serialization for exact downstream lineage binding.
+    ///
+    /// Unlike the compact human-readable grounding surface, this preserves every persisted
+    /// field, including the full prosody payload, without display rounding or omission.
+    pub fn canonical_grounding_surface(&self) -> String {
+        serde_json::to_string(self).unwrap_or_else(|_| {
+            format!(
+                r#"{{"version":"{}","serialization":"failed"}}"#,
+                self.version
+            )
+        })
+    }
+
     /// Stable evidence surface.
     pub fn grounding_surface(&self) -> String {
         let constituents = self

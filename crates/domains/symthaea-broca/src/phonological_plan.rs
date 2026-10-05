@@ -9,6 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::lexical_binding::LexicalMorphosyntacticBinding;
 use crate::linguistic_frame::LinguisticFrame;
 use crate::speech_plan::{IntonationIntent, SpeechPlan};
 
@@ -188,6 +189,43 @@ impl PhonologicalPlan {
         Self::from_linguistic_frame(&frame)
     }
 
+    /// Bind phonology using the exact provenance identity of an existing lexical binding.
+    ///
+    /// The lexical binding remains the authority for lexical identity; this method only carries
+    /// its deterministic token into the downstream phonological plan.
+    pub fn bind_lexical_segments_from_binding(
+        &mut self,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        segments: Vec<PhonemeSlot>,
+    ) -> Result<(), PhonologicalPlanError> {
+        binding
+            .validate_against_frame(frame)
+            .map_err(|_| PhonologicalPlanError::LexicalBindingMismatch)?;
+        self.validate_against_frame(frame)?;
+        self.bind_lexical_segments(segments, binding.provenance_token())
+    }
+
+    /// Validate that this lexicalized phonological plan carries the exact supplied binding.
+    pub fn validate_against_lexical_binding(
+        &self,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+    ) -> Result<(), PhonologicalPlanError> {
+        binding
+            .validate_against_frame(frame)
+            .map_err(|_| PhonologicalPlanError::LexicalBindingMismatch)?;
+        self.validate_against_frame(frame)?;
+
+        if self.content_binding != ContentBindingStatus::LexicallyBound
+            || self.lexical_provenance.as_deref() != Some(binding.provenance_token().as_str())
+        {
+            return Err(PhonologicalPlanError::LexicalBindingMismatch);
+        }
+
+        Ok(())
+    }
+
     /// Bind an explicit phoneme sequence without changing the upstream speech plan.
     ///
     /// LexicallyBound is permitted only when the caller has separately retained lexical
@@ -365,11 +403,13 @@ pub enum PhonologicalPlanError {
     ConflictingSyllableStress { syllable_index: usize },
     MixedSyllableFocus { syllable_index: usize },
     MultipleSyllableOnsets { syllable_index: usize },
+    MissingSyllableOnset { syllable_index: usize },
     MidSyllablePhraseBoundary { syllable_index: usize },
     EmptySegmentSymbol { index: usize },
     NonContiguousSyllableIndex { expected: usize, found: usize },
     LexicalBindingWithoutSegments,
     LexicalBindingWithoutProvenance,
+    LexicalBindingMismatch,
     EmptyLexicalProvenance,
     InvalidLexicalProvenanceFormat,
     NonLexicalProvenance,
@@ -394,6 +434,7 @@ impl std::fmt::Display for PhonologicalPlanError {
             Self::ConflictingSyllableStress { syllable_index } => write!(f, "syllable {syllable_index} contains conflicting stress annotations"),
             Self::MixedSyllableFocus { syllable_index } => write!(f, "syllable {syllable_index} contains mixed focus annotations"),
             Self::MultipleSyllableOnsets { syllable_index } => write!(f, "syllable {syllable_index} contains multiple onset markers"),
+            Self::MissingSyllableOnset { syllable_index } => write!(f, "syllable {syllable_index} must contain exactly one onset marker"),
             Self::MidSyllablePhraseBoundary { syllable_index } => write!(f, "syllable {syllable_index} has an internal phrase boundary"),
             Self::EmptySegmentSymbol { index } => {
                 write!(f, "phoneme slot {index} has an empty symbol")
@@ -409,6 +450,9 @@ impl std::fmt::Display for PhonologicalPlanError {
             }
             Self::LexicalBindingWithoutProvenance => {
                 write!(f, "lexically bound plans require explicit lexical provenance")
+            }
+            Self::LexicalBindingMismatch => {
+                write!(f, "phonological plan does not match the supplied lexical binding")
             }
             Self::EmptyLexicalProvenance => {
                 write!(f, "lexically bound plans require non-empty lexical provenance")
@@ -480,6 +524,13 @@ fn validate_segment_sequence(segments: &[PhonemeSlot]) -> Result<(), Phonologica
 
     for segment in segments {
         if last_syllable != Some(segment.syllable_index) {
+            if let Some(previous_syllable) = last_syllable {
+                if onset_count != 1 {
+                    return Err(PhonologicalPlanError::MissingSyllableOnset {
+                        syllable_index: previous_syllable,
+                    });
+                }
+            }
             if segment.syllable_index != expected_syllable {
                 return Err(PhonologicalPlanError::NonContiguousSyllableIndex {
                     expected: expected_syllable,
@@ -511,6 +562,14 @@ fn validate_segment_sequence(segments: &[PhonemeSlot]) -> Result<(), Phonologica
                     syllable_index: segment.syllable_index,
                 });
             }
+        }
+    }
+
+    if let Some(last_syllable) = last_syllable {
+        if onset_count != 1 {
+            return Err(PhonologicalPlanError::MissingSyllableOnset {
+                syllable_index: last_syllable,
+            });
         }
     }
 
@@ -647,6 +706,99 @@ mod tests {
                 .validate_against_frame(&frame)
                 .expect_err("tampered pitch range must fail lineage validation"),
             PhonologicalPlanError::UpstreamMismatch
+        );
+    }
+
+    #[test]
+    fn lexical_bridge_binds_and_rejects_tampered_identity() {
+        let mut speech_plan = plan();
+        speech_plan.focus_role = None;
+        let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+        let constituents = frame
+            .constituents
+            .iter()
+            .enumerate()
+            .map(|(position, slot)| LexemeBinding {
+                position,
+                source: LexicalSource::SemanticConstituent {
+                    role: slot.role.clone(),
+                    prime: slot.prime.clone(),
+                },
+                lemma: slot.prime.to_ascii_lowercase(),
+                lexeme_id: format!("fixture:lexeme:{position}"),
+                grammatical_function: GrammaticalFunction::Other("fixture".into()),
+                morphology: Vec::new(),
+                morphophonological_form: Some(slot.prime.to_ascii_lowercase()),
+                provenance: "fixture:lexicon:v1".into(),
+                semantic_payload: true,
+            })
+            .collect::<Vec<_>>();
+        let binding = LexicalMorphosyntacticBinding::new(
+            &frame,
+            LanguageRuleBinding {
+                language_tag: "en".into(),
+                status: LanguageRuleStatus::Bound,
+                rule_id: Some("fixture:rule:v1".into()),
+                provenance: Some("fixture:rules:v1".into()),
+                unbound_reason: None,
+            },
+            constituents,
+            Vec::new(),
+            Vec::new(),
+        )
+        .expect("fixture lexical binding must validate");
+
+        let mut phonological = PhonologicalPlan::from_linguistic_frame(&frame);
+        phonological
+            .bind_lexical_segments_from_binding(
+                &frame,
+                &binding,
+                vec![PhonemeSlot::new(
+                    "AH",
+                    0,
+                    SyllableStress::Primary,
+                    true,
+                    false,
+                    true,
+                )],
+            )
+            .expect("typed lexical-to-phonological bridge should bind");
+        assert!(
+            phonological
+                .validate_against_lexical_binding(&frame, &binding)
+                .is_ok()
+        );
+
+        let mut tampered = binding.clone();
+        tampered.constituents[0].lemma.push_str("-tampered");
+        assert_eq!(
+            phonological
+                .validate_against_lexical_binding(&frame, &tampered)
+                .expect_err("tampered lexical identity must be rejected"),
+            PhonologicalPlanError::LexicalBindingMismatch
+        );
+    }
+
+    #[test]
+    fn missing_syllable_onset_fails_closed() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        let error = plan
+            .bind_segments(
+                vec![PhonemeSlot::new(
+                    "AH",
+                    0,
+                    SyllableStress::Primary,
+                    false,
+                    false,
+                    true,
+                )],
+                ContentBindingStatus::PhonologicallyBound,
+            )
+            .expect_err("every syllable needs exactly one explicit onset");
+
+        assert_eq!(
+            error,
+            PhonologicalPlanError::MissingSyllableOnset { syllable_index: 0 }
         );
     }
 
