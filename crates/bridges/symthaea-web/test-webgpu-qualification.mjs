@@ -347,27 +347,42 @@ async function waitForQualificationRecovery(page, selector) {
 }
 
 async function waitForQualificationReady(page, selector, probe) {
+  const blankDataUrl = await page.evaluate(({ selector }) => {
+    const canvas = document.querySelector(selector);
+    if (!(canvas instanceof HTMLCanvasElement)) return null;
+    const blank = document.createElement('canvas');
+    blank.width = canvas.width;
+    blank.height = canvas.height;
+    return blank.toDataURL('image/png');
+  }, { selector });
+  if (!blankDataUrl) {
+    throw new QualificationError(
+      'WebGPU projection ' + selector + ' canvas was not available for paint qualification',
+      'renderer',
+    );
+  }
   try {
     await page.waitForFunction(
-      ({ selector, probe }) => {
+      ({ selector, blankDataUrl, probe }) => {
         const canvas = document.querySelector(selector);
         if (!(canvas instanceof HTMLCanvasElement)
           || canvas.getAttribute('data-qualification-ready') !== 'true') {
           return false;
         }
-        const context = canvas.getContext('2d');
-        if (!context) return false;
-        const pixel = context.getImageData(probe.x, probe.y, 1, 1).data;
-        return pixel[3] > 0 && (pixel[0] !== 0 || pixel[1] !== 0 || pixel[2] !== 0);
+        if (probe.x < 0 || probe.y < 0 || probe.x >= canvas.width || probe.y >= canvas.height) {
+          return false;
+        }
+        return canvas.toDataURL('image/png') !== blankDataUrl;
       },
       { timeout: 30_000 },
-      { selector, probe },
+      { selector, blankDataUrl, probe },
     );
     await page.evaluate(() => new Promise(requestAnimationFrame));
     await page.evaluate(() => new Promise(requestAnimationFrame));
   } catch (error) {
     throw new QualificationError(
-      'WebGPU projection ' + selector + ' did not reach an observable painted state: '
+      'WebGPU projection ' + selector + ' did not reach an observable painted state at '
+        + '(' + probe.x + ',' + probe.y + '): '
         + (error instanceof Error ? error.message : String(error)),
       'renderer',
     );
