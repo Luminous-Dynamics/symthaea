@@ -81,6 +81,7 @@ jobs:
           cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_grounded_identity_calibration_n0 | tee target/communication-evidence/neurosemantic_hdc_grounded_identity_calibration_n0.json
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
 
           provenance = json.loads(Path("target/communication-evidence/execution-provenance.json").read_text())
