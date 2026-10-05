@@ -6289,6 +6289,49 @@ mod tests {
     }
 
     #[test]
+    fn evidence_evaluation_v9_fingerprint_matches_independent_oracle() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let evaluation = report
+            .try_to_evidence_evaluation_v9_with_supplement(
+                EvaluationContextSupplement::empty().with_trust_root_fingerprint(
+                    blake3::hash(b"trust-root-a").to_hex().to_string(),
+                ),
+            )
+            .expect("v9 evaluation");
+
+        fn put_string(hasher: &mut blake3::Hasher, value: &str) {
+            hasher.update(&(value.len() as u64).to_be_bytes());
+            hasher.update(value.as_bytes());
+        }
+
+        let mut expected = blake3::Hasher::new();
+        expected.update(b"symthaea:evidence-evaluation:v9\n");
+        put_string(&mut expected, evaluation.evaluation_version);
+        put_string(&mut expected, &evaluation.subject_fingerprint);
+        put_string(&mut expected, evaluation.evaluation_type);
+        put_string(&mut expected, &evaluation.context_fingerprint);
+        put_string(&mut expected, &evaluation.supplement_fingerprint);
+        let trace_bytes = evaluation.execution_trace.canonical_bytes();
+        expected.update(&(trace_bytes.len() as u64).to_be_bytes());
+        expected.update(&trace_bytes);
+        put_string(&mut expected, &evaluation.verification_report_fingerprint);
+        expected.update(&[verification_outcome_tag(evaluation.outcome)]);
+        expected.update(&evaluation.boundary.canonical_bytes());
+
+        assert_eq!(
+            evaluation.fingerprint(),
+            expected.finalize().to_hex().to_string()
+        );
+    }
+
+    #[test]
     fn evidence_evaluation_v9_does_not_import_legacy_supplement_into_execution_context() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let report = Ed25519ReceiptVerifier::new(
