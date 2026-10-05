@@ -1299,3 +1299,29 @@ fn rfc9942_es256_binds_external_aad() {
         Err(Rfc9942VdpError::InvalidEs256Signature)
     );
 }
+
+
+#[test]
+fn rfc9942_vdp_malformed_map_shape_is_not_resource_exhaustion() {
+    let encoded = [
+        0xa2, // Two VDP members are structurally invalid but below the scan cap.
+        0x20, 0x81, 0x40,
+        0x21, 0x81, 0x40,
+    ];
+
+    assert_eq!(
+        Rfc9942Vdp::from_cbor(&encoded),
+        Err(Rfc9942VdpError::InvalidStructure)
+    );
+}
+
+#[test]
+fn rfc9942_vdp_map_resource_limit_remains_typed() {
+    let mut encoded = vec![0xb8, 0x21]; // 33 map members > the 32-member scan cap.
+    encoded.extend(std::iter::repeat_n(0x00, 66));
+
+    assert_eq!(
+        Rfc9942Vdp::from_cbor(&encoded),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
