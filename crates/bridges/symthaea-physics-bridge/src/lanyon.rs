@@ -477,6 +477,15 @@ mod tests {
     }
 
     #[test]
+    fn parameter_free_systems_match_public_lanyon_shape() {
+        let mut spec = fixture();
+        spec.parameters.clear();
+        spec.parameter_assumptions.clear();
+        assert!(spec.validate().is_ok());
+        assert!(spec.render_racket().unwrap().contains("'parameters (list)"));
+    }
+
+    #[test]
     fn expression_export_preserves_structure() {
         let expr = Expr::BinOp(
             BinOp::Mul,
