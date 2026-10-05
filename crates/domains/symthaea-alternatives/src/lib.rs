@@ -1580,6 +1580,24 @@ mod tests {
                     },
                 ),
             ]),
+            operating_envelope: BTreeMap::from([
+                (
+                    "temperature".into(),
+                    OperatingRequirement {
+                        interval: Interval::new(-20.0, 80.0).unwrap(),
+                        unit: "unit".into(),
+                        scope: "synthetic functional unit".into(),
+                    },
+                ),
+                (
+                    "pressure".into(),
+                    OperatingRequirement {
+                        interval: Interval::new(0.5, 10.0).unwrap(),
+                        unit: "unit".into(),
+                        scope: "synthetic functional unit".into(),
+                    },
+                ),
+            ]),
         }
     }
 
@@ -1595,7 +1613,7 @@ mod tests {
         performance.insert(
             "service_life_years".into(),
             PerformanceEstimate {
-                value: 12.0,
+                interval: Interval::point(12.0).unwrap(),
                 unit: "unit".into(),
                 scope: "synthetic functional unit".into(),
                 evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
@@ -1604,12 +1622,33 @@ mod tests {
         performance.insert(
             "throughput_per_hour".into(),
             PerformanceEstimate {
-                value: 120.0,
+                interval: Interval::point(120.0).unwrap(),
                 unit: "unit".into(),
                 scope: "synthetic functional unit".into(),
                 evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
             },
         );
+
+        let operating_capabilities = BTreeMap::from([
+            (
+                "temperature".into(),
+                PerformanceEstimate {
+                    interval: Interval::new(-40.0, 120.0).unwrap(),
+                    unit: "unit".into(),
+                    scope: "synthetic functional unit".into(),
+                    evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
+                },
+            ),
+            (
+                "pressure".into(),
+                PerformanceEstimate {
+                    interval: Interval::new(0.1, 20.0).unwrap(),
+                    unit: "unit".into(),
+                    scope: "synthetic functional unit".into(),
+                    evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
+                },
+            ),
+        ]);
         let mut burdens = all_burdens(5.0, &evidence_ids);
         burdens.insert(
             Dimension::Hazard,
@@ -1635,6 +1674,7 @@ mod tests {
             kind,
             performance,
             burdens,
+            operating_capabilities,
             evidence,
         }
     }
@@ -1666,6 +1706,69 @@ mod tests {
             ConstraintStatus::Unresolved
         );
         assert!(result.frontier_blockers.contains_key("uncertain-performance"));
+    }
+
+    #[test]
+    fn missing_operating_capability_blocks_frontier() {
+        let mut c = candidate(
+            "missing-envelope",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "o1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.operating_capabilities.remove("pressure");
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert!(result.frontier_blockers["missing-envelope"]
+            .iter()
+            .any(|b| matches!(
+                b,
+                FrontierBlocker::OperatingConditionUnresolved(name)
+                    if name == "pressure"
+            )));
+    }
+
+    #[test]
+    fn insufficient_operating_capability_blocks_frontier() {
+        let mut c = candidate(
+            "narrow-envelope",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "o1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.operating_capabilities
+            .get_mut("temperature")
+            .unwrap()
+            .interval = Interval::new(0.0, 60.0).unwrap();
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert!(result.frontier_blockers["narrow-envelope"]
+            .iter()
+            .any(|b| matches!(
+                b,
+                FrontierBlocker::OperatingConditionFailed(name)
+                    if name == "temperature"
+            )));
     }
 
     #[test]
