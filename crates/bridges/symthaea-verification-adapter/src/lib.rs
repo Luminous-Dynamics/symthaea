@@ -379,13 +379,15 @@ fn extract_verification_method(
             ));
         }
 
-        let method_id = ClaimVerificationMethod::new(id)?;
+        let method_id = ClaimVerificationMethod::new(id)
+            .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
         if method_id != request.verification_method {
             continue;
         }
 
         let controller = required_string(object, "controller")?;
-        let controller = ClaimControllerIdentity::new(controller.to_owned())?;
+        let controller = ClaimControllerIdentity::new(controller.to_owned())
+            .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
         let expires = optional_timestamp(object, "expires")?;
         let revoked = optional_timestamp(object, "revoked")?;
         let lifecycle = VerificationMethodLifecycle::new(expires.as_deref(), revoked.as_deref())?;
@@ -450,7 +452,8 @@ fn extract_relationship_methods(
         let absolute = base
             .join(&id)
             .map_err(|_| SnapshotError::Malformed("verification relationship member id is not a valid URL".into()))?;
-        let method = ClaimVerificationMethod::new(absolute.to_string())?;
+        let method = ClaimVerificationMethod::new(absolute.to_string())
+            .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
         if !seen.insert(method.clone()) {
             return Err(SnapshotError::Malformed(
                 "verification relationship members must be unique".into(),
@@ -463,8 +466,10 @@ fn extract_relationship_methods(
                 if controller != expected {
                     return Err(SnapshotError::Verification(
                         VerificationFailure::ControllerMismatch {
-                            expected: ClaimControllerIdentity::new(expected.to_owned())?,
-                            actual: ClaimControllerIdentity::new(controller)?,
+                            expected: ClaimControllerIdentity::new(expected.to_owned())
+                                .map_err(|error| SnapshotError::Malformed(error.to_owned()))?,
+                            actual: ClaimControllerIdentity::new(controller)
+                                .map_err(|error| SnapshotError::Malformed(error.to_owned()))?,
                         },
                     ));
                 }
