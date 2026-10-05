@@ -734,11 +734,10 @@ impl HdcSemanticCodebook {
             .map(|candidate| candidate.key.clone())
             .collect::<Vec<_>>();
 
-        let edge_candidate_count = selected_nodes
-            .len()
-            .checked_mul(self.relations.len())
-            .and_then(|count| count.checked_mul(selected_nodes.len()))
-            .ok_or_else(|| "HDC edge candidate count overflowed".to_string())?;
+        let edge_candidate_count = checked_edge_candidate_count(
+            selected_nodes.len(),
+            self.relations.len(),
+        )?;
         if edge_candidate_count > HDC_SEMANTIC_MAX_EDGE_CANDIDATES {
             return Err(format!(
                 "HDC edge candidate budget exceeds {} candidates",
@@ -953,6 +952,23 @@ fn parse_edge_candidate(value: &str) -> Result<(String, String, String), String>
         .map_err(|error| format!("invalid encoded edge candidate: {value}: {error}"))
 }
 
+fn checked_edge_candidate_count(node_count: usize, relation_count: usize) -> Result<usize, String> {
+    node_count
+        .checked_mul(relation_count)
+        .and_then(|count| count.checked_mul(node_count))
+        .ok_or_else(|| "HDC edge candidate count overflowed".to_string())
+        .and_then(|count| {
+            if count > HDC_SEMANTIC_MAX_EDGE_CANDIDATES {
+                Err(format!(
+                    "HDC edge candidate budget exceeds {} candidates",
+                    HDC_SEMANTIC_MAX_EDGE_CANDIDATES
+                ))
+            } else {
+                Ok(count)
+            }
+        })
+}
+
 fn selection_stats(
     candidates: &[HdcRetrievalCandidate],
     selected_count: usize,
@@ -1103,7 +1119,7 @@ mod tests {
         let descriptor_bytes = serde_json::to_vec(codebook.descriptor()).unwrap();
         assert_eq!(
             HdcSemanticCodebookDescriptor::from_json_bytes(&descriptor_bytes).unwrap(),
-            *codebook.descriptor()
+            codebook.descriptor().clone()
         );
         let representation_bytes = serde_json::to_vec(&representation).unwrap();
         assert_eq!(
@@ -1137,12 +1153,9 @@ mod tests {
 
     #[test]
     fn edge_candidate_budget_fails_closed_before_allocation() {
-        let training = training_graphs();
-        let codebook = HdcSemanticCodebook::from_training_graphs(77, &training).unwrap();
-        let representation = codebook.encode_graph(&training[0]).unwrap();
-        let mut oversized = representation.clone();
-        oversized.node_count = HDC_SEMANTIC_MAX_NODES;
-        assert!(codebook.decode_graph(&oversized).is_err());
+        assert_eq!(checked_edge_candidate_count(9, 12).unwrap(), 972);
+        assert!(checked_edge_candidate_count(256, 17).is_err());
+        assert!(checked_edge_candidate_count(usize::MAX, usize::MAX).is_err());
     }
 
     #[test]
