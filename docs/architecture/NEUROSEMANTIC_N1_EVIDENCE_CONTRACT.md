@@ -130,6 +130,14 @@ size or abstention rate). Coverage without efficiency can be made trivially safe
 by returning an enormous prediction set, while efficiency without coverage does
 not provide the intended statistical guarantee.
 
+The preregistration must also declare the coverage target explicitly: marginal
+coverage, label-conditional coverage, or another precisely defined criterion.
+Marginal finite-sample validity must not be reported as subgroup-, participant-,
+or feature-conditional validity. Conditional coverage can fail for specific
+subpopulations even when marginal coverage is satisfactory, so any stronger
+claim requires its own evaluation design and sufficient data rather than an
+unstated interpretation of the same threshold.
+
 
 ## Privacy requirements
 
