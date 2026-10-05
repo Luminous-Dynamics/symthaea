@@ -436,6 +436,7 @@ mod tests {
         assert_eq!(receipt.hypothesis_count, 2);
         assert_eq!(receipt.prediction_frame_digest, frame.digest_hex());
         assert!(receipt.validate().is_ok());
+        assert!(receipt.validate_against_prediction_frame(&frame).is_ok());
     }
 
 
