@@ -3174,11 +3174,12 @@ fn validate_native_authority_pin_set(
             )?;
             tx.execute(
                 "INSERT OR IGNORE INTO authorization_recovery_markers
-                 (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker,attempt_scope_digest)
-                 VALUES (?1,?2,?3,?4,?5,'not_entered_validity',?6)",
+                 (authorization_instance,attempt_id,operation_id,boundary_id,action_digest,authority_epoch,marker,attempt_scope_digest)
+                 VALUES (?1,?2,NULLIF(?3,''),?4,?5,?6,'not_entered_validity',?7)",
                 params![
                     record.authorization_instance.as_str(),
                     record.attempt_id.as_str(),
+                    record.operation_id.as_str(),
                     record.boundary_id.as_str(),
                     record.action_digest.as_str(),
                     authority_epoch,
@@ -8014,6 +8015,14 @@ mod tests {
         ).unwrap();
         assert_eq!(states.0,"not_entered");
         assert_eq!(states.1,"ready");
+        let marker_operation_id: Option<String> = store.connection().unwrap().query_row(
+            "SELECT operation_id
+             FROM authorization_recovery_markers
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND marker='not_entered_validity'",
+            params![record.authorization_instance.as_str(),record.attempt_id.as_str()],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(marker_operation_id.as_deref(), Some("operation:validity-preentry"));
 
         let _=std::fs::remove_file(path);
     }
