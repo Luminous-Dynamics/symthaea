@@ -81,6 +81,16 @@ impl PendingNixApprovalProjectionV1 {
 
     pub fn compute_digest(&self) -> Result<String, LocalApprovalProjectionErrorV1> {
         self.validate_without_self_digest()?;
+        Ok(self.compute_digest_unchecked())
+    }
+
+    /// Compute the canonical projection digest without validating the fields.
+    ///
+    /// Production callers use compute_digest(), which fails closed on invalid
+    /// disclosure fields. This raw helper exists only so adversarial tests can
+    /// construct a self-consistent-but-invalid projection and prove that the
+    /// validator rejects the invalid field before accepting its digest.
+    fn compute_digest_unchecked(&self) -> String {
         let mut h = Hasher::new();
         h.update(PROJECTION_DOMAIN);
         put_u16(&mut h, self.schema_version);
@@ -93,7 +103,7 @@ impl PendingNixApprovalProjectionV1 {
         put_str(&mut h, &self.required_approval_profile);
         put_u64(&mut h, self.created_at_unix_ms);
         put_u64(&mut h, self.expires_at_unix_ms);
-        Ok(h.finalize().to_hex().to_string())
+        h.finalize().to_hex().to_string()
     }
 
     pub fn validate(&self) -> Result<(), LocalApprovalProjectionErrorV1> {
@@ -367,7 +377,7 @@ mod tests {
         projection.operator_visible_action.push('\n');
         projection.operator_visible_action_digest =
             digest_display(&projection.operator_visible_action);
-        projection.projection_digest = projection.compute_digest().unwrap();
+        projection.projection_digest = projection.compute_digest_unchecked();
 
         assert_eq!(
             projection.validate().unwrap_err(),
