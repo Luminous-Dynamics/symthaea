@@ -269,6 +269,68 @@ fn rfc9942_vdp_resource_limit_is_not_collapsed_into_encoding_error() {
 }
 
 #[test]
+fn rfc9942_vdp_array_count_resource_limit_is_typed() {
+    let encoded = {
+        let mut value = vec![0xa1, 0x20, 0x98, 0x01, 0x01];
+        value.extend(std::iter::repeat_n(0x40, 257));
+        value
+    };
+
+    assert_eq!(
+        Rfc9942Vdp::from_cbor(&encoded),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
+
+#[test]
+fn rfc9942_receipt_count_resource_limit_is_typed() {
+    let mut encoded = vec![
+        0xd2, 0x84, // COSE_Sign1
+        0x41, 0xa0, // protected = {}
+        0xa1, 0x19, 0x01, 0x8a, 0x91, // receipts (394) = [ ... ] x 17
+    ];
+    encoded.extend(std::iter::repeat_n(0x40, 17));
+    encoded.extend_from_slice(&[0xf6, 0x40]); // detached payload, empty signature
+
+    assert_eq!(
+        Rfc9942SignatureWithReceipts::from_cbor(&encoded),
+        Err(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded)
+    );
+}
+
+#[test]
+fn rfc9942_indefinite_bstr_chunk_limit_is_typed() {
+    let mut encoded = vec![
+        0xd2, 0x84, // COSE_Sign1
+        0x41, 0xa0, // protected = {}
+        0xa1, 0x18, 0x1e, 0x5f, // extension label 30 = indefinite bstr
+    ];
+    encoded.extend(std::iter::repeat_n(0x40, 4097));
+    encoded.extend_from_slice(&[0xff, 0xf6, 0x40]); // break, detached payload, signature
+
+    assert_eq!(
+        Rfc9942SignatureWithReceipts::from_cbor(&encoded),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
+
+#[test]
+fn rfc9942_indefinite_tstr_chunk_limit_is_typed() {
+    let mut encoded = vec![
+        0xd2, 0x84, // COSE_Sign1
+        0x41, 0xa0, // protected = {}
+        0xa1, 0x18, 0x1e, 0x7f, // extension label 30 = indefinite tstr
+    ];
+    encoded.extend(std::iter::repeat_n(0x60, 4097));
+    encoded.extend_from_slice(&[0xff, 0xf6, 0x40]); // break, detached payload, signature
+
+    assert_eq!(
+        Rfc9942SignatureWithReceipts::from_cbor(&encoded),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
+
+#[test]
 fn rfc9942_crit_rejects_unknown_critical_header() {
     // Protected = {2: [999], 999: {bstr(0): 0}}.
     // The extension itself is understood as opaque, but a critical extension
