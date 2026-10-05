@@ -988,6 +988,77 @@ pub struct MeasurementPriority {
     pub rationale: String,
 }
 
+/// A set of functional requirements that must all be satisfied by one pathway.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FunctionalRequirementSet {
+    /// Requirements keyed by their stable IDs.
+    pub requirements: BTreeMap<String, FunctionalRequirement>,
+}
+
+impl FunctionalRequirementSet {
+    /// Construct a requirement set from an ordered map.
+    pub fn new(requirements: BTreeMap<String, FunctionalRequirement>) -> Result<Self, AssessmentError> {
+        if requirements.is_empty() {
+            return Err(AssessmentError::EmptyRequirementSet);
+        }
+        for (id, requirement) in &requirements {
+            requirement.validate()?;
+            if id != &requirement.id {
+                return Err(AssessmentError::RequirementSetKeyMismatch {
+                    key: id.clone(),
+                    requirement_id: requirement.id.clone(),
+                });
+            }
+        }
+        Ok(Self { requirements })
+    }
+
+    /// Validate every requirement and its map identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.requirements.is_empty() {
+            return Err(AssessmentError::EmptyRequirementSet);
+        }
+        for (id, requirement) in &self.requirements {
+            requirement.validate()?;
+            if id != &requirement.id {
+                return Err(AssessmentError::RequirementSetKeyMismatch {
+                    key: id.clone(),
+                    requirement_id: requirement.id.clone(),
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Why a pathway is excluded from joint requirement-set eligibility.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RequirementSetBlocker {
+    /// Requirement that produced the blocker.
+    pub requirement_id: String,
+    /// Underlying fail-closed assessment blocker.
+    pub blocker: FrontierBlocker,
+}
+
+/// Joint assessment across multiple functions of one system.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RequirementSetAssessment {
+    /// Version of the requirement-set result schema.
+    pub schema_version: u16,
+    /// Version of the joint-gating algorithm.
+    pub algorithm_version: String,
+    /// Individual requirement assessments.
+    pub assessments: BTreeMap<String, AssessmentResult>,
+    /// Candidate IDs that satisfy every requirement without unresolved blockers.
+    pub jointly_eligible_candidate_ids: Vec<String>,
+    /// Qualification ceiling limited by the least-qualified requirement assessment.
+    pub joint_qualification: BTreeMap<String, QualificationState>,
+    /// All blockers grouped by candidate across the requirement set.
+    pub blockers: BTreeMap<String, Vec<RequirementSetBlocker>>,
+    /// Deterministic receipt over the complete joint assessment payload.
+    pub receipt: AssessmentReceipt,
+}
+
 /// Complete deterministic assessment.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AssessmentResult {
@@ -1104,6 +1175,10 @@ pub enum AssessmentError {
     MissingIncumbent(String),
     /// Two candidates have the same stable identifier.
     DuplicateCandidateId(String),
+    /// A requirement set contains no requirements.
+    EmptyRequirementSet,
+    /// A requirement-set map key does not match the requirement's stable ID.
+    RequirementSetKeyMismatch { key: String, requirement_id: String },
     /// Simulated or derived evidence lacks reproducible derivation provenance.
     MissingDerivationMetadata(EvidenceKind),
     /// Derivation metadata has incomplete identity.
@@ -1186,6 +1261,11 @@ impl std::fmt::Display for AssessmentError {
             }
             Self::MissingIncumbent(id) => write!(f, "incumbent {id} not found"),
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate id {id}"),
+            Self::EmptyRequirementSet => write!(f, "requirement set is empty"),
+            Self::RequirementSetKeyMismatch { key, requirement_id } => write!(
+                f,
+                "requirement set key {key} does not match requirement id {requirement_id}"
+            ),
             Self::MissingDerivationMetadata(kind) => {
                 write!(f, "evidence kind {kind:?} requires derivation metadata")
             }
@@ -1205,6 +1285,101 @@ impl std::error::Error for AssessmentError {}
 pub struct AlternativesEngine;
 
 impl AlternativesEngine {
+    /// Evaluate one candidate set against every requirement in a requirement set.
+    ///
+    /// Joint eligibility is the intersection of the individual requirement
+    /// eligibility sets. Pareto frontiers remain per-requirement because
+    /// requirements may legitimately use different functional/lifecycle scopes.
+    pub fn assess_requirement_set(
+        &self,
+        requirement_set: &FunctionalRequirementSet,
+        candidates: &[CandidatePathway],
+        incumbent_id: Option<&str>,
+        assessed_at_epoch_seconds: Option<i64>,
+    ) -> Result<RequirementSetAssessment, AssessmentError> {
+        requirement_set.validate()?;
+        let mut assessments = BTreeMap::new();
+        for (requirement_id, requirement) in &requirement_set.requirements {
+            let assessment = self.assess_at(
+                requirement,
+                candidates,
+                incumbent_id,
+                assessed_at_epoch_seconds,
+            )?;
+            assessments.insert(requirement_id.clone(), assessment);
+        }
+
+        let mut candidate_ids = candidates
+            .iter()
+            .map(|candidate| candidate.id.clone())
+            .collect::<Vec<_>>();
+        candidate_ids.sort();
+        candidate_ids.dedup();
+
+        let mut jointly_eligible_candidate_ids = candidate_ids
+            .iter()
+            .filter(|candidate_id| {
+                assessments
+                    .values()
+                    .all(|assessment| !assessment.frontier_blockers.contains_key(*candidate_id))
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        jointly_eligible_candidate_ids.sort();
+
+        let mut blockers = BTreeMap::<String, Vec<RequirementSetBlocker>>::new();
+        for (requirement_id, assessment) in &assessments {
+            for (candidate_id, candidate_blockers) in &assessment.frontier_blockers {
+                blockers
+                    .entry(candidate_id.clone())
+                    .or_default()
+                    .extend(candidate_blockers.iter().cloned().map(|blocker| {
+                        RequirementSetBlocker {
+                            requirement_id: requirement_id.clone(),
+                            blocker,
+                        }
+                    }));
+            }
+        }
+
+        let mut joint_qualification = BTreeMap::new();
+        for candidate_id in &candidate_ids {
+            let minimum = assessments
+                .values()
+                .filter_map(|assessment| {
+                    assessment
+                        .candidates
+                        .iter()
+                        .find(|candidate| candidate.candidate_id == *candidate_id)
+                        .map(|candidate| candidate.qualification)
+                })
+                .min()
+                .unwrap_or(QualificationState::Hypothesis);
+            joint_qualification.insert(candidate_id.clone(), minimum);
+        }
+
+        let mut result = RequirementSetAssessment {
+            schema_version: 1,
+            algorithm_version: "multi-requirement-intersection-v1".into(),
+            assessments,
+            jointly_eligible_candidate_ids,
+            joint_qualification,
+            blockers,
+            receipt: AssessmentReceipt {
+                schema_version: 1,
+                algorithm_version: "multi-requirement-intersection-v1".into(),
+                payload_hash: String::new(),
+            },
+        };
+        let mut payload = result.clone();
+        payload.receipt.payload_hash.clear();
+        let bytes = serde_json::to_vec(&payload).map_err(|_| AssessmentError::NonFinite)?;
+        let mut hasher = Hasher::new();
+        hasher.update(&bytes);
+        result.receipt.payload_hash = hasher.finalize().to_hex().to_string();
+        Ok(result)
+    }
+
     /// Evaluate candidates against a functional requirement.
     pub fn assess(
         &self,
@@ -1766,6 +1941,78 @@ mod tests {
             operating_capabilities,
             evidence,
         }
+    }
+
+    #[test]
+    fn requirement_set_intersects_functional_eligibility() {
+        let candidate = candidate(
+            "multi-function",
+            PathwayKind::ProductRedesign,
+            2.0,
+            2.0,
+            vec![evidence(
+                "m1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut safe = fixture_requirement();
+        safe.id = "safety-function".into();
+        let mut incompatible = fixture_requirement();
+        incompatible.id = "throughput-function".into();
+        incompatible
+            .constraints
+            .insert("throughput_per_hour".into(), RequirementBound::AtLeast(125.0));
+        let requirements = FunctionalRequirementSet::new(BTreeMap::from([
+            (safe.id.clone(), safe),
+            (incompatible.id.clone(), incompatible),
+        ]))
+        .unwrap();
+
+        let result = AlternativesEngine
+            .assess_requirement_set(&requirements, &[candidate], None, None)
+            .unwrap();
+
+        assert!(result.assessments["safety-function"].frontier_blockers.is_empty());
+        assert!(result.assessments["throughput-function"].frontier_blockers.contains_key("multi-function"));
+        assert!(!result.jointly_eligible_candidate_ids.contains(&"multi-function".into()));
+        assert!(result.blockers["multi-function"]
+            .iter()
+            .any(|blocker| blocker.requirement_id == "throughput-function"));
+    }
+
+    #[test]
+    fn requirement_set_receipt_is_order_independent() {
+        let a = candidate(
+            "a",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence("a1", "a", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)],
+        );
+        let b = candidate(
+            "b",
+            PathwayKind::ProcessSubstitution,
+            3.0,
+            3.0,
+            vec![evidence("b1", "b", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)],
+        );
+        let requirements = FunctionalRequirementSet::new(BTreeMap::from([
+            ("seal-v1".into(), fixture_requirement()),
+        ]))
+        .unwrap();
+
+        let first = AlternativesEngine
+            .assess_requirement_set(&requirements, &[a.clone(), b.clone()], None, None)
+            .unwrap();
+        let second = AlternativesEngine
+            .assess_requirement_set(&requirements, &[b, a], None, None)
+            .unwrap();
+
+        assert_eq!(first, second);
+        assert!(!first.receipt.payload_hash.is_empty());
     }
 
     #[test]
