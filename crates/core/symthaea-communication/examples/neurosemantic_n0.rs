@@ -5,7 +5,8 @@ use symthaea_communication::{
     CognitiveSensitivity, CommunicationPurpose, ConceptKind, ConceptNode, GroundedConceptGraph,
     ChannelDirection, ExpressionDecision, ExpressionPolicy, ExpressionTarget,
     NeurosemanticPacket, NeurosemanticPayload, NeurosemanticReplayTracker, RepresentationFamily,
-    ReplayDecision,
+    NeurosemanticDataClass, NeurosemanticDataPolicy, NeurosemanticInferenceClass,
+    NeurosemanticHandlingPolicy, NeurosemanticRetentionPolicy, ReplayDecision,
 };
 
 fn main() -> Result<(), String> {
@@ -65,13 +66,17 @@ fn main() -> Result<(), String> {
         write_scopes: BTreeSet::from([CognitiveChannel::Semantic]),
         max_read_sensitivity: CognitiveSensitivity::Private,
         max_write_sensitivity: CognitiveSensitivity::Private,
+        read_data_classes: BTreeSet::from([NeurosemanticDataClass::SemanticRepresentation]),
+        write_data_classes: BTreeSet::from([NeurosemanticDataClass::SemanticRepresentation]),
+        read_inference_classes: BTreeSet::from([NeurosemanticInferenceClass::SemanticContent]),
+        write_inference_classes: BTreeSet::from([NeurosemanticInferenceClass::SemanticContent]),
         issued_at_unix_s: 1_000,
         expires_at_unix_s: 2_000,
         consent_epoch: 4,
         revoked: false,
     };
 
-    let packet = NeurosemanticPacket::new(
+    let packet = NeurosemanticPacket::new_with_policy(
         1,
         "peer",
         "subject",
@@ -80,6 +85,19 @@ fn main() -> Result<(), String> {
         ChannelDirection::Write,
         RepresentationFamily::Custom("GroundedConceptGraph".into()),
         CognitiveSensitivity::Private,
+        NeurosemanticDataPolicy {
+            schema_version: symthaea_communication::NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
+            data_class: NeurosemanticDataClass::SemanticRepresentation,
+            inference_classes: BTreeSet::from([NeurosemanticInferenceClass::SemanticContent]),
+            permitted_purposes: BTreeSet::from([CommunicationPurpose::HumanCollaboration]),
+            handling: NeurosemanticHandlingPolicy {
+                schema_version: symthaea_communication::NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
+                origin_jurisdiction: "ZA".into(),
+                permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
+                permitted_secondary_uses: BTreeSet::new(),
+                retention: NeurosemanticRetentionPolicy::UntilUnixS(2_000),
+            },
+        },
         0.93,
         NeurosemanticPayload::SemanticGraph(graph_bytes.clone()),
     )?;
@@ -90,6 +108,12 @@ fn main() -> Result<(), String> {
         lease_id: lease.lease_id.clone(),
     };
     message.validate(&lease, 1_500)?;
+    message.validate_for_handling(
+        &lease,
+        "ZA",
+        symthaea_communication::NeurosemanticHandlingAction::Transmit,
+        1_500,
+    )?;
 
     let mut replay = NeurosemanticReplayTracker::default();
     let accepted = replay.observe_authorized(&message, &lease, 1_500)?;
