@@ -1701,6 +1701,25 @@ mod tests {
             "receipt must retain the exact witness identity"
         );
         assert!(receipt.realization.sample_count > 0);
+
+        let mut tampered_witness = witness.clone();
+        tampered_witness.mappings[0].symbols[0] = "TAMPERED".into();
+        assert!(
+            receipt
+                .verify_against_plan(&plan, &frame, &binding, &tampered_witness)
+                .is_err(),
+            "changing the retained witness must invalidate the verified receipt"
+        );
+
+        let mut tampered_receipt = receipt.clone();
+        tampered_receipt.witness_blake3 =
+            blake3::hash(b"different-witness").to_hex().to_string();
+        assert!(
+            tampered_receipt
+                .verify_against_plan(&plan, &frame, &binding, &witness)
+                .is_err(),
+            "changing only the receipt witness digest must fail verification"
+        );
     }
 
     #[cfg(feature = "ssm_language")]
