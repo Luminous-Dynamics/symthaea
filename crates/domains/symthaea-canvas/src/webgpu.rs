@@ -784,7 +784,19 @@ impl WebGpuRenderer {
         let width = canvas.width().max(1);
         let height = canvas.height().max(1);
         let capabilities = surface.get_capabilities(&adapter);
-        let Some(&format) = capabilities.formats.first() else {
+        // Prefer RGBA for browser presentation when available. Current Chromium/Linux
+        // WebGPU canvas interop has active Vulkan SharedImage failures affecting both
+        // RGBA and BGRA copy paths, so keeping the selected format deterministic and
+        // recording it in qualification evidence makes renderer failures diagnosable.
+        let Some(&format) = capabilities
+            .formats
+            .iter()
+            .find(|format| matches!(
+                format,
+                wgpu::TextureFormat::Rgba8UnormSrgb | wgpu::TextureFormat::Rgba8Unorm
+            ))
+            .or_else(|| capabilities.formats.first())
+        else {
             return Err("WebGPU adapter exposed no surface formats".to_string());
         };
         let Some(&alpha_mode) = capabilities.alpha_modes.first() else {
