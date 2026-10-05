@@ -203,6 +203,12 @@ impl MultiPhysicsRequest {
                 if port.name.trim().is_empty() {
                     return Err(SimulationError::InvalidRequest("typed output name cannot be empty".into()));
                 }
+                if producers.contains_key(port.name.as_str()) {
+                    return Err(SimulationError::InvalidRequest(format!(
+                        "typed output {:?} has multiple producers",
+                        port.name
+                    )));
+                }
                 producers.insert(port.name.as_str(), &port.physical_type);
             }
         }
@@ -397,6 +403,26 @@ impl SimulationRequest {
             value,
             unit: unit.into(),
             physical_type: None,
+            provenance: provenance.into(),
+            uncertainty: None,
+        });
+        self
+    }
+
+    /// Add a parameter with canonical physical semantics.
+    pub fn with_typed_parameter(
+        mut self,
+        name: impl Into<String>,
+        value: f64,
+        unit: impl Into<String>,
+        physical_type: PhysicalType,
+        provenance: impl Into<String>,
+    ) -> Self {
+        self.parameters.push(ModelParameter {
+            name: name.into(),
+            value,
+            unit: unit.into(),
+            physical_type: Some(physical_type),
             provenance: provenance.into(),
             uncertainty: None,
         });
@@ -1522,6 +1548,108 @@ mod tests {
 
         assert_eq!(request.stages.len(), 2);
         assert_eq!(request.coupling, CouplingMode::Iterative);
+    }
+
+    #[test]
+    fn typed_multiphysics_connections_accept_matching_types() {
+        let pressure = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Pressure,
+            symthaea_types::PhysicalDimension::PRESSURE,
+        );
+        let request = MultiPhysicsRequest::new(
+            "typed-1",
+            "pressure transfer",
+            CouplingMode::OneWay,
+        )
+        .with_stage(
+            CoupledSimulationStage::new(
+                "cfd",
+                EngineeringDomain::Aerospace,
+                SolverKind::ComputationalFluidDynamics,
+            )
+            .typed_produces([TypedPhysicalPort::new("pressure", pressure.clone())]),
+        )
+        .with_stage(
+            CoupledSimulationStage::new(
+                "fea",
+                EngineeringDomain::Materials,
+                SolverKind::FiniteElement,
+            )
+            .typed_consumes([TypedPhysicalPort::new("pressure", pressure)]),
+        );
+        assert!(request.validate_typed_connections().is_ok());
+    }
+
+    #[test]
+    fn typed_multiphysics_connections_reject_dimension_mismatch() {
+        let pressure = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Pressure,
+            symthaea_types::PhysicalDimension::PRESSURE,
+        );
+        let length = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Length,
+            symthaea_types::PhysicalDimension::LENGTH,
+        );
+        let request = MultiPhysicsRequest::new("typed-2", "bad transfer", CouplingMode::OneWay)
+            .with_stage(
+                CoupledSimulationStage::new(
+                    "source",
+                    EngineeringDomain::Aerospace,
+                    SolverKind::ComputationalFluidDynamics,
+                )
+                .typed_produces([TypedPhysicalPort::new("signal", pressure)]),
+            )
+            .with_stage(
+                CoupledSimulationStage::new(
+                    "sink",
+                    EngineeringDomain::Materials,
+                    SolverKind::FiniteElement,
+                )
+                .typed_consumes([TypedPhysicalPort::new("signal", length)]),
+            );
+        assert!(request.validate_typed_connections().is_err());
+    }
+
+    #[test]
+    fn typed_multiphysics_connections_reject_unknown_semantics() {
+        let request = MultiPhysicsRequest::new("typed-3", "unknown transfer", CouplingMode::OneWay)
+            .with_stage(
+                CoupledSimulationStage::new(
+                    "source",
+                    EngineeringDomain::Aerospace,
+                    SolverKind::ComputationalFluidDynamics,
+                )
+                .typed_produces([TypedPhysicalPort::new("signal", PhysicalType::unknown())]),
+            )
+            .with_stage(
+                CoupledSimulationStage::new(
+                    "sink",
+                    EngineeringDomain::Materials,
+                    SolverKind::FiniteElement,
+                )
+                .typed_consumes([TypedPhysicalPort::new("signal", PhysicalType::unknown())]),
+            );
+        assert!(request.validate_typed_connections().is_err());
+    }
+
+    #[test]
+    fn typed_parameter_and_metric_preserve_semantics() {
+        let energy = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Energy,
+            symthaea_types::PhysicalDimension::ENERGY,
+        );
+        let request = SimulationRequest::new(
+            "typed-4",
+            EngineeringDomain::Mechanical,
+            SolverKind::MultibodyDynamics,
+            "energy check",
+        )
+        .with_typed_parameter("energy", 10.0, "J", energy.clone(), "fixture");
+        assert_eq!(request.parameters[0].physical_type, Some(energy.clone()));
+
+        let result = SimulationResult::converged("typed-4", 0.9)
+            .with_typed_metric("energy", 10.0, "J", energy.clone());
+        assert_eq!(result.metrics[0].physical_type, Some(energy));
     }
 
     #[test]
