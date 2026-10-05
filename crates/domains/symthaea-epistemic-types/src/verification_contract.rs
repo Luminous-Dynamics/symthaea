@@ -23,9 +23,9 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 pub const VERIFICATION_REQUEST_SCHEMA_VERSION: u16 = 1;
-pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 8;
-pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 9;
-pub const CRYPTOGRAPHIC_VERIFICATION_RECEIPT_SCHEMA_VERSION: u16 = 3;
+pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 9;
+pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 10;
+pub const CRYPTOGRAPHIC_VERIFICATION_RECEIPT_SCHEMA_VERSION: u16 = 4;
 
 /// Typed identifier for the verification relationship under which a verification
 /// method is permitted to validate a proof.
@@ -1147,9 +1147,20 @@ pub struct VerificationRequest {
     pub statement_digest: String,
     pub author: ClaimAuthorIdentity,
     pub proof_purpose: ClaimProofPurpose,
+    /// Exact JCS-transformed representation digest that the request bound before
+    /// cryptographic verification. This makes the representation binding durable
+    /// alongside the cryptographic receipt.
+    #[serde(default)]
+    pub expected_transformed_document_digest: Option<String>,
     pub verification_method: ClaimVerificationMethod,
     pub expected_controller: ClaimControllerIdentity,
     pub expected_verification_relationship: ClaimVerificationRelationship,
+    /// Optional exact digest of the JCS-transformed external representation that
+    /// a concrete cryptographic adapter is expected to verify. Generic adapters
+    /// may leave this unset; suite-specific adapters can require it to bind the
+    /// external signed representation to the local verification request.
+    #[serde(default)]
+    pub expected_transformed_document_digest: Option<String>,
     pub controller_document_integrity_policy: ControllerDocumentIntegrityPolicy,
     pub controller_document_network_policy: ControllerDocumentNetworkPolicy,
     pub freshness: VerificationFreshnessContext,
@@ -1229,6 +1240,21 @@ impl VerificationRequest {
         })
     }
 
+    pub fn with_expected_transformed_document_digest(
+        mut self,
+        digest: impl Into<String>,
+    ) -> Result<Self, VerificationFailure> {
+        let digest = digest.into();
+        if !is_hex_digest(&digest) {
+            return Err(VerificationFailure::Structural(
+                "expected transformed document digest must be a 64-character hexadecimal digest"
+                    .into(),
+            ));
+        }
+        self.expected_transformed_document_digest = Some(digest);
+        Ok(self)
+    }
+
     pub fn with_controller_document_network_policy(
         mut self,
         policy: ControllerDocumentNetworkPolicy,
@@ -1299,6 +1325,14 @@ impl VerificationRequest {
             .validate_structure()
             .map_err(|reason| VerificationFailure::Structural(reason.to_owned()))?;
         self.expected_verification_relationship.validate_structure()?;
+        if let Some(digest) = &self.expected_transformed_document_digest {
+            if !is_hex_digest(digest) {
+                return Err(VerificationFailure::Structural(
+                    "expected transformed document digest must be a 64-character hexadecimal digest"
+                        .into(),
+                ));
+            }
+        }
         self.controller_document_integrity_policy.validate_structure()?;
         self.controller_document_network_policy.validate_structure()?;
         self.freshness.validate()?;
@@ -1360,6 +1394,9 @@ impl CryptographicVerificationReceipt {
             cryptosuite: cryptosuite.into(),
             proof_type: proof_type.into(),
             proof_purpose: request.proof_purpose.clone(),
+            expected_transformed_document_digest: request
+                .expected_transformed_document_digest
+                .clone(),
             verification_method: resolution.verification_method.clone(),
             verification_method_type: resolution.verification_method_type.clone(),
             verification_method_material_digest:
@@ -1384,6 +1421,7 @@ impl CryptographicVerificationReceipt {
             &self.cryptosuite,
             &self.proof_type,
             &self.proof_purpose,
+            &self.expected_transformed_document_digest,
             &self.verification_method,
             &self.verification_method_type,
             &self.verification_method_material_digest,
@@ -1439,6 +1477,22 @@ impl CryptographicVerificationReceipt {
                 expected: request.proof_purpose.clone(),
                 actual: self.proof_purpose.clone(),
             });
+        }
+        if self.expected_transformed_document_digest
+            != request.expected_transformed_document_digest
+        {
+            return Err(VerificationFailure::TransformedDocumentDigestMismatch {
+                expected: request.expected_transformed_document_digest.clone(),
+                actual: self.expected_transformed_document_digest.clone(),
+            });
+        }
+        if let Some(digest) = &self.expected_transformed_document_digest {
+            if !is_hex_digest(digest) {
+                return Err(VerificationFailure::Structural(
+                    "cryptographic receipt expected transformed document digest must be a 64-character hexadecimal digest"
+                        .into(),
+                ));
+            }
         }
         if self.verification_method != resolution.verification_method {
             return Err(VerificationFailure::VerificationMethodMismatch {
@@ -1542,6 +1596,9 @@ impl VerificationEvidence {
             statement_digest: request.statement_digest.clone(),
             author: request.author.clone(),
             proof_purpose: request.proof_purpose.clone(),
+            expected_transformed_document_digest: request
+                .expected_transformed_document_digest
+                .clone(),
             verification_method: resolution.verification_method.clone(),
             controller: request.expected_controller.clone(),
             resolved_verification_method_controller:
@@ -1608,6 +1665,10 @@ impl VerificationEvidence {
             verification_method: self.verification_method.clone(),
             expected_controller: self.controller.clone(),
             expected_verification_relationship: self.verification_relationship.clone(),
+            expected_transformed_document_digest: self
+                .cryptographic_verification
+                .expected_transformed_document_digest
+                .clone(),
             controller_document_integrity_policy:
                 match &self.resolution.controller_document_integrity {
                     ControllerDocumentIntegrityAttestation::Unpinned { .. } => {
@@ -1781,6 +1842,11 @@ pub enum VerificationFailure {
     MissingControllerDocumentDereference,
     ControllerDocumentDereferenceMismatch,
     ControllerDocumentDereferenceTimeMismatch,
+    MissingExpectedTransformedDocumentDigest,
+    TransformedDocumentDigestMismatch {
+        expected: Option<String>,
+        actual: Option<String>,
+    },
     CryptographicVerificationFailed,
 }
 
@@ -2609,6 +2675,7 @@ mod tests {
             statement_digest: request.statement_digest.clone(),
             cryptosuite: "ed25519-test".into(),
             proof_type: "DataIntegrityProof".into(),
+
             proof_purpose: request.proof_purpose.clone(),
             verification_method: resolution.verification_method.clone(),
             verification_method_type: resolution.verification_method_type.clone(),
