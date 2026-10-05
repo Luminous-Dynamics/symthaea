@@ -173,12 +173,6 @@ impl JsonControllerDocumentSnapshotAdapter {
             }
         })?;
 
-        if bytes.len() as u64 > request.controller_document_network_policy.max_response_bytes {
-            return Err(SnapshotError::Verification(
-                VerificationFailure::ControllerDocumentResponseTooLarge,
-            ));
-        }
-
         let snapshot: ControllerDocumentSnapshotFile =
             serde_json::from_slice(&bytes).map_err(|error| {
                 SnapshotError::Malformed(format!(
