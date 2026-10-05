@@ -26,7 +26,7 @@ pub mod corpus;
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 6;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-v10";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-diversity-v11";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -226,8 +226,10 @@ impl EvidenceSourceIdentity {
         Ok(())
     }
 
-    /// Derive the stable identity used when counting independent authorities.
-    pub fn independence_id(&self) -> String {
+    /// Derive the stable identity used when counting distinct authority groups.
+    ///
+    /// This is structural source diversity, not proof of epistemic or organizational independence.
+    pub fn authority_group_id(&self) -> String {
         let bytes = serde_json::to_vec(&self.authority_id)
             .expect("source authority identity is serializable");
         let mut hasher = Hasher::new();
@@ -765,7 +767,7 @@ impl CandidatePathway {
                     && e.confidence >= 0.7
             })
         });
-        let independent_sources = self
+        let distinct_authority_sources = self
             .burdens
             .values()
             .flat_map(|estimate| self.linked_evidence_at(&estimate.evidence_ids, as_of))
@@ -782,7 +784,7 @@ impl CandidatePathway {
                 ) && e.stance == EvidenceStance::Supports
                     && e.confidence >= 0.7
             })
-            .map(|e| e.source.independence_id())
+            .map(|e| e.source.authority_group_id())
             .collect::<BTreeSet<_>>()
             .len();
         let has_all_dimension_evidence = Dimension::ALL.iter().all(|dimension| {
@@ -812,7 +814,7 @@ impl CandidatePathway {
                     && e.confidence >= 0.7
             })
         });
-        let field_independent_sources = self
+        let field_distinct_authority_sources = self
             .burdens
             .values()
             .flat_map(|estimate| self.linked_evidence_at(&estimate.evidence_ids, as_of))
@@ -824,7 +826,7 @@ impl CandidatePathway {
             .map(|e| e.source_id.as_str())
             .collect::<BTreeSet<_>>()
             .len();
-        let monitoring_independent_sources = self
+        let monitoring_distinct_authority_sources = self
             .burdens
             .values()
             .flat_map(|estimate| self.linked_evidence_at(&estimate.evidence_ids, as_of))
@@ -868,18 +870,18 @@ impl CandidatePathway {
             })
         });
 
-        if all_dimensions_monitored && monitoring_independent_sources >= 2 {
+        if all_dimensions_monitored && monitoring_distinct_authority_sources >= 2 {
             QualificationState::ContinuouslyMonitored
-        } else if all_dimensions_field_observed && field_independent_sources >= 2 {
+        } else if all_dimensions_field_observed && field_distinct_authority_sources >= 2 {
             QualificationState::FieldQualified
         } else if any_supported_measurement
-            && independent_sources >= 2
+            && distinct_authority_sources >= 2
             && has_all_dimension_evidence
             && has_manufacturing_observation
         {
             QualificationState::ManufacturingQualified
         } else if any_supported_measurement
-            && independent_sources >= 2
+            && distinct_authority_sources >= 2
             && has_all_dimension_evidence
             && has_lifecycle_assessment
         {
@@ -903,7 +905,7 @@ pub enum QualificationState {
     ComputationallyPlausible,
     /// At least one substantive empirical/reporting claim is supported.
     EvidenceSupported,
-    /// Multiple independent supported sources exist.
+    /// Multiple distinct authority groups provide supported evidence.
     LifecycleQualified,
     /// Multiple independent sources plus full dimension coverage exist.
     ManufacturingQualified,
@@ -2651,12 +2653,12 @@ mod tests {
             issuer_key_fingerprint: None,
         };
 
-        assert_eq!(a.independence_id(), b.independence_id());
-        assert_ne!(a.independence_id(), c.independence_id());
+        assert_eq!(a.authority_group_id(), b.authority_group_id());
+        assert_ne!(a.authority_group_id(), c.authority_group_id());
 
         let mut rotated_key = a.clone();
         rotated_key.issuer_key_fingerprint = Some("new-key".into());
-        assert_eq!(a.independence_id(), rotated_key.independence_id());
+        assert_eq!(a.authority_group_id(), rotated_key.authority_group_id());
     }
 
     #[test]
