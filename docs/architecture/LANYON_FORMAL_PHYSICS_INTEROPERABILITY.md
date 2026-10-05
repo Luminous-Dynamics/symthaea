@@ -90,6 +90,11 @@ does not claim empirical truth or semantic correctness of the original intent.
 A Lanyon verification result can then be attached to the bundle by an external
 evidence layer without changing the original physical semantic identity.
 
+When the source is a `ScientificHypothesisHandoff`, the adapter can bind both
+its candidate digest and exact handoff digest. This preserves not only which
+equation was selected, but the typed and provenance envelope that authorized
+sending it into a formal solver pipeline.
+
 ## Mapping
 
 | Symthaea | Lanyon public surface | Treatment |
