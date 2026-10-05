@@ -191,6 +191,7 @@ pub fn discover_conservation_laws(
             variance: var,
             mean_value: mean,
             symbolically_proven: proven,
+            discovery_mode,
         });
     }
     results.sort_by(|a, b| {
@@ -440,6 +441,16 @@ pub(crate) fn compute_trajectory_variance(
     var * (1.0 + 4.0 * nan_fraction)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AutonomousDiscoveryMode {
+    /// Built-in invariant templates are injected into the initial population.
+    /// Results are primed rediscoveries rather than cold discoveries.
+    Primed,
+    /// Built-in invariant templates are excluded. Caller-supplied templates,
+    /// when explicitly provided, remain a form of priming.
+    Cold,
+}
+
 #[derive(Debug, Clone)]
 pub struct AutonomousInvariant {
     pub formula: Expr,
@@ -448,6 +459,7 @@ pub struct AutonomousInvariant {
     pub mean_value: f64,
     pub complexity: usize,
     pub symbolically_proven: bool,
+    pub discovery_mode: AutonomousDiscoveryMode,
 }
 
 pub fn compose_top_k_invariants(
@@ -545,6 +557,10 @@ pub fn compose_top_k_invariants(
         mean_value,
         complexity,
         symbolically_proven: false,
+        discovery_mode: invariants
+            .first()
+            .map(|inv| inv.discovery_mode)
+            .unwrap_or(AutonomousDiscoveryMode::Primed),
     })
 }
 
@@ -557,7 +573,7 @@ pub fn discover_invariants_autonomous(
     t_max: f64,
     dt: f64,
 ) -> Vec<AutonomousInvariant> {
-    discover_invariants_autonomous_with_seed_templates(
+    discover_invariants_autonomous_with_mode(
         rhs,
         initial_state,
         var_names,
@@ -566,6 +582,33 @@ pub fn discover_invariants_autonomous(
         t_max,
         dt,
         &[],
+        AutonomousDiscoveryMode::Primed,
+    )
+}
+
+/// Cold autonomous discovery: no built-in invariant templates are injected.
+///
+/// Use this entry point for unassisted-discovery claims. Explicit caller-supplied
+/// templates remain a separate, visibly primed experiment.
+pub fn discover_invariants_autonomous_cold(
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    initial_state: &[f64],
+    var_names: &[&str],
+    dynamics: Option<&[(&str, SymExpr)]>,
+    config: &RegressorConfig,
+    t_max: f64,
+    dt: f64,
+) -> Vec<AutonomousInvariant> {
+    discover_invariants_autonomous_with_mode(
+        rhs,
+        initial_state,
+        var_names,
+        dynamics,
+        config,
+        t_max,
+        dt,
+        &[],
+        AutonomousDiscoveryMode::Cold,
     )
 }
 
@@ -578,6 +621,30 @@ pub fn discover_invariants_autonomous_with_seed_templates(
     t_max: f64,
     dt: f64,
     extra_seed_templates: &[Expr],
+) -> Vec<AutonomousInvariant> {
+    discover_invariants_autonomous_with_mode(
+        rhs,
+        initial_state,
+        var_names,
+        dynamics,
+        config,
+        t_max,
+        dt,
+        extra_seed_templates,
+        AutonomousDiscoveryMode::Primed,
+    )
+}
+
+fn discover_invariants_autonomous_with_mode(
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    initial_state: &[f64],
+    var_names: &[&str],
+    dynamics: Option<&[(&str, SymExpr)]>,
+    config: &RegressorConfig,
+    t_max: f64,
+    dt: f64,
+    extra_seed_templates: &[Expr],
+    discovery_mode: AutonomousDiscoveryMode,
 ) -> Vec<AutonomousInvariant> {
     let ndim = initial_state.len();
     assert_eq!(var_names.len(), ndim);
@@ -632,7 +699,10 @@ pub fn discover_invariants_autonomous_with_seed_templates(
         })
         .collect();
 
-    let mut seed_templates = build_invariant_templates(var_names);
+    let mut seed_templates = match discovery_mode {
+        AutonomousDiscoveryMode::Primed => build_invariant_templates(var_names),
+        AutonomousDiscoveryMode::Cold => Vec::new(),
+    };
     let mut seen_seed_templates: std::collections::HashSet<String> =
         seed_templates.iter().map(macro_usage_key).collect();
     for template in extra_seed_templates {
@@ -1468,4 +1538,48 @@ fn find_lyapunov_candidate(
     }
 
     None
+}
+
+
+#[cfg(test)]
+mod discovery_provenance_tests {
+    use super::*;
+
+    fn harmonic_rhs(s: &[f64], _t: f64) -> Vec<f64> {
+        vec![s[1], -s[0]]
+    }
+
+    fn harmonic_dynamics() -> Vec<(&'static str, SymExpr)> {
+        vec![
+            ("x", SymExpr::Var("v".into())),
+            ("v", SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
+        ]
+    }
+
+    #[test]
+    fn primed_and_cold_entry_points_report_provenance() {
+        let cfg = RegressorConfig {
+            population_size: 80,
+            generations: 8,
+            max_depth: 3,
+            max_complexity: 12,
+            seed: 7,
+            ..RegressorConfig::default()
+        };
+        let dynamics = harmonic_dynamics();
+
+        let primed = discover_invariants_autonomous(
+            harmonic_rhs, &[1.0, 0.0], &["x", "v"], Some(&dynamics), &cfg, 4.0, 0.02,
+        );
+        assert!(primed
+            .iter()
+            .all(|inv| inv.discovery_mode == AutonomousDiscoveryMode::Primed));
+
+        let cold = discover_invariants_autonomous_cold(
+            harmonic_rhs, &[1.0, 0.0], &["x", "v"], Some(&dynamics), &cfg, 4.0, 0.02,
+        );
+        assert!(cold
+            .iter()
+            .all(|inv| inv.discovery_mode == AutonomousDiscoveryMode::Cold));
+    }
 }
