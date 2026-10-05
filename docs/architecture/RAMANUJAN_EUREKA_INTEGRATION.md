@@ -228,11 +228,13 @@ The candidate digest is derived from the exact symbolic expression AST, source i
 
 The experiment selector now explicitly preserves first-occurrence tie breaking, and a dedicated regression covers exact ties.
 
-The current workflow therefore has an intentionally asymmetric dependency:
+The current workflow therefore has an intentionally one-way evidence boundary:
 
 ```text
 Ramanujan -> hypothesis identity -> EUREKA challenge
 EUREKA outcome -X-> original Ramanujan campaign
 ```
 
-A later model-revision campaign may consume the closed result as a new input, but it receives a new campaign/search identity.
+A later model-revision campaign may consume the closed result as a new input, but it receives a new campaign/search identity. The first `ScientificHypothesisRevisionReceipt` implementation enforces this at the value level by requiring distinct prior/new handoff digests and a distinct campaign digest.
+
+The first `ScientificInquirySelectionReceipt` implementation similarly freezes which hypothesis set and challenge space produced an experiment-selection decision. Its predicted information value is explicitly not realized evidence; the actual experiment must be evaluated separately.
