@@ -16,7 +16,7 @@ use symthaea_core::hdc::conjecture_engine::{
 };
 use symthaea_types::{
     ModelMaturity, PhysicalDimension, PhysicalType, QuantityKind, UnitRef, UnitTransform,
-    ScientificHypothesisHandoff, ScientificHypothesisRevisionReceipt,
+    ScientificHypothesisHandoff, ScientificHypothesisRevisionReceipt, ScientificInquiryExecutionReceipt,
 };
 
 fn candidate(formula: Expr, source: &str) -> Conjecture {
@@ -142,6 +142,18 @@ fn main() {
     assert!(selection.validate().is_ok());
     assert!(selection.validate_against_prediction_frame(&prediction_frame).is_ok());
 
+    // Execution is a separate provenance receipt. The actual scientific result
+    // remains in the existing evidence/result infrastructure.
+    let execution = ScientificInquiryExecutionReceipt::new(
+        &selection,
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        &prediction_frame,
+        "independent-evaluator-v1",
+    )
+    .expect("execution receipt should be structurally valid");
+    assert!(execution.validate_against_selection(&selection).is_ok());
+
     // A later revision is a new lineage, never a mutation of the original handoff.
     let revised = ScientificHypothesisHandoff::new(
         "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
@@ -162,7 +174,7 @@ fn main() {
     let revision = ScientificHypothesisRevisionReceipt::new(
         h1_ref.digest_hex(),
         revised.digest_hex(),
-        selection.digest_hex(),
+        execution.digest_hex(),
         "3333333333333333333333333333333333333333333333333333333333333333",
         "candidate-refinement-after-independent-challenge",
     )
@@ -185,6 +197,7 @@ fn main() {
         selection.predicted_disagreement_score()
     );
     println!("  selection receipt: {}", selection.digest_hex());
+    println!("  execution receipt: {}", execution.digest_hex());
     println!("  revision receipt: {}", revision.digest_hex());
     println!("  status: receipts are identity/selection artifacts, not scientific confirmation");
 }
