@@ -17,6 +17,7 @@ use symthaea_core::hdc::conjecture_engine::{
 use symthaea_types::{
     ModelMaturity, PhysicalDimension, PhysicalType, QuantityKind, UnitRef, UnitTransform,
     ScientificHypothesisHandoff, ScientificHypothesisRevisionReceipt, ScientificInquiryExecutionReceipt,
+    validate_scientific_hypothesis_set,
 };
 
 fn candidate(formula: Expr, source: &str) -> Conjecture {
@@ -111,6 +112,8 @@ fn main() {
     assert!(h2_ref.validate().is_ok());
 
     let handoffs = vec![h1_ref.clone(), h2_ref.clone()];
+    validate_scientific_hypothesis_set(&handoffs)
+        .expect("independent inquiry set must contain two unique valid hypotheses");
     let hypothesis_set_digest = scientific_hypothesis_set_digest(&handoffs);
 
     // Candidate experiments are fresh initial conditions. Finite prediction
