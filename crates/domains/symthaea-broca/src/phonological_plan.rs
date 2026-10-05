@@ -754,7 +754,7 @@ mod tests {
 
         assert_eq!(plan.content_binding, ContentBindingStatus::LexicallyBound);
         assert_eq!(plan.lexical_provenance.as_deref(), Some(provenance.as_str()));
-        assert!(plan.grounding_surface().contains("lexical_provenance=true"));
+        assert!(plan.grounding_surface().contains(&format!("\"lexical_provenance\":\"{}\"", provenance)));
     }
 
     #[test]
