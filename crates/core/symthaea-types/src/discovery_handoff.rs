@@ -248,12 +248,19 @@ pub struct ScientificInquirySelectionReceipt {
     pub selected_challenge_digest: String,
     pub selector_revision: String,
     pub selection_seed: u64,
-    /// Predicted disagreement / information value; this is not realized evidence.
-    pub predicted_information_gain_bits: u64,
+    /// Prediction-disagreement score used to select the challenge; this is not realized evidence.
+    ///
+    /// Stored as the exact IEEE-754 bit pattern so the receipt remains deterministic.
+    pub predicted_disagreement_score_bits: u64,
+    /// Number of hypotheses that produced finite predictions for the selected challenge.
+    ///
+    /// Active inquiry is only admissible when at least two hypotheses are directly
+    /// comparable at the selected challenge.
+    pub prediction_count: u16,
 }
 
 impl ScientificInquirySelectionReceipt {
-    pub const SCHEMA_REVISION: &'static str = "SCIENTIFIC_INQUIRY_SELECTION.v1";
+    pub const SCHEMA_REVISION: &'static str = "SCIENTIFIC_INQUIRY_SELECTION.v2";
 
     pub fn new(
         hypothesis_handoff_digest: impl Into<String>,
@@ -262,10 +269,14 @@ impl ScientificInquirySelectionReceipt {
         selected_challenge_digest: impl Into<String>,
         selector_revision: impl Into<String>,
         selection_seed: u64,
-        predicted_information_gain: f64,
+        predicted_disagreement_score: f64,
+        prediction_count: u16,
     ) -> Result<Self, String> {
-        if !predicted_information_gain.is_finite() || predicted_information_gain < 0.0 {
-            return Err("predicted information gain must be finite and non-negative".into());
+        if !predicted_disagreement_score.is_finite() || predicted_disagreement_score < 0.0 {
+            return Err("predicted disagreement score must be finite and non-negative".into());
+        }
+        if prediction_count < 2 {
+            return Err("inquiry selection requires at least two finite hypothesis predictions".into());
         }
         let receipt = Self {
             schema_revision: Self::SCHEMA_REVISION.into(),
@@ -276,14 +287,15 @@ impl ScientificInquirySelectionReceipt {
             selected_challenge_digest: selected_challenge_digest.into(),
             selector_revision: selector_revision.into(),
             selection_seed,
-            predicted_information_gain_bits: predicted_information_gain.to_bits(),
+            predicted_disagreement_score_bits: predicted_disagreement_score.to_bits(),
+            prediction_count,
         };
         receipt.validate()?;
         Ok(receipt)
     }
 
-    pub fn predicted_information_gain(&self) -> f64 {
-        f64::from_bits(self.predicted_information_gain_bits)
+    pub fn predicted_disagreement_score(&self) -> f64 {
+        f64::from_bits(self.predicted_disagreement_score_bits)
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
@@ -331,9 +343,12 @@ impl ScientificInquirySelectionReceipt {
         if self.selector_revision.trim().is_empty() {
             return Err("selector_revision cannot be empty".into());
         }
-        let predicted = self.predicted_information_gain();
+        let predicted = self.predicted_disagreement_score();
         if !predicted.is_finite() || predicted < 0.0 {
-            return Err("predicted information gain is invalid".into());
+            return Err("predicted disagreement score is invalid".into());
+        }
+        if self.prediction_count < 2 {
+            return Err("inquiry selection requires at least two finite hypothesis predictions".into());
         }
         Ok(())
     }
