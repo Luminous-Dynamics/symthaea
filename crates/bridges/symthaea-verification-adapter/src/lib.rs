@@ -17,6 +17,7 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 mod eddsa_jcs_2022;
+mod strict_json;
 
 pub use eddsa_jcs_2022::{verify_eddsa_jcs_2022, EDDSA_JCS_2022};
 
