@@ -167,6 +167,9 @@ impl LexicalMorphosyntacticBinding {
     ) -> Result<(), LexicalBindingError> {
         frame.validate()
             .map_err(|_| LexicalBindingError::UpstreamMismatch)?;
+        if matches!(frame.strategy, FormulationStrategy::Abstain) {
+            return Err(LexicalBindingError::AbstentionCannotBind);
+        }
         self.validate()?;
 
         if self.source_frame_version != frame.version
@@ -744,6 +747,39 @@ mod tests {
                 .filter(|item| !item.semantic_payload)
                 .count(),
             1
+        );
+    }
+
+    #[test]
+    fn persisted_binding_cannot_target_abstention_frame() {
+        let frame = statement_frame();
+        let bindings = base_semantic_bindings();
+        let mut binding = LexicalMorphosyntacticBinding::new(
+            &frame,
+            english_rule_binding(),
+            bindings.clone(),
+            vec![],
+            vec![],
+        )
+        .expect("base lexical binding");
+
+        let genesis = GenesisSeed::from_phrase("lexical-binding-test");
+        let decoder = StructuredDecoder::new(&genesis);
+        let mut channels = ThoughtChannels::with_intent(7);
+        channels.set_epistemic(3.0);
+        let readout = decoder.decode(&channels);
+        let mut abstention_frame =
+            LinguisticFrame::from_speech_plan(&crate::SpeechPlan::from_readout(&channels, &readout));
+        binding.source_frame_version = abstention_frame.version.clone();
+        binding.source_frame_grounding = abstention_frame.grounding_surface();
+
+        abstention_frame.strategy = FormulationStrategy::Abstain;
+
+        assert_eq!(
+            binding
+                .validate_against_frame(&abstention_frame)
+                .expect_err("persisted binding must remain non-realizable"),
+            LexicalBindingError::AbstentionCannotBind
         );
     }
 
