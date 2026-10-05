@@ -567,6 +567,12 @@ impl ControllerDocumentSnapshotScope {
     ///
     /// A current snapshot is usable only for its own resolution instant. Historical
     /// evaluation requires a historical snapshot explicitly tied to the reference time.
+    pub fn resolved_at(&self) -> &str {
+        match self {
+            Self::Current { resolved_at } | Self::HistoricalAt { resolved_at, .. } => resolved_at,
+        }
+    }
+
     pub fn validate_for_reference_time(
         &self,
         reference_time: &str,
@@ -1035,6 +1041,15 @@ impl VerificationMethodResolution {
             &self.controller_document_ref,
             &self.controller_document_digest,
         )?;
+        let snapshot_resolved_at = parse_timestamp(
+            "controller document resolved at",
+            self.controller_document_snapshot_scope.resolved_at(),
+        )?;
+        let dereference_resolved_at =
+            parse_timestamp("controller document resolved at", &dereference.resolved_at)?;
+        if snapshot_resolved_at != dereference_resolved_at {
+            return Err(VerificationFailure::ControllerDocumentDereferenceTimeMismatch);
+        }
         Ok(())
     }
 
@@ -1579,6 +1594,7 @@ pub enum VerificationFailure {
     ControllerDocumentResponseTooLarge,
     MissingControllerDocumentDereference,
     ControllerDocumentDereferenceMismatch,
+    ControllerDocumentDereferenceTimeMismatch,
     CryptographicVerificationFailed,
 }
 
@@ -2263,6 +2279,39 @@ mod tests {
         assert!(matches!(
             pinned_mismatch,
             Err(VerificationFailure::ControllerDocumentIntegrityMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn resolution_rejects_dereference_snapshot_time_mismatch() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let mut resolution = resolved_method(&request);
+        let dereference = ControllerDocumentDereferenceAttestation::from_adapter(
+            &request,
+            "https://example.test/controller",
+            "application/cid",
+            1024,
+            0,
+            "2026-10-05T02:10:00Z",
+            ControllerDocumentResolutionSource::HistoricalRegistry,
+            &"11".repeat(32),
+            None,
+        )
+        .unwrap();
+        resolution.controller_document_dereference = Some(dereference);
+
+        assert!(matches!(
+            resolution.validate_structure(),
+            Err(VerificationFailure::ControllerDocumentDereferenceTimeMismatch)
         ));
     }
 
