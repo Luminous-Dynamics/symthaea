@@ -1132,10 +1132,6 @@ impl VerificationMethodResolution {
                 .controller_document_dereference
                 .as_ref()
                 .is_some_and(|value| value.validate_against_request(request).is_ok())
-            && self
-                .cryptographic_verification
-                .validate_against(request, &self.resolution)
-                .is_ok()
     }
 }
 
@@ -1664,7 +1660,6 @@ impl VerificationEvidence {
         for (name, value) in [
             ("controller document reference", self.controller_document_ref.as_str()),
             ("verification relationship", self.verification_relationship.as_str()),
-            ("cryptosuite", self.cryptosuite.as_str()),
         ] {
             if value.trim().is_empty() {
                 return Err(VerificationFailure::Structural(format!(
