@@ -130,7 +130,6 @@ jobs:
           }
           EOF
 
-          cp "$GITHUB_WORKSPACE/crates/core/symthaea-core/src/hdc/linear_code.rs" "$HARNESS/src/linear_code.rs" 2>/dev/null || true
           cp "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_ambiguity.rs" \
             "$HARNESS/tests/linear_code_ambiguity.rs"
           cp "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs" \
