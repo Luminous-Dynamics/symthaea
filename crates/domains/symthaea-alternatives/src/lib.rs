@@ -125,7 +125,7 @@ impl Interval {
 }
 
 /// The type of evidence behind an assertion.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum EvidenceKind {
     /// Direct physical or operational observation.
     Observed,
@@ -145,6 +145,41 @@ pub enum EvidenceKind {
     FieldObserved,
     /// Repeated operational monitoring.
     ContinuouslyMonitored,
+}
+
+/// Explicit decision-profile freshness semantics for evidence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceFreshnessPolicy {
+    /// Stable identity of the freshness policy profile.
+    pub policy_id: String,
+    /// Policy revision.
+    pub policy_revision: String,
+    /// Digest of the exact policy semantics.
+    pub policy_digest: String,
+    /// Maximum evidence age by evidence kind in seconds.
+    ///
+    /// Kinds absent from this map are not freshness-bounded by this policy.
+    pub max_age_seconds_by_kind: BTreeMap<EvidenceKind, u64>,
+}
+
+impl EvidenceFreshnessPolicy {
+    /// Validate the explicit freshness-policy identity and rules.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.policy_id.is_empty()
+            || self.policy_revision.is_empty()
+            || self.policy_digest.is_empty()
+        {
+            return Err(AssessmentError::EmptyFreshnessPolicyIdentity);
+        }
+        if self.max_age_seconds_by_kind.is_empty() {
+            return Err(AssessmentError::EmptyFreshnessPolicy);
+        }
+        Ok(())
+    }
+
+    fn max_age_for(&self, kind: EvidenceKind) -> Option<u64> {
+        self.max_age_seconds_by_kind.get(&kind).copied()
+    }
 }
 
 /// Reproducible provenance for a simulated or derived evidence record.
@@ -316,6 +351,10 @@ pub struct EvidenceRecord {
     pub unit: Option<String>,
     /// Optional source timestamp/version label.
     pub as_of: Option<String>,
+    /// Optional Unix timestamp representing when the observation or measurement occurred.
+    ///
+    /// This is distinct from validity windows and the human/source version label in as_of.
+    pub observed_at_epoch_seconds: Option<i64>,
     /// Optional Unix timestamp from which this evidence is valid.
     pub valid_from_epoch_seconds: Option<i64>,
     /// Optional Unix timestamp through which this evidence is valid.
