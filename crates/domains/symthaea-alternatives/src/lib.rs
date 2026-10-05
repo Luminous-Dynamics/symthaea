@@ -236,6 +236,29 @@ impl RequirementBound {
     }
 }
 
+/// The explicit comparison scale for one burden dimension.
+///
+/// The engine never infers a comparison cohort's scale from the candidates.
+/// This prevents a mutually inconsistent set of candidate units/scopes from
+/// silently becoming its own reference frame.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComparisonScale {
+    /// Unit shared by all comparable candidates for the dimension.
+    pub unit: String,
+    /// Functional-unit / lifecycle / geography / temporal scope identifier.
+    pub scope: String,
+}
+
+impl ComparisonScale {
+    /// Validate that the comparison scale is explicit and non-empty.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.unit.is_empty() || self.scope.is_empty() {
+            return Err(AssessmentError::EmptyBurdenScale);
+        }
+        Ok(())
+    }
+}
+
 /// The function that must be satisfied independently of the incumbent.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FunctionalRequirement {
@@ -245,10 +268,12 @@ pub struct FunctionalRequirement {
     pub description: String,
     /// Named performance constraints.
     pub constraints: BTreeMap<String, RequirementBound>,
+    /// Explicit comparison scales for every burden dimension.
+    pub comparison_scales: BTreeMap<Dimension, ComparisonScale>,
 }
 
 impl FunctionalRequirement {
-    /// Validate identity and numeric bounds.
+    /// Validate identity, numeric bounds, and explicit comparison scales.
     pub fn validate(&self) -> Result<(), AssessmentError> {
         if self.id.is_empty() || self.description.is_empty() {
             return Err(AssessmentError::EmptyRequirementIdentity);
@@ -269,6 +294,12 @@ impl FunctionalRequirement {
                     }
                 }
             }
+        }
+        for dimension in Dimension::ALL {
+            let Some(scale) = self.comparison_scales.get(&dimension) else {
+                return Err(AssessmentError::MissingComparisonScale(dimension));
+            };
+            scale.validate()?;
         }
         Ok(())
     }
@@ -428,14 +459,40 @@ impl CandidatePathway {
             .burdens
             .values()
             .flat_map(|estimate| self.linked_evidence(estimate))
-            .filter(|e| e.stance == EvidenceStance::Supports && e.confidence >= 0.7)
+            .filter(|e| {
+                matches!(
+                    e.kind,
+                    EvidenceKind::Observed
+                        | EvidenceKind::Reported
+                        | EvidenceKind::Derived
+                        | EvidenceKind::LifecycleAssessed
+                        | EvidenceKind::ManufacturingObserved
+                        | EvidenceKind::FieldObserved
+                        | EvidenceKind::ContinuouslyMonitored
+                ) && e.stance == EvidenceStance::Supports
+                    && e.confidence >= 0.7
+            })
             .map(|e| e.source_id.as_str())
             .collect::<BTreeSet<_>>()
             .len();
         let has_all_dimension_evidence = Dimension::ALL.iter().all(|dimension| {
             self.burdens
                 .get(dimension)
-                .map(|estimate| !estimate.evidence_ids.is_empty())
+                .map(|estimate| {
+                    self.linked_evidence(estimate).any(|e| {
+                        matches!(
+                            e.kind,
+                            EvidenceKind::Observed
+                                | EvidenceKind::Reported
+                                | EvidenceKind::Derived
+                                | EvidenceKind::LifecycleAssessed
+                                | EvidenceKind::ManufacturingObserved
+                                | EvidenceKind::FieldObserved
+                                | EvidenceKind::ContinuouslyMonitored
+                        ) && e.stance == EvidenceStance::Supports
+                            && e.confidence >= 0.7
+                    })
+                })
                 .unwrap_or(false)
         });
         let has_lifecycle_assessment = self.burdens.values().any(|estimate| {
@@ -449,8 +506,11 @@ impl CandidatePathway {
             self.burdens
                 .get(dimension)
                 .map(|estimate| {
-                    self.linked_evidence(estimate)
-                        .any(|e| e.kind == EvidenceKind::FieldObserved)
+                    self.linked_evidence(estimate).any(|e| {
+                        e.kind == EvidenceKind::FieldObserved
+                            && e.stance == EvidenceStance::Supports
+                            && e.confidence >= 0.7
+                    })
                 })
                 .unwrap_or(false)
         });
@@ -458,14 +518,20 @@ impl CandidatePathway {
             self.burdens
                 .get(dimension)
                 .map(|estimate| {
-                    self.linked_evidence(estimate)
-                        .any(|e| e.kind == EvidenceKind::ContinuouslyMonitored)
+                    self.linked_evidence(estimate).any(|e| {
+                        e.kind == EvidenceKind::ContinuouslyMonitored
+                            && e.stance == EvidenceStance::Supports
+                            && e.confidence >= 0.7
+                    })
                 })
                 .unwrap_or(false)
         });
         let has_manufacturing_observation = self.burdens.values().any(|estimate| {
-            self.linked_evidence(estimate)
-                .any(|e| e.kind == EvidenceKind::ManufacturingObserved)
+            self.linked_evidence(estimate).any(|e| {
+                e.kind == EvidenceKind::ManufacturingObserved
+                    && e.stance == EvidenceStance::Supports
+                    && e.confidence >= 0.7
+            })
         });
 
         if all_dimensions_monitored {
@@ -624,6 +690,9 @@ pub struct AssessmentResult {
     /// Candidate assessments.
     pub candidates: Vec<CandidateAssessment>,
     /// Candidate IDs on the conservative Pareto frontier.
+    ///
+    /// Frontier membership is a comparison result, not a recommendation or
+    /// authorization to deploy a candidate.
     pub pareto_frontier: Vec<String>,
     /// Candidate comparisons against the incumbent.
     pub burden_transfers: Vec<BurdenTransfer>,
@@ -665,6 +734,8 @@ pub enum AssessmentError {
     NoBurdenData,
     /// A burden estimate lacks a comparable unit or scope.
     EmptyBurdenScale,
+    /// The requirement does not declare a comparison scale for a dimension.
+    MissingComparisonScale(Dimension),
     /// Linked evidence uses a different scope from the burden estimate.
     EvidenceScopeMismatch {
         /// Evidence identifier.
@@ -706,6 +777,9 @@ impl std::fmt::Display for AssessmentError {
             Self::EmptyCandidateIdentity => write!(f, "candidate identity is incomplete"),
             Self::NoBurdenData => write!(f, "candidate has no burden data"),
             Self::EmptyBurdenScale => write!(f, "burden unit/scope is empty"),
+            Self::MissingComparisonScale(dimension) => {
+                write!(f, "missing comparison scale for {dimension:?}")
+            }
             Self::EvidenceScopeMismatch {
                 evidence_id,
                 burden_scope,
@@ -780,19 +854,10 @@ impl AlternativesEngine {
 
         let mut assessments = Vec::with_capacity(normalized_candidates.len());
         let mut blockers = BTreeMap::new();
-        let expected_scales = Dimension::ALL
-            .into_iter()
-            .filter_map(|dimension| {
-                normalized_candidates
-                    .iter()
-                    .find_map(|candidate| {
-                        candidate
-                            .burdens
-                            .get(&dimension)
-                            .map(|estimate| (estimate.unit.clone(), estimate.scope.clone()))
-                    })
-                    .map(|scale| (dimension, scale))
-            })
+        let expected_scales = requirement
+            .comparison_scales
+            .iter()
+            .map(|(dimension, scale)| (dimension, (scale.unit.clone(), scale.scope.clone())))
             .collect::<BTreeMap<_, _>>();
 
         for candidate in &normalized_candidates {
