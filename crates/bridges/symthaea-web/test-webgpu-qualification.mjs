@@ -297,6 +297,20 @@ function assertSemanticSceneSamples(samples) {
   }
 }
 
+function expectedWgpuSurfaceFormat(preferredFormat) {
+  switch (preferredFormat) {
+    case 'rgba8unorm':
+      return 'Rgba8Unorm';
+    case 'bgra8unorm':
+      return 'Bgra8Unorm';
+    default:
+      throw new QualificationError(
+        `unsupported browser preferred canvas format: ${preferredFormat}`,
+        'capability',
+      );
+  }
+}
+
 function assertCanvasStatistics(statistics, width, height, label = 'WebGPU', classification = 'renderer') {
   const expectedPixels = width * height;
   if (!statistics
@@ -1144,6 +1158,9 @@ async function runMode(mode) {
         'WebGPU movie',
         'renderer',
       );
+      diagnostics.browser_preferred_canvas_format =
+        diagnostics.raw_webgpu_canary?.format || null;
+
       diagnostics.surface_configuration = await page.evaluate(() => {
         const read = selector => {
           const canvas = document.querySelector(selector);
@@ -1170,13 +1187,21 @@ async function runMode(mode) {
           movie: read('#webgpu-movie-canvas'),
         };
       });
+      const expectedRendererFormat =
+        expectedWgpuSurfaceFormat(diagnostics.browser_preferred_canvas_format);
+      diagnostics.surface_configuration_expected_format = expectedRendererFormat;
       for (const [canvas, configuration] of Object.entries(diagnostics.surface_configuration)) {
         if (!configuration.selected_format_advertised
           || !configuration.selected_format_preferred
           || !configuration.selected_alpha_advertised
-          || !configuration.selected_present_mode_advertised) {
+          || !configuration.selected_present_mode_advertised
+          || configuration.format !== expectedRendererFormat) {
           throw new QualificationError(
-            `WebGPU ${canvas} surface configuration is inconsistent with advertised capabilities: ${JSON.stringify(configuration)}`,
+            `WebGPU ${canvas} surface configuration is inconsistent with the browser-preferred format/capabilities: ${JSON.stringify({
+              configuration,
+              browser_preferred_canvas_format: diagnostics.browser_preferred_canvas_format,
+              expected_renderer_format: expectedRendererFormat,
+            })}`,
             'capability',
           );
         }
