@@ -1448,7 +1448,6 @@ impl OpenFoamPassiveBoundaryAdapter {
         source_bytes: impl Into<Vec<u8>>,
         faces_source_bytes: impl Into<Vec<u8>>,
         points_source_bytes: impl Into<Vec<u8>>,
-        neighbour_source_bytes: impl Into<Vec<u8>>,
         point_scale_mm_per_unit: f64,
         patch_name: impl Into<String>,
         tolerance_mm: f64,
