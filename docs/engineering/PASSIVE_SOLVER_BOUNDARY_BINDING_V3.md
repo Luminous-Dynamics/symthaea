@@ -94,20 +94,13 @@ The neutral core now has an explicit evidence ladder:
 
 `SolverEntityAttested` is still an adapter provenance claim. The neutral core can verify that the receipt refers to the exact binding it is promoting, but it cannot independently inspect vendor-specific solver state. The OpenFOAM bridge now also exposes an evidence-only observer for `constant/polyMesh/boundary`.
 It canonicalizes patch name, type, startFace, and nFaces and records an exact source-file digest.
-With the exact `constant/polyMesh/faces` artifact, it parses the referenced face records and checks the
-declared patch range against actual serialized faces. With the exact `constant/polyMesh/points` artifact
-and an explicit coordinate-unit scale, it derives the exposed perimeter edges of the referenced patch
-faces and requires that perimeter to equal the candidate's independently certified interface rim. The
-observer also rejects repeated point indices in a face and fails closed if distinct OpenFOAM topology
-edges collapse onto the same quantized portable edge identity. With the exact `constant/polyMesh/neighbour`
-artifact, it additionally derives `nInternalFaces` and requires the declared patch ranges to form the
-complete non-overlapping boundary-face suffix. The combined observation commits to the exact source
-artifacts and scale. When the exact
-`neighbour` artifact is also supplied, the observer derives the internal-face count and requires
-the declared boundary patches to form a non-overlapping, contiguous partition of the global boundary
-face suffix. This is still input-artifact evidence only: it is not a claim that a live solver loaded
-or accepted the files, nor that numerical physics is valid. A live-capable adapter may still use the higher
-`SolverEntityAttested` rung after inspecting actual solver state.
+With the exact `constant/polyMesh/neighbour` artifact, it additionally derives `nInternalFaces` and requires the
+declared patch ranges to form the complete non-overlapping boundary-face suffix. With the exact
+`constant/polyMesh/owner` artifact, the complete-topology path also requires the owner-list
+cardinality to equal the global face count. The combined observation commits to all supplied source
+artifacts and the explicit coordinate scale. Inconsistent optional-artifact combinations fail closed
+rather than silently degrading to weaker evidence. This remains input-artifact evidence only: it is
+not a claim that a live solver loaded or accepted the files, nor that numerical physics is valid.
 The OpenFOAM input observer is deliberately conservative: it accepts only the declared patch-list
 grammar it can parse, requires the declared patch count to equal the number of parsed patch entries,
 rejects duplicate patch names, and fails closed on unsupported directives/characters rather than guessing.
