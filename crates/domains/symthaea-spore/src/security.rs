@@ -102,6 +102,39 @@ pub fn validate_hostname(h: &str) -> Result<String, String> {
     Ok(h)
 }
 
+/// Validate a Unix account name for use at the generated installer shell boundary.
+///
+/// This intentionally accepts a conservative subset rather than every account
+/// name a particular local NSS implementation might permit. The relay is
+/// provisioning a normal NixOS user, so failing closed on unusual names is
+/// preferable to widening the shell boundary.
+pub fn validate_username(username: &str) -> Result<String, String> {
+    let name = username.trim();
+    if name.is_empty() {
+        return Ok("user".to_string());
+    }
+    if name.len() > 32 {
+        return Err("Username too long (max 32)".into());
+    }
+
+    let mut chars = name.chars();
+    let first = chars.next().expect("non-empty checked above");
+    if !(first.is_ascii_lowercase() || first == '_') {
+        return Err(
+            "Username must start with a lowercase letter or underscore".into(),
+        );
+    }
+
+    if !chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-') {
+        return Err(
+            "Username may contain only lowercase letters, numbers, underscores, and hyphens"
+                .into(),
+        );
+    }
+
+    Ok(name.to_string())
+}
+
 /// Constant-time token comparison — prevents timing side-channel attacks.
 pub fn token_eq(a: &str, b: &str) -> bool {
     if a.len() != b.len() {
@@ -245,6 +278,27 @@ mod tests {
     fn hostname_rejects_invalid() {
         assert!(validate_hostname("host;evil").is_err());
         assert!(validate_hostname(&"a".repeat(64)).is_err());
+    }
+
+    // ── validate_username ──
+
+    #[test]
+    fn username_valid() {
+        assert_eq!(validate_username("").unwrap(), "user");
+        assert_eq!(validate_username("alice").unwrap(), "alice");
+        assert_eq!(validate_username("alice-2").unwrap(), "alice-2");
+        assert_eq!(validate_username("_service").unwrap(), "_service");
+    }
+
+    #[test]
+    fn username_rejects_shell_and_invalid_account_syntax() {
+        assert!(validate_username("Alice").is_err());
+        assert!(validate_username("9alice").is_err());
+        assert!(validate_username("alice bob").is_err());
+        assert!(validate_username("alice;id").is_err());
+        assert!(validate_username("$(id)").is_err());
+        assert!(validate_username("alice'").is_err());
+        assert!(validate_username(&"a".repeat(33)).is_err());
     }
 
     // ── token_eq ──
