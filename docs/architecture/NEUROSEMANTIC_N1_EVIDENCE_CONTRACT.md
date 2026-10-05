@@ -116,7 +116,10 @@ which is why this boundary remains explicit here (Siahkali et al., arXiv:2602.14
 Pournaderi, arXiv:2609.33456).
 
 Serialized ontology artifacts should cross the byte-level trust boundary through the
-bounded `from_json_bytes` constructors. These reject oversized raw JSON before
+bounded `from_json_bytes` constructors. Ontology manifests also reject duplicate
+stable identities and duplicate grounding provenance references before canonical
+hashing, so canonicalization cannot silently erase an ambiguous or duplicated
+identity/provenance binding. These reject oversized raw JSON before
 `serde_json` materialization and then apply the semantic/resource validators.
 Direct unbounded deserialization of an untrusted manifest, codebook descriptor,
 representation, or conformal artifact is outside this contract. Conformal artifact
