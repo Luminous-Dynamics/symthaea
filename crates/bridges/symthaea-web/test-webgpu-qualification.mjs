@@ -928,11 +928,15 @@ async function runMode(mode) {
         );
       }
       if (diagnostics.raw_webgpu_execution_canary?.validation_error
-        || diagnostics.raw_webgpu_canary?.validation_error) {
+        || diagnostics.raw_webgpu_canary?.validation_error
+        || diagnostics.raw_webgpu_execution_canary?.uncaptured_errors?.length > 0
+        || diagnostics.raw_webgpu_canary?.uncaptured_errors?.length > 0) {
         throw new QualificationError(
-          `Raw WebGPU validation scope reported an error: ${JSON.stringify({
-            execution: diagnostics.raw_webgpu_execution_canary?.validation_error || null,
-            presentation: diagnostics.raw_webgpu_canary?.validation_error || null,
+          `Raw WebGPU validation error observed: ${JSON.stringify({
+            execution_validation: diagnostics.raw_webgpu_execution_canary?.validation_error || null,
+            presentation_validation: diagnostics.raw_webgpu_canary?.validation_error || null,
+            execution_uncaptured: diagnostics.raw_webgpu_execution_canary?.uncaptured_errors || [],
+            presentation_uncaptured: diagnostics.raw_webgpu_canary?.uncaptured_errors || [],
           })}`,
           'capability',
         );
