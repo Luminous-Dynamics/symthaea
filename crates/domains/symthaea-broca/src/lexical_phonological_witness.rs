@@ -155,13 +155,6 @@ impl LexicalPhonologicalWitness {
 
         for mapping in &self.mappings {
             for (offset, &segment_index) in mapping.segment_indices.iter().enumerate() {
-                if previous_segment_index.is_some_and(|previous| segment_index <= previous) {
-                    return Err(LexicalPhonologicalWitnessError::LexicalMappingOrderMismatch {
-                        lexical_position: mapping.lexical_position,
-                    });
-                }
-                previous_segment_index = Some(segment_index);
-
                 let segment = segments
                     .get(segment_index)
                     .ok_or(LexicalPhonologicalWitnessError::SegmentIndexOutOfRange {
@@ -179,6 +172,12 @@ impl LexicalPhonologicalWitness {
                         segment_index,
                     });
                 }
+                if previous_segment_index.is_some_and(|previous| segment_index <= previous) {
+                    return Err(LexicalPhonologicalWitnessError::LexicalMappingOrderMismatch {
+                        lexical_position: mapping.lexical_position,
+                    });
+                }
+                previous_segment_index = Some(segment_index);
                 if mapping.symbols[offset] != segment.symbol {
                     return Err(LexicalPhonologicalWitnessError::SegmentSymbolMismatch {
                         lexical_position: mapping.lexical_position,
