@@ -56,13 +56,13 @@ fn parse_service_pre_state_identity(
         .and_then(|part| part.strip_prefix("generation="))
         .ok_or_else(|| format!("service pre-state identity missing generation: {identity}"))?;
     let generation = if generation == "none" {
-        None
+        return Err(
+            "service execution authority requires a bound NixOS generation".to_string(),
+        );
     } else {
-        Some(
-            generation
-                .parse::<u64>()
-                .map_err(|_| format!("invalid service pre-state generation: {identity}"))?,
-        )
+        generation
+            .parse::<u64>()
+            .map_err(|_| format!("invalid service pre-state generation: {identity}"))?
     };
 
     let unit = parts
@@ -88,7 +88,7 @@ fn parse_service_pre_state_identity(
         ));
     }
 
-    Ok((generation, unit, digest.to_string()))
+    Ok((Some(generation), unit, digest.to_string()))
 }
 
 
@@ -1186,6 +1186,10 @@ mod tests {
         assert_eq!(generation, Some(42));
         assert_eq!(unit, "nginx.service");
         assert_eq!(digest.len(), 64);
+        assert!(parse_service_pre_state_identity(
+            "nixward-service-pre-state-v1|generation=none|unit=nginx.service|state=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        )
+        .is_err());
 
         assert!(parse_service_pre_state_identity(
             "nixward-service-pre-state-v1|generation=42|unit=nginx|state=0123"
@@ -1520,8 +1524,8 @@ mod tests {
         )
         .unwrap();
 
-        let a = active.execution_pre_state_identity(Some(42)).unwrap();
-        let b = failed.execution_pre_state_identity(Some(42)).unwrap();
+        let a = active.execution_pre_state_identity(42).unwrap();
+        let b = failed.execution_pre_state_identity(42).unwrap();
 
         assert_ne!(a, b);
         assert_eq!(
