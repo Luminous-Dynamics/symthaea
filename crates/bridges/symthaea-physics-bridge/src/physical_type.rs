@@ -1,6 +1,7 @@
 //! Gradual physical typing shared by discovery and engineering.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
 use crate::dimensional_inference::UnitMap;
 use crate::types::DimensionalSignature;
@@ -8,7 +9,7 @@ use crate::types::DimensionalSignature;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum QuantityKind {
     Unknown, Dimensionless, Angle, Length, Mass, Time, Velocity, Acceleration,
-    Momentum, Force, Energy, Power, Charge, Temperature, Pressure, Stress,
+    Momentum, Force, Energy, Power, Torque, Charge, Temperature, Pressure, Stress,
     Strain, Frequency, Custom,
 }
 
@@ -83,9 +84,13 @@ fn kind_from_dimension(d: DimensionalSignature) -> QuantityKind {
     else if d == DimensionalSignature::ACCELERATION { Acceleration }
     else if d == DimensionalSignature::MOMENTUM { Momentum }
     else if d == DimensionalSignature::FORCE { Force }
-    else if d == DimensionalSignature::ENERGY { Energy }
-    else if d == DimensionalSignature::PRESSURE { Pressure }
+    else if d == DimensionalSignature::ENERGY { Custom }
+    else if d == DimensionalSignature::PRESSURE { Custom }
     else { Custom }
+}
+
+pub fn explicit_type(kind: QuantityKind, dimension: DimensionalSignature) -> PhysicalType {
+    PhysicalType::with_kind(kind, dimension)
 }
 
 pub fn variable_type(name: &str, units: &UnitMap) -> PhysicalType {
@@ -98,14 +103,33 @@ pub fn variable_type(name: &str, units: &UnitMap) -> PhysicalType {
 fn valid(t: PhysicalType) -> TypeJudgement<PhysicalType> { TypeJudgement::Valid(t) }
 
 pub fn infer_expr_type(expr: &Expr, units: &UnitMap) -> TypeJudgement<PhysicalType> {
+    infer_expr_type_with_lookup(expr, &|name| variable_type(name, units))
+}
+
+pub fn infer_expr_type_with_variables(
+    expr: &Expr,
+    variables: &HashMap<String, PhysicalType>,
+) -> TypeJudgement<PhysicalType> {
+    infer_expr_type_with_lookup(expr, &|name| {
+        variables
+            .get(name)
+            .cloned()
+            .unwrap_or_else(PhysicalType::unknown)
+    })
+}
+
+fn infer_expr_type_with_lookup<F>(expr: &Expr, lookup: &F) -> TypeJudgement<PhysicalType>
+where
+    F: Fn(&str) -> PhysicalType,
+{
     use BinOp::*;
     use QuantityKind::*;
     match expr {
-        Expr::Var(name) => valid(variable_type(name, units)),
+        Expr::Var(name) => valid(lookup(name)),
         Expr::Const(_) => valid(PhysicalType::dimensionless()),
-        Expr::Sum(body, _) => infer_expr_type(body, units),
+        Expr::Sum(body, _) => infer_expr_type_with_lookup(body, lookup),
         Expr::Func(function, arg) => {
-            let arg_ty = match infer_expr_type(arg, units) { TypeJudgement::Valid(t) => t, other => return other };
+            let arg_ty = match infer_expr_type_with_lookup(arg, lookup) { TypeJudgement::Valid(t) => t, other => return other };
             let Some(dimension) = arg_ty.dimension else { return TypeJudgement::Unknown("function input physical type is unknown".into()) };
             match function {
                 UnaryFn::Sin | UnaryFn::Cos => if arg_ty.kind == Angle || dimension.is_dimensionless() { valid(PhysicalType::dimensionless()) } else { TypeJudgement::Invalid(PhysicalTypeError { operation: format!("{:?}", function), reason: "trigonometric input must be angle or dimensionless".into() }) },
@@ -120,8 +144,8 @@ pub fn infer_expr_type(expr: &Expr, units: &UnitMap) -> TypeJudgement<PhysicalTy
             }
         }
         Expr::BinOp(Add, left, right) | Expr::BinOp(Sub, left, right) => {
-            let l = match infer_expr_type(left, units) { TypeJudgement::Valid(t) => t, other => return other };
-            let r = match infer_expr_type(right, units) { TypeJudgement::Valid(t) => t, other => return other };
+            let l = match infer_expr_type_with_lookup(left, lookup) { TypeJudgement::Valid(t) => t, other => return other };
+            let r = match infer_expr_type_with_lookup(right, lookup) { TypeJudgement::Valid(t) => t, other => return other };
             match l.compatible_additive(&r) {
                 Some(true) => valid(l),
                 Some(false) => TypeJudgement::Invalid(PhysicalTypeError { operation: "add/sub".into(), reason: "operands require compatible physical kind and dimension".into() }),
@@ -142,7 +166,7 @@ pub fn infer_expr_type(expr: &Expr, units: &UnitMap) -> TypeJudgement<PhysicalTy
             else { TypeJudgement::Unknown("division denominator is not established nonzero".into()) }
         }
         Expr::BinOp(Pow, base, exponent) => {
-            let b = match infer_expr_type(base, units) { TypeJudgement::Valid(t) => t, other => return other };
+            let b = match infer_expr_type_with_lookup(base, lookup) { TypeJudgement::Valid(t) => t, other => return other };
             let Some(dimension) = b.dimension else { return TypeJudgement::Unknown("power base physical type is unknown".into()) };
             match exponent.as_ref() {
                 Expr::Const(k) if (k - k.round()).abs() < 1e-9 => match dimension.scale(*k as i8) {
@@ -186,6 +210,14 @@ mod tests {
     #[test] fn mass_acceleration_is_force() {
         let expr=Expr::BinOp(BinOp::Mul,Box::new(Expr::Var("m".into())),Box::new(Expr::BinOp(BinOp::Div,Box::new(Expr::Var("v".into())),Box::new(Expr::Var("t".into())))));
         match infer_expr_type(&expr,&units()) { TypeJudgement::Valid(t)=>assert_eq!(t.kind,QuantityKind::Force), other=>panic!("{other:?}") }
+    }
+    #[test] fn explicit_energy_and_torque_are_not_additively_compatible() {
+        let energy = explicit_type(QuantityKind::Energy, DimensionalSignature::ENERGY);
+        let torque = explicit_type(QuantityKind::Torque, DimensionalSignature::ENERGY);
+        assert!(!energy.compatible_additive(&torque).unwrap());
+        let variables = HashMap::from([(String::from("E"), energy), (String::from("tau"), torque)]);
+        let expr = Expr::BinOp(BinOp::Add, Box::new(Expr::Var("E".into())), Box::new(Expr::Var("tau".into())));
+        assert!(matches!(infer_expr_type_with_variables(&expr, &variables), TypeJudgement::Invalid(_)));
     }
     #[test] fn log_of_energy_is_invalid() {
         let e=Expr::Func(UnaryFn::Log,Box::new(Expr::Var("E".into())));
