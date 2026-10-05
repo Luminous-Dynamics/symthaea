@@ -212,6 +212,7 @@ pub fn five_pathway_adversarial_case() -> BenchmarkCase {
                     ComparisonScale {
                         unit: "burden-unit".into(),
                         scope: "benchmark:functional-unit-v1|global".into(),
+                        basis: benchmark_basis(),
                     },
                 ),
                 (
@@ -219,6 +220,7 @@ pub fn five_pathway_adversarial_case() -> BenchmarkCase {
                     ComparisonScale {
                         unit: "burden-unit".into(),
                         scope: "benchmark:functional-unit-v1|global".into(),
+                        basis: benchmark_basis(),
                     },
                 ),
             ]),
