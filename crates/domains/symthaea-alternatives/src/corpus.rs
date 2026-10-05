@@ -8,7 +8,7 @@ use blake3::Hasher;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-const BENCHMARK_MANIFEST_SCHEMA_VERSION: u16 = 3;
+const BENCHMARK_MANIFEST_SCHEMA_VERSION: u16 = 4;
 
 /// One frozen benchmark scenario.
 #[derive(Debug, Clone)]
@@ -134,6 +134,7 @@ fn candidate(
         id: id.into(),
         name: id.into(),
         kind,
+        derivation: None,
         performance: BTreeMap::from([
             (
                 "service_life_years".into(),
