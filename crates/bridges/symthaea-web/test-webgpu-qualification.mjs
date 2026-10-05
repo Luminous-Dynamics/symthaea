@@ -1464,7 +1464,8 @@ try {
   }
 
   const artifact = {
-    schema: 'symthaea-ui-webgpu-qualification-v2',
+    schema: 'symthaea-ui-webgpu-qualification-v3',
+    harness_self_tests_passed: true,
     url: URL,
     chromium: CHROMIUM,
     headed_under_xvfb: HEADLESS === false,
