@@ -210,7 +210,9 @@ impl NixOSCommand {
 
             Self::CollectGarbage { .. } => SafetyLevel::Destructive,
 
-            Self::Custom { safety_level, .. } => *safety_level,
+            // `Custom` is an ungoverned compatibility channel. Its embedded
+            // label is diagnostic metadata only and must never grant a lower risk tier.
+            Self::Custom { .. } => SafetyLevel::Destructive,
         }
     }
 
@@ -1149,13 +1151,13 @@ mod tests {
     fn test_custom_auto_classify_search() {
         let cmd =
             NixOSCommand::custom_auto("nix", vec!["search".into(), "nixpkgs".into(), "vim".into()]);
-        assert_eq!(cmd.safety_level(), SafetyLevel::ReadOnly);
+        assert_eq!(cmd.safety_level(), SafetyLevel::Destructive);
     }
 
     #[test]
     fn test_custom_auto_classify_rebuild() {
         let cmd = NixOSCommand::custom_auto("nixos-rebuild", vec!["switch".into()]);
-        assert_eq!(cmd.safety_level(), SafetyLevel::SystemCritical);
+        assert_eq!(cmd.safety_level(), SafetyLevel::Destructive);
     }
 
     #[test]
@@ -1178,10 +1180,27 @@ mod tests {
             args: vec!["hello".to_string()],
             safety_level: SafetyLevel::ReadOnly,
         };
-        assert_eq!(custom.safety_level(), SafetyLevel::ReadOnly);
+        assert_eq!(custom.safety_level(), SafetyLevel::Destructive);
         let (bin, args) = custom.to_command();
         assert_eq!(bin, "echo");
         assert_eq!(args, vec!["hello"]);
+    }
+
+    #[test]
+    fn test_custom_safety_label_cannot_lower_risk() {
+        for claimed in [
+            SafetyLevel::ReadOnly,
+            SafetyLevel::UserModify,
+            SafetyLevel::SystemModify,
+            SafetyLevel::SystemCritical,
+        ] {
+            let custom = NixOSCommand::Custom {
+                command: "echo".to_string(),
+                args: vec!["hello".to_string()],
+                safety_level: claimed,
+            };
+            assert_eq!(custom.safety_level(), SafetyLevel::Destructive);
+        }
     }
 
     #[test]
