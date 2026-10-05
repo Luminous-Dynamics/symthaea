@@ -8,6 +8,8 @@ on:
       - "Cargo.lock"
       - "crates/domains/symthaea-broca/**"
       - "crates/domains/symthaea-vocal-tract/**"
+      - "crates/core/symthaea-core/**"
+      - "crates/core/symthaea-fep/**"
       - "src/voice/**"
       - "scripts/broca_measurement_artifacts.sh"
       - "scripts/broca_measurement_summary.py"
