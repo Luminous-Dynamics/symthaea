@@ -501,6 +501,100 @@ async function rawWebGpuExecutionCanary(page) {
   });
 }
 
+async function rawWebGpuCompositorCanary(page) {
+  return page.evaluate(async () => {
+    if (!navigator.gpu) {
+      return { supported: false, reason: 'navigator.gpu unavailable' };
+    }
+
+    const webgpuCanvas = document.createElement('canvas');
+    const controlCanvas = document.createElement('canvas');
+    for (const canvas of [webgpuCanvas, controlCanvas]) {
+      canvas.width = 64;
+      canvas.height = 64;
+      canvas.style.cssText = [
+        'position:fixed',
+        'top:0',
+        'width:64px',
+        'height:64px',
+        'opacity:1',
+        'pointer-events:none',
+        'z-index:2147483647',
+      ].join(';');
+      document.body.appendChild(canvas);
+    }
+    webgpuCanvas.id = 'symthaea-webgpu-compositor-canary';
+    controlCanvas.id = 'symthaea-webgpu-compositor-control';
+    webgpuCanvas.style.left = '0';
+    controlCanvas.style.left = '72px';
+
+    let device = null;
+    try {
+      const adapter = await navigator.gpu.requestAdapter();
+      if (!adapter) {
+        return { supported: false, reason: 'compositor canary requestAdapter returned null' };
+      }
+      device = await adapter.requestDevice();
+      const format = navigator.gpu.getPreferredCanvasFormat();
+      const context = webgpuCanvas.getContext('webgpu');
+      const controlContext = controlCanvas.getContext('2d');
+      if (!context || !controlContext) {
+        return {
+          supported: false,
+          reason: 'compositor canary context unavailable',
+          format,
+        };
+      }
+
+      controlContext.fillStyle = 'rgb(255, 0, 0)';
+      controlContext.fillRect(0, 0, 64, 64);
+
+      context.configure({
+        device,
+        format,
+        alphaMode: 'opaque',
+      });
+      const encoder = device.createCommandEncoder();
+      const pass = encoder.beginRenderPass({
+        colorAttachments: [{
+          view: context.getCurrentTexture().createView(),
+          clearValue: { r: 1, g: 0, b: 0, a: 1 },
+          loadOp: 'clear',
+          storeOp: 'store',
+        }],
+      });
+      pass.end();
+      device.queue.submit([encoder.finish()]);
+      await device.queue.onSubmittedWorkDone();
+      await new Promise(requestAnimationFrame);
+      await new Promise(requestAnimationFrame);
+
+      return {
+        supported: true,
+        format,
+        webgpu_rect: (() => {
+          const rect = webgpuCanvas.getBoundingClientRect();
+          return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+        })(),
+        control_rect: (() => {
+          const rect = controlCanvas.getBoundingClientRect();
+          return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+        })(),
+      };
+    } catch (error) {
+      return {
+        supported: true,
+        format: null,
+        webgpu_rect: null,
+        control_rect: null,
+        exception: error instanceof Error ? error.message : String(error),
+      };
+    } finally {
+      device?.destroy();
+    }
+  });
+}
+
 async function rawWebGpuCanvasCanary(page) {
   return page.evaluate(async () => {
     if (!navigator.gpu) {
@@ -921,11 +1015,41 @@ async function runMode(mode) {
     if (gpuMode) {
       diagnostics.raw_webgpu_execution_canary = await rawWebGpuExecutionCanary(page);
       diagnostics.raw_webgpu_canary = await rawWebGpuCanvasCanary(page);
+      diagnostics.raw_webgpu_compositor_canary = await rawWebGpuCompositorCanary(page);
+      if (diagnostics.raw_webgpu_compositor_canary?.supported
+        && diagnostics.raw_webgpu_compositor_canary?.webgpu_rect
+        && diagnostics.raw_webgpu_compositor_canary?.control_rect) {
+        const { webgpu_rect: webgpuRect, control_rect: controlRect } =
+          diagnostics.raw_webgpu_compositor_canary;
+        const [webgpuShot, controlShot] = await Promise.all([
+          page.screenshot({
+            clip: webgpuRect,
+            type: 'png',
+          }),
+          page.screenshot({
+            clip: controlRect,
+            type: 'png',
+          }),
+        ]);
+        diagnostics.raw_webgpu_compositor_canary.screenshot_hash =
+          createHash('sha256').update(webgpuShot).digest('hex');
+        diagnostics.raw_webgpu_compositor_canary.control_screenshot_hash =
+          createHash('sha256').update(controlShot).digest('hex');
+        diagnostics.raw_webgpu_compositor_canary.screenshot_matches_2d_control =
+          diagnostics.raw_webgpu_compositor_canary.screenshot_hash
+          === diagnostics.raw_webgpu_compositor_canary.control_screenshot_hash;
+        await page.evaluate(() => {
+          document.querySelector('#symthaea-webgpu-compositor-canary')?.remove();
+          document.querySelector('#symthaea-webgpu-compositor-control')?.remove();
+        });
+      }
       const rawExecutionOk = diagnostics.raw_webgpu_execution_canary?.executed_red === true;
       const rawPresentationOk = diagnostics.raw_webgpu_canary?.painted_red === true;
       diagnostics.raw_webgpu_boundary = {
         execution_canary_passed: rawExecutionOk,
         presentation_canary_passed: rawPresentationOk,
+        compositor_canary_passed:
+          diagnostics.raw_webgpu_compositor_canary?.screenshot_matches_2d_control === true,
         implicated_boundary: !rawExecutionOk
           ? 'webgpu-device-execution-or-driver'
           : !rawPresentationOk
@@ -970,6 +1094,12 @@ async function runMode(mode) {
       if (!diagnostics.raw_webgpu_canary?.painted_red) {
         throw new QualificationError(
           `Raw WebGPU canvas presentation canary failed: ${JSON.stringify(diagnostics.raw_webgpu_canary)}`,
+          'renderer',
+        );
+      }
+      if (diagnostics.raw_webgpu_compositor_canary?.screenshot_matches_2d_control !== true) {
+        throw new QualificationError(
+          `Raw WebGPU compositor output does not match the 2D red control: ${JSON.stringify(diagnostics.raw_webgpu_compositor_canary)}`,
           'renderer',
         );
       }
