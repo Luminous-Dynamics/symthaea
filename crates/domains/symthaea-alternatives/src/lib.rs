@@ -793,19 +793,52 @@ impl CandidatePathway {
         }
     }
 
+    fn evidence_is_usable_at(
+        evidence: &EvidenceRecord,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        if !Self::evidence_is_valid_at(evidence, as_of) {
+            return false;
+        }
+
+        let Some(policy) = freshness_policy else {
+            return true;
+        };
+        let Some(max_age_seconds) = policy.max_age_for(evidence.kind) else {
+            return true;
+        };
+        let Some(assessed_at) = as_of else {
+            return false;
+        };
+        let Some(observed_at) = evidence.observed_at_epoch_seconds else {
+            return false;
+        };
+
+        let age = i128::from(assessed_at) - i128::from(observed_at);
+        age >= 0 && age <= i128::from(max_age_seconds)
+    }
+
     fn linked_evidence_at<'a>(
         &'a self,
         ids: &'a [String],
         as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
     ) -> impl Iterator<Item = &'a EvidenceRecord> {
         self.evidence.iter().filter(move |e| {
-            ids.iter().any(|id| id == &e.id) && Self::evidence_is_valid_at(e, as_of)
+            ids.iter().any(|id| id == &e.id)
+                && Self::evidence_is_usable_at(e, as_of, freshness_policy)
         })
     }
 
-    fn dimension_has_conflict_at(&self, estimate: &BurdenEstimate, as_of: Option<i64>) -> bool {
+    fn dimension_has_conflict_at(
+        &self,
+        estimate: &BurdenEstimate,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
         let support = self
-            .linked_evidence_at(&estimate.evidence_ids, as_of)
+            .linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
             .any(|e| e.stance == EvidenceStance::Supports);
         let contradict = self
             .linked_evidence_at(&estimate.evidence_ids, as_of)
@@ -813,13 +846,22 @@ impl CandidatePathway {
         support && contradict
     }
 
-    fn has_conflict_at(&self, as_of: Option<i64>) -> bool {
+    fn has_conflict_at(
+        &self,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
         self.burdens
             .values()
-            .any(|estimate| self.dimension_has_conflict_at(estimate, as_of))
+            .any(|estimate| self.dimension_has_conflict_at(estimate, as_of, freshness_policy))
     }
 
-    fn performance_evidence_is_supported_at(&self, metric: &str, as_of: Option<i64>) -> bool {
+    fn performance_evidence_is_supported_at(
+        &self,
+        metric: &str,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
         self.performance
             .get(metric)
             .map(|estimate| {
@@ -844,6 +886,7 @@ impl CandidatePathway {
         &self,
         requirement: &FunctionalRequirement,
         as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
     ) -> bool {
         requirement.operating_envelope.iter().all(|(condition, required)| {
             let Some(capability) = self.operating_capabilities.get(condition) else {
@@ -853,7 +896,7 @@ impl CandidatePathway {
                 && capability.scope == required.scope
                 && capability.interval.lower <= required.interval.lower
                 && capability.interval.upper >= required.interval.upper
-                && self.operating_evidence_is_supported_at(condition, as_of)
+                && self.operating_evidence_is_supported_at(condition, as_of, freshness_policy)
         })
     }
 
@@ -861,6 +904,7 @@ impl CandidatePathway {
         &self,
         requirement: &FunctionalRequirement,
         as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
     ) -> bool {
         requirement.constraints.keys().all(|metric| {
             let Some(estimate) = self.performance.get(metric) else {
@@ -871,7 +915,7 @@ impl CandidatePathway {
             };
             estimate.unit == scale.unit
                 && estimate.scope == scale.scope
-                && self.performance_evidence_is_supported_at(metric, as_of)
+                && self.performance_evidence_is_supported_at(metric, as_of, freshness_policy)
         })
     }
 
@@ -879,9 +923,10 @@ impl CandidatePathway {
         &self,
         requirement: &FunctionalRequirement,
         as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
     ) -> QualificationState {
-        if !self.performance_is_supported(requirement, as_of)
-            || !self.operating_envelope_is_supported(requirement, as_of)
+        if !self.performance_is_supported(requirement, as_of, freshness_policy)
+            || !self.operating_envelope_is_supported(requirement, as_of, freshness_policy)
             || self.burdens.is_empty()
             || self.burdens.values().all(|estimate| {
                 let linked = self
@@ -969,7 +1014,7 @@ impl CandidatePathway {
                     && e.stance == EvidenceStance::Supports
                     && e.confidence >= 0.7
             })
-            .map(|e| e.source_id.as_str())
+            .map(|e| e.source.authority_group_id())
             .collect::<BTreeSet<_>>()
             .len();
         let monitoring_distinct_authority_sources = self
