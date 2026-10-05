@@ -301,3 +301,40 @@ typed
 ```
 
 A solver result can discharge a narrowly defined engineering obligation inside its model envelope, but it must not silently elevate the claim beyond that envelope.
+
+## Model maturity is a separate axis
+
+Physical semantics answer what a model means. They do not answer how much trust the model has earned.
+
+A model descriptor should therefore carry an independent maturity/evidence envelope. A useful initial vocabulary is:
+
+- TextbookAnalytic
+- ValidatedNumerical
+- CalibratedEmpirical
+- ResearchPrototype
+- FrontierHypothesis
+- SyntheticInstrumental
+
+This matters because Symthaea already spans very different regimes: continuum solvers, calibrated nuclear models, particle-physics calculations, quantum chemistry, engineering solvers, and frontier modules such as holography, stochastic QED, tensor networks, and quantum Darwinism.
+
+The critical invariant is:
+
+dimensionally valid != physically validated != engineering qualified
+
+A numerical pass must not upgrade a model's maturity. Catalog recognition must not upgrade it. A formal theorem about the mathematics must not automatically certify the empirical model. A frontier hypothesis may still be mathematically interesting and discoverable; it simply carries a different evidence envelope.
+
+Conceptually:
+
+```text
+ScientificModel {
+    physical_type
+    model_maturity
+    epistemic_status
+    provenance
+    executable_semantics
+}
+```
+
+Engineering safety gates can require a minimum maturity/evidence class without preventing exploratory research from using lower-maturity models.
+
+Related: #6871.
