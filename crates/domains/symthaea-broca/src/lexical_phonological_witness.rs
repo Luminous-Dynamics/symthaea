@@ -391,6 +391,29 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_segment_claim_fails_closed() {
+        let binding = binding();
+        let mut mappings = witness_for_segments(&binding).mappings;
+        let duplicated_index = mappings[0].segment_indices[0];
+        mappings[1].segment_indices[0] = duplicated_index;
+        mappings[1].symbols[0] = mappings[0].symbols[0].clone();
+        let witness = LexicalPhonologicalWitness {
+            version: LEXICAL_PHONOLOGICAL_WITNESS_VERSION.into(),
+            lexical_binding_provenance: binding.provenance_token(),
+            mappings,
+        };
+
+        assert_eq!(
+            witness
+                .validate_against_segments(&binding, &segments(&binding))
+                .expect_err("duplicate segment claim must fail"),
+            LexicalPhonologicalWitnessError::DuplicateSegmentCoverage {
+                segment_index: duplicated_index,
+            }
+        );
+    }
+
+    #[test]
     fn provenance_mismatch_fails_closed() {
         let binding = binding();
         let mut witness = witness_for_segments(&binding);
