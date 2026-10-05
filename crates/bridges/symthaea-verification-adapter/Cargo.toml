@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-verification-adapter"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Durable controller-document snapshot adapter for Symthaea verification evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["verification", "controlled-identifiers", "provenance", "attestation"]
+categories = ["authentication", "cryptography"]
+
+[dependencies]
+bs58 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+symthaea-epistemic-types = { path = "../../domains/symthaea-epistemic-types" }
+url = { workspace = true }
