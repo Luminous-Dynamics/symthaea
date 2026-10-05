@@ -192,6 +192,16 @@ The strict selector rejects the challenge when any live hypothesis cannot produc
 
 The inquiry receipt binds the prediction-frame digest as well as the hypothesis-set, challenge-space, and selected-challenge identities.
 
+Execution is a separate provenance event:
+
+```text
+ScientificInquirySelectionReceipt
+    -> ScientificInquiryExecutionReceipt
+    -> existing observation/evidence artifact
+```
+
+The execution receipt binds the exact selection receipt, selected challenge, prediction frame, execution manifest, observation artifact, observation physical type, and evaluator revision. It does not itself declare the scientific result true, false, novel, or qualified.
+
 ## Formal verification boundary
 
 Formal proof establishes a theorem about the formalized model when the theorem and implementation are correctly bound.
