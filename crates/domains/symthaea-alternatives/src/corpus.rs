@@ -8,7 +8,7 @@ use blake3::Hasher;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-const BENCHMARK_MANIFEST_SCHEMA_VERSION: u16 = 9;
+const BENCHMARK_MANIFEST_SCHEMA_VERSION: u16 = 10;
 
 /// One frozen benchmark scenario.
 #[derive(Debug, Clone)]
