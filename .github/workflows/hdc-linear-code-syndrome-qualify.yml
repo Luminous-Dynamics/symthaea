@@ -37,19 +37,34 @@ jobs:
         env:
           EVENT_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           EVENT_HEAD_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref_name }}
+          EVENT_HEAD_REPO: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
           SYNTHETIC_MERGE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || '' }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           ACTUAL_SHA="$(git rev-parse HEAD)"
           PARENT_SHA="164d6b94d12bb72a902bdc2164d25cd540d3ba7f"
           git fetch --no-tags --depth=1 origin "$PARENT_SHA"
           test -n "$EVENT_HEAD_SHA"
           test "$EVENT_HEAD_REF" = "research/hdc-linear-code-bounded-decoder-v2"
+          test "$EVENT_HEAD_REPO" = "$GITHUB_REPOSITORY"
           test "$ACTUAL_SHA" = "$EVENT_HEAD_SHA"
           git cat-file -e "${PARENT_SHA}^{commit}"
-          git merge-base --is-ancestor "$PARENT_SHA" "$ACTUAL_SHA"
+          COMPARE_STATUS="$(gh api --method GET \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/compare/${PARENT_SHA}...${ACTUAL_SHA}" \
+            --jq '.status')"
+          COMPARE_AHEAD_BY="$(gh api --method GET \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/compare/${PARENT_SHA}...${ACTUAL_SHA}" \
+            --jq '.ahead_by')"
+          test "$COMPARE_STATUS" = "ahead"
+          test "$COMPARE_AHEAD_BY" -gt 0
           echo "sha=$ACTUAL_SHA" >> "$GITHUB_OUTPUT"
           echo "parent_sha=$PARENT_SHA" >> "$GITHUB_OUTPUT"
           echo "source_ref=$EVENT_HEAD_REF" >> "$GITHUB_OUTPUT"
+          echo "source_repo=$EVENT_HEAD_REPO" >> "$GITHUB_OUTPUT"
+          echo "ancestry_status=$COMPARE_STATUS" >> "$GITHUB_OUTPUT"
+          echo "stack_distance=$COMPARE_AHEAD_BY" >> "$GITHUB_OUTPUT"
           echo "synthetic_merge_sha=$SYNTHETIC_MERGE_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Enforce stacked research surface
@@ -182,6 +197,19 @@ jobs:
             --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
             --test linear_code_syndrome_decoder
 
+      - name: Capture syndrome/coset invariant ledger
+        id: coset_invariants
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            small_fixture_kernel_equals_code_and_syndrome_cosets_are_exact -- --nocapture 2>&1)"
+          LEDGER_COUNT="$(printf '%s\\n' "$OUTPUT" | grep -c '^SYNDROME_COSET_LEDGER=')"
+          test "$LEDGER_COUNT" -eq 1
+          LEDGER="$(printf '%s\\n' "$OUTPUT" | sed -n 's/^SYNDROME_COSET_LEDGER=//p')"
+          test -n "$LEDGER"
+          printf "syndrome_coset_ledger=%s\\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
       - name: Capture syndrome decoder ledger
         id: decoder_ledger
         run: |
@@ -242,6 +270,9 @@ jobs:
           synthetic_merge_sha=${{ steps.head.outputs.synthetic_merge_sha }}
           parent_head=${{ steps.head.outputs.parent_sha }}
           parent_head_required=164d6b94d12bb72a902bdc2164d25cd540d3ba7f
+          source_repo=${{ steps.head.outputs.source_repo }}
+          ancestry_status=${{ steps.head.outputs.ancestry_status }}
+          stack_distance=${{ steps.head.outputs.stack_distance }}
           research_surface_status=${{ steps.scope.outcome }}
           research_surface_paths=${{ steps.scope.outputs.changed_paths }}
           rust_toolchain=1.96.1
@@ -254,12 +285,14 @@ jobs:
           syndrome_decoder_status=${{ steps.decoder_tests.outcome }}
           strict_clippy_status=${{ steps.clippy.outcome }}
           dependency_lock_sha256=${{ steps.harness.outputs.lock_sha256 }}
+          syndrome_coset_ledger_status=${{ steps.coset_invariants.outcome }}
+          syndrome_coset_ledger=${{ steps.coset_invariants.outputs.syndrome_coset_ledger }}
           syndrome_decoder_ledger_status=${{ steps.decoder_ledger.outcome }}
           runner_os=${{ steps.runner.outputs.runner_os }}
           runner_arch=${{ steps.runner.outputs.runner_arch }}
           runner_image=${{ steps.runner.outputs.runner_image }}
           runner_image_version=${{ steps.runner.outputs.runner_image_version }}
-          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
           random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
           random_syndrome_sweep=${{ steps.random_sweep.outputs.random_syndrome_sweep }}
