@@ -114,6 +114,7 @@ jobs:
           assert report["authorization_valid"] is True
           assert report["handling_policy_provenance_present"] is True
           assert report["handling_policy_provenance_hash_valid"] is True
+          assert report["handling_policy_provenance_reference_mismatch_blocked"] is True
           assert report["handling_policy_provenance_mismatch_blocked"] is True
           assert report["inference_escalation_blocked"] is True
           assert report["first_packet_accepted"] is True

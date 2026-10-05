@@ -25,6 +25,9 @@ pub const MAX_NEUROSEMANTIC_JURISDICTION_ID_BYTES: usize = 64;
 pub const MAX_NEUROSEMANTIC_SECONDARY_USE_CLASSES: usize = 16;
 pub const MAX_NEUROSEMANTIC_DESTINATION_JURISDICTIONS: usize = 16;
 
+const NEUROSEMANTIC_POLICY_PROVENANCE_DOMAIN: &[u8] =
+    b"symthaea-neurosemantic-policy-provenance-v1\0";
+
 /// Representation channel used for routing and authorization.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum CognitiveChannel {
@@ -82,7 +85,7 @@ pub enum NeurosemanticInferenceClass {
     Identity,
 }
 
-pub const NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION: u16 = 3;
+pub const NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION: u16 = 4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum NeurosemanticSecondaryUse {
@@ -167,12 +170,14 @@ impl NeurosemanticHandlingPolicy {
     }
 
     /// Verify the stored provenance digest against the exact externally supplied
-    /// policy/consent record bytes. This authenticates the bytes against the binding,
-    /// but does not authenticate the issuing authority or its signature.
+    /// policy/consent record bytes and the exact provenance reference.
+    /// This authenticates the reference+record binding, but does not authenticate
+    /// the issuing authority or its signature.
     pub fn verify_policy_provenance_bytes(&self, record_bytes: &[u8]) -> bool {
         self.validates()
             && record_bytes.len() <= MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
-            && content_hash(record_bytes) == self.policy_provenance_hash
+            && compute_policy_provenance_hash(&self.policy_provenance_ref, record_bytes)
+                == self.policy_provenance_hash
     }
 
     pub fn allows_destination(&self, destination_jurisdiction: &str) -> bool {
@@ -547,7 +552,7 @@ impl NeurosemanticPacket {
         payload: NeurosemanticPayload,
     ) -> Result<Self, String> {
         if !data_policy.validates() || !data_policy.transportable() {
-            return Err("neurosemantic data policy is invalid or not transportable in protocol v2".into());
+            return Err("neurosemantic data policy is invalid or not transportable in protocol v1".into());
         }
         if payload.intrinsic_data_class() != Some(data_policy.data_class) {
             return Err("neurosemantic payload type does not match its declared data class".into());
@@ -835,6 +840,16 @@ fn default_public_sensitivity() -> CognitiveSensitivity {
     CognitiveSensitivity::Public
 }
 
+pub fn compute_policy_provenance_hash(provenance_ref: &str, record_bytes: &[u8]) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(NEUROSEMANTIC_POLICY_PROVENANCE_DOMAIN);
+    hasher.update(&(provenance_ref.len() as u64).to_le_bytes());
+    hasher.update(provenance_ref.as_bytes());
+    hasher.update(&(record_bytes.len() as u64).to_le_bytes());
+    hasher.update(record_bytes);
+    hasher.finalize().to_hex().to_string()
+}
+
 fn valid_identifier(value: &str) -> bool {
     !value.trim().is_empty() && value.len() <= MAX_NEUROSEMANTIC_ID_BYTES
 }
@@ -893,7 +908,10 @@ mod tests {
             handling: NeurosemanticHandlingPolicy {
                 schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
                 policy_provenance_ref: "synthetic-policy-record-1".into(),
-            policy_provenance_hash: content_hash(b"synthetic-policy-record-1"),
+            policy_provenance_hash: compute_policy_provenance_hash(
+                "synthetic-policy-record-1",
+                b"synthetic-policy-record-1",
+            ),
             origin_jurisdiction: "ZA".into(),
                 permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
                 permitted_secondary_uses: BTreeSet::new(),
@@ -1075,13 +1093,21 @@ mod tests {
     }
 
     #[test]
-    fn handling_policy_provenance_digest_verifies_exact_record() {
+    fn handling_policy_provenance_digest_verifies_exact_record_and_reference() {
         let policy = semantic_policy().handling;
         assert!(policy.verify_policy_provenance_bytes(b"synthetic-policy-record-1"));
         assert!(!policy.verify_policy_provenance_bytes(b"synthetic-policy-record-2"));
         assert!(!policy.verify_policy_provenance_bytes(
             &vec![b'x'; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1]
         ));
+    }
+
+    #[test]
+    fn handling_policy_provenance_reference_cannot_be_swapped_under_existing_digest() {
+        let mut policy = semantic_policy().handling;
+        assert!(policy.verify_policy_provenance_bytes(b"synthetic-policy-record-1"));
+        policy.policy_provenance_ref = "synthetic-policy-record-2".into();
+        assert!(!policy.verify_policy_provenance_bytes(b"synthetic-policy-record-1"));
     }
 
     #[test]
@@ -1143,7 +1169,6 @@ mod tests {
         assert!(policy.validates());
     }
 
-    #[test]
     #[test]
     fn inference_sensitive_secondary_uses_cannot_escalate_declared_inference_classes() {
         let lease = lease();
@@ -1215,6 +1240,7 @@ mod tests {
             .is_ok());
     }
 
+    #[test]
     fn authorized_handling_respects_secondary_use_jurisdiction_and_retention() {
         let lease = lease();
         let packet = NeurosemanticPacket::new_with_policy(
@@ -1887,7 +1913,14 @@ mod tests {
             CommunicationPurpose::HumanCollaboration,
             "peer",
             149
-        ) == false);
+        ));
+        assert!(!l.authorizes(
+            CognitiveChannel::Semantic,
+            ChannelDirection::Read,
+            CommunicationPurpose::HumanCollaboration,
+            "peer",
+            150
+        ));
     }
 
     #[test]

@@ -94,7 +94,10 @@ fn main() -> Result<(), String> {
             handling: NeurosemanticHandlingPolicy {
                 schema_version: symthaea_communication::NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
                 policy_provenance_ref: "synthetic-policy-record-1".into(),
-                policy_provenance_hash: symthaea_communication::content_hash(b"synthetic-policy-record-1"),
+                policy_provenance_hash: symthaea_communication::compute_policy_provenance_hash(
+                    "synthetic-policy-record-1",
+                    b"synthetic-policy-record-1",
+                ),
                 origin_jurisdiction: "ZA".into(),
                 permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
                 permitted_secondary_uses: BTreeSet::new(),
@@ -122,9 +125,25 @@ fn main() -> Result<(), String> {
         .data_policy
         .handling
         .verify_policy_provenance_bytes(b"synthetic-policy-record-1");
+
+    let mut reference_mismatch = message.clone();
+    reference_mismatch
+        .packet
+        .data_policy
+        .handling
+        .policy_provenance_ref = "synthetic-policy-record-2".into();
+    reference_mismatch.packet.refresh_hashes()?;
+    let handling_policy_provenance_reference_mismatch_blocked = !reference_mismatch
+        .packet
+        .data_policy
+        .handling
+        .verify_policy_provenance_bytes(b"synthetic-policy-record-1");
     let mut provenance_mismatch = message.clone();
     provenance_mismatch.packet.data_policy.handling.policy_provenance_hash =
-        symthaea_communication::content_hash(b"synthetic-policy-record-2");
+        symthaea_communication::compute_policy_provenance_hash(
+            "synthetic-policy-record-1",
+            b"synthetic-policy-record-2",
+        );
     provenance_mismatch.packet.refresh_hashes()?;
     let handling_policy_provenance_mismatch_blocked = !provenance_mismatch
         .packet
@@ -230,6 +249,10 @@ fn main() -> Result<(), String> {
         ("authorization_valid", true),
         ("handling_policy_provenance_present", handling_policy_provenance_present),
         ("handling_policy_provenance_hash_valid", handling_policy_provenance_hash_valid),
+        (
+            "handling_policy_provenance_reference_mismatch_blocked",
+            handling_policy_provenance_reference_mismatch_blocked,
+        ),
         ("handling_policy_provenance_mismatch_blocked", handling_policy_provenance_mismatch_blocked),
         ("inference_escalation_blocked", inference_escalation_blocked),
         ("first_packet_accepted", accepted == ReplayDecision::Accept),
