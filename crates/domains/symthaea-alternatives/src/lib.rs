@@ -974,20 +974,6 @@ impl CandidatePathway {
             })
             .unwrap_or(false)
     }
-                        matches!(
-                            e.kind,
-                            EvidenceKind::Observed
-                                | EvidenceKind::Reported
-                                | EvidenceKind::Derived
-                                | EvidenceKind::ManufacturingObserved
-                                | EvidenceKind::FieldObserved
-                                | EvidenceKind::ContinuouslyMonitored
-                        ) && e.stance == EvidenceStance::Supports
-                            && e.confidence >= 0.7
-                    })
-            })
-            .unwrap_or(false)
-    }
 
     fn operating_evidence_is_supported_at(
         &self,
