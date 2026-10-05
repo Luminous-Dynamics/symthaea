@@ -1,7 +1,7 @@
 //! Evidence-first alternatives assessment.
 //!
 //! This crate deliberately avoids a single "green score". Burden dimensions
-//! remain separate, hard constraints fail closed, Pareto dominance is
+//! remain seuarate, hard constraints fail closed, Pareto dominance is
 //! conservative over uncertainty intervals, and qualification cannot exceed
 //! what the linked evidence demonstrates.
 //!
@@ -5123,6 +5123,7 @@ mod tests {
         let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
         let design = ExperimentalDesignProvenance {
             design_id: "design:water-v1".into(),
+            requirement_id: case.requirement.id.clone(),
             hypothesis_id: "hypothesis:water-discrimination-v1".into(),
             hypothesis_statement: "A direct measurement can discriminate the unresolved water-burden intervals of the selected frontier candidates.".into(),
             unresolved_uncertainty_refs: vec!["uncertainty:direct-substitute:Water".into()],
@@ -5176,6 +5177,7 @@ mod tests {
         let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
         let design = ExperimentalDesignProvenance {
             design_id: "design:invalid".into(),
+            requirement_id: case.requirement.id.clone(),
             hypothesis_id: "hypothesis:invalid".into(),
             hypothesis_statement: "Test.".into(),
             unresolved_uncertainty_refs: vec!["u".into()],
@@ -5222,6 +5224,52 @@ mod tests {
     }
 
     #[test]
+    fn experimental_design_must_match_requirement_identity() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:req".into(),
+            requirement_id: "different-requirement".into(),
+            hypothesis_id: "hypothesis:req".into(),
+            hypothesis_statement: "Test water.".into(),
+            unresolved_uncertainty_refs: vec!["u1".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                target_uncertainty_width: None,
+            },
+            comparison_basis: basis,
+        };
+        assert_eq!(
+            design.validate_against(&case.requirement).unwrap_err(),
+            AssessmentError::ExperimentalDesignRequirementMismatch {
+                expected_requirement_id: case.requirement.id,
+                actual_requirement_id: "different-requirement".into(),
+            }
+        );
+    }
+
+    #[test]
     fn experimental_design_rejects_surface_basis_drift() {
         let case = crate::corpus::five_pathway_adversarial_case();
         let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
@@ -5229,6 +5277,7 @@ mod tests {
         wrong_basis.basis_revision = "v2".into();
         let design = ExperimentalDesignProvenance {
             design_id: "design:drift".into(),
+            requirement_id: case.requirement.id.clone(),
             hypothesis_id: "hypothesis:drift".into(),
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
@@ -5318,6 +5367,7 @@ mod tests {
         let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
         let design = ExperimentalDesignProvenance {
             design_id: "design:expected".into(),
+            requirement_id: case.requirement.id.clone(),
             hypothesis_id: "hypothesis:water".into(),
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
@@ -5388,6 +5438,7 @@ mod tests {
         let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
         let design = ExperimentalDesignProvenance {
             design_id: "design:positive".into(),
+            requirement_id: case.requirement.id.clone(),
             hypothesis_id: "hypothesis:water".into(),
             hypothesis_statement: "A measurement distinguishes the selected alternatives.".into(),
             unresolved_uncertainty_refs: vec!["uncertainty:water".into()],
