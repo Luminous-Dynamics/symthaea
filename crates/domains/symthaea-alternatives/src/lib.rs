@@ -780,7 +780,7 @@ impl AlternativesEngine {
         let expected_scales = Dimension::ALL
             .into_iter()
             .filter_map(|dimension| {
-                candidates
+                normalized_candidates
                     .iter()
                     .find_map(|candidate| {
                         candidate
@@ -1147,6 +1147,7 @@ mod tests {
             vec![
                 evidence("d1", "source-b", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
                 evidence("d2", "source-c", EvidenceKind::Reported, EvidenceStance::Supports, 0.9),
+                evidence("d3", "source-lca", EvidenceKind::LifecycleAssessed, EvidenceStance::Supports, 0.9),
             ],
         );
         let process = candidate(
@@ -1355,6 +1356,96 @@ mod tests {
         assert_eq!(
             result.candidates[0].qualification,
             QualificationState::LifecycleQualified
+        );
+    }
+
+    #[test]
+    fn assessment_is_order_independent() {
+        let a = candidate(
+            "a",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            8.0,
+            vec![
+                evidence("a2", "source-2", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("a1", "source-1", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+            ],
+        );
+        let b = candidate(
+            "b",
+            PathwayKind::ProductRedesign,
+            3.0,
+            4.0,
+            vec![
+                evidence("b2", "source-4", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("b1", "source-3", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+            ],
+        );
+
+        let first = AlternativesEngine
+            .assess(&fixture_requirement(), &[a.clone(), b.clone()], None)
+            .unwrap();
+        let second = AlternativesEngine
+            .assess(&fixture_requirement(), &[b, a], None)
+            .unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(first.pareto_frontier, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn evidence_scope_mismatch_is_rejected() {
+        let mut c = candidate(
+            "scope-mismatch",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence("x1", "source", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)],
+        );
+        c.burdens.get_mut(&Dimension::Water).unwrap().scope = "EU".into();
+
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap_err();
+
+        assert!(matches!(error, AssessmentError::EvidenceScopeMismatch { .. }));
+    }
+
+    #[test]
+    fn evidence_unit_mismatch_is_rejected() {
+        let mut c = candidate(
+            "unit-mismatch",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence("x1", "source", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)],
+        );
+        c.burdens.get_mut(&Dimension::Water).unwrap().unit = "litre".into();
+
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap_err();
+
+        assert!(matches!(error, AssessmentError::EvidenceUnitMismatch { .. }));
+    }
+
+    #[test]
+    fn lifecycle_qualification_requires_explicit_lifecycle_evidence() {
+        let c = candidate(
+            "reported-only",
+            PathwayKind::MaterialSubstitution,
+            2.0,
+            2.0,
+            vec![
+                evidence("x1", "source-a", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("x2", "source-b", EvidenceKind::Reported, EvidenceStance::Supports, 0.9),
+            ],
+        );
+        let result = AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
         );
     }
 
