@@ -1407,3 +1407,30 @@ fn rfc9942_es256_key_key_ops_resource_limit_is_typed() {
         Err(Rfc9942VdpError::ResourceLimitExceeded)
     );
 }
+
+
+#[test]
+fn rfc9942_receipt_crit_array_resource_limit_is_typed() {
+    let mut protected = vec![0xa2, 0x01, 0x26, 0x02, 0x98, 0x11];
+    for label in 0..17u8 { protected.push(label); }
+    let mut encoded = vec![0xd2, 0x84, 0x58, protected.len() as u8];
+    encoded.extend_from_slice(&protected);
+    assert_eq!(Rfc9942ReceiptEnvelope::from_cbor(&encoded), Err(Rfc9942VdpError::ResourceLimitExceeded));
+}
+
+#[test]
+fn rfc9942_outer_crit_array_resource_limit_is_typed() {
+    let mut protected = vec![0xa2, 0x01, 0x26, 0x02, 0x98, 0x11];
+    for label in 0..17u8 { protected.push(label); }
+    let mut encoded = vec![0xd2, 0x84, 0x58, protected.len() as u8];
+    encoded.extend_from_slice(&protected);
+    assert_eq!(Rfc9942SignatureWithReceipts::from_cbor(&encoded), Err(Rfc9942VdpError::ResourceLimitExceeded));
+}
+
+#[test]
+fn rfc9942_receipt_extension_recursion_resource_limit_is_typed() {
+    let mut encoded = vec![0xd2, 0x84, 0x47, 0xa2, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01, 0xa1, 0x18, 0x1e];
+    for _ in 0..17 { encoded.push(0xc0); }
+    encoded.push(0xf6);
+    assert_eq!(Rfc9942ReceiptEnvelope::from_cbor(&encoded), Err(Rfc9942VdpError::ResourceLimitExceeded));
+}
