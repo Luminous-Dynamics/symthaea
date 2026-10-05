@@ -1084,6 +1084,15 @@ impl ReceiptAttestationVerificationReport {
 }
 
 pub const VERIFICATION_CONTEXT_VERSION: &str = "symthaea-observation-verification-context-v4";
+/// Versioned execution-only context used by the v9 evidence representation.
+pub const VERIFICATION_CONTEXT_V5_VERSION: &str =
+    "symthaea-observation-verification-context-v5";
+/// Versioned annotation/provenance record for evaluator, trust-root, and authorization identities.
+pub const EVALUATION_CONTEXT_SUPPLEMENT_VERSION: &str =
+    "symthaea-observation-evaluation-context-supplement-v1";
+/// Future evaluation representation that separates execution context from supplemental annotations.
+pub const EVIDENCE_EVALUATION_V9_VERSION: &str =
+    "symthaea-observation-evaluation-v9";
 /// Historical evaluation identity retained so serialized v7 evidence remains reconstructable.
 pub const LEGACY_EVIDENCE_EVALUATION_VERSION: &str = "symthaea-observation-evaluation-v7";
 /// Current evaluation identity. v8 separates receipt commitment from intrinsic receipt integrity.
@@ -1230,6 +1239,213 @@ impl VerificationContext {
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea:observation-verification-context:v4\n");
+        hasher.update(&self.canonical_bytes());
+        hasher.finalize().to_hex().to_string()
+    }
+}
+
+/// Versioned execution-bound context for the v9 Evidence Fabric representation.
+///
+/// Unlike the historical VerificationContext v4, this type contains only
+/// inputs that describe the appraisal execution itself. Evaluator identity,
+/// trust-root identity, and authorization-policy identity live in
+/// EvaluationContextSupplement and are never treated as governing inputs here.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerificationContextV5 {
+    pub context_version: &'static str,
+    pub policy_fingerprint: String,
+    pub verifier_id: &'static str,
+    pub verifier_version: &'static str,
+    pub environment_fingerprint: String,
+    pub procedure_id: &'static str,
+    pub procedure_fingerprint: String,
+    pub resolution_snapshot_fingerprint: Option<String>,
+    pub evaluated_at_unix_ns: i128,
+}
+
+impl VerificationContextV5 {
+    pub fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
+        Self {
+            context_version: VERIFICATION_CONTEXT_V5_VERSION,
+            policy_fingerprint: report.policy_fingerprint.clone(),
+            verifier_id: VERIFIER_IMPLEMENTATION_ID,
+            verifier_version: report.verifier_version,
+            environment_fingerprint: report.environment_fingerprint.clone(),
+            procedure_id: EVALUATION_PROCEDURE_ID,
+            procedure_fingerprint: report.procedure_fingerprint.clone(),
+            resolution_snapshot_fingerprint: report.resolution_snapshot_fingerprint.clone(),
+            evaluated_at_unix_ns: report.evaluated_at_unix_ns,
+        }
+    }
+
+    fn expected_procedure_fingerprint(&self) -> Option<String> {
+        match self.verifier_version {
+            VERIFIER_VERSION => Some(EvaluationProcedure::attestation_ed25519().fingerprint()),
+            LEGACY_REPORT_VERIFIER_VERSION => {
+                Some(EvaluationProcedure::attestation_ed25519_v1().fingerprint())
+            }
+            _ => None,
+        }
+    }
+
+    pub fn is_well_formed(&self) -> bool {
+        self.context_version == VERIFICATION_CONTEXT_V5_VERSION
+            && self.verifier_id == VERIFIER_IMPLEMENTATION_ID
+            && self.procedure_id == EVALUATION_PROCEDURE_ID
+            && self
+                .expected_procedure_fingerprint()
+                .is_some_and(|expected| self.procedure_fingerprint == expected)
+            && is_blake3_fingerprint(&self.policy_fingerprint)
+            && is_blake3_fingerprint(&self.environment_fingerprint)
+            && self
+                .resolution_snapshot_fingerprint
+                .as_deref()
+                .is_none_or(|value| !value.trim().is_empty())
+    }
+
+    pub fn matches_report(&self, report: &ReceiptAttestationVerificationReport) -> bool {
+        self.is_well_formed()
+            && report.is_well_formed()
+            && self.policy_fingerprint == report.policy_fingerprint
+            && self.verifier_id == VERIFIER_IMPLEMENTATION_ID
+            && self.verifier_version == report.verifier_version
+            && self.environment_fingerprint == report.environment_fingerprint
+            && self.procedure_id == EVALUATION_PROCEDURE_ID
+            && self.procedure_fingerprint == report.procedure_fingerprint
+            && self.resolution_snapshot_fingerprint == report.resolution_snapshot_fingerprint
+            && self.evaluated_at_unix_ns == report.evaluated_at_unix_ns
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        fn write_string(bytes: &mut Vec<u8>, value: &str) {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value.as_bytes());
+        }
+        fn write_option(bytes: &mut Vec<u8>, value: Option<&str>) {
+            match value {
+                Some(value) => {
+                    bytes.push(1);
+                    write_string(bytes, value);
+                }
+                None => bytes.push(0),
+            }
+        }
+
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"symthaea:observation-verification-context:v5\n");
+        write_string(&mut bytes, self.context_version);
+        write_string(&mut bytes, &self.policy_fingerprint);
+        write_string(&mut bytes, self.verifier_id);
+        write_string(&mut bytes, self.verifier_version);
+        write_string(&mut bytes, self.environment_fingerprint);
+        write_string(&mut bytes, self.procedure_id);
+        write_string(&mut bytes, &self.procedure_fingerprint);
+        write_option(
+            &mut bytes,
+            self.resolution_snapshot_fingerprint.as_deref(),
+        );
+        bytes.extend_from_slice(&self.evaluated_at_unix_ns.to_be_bytes());
+        bytes
+    }
+
+    pub fn fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:observation-verification-context:v5\n");
+        hasher.update(&self.canonical_bytes());
+        hasher.finalize().to_hex().to_string()
+    }
+}
+
+/// Evaluation-time provenance annotations that are explicitly excluded from
+/// execution-bound verification context.
+///
+/// These fingerprints can identify the evaluator, trust roots, or authorization
+/// policy recorded by an appraisal authority without asserting that the
+/// annotation necessarily governed the underlying report execution.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvaluationContextSupplement {
+    pub supplement_version: &'static str,
+    pub evaluator_identity_fingerprint: Option<String>,
+    pub trust_root_fingerprint: Option<String>,
+    pub authorization_policy_fingerprint: Option<String>,
+}
+
+impl EvaluationContextSupplement {
+    pub fn empty() -> Self {
+        Self {
+            supplement_version: EVALUATION_CONTEXT_SUPPLEMENT_VERSION,
+            evaluator_identity_fingerprint: None,
+            trust_root_fingerprint: None,
+            authorization_policy_fingerprint: None,
+        }
+    }
+
+    pub fn with_evaluator_identity_fingerprint(mut self, fingerprint: impl Into<String>) -> Self {
+        self.evaluator_identity_fingerprint = Some(fingerprint.into());
+        self
+    }
+
+    pub fn with_trust_root_fingerprint(mut self, fingerprint: impl Into<String>) -> Self {
+        self.trust_root_fingerprint = Some(fingerprint.into());
+        self
+    }
+
+    pub fn with_authorization_policy_fingerprint(mut self, fingerprint: impl Into<String>) -> Self {
+        self.authorization_policy_fingerprint = Some(fingerprint.into());
+        self
+    }
+
+    pub fn is_well_formed(&self) -> bool {
+        self.supplement_version == EVALUATION_CONTEXT_SUPPLEMENT_VERSION
+            && self
+                .evaluator_identity_fingerprint
+                .as_deref()
+                .is_none_or(is_blake3_fingerprint)
+            && self
+                .trust_root_fingerprint
+                .as_deref()
+                .is_none_or(is_blake3_fingerprint)
+            && self
+                .authorization_policy_fingerprint
+                .as_deref()
+                .is_none_or(is_blake3_fingerprint)
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        fn write_string(bytes: &mut Vec<u8>, value: &str) {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value.as_bytes());
+        }
+        fn write_option(bytes: &mut Vec<u8>, value: Option<&str>) {
+            match value {
+                Some(value) => {
+                    bytes.push(1);
+                    write_string(bytes, value);
+                }
+                None => bytes.push(0),
+            }
+        }
+
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(
+            b"symthaea:observation-evaluation-context-supplement:v1\n",
+        );
+        write_string(&mut bytes, self.supplement_version);
+        write_option(
+            &mut bytes,
+            self.evaluator_identity_fingerprint.as_deref(),
+        );
+        write_option(&mut bytes, self.trust_root_fingerprint.as_deref());
+        write_option(
+            &mut bytes,
+            self.authorization_policy_fingerprint.as_deref(),
+        );
+        bytes
+    }
+
+    pub fn fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:observation-evaluation-context-supplement:v1\n");
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
@@ -1744,6 +1960,142 @@ impl EvidenceEvaluation {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceEvaluationV9 {
+    pub evaluation_version: &'static str,
+    pub subject_fingerprint: String,
+    pub evaluation_type: &'static str,
+    pub context: VerificationContextV5,
+    pub context_fingerprint: String,
+    pub supplement: EvaluationContextSupplement,
+    pub supplement_fingerprint: String,
+    pub execution_trace: EvaluationTrace,
+    pub verification_report_fingerprint: String,
+    pub outcome: ReceiptAttestationVerificationOutcome,
+    pub boundary: EvaluationBoundary,
+}
+
+impl EvidenceEvaluationV9 {
+    pub fn try_from_report(
+        report: &ReceiptAttestationVerificationReport,
+    ) -> Result<Self, EvidenceEvaluationConstructionError> {
+        Self::try_from_report_with_supplement(report, EvaluationContextSupplement::empty())
+    }
+
+    pub fn try_from_report_with_supplement(
+        report: &ReceiptAttestationVerificationReport,
+        supplement: EvaluationContextSupplement,
+    ) -> Result<Self, EvidenceEvaluationConstructionError> {
+        if !report.is_well_formed() {
+            return Err(EvidenceEvaluationConstructionError::InvalidReport);
+        }
+        if !supplement.is_well_formed() {
+            return Err(EvidenceEvaluationConstructionError::InvalidSupplementalContext);
+        }
+        let evaluation = Self::from_report_with_supplement(report, supplement);
+        evaluation
+            .is_well_formed()
+            .then_some(evaluation)
+            .ok_or(EvidenceEvaluationConstructionError::InvalidSupplementalContext)
+    }
+
+    pub fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
+        Self::from_report_with_supplement(report, EvaluationContextSupplement::empty())
+    }
+
+    pub fn from_report_with_supplement(
+        report: &ReceiptAttestationVerificationReport,
+        supplement: EvaluationContextSupplement,
+    ) -> Self {
+        let context = VerificationContextV5::from_report(report);
+        let execution_trace = if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
+            EvaluationTrace::from_report_legacy(report)
+        } else {
+            report.execution_trace.clone()
+        };
+        let supplement_fingerprint = supplement.fingerprint();
+        Self {
+            evaluation_version: EVIDENCE_EVALUATION_V9_VERSION,
+            subject_fingerprint: report.receipt_fingerprint.clone(),
+            evaluation_type: ATTESTATION_VERIFICATION_EVALUATION_TYPE,
+            context_fingerprint: context.fingerprint(),
+            context,
+            supplement,
+            supplement_fingerprint,
+            execution_trace: execution_trace.clone(),
+            verification_report_fingerprint: report.fingerprint(),
+            outcome: report.outcome,
+            boundary: EvaluationBoundary::from_execution_trace(&execution_trace),
+        }
+    }
+
+    pub fn is_well_formed(&self) -> bool {
+        self.evaluation_version == EVIDENCE_EVALUATION_V9_VERSION
+            && self.evaluation_type == ATTESTATION_VERIFICATION_EVALUATION_TYPE
+            && is_blake3_fingerprint(&self.subject_fingerprint)
+            && is_blake3_fingerprint(&self.verification_report_fingerprint)
+            && self.context.is_well_formed()
+            && self.context_fingerprint == self.context.fingerprint()
+            && self.supplement.is_well_formed()
+            && self.supplement_fingerprint == self.supplement.fingerprint()
+            && self.execution_trace.is_well_formed()
+            && self.execution_trace.terminal_outcome() == Some(self.outcome)
+            && self.boundary.is_well_formed()
+            && self.boundary == EvaluationBoundary::from_execution_trace(&self.execution_trace)
+    }
+
+    pub fn is_consistent_with_report(
+        &self,
+        report: &ReceiptAttestationVerificationReport,
+    ) -> bool {
+        report.is_well_formed()
+            && self.is_well_formed()
+            && self.subject_fingerprint == report.receipt_fingerprint
+            && self.verification_report_fingerprint == report.fingerprint()
+            && self.context_fingerprint == self.context.fingerprint()
+            && self.context.matches_report(report)
+            && self.execution_trace.procedure_fingerprint == report.procedure_fingerprint
+            && self.execution_trace.matches_report(report)
+            && self.execution_trace.terminal_outcome() == Some(self.outcome)
+            && self.execution_trace.is_well_formed()
+            && self.boundary == EvaluationBoundary::from_execution_trace(&self.execution_trace)
+            && self.boundary.is_well_formed()
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        fn write_string(bytes: &mut Vec<u8>, value: &str) {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value.as_bytes());
+        }
+
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"symthaea:evidence-evaluation:v9\n");
+        write_string(&mut bytes, self.evaluation_version);
+        write_string(&mut bytes, &self.subject_fingerprint);
+        write_string(&mut bytes, self.evaluation_type);
+        write_string(&mut bytes, &self.context_fingerprint);
+        write_string(&mut bytes, &self.supplement_fingerprint);
+        let trace_bytes = self.execution_trace.canonical_bytes();
+        bytes.extend_from_slice(&(trace_bytes.len() as u64).to_be_bytes());
+        bytes.extend_from_slice(&trace_bytes);
+        write_string(&mut bytes, &self.verification_report_fingerprint);
+        bytes.push(verification_outcome_tag(self.outcome));
+        bytes.extend_from_slice(&self.boundary.canonical_bytes());
+        bytes
+    }
+
+    pub fn execution_trace_fingerprint(&self) -> String {
+        self.execution_trace.fingerprint()
+    }
+
+    pub fn fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:evidence-evaluation:v9\n");
+        hasher.update(&self.canonical_bytes());
+        hasher.finalize().to_hex().to_string()
+    }
+}
+
 impl ReceiptAttestationVerificationReport {
     pub fn to_evidence_evaluation(&self) -> EvidenceEvaluation {
         EvidenceEvaluation::from_report(self)
@@ -1754,6 +2106,24 @@ impl ReceiptAttestationVerificationReport {
         &self,
     ) -> Result<EvidenceEvaluation, EvidenceEvaluationConstructionError> {
         EvidenceEvaluation::try_from_report(self)
+    }
+
+    /// Materialize the additive v9 representation with an empty annotation supplement.
+    pub fn to_evidence_evaluation_v9(&self) -> EvidenceEvaluationV9 {
+        EvidenceEvaluationV9::from_report(self)
+    }
+
+    pub fn try_to_evidence_evaluation_v9(
+        &self,
+    ) -> Result<EvidenceEvaluationV9, EvidenceEvaluationConstructionError> {
+        EvidenceEvaluationV9::try_from_report(self)
+    }
+
+    pub fn try_to_evidence_evaluation_v9_with_supplement(
+        &self,
+        supplement: EvaluationContextSupplement,
+    ) -> Result<EvidenceEvaluationV9, EvidenceEvaluationConstructionError> {
+        EvidenceEvaluationV9::try_from_report_with_supplement(self, supplement)
     }
 }
 
@@ -5743,4 +6113,172 @@ mod tests {
         );
         assert!(report.execution_trace.is_well_formed());
     }
+    #[test]
+    fn evidence_evaluation_v9_separates_execution_context_from_supplement() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let supplement = EvaluationContextSupplement::empty()
+            .with_evaluator_identity_fingerprint(
+                blake3::hash(b"evaluator-a").to_hex().to_string(),
+            )
+            .with_trust_root_fingerprint(
+                blake3::hash(b"trust-root-a").to_hex().to_string(),
+            )
+            .with_authorization_policy_fingerprint(
+                blake3::hash(b"authz-policy-a").to_hex().to_string(),
+            );
+
+        let evaluation = report
+            .try_to_evidence_evaluation_v9_with_supplement(supplement)
+            .expect("v9 evaluation");
+
+        assert!(evaluation.is_well_formed());
+        assert!(evaluation.is_consistent_with_report(&report));
+        assert!(evaluation.context.is_well_formed());
+        assert!(evaluation.supplement.is_well_formed());
+
+        let empty = report.to_evidence_evaluation_v9();
+        assert_eq!(evaluation.context_fingerprint, empty.context_fingerprint);
+        assert_ne!(evaluation.supplement_fingerprint, empty.supplement_fingerprint);
+        assert_ne!(evaluation.fingerprint(), empty.fingerprint());
+        assert_eq!(evaluation.subject_fingerprint, empty.subject_fingerprint);
+    }
+
+    #[test]
+    fn evidence_evaluation_v9_supplement_mutation_does_not_touch_execution_context() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let mut evaluation = report.to_evidence_evaluation_v9();
+        let original_context_fingerprint = evaluation.context_fingerprint;
+
+        evaluation.supplement.trust_root_fingerprint =
+            Some(blake3::hash(b"trust-root-b").to_hex().to_string());
+        evaluation.supplement_fingerprint = evaluation.supplement.fingerprint();
+
+        assert!(evaluation.is_well_formed());
+        assert!(evaluation.is_consistent_with_report(&report));
+        assert_eq!(evaluation.context_fingerprint, original_context_fingerprint);
+    }
+
+    #[test]
+    fn evidence_evaluation_v9_rejects_rebound_execution_context() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let mut evaluation = report.to_evidence_evaluation_v9();
+        evaluation.context.verifier_id = "attacker-verifier";
+        evaluation.context_fingerprint = evaluation.context.fingerprint();
+        assert!(!evaluation.is_well_formed());
+    }
+
+    #[test]
+    fn evidence_evaluation_v9_rejects_nonfingerprint_supplement() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let supplement =
+            EvaluationContextSupplement::empty().with_trust_root_fingerprint("trust-root-a");
+
+        assert_eq!(
+            report.try_to_evidence_evaluation_v9_with_supplement(supplement),
+            Err(EvidenceEvaluationConstructionError::InvalidSupplementalContext)
+        );
+    }
+
+    #[test]
+    fn evidence_evaluation_v9_uses_separate_fingerprint_domain_from_v8() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let v8 = report.to_evidence_evaluation();
+        let v9 = report.to_evidence_evaluation_v9();
+
+        assert!(v8.canonical_bytes().starts_with(b"symthaea:evidence-evaluation:v8\n"));
+        assert!(v9.canonical_bytes().starts_with(b"symthaea:evidence-evaluation:v9\n"));
+        assert_ne!(v8.fingerprint(), v9.fingerprint());
+    }
+
+    #[test]
+    fn evidence_evaluation_v9_does_not_import_legacy_supplement_into_execution_context() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let legacy_context = VerificationContext::from_report(&report)
+            .with_evaluator_identity_fingerprint("legacy-evaluator")
+            .with_trust_root_fingerprint("legacy-trust-root")
+            .with_authorization_policy_fingerprint("legacy-authz");
+
+        let supplement = EvaluationContextSupplement::empty()
+            .with_evaluator_identity_fingerprint(
+                blake3::hash(
+                    legacy_context
+                        .evaluator_identity_fingerprint
+                        .as_deref()
+                        .expect("legacy evaluator"),
+                )
+                .to_hex()
+                .to_string(),
+            )
+            .with_trust_root_fingerprint(
+                blake3::hash(
+                    legacy_context
+                        .trust_root_fingerprint
+                        .as_deref()
+                        .expect("legacy trust root"),
+                )
+                .to_hex()
+                .to_string(),
+            )
+            .with_authorization_policy_fingerprint(
+                blake3::hash(
+                    legacy_context
+                        .authorization_policy_fingerprint
+                        .as_deref()
+                        .expect("legacy authz"),
+                )
+                .to_hex()
+                .to_string(),
+            );
+
+        let v9 = EvidenceEvaluationV9::from_report_with_supplement(&report, supplement);
+        assert!(v9.is_well_formed());
+        assert!(v9.is_consistent_with_report(&report));
+        assert!(v9.supplement.evaluator_identity_fingerprint.is_some());
+        assert!(v9.supplement.trust_root_fingerprint.is_some());
+        assert!(v9.supplement.authorization_policy_fingerprint.is_some());
+    }
+
+
 }
