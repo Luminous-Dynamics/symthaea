@@ -1365,6 +1365,8 @@ impl VerificationContextV5 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvaluationContextSupplement {
     pub supplement_version: &'static str,
+    /// Exact execution-context identity this annotation applies to.
+    pub applies_to_context_fingerprint: Option<String>,
     pub evaluator_identity_fingerprint: Option<String>,
     pub trust_root_fingerprint: Option<String>,
     pub authorization_policy_fingerprint: Option<String>,
@@ -1374,10 +1376,16 @@ impl EvaluationContextSupplement {
     pub fn empty() -> Self {
         Self {
             supplement_version: EVALUATION_CONTEXT_SUPPLEMENT_VERSION,
+            applies_to_context_fingerprint: None,
             evaluator_identity_fingerprint: None,
             trust_root_fingerprint: None,
             authorization_policy_fingerprint: None,
         }
+    }
+
+    fn bind_to_context(mut self, context: &VerificationContextV5) -> Self {
+        self.applies_to_context_fingerprint = Some(context.fingerprint());
+        self
     }
 
     pub fn with_evaluator_identity_fingerprint(mut self, fingerprint: impl Into<String>) -> Self {
@@ -1431,6 +1439,10 @@ impl EvaluationContextSupplement {
             b"symthaea:observation-evaluation-context-supplement:v1\n",
         );
         write_string(&mut bytes, self.supplement_version);
+        write_option(
+            &mut bytes,
+            self.applies_to_context_fingerprint.as_deref(),
+        );
         write_option(
             &mut bytes,
             self.evaluator_identity_fingerprint.as_deref(),
@@ -2008,6 +2020,7 @@ impl EvidenceEvaluationV9 {
         supplement: EvaluationContextSupplement,
     ) -> Self {
         let context = VerificationContextV5::from_report(report);
+        let supplement = supplement.bind_to_context(&context);
         let execution_trace = if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
             EvaluationTrace::from_report_legacy(report)
         } else {
@@ -2038,6 +2051,9 @@ impl EvidenceEvaluationV9 {
             && self.context_fingerprint == self.context.fingerprint()
             && self.supplement.is_well_formed()
             && self.supplement_fingerprint == self.supplement.fingerprint()
+            && self.supplement.applies_to_context_fingerprint
+                .as_deref()
+                .is_some_and(|value| value == self.context_fingerprint)
             && self.execution_trace.is_well_formed()
             && self.execution_trace.terminal_outcome() == Some(self.outcome)
             && self.boundary.is_well_formed()
@@ -6170,6 +6186,36 @@ mod tests {
         assert!(evaluation.is_well_formed());
         assert!(evaluation.is_consistent_with_report(&report));
         assert_eq!(evaluation.context_fingerprint, original_context_fingerprint);
+
+        evaluation.context.verifier_version = "attacker-verifier-version";
+        evaluation.context_fingerprint = evaluation.context.fingerprint();
+        assert!(!evaluation.is_well_formed());
+    }
+
+    #[test]
+    fn evidence_evaluation_v9_rejects_supplement_transplantation() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let mut evaluation = report
+            .try_to_evidence_evaluation_v9_with_supplement(
+                EvaluationContextSupplement::empty().with_trust_root_fingerprint(
+                    blake3::hash(b"trust-root-a").to_hex().to_string(),
+                ),
+            )
+            .expect("v9 evaluation");
+
+        evaluation.supplement.applies_to_context_fingerprint =
+            Some(blake3::hash(b"foreign-context").to_hex().to_string());
+        evaluation.supplement_fingerprint = evaluation.supplement.fingerprint();
+
+        assert!(!evaluation.is_well_formed());
+        assert!(!evaluation.is_consistent_with_report(&report));
     }
 
     #[test]
