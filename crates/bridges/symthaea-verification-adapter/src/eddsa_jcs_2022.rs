@@ -875,7 +875,8 @@ mod tests {
             &resolved_method.method,
             "Multikey",
             &material_object,
-        )?;
+        )
+        .unwrap();
         resolution.verification_method_material_digest =
             resolved_method.material_digest.clone();
 
