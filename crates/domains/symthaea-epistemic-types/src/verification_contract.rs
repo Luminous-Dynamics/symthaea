@@ -1310,12 +1310,6 @@ impl VerificationRequest {
     }
 }
 
-/// A successful adapter attestation.
-///
-/// The presence of this type means the adapter claims all required steps for this
-/// exact request succeeded: method resolution, controller binding, permitted
-/// verification relationship, proof-purpose match, and cryptographic verification.
-/// The core does not independently establish any of those external facts.
 /// Typed cryptographic proof result produced by a concrete adapter.
 ///
 /// This receipt binds the exact cryptographic suite, proof representation,
@@ -2600,9 +2594,9 @@ mod tests {
     fn make_evidence(
         request: &VerificationRequest,
         controller_document_digest: &str,
-        cryptosuite: &str,
-        signed_payload_digest: &str,
-        proof_digest: &str,
+        _cryptosuite: &str,
+        _signed_payload_digest: &str,
+        _proof_digest: &str,
     ) -> Result<VerificationEvidence, VerificationFailure> {
         let mut resolution = resolved_method(request);
         resolution.controller_document_digest = controller_document_digest.to_owned();
@@ -2770,6 +2764,39 @@ mod tests {
     }
 
     #[test]
+    fn cryptographic_receipt_is_part_of_typed_evidence_identity() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let evidence = make_evidence(
+            &request,
+            &"11".repeat(32),
+            "ed25519",
+            &"22".repeat(32),
+            &"33".repeat(32),
+        )
+        .unwrap();
+
+        let mut tampered = evidence.clone();
+        tampered
+            .cryptographic_verification
+            .verification_method_material_digest = "66".repeat(32);
+        assert!(matches!(
+            tampered.validate_structure(),
+            Err(VerificationFailure::Structural(message))
+                if message.contains("verification material")
+        ));
+        assert_ne!(evidence.evidence_digest(), tampered.evidence_digest());
+    }
+
+    #[test]
     fn evidence_rejects_malformed_external_artifacts() {
         let claim = fixture_claim();
         let request = VerificationRequest::from_claim(
@@ -2787,7 +2814,7 @@ mod tests {
             &request,
             resolution.clone(),
             test_cryptographic_receipt(&request, &resolution),
-            );
+        );
         assert!(matches!(
             result,
             Err(VerificationFailure::Structural(_))
