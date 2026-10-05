@@ -397,6 +397,9 @@ fn validate_matrix(label: &str, matrix: &[Vec<LanyonForm>], dimensions: usize, s
 }
 
 fn render_symbols(names: &[String]) -> String {
+    if names.is_empty() {
+        return "(list)".into();
+    }
     let body = names.iter().map(|name| format!("`{name}")).collect::<Vec<_>>().join(" ");
     format!("(list {body})")
 }
