@@ -417,6 +417,8 @@ pub struct BurdenEstimate {
     /// Scope in which this value is comparable: geography, functional unit,
     /// lifecycle boundary, process boundary, time basis, etc.
     pub scope: String,
+    /// Exact methodological/comparability basis for the burden value.
+    pub basis: ComparisonBasisRef,
     /// Evidence IDs that specifically bear on this dimension.
     pub evidence_ids: Vec<String>,
 }
@@ -452,6 +454,31 @@ impl RequirementBound {
     }
 }
 
+/// Exact methodological/comparability identity for a measured quantity.
+///
+/// This is intentionally opaque: the authority defining the basis can encode
+/// the functional unit, system boundary, allocation rules, normalization method,
+/// or engineering test protocol behind this exact profile.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComparisonBasisRef {
+    /// Stable identifier for the comparison methodology/profile.
+    pub basis_id: String,
+    /// Revision of the comparison methodology/profile.
+    pub basis_revision: String,
+    /// Digest of the exact comparison methodology/profile semantics.
+    pub basis_digest: String,
+}
+
+impl ComparisonBasisRef {
+    /// Validate the exact comparison-basis identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.basis_id.is_empty() || self.basis_revision.is_empty() || self.basis_digest.is_empty() {
+            return Err(AssessmentError::EmptyComparisonBasis);
+        }
+        Ok(())
+    }
+}
+
 /// The explicit comparison scale for one burden dimension.
 ///
 /// The engine never infers a comparison cohort's scale from the candidates.
@@ -463,6 +490,8 @@ pub struct ComparisonScale {
     pub unit: String,
     /// Functional-unit / lifecycle / geography / temporal scope identifier.
     pub scope: String,
+    /// Exact methodology/comparability basis for the scale.
+    pub basis: ComparisonBasisRef,
 }
 
 impl ComparisonScale {
@@ -471,6 +500,7 @@ impl ComparisonScale {
         if self.unit.is_empty() || self.scope.is_empty() {
             return Err(AssessmentError::EmptyBurdenScale);
         }
+        self.basis.validate()?;
         Ok(())
     }
 }
@@ -484,6 +514,8 @@ pub struct OperatingRequirement {
     pub unit: String,
     /// Functional/geographic/system scope for the condition.
     pub scope: String,
+    /// Exact methodology/test-protocol basis for the operating measurement.
+    pub basis: ComparisonBasisRef,
 }
 
 impl OperatingRequirement {
@@ -493,6 +525,7 @@ impl OperatingRequirement {
         if self.unit.is_empty() || self.scope.is_empty() {
             return Err(AssessmentError::EmptyOperatingScale);
         }
+        self.basis.validate()?;
         Ok(())
     }
 }
@@ -621,6 +654,8 @@ pub struct PerformanceEstimate {
     pub unit: String,
     /// Scope in which this performance value applies.
     pub scope: String,
+    /// Exact methodological/test-protocol basis for the performance value.
+    pub basis: ComparisonBasisRef,
     /// Evidence IDs supporting or contradicting the value.
     pub evidence_ids: Vec<String>,
 }
@@ -632,6 +667,7 @@ impl PerformanceEstimate {
         if self.unit.is_empty() || self.scope.is_empty() {
             return Err(AssessmentError::EmptyPerformanceScale);
         }
+        self.basis.validate()?;
         Ok(())
     }
 }
@@ -1567,6 +1603,10 @@ pub enum AssessmentError {
     EmptySourceAdmissionReference,
     /// Freshness policy identity is incomplete.
     EmptyFreshnessPolicyIdentity,
+    /// Comparison methodology/basis identity is incomplete.
+    EmptyComparisonBasis,
+    /// A burden estimate and its requirement use different comparison bases.
+    ComparisonBasisMismatch(String),
     /// Freshness policy contains no rules.
     EmptyFreshnessPolicy,
     /// A freshness policy was supplied without an assessment timestamp.
@@ -1671,6 +1711,12 @@ impl std::fmt::Display for AssessmentError {
             Self::EmptyFreshnessPolicy => write!(f, "freshness policy has no rules"),
             Self::FreshnessPolicyRequiresAssessmentTimestamp => {
                 write!(f, "freshness policy requires an assessment timestamp")
+            }
+            Self::EmptyComparisonBasis => {
+                write!(f, "comparison basis identity is incomplete")
+            }
+            Self::ComparisonBasisMismatch(context) => {
+                write!(f, "comparison basis mismatch for {context}")
             }
             Self::InvalidSourceAdmissionValidity { from, until } => {
                 write!(f, "source admission validity [{from}, {until}] is inverted")
