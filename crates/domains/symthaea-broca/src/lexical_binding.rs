@@ -183,8 +183,14 @@ impl LexicalMorphosyntacticBinding {
             .iter()
             .map(|slot| (slot.role.clone(), slot.prime.clone()))
             .collect();
+        let expected_source_order: Vec<(String, String)> = frame
+            .constituents
+            .iter()
+            .map(|slot| (slot.role.clone(), slot.prime.clone()))
+            .collect();
 
         let mut observed_sources = HashSet::new();
+        let mut observed_source_order = Vec::new();
         for constituent in &self.constituents {
             match &constituent.source {
                 LexicalSource::SemanticConstituent { role, prime } => {
@@ -200,6 +206,7 @@ impl LexicalMorphosyntacticBinding {
                             prime: prime.clone(),
                         });
                     }
+                    observed_source_order.push((role.clone(), prime.clone()));
                 }
                 LexicalSource::InsertedFunctionWord { .. } => {}
             }
@@ -218,6 +225,10 @@ impl LexicalMorphosyntacticBinding {
                 role: missing.0,
                 prime: missing.1,
             });
+        }
+
+        if observed_source_order != expected_source_order {
+            return Err(LexicalBindingError::SemanticSourceOrderMismatch);
         }
 
         Ok(())
@@ -493,6 +504,7 @@ pub enum LexicalBindingError {
     UnknownSemanticSource { role: String, prime: String },
     DuplicateSemanticSource { role: String, prime: String },
     MissingSemanticCoverage { role: String, prime: String },
+    SemanticSourceOrderMismatch,
     NoSemanticPayload,
     SemanticPayloadMismatch { position: usize },
     SemanticFunctionMismatch { position: usize },
@@ -533,6 +545,7 @@ impl std::fmt::Display for LexicalBindingError {
             Self::UnknownSemanticSource { role, prime } => write!(f, "lexical binding references unknown semantic source {role}:{prime}"),
             Self::DuplicateSemanticSource { role, prime } => write!(f, "semantic source {role}:{prime} is bound more than once"),
             Self::MissingSemanticCoverage { role, prime } => write!(f, "semantic source {role}:{prime} is not lexically covered"),
+            Self::SemanticSourceOrderMismatch => write!(f, "lexical semantic-source order no longer matches the linguistic frame"),
             Self::NoSemanticPayload => write!(f, "lexical binding must contain semantic payload"),
             Self::SemanticPayloadMismatch { position } => write!(f, "semantic-payload flag disagrees with lexical source at position {position}"),
             Self::SemanticFunctionMismatch { position } => write!(f, "semantic payload at position {position} cannot be classified as a function word"),
@@ -747,6 +760,23 @@ mod tests {
         assert!(binding.validate_against_frame(&frame).is_ok());
         assert!(binding.grounding_surface().contains(LEXICAL_MORPHOSYNTACTIC_BINDING_VERSION));
         assert_eq!(binding.provenance_token().len(), 64);
+    }
+
+    #[test]
+    fn semantic_source_order_must_match_frame_linearization() {
+        let frame = statement_frame();
+        let mut bindings = base_semantic_bindings();
+        bindings.swap(0, 1);
+        let error = LexicalMorphosyntacticBinding::new(
+            &frame,
+            english_rule_binding(),
+            bindings,
+            vec![],
+            vec![],
+        )
+        .expect_err("semantic sources must preserve the already-authorized frame order");
+
+        assert_eq!(error, LexicalBindingError::SemanticSourceOrderMismatch);
     }
 
     #[test]
