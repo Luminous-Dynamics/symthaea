@@ -4762,7 +4762,7 @@ mod tests {
             IndependenceScopeWitnessV3::from_canonical_bytes(&scope).expect("decode witness");
         assert_eq!(
             witness.assess_independence().expect("witness assessment"),
-            (v3.classification, v3.basis)
+            (v3.classification.clone(), v3.basis.clone())
         );
         assert!(IndependenceVerificationReceiptV3::from_assessment(&v3)
             .verify_against_scope_witness(&scope));
