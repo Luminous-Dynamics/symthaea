@@ -181,7 +181,7 @@ mod tests {
             .candidates
             .iter()
             .map(|candidate| candidate.kind)
-            .collect::<std::collections::BTreeSet<_>>();
+            .collect::<Vec<_>>();
 
         assert!(kinds.contains(&PathwayKind::MaterialSubstitution));
         assert!(kinds.contains(&PathwayKind::ProcessSubstitution));
@@ -214,7 +214,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(elimination.qualification, QualificationState::Hypothesis);
-        assert!(elimination.frontier_blocked == false);
+        assert!(!elimination.frontier_blocked);
     }
 
     #[test]
@@ -233,5 +233,19 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.receipt.schema_version, SCHEMA_VERSION);
         assert_eq!(first.receipt.algorithm_version, ALGORITHM_VERSION);
+    }
+
+    #[test]
+    fn five_pathway_case_does_not_make_regrettable_substitution_disappear() {
+        let result = run_case(&five_pathway_adversarial_case()).unwrap();
+        let direct = result
+            .candidates
+            .iter()
+            .find(|candidate| candidate.candidate_id == "direct-substitute")
+            .unwrap();
+
+        assert!(direct.evidence_conflict == false);
+        assert_eq!(direct.qualification, QualificationState::LifecycleQualified);
+    }
     }
 }
