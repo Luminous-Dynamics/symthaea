@@ -211,7 +211,8 @@ def focused_pr_job_is_safe(job: str, block: str) -> bool:
     if f"    {GOVERNANCE_DRAFT_GUARD}" not in block.splitlines():
         return False
     expression = job_level_if_expression(block, job)
-    return expression == GOVERNANCE_DRAFT_GUARD and not STATUS_CHECK.search(expression or "")
+    expected_expression = GOVERNANCE_DRAFT_GUARD.removeprefix("if: ")
+    return expression == expected_expression and not STATUS_CHECK.search(expression or "")
 
 
 def self_test_focused_pr_job_policy() -> None:
