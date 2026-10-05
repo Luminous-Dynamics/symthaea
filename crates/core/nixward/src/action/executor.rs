@@ -34,6 +34,8 @@ pub enum NixOSCommand {
         flake: Option<String>,
         extra_args: Vec<String>,
     },
+    /// Switch the NixOS system profile to an exact existing generation.
+    SwitchGeneration { generation: u32 },
     /// nix-env -i (user package install)
     EnvInstall { packages: Vec<String> },
     /// nix-env -e (user package remove)
@@ -163,6 +165,7 @@ impl NixOSCommand {
 
             Self::RebuildTest { .. } => SafetyLevel::SystemModify,
             Self::RebuildBoot { .. } => SafetyLevel::SystemModify,
+            Self::SwitchGeneration { .. } => SafetyLevel::SystemCritical,
 
             Self::RebuildSwitch { .. } => SafetyLevel::SystemCritical,
 
@@ -235,6 +238,15 @@ impl NixOSCommand {
                 args.extend(extra_args.iter().cloned());
                 ("nixos-rebuild".to_string(), args)
             }
+            Self::SwitchGeneration { generation } => (
+                "nix-env".to_string(),
+                vec![
+                    "--profile".to_string(),
+                    "/nix/var/nix/profiles/system".to_string(),
+                    "--switch-generation".to_string(),
+                    generation.to_string(),
+                ],
+            ),
             Self::EnvInstall { packages } => {
                 let mut args = Vec::with_capacity(1 + packages.len());
                 args.push("-iA".to_string());
@@ -681,6 +693,23 @@ mod tests {
     use super::*;
 
     #[test]
+    #[test]
+    fn test_switch_generation_is_system_critical_and_typed() {
+        let command = NixOSCommand::SwitchGeneration { generation: 42 };
+        assert_eq!(command.safety_level(), SafetyLevel::SystemCritical);
+        let (bin, args) = command.to_command();
+        assert_eq!(bin, "nix-env");
+        assert_eq!(
+            args,
+            vec![
+                "--profile",
+                "/nix/var/nix/profiles/system",
+                "--switch-generation",
+                "42",
+            ]
+        );
+    }
+
     fn test_command_safety_levels() {
         let search = NixOSCommand::Search {
             query: "vim".to_string(),
