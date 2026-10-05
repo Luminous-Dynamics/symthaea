@@ -604,6 +604,33 @@ fn backfill_receipt_operation_ids_from_dispatch(
     Ok(())
 }
 
+fn backfill_receipt_provider_idempotency_keys_from_dispatch(
+    connection: &mut Connection,
+) -> Result<(), AuthorizationStoreError> {
+    connection.execute(
+        "UPDATE authorization_receipts
+         SET provider_idempotency_key=(
+             SELECT d.provider_idempotency_key
+             FROM authorization_dispatches d
+             WHERE d.authorization_instance=authorization_receipts.authorization_instance
+               AND d.attempt_id=authorization_receipts.attempt_id
+               AND d.provider_idempotency_key IS NOT NULL
+               AND d.provider_idempotency_key <> ''
+         )
+         WHERE (provider_idempotency_key IS NULL OR provider_idempotency_key='')
+           AND EXISTS(
+             SELECT 1
+             FROM authorization_dispatches d
+             WHERE d.authorization_instance=authorization_receipts.authorization_instance
+               AND d.attempt_id=authorization_receipts.attempt_id
+               AND d.provider_idempotency_key IS NOT NULL
+               AND d.provider_idempotency_key <> ''
+           )",
+        [],
+    )?;
+    Ok(())
+}
+
 fn backfill_bound_attempt_boundaries_from_dispatch(
     connection: &mut Connection,
 ) -> Result<(), AuthorizationStoreError> {
@@ -1415,6 +1442,7 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_status_checks", "attempt_scope_digest", "TEXT")?;
         backfill_status_check_boundary_ownership(&mut connection)?;
         backfill_receipt_operation_ids_from_dispatch(&mut connection)?;
+        backfill_receipt_provider_idempotency_keys_from_dispatch(&mut connection)?;
         backfill_status_check_operation_ids_from_dispatch(&mut connection)?;
         backfill_bound_attempt_boundaries_from_dispatch(&mut connection)?;
         backfill_attempt_scope_digests(&mut connection)?;
@@ -11034,10 +11062,10 @@ mod tests {
             conn.execute(
                 "INSERT INTO authorization_receipts(
                     authorization_instance,action_id,attempt_id,phase,outcome,action_digest,
-                    authority_epoch,provider_idempotency_key)
+                    authority_epoch)
                  VALUES(
                     'auth-status','action-status','attempt-status','indeterminate','indeterminate',
-                    'digest-status',1,'provider-status'
+                    'digest-status',1
                  )",
                 [],
             ).unwrap();
@@ -11060,6 +11088,14 @@ mod tests {
             |row| row.get(0)
         ).unwrap();
         assert_eq!(receipt_operation_id,"op-status");
+        let receipt_provider_key: String = conn.query_row(
+            "SELECT provider_idempotency_key
+             FROM authorization_receipts
+             WHERE authorization_instance='auth-status' AND attempt_id='attempt-status' AND phase='indeterminate'",
+            [],
+            |row| row.get(0),
+        ).unwrap();
+        assert_eq!(receipt_provider_key,"provider-status");
         assert_eq!(boundary,"boundary-authoritative");
         assert_eq!(
             scope,
