@@ -896,7 +896,8 @@ fn executor_command_requires_governed_authority(program: &str, args: &[String]) 
         // program through a second argv layer.
         "sh" | "bash" | "dash" | "zsh" | "fish" | "env" | "sudo" | "doas" | "pkexec"
         | "xargs" | "busybox" | "timeout" | "nohup" | "setsid" | "stdbuf" | "ionice"
-        | "chroot" | "nsenter" => true,
+        | "chroot" | "nsenter" | "nice" | "watch" | "daemonize" | "runuser" | "su"
+        | "parallel" | "script" | "expect" => true,
 
         // systemd lifecycle is always governed; only the explicitly
         // observational verbs remain in the generic command plane.
@@ -921,6 +922,10 @@ fn executor_command_requires_governed_authority(program: &str, args: &[String]) 
                 if matches!(subcommand.as_str(), "show" | "metadata") => false,
             _ => true,
         },
+
+        // `find` is observational until its executable actions are enabled;
+        // those actions create a second argv execution layer.
+        "find" => args.iter().any(|arg| arg == "-exec" || arg == "-execdir"),
 
         // Other well-known system lifecycle/configuration planes should not be
         // smuggled through a generic executable allowlist.
@@ -1823,6 +1828,18 @@ mod executor_authority_tests {
         assert!(executor_command_requires_governed_authority(
             "timeout",
             &args(&["1", "systemctl", "restart", "sshd.service"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "nice",
+            &args(&["systemctl", "restart", "sshd.service"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "find",
+            &args(&["/tmp", "-exec", "systemctl", "restart", "sshd.service", ";"])
+        ));
+        assert!(!executor_command_requires_governed_authority(
+            "find",
+            &args(&["/tmp", "-type", "f", "-maxdepth", "1"])
         ));
     }
 
