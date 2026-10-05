@@ -929,10 +929,20 @@ fn executor_command_requires_governed_authority(program: &str, args: &[String]) 
 
         // Other well-known system lifecycle/configuration planes should not be
         // smuggled through a generic executable allowlist.
-        "nmcli"
+        "nix-store"
+        | "nix-channel"
+        | "nix-collect-garbage"
+        | "nmcli"
         | "loginctl"
+        | "networkctl"
+        | "resolvectl"
+        | "ip"
+        | "nft"
+        | "iptables"
+        | "firewall-cmd"
         | "systemd-run"
         | "systemd-cryptenroll"
+        | "udevadm"
         | "cryptsetup"
         | "mount"
         | "umount"
@@ -1788,6 +1798,14 @@ mod executor_authority_tests {
         assert!(executor_command_requires_governed_authority(
             "nix",
             &args(&["store", "gc"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "nix-collect-garbage",
+            &args(&["-d"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "nix-channel",
+            &args(&["--update"])
         ));
         assert!(!executor_command_requires_governed_authority(
             "nix",
