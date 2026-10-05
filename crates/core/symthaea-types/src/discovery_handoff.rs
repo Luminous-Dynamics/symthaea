@@ -256,7 +256,7 @@ pub struct ScientificInquirySelectionReceipt {
     ///
     /// Active inquiry is only admissible when at least two hypotheses are directly
     /// comparable at the selected challenge.
-    pub prediction_count: u16,
+    pub prediction_count: u32,
 }
 
 impl ScientificInquirySelectionReceipt {
@@ -270,7 +270,7 @@ impl ScientificInquirySelectionReceipt {
         selector_revision: impl Into<String>,
         selection_seed: u64,
         predicted_disagreement_score: f64,
-        prediction_count: u16,
+        prediction_count: u32,
     ) -> Result<Self, String> {
         if !predicted_disagreement_score.is_finite() || predicted_disagreement_score < 0.0 {
             return Err("predicted disagreement score must be finite and non-negative".into());
