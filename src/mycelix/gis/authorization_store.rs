@@ -4854,6 +4854,13 @@ fn validate_persisted_terminal_evidence(
         params![record.authorization_instance, record.attempt_id, record.boundary_id],
         |r| Ok((r.get(0)?, r.get(1)?)),
     )?;
+    let dispatch_validity: (Option<String>, Option<String>, Option<String>) = tx.query_row(
+        "SELECT validity_issued_at,validity_expires_at,validity_policy_digest
+         FROM authorization_dispatches
+         WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+        params![record.authorization_instance, record.attempt_id, record.boundary_id],
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+    )?;
 
     let row: Option<(
         String, String, Option<String>, Option<String>, Option<String>,
@@ -4883,6 +4890,14 @@ fn validate_persisted_terminal_evidence(
             r.get(25)?, r.get(26)?, r.get(27)?, r.get(28)?, r.get(29)?,
         )),
     ).optional()?;
+
+    let terminal_validity: (Option<String>, Option<String>, Option<String>) = tx.query_row(
+        "SELECT validity_issued_at,validity_expires_at,validity_policy_digest
+         FROM authorization_terminal_evidence
+         WHERE authorization_instance=?1 AND attempt_id=?2",
+        params![record.authorization_instance.as_str(), record.attempt_id.as_str()],
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+    )?;
 
     let Some((
         operation_id,native_replay_identity,native_issuer,native_authority_namespace,
@@ -4920,6 +4935,7 @@ fn validate_persisted_terminal_evidence(
         || native_replay_derivation_digest.as_deref() != Some(record.native_replay_derivation_digest.as_str())
         || native_authority_pin_set_id != pin_set.0
         || native_authority_pin_set_digest != pin_set.1
+        || terminal_validity != dispatch_validity
         || relying_party_id.as_deref() != Some(store.relying_party_id.as_str())
         || boundary_id != record.boundary_id
         || attempt_scope_digest.as_deref() != Some(expected_scope.as_str())
@@ -5983,6 +5999,108 @@ mod tests {
             store.pin_provider_evidence_verifier_configuration(&changed),
             Err(AuthorizationStoreError::InvalidState(_))
         ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn terminal_receipt_replay_rejects_tampered_validity_provenance() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-terminal-replay-validity-tamper-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=ActionEffectBinding::new(
+            "target-terminal-replay-validity-tamper",
+            "prod",
+            "adapter-terminal-replay-validity-tamper"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            authorization_instance:"terminal-replay-validity-tamper".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-04T07:40:00Z".into(),
+            expires_at:Some("2026-10-05T07:40:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,
+            &action,
+            "frame@1",
+            "attempt-terminal-replay-validity-tamper",
+            "boundary-terminal-replay-validity-tamper"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt-terminal-replay-validity-tamper",
+            &action,
+            &effect,
+            "boundary-terminal-replay-validity-tamper",
+            "operation:terminal-replay-validity-tamper",
+            "native-terminal-replay-validity-tamper"
+        ).unwrap();
+
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        let _first=store.commit_bound_verified(
+            &record,
+            &evidence,
+            &TestProviderVerifier
+        ).unwrap();
+
+        store.connection().unwrap().execute(
+            "UPDATE authorization_terminal_evidence
+             SET validity_policy_digest='sha256:tampered-terminal-validity'
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+        ).unwrap();
+
+        struct RefusingVerifier;
+        impl ProviderEvidenceVerifier for RefusingVerifier {
+            fn verify(
+                &self,
+                _purpose:ProviderVerificationPurpose,
+                _record:&DurableDispatchRecord,
+                _evidence:&ProviderTerminalEvidence,
+            ) -> Result<VerifiedProviderOutcome,ProviderVerificationError> {
+                Err(ProviderVerificationError::VerificationFailed)
+            }
+        }
+
+        let err=store.commit_bound_verified(
+            &record,
+            &evidence,
+            &RefusingVerifier,
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
+        ));
+
+        let persisted:String=store.connection().unwrap().query_row(
+            "SELECT validity_policy_digest
+             FROM authorization_terminal_evidence
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(persisted,"sha256:tampered-terminal-validity");
         let _=std::fs::remove_file(path);
     }
 
