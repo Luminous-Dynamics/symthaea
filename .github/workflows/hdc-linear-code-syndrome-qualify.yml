@@ -26,22 +26,31 @@ jobs:
       contents: read
 
     steps:
-      - name: Checkout exact workflow head
+      - name: Checkout exact research head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 2
 
-      - name: Record exact head and parent
+      - name: Record exact research head and parent
         id: head
+        env:
+          EVENT_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          EVENT_HEAD_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref_name }}
+          SYNTHETIC_MERGE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || '' }}
         run: |
           ACTUAL_SHA="$(git rev-parse HEAD)"
           PARENT_SHA="164d6b94d12bb72a902bdc2164d25cd540d3ba7f"
           git fetch --no-tags --depth=1 origin "$PARENT_SHA"
-          test "$ACTUAL_SHA" = "${GITHUB_SHA}"
+          test -n "$EVENT_HEAD_SHA"
+          test "$EVENT_HEAD_REF" = "research/hdc-linear-code-bounded-decoder-v2"
+          test "$ACTUAL_SHA" = "$EVENT_HEAD_SHA"
           git cat-file -e "${PARENT_SHA}^{commit}"
+          git merge-base --is-ancestor "$PARENT_SHA" "$ACTUAL_SHA"
           echo "sha=$ACTUAL_SHA" >> "$GITHUB_OUTPUT"
           echo "parent_sha=$PARENT_SHA" >> "$GITHUB_OUTPUT"
+          echo "source_ref=$EVENT_HEAD_REF" >> "$GITHUB_OUTPUT"
+          echo "synthetic_merge_sha=$SYNTHETIC_MERGE_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Enforce stacked research surface
         id: scope
@@ -226,9 +235,11 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
           HDC Linear-Code Bounded Decoder Qualification
           =============================================
-          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v1
+          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v2
           event_name=${{ github.event_name }}
           exact_head=${{ steps.head.outputs.sha }}
+          event_head_ref=${{ steps.head.outputs.source_ref }}
+          synthetic_merge_sha=${{ steps.head.outputs.synthetic_merge_sha }}
           parent_head=${{ steps.head.outputs.parent_sha }}
           parent_head_required=164d6b94d12bb72a902bdc2164d25cd540d3ba7f
           research_surface_status=${{ steps.scope.outcome }}
@@ -248,7 +259,7 @@ jobs:
           runner_arch=${{ steps.runner.outputs.runner_arch }}
           runner_image=${{ steps.runner.outputs.runner_image }}
           runner_image_version=${{ steps.runner.outputs.runner_image_version }}
-          qualification_status=${{ steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
           random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
           random_syndrome_sweep=${{ steps.random_sweep.outputs.random_syndrome_sweep }}
