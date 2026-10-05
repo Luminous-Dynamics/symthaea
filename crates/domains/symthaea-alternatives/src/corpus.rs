@@ -107,6 +107,18 @@ pub fn five_pathway_adversarial_case() -> BenchmarkCase {
                 ("service_life_years".into(), RequirementBound::AtLeast(10.0)),
                 ("throughput_per_hour".into(), RequirementBound::AtLeast(100.0)),
             ]),
+            comparison_scales: Dimension::ALL
+                .into_iter()
+                .map(|dimension| {
+                    (
+                        dimension,
+                        ComparisonScale {
+                            unit: "burden-unit".into(),
+                            scope: "benchmark:functional-unit-v1|global".into(),
+                        },
+                    )
+                })
+                .collect(),
         },
         candidates: vec![
             // Intentionally shuffled: canonicalization must make output invariant
@@ -303,7 +315,7 @@ mod tests {
             .find(|candidate| candidate.candidate_id == "direct-substitute")
             .unwrap();
 
-        assert!(direct.evidence_conflict == false);
+        assert!(!direct.evidence_conflict);
         assert_eq!(direct.qualification, QualificationState::LifecycleQualified);
     }
     }
