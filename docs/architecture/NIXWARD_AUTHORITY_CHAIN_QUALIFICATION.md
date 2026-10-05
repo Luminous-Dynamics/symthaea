@@ -13,8 +13,13 @@ Included scoped hardening stages:
 - CROSS-052: unconstrained `nixos-rebuild` `extra_args` are rejected for real execution.
 - CROSS-053: `Custom` safety metadata is conservatively `Destructive`.
 
-## Exact integration head at initial qualification creation
+## Current exact integration head
 
-`681c8cce4992a5cb348783971ac057e1899f4f24`
+`c186e69291970d496efd5359728e4d585afb20e4`
 
-At initial creation, repository Actions had not yet produced a successful qualification receipt for the combined chain.
+The integration branch now includes both authority architectures:
+- top-level Symthaea ActionIR/root executor hardening (CROSS-032/045/056);
+- top-level legacy Sandbox hardening (CROSS-048);
+- `crates/core/nixward` typed-command hardening (CROSS-049/050/051/052/053).
+
+Qualification is fail-closed: queued, skipped, cancelled, or mergeable states are not PASS evidence. A PASS requires executed checks against this exact integration head.
