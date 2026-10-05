@@ -593,6 +593,15 @@ fn observe_openfoam_patch_geometry_with_neighbour(
             });
         }
 
+        let mut seen_points = std::collections::BTreeSet::new();
+        for &point_index in face {
+            if !seen_points.insert(point_index) {
+                return Err(OpenFoamBoundaryObservationError::InvalidFaceRecord {
+                    face_index: record.start_face + offset as u64,
+                });
+            }
+        }
+
         for edge_index in 0..face.len() {
             let a_index = face[edge_index];
             let b_index = face[(edge_index + 1) % face.len()];
@@ -623,6 +632,18 @@ fn observe_openfoam_patch_geometry_with_neighbour(
             let b_mm = scaled_point_to_f32(*b, point_scale_mm_per_unit)?;
             let edge = symthaea_passive_solver_binding::BoundaryEdgeKey::new(a_mm, b_mm)
                 .map_err(|_| OpenFoamBoundaryObservationError::PatchGeometryMismatch)?;
+            let topology_edge = if a_index <= b_index {
+                (a_index, b_index)
+            } else {
+                (b_index, a_index)
+            };
+            if let Some(existing) = edge_origins.get(&edge) {
+                if *existing != topology_edge {
+                    return Err(OpenFoamBoundaryObservationError::PatchGeometryMismatch);
+                }
+            } else {
+                edge_origins.insert(edge, topology_edge);
+            }
             let count = edge_occurrences.entry(edge).or_insert(0);
             *count = count
                 .checked_add(1)
