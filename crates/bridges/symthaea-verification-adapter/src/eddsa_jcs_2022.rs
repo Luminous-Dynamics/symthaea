@@ -418,7 +418,7 @@ impl<'de> serde::de::Visitor<'de> for StrictJsonValueVisitor {
     }
 }
 
-fn parse_strict_json(bytes: &[u8]) -> Result<Value, SnapshotError> {
+pub(crate) fn parse_strict_json(bytes: &[u8]) -> Result<Value, SnapshotError> {
     let mut deserializer = serde_json::Deserializer::from_slice(bytes);
     let value = serde::de::DeserializeSeed::deserialize(
         StrictJsonValue,
