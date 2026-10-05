@@ -79,7 +79,7 @@ impl PhonologicalPlanRealizationReceipt {
         plan.validate()
             .map_err(|error| anyhow::anyhow!("invalid phonological plan: {error}"))?;
 
-        if self.schema_version != 2 {
+        if self.schema_version != 3 {
             anyhow::bail!("unsupported realization receipt schema: {}", self.schema_version);
         }
         if self.plan_version != plan.version {
@@ -146,16 +146,25 @@ impl PhonologicalPlanRealizationReceipt {
     }
 
     /// Verify the audio digest independently from the plan receipt.
+    ///
+    /// The digest is domain-separated and binds the authoritative sample-rate metadata
+    /// together with the exact f32 sample buffer, so metadata-only rate tampering cannot
+    /// preserve a previously valid audio receipt.
     pub fn verify_samples(&self, samples: &[f32]) -> bool {
-        if samples.len() != self.sample_count {
-            return false;
-        }
-        let mut hasher = blake3::Hasher::new();
-        for sample in samples {
-            hasher.update(&sample.to_le_bytes());
-        }
-        hasher.finalize().to_hex().to_string() == self.audio_blake3
+        samples.len() == self.sample_count
+            && hash_audio_binding(self.sample_rate, samples) == self.audio_blake3
     }
+}
+
+#[cfg(feature = "ssm_language")]
+fn hash_audio_binding(sample_rate: u32, samples: &[f32]) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-phonological-plan-audio-v1\\0");
+    hasher.update(&sample_rate.to_le_bytes());
+    for sample in samples {
+        hasher.update(&sample.to_le_bytes());
+    }
+    hasher.finalize().to_hex().to_string()
 }
 
 #[cfg(feature = "ssm_language")]
@@ -518,15 +527,10 @@ fn progress_within_frame_span(global_frame: usize, start_frame: usize, end_frame
         }
 
         let plan_grounding = plan.grounding_surface();
-        let audio_blake3 = {
-            let mut hasher = blake3::Hasher::new();
-            for sample in &all_samples {
-                hasher.update(&sample.to_le_bytes());
-            }
-            hasher.finalize().to_hex().to_string()
-        };
+        let sample_rate = self.streaming.vocoder.sample_rate();
+        let audio_blake3 = hash_audio_binding(sample_rate, &all_samples);
         let receipt = PhonologicalPlanRealizationReceipt {
-            schema_version: 2,
+            schema_version: 3,
             plan_version: plan.version.clone(),
             plan_grounding_blake3: blake3::hash(plan_grounding.as_bytes())
                 .to_hex()
@@ -1137,13 +1141,15 @@ mod tests {
             .speak_phonological_plan_with_receipt(&plan)
             .expect("plan-native receipt should be emitted");
 
-        assert_eq!(receipt.schema_version, 2);
-        let mut legacy_receipt = receipt.clone();
-        legacy_receipt.schema_version = 1;
-        assert!(
-            legacy_receipt.verify_against_plan(&plan).is_err(),
-            "pre-schedule receipt schema must fail closed"
-        );
+        assert_eq!(receipt.schema_version, 3);
+        for legacy_schema in [1, 2] {
+            let mut legacy_receipt = receipt.clone();
+            legacy_receipt.schema_version = legacy_schema;
+            assert!(
+                legacy_receipt.verify_against_plan(&plan).is_err(),
+                "legacy realization receipt schema must fail closed"
+            );
+        }
         assert_eq!(receipt.plan_version, plan.version);
         assert!(receipt.realization_authorized);
         assert_eq!(
@@ -1204,6 +1210,13 @@ mod tests {
         unauthorized_receipt.realization_authorized = false;
         assert!(unauthorized_receipt.verify_against_plan(&plan).is_err());
         assert!(receipt.verify_samples(&samples));
+
+        let mut tampered_rate = receipt.clone();
+        tampered_rate.sample_rate = tampered_rate.sample_rate.saturating_add(1);
+        assert!(
+            !tampered_rate.verify_samples(&samples),
+            "audio receipt must bind sample-rate metadata to the sample digest"
+        );
 
         let mut tampered_schedule = receipt.clone();
         tampered_schedule.segment_frame_counts[0] =
