@@ -1447,6 +1447,68 @@ mod tests {
     }
 
     #[test]
+    fn resolution_rejects_method_lifecycle_failure_at_proof_time() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let result = VerificationMethodResolution::from_controller_document(
+            &request,
+            "https://example.test/controller",
+            ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
+            request.verification_method.clone(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            &[request.verification_method.clone()],
+            &"11".repeat(32),
+            VerificationMethodLifecycle::new(
+                Some("2026-10-05T00:30:00Z"),
+                None,
+            )
+            .unwrap(),
+        );
+
+        assert!(matches!(
+            result,
+            Err(VerificationFailure::VerificationMethodExpired { .. })
+        ));
+    }
+
+    #[test]
+    fn evidence_cannot_turn_an_unpinned_request_into_a_pinned_claim() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let mut evidence = make_evidence(
+            &request,
+            &"11".repeat(32),
+            "ed25519",
+            &"22".repeat(32),
+            &"33".repeat(32),
+        )
+        .unwrap();
+        evidence.resolution.controller_document_integrity =
+            ControllerDocumentIntegrityAttestation::Sha256Digest {
+                expected_digest: "11".repeat(32),
+                actual_digest: "11".repeat(32),
+            };
+        assert!(evidence.validate_structure().is_ok());
+        assert!(!evidence.matches_request(&request));
+    }
+
+    #[test]
     fn resolution_digest_changes_when_integrity_policy_or_lifecycle_changes() {
         let claim = fixture_claim();
         let request = VerificationRequest::from_claim(
