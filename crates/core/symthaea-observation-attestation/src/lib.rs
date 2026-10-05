@@ -2010,6 +2010,12 @@ impl EvidenceEvaluationV9 {
         if !supplement.is_well_formed() {
             return Err(EvidenceEvaluationConstructionError::InvalidSupplementalContext);
         }
+        let context = VerificationContextV5::from_report(report);
+        if let Some(bound_context) = supplement.applies_to_context_fingerprint.as_deref() {
+            if bound_context != context.fingerprint() {
+                return Err(EvidenceEvaluationConstructionError::InvalidSupplementalContext);
+            }
+        }
         let evaluation = Self::from_report_with_supplement(report, supplement);
         evaluation
             .is_well_formed()
@@ -2026,7 +2032,15 @@ impl EvidenceEvaluationV9 {
         supplement: EvaluationContextSupplement,
     ) -> Self {
         let context = VerificationContextV5::from_report(report);
-        let supplement = supplement.bind_to_context(&context);
+        // An unbound supplement may be attached to this exact execution context at
+        // materialization time. A supplement already carrying a context binding must
+        // retain that binding; checked construction rejects foreign bindings rather
+        // than silently rebinding provenance from one evaluation to another.
+        let supplement = if supplement.applies_to_context_fingerprint.is_none() {
+            supplement.bind_to_context(&context)
+        } else {
+            supplement
+        };
         let execution_trace = if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
             EvaluationTrace::from_report_legacy(report)
         } else {
@@ -6223,6 +6237,42 @@ mod tests {
         evaluation.context.verifier_version = "attacker-verifier-version";
         evaluation.context_fingerprint = evaluation.context.fingerprint();
         assert!(!evaluation.is_well_formed());
+    }
+
+    #[test]
+    fn checked_v9_constructor_rejects_prebound_supplement_transplantation() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report_a = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let bound = report_a
+            .try_to_evidence_evaluation_v9_with_supplement(
+                EvaluationContextSupplement::empty().with_trust_root_fingerprint(
+                    blake3::hash(b"trust-root-a").to_hex().to_string(),
+                ),
+            )
+            .expect("v9 evaluation")
+            .supplement;
+
+        let report_b = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            151,
+        )
+        .verify_report(&envelope, &receipt);
+
+        assert_ne!(
+            VerificationContextV5::from_report(&report_a).fingerprint(),
+            VerificationContextV5::from_report(&report_b).fingerprint()
+        );
+        assert_eq!(
+            report_b.try_to_evidence_evaluation_v9_with_supplement(bound),
+            Err(EvidenceEvaluationConstructionError::InvalidSupplementalContext)
+        );
     }
 
     #[test]
