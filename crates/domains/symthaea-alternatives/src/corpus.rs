@@ -8,7 +8,7 @@ use blake3::Hasher;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-const BENCHMARK_MANIFEST_SCHEMA_VERSION: u16 = 5;
+const BENCHMARK_MANIFEST_SCHEMA_VERSION: u16 = 6;
 
 /// One frozen benchmark scenario.
 #[derive(Debug, Clone)]
@@ -53,6 +53,21 @@ fn evidence(
             admission: None,
         },
         basis: benchmark_basis(),
+        observation: matches!(
+            kind,
+            EvidenceKind::Observed
+                | EvidenceKind::ManufacturingObserved
+                | EvidenceKind::FieldObserved
+                | EvidenceKind::ContinuouslyMonitored
+        )
+        .then(|| ObservationProvenanceRef {
+            observation_id: format!("benchmark-observation:{id}"),
+            subject_id: format!("benchmark-subject:{id}"),
+            activity_id: format!("benchmark-activity:{id}"),
+            record_digest: format!("benchmark-record-digest:{id}"),
+            measurement_system_id: Some("benchmark-measurement-system-v1".into()),
+            calibration_chain_refs: vec!["benchmark-calibration-chain-v1".into()],
+        }),
         scope: "benchmark:functional-unit-v1|global".into(),
         unit: Some("burden-unit".into()),
         as_of: Some("benchmark-v1".into()),
