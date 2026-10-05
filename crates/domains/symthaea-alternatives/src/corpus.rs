@@ -8,6 +8,8 @@ use blake3::Hasher;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
+const BENCHMARK_MANIFEST_SCHEMA_VERSION: u16 = 2;
+
 /// One frozen benchmark scenario.
 #[derive(Debug, Clone)]
 pub struct BenchmarkCase {
@@ -319,7 +321,7 @@ impl BenchmarkCase {
         candidate_ids.sort();
 
         BenchmarkManifest {
-            schema_version: SCHEMA_VERSION,
+            schema_version: BENCHMARK_MANIFEST_SCHEMA_VERSION,
             case_id: self.id.into(),
             algorithm_version: ALGORITHM_VERSION.into(),
             requirement_id: self.requirement.id.clone(),
@@ -417,6 +419,10 @@ mod tests {
         let case = five_pathway_adversarial_case();
         let mut reversed = case.clone();
         reversed.candidates.reverse();
+        reversed
+            .candidates
+            .iter_mut()
+            .for_each(|candidate| candidate.evidence.reverse());
 
         assert_eq!(case.manifest(), reversed.manifest());
         assert_eq!(case.manifest_hash(), reversed.manifest_hash());
