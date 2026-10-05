@@ -4428,6 +4428,13 @@ mod tests {
             Err(Rfc9942VdpError::ResourceLimitExceeded)
         );
 
+        let mut too_many_wire=vec![0xa1,0x20,0x99,0x01,0x01];
+        too_many_wire.extend(std::iter::repeat_n(0x40u8,MAX_RFC9942_PROOFS+1));
+        assert_eq!(
+            Rfc9942Vdp::from_cbor(&too_many_wire),
+            Err(Rfc9942VdpError::ResourceLimitExceeded)
+        );
+
         let mut encoded=vec![0xa1,0x20,0x81,0x59];
         encoded.extend_from_slice(&(MAX_RFC9942_PROOF_BYTES as u16+1).to_be_bytes());
         encoded.extend(std::iter::repeat_n(0u8,MAX_RFC9942_PROOF_BYTES+1));
