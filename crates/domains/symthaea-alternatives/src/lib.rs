@@ -465,48 +465,75 @@ impl CandidatePathway {
         self.evidence.iter().filter(move |e| ids.contains(e.id.as_str()))
     }
 
-    fn dimension_has_conflict(&self, estimate: &BurdenEstimate) -> bool {
+    fn evidence_is_valid_at(evidence: &EvidenceRecord, as_of: Option<i64>) -> bool {
+        match as_of {
+            Some(timestamp) => {
+                evidence
+                    .valid_from_epoch_seconds
+                    .is_none_or(|from| from <= timestamp)
+                    && evidence
+                        .valid_until_epoch_seconds
+                        .is_none_or(|until| timestamp <= until)
+            }
+            None => {
+                evidence.valid_from_epoch_seconds.is_none()
+                    && evidence.valid_until_epoch_seconds.is_none()
+            }
+        }
+    }
+
+    fn linked_evidence_at<'a>(
+        &'a self,
+        ids: &'a [String],
+        as_of: Option<i64>,
+    ) -> impl Iterator<Item = &'a EvidenceRecord> {
+        self.evidence.iter().filter(move |e| {
+            ids.iter().any(|id| id == &e.id) && Self::evidence_is_valid_at(e, as_of)
+        })
+    }
+
+    fn dimension_has_conflict_at(&self, estimate: &BurdenEstimate, as_of: Option<i64>) -> bool {
         let support = self
-            .linked_evidence(estimate)
+            .linked_evidence_at(&estimate.evidence_ids, as_of)
             .any(|e| e.stance == EvidenceStance::Supports);
         let contradict = self
-            .linked_evidence(estimate)
+            .linked_evidence_at(&estimate.evidence_ids, as_of)
             .any(|e| e.stance == EvidenceStance::Contradicts);
         support && contradict
     }
 
-    fn has_conflict(&self) -> bool {
+    fn has_conflict_at(&self, as_of: Option<i64>) -> bool {
         self.burdens
             .values()
-            .any(|estimate| self.dimension_has_conflict(estimate))
+            .any(|estimate| self.dimension_has_conflict_at(estimate, as_of))
     }
 
-    fn performance_evidence_is_supported(&self, metric: &str) -> bool {
+    fn performance_evidence_is_supported_at(&self, metric: &str, as_of: Option<i64>) -> bool {
         self.performance
             .get(metric)
             .map(|estimate| {
-                !estimate.evidence_ids.is_empty()
-                    && self
-                        .evidence
-                        .iter()
-                        .filter(|e| estimate.evidence_ids.contains(&e.id))
-                        .any(|e| {
-                            matches!(
-                                e.kind,
-                                EvidenceKind::Observed
-                                    | EvidenceKind::Reported
-                                    | EvidenceKind::Derived
-                                    | EvidenceKind::ManufacturingObserved
-                                    | EvidenceKind::FieldObserved
-                                    | EvidenceKind::ContinuouslyMonitored
-                            ) && e.stance == EvidenceStance::Supports
-                                && e.confidence >= 0.7
-                        })
+                self.linked_evidence_at(&estimate.evidence_ids, as_of)
+                    .any(|e| {
+                        matches!(
+                            e.kind,
+                            EvidenceKind::Observed
+                                | EvidenceKind::Reported
+                                | EvidenceKind::Derived
+                                | EvidenceKind::ManufacturingObserved
+                                | EvidenceKind::FieldObserved
+                                | EvidenceKind::ContinuouslyMonitored
+                        ) && e.stance == EvidenceStance::Supports
+                            && e.confidence >= 0.7
+                    })
             })
             .unwrap_or(false)
     }
 
-    fn performance_is_supported(&self, requirement: &FunctionalRequirement) -> bool {
+    fn performance_is_supported(
+        &self,
+        requirement: &FunctionalRequirement,
+        as_of: Option<i64>,
+    ) -> bool {
         requirement.constraints.keys().all(|metric| {
             let Some(estimate) = self.performance.get(metric) else {
                 return false;
@@ -516,15 +543,21 @@ impl CandidatePathway {
             };
             estimate.unit == scale.unit
                 && estimate.scope == scale.scope
-                && self.performance_evidence_is_supported(metric)
+                && self.performance_evidence_is_supported_at(metric, as_of)
         })
     }
 
-    fn qualification_ceiling(&self, requirement: &FunctionalRequirement) -> QualificationState {
-        if !self.performance_is_supported(requirement)
+    fn qualification_ceiling(
+        &self,
+        requirement: &FunctionalRequirement,
+        as_of: Option<i64>,
+    ) -> QualificationState {
+        if !self.performance_is_supported(requirement, as_of)
             || self.burdens.is_empty()
             || self.burdens.values().all(|estimate| {
-                let linked = self.linked_evidence(estimate).collect::<Vec<_>>();
+                let linked = self
+                    .linked_evidence_at(&estimate.evidence_ids, as_of)
+                    .collect::<Vec<_>>();
                 linked.is_empty()
                     || linked
                         .iter()
@@ -534,16 +567,16 @@ impl CandidatePathway {
             return QualificationState::Hypothesis;
         }
 
-        if self.has_conflict() {
+        if self.has_conflict_at(as_of) {
             return QualificationState::ComputationallyPlausible;
         }
 
         let any_simulation = self.burdens.values().any(|estimate| {
-            self.linked_evidence(estimate)
+            self.linked_evidence_at(&estimate.evidence_ids, as_of)
                 .any(|e| e.kind == EvidenceKind::Simulated)
         });
         let any_supported_measurement = self.burdens.values().any(|estimate| {
-            self.linked_evidence(estimate).any(|e| {
+            self.linked_evidence_at(&estimate.evidence_ids, as_of).any(|e| {
                 matches!(
                     e.kind,
                     EvidenceKind::Observed | EvidenceKind::Reported | EvidenceKind::Derived
@@ -554,7 +587,7 @@ impl CandidatePathway {
         let independent_sources = self
             .burdens
             .values()
-            .flat_map(|estimate| self.linked_evidence(estimate))
+            .flat_map(|estimate| self.linked_evidence_at(&estimate.evidence_ids, as_of))
             .filter(|e| {
                 matches!(
                     e.kind,
@@ -575,7 +608,7 @@ impl CandidatePathway {
             self.burdens
                 .get(dimension)
                 .map(|estimate| {
-                    self.linked_evidence(estimate).any(|e| {
+                    self.linked_evidence_at(&estimate.evidence_ids, as_of).any(|e| {
                         matches!(
                             e.kind,
                             EvidenceKind::Observed
@@ -592,7 +625,7 @@ impl CandidatePathway {
                 .unwrap_or(false)
         });
         let has_lifecycle_assessment = self.burdens.values().any(|estimate| {
-            self.linked_evidence(estimate).any(|e| {
+            self.linked_evidence_at(&estimate.evidence_ids, as_of).any(|e| {
                 e.kind == EvidenceKind::LifecycleAssessed
                     && e.stance == EvidenceStance::Supports
                     && e.confidence >= 0.7
@@ -602,7 +635,7 @@ impl CandidatePathway {
             self.burdens
                 .get(dimension)
                 .map(|estimate| {
-                    self.linked_evidence(estimate).any(|e| {
+                    self.linked_evidence_at(&estimate.evidence_ids, as_of).any(|e| {
                         e.kind == EvidenceKind::FieldObserved
                             && e.stance == EvidenceStance::Supports
                             && e.confidence >= 0.7
@@ -614,7 +647,7 @@ impl CandidatePathway {
             self.burdens
                 .get(dimension)
                 .map(|estimate| {
-                    self.linked_evidence(estimate).any(|e| {
+                    self.linked_evidence_at(&estimate.evidence_ids, as_of).any(|e| {
                         e.kind == EvidenceKind::ContinuouslyMonitored
                             && e.stance == EvidenceStance::Supports
                             && e.confidence >= 0.7
@@ -623,7 +656,7 @@ impl CandidatePathway {
                 .unwrap_or(false)
         });
         let has_manufacturing_observation = self.burdens.values().any(|estimate| {
-            self.linked_evidence(estimate).any(|e| {
+            self.linked_evidence_at(&estimate.evidence_ids, as_of).any(|e| {
                 e.kind == EvidenceKind::ManufacturingObserved
                     && e.stance == EvidenceStance::Supports
                     && e.confidence >= 0.7
