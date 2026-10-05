@@ -151,8 +151,17 @@ impl LexicalPhonologicalWitness {
         self.validate_against_binding(binding)?;
 
         let mut covered = vec![false; segments.len()];
+        let mut previous_segment_index = None;
+
         for mapping in &self.mappings {
             for (offset, &segment_index) in mapping.segment_indices.iter().enumerate() {
+                if previous_segment_index.is_some_and(|previous| segment_index <= previous) {
+                    return Err(LexicalPhonologicalWitnessError::LexicalMappingOrderMismatch {
+                        lexical_position: mapping.lexical_position,
+                    });
+                }
+                previous_segment_index = Some(segment_index);
+
                 let segment = segments
                     .get(segment_index)
                     .ok_or(LexicalPhonologicalWitnessError::SegmentIndexOutOfRange {
@@ -210,6 +219,7 @@ pub enum LexicalPhonologicalWitnessError {
     SegmentIndexOutOfRange { lexical_position: usize, segment_index: usize },
     DuplicateSegmentCoverage { segment_index: usize },
     SegmentSymbolMismatch { lexical_position: usize, segment_index: usize },
+    LexicalMappingOrderMismatch { lexical_position: usize },
     LexicalCoverageMismatch,
     UncoveredPhonologicalSegment,
 }
@@ -231,6 +241,7 @@ impl std::fmt::Display for LexicalPhonologicalWitnessError {
             Self::SegmentIndexOutOfRange { lexical_position, segment_index } => write!(f, "lexical position {lexical_position} references out-of-range segment {segment_index}"),
             Self::DuplicateSegmentCoverage { segment_index } => write!(f, "phonological segment {segment_index} is claimed by multiple lexical constituents"),
             Self::SegmentSymbolMismatch { lexical_position, segment_index } => write!(f, "lexical position {lexical_position} symbol does not match phonological segment {segment_index}"),
+            Self::LexicalMappingOrderMismatch { lexical_position } => write!(f, "lexical position {lexical_position} maps to a segment before an earlier lexical position"),
             Self::LexicalCoverageMismatch => write!(f, "lexical-to-phonological witness does not cover every lexical constituent exactly once"),
             Self::UncoveredPhonologicalSegment => write!(f, "a non-silence phonological segment is not covered by the lexical witness"),
         }
@@ -360,7 +371,9 @@ mod tests {
             witness
                 .validate_against_segments(&binding, &segments())
                 .expect_err("swapped lexical realization must fail"),
-            LexicalPhonologicalWitnessError::UncoveredPhonologicalSegment
+            LexicalPhonologicalWitnessError::LexicalMappingOrderMismatch {
+                lexical_position: 1,
+            }
         );
     }
 
