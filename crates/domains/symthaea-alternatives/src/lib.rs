@@ -1268,7 +1268,8 @@ impl CandidatePathway {
                 .get(dimension)
                 .map(|estimate| {
                     self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy).any(|e| {
-                        e.kind == EvidenceKind::FieldObserved
+                        e.source.admission.is_some()
+                            && e.kind == EvidenceKind::FieldObserved
                             && e.stance == EvidenceStance::Supports
                             && e.confidence >= 0.7
                     })
@@ -1280,7 +1281,8 @@ impl CandidatePathway {
                 .get(dimension)
                 .map(|estimate| {
                     self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy).any(|e| {
-                        e.kind == EvidenceKind::ContinuouslyMonitored
+                        e.source.admission.is_some()
+                            && e.kind == EvidenceKind::ContinuouslyMonitored
                             && e.stance == EvidenceStance::Supports
                             && e.confidence >= 0.7
                     })
@@ -1317,6 +1319,7 @@ impl CandidatePathway {
             EvidenceKind::FieldObserved,
             as_of,
             freshness_policy,
+            true,
         );
         let performance_monitored = self.performance_has_supported_kind_at(
             requirement,
@@ -1330,6 +1333,7 @@ impl CandidatePathway {
             EvidenceKind::ContinuouslyMonitored,
             as_of,
             freshness_policy,
+            true,
         );
 
         if all_dimensions_monitored
@@ -1388,7 +1392,7 @@ pub enum QualificationState {
     ComputationallyPlausible,
     /// At least one substantive empirical/reporting claim is supported.
     EvidenceSupported,
-    /// Multiple distinct authority groups provide supported evidence.
+    /// Multiple distinct admitted authority groups provide supported evidence.
     LifecycleQualified,
     /// Multiple distinct authority groups plus full manufacturing-scale dimension coverage exist.
     ManufacturingQualified,
@@ -3612,6 +3616,48 @@ mod tests {
         let mut rotated_key = a.clone();
         rotated_key.issuer_key_fingerprint = Some("new-key".into());
         assert_eq!(a.authority_group_id(), rotated_key.authority_group_id());
+    }
+
+    #[test]
+    fn expired_source_admission_cannot_support_assessment() {
+        let mut e = evidence(
+            "admission-expired",
+            "admitted-authority",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        e.source.admission = Some(SourceAdmissionRef {
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission-1".into(),
+            authority_epoch: "epoch-1".into(),
+            fault_domain_id: Some("domain-a".into()),
+            valid_from_epoch_seconds: Some(0),
+            valid_until_epoch_seconds: Some(100),
+        });
+        let c = candidate(
+            "admission-expired",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![e],
+        );
+
+        let expired = AlternativesEngine
+            .assess_at(&fixture_requirement(), &[c.clone()], None, Some(200))
+            .unwrap();
+        assert!(expired.frontier_blockers.contains_key("admission-expired"));
+        assert_eq!(
+            expired.candidates[0].qualification,
+            QualificationState::Hypothesis
+        );
+
+        let valid = AlternativesEngine
+            .assess_at(&fixture_requirement(), &[c], None, Some(50))
+            .unwrap();
+        assert!(!valid.frontier_blockers.contains_key("admission-expired"));
     }
 
     #[test]
