@@ -56,12 +56,14 @@ jobs:
           COMPARE_STATUS="$(printf '%s' "$COMPARE_JSON" | jq -r '.status')"
           COMPARE_AHEAD_BY="$(printf '%s' "$COMPARE_JSON" | jq -r '.ahead_by')"
           COMPARE_BEHIND_BY="$(printf '%s' "$COMPARE_JSON" | jq -r '.behind_by')"
+          COMPARE_MERGE_BASE_SHA="$(printf '%s' "$COMPARE_JSON" | jq -r '.merge_base_commit.sha')"
           if test -n "$EVENT_BASE_SHA"; then
             test "$EVENT_BASE_SHA" = "$PARENT_SHA"
           fi
           test "$COMPARE_STATUS" = "ahead"
           test "$COMPARE_AHEAD_BY" -gt 0
           test "$COMPARE_BEHIND_BY" -eq 0
+          test "$COMPARE_MERGE_BASE_SHA" = "$PARENT_SHA"
           echo "sha=$ACTUAL_SHA" >> "$GITHUB_OUTPUT"
           echo "parent_sha=$PARENT_SHA" >> "$GITHUB_OUTPUT"
           echo "source_ref=$EVENT_HEAD_REF" >> "$GITHUB_OUTPUT"
@@ -70,6 +72,7 @@ jobs:
           echo "ancestry_status=$COMPARE_STATUS" >> "$GITHUB_OUTPUT"
           echo "stack_distance=$COMPARE_AHEAD_BY" >> "$GITHUB_OUTPUT"
           echo "stack_behind=$COMPARE_BEHIND_BY" >> "$GITHUB_OUTPUT"
+          echo "compare_merge_base_sha=$COMPARE_MERGE_BASE_SHA" >> "$GITHUB_OUTPUT"
           echo "synthetic_merge_sha=$SYNTHETIC_MERGE_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Enforce stacked research surface
@@ -281,7 +284,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
           HDC Linear-Code Bounded Decoder Qualification
           =============================================
-          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v3
+          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v4
           event_name=${{ github.event_name }}
           exact_head=${{ steps.head.outputs.sha }}
           event_head_ref=${{ steps.head.outputs.source_ref }}
@@ -293,6 +296,7 @@ jobs:
           ancestry_status=${{ steps.head.outputs.ancestry_status }}
           stack_distance=${{ steps.head.outputs.stack_distance }}
           stack_behind=${{ steps.head.outputs.stack_behind }}
+          compare_merge_base_sha=${{ steps.head.outputs.compare_merge_base_sha }}
           research_surface_status=${{ steps.scope.outcome }}
           research_surface_paths=${{ steps.scope.outputs.changed_paths }}
           rust_toolchain=1.96.1
