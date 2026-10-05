@@ -361,7 +361,15 @@ where
 
             match exponent.as_ref() {
                 Expr::Const(k) if (k - k.round()).abs() < 1e-9 => {
-                    match dimension.scale(*k as i8) {
+                    let rounded = k.round();
+                    if rounded < i8::MIN as f64 || rounded > i8::MAX as f64 {
+                        return TypeJudgement::Invalid(PhysicalTypeError {
+                            operation: "pow".into(),
+                            reason: "integer power exponent is outside the supported i8 range"
+                                .into(),
+                        });
+                    }
+                    match dimension.scale(rounded as i8) {
                         Some(d) => valid(PhysicalType::with_kind(Unknown, d)),
                         None => TypeJudgement::Invalid(PhysicalTypeError {
                             operation: "pow".into(),
@@ -422,6 +430,24 @@ mod tests {
             ("E".into(), DimensionalSignature::ENERGY),
             ("x".into(), DimensionalSignature::LENGTH),
         ])
+    }
+
+    #[test]
+    fn rejects_integer_power_exponent_outside_dimension_factor_range() {
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(128.0)),
+        );
+        let variables = HashMap::from([(
+            "x".into(),
+            PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH),
+        )]);
+
+        assert!(matches!(
+            infer_expr_type_with_variables(&expr, &variables),
+            TypeJudgement::Invalid(_)
+        ));
     }
 
     #[test]
