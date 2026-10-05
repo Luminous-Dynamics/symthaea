@@ -69,7 +69,8 @@ fn evidence(
             record_digest: format!("benchmark-record-digest:{id}"),
             measurement_system_id: Some("benchmark-measurement-system-v1".into()),
             calibration_chain_refs: vec!["benchmark-calibration-chain-v1".into()],
-            experimental_design_id: None
+            experimental_design_id: None,
+            experimental_target_id: None,
         }),
         uncertainty: matches!(
             kind,
