@@ -185,6 +185,23 @@ impl LiveVoice {
     }
 
     #[cfg(feature = "ssm_language")]
+    fn pitch_accent_for_plan(
+        segment_is_focus: bool,
+        prominence: f32,
+        pause_weight: f32,
+    ) -> PitchAccent {
+        if segment_is_focus && prominence >= 0.82 {
+            PitchAccent::RiseHigh
+        } else if prominence >= 0.62 {
+            PitchAccent::High
+        } else if pause_weight >= 0.65 {
+            PitchAccent::FallLow
+        } else {
+            PitchAccent::None
+        }
+    }
+
+    #[cfg(feature = "ssm_language")]
     fn synthesize_phonological_plan(&mut self, plan: &PhonologicalPlan) -> Result<Vec<f32>> {
         plan.validate()
             .map_err(|error| anyhow::anyhow!("invalid phonological plan: {error}"))?;
@@ -284,17 +301,11 @@ impl LiveVoice {
                     phrase_index,
                     phrase_progress: phrase_progress.clamp(0.0, 1.0),
                     is_focus: segment.is_focus && plan.focus_role.is_some(),
-                    pitch_accent: {
-                        if segment.is_focus && plan.prominence >= 0.82 {
-                            PitchAccent::RiseHigh
-                        } else if plan.prominence >= 0.62 {
-                            PitchAccent::High
-                        } else if plan.pause_weight >= 0.65 {
-                            PitchAccent::FallLow
-                        } else {
-                            PitchAccent::None
-                        }
-                    },
+                    pitch_accent: Self::pitch_accent_for_plan(
+                        segment.is_focus,
+                        plan.prominence,
+                        plan.pause_weight,
+                    ),
                     is_syllable_onset: segment.is_syllable_onset,
                     syllable_progress: progress,
                     prev_source_type: None,
@@ -595,6 +606,27 @@ mod tests {
 
         flag.store(false, Ordering::SeqCst);
         assert!(!flag.load(Ordering::SeqCst));
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_plan_prominence_selects_typed_pitch_accent() {
+        assert_eq!(
+            LiveVoice::pitch_accent_for_plan(true, 0.90, 0.0),
+            PitchAccent::RiseHigh
+        );
+        assert_eq!(
+            LiveVoice::pitch_accent_for_plan(false, 0.70, 0.0),
+            PitchAccent::High
+        );
+        assert_eq!(
+            LiveVoice::pitch_accent_for_plan(false, 0.20, 0.80),
+            PitchAccent::FallLow
+        );
+        assert_eq!(
+            LiveVoice::pitch_accent_for_plan(false, 0.20, 0.20),
+            PitchAccent::None
+        );
     }
 
     #[cfg(feature = "ssm_language")]
