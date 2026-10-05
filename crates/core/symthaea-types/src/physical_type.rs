@@ -290,6 +290,18 @@ pub struct PhysicalType {
 }
 
 impl PhysicalType {
+    /// Conservative scalar domain for calculus over a physical quantity.
+    fn derivative_scalar(value: ScalarDomain, independent: ScalarDomain) -> ScalarDomain {
+        match (value, independent) {
+            (ScalarDomain::Unknown, _) | (_, ScalarDomain::Unknown) => ScalarDomain::Unknown,
+            (ScalarDomain::Complex, _) | (_, ScalarDomain::Complex) => ScalarDomain::Complex,
+            (ScalarDomain::ApproximateReal, _) | (_, ScalarDomain::ApproximateReal) => {
+                ScalarDomain::ApproximateReal
+            }
+            _ => ScalarDomain::Real,
+        }
+    }
+
     pub fn unknown() -> Self {
         Self {
             kind: QuantityKind::Unknown,
@@ -371,7 +383,16 @@ impl PhysicalType {
             (QuantityKind::Acceleration, QuantityKind::Time) => QuantityKind::Custom,
             _ => QuantityKind::Unknown,
         };
-        TypeJudgement::Valid(Self::with_kind(kind, dimension))
+        let mut result = Self::with_kind(kind, dimension);
+        result.scalar = Self::derivative_scalar(self.scalar, independent.scalar);
+        if result.scalar == ScalarDomain::Unknown {
+            TypeJudgement::Unknown(
+                "derivative requires known scalar domains for value and independent variable"
+                    .into(),
+            )
+        } else {
+            TypeJudgement::Valid(result)
+        }
     }
 
     pub fn validate(&self) -> Result<(), PhysicalTypeError> {
@@ -640,6 +661,22 @@ mod tests {
         let unknown = PhysicalType::unknown();
         assert_eq!(unknown.kind, QuantityKind::Unknown);
         assert_eq!(unknown.dimension, None);
+    }
+
+    #[test]
+    fn derivative_preserves_complex_scalar_domain() {
+        let mut length =
+            PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH);
+        length.scalar = ScalarDomain::Complex;
+        let time = PhysicalType::with_kind(QuantityKind::Time, PhysicalDimension::TIME);
+
+        match length.derivative_with(&time) {
+            TypeJudgement::Valid(result) => {
+                assert_eq!(result.kind, QuantityKind::Velocity);
+                assert_eq!(result.scalar, ScalarDomain::Complex);
+            }
+            other => panic!("unexpected judgment: {other:?}"),
+        }
     }
 
     #[test]
