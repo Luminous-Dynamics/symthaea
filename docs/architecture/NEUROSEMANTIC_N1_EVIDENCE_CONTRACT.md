@@ -115,6 +115,14 @@ also shows that nominal conformal coverage can degrade under distribution shift,
 which is why this boundary remains explicit here (Siahkali et al., arXiv:2602.14913;
 Pournaderi, arXiv:2609.33456).
 
+Serialized ontology artifacts should cross the byte-level trust boundary through the
+bounded `from_json_bytes` constructors. These reject oversized raw JSON before
+`serde_json` materialization and then apply the semantic/resource validators.
+Direct unbounded deserialization of an untrusted manifest, codebook descriptor,
+representation, or conformal artifact is outside this contract. Conformal artifact
+parsing validates structural state, but score-set verification must additionally
+recompute the threshold from the separately retained calibration scores and alpha.
+
 A conformal N1 artifact should bind at minimum:
 
 - exact codebook/model hash;
