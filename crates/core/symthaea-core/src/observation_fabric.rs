@@ -1421,6 +1421,51 @@ impl ObservationGraph {
         let bytes = self.independence_verification_scope_canonical_bytes()?;
         Ok(blake3::hash(&bytes).to_hex().to_string())
     }
+    /// Return the observation IDs that can be reached by the bounded independence
+    /// predicate from the requested source/target pair.
+    ///
+    /// This helper is intentionally additive and is not used by the frozen v2
+    /// scope fingerprint. It defines the candidate reachable subject set for the
+    /// next versioned, predicate-relative scope contract:
+    ///
+    /// source + target + recursively reachable parents.
+    ///
+    /// It is still evaluated over the validated closed-world graph so missing
+    /// parents/cycles/duplicate IDs cannot produce a misleading reachable scope.
+    pub fn independence_verification_reachable_scope_observation_ids(
+        &self,
+        source_observation_id: &str,
+        target_observation_id: &str,
+    ) -> Result<Vec<String>, ObservationValidationError> {
+        self.validate()?;
+        if source_observation_id == target_observation_id {
+            return Err(ObservationValidationError::SelfRelation);
+        }
+
+        let by_id = self
+            .observations
+            .iter()
+            .map(|observation| (observation.id.as_str(), observation))
+            .collect::<HashMap<_, _>>();
+
+        by_id.get(source_observation_id).ok_or_else(|| {
+            ObservationValidationError::MissingRelationEndpoint(source_observation_id.to_string())
+        })?;
+        by_id.get(target_observation_id).ok_or_else(|| {
+            ObservationValidationError::MissingRelationEndpoint(target_observation_id.to_string())
+        })?;
+
+        let mut reachable = HashSet::new();
+        reachable.insert(source_observation_id.to_string());
+        reachable.insert(target_observation_id.to_string());
+        reachable.extend(Self::ancestor_ids(source_observation_id, &by_id)?);
+        reachable.extend(Self::ancestor_ids(target_observation_id, &by_id)?);
+
+        let mut reachable = reachable.into_iter().collect::<Vec<_>>();
+        reachable.sort();
+        Ok(reachable)
+    }
+
     /// Recompute the provenance-scope commitment for an existing assessment.
     ///
     /// This is stronger than the assessment fingerprint check because it
@@ -3137,6 +3182,82 @@ mod tests {
         assert_eq!(
             mutated.assess_independence("obs-001", "obs-002"),
             graph.assess_independence("obs-001", "obs-002")
+        );
+    }
+
+    #[test]
+    fn independence_reachable_scope_contains_only_pair_and_recursive_ancestors() {
+        let mut root = fixture();
+        root.id = "root".into();
+
+        let mut source = fixture();
+        source.id = "source".into();
+        source.provenance.source.sensor_id = "camera-source".into();
+        source.provenance.parent_observation_ids = vec!["root".into()];
+
+        let mut target = fixture();
+        target.id = "target".into();
+        target.provenance.source.sensor_id = "camera-target".into();
+        target.provenance.parent_observation_ids = vec!["root".into()];
+
+        let mut unrelated = fixture();
+        unrelated.id = "unrelated".into();
+
+        let graph = ObservationGraph {
+            observations: vec![unrelated, target, root, source],
+            relations: vec![],
+        };
+
+        assert_eq!(
+            graph
+                .independence_verification_reachable_scope_observation_ids("source", "target")
+                .expect("reachable scope"),
+            vec![
+                "root".to_string(),
+                "source".to_string(),
+                "target".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn independence_reachable_scope_is_order_invariant_and_fails_closed_for_unknown_pair() {
+        let mut root = fixture();
+        root.id = "root".into();
+
+        let mut source = fixture();
+        source.id = "source".into();
+        source.provenance.parent_observation_ids = vec!["root".into()];
+
+        let mut target = fixture();
+        target.id = "target".into();
+        target.provenance.parent_observation_ids = vec!["root".into()];
+
+        let graph = ObservationGraph {
+            observations: vec![target.clone(), root.clone(), source.clone()],
+            relations: vec![],
+        };
+        let reversed = ObservationGraph {
+            observations: vec![source, root, target],
+            relations: vec![],
+        };
+
+        let first = graph
+            .independence_verification_reachable_scope_observation_ids("source", "target")
+            .expect("scope");
+        let second = reversed
+            .independence_verification_reachable_scope_observation_ids("source", "target")
+            .expect("reversed scope");
+
+        assert_eq!(first, second);
+        assert_eq!(
+            graph.independence_verification_reachable_scope_observation_ids(
+                "source",
+                "missing",
+            ),
+            Err(ObservationValidationError::MissingRelationEndpoint(
+                "missing".into(),
+            ))
         );
     }
 
