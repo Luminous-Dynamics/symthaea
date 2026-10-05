@@ -22,6 +22,7 @@ The model is:
 14. Intersect eligibility across every required function while keeping each requirement assessment separate and auditable.
 15. Carry externally qualified source-admission references without verifying or upgrading them inside Symthaea.
 16. Identify a conservative next-measurement target from unresolved uncertainty.
+17. Carry explicit experimental-design provenance when a proposed measurement is actually specified: hypothesis, targeted uncertainty identities, candidate discrimination set, exact protocol identity/basis, and stopping criteria.
 
 Authority diversity is authority-scoped: multiple artifacts or rotated issuer keys under one authority do not become distinct authority groups. Only externally admitted authorities count toward higher qualification tiers. This is still not proof of epistemic or organizational independence, and the identity/admission contract is not an authenticity proof; Mycelix admission/attestation remains the authority boundary for source control. The requirement is bound to an exact subject/profile/revision/digest so the same generic function cannot be silently reused for a different BOM, product, or design revision. The design is intended to compose later with Mycelix manufacturing/BOM/routing records and a federated evidence graph, while remaining independent of Holochain versioning. The Pareto frontier is a candidate comparison set, not a recommendation or deployment authorization. Functional performance and operating capabilities use conservative intervals rather than midpoint-based pass/fail. A required operating envelope must be fully covered; partial temperature/pressure/load coverage is unresolved or failed rather than extrapolated. Time-bounded evidence is ignored by timeless assessments and evaluated only when the caller supplies an explicit assessment timestamp.
 
@@ -71,3 +72,12 @@ Observation evidence also carries a quantitative uncertainty statement: standard
 The assessment receipt also binds a canonical BLAKE3 digest of the complete evidence bundle for each candidate. That prevents a provenance-only mutation—such as an artifact digest, admission reference, observation timestamp, validity window, or evidence derivation change—from becoming invisible merely because the downstream qualification result happens to remain unchanged. Evidence is therefore both evaluated and integrity-bound.
 
 Source admission is authority-bound: an EvidenceSourceIdentity whose admission reference names a different authority is rejected. This keeps authority admission from becoming a detached capability token that could be attached to an unrelated source identity.
+
+
+## Experimental-design provenance
+
+The heuristic next-measurement target is intentionally weaker than an experiment specification. It identifies an unresolved dimension, candidate set, uncertainty references, and interval-overlap discrimination targets without inventing a laboratory protocol.
+
+When an actual measurement campaign is proposed, ExperimentalDesignProvenance can be attached to the assessment. It requires an exact hypothesis, targeted uncertainty identities, candidate identities, explicit discrimination targets, an exact documented protocol identity/digest and comparison basis, and explicit stopping criteria. The assessment receipt commits to that design.
+
+An observation may then carry the resulting experimental_design_id, closing the lineage from proposal to observed result. This is provenance, not scientific authorization: Symthaea does not certify protocol adequacy, sample size, statistical power, causal validity, metrological traceability, or experimental safety.
