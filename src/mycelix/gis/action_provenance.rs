@@ -480,6 +480,7 @@ impl AuthorizationLease {
         let receipt = ExecutionReceipt {
             action_id: self.action_id.clone(),
             authorization_instance: self.authorization_instance.clone(),
+            operation_id: self.operation_id.clone(),
             action_digest: self.action_digest.clone(),
             provider_idempotency_key: self.provider_idempotency_key(),
             attempt_id: attempt_id.to_owned(),
@@ -551,6 +552,7 @@ pub fn reconcile_indeterminate(
         Ok(ExecutionReceipt {
             action_id: self.action_id.clone(),
             authorization_instance: self.authorization_instance.clone(),
+            operation_id: self.operation_id.clone(),
             action_digest: self.action_digest.clone(),
             provider_idempotency_key: self.provider_idempotency_key(),
             attempt_id: attempt_id.to_owned(),
