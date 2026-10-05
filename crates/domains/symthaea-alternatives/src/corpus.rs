@@ -4,6 +4,8 @@
 //! not claims about real materials, chemicals, suppliers, or impacts.
 
 use super::*;
+use blake3::Hasher;
+use serde::Serialize;
 use std::collections::BTreeMap;
 
 /// One frozen benchmark scenario.
@@ -165,6 +167,52 @@ pub fn five_pathway_adversarial_case() -> BenchmarkCase {
     }
 }
 
+/// Frozen identity manifest for a benchmark case.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct BenchmarkManifest {
+    /// Manifest schema version.
+    pub schema_version: u16,
+    /// Benchmark case identifier.
+    pub case_id: String,
+    /// Assessment algorithm version.
+    pub algorithm_version: String,
+    /// Functional requirement identifier.
+    pub requirement_id: String,
+    /// Candidate identifiers in canonical order.
+    pub candidate_ids: Vec<String>,
+    /// Incumbent identifier.
+    pub incumbent_id: String,
+}
+
+impl BenchmarkCase {
+    /// Build the canonical manifest identity for this case.
+    pub fn manifest(&self) -> BenchmarkManifest {
+        let mut candidate_ids = self
+            .candidates
+            .iter()
+            .map(|candidate| candidate.id.clone())
+            .collect::<Vec<_>>();
+        candidate_ids.sort();
+
+        BenchmarkManifest {
+            schema_version: SCHEMA_VERSION,
+            case_id: self.id.into(),
+            algorithm_version: ALGORITHM_VERSION.into(),
+            requirement_id: self.requirement.id.clone(),
+            candidate_ids,
+            incumbent_id: self.incumbent_id.into(),
+        }
+    }
+
+    /// Compute a stable BLAKE3 identity for the frozen benchmark topology.
+    pub fn manifest_hash(&self) -> String {
+        let bytes = serde_json::to_vec(&self.manifest()).expect("manifest is serializable");
+        let mut hasher = Hasher::new();
+        hasher.update(&bytes);
+        hasher.finalize().to_hex().to_string()
+    }
+}
+
 /// Run every case with the deterministic engine.
 pub fn run_case(case: &BenchmarkCase) -> Result<AssessmentResult, AssessmentError> {
     AlternativesEngine.assess(&case.requirement, &case.candidates, Some(case.incumbent_id))
@@ -233,6 +281,17 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.receipt.schema_version, SCHEMA_VERSION);
         assert_eq!(first.receipt.algorithm_version, ALGORITHM_VERSION);
+    }
+
+    #[test]
+    fn manifest_identity_is_input_order_independent() {
+        let case = five_pathway_adversarial_case();
+        let mut reversed = case.clone();
+        reversed.candidates.reverse();
+
+        assert_eq!(case.manifest(), reversed.manifest());
+        assert_eq!(case.manifest_hash(), reversed.manifest_hash());
+        assert!(!case.manifest_hash().is_empty());
     }
 
     #[test]
