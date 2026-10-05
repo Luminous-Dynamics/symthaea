@@ -354,23 +354,12 @@ impl HdcOntologyConformalCalibration {
             return Err("conformal nonconformity scores must be finite and within [0, 1]".into());
         }
 
-        let mut sorted = calibration_scores.to_vec();
-        sorted.sort_by(f64::total_cmp);
-
-        // Split-conformal finite-sample rank:
-        // k = ceil((n + 1) * (1 - alpha)).
-        // The rank is clipped to n because the calibration set has only n
-        // observed scores. Small calibration sets therefore conservatively
-        // collapse to their maximum score rather than fabricating a tighter
-        // threshold.
-        let n = sorted.len();
-        let rank = (((n + 1) as f64) * (1.0 - alpha)).ceil() as usize;
-        let rank = rank.clamp(1, n);
+        let threshold = conformal_threshold(calibration_scores, alpha)?;
 
         Ok(Self {
             schema_version: HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION,
             alpha,
-            threshold: sorted[rank - 1],
+            threshold,
             calibration_case_count: n,
             codebook_hash,
             calibration_scores_hash,
@@ -393,6 +382,10 @@ impl HdcOntologyConformalCalibration {
         }
         if calibration_scores_hash(calibration_scores)? != self.calibration_scores_hash {
             return Err("conformal calibration score hash does not match artifact".into());
+        }
+        let expected_threshold = conformal_threshold(calibration_scores, self.alpha)?;
+        if expected_threshold.total_cmp(&self.threshold) != std::cmp::Ordering::Equal {
+            return Err("conformal calibration threshold does not match the declared alpha and score set".into());
         }
         Ok(())
     }
@@ -468,7 +461,9 @@ impl HdcOntologyConformalCalibration {
             && !self.codebook_hash.trim().is_empty()
             && self.codebook_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && !self.calibration_scores_hash.trim().is_empty()
+            && self.calibration_scores_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && !self.candidate_universe_hash.trim().is_empty()
+            && self.candidate_universe_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && self.candidate_universe_size > 0
             && self.candidate_universe_size <= HDC_ONTOLOGY_MAX_CONFORMAL_CANDIDATES
             && self.score_revision == HDC_ONTOLOGY_CONFORMAL_SCORE_REVISION
@@ -1473,6 +1468,35 @@ fn selection_stats(
     Ok((min_selected, min_selected - max_unselected))
 }
 
+fn conformal_threshold(scores: &[f64], alpha: f64) -> Result<f64, String> {
+    if scores.is_empty() {
+        return Err("conformal calibration scores cannot be empty".into());
+    }
+    if !alpha.is_finite() || !(0.0..1.0).contains(&alpha) {
+        return Err("conformal alpha must be finite and within (0, 1)".into());
+    }
+    if scores.len() > HDC_ONTOLOGY_MAX_CONFORMAL_CALIBRATION_CASES {
+        return Err(format!(
+            "conformal calibration case budget exceeded: {} > {}",
+            scores.len(),
+            HDC_ONTOLOGY_MAX_CONFORMAL_CALIBRATION_CASES
+        ));
+    }
+    if scores
+        .iter()
+        .any(|score| !score.is_finite() || !(0.0..=1.0).contains(score))
+    {
+        return Err("conformal nonconformity scores must be finite and within [0, 1]".into());
+    }
+
+    let mut sorted = scores.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let n = sorted.len();
+    let rank = (((n + 1) as f64) * (1.0 - alpha)).ceil() as usize;
+    let rank = rank.clamp(1, n);
+    Ok(sorted[rank - 1])
+}
+
 fn calibration_scores_hash(scores: &[f64]) -> Result<String, String> {
     if scores.is_empty() {
         return Err("conformal calibration scores cannot be empty".into());
@@ -1751,6 +1775,15 @@ mod tests {
         assert!(calibration.validates_calibration_scores(&[0.30, 0.10, 0.20]).is_ok());
         assert!(calibration.validates_calibration_scores(&[0.30, 0.10]).is_err());
         assert!(calibration.validates_calibration_scores(&[0.30, 0.10, 0.21]).is_err());
+
+        let mut forged_threshold = calibration.clone();
+        forged_threshold.threshold = 0.10;
+        assert!(!forged_threshold.validates());
+        assert!(forged_threshold.validates_calibration_scores(&[0.30, 0.10, 0.20]).is_err());
+
+        let mut forged_alpha = calibration.clone();
+        forged_alpha.alpha = 0.50;
+        assert!(!forged_alpha.validates_calibration_scores(&[0.30, 0.10, 0.20]).is_ok());
     }
 
     #[test]
