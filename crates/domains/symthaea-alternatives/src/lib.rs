@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 10;
+pub const SCHEMA_VERSION: u16 = 11;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-v19";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-v20";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -197,7 +197,7 @@ impl EvidenceFreshnessPolicy {
     }
 }
 
-/// Reproducible provenance for a simulated or derived evidence record.
+/// Reproducible provenance for candidate generation or simulated/derived evidence.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DerivationRecord {
     /// Stable identifier for the model, solver, transformation, or reasoning procedure.
@@ -697,6 +697,12 @@ pub struct CandidatePathway {
     pub operating_capabilities: BTreeMap<String, PerformanceEstimate>,
     /// Candidate-level evidence bundle.
     pub evidence: Vec<EvidenceRecord>,
+    /// Optional reproducible derivation lineage for a generated candidate.
+    ///
+    /// This records the activity/method and input identities that produced the
+    /// candidate pathway. It does not establish evidence quality or authority;
+    /// those remain separate assessment concerns.
+    pub derivation: Option<DerivationRecord>,
 }
 
 impl CandidatePathway {
@@ -708,6 +714,9 @@ impl CandidatePathway {
         }
         if self.burdens.is_empty() {
             return Err(AssessmentError::NoBurdenData);
+        }
+        if let Some(derivation) = &self.derivation {
+            derivation.validate()?;
         }
         for performance in self.performance.values() {
             performance.validate()?;
@@ -1429,6 +1438,8 @@ pub struct ConstraintEvaluation {
 pub struct CandidateAssessment {
     /// Candidate identifier.
     pub candidate_id: String,
+    /// Candidate-generation derivation lineage, when declared.
+    pub derivation: Option<DerivationRecord>,
     /// Evidence-linked functional performance estimates.
     pub performance: BTreeMap<String, PerformanceEstimate>,
     /// Evidence-linked operating capabilities.
@@ -2263,6 +2274,7 @@ impl AlternativesEngine {
 
             assessments.push(CandidateAssessment {
                 candidate_id: candidate.id.clone(),
+                derivation: candidate.derivation.clone(),
                 performance: candidate.performance.clone(),
                 operating_capabilities: candidate.operating_capabilities.clone(),
                 constraints,
@@ -2684,7 +2696,78 @@ mod tests {
             burdens,
             operating_capabilities,
             evidence,
+            derivation: None,
         }
+    }
+
+    #[test]
+    fn candidate_generation_provenance_is_carried_and_affects_receipt() {
+        let mut c = candidate(
+            "generated-candidate",
+            PathwayKind::ProductRedesign,
+            2.0,
+            2.0,
+            vec![evidence(
+                "g1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let baseline = AlternativesEngine
+            .assess(&fixture_requirement(), &[c.clone()], None)
+            .unwrap();
+
+        c.derivation = Some(DerivationRecord {
+            method_id: "symthaea.alternatives.candidate_search".into(),
+            method_version: "v1".into(),
+            input_refs: vec![
+                "requirement:seal-v1".into(),
+                "constraint:service-life>=10".into(),
+            ],
+            configuration_hash: Some("candidate-search-config-v1".into()),
+        });
+
+        let generated = AlternativesEngine
+            .assess(&fixture_requirement(), &[c.clone()], None)
+            .unwrap();
+
+        assert_eq!(generated.candidates[0].derivation, c.derivation);
+        assert_ne!(
+            baseline.receipt.payload_hash,
+            generated.receipt.payload_hash
+        );
+    }
+
+    #[test]
+    fn invalid_candidate_generation_provenance_fails_closed() {
+        let mut c = candidate(
+            "invalid-generated-candidate",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "g2",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.derivation = Some(DerivationRecord {
+            method_id: "symthaea.alternatives.candidate_search".into(),
+            method_version: "v1".into(),
+            input_refs: Vec::new(),
+            configuration_hash: None,
+        });
+
+        assert_eq!(
+            AlternativesEngine
+                .assess(&fixture_requirement(), &[c], None)
+                .unwrap_err(),
+            AssessmentError::EmptyDerivationIdentity
+        );
     }
 
     #[test]
