@@ -126,6 +126,73 @@ impl ScientificHypothesisHandoff {
 }
 
 
+
+/// Evidence-neutral lineage record for revising a scientific hypothesis into
+/// a new discovery campaign. The prior handoff remains immutable by identity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScientificHypothesisRevisionReceipt {
+    pub schema_revision: String,
+    pub prior_handoff_digest: String,
+    pub new_handoff_digest: String,
+    /// Digest of the closed evidence/result that motivated revision.
+    pub motivating_evidence_digest: String,
+    /// Identity of the new Ramanujan campaign/search.
+    pub new_campaign_digest: String,
+    pub revision_reason: String,
+}
+
+impl ScientificHypothesisRevisionReceipt {
+    pub const SCHEMA_REVISION: &'static str = "SCIENTIFIC_HYPOTHESIS_REVISION.v1";
+
+    pub fn new(
+        prior_handoff_digest: impl Into<String>,
+        new_handoff_digest: impl Into<String>,
+        motivating_evidence_digest: impl Into<String>,
+        new_campaign_digest: impl Into<String>,
+        revision_reason: impl Into<String>,
+    ) -> Result<Self, String> {
+        let receipt = Self {
+            schema_revision: Self::SCHEMA_REVISION.into(),
+            prior_handoff_digest: prior_handoff_digest.into(),
+            new_handoff_digest: new_handoff_digest.into(),
+            motivating_evidence_digest: motivating_evidence_digest.into(),
+            new_campaign_digest: new_campaign_digest.into(),
+            revision_reason: revision_reason.into(),
+        };
+        receipt.validate()?;
+        if receipt.prior_handoff_digest == receipt.new_handoff_digest {
+            return Err("hypothesis revision must create a new handoff identity".into());
+        }
+        Ok(receipt)
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        serde_json::to_vec(self).expect("hypothesis revision serialization must be infallible")
+    }
+
+    pub fn digest_hex(&self) -> String {
+        blake3::hash(&self.canonical_bytes()).to_hex().to_string()
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_revision != Self::SCHEMA_REVISION {
+            return Err("unsupported hypothesis revision schema revision".into());
+        }
+        for (label, value) in [
+            ("prior_handoff_digest", self.prior_handoff_digest.as_str()),
+            ("new_handoff_digest", self.new_handoff_digest.as_str()),
+            ("motivating_evidence_digest", self.motivating_evidence_digest.as_str()),
+            ("new_campaign_digest", self.new_campaign_digest.as_str()),
+        ] {
+            validate_digest(label, value)?;
+        }
+        if self.revision_reason.trim().is_empty() {
+            return Err("revision_reason cannot be empty".into());
+        }
+        Ok(())
+    }
+}
+
 /// Scope of a scientific inquiry-selection receipt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InquirySelectionScope {
@@ -222,6 +289,28 @@ impl ScientificInquirySelectionReceipt {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn hypothesis_revision_requires_a_new_campaign_identity() {
+        let receipt = ScientificHypothesisRevisionReceipt::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "heldout contradiction",
+        )
+        .unwrap();
+        assert!(receipt.validate().is_ok());
+        assert_ne!(receipt.prior_handoff_digest, receipt.new_handoff_digest);
+
+        assert!(ScientificHypothesisRevisionReceipt::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "same hypothesis",
+        ).is_err());
+    }
+
     #[test]
     fn inquiry_selection_is_explicitly_not_an_outcome() {
         let receipt = ScientificInquirySelectionReceipt::new(
