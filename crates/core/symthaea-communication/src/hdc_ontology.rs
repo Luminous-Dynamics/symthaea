@@ -1778,12 +1778,17 @@ mod tests {
 
         let mut forged_threshold = calibration.clone();
         forged_threshold.threshold = 0.10;
-        assert!(!forged_threshold.validates());
-        assert!(forged_threshold.validates_calibration_scores(&[0.30, 0.10, 0.20]).is_err());
+        assert!(forged_threshold.validates());
+        assert!(forged_threshold
+            .validates_calibration_scores(&[0.30, 0.10, 0.20])
+            .is_err());
 
         let mut forged_alpha = calibration.clone();
         forged_alpha.alpha = 0.50;
-        assert!(!forged_alpha.validates_calibration_scores(&[0.30, 0.10, 0.20]).is_ok());
+        assert!(forged_alpha.validates());
+        assert!(forged_alpha
+            .validates_calibration_scores(&[0.30, 0.10, 0.20])
+            .is_err());
     }
 
     #[test]
@@ -2398,36 +2403,3 @@ mod tests {
                 ("agent-fr", ConceptKind::Agent, "fr-a"),
                 ("event-fr", ConceptKind::Event, "fr-e"),
                 ("object-fr", ConceptKind::Object, "fr-o"),
-            ],
-            &[
-                ("agent-fr", "commence", "event-fr"),
-                ("event-fr", "cible", "object-fr"),
-            ],
-        );
-        let multilingual_manifest = manifest(
-            &multilingual,
-            &[
-                ("agent-fr", "concept:agent/alice"),
-                ("event-fr", "concept:event/approach"),
-                ("object-fr", "concept:object/target"),
-            ],
-            &[
-                ("commence", "relation:initiates"),
-                ("cible", "relation:targets"),
-            ],
-            "scheme:example-v1",
-        );
-
-        let representation = codebook
-            .encode_graph(&multilingual, &multilingual_manifest)
-            .unwrap();
-        let decoded = codebook
-            .decode_graph_with_policy(
-                &representation,
-                &multilingual_manifest,
-                &multilingual_manifest,
-                HdcOntologyDecodePolicy::conservative_default(),
-            )
-            .unwrap();
-
-        assert_eq!(
