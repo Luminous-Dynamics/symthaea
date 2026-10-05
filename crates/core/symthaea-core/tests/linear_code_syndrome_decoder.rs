@@ -361,7 +361,6 @@ fn invalid_decoder_bound_is_rejected_without_search() {
     assert_eq!(work, Default::default());
 }
 
-
 fn error_words_up_to_weight(dimension: usize, max_weight: usize) -> Vec<BinaryCodeword> {
     fn visit(
         dimension: usize,
@@ -393,7 +392,10 @@ fn error_words_up_to_weight(dimension: usize, max_weight: usize) -> Vec<BinaryCo
 
 #[test]
 fn random_small_and_low_rate_code_sweep_matches_exhaustive_oracle_within_guaranteed_radius() {
-    let regimes = [(12usize, 4usize, 64u64, 0xD300_0000u64), (20, 3, 32, 0xD400_0000)];
+    let regimes = [
+        (12usize, 4usize, 64u64, 0xD300_0000u64),
+        (20, 3, 32, 0xD400_0000),
+    ];
     let mut qualifying_by_regime = [0usize; 2];
     let mut checked_observations_by_regime = [0usize; 2];
 
@@ -420,8 +422,7 @@ fn random_small_and_low_rate_code_sweep_matches_exhaustive_oracle_within_guarant
             for clean in &codewords {
                 for error in &errors {
                     let observation = clean.bound(error);
-                    let (nearest_distance, nearest) =
-                        nearest_codewords(&observation, &codewords);
+                    let (nearest_distance, nearest) = nearest_codewords(&observation, &codewords);
                     assert_eq!(nearest_distance, error.weight());
                     assert_eq!(nearest.len(), 1);
                     assert_eq!(codewords[nearest[0]], *clean);
