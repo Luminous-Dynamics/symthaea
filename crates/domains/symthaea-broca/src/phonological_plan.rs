@@ -254,6 +254,10 @@ impl PhonologicalPlan {
             _ => {}
         }
 
+        if !self.realization_authorized && !self.segments.is_empty() {
+            return Err(PhonologicalPlanError::RealizationNotAuthorized);
+        }
+
         validate_binding_status(&self.segments, self.content_binding)?;
 
         match self.content_binding {
@@ -680,6 +684,29 @@ mod tests {
             .expect_err("lexical binding cannot be asserted without phonology");
 
         assert_eq!(error, PhonologicalPlanError::LexicalBindingWithoutProvenance);
+    }
+
+    #[test]
+    fn unauthorized_deserialized_segments_fail_closed() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        plan.realization_authorized = false;
+        plan.content_binding = ContentBindingStatus::PhonologicallyBound;
+        plan.segments = vec![PhonemeSlot::new(
+            "AH",
+            0,
+            SyllableStress::Primary,
+            true,
+            false,
+            true,
+        )];
+        plan.syllables = derive_syllables(&plan.segments);
+
+        let error = plan
+            .validate()
+            .expect_err("unauthorized segments must fail closed");
+
+        assert_eq!(error, PhonologicalPlanError::RealizationNotAuthorized);
+        assert!(!plan.ready_for_realization());
     }
 
     #[test]
