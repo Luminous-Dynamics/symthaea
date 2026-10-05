@@ -381,6 +381,90 @@ impl ScientificInquirySelectionReceipt {
     }
 }
 
+/// Evidence-neutral provenance receipt linking a selected inquiry to an execution
+/// and an immutable observation artifact. Scientific interpretation remains in
+/// the existing evidence/result infrastructure.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScientificInquiryExecutionReceipt {
+    pub schema_revision: String,
+    pub selection_receipt_digest: String,
+    pub selected_challenge_digest: String,
+    pub execution_manifest_digest: String,
+    pub observation_digest: String,
+    pub observation_physical_type_digest: String,
+    pub evaluator_revision: String,
+}
+
+impl ScientificInquiryExecutionReceipt {
+    pub const SCHEMA_REVISION: &'static str = "SCIENTIFIC_INQUIRY_EXECUTION.v1";
+
+    pub fn new(
+        selection_receipt: &ScientificInquirySelectionReceipt,
+        execution_manifest_digest: impl Into<String>,
+        observation_digest: impl Into<String>,
+        observation_physical_type: &PhysicalType,
+        evaluator_revision: impl Into<String>,
+    ) -> Result<Self, String> {
+        selection_receipt.validate()?;
+        observation_physical_type
+            .validate()
+            .map_err(|error| format!("invalid observation physical type: {}", error.reason))?;
+        let receipt = Self {
+            schema_revision: Self::SCHEMA_REVISION.into(),
+            selection_receipt_digest: selection_receipt.digest_hex(),
+            selected_challenge_digest: selection_receipt.selected_challenge_digest.clone(),
+            execution_manifest_digest: execution_manifest_digest.into(),
+            observation_digest: observation_digest.into(),
+            observation_physical_type_digest: observation_physical_type.digest_hex(),
+            evaluator_revision: evaluator_revision.into(),
+        };
+        receipt.validate()?;
+        Ok(receipt)
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        serde_json::to_vec(self).expect("inquiry execution serialization must be infallible")
+    }
+
+    pub fn digest_hex(&self) -> String {
+        blake3::hash(&self.canonical_bytes()).to_hex().to_string()
+    }
+
+    pub fn validate_against_selection(
+        &self,
+        selection: &ScientificInquirySelectionReceipt,
+    ) -> Result<(), String> {
+        self.validate()?;
+        selection.validate()?;
+        if self.selection_receipt_digest != selection.digest_hex() {
+            return Err("execution receipt references a different inquiry selection".into());
+        }
+        if self.selected_challenge_digest != selection.selected_challenge_digest {
+            return Err("execution receipt challenge does not match inquiry selection".into());
+        }
+        Ok(())
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_revision != Self::SCHEMA_REVISION {
+            return Err("unsupported inquiry execution schema revision".into());
+        }
+        for (label, value) in [
+            ("selection_receipt_digest", self.selection_receipt_digest.as_str()),
+            ("selected_challenge_digest", self.selected_challenge_digest.as_str()),
+            ("execution_manifest_digest", self.execution_manifest_digest.as_str()),
+            ("observation_digest", self.observation_digest.as_str()),
+            ("observation_physical_type_digest", self.observation_physical_type_digest.as_str()),
+        ] {
+            validate_digest(label, value)?;
+        }
+        if self.evaluator_revision.trim().is_empty() {
+            return Err("evaluator_revision cannot be empty".into());
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -400,6 +484,39 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[test]
+    fn execution_receipt_binds_selection_and_observation_identity() {
+        let frame = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH);
+        let selection = ScientificInquirySelectionReceipt::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "selector-v3",
+            7,
+            frame.digest_hex(),
+            1.5,
+            2,
+            2,
+        )
+        .unwrap();
+        let execution = ScientificInquiryExecutionReceipt::new(
+            &selection,
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            &frame,
+            "evaluator-v1",
+        )
+        .unwrap();
+
+        assert!(execution.validate().is_ok());
+        assert!(execution.validate_against_selection(&selection).is_ok());
+        assert_eq!(execution.selected_challenge_digest, selection.selected_challenge_digest);
+
+        let mut tampered = execution.clone();
+        tampered.selection_receipt_digest = "1111111111111111111111111111111111111111111111111111111111111111".into();
+        assert!(tampered.validate_against_selection(&selection).is_err());
+    }
     #[test]
     fn handoff_rejects_internally_incoherent_physical_type() {
         let malformed =
