@@ -353,6 +353,14 @@ fn progress_within_frame_span(global_frame: usize, start_frame: usize, end_frame
         if !plan.ready_for_realization() {
             anyhow::bail!("phonological plan is not ready for realization");
         }
+        let sample_rate = self.sample_rate();
+        if sample_rate < FRAME_RATE {
+            anyhow::bail!(
+                "phonological plan realization requires sample rate >= {} Hz; got {}",
+                FRAME_RATE,
+                sample_rate
+            );
+        }
 
         // The current vocal-tract realization surface consumes canonical ARPABET symbols
         // (plus explicit SIL). Never silently route an unsupported plan symbol to the
@@ -1278,6 +1286,40 @@ mod tests {
                 .contains("unsupported realization symbol"),
             "unexpected rejection: {error:#}"
         );
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_phonological_plan_rejects_zero_frame_sample_rate() {
+        use symthaea_broca::{
+            ContentBindingStatus, LinguisticFrame, PhonemeSlot, SpeechPlan, StructuredDecoder,
+            SyllableStress, ThoughtChannels,
+        };
+
+        let genesis = GenesisSeed::from_phrase("plan-native-invalid-sample-rate-test");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(2);
+        let readout = decoder.decode(&channels);
+        let frame = LinguisticFrame::from_speech_plan(&SpeechPlan::from_readout(&channels, &readout));
+        let mut plan = PhonologicalPlan::from_linguistic_frame(&frame);
+        plan.bind_segments(
+            vec![PhonemeSlot::new(
+                "AH",
+                0,
+                SyllableStress::Primary,
+                true,
+                false,
+                true,
+            )],
+            ContentBindingStatus::PhonologicallyBound,
+        )
+        .expect("explicit phonological fixture");
+
+        let mut voice = LiveVoice::new_headless_with_rate(&genesis, FRAME_RATE - 1);
+        let error = voice
+            .synthesize_phonological_plan(&plan)
+            .expect_err("a motor frame with zero output samples must fail closed");
+        assert!(error.to_string().contains("sample rate >= 200 Hz"));
     }
 
     #[cfg(feature = "ssm_language")]
