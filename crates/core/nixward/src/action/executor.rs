@@ -259,7 +259,11 @@ impl SafetyLevel {
 }
 
 impl NixOSCommand {
-    /// Create a Custom command with auto-classified safety level.
+    /// Create a legacy Custom command with auto-classified safety level.
+    ///
+    /// Custom commands are retained only for compatibility and dry-run
+    /// presentation. Non-dry-run execution fails closed because the arbitrary
+    /// executable/argv pair cannot establish a bounded effect identity.
     ///
     /// Uses `classify_command_destructiveness` from `phi_gate` to infer
     /// the safety level from the command string, rather than requiring
