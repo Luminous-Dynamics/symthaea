@@ -36,11 +36,20 @@ pub enum OpenFoamBoundaryObservationError {
     MissingFaceList,
     DuplicateFaceList,
     InvalidFaceListEntry,
+    FacesCountMismatch { declared: u64, observed: u64 },
+    InvalidFaceRecord { face_index: u64 },
     BoundaryFaceRangeOutOfBounds {
         start_face: u64,
         n_faces: u64,
         face_count: u64,
     },
+    MissingPointList,
+    DuplicatePointList,
+    InvalidPointRecord { point_index: u64 },
+    PointsCountMismatch { declared: u64, observed: u64 },
+    PointIndexOutOfBounds { face_index: u64, point_index: u64 },
+    InvalidPointScale,
+    PatchGeometryMismatch,
     UnexpectedPatchListEntry,
     InvalidTolerance,
     InvalidSolverBinding(SolverBindingError),
@@ -124,7 +133,8 @@ fn observe_openfoam_boundary_patch_and_faces(
 > {
     let (record, _) =
         observe_openfoam_boundary_patch(boundary_source_bytes, patch_name)?;
-    let face_count = parse_face_list_count(faces_source_bytes)?;
+    let faces = parse_face_list(faces_source_bytes)?;
+    let face_count = faces.len() as u64;
 
     let end_face = record
         .start_face
@@ -165,64 +175,178 @@ fn observe_openfoam_boundary_patch_and_faces(
     Ok((record, observation))
 }
 
-fn parse_face_list_count(
+fn parse_face_list(
     source_bytes: &[u8],
-) -> Result<u64, OpenFoamBoundaryObservationError> {
+) -> Result<Vec<Vec<u64>>, OpenFoamBoundaryObservationError> {
     let text = std::str::from_utf8(source_bytes)
         .map_err(|_| OpenFoamBoundaryObservationError::InvalidUtf8)?;
     let stripped = strip_comments(text)?;
     let tokens = tokenize(&stripped)?;
 
+    let (count, mut index) = locate_top_level_list(
+        &tokens,
+        OpenFoamBoundaryObservationError::MissingFaceList,
+        OpenFoamBoundaryObservationError::DuplicateFaceList,
+        OpenFoamBoundaryObservationError::InvalidFaceListEntry,
+    )?;
+
+    let mut faces = Vec::new();
+    while index < tokens.len() && !matches!(tokens[index], Token::RParen) {
+        let face_index = faces.len() as u64;
+        let Token::Number(vertex_count) = tokens.get(index).ok_or(
+            OpenFoamBoundaryObservationError::InvalidFaceRecord { face_index },
+        )? else {
+            return Err(OpenFoamBoundaryObservationError::InvalidFaceRecord { face_index });
+        };
+        let vertex_count = vertex_count.parse::<usize>().map_err(|_| {
+            OpenFoamBoundaryObservationError::InvalidFaceRecord { face_index }
+        })?;
+        if vertex_count < 3 {
+            return Err(OpenFoamBoundaryObservationError::InvalidFaceRecord { face_index });
+        }
+        index += 1;
+        if !matches!(tokens.get(index), Some(Token::LParen)) {
+            return Err(OpenFoamBoundaryObservationError::InvalidFaceRecord { face_index });
+        }
+        index += 1;
+
+        let mut face = Vec::with_capacity(vertex_count);
+        for _ in 0..vertex_count {
+            let Token::Number(point) = tokens.get(index).ok_or(
+                OpenFoamBoundaryObservationError::InvalidFaceRecord { face_index },
+            )? else {
+                return Err(OpenFoamBoundaryObservationError::InvalidFaceRecord { face_index });
+            };
+            let point = point.parse::<u64>().map_err(|_| {
+                OpenFoamBoundaryObservationError::InvalidFaceRecord { face_index }
+            })?;
+            face.push(point);
+            index += 1;
+        }
+
+        if !matches!(tokens.get(index), Some(Token::RParen)) {
+            return Err(OpenFoamBoundaryObservationError::InvalidFaceRecord { face_index });
+        }
+        index += 1;
+        faces.push(face);
+    }
+
+    if !matches!(tokens.get(index), Some(Token::RParen)) {
+        return Err(OpenFoamBoundaryObservationError::InvalidFaceListEntry);
+    }
+    index += 1;
+
+    if index != tokens.len() {
+        return Err(OpenFoamBoundaryObservationError::InvalidFaceListEntry);
+    }
+
+    let observed = faces.len() as u64;
+    if observed != count {
+        return Err(OpenFoamBoundaryObservationError::FacesCountMismatch {
+            declared: count,
+            observed,
+        });
+    }
+    Ok(faces)
+}
+
+fn parse_points_list(
+    source_bytes: &[u8],
+) -> Result<Vec<[f64; 3]>, OpenFoamBoundaryObservationError> {
+    let text = std::str::from_utf8(source_bytes)
+        .map_err(|_| OpenFoamBoundaryObservationError::InvalidUtf8)?;
+    let stripped = strip_comments(text)?;
+    let tokens = tokenize(&stripped)?;
+
+    let (count, mut index) = locate_top_level_list(
+        &tokens,
+        OpenFoamBoundaryObservationError::MissingPointList,
+        OpenFoamBoundaryObservationError::DuplicatePointList,
+        OpenFoamBoundaryObservationError::InvalidPointRecord { point_index: 0 },
+    )?;
+
+    let mut points = Vec::new();
+    while index < tokens.len() && !matches!(tokens[index], Token::RParen) {
+        let point_index = points.len() as u64;
+        if !matches!(tokens.get(index), Some(Token::LParen)) {
+            return Err(OpenFoamBoundaryObservationError::InvalidPointRecord { point_index });
+        }
+        index += 1;
+        let mut point = [0.0f64; 3];
+        for coordinate in &mut point {
+            let Token::Number(value) = tokens.get(index).ok_or(
+                OpenFoamBoundaryObservationError::InvalidPointRecord { point_index },
+            )? else {
+                return Err(OpenFoamBoundaryObservationError::InvalidPointRecord { point_index });
+            };
+            *coordinate = value.parse::<f64>().map_err(|_| {
+                OpenFoamBoundaryObservationError::InvalidPointRecord { point_index }
+            })?;
+            if !coordinate.is_finite() {
+                return Err(OpenFoamBoundaryObservationError::InvalidPointRecord { point_index });
+            }
+            index += 1;
+        }
+        if !matches!(tokens.get(index), Some(Token::RParen)) {
+            return Err(OpenFoamBoundaryObservationError::InvalidPointRecord { point_index });
+        }
+        index += 1;
+        points.push(point);
+    }
+
+    if !matches!(tokens.get(index), Some(Token::RParen)) || index + 1 != tokens.len() {
+        return Err(OpenFoamBoundaryObservationError::InvalidFaceListEntry);
+    }
+
+    let observed = points.len() as u64;
+    if observed != count {
+        return Err(OpenFoamBoundaryObservationError::PointsCountMismatch {
+            declared: count,
+            observed,
+        });
+    }
+    Ok(points)
+}
+
+fn locate_top_level_list(
+    tokens: &[Token],
+    missing: OpenFoamBoundaryObservationError,
+    duplicate: OpenFoamBoundaryObservationError,
+    malformed: OpenFoamBoundaryObservationError,
+) -> Result<(u64, usize), OpenFoamBoundaryObservationError> {
     let mut brace_depth = 0usize;
     let mut paren_depth = 0usize;
-    let mut list_count = None;
+    let mut found = None;
+
     for index in 0..tokens.len().saturating_sub(1) {
         if brace_depth == 0
             && paren_depth == 0
             && matches!(&tokens[index], Token::Number(_))
             && matches!(tokens[index + 1], Token::LParen)
         {
-            if list_count.is_some() {
-                return Err(OpenFoamBoundaryObservationError::DuplicateFaceList);
+            if found.is_some() {
+                return Err(duplicate);
             }
             let Token::Number(count) = &tokens[index] else {
                 unreachable!();
             };
-            list_count = Some(count.parse::<u64>().map_err(|_| {
-                OpenFoamBoundaryObservationError::InvalidFaceListEntry
-            })?);
+            let count = count.parse::<u64>().map_err(|_| malformed.clone())?;
+            found = Some((count, index + 2));
         }
 
         match tokens[index] {
-            Token::LBrace => {
-                brace_depth = brace_depth
-                    .checked_add(1)
-                    .ok_or(OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
-            }
-            Token::RBrace => {
-                brace_depth = brace_depth
-                    .checked_sub(1)
-                    .ok_or(OpenFoamBoundaryObservationError::InvalidFaceListEntry)?;
-            }
-            Token::LParen => {
-                paren_depth = paren_depth
-                    .checked_add(1)
-                    .ok_or(OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
-            }
-            Token::RParen => {
-                paren_depth = paren_depth
-                    .checked_sub(1)
-                    .ok_or(OpenFoamBoundaryObservationError::InvalidFaceListEntry)?;
-            }
+            Token::LBrace => brace_depth = brace_depth.checked_add(1).ok_or_else(|| malformed.clone())?,
+            Token::RBrace => brace_depth = brace_depth.checked_sub(1).ok_or_else(|| malformed.clone())?,
+            Token::LParen => paren_depth = paren_depth.checked_add(1).ok_or_else(|| malformed.clone())?,
+            Token::RParen => paren_depth = paren_depth.checked_sub(1).ok_or_else(|| malformed.clone())?,
             Token::Number(_) | Token::Ident(_) | Token::Semi => {}
         }
     }
 
     if brace_depth != 0 || paren_depth != 0 {
-        return Err(OpenFoamBoundaryObservationError::InvalidFaceListEntry);
+        return Err(malformed);
     }
-
-    list_count.ok_or(OpenFoamBoundaryObservationError::MissingFaceList)
+    found.ok_or(missing)
 }
 
 fn parse_boundary_patch_list(
