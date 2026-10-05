@@ -49,6 +49,10 @@ pub const HDC_ONTOLOGY_MAX_CODEBOOK_RELATIONS: usize = 4_096;
 pub const HDC_ONTOLOGY_MAX_CONFORMAL_CANDIDATES: usize = 4_096;
 /// Maximum number of training graphs consumed by the N0 codebook constructor.
 pub const HDC_ONTOLOGY_MAX_TRAINING_GRAPHS: usize = 4_096;
+/// Maximum UTF-8 byte length of manifest identity strings.
+pub const HDC_ONTOLOGY_MAX_ID_BYTES: usize = 4_096;
+/// Maximum provenance references attached to one concept binding.
+pub const HDC_ONTOLOGY_MAX_GROUNDING_IDS_PER_CONCEPT: usize = 256;
 /// Hard ceiling on receiver-side edge candidates before ranking allocation.
 pub const HDC_ONTOLOGY_MAX_EDGE_CANDIDATES: usize = 1_000_000;
 /// Versioned HDC nonconformity score used by the isolated N1 conformal primitive.
@@ -97,12 +101,19 @@ impl HdcOntologyManifest {
             && !self.concepts.iter().any(|binding| {
                 binding.node_id.trim().is_empty()
                     || binding.concept_id.trim().is_empty()
+                    || binding.node_id.len() > HDC_ONTOLOGY_MAX_ID_BYTES
+                    || binding.concept_id.len() > HDC_ONTOLOGY_MAX_ID_BYTES
                     || binding.grounding_ids.is_empty()
-                    || binding.grounding_ids.iter().any(|id| id.trim().is_empty())
+                    || binding.grounding_ids.len() > HDC_ONTOLOGY_MAX_GROUNDING_IDS_PER_CONCEPT
+                    || binding.grounding_ids.iter().any(|id| {
+                        id.trim().is_empty() || id.len() > HDC_ONTOLOGY_MAX_ID_BYTES
+                    })
             })
             && !self.relations.iter().any(|binding| {
                 binding.local_relation.trim().is_empty()
                     || binding.relation_id.trim().is_empty()
+                    || binding.local_relation.len() > HDC_ONTOLOGY_MAX_ID_BYTES
+                    || binding.relation_id.len() > HDC_ONTOLOGY_MAX_ID_BYTES
             })
             && unique_concept_node_ids(&self.concepts)
             && unique_graph_local_relations(&self.relations)
@@ -1595,6 +1606,16 @@ mod tests {
             })
             .collect();
         assert!(!oversized_manifest.validates());
+
+        let mut oversized_grounding = training_manifest.clone();
+        oversized_grounding.concepts[0].grounding_ids =
+            vec!["g".repeat(HDC_ONTOLOGY_MAX_ID_BYTES); HDC_ONTOLOGY_MAX_GROUNDING_IDS_PER_CONCEPT + 1];
+        assert!(!oversized_grounding.validates());
+
+        let mut oversized_identifier = training_manifest.clone();
+        oversized_identifier.concepts[0].concept_id =
+            "x".repeat(HDC_ONTOLOGY_MAX_ID_BYTES + 1);
+        assert!(!oversized_identifier.validates());
 
         let codebook =
             HdcOntologyCodebook::from_training_graphs(77, &[training], &training_manifest)
