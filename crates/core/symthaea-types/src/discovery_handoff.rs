@@ -360,6 +360,26 @@ impl ScientificInquirySelectionReceipt {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn handoff_rejects_internally_incoherent_physical_type() {
+        let malformed =
+            PhysicalType::with_kind(QuantityKind::Energy, PhysicalDimension::LENGTH);
+        let handoff = ScientificHypothesisHandoff::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &malformed,
+            ModelMaturity::ResearchPrototype,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            1,
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            1,
+            "ramanujan",
+            vec!["not empirical confirmation".into()],
+        );
+        let error = handoff.validate().expect_err("malformed physical type must fail");
+        assert!(error.contains("invalid carried physical type"));
+    }
+
+    #[test]
     fn hypothesis_revision_cross_link_validation_rejects_wrong_handoff() {
         let energy = energy();
         let prior = ScientificHypothesisHandoff::new(
