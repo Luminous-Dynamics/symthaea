@@ -1380,6 +1380,11 @@ pub struct EvaluationContextSupplement {
     pub applies_to_report_fingerprint: Option<String>,
     pub evaluator_identity_fingerprint: Option<String>,
     pub trust_root_fingerprint: Option<String>,
+    /// Downstream/relying-party authorization-policy identity recorded after
+    /// verifier execution. This is distinct from verifier-side proof-purpose
+    /// authorization, which is governed by the resolver result and resolution
+    /// snapshot. This annotation does not retroactively alter the verification
+    /// procedure or authorize an attested action.
     pub authorization_policy_fingerprint: Option<String>,
 }
 
@@ -1419,6 +1424,19 @@ impl EvaluationContextSupplement {
     pub fn with_authorization_policy_fingerprint(mut self, fingerprint: impl Into<String>) -> Self {
         self.authorization_policy_fingerprint = Some(fingerprint.into());
         self
+    }
+
+    /// Clearer alias for callers: this annotation names a downstream/relying-party
+    /// authorization policy, not the verifier's proof-purpose authorization input.
+    pub fn with_relying_party_authorization_policy_fingerprint(
+        self,
+        fingerprint: impl Into<String>,
+    ) -> Self {
+        self.with_authorization_policy_fingerprint(fingerprint)
+    }
+
+    pub fn relying_party_authorization_policy_fingerprint(&self) -> Option<&str> {
+        self.authorization_policy_fingerprint.as_deref()
     }
 
     pub fn is_well_formed(&self) -> bool {
@@ -6214,6 +6232,19 @@ mod tests {
         tampered.supplement.attachment_phase = "concurrent";
         tampered.supplement_fingerprint = tampered.supplement.fingerprint();
         assert!(!tampered.is_well_formed());
+    }
+
+    #[test]
+    fn v9_supplement_explicitly_distinguishes_relying_party_authorization() {
+        let digest = blake3::hash(b"rp-policy").to_hex().to_string();
+        let supplement = EvaluationContextSupplement::empty()
+            .with_relying_party_authorization_policy_fingerprint(digest.clone());
+
+        assert_eq!(
+            supplement.relying_party_authorization_policy_fingerprint(),
+            Some(digest.as_str())
+        );
+        assert!(supplement.is_well_formed());
     }
 
     #[test]
