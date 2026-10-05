@@ -147,6 +147,73 @@ async function canvasPngHash(page, selector) {
   return createHash('sha256').update(payload).digest('hex');
 }
 
+
+async function canvasPixelStatistics(page, selector) {
+  return page.$eval(selector, async canvas => {
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      throw new Error('selected element is not a canvas');
+    }
+    const dataUrl = canvas.toDataURL('image/png');
+    const image = new Image();
+    image.src = dataUrl;
+    await image.decode();
+    const probe = document.createElement('canvas');
+    probe.width = canvas.width;
+    probe.height = canvas.height;
+    const context = probe.getContext('2d');
+    if (!context) {
+      throw new Error('could not create statistics probe context');
+    }
+    context.drawImage(image, 0, 0);
+    const rgba = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let nonOpaqueBlack = 0;
+    let nonBlack = 0;
+    let minX = canvas.width;
+    let minY = canvas.height;
+    let maxX = -1;
+    let maxY = -1;
+    const samples = [];
+    const stepX = Math.max(1, Math.floor(canvas.width / 16));
+    const stepY = Math.max(1, Math.floor(canvas.height / 16));
+    for (let y = 0; y < canvas.height; y += stepY) {
+      for (let x = 0; x < canvas.width; x += stepX) {
+        const offset = (y * canvas.width + x) * 4;
+        samples.push({ x, y, rgba: [...rgba.slice(offset, offset + 4)] });
+      }
+    }
+    for (let y = 0; y < canvas.height; y++) {
+      for (let x = 0; x < canvas.width; x++) {
+        const offset = (y * canvas.width + x) * 4;
+        const r = rgba[offset];
+        const g = rgba[offset + 1];
+        const b = rgba[offset + 2];
+        const a = rgba[offset + 3];
+        if (r !== 0 || g !== 0 || b !== 0 || a !== 255) {
+          nonOpaqueBlack++;
+        }
+        if (r !== 0 || g !== 0 || b !== 0) {
+          nonBlack++;
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+      }
+    }
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      non_opaque_black_pixels: nonOpaqueBlack,
+      non_black_pixels: nonBlack,
+      non_black_fraction: (canvas.width * canvas.height) > 0
+        ? nonBlack / (canvas.width * canvas.height)
+        : 0,
+      non_black_bounds: maxX >= 0 ? { min_x: minX, min_y: minY, max_x: maxX, max_y: maxY } : null,
+      coarse_samples: samples,
+    };
+  });
+}
+
 async function canvasPixelSamples(page, selector, points) {
   return page.$eval(
     selector,
@@ -495,6 +562,14 @@ async function runMode(mode) {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
 
+  const pageConsoleMessages = [];
+  page.on('console', message => {
+    const type = message.type();
+    if (type === 'error' || type === 'warning') {
+      pageConsoleMessages.push({ type, text: message.text() });
+    }
+  });
+  const diagnostics = {};
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
@@ -535,6 +610,21 @@ async function runMode(mode) {
       const firstMovieHash = await canvasPngHash(page, '#webgpu-movie-canvas');
       const blankSceneHash = await blankCanvasHash(page, 512, 512);
       const blankMovieHash = await blankCanvasHash(page, 192, 192);
+      diagnostics.scene = {
+        scene_hash: firstSceneHash,
+        blank_hash: blankSceneHash,
+        pixel_statistics: await canvasPixelStatistics(page, '#webgpu-cognitive-canvas'),
+      };
+      diagnostics.movie = {
+        movie_hash: firstMovieHash,
+        blank_hash: blankMovieHash,
+        pixel_statistics: await canvasPixelStatistics(page, '#webgpu-movie-canvas'),
+      };
+
+      await page.screenshot({
+        path: path.join(SCREENSHOT_DIR, \`${mode}-preassert.png\`),
+        fullPage: false,
+      });
 
       const semanticSceneSamples = await canvasPixelSamples(page, '#webgpu-cognitive-canvas', [
         { name: 'background', x: 10, y: 10 },
@@ -715,6 +805,12 @@ async function runMode(mode) {
       deterministic_repeat: true,
       page_errors: pageErrors,
     };
+  } catch (error) {
+    if (error && typeof error === 'object') {
+      error.page_console_messages = pageConsoleMessages;
+      error.diagnostics = diagnostics;
+    }
+    throw error;
   } finally {
     await browser.close();
   }
@@ -730,6 +826,8 @@ try {
       failures[mode] = {
         classification: error instanceof QualificationError ? error.classification : 'harness',
         error: error instanceof Error ? error.message : String(error),
+        page_console_messages: error?.page_console_messages || [],
+        diagnostics: error?.diagnostics || {},
       };
     }
   }
