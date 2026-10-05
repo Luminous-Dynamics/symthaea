@@ -82,6 +82,11 @@ Instead, the adapter emits two linked artifacts:
 
 The bundle digest covers both artifacts.
 
+A separate `LanyonVerificationReceipt` can later bind observed verification
+artifacts to the exact bundle digest. A passed receipt requires both a Lean
+proof artifact and a C implementation artifact, but the receipt deliberately
+does not claim empirical truth or semantic correctness of the original intent.
+
 A Lanyon verification result can then be attached to the bundle by an external
 evidence layer without changing the original physical semantic identity.
 
