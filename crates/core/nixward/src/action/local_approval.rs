@@ -505,11 +505,11 @@ mod tests {
         );
         assert_eq!(
             one,
-            r#"nixos-rebuild switch "profile with spaces""#
+            r#"nixos-rebuild switch flake=<none> extra-args=["profile with spaces"]"#
         );
         assert_eq!(
             two,
-            "nixos-rebuild switch profile with spaces"
+            "nixos-rebuild switch flake=<none> extra-args=[profile with spaces]"
         );
     }
 
@@ -558,7 +558,7 @@ mod tests {
 
         assert_eq!(
             operator_visible_action_for_command(&command),
-            r#"nixos-rebuild switch "a\"b" "a\\b" """#
+            r#"nixos-rebuild switch flake=<none> extra-args=["a\"b" "a\\b" ""]"#
         );
     }
 
