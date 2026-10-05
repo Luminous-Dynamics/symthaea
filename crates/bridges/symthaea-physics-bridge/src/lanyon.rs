@@ -159,7 +159,7 @@ pub fn expr_to_lanyon_form(expr: &Expr) -> Result<LanyonForm, String> {
                     };
                     if !exponent.is_finite() || (exponent - exponent.round()).abs() >= 1e-9 {
                         return Err(
-                            "only finite integer powers have a lossless mapping in the observed public Lanyon subset"
+                            "only finite integer powers have a bounded structural lowering in the observed public Lanyon subset"
                                 .into(),
                         );
                     }
@@ -764,6 +764,24 @@ mod tests {
         spec.parameter_assumptions.clear();
         let source = spec.render_racket().unwrap();
         assert!(source.contains("'parameters (list)"));
+    }
+
+    #[test]
+    fn two_dimensional_lanyon_matrices_follow_public_shape() {
+        let zero = LanyonForm::number(0.0).unwrap();
+        let row = vec![zero.clone(), zero.clone()];
+        let spec = LanyonSystemSpec {
+            name: "two-dimensional-test".into(),
+            coordinates: vec!["x".into(), "y".into()],
+            state: vec!["q1".into(), "q2".into()],
+            state_assumptions: vec![],
+            parameters: vec![],
+            parameter_assumptions: vec![],
+            fluxes: vec![row.clone(), row.clone()],
+            wavespeeds: vec![row.clone(), row.clone()],
+            diffusive_fluxes: vec![row.clone(), row],
+        };
+        assert!(spec.validate().is_ok());
     }
 
     #[test]
