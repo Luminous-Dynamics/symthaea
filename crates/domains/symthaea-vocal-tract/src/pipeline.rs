@@ -1094,6 +1094,63 @@ impl VocalTractPipeline {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_pitch_range_is_independent_from_arousal() {
+        let frame = FormantFrame {
+            f0: 0.0,
+            energy: 0.5,
+            ..FormantFrame::silent(0.0)
+        };
+
+        let mut narrow = frame;
+        let mut wide = frame;
+
+        let narrow_context = ProsodyContext {
+            utterance_progress: 0.35,
+            phoneme_progress: 0.5,
+            stress: 0,
+            arousal: 0.5,
+            pitch_range: 0.65,
+            ..ProsodyContext::default()
+        };
+        let wide_context = ProsodyContext {
+            pitch_range: 1.45,
+            ..narrow_context
+        };
+
+        narrow_context.apply_prosody(&mut narrow);
+        wide_context.apply_prosody(&mut wide);
+
+        assert!(
+            wide.f0 > narrow.f0,
+            "wider plan pitch range must expand the same planned contour: narrow={:.3}, wide={:.3}",
+            narrow.f0,
+            wide.f0
+        );
+
+        let mut low_arousal = frame;
+        let mut high_arousal = frame;
+        let low_context = ProsodyContext {
+            arousal: 0.1,
+            pitch_range: 1.0,
+            ..narrow_context
+        };
+        let high_context = ProsodyContext {
+            arousal: 0.9,
+            pitch_range: 1.0,
+            ..narrow_context
+        };
+        low_context.apply_prosody(&mut low_arousal);
+        high_context.apply_prosody(&mut high_arousal);
+
+        assert!(
+            high_arousal.f0 > low_arousal.f0,
+            "speaker-state arousal must remain independently observable: low={:.3}, high={:.3}",
+            low_arousal.f0,
+            high_arousal.f0
+        );
+    }
+
     use super::*;
 
     use crate::controller::SpeakerProfile;
