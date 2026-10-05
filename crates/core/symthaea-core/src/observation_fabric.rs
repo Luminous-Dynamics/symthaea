@@ -3422,12 +3422,13 @@ mod tests {
             .parent_observation_ids = vec!["missing-parent".into()];
         assert_eq!(
             ancestor_lineage_change
-                .independence_verification_reachable_scope_fingerprint_v3(
+                .independence_verification_reachable_scope_canonical_bytes_v3(
                     "obs-001",
                     "obs-002"
-                )
-                .expect("invalid graph should fail closed"),
-            baseline
+                ),
+            Err(ObservationValidationError::MissingParentObservation(
+                "missing-parent".into()
+            ))
         );
     }
 
