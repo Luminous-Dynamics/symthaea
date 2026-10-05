@@ -114,6 +114,7 @@ impl HdcOntologyManifest {
                     || binding.grounding_ids.iter().any(|id| {
                         id.trim().is_empty() || id.len() > HDC_ONTOLOGY_MAX_ID_BYTES
                     })
+                    || !unique_grounding_ids(&binding.grounding_ids)
             })
             && !self.relations.iter().any(|binding| {
                 binding.local_relation.trim().is_empty()
@@ -1582,6 +1583,13 @@ fn unique_stable_concept_ids(concepts: &[HdcConceptIdentityBinding]) -> bool {
         .all(|binding| ids.insert(binding.concept_id.clone()))
 }
 
+fn unique_grounding_ids(grounding_ids: &[String]) -> bool {
+    let mut ids = BTreeSet::new();
+    grounding_ids
+        .iter()
+        .all(|grounding_id| ids.insert(grounding_id.clone()))
+}
+
 fn unique_graph_local_relations(relations: &[HdcRelationIdentityBinding]) -> bool {
     let mut ids = BTreeSet::new();
     relations
@@ -2413,6 +2421,20 @@ mod tests {
             "scheme:example-v1",
         );
         assert!(!duplicate_relation_manifest.validates());
+
+        let mut duplicate_grounding_manifest = manifest(
+            &duplicate_graph,
+            &[
+                ("node-a", "concept:agent/a"),
+                ("node-b", "concept:agent/b"),
+            ],
+            &[("links", "relation:links")],
+            "scheme:example-v1",
+        );
+        duplicate_grounding_manifest.concepts[0].grounding_ids.push(
+            duplicate_grounding_manifest.concepts[0].grounding_ids[0].clone(),
+        );
+        assert!(!duplicate_grounding_manifest.validates());
     }
 
     #[test]
