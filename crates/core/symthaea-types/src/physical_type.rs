@@ -238,6 +238,30 @@ impl PhysicalType {
     }
 
     /// Fail-closed compatibility judgment for a typed signal/port boundary.
+    /// Infer the type of the first derivative with respect to an independent
+    /// physical quantity. Higher-order derivatives may be represented by
+    /// repeatedly applying this operation.
+    pub fn derivative_with(&self, independent: &Self) -> TypeJudgement<Self> {
+        let (Some(value_dim), Some(independent_dim)) = (self.dimension, independent.dimension) else {
+            return TypeJudgement::Unknown(
+                "derivative requires known dimensions for value and independent variable".into(),
+            );
+        };
+        let Some(dimension) = value_dim.checked_sub(independent_dim) else {
+            return TypeJudgement::Invalid(PhysicalTypeError {
+                operation: "derivative".into(),
+                reason: "physical dimension exponent overflow".into(),
+            });
+        };
+        let kind = match (self.kind, independent.kind) {
+            (QuantityKind::Length, QuantityKind::Time) => QuantityKind::Velocity,
+            (QuantityKind::Velocity, QuantityKind::Time) => QuantityKind::Acceleration,
+            (QuantityKind::Acceleration, QuantityKind::Time) => QuantityKind::Custom,
+            _ => QuantityKind::Unknown,
+        };
+        TypeJudgement::Valid(Self::with_kind(kind, dimension))
+    }
+
     pub fn judge_compatibility(&self, other: &Self) -> TypeJudgement<()> {
         let (Some(a), Some(b)) = (self.dimension, other.dimension) else {
             return TypeJudgement::Unknown(
@@ -341,6 +365,19 @@ mod tests {
         let unknown = PhysicalType::unknown();
         assert_eq!(unknown.kind, QuantityKind::Unknown);
         assert_eq!(unknown.dimension, None);
+    }
+
+    #[test]
+    fn derivative_preserves_physical_meaning() {
+        let length = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH);
+        let time = PhysicalType::with_kind(QuantityKind::Time, PhysicalDimension::TIME);
+        match length.derivative_with(&time) {
+            TypeJudgement::Valid(v) => {
+                assert_eq!(v.kind, QuantityKind::Velocity);
+                assert_eq!(v.dimension, Some(PhysicalDimension::VELOCITY));
+            }
+            other => panic!("unexpected judgment: {other:?}"),
+        }
     }
 
     #[test]
