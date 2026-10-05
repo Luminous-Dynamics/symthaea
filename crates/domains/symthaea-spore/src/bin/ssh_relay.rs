@@ -39,6 +39,47 @@ struct CmdResult {
     pub exit_status: u32,
 }
 
+fn systemctl_executable() -> Result<&'static str, std::io::Error> {
+    // Prefer immutable, system-owned paths so a privileged service action
+    // does not depend on an inherited PATH lookup.
+    const CANDIDATES: &[&str] = &[
+        "/run/current-system/sw/bin/systemctl",
+        "/nix/var/nix/profiles/system/sw/bin/systemctl",
+        "/usr/bin/systemctl",
+        "/bin/systemctl",
+    ];
+
+    CANDIDATES
+        .iter()
+        .copied()
+        .find(|path| std::path::Path::new(path).is_file())
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "could not locate systemctl in known system-owned paths",
+            )
+        })
+}
+
+fn service_action_argv(action: &str, service: &str) -> [String; 2] {
+    [action.to_string(), format!("{service}.service")]
+}
+
+async fn run_service_action(action: &str, service: &str) -> Result<CmdResult, std::io::Error> {
+    let executable = systemctl_executable()?;
+    let args = service_action_argv(action, service);
+    let output = tokio::process::Command::new(executable)
+        .args(&args)
+        .output()
+        .await?;
+
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
 async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
     // Use /bin/sh (POSIX, always available) as fallback if bash isn't in PATH
     let shell = if std::path::Path::new("/bin/bash").exists() {
@@ -4120,8 +4161,10 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                     }
                 };
                 eprintln!("[{}] {} {}...", peer_addr, action, service);
-                let cmd = format!("systemctl {} {}.service 2>&1", action, service);
-                match run_cmd(&cmd).await {
+                // This is a privileged, network-triggered service effect. Keep
+                // the effect boundary at argv so no shell can reinterpret the
+                // action or unit, even if sanitization evolves later.
+                match run_service_action(action, service).await {
                     Ok(r) => {
                         let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout}).to_string())).await;
                     }
@@ -5032,6 +5075,21 @@ echo '}'
     // Cleanup
     tracker.lock().await.release(&peer_addr);
     eprintln!("[{}] WebSocket disconnected", peer_addr);
+}
+
+#[cfg(test)]
+mod service_action_tests {
+    use super::service_action_argv;
+
+    #[test]
+    fn service_action_argv_is_shell_free() {
+        let args = service_action_argv("restart", "nginx");
+        assert_eq!(args, ["restart", "nginx.service"]);
+
+        let args = service_action_argv("stop", "foo.service");
+        assert_eq!(args, ["stop", "foo.service.service"]);
+        assert!(args.iter().all(|arg| !arg.contains("-c")));
+    }
 }
 
 fn generate_auth_token() -> String {
