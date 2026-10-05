@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 22;
+pub const SCHEMA_VERSION: u16 = 23;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-v31";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-v32";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -5661,6 +5661,82 @@ mod tests {
                 design,
             )
             .unwrap();
+    }
+
+    #[test]
+    fn experimental_design_rejects_procedure_drift() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let mut candidates = case.candidates.clone();
+        let candidate_index = candidates
+            .iter()
+            .position(|candidate| candidate.id == "product-redesign")
+            .unwrap();
+        let observed = candidates[candidate_index]
+            .evidence
+            .iter_mut()
+            .find(|evidence| evidence.kind == EvidenceKind::Observed)
+            .unwrap();
+        let evidence_id = observed.id.clone();
+        observed.observation.as_mut().unwrap().experimental_design_id =
+            Some("design:procedure".into());
+        observed.observation.as_mut().unwrap().experimental_target_id = Some("t1".into());
+        observed.observation.as_mut().unwrap().procedure_id = "procedure:wrong".into();
+
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:procedure".into(),
+            requirement_id: case.requirement.id.clone(),
+            hypothesis_id: "hypothesis:procedure".into(),
+            hypothesis_statement: "Test water.".into(),
+            unresolved_uncertainty_refs: vec!["u1".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                target_uncertainty_width: None,
+            },
+            comparison_basis: basis,
+        };
+
+        let error = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                design,
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            AssessmentError::ExperimentalDesignProcedureMismatch {
+                evidence_id,
+                expected_procedure_id: "fixture-measurement-procedure-v1".into(),
+                actual_procedure_id: "procedure:wrong".into(),
+            }
+        );
     }
 
     #[test]
