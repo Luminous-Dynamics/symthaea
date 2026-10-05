@@ -1475,6 +1475,12 @@ mod tests {
         let mut snapshot = snapshot();
         snapshot.document = r##"{
             "id": "https://example.test/controller",
+            "verificationMethod": [{
+                "id": "#key-1",
+                "type": "Multikey",
+                "controller": "https://example.test/controller",
+                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+            }],
             "assertionMethod": ["#key-1"],
             "extension": {
                 "method": {
