@@ -43,6 +43,14 @@ fn evidence(
         as_of: Some("benchmark-v1".into()),
         valid_from_epoch_seconds: None,
         valid_until_epoch_seconds: None,
+        derivation: matches!(kind, EvidenceKind::Simulated | EvidenceKind::Derived).then(
+            || DerivationRecord {
+                method_id: "synthetic-fixture".into(),
+                method_version: "benchmark-v1".into(),
+                input_refs: vec!["benchmark-input".into()],
+                configuration_hash: Some("benchmark-config-v1".into()),
+            },
+        ),
     }
 }
 
