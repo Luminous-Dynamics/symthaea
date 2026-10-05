@@ -485,13 +485,22 @@ impl ControllerDocumentDereferenceAttestation {
                     .into(),
             ));
         }
+        match &request.controller_document_integrity_policy {
+            ControllerDocumentIntegrityPolicy::Unpinned => {}
+            ControllerDocumentIntegrityPolicy::Sha256Digest(expected)
+                if expected == &self.document_digest => {}
+            ControllerDocumentIntegrityPolicy::Sha256Digest(expected) => {
+                return Err(VerificationFailure::ControllerDocumentIntegrityMismatch {
+                    expected: expected.clone(),
+                    actual: self.document_digest.clone(),
+                });
+            }
+        }
         Ok(())
     }
 
     pub fn matches_document(&self, document_url: &str, document_digest: &str) -> bool {
-        self.requested_url == document_url
-            && self.effective_url == document_url
-            && self.document_digest == document_digest
+        self.requested_url == document_url && self.document_digest == document_digest
     }
 }
 
@@ -2136,6 +2145,27 @@ mod tests {
         assert!(matches!(
             scheme,
             Err(VerificationFailure::ControllerDocumentNetworkPolicyViolation)
+        ));
+
+        let pinned_request = request
+            .clone()
+            .with_controller_document_integrity(
+                ControllerDocumentIntegrityPolicy::Sha256Digest("11".repeat(32)),
+            )
+            .unwrap();
+        let pinned_mismatch = ControllerDocumentDereferenceAttestation::from_adapter(
+            &pinned_request,
+            "https://example.test/controller",
+            "application/cid",
+            1024,
+            0,
+            pinned_request.freshness.verification_time.clone(),
+            ControllerDocumentResolutionSource::Cache,
+            &"22".repeat(32),
+        );
+        assert!(matches!(
+            pinned_mismatch,
+            Err(VerificationFailure::ControllerDocumentIntegrityMismatch { .. })
         ));
     }
 
