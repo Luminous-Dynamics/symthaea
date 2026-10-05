@@ -198,14 +198,20 @@ where
                     "multiplicative operand dimension is unknown".into(),
                 );
             };
-            valid(PhysicalType::with_kind(
-                if l.kind == Unknown || r.kind == Unknown {
-                    Unknown
-                } else {
-                    derived_kind_mul(l.kind, r.kind)
-                },
-                ld.add(rd),
-            ))
+            match ld.checked_add(rd) {
+                Some(dimension) => valid(PhysicalType::with_kind(
+                    if l.kind == Unknown || r.kind == Unknown {
+                        Unknown
+                    } else {
+                        derived_kind_mul(l.kind, r.kind)
+                    },
+                    dimension,
+                )),
+                None => TypeJudgement::Invalid(PhysicalTypeError {
+                    operation: "mul".into(),
+                    reason: "physical dimension exponent overflow".into(),
+                }),
+            }
         }
 
         Expr::BinOp(Div, left, right) => {
@@ -221,10 +227,16 @@ where
                 return TypeJudgement::Unknown("division operand dimension is unknown".into());
             };
             if r.kind == Unknown || r.has_refinement(Refinement::NonZero) {
-                valid(PhysicalType::with_kind(
-                    derived_kind_div(l.kind, r.kind),
-                    ld.sub(rd),
-                ))
+                match ld.checked_sub(rd) {
+                    Some(dimension) => valid(PhysicalType::with_kind(
+                        derived_kind_div(l.kind, r.kind),
+                        dimension,
+                    )),
+                    None => TypeJudgement::Invalid(PhysicalTypeError {
+                        operation: "div".into(),
+                        reason: "physical dimension exponent overflow".into(),
+                    }),
+                }
             } else {
                 TypeJudgement::Unknown(
                     "division denominator is not established nonzero".into(),
