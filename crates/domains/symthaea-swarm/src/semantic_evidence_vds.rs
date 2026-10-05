@@ -960,10 +960,14 @@ impl Rfc9942SignatureWithReceipts {
     pub fn protected_algorithm_id(&self) -> Result<i64, Rfc9942VdpError> {
         let protected=self.protected_header_bytes();
         let mut reader=CborReader::new(&protected);
-        let entries=reader.read_map_entries_bounded(32).map_err(|error|match error {
-            Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
-            _=>Rfc9942VdpError::InvalidEncoding,
-        })?;
+        let entries=if protected.is_empty() {
+            Vec::new()
+        } else {
+            reader.read_map_entries_bounded(32).map_err(|error|match error {
+                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+                _=>Rfc9942VdpError::InvalidEncoding,
+            })?
+        };
         reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
 
         let mut algorithm=None;
