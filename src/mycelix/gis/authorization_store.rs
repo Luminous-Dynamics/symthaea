@@ -550,6 +550,33 @@ fn backfill_status_check_boundary_ownership(
     Ok(())
 }
 
+fn backfill_status_check_operation_ids_from_dispatch(
+    connection: &mut Connection,
+) -> Result<(), AuthorizationStoreError> {
+    connection.execute(
+        "UPDATE authorization_status_checks
+         SET operation_id=(
+             SELECT d.operation_id
+             FROM authorization_dispatches d
+             WHERE d.authorization_instance=authorization_status_checks.authorization_instance
+               AND d.attempt_id=authorization_status_checks.attempt_id
+               AND d.operation_id IS NOT NULL
+               AND d.operation_id <> ''
+         )
+         WHERE (operation_id IS NULL OR operation_id='')
+           AND EXISTS(
+             SELECT 1
+             FROM authorization_dispatches d
+             WHERE d.authorization_instance=authorization_status_checks.authorization_instance
+               AND d.attempt_id=authorization_status_checks.attempt_id
+               AND d.operation_id IS NOT NULL
+               AND d.operation_id <> ''
+           )",
+        [],
+    )?;
+    Ok(())
+}
+
 fn backfill_receipt_operation_ids_from_dispatch(
     connection: &mut Connection,
 ) -> Result<(), AuthorizationStoreError> {
@@ -617,6 +644,7 @@ fn validate_attempt_operation_consistency(
     for table in [
         "authorization_leases",
         "authorization_receipts",
+        "authorization_status_checks",
         "authorization_recovery_markers",
         "authorization_terminal_evidence",
         "authorization_dispatches",
@@ -750,6 +778,7 @@ fn validate_attempt_operation_consistency_for_attempt(
     for table in [
         "authorization_leases",
         "authorization_receipts",
+        "authorization_status_checks",
         "authorization_recovery_markers",
         "authorization_terminal_evidence",
         "authorization_dispatches",
@@ -1236,6 +1265,7 @@ impl SqliteAuthorizationStore {
                authorization_instance TEXT NOT NULL,
                attempt_id TEXT NOT NULL,
                phase TEXT NOT NULL,
+               operation_id TEXT,
                status_identifier TEXT NOT NULL,
                status_source_digest TEXT NOT NULL,
                status_observed_at TEXT NOT NULL,
@@ -1380,10 +1410,12 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_terminal_evidence", "attempt_binding_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "attempt_scope_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "evidence_profile_digest", "TEXT NOT NULL DEFAULT ''")?;
+        ensure_column(&mut connection, "authorization_status_checks", "operation_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_status_checks", "boundary_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_status_checks", "attempt_scope_digest", "TEXT")?;
         backfill_status_check_boundary_ownership(&mut connection)?;
         backfill_receipt_operation_ids_from_dispatch(&mut connection)?;
+        backfill_status_check_operation_ids_from_dispatch(&mut connection)?;
         backfill_bound_attempt_boundaries_from_dispatch(&mut connection)?;
         backfill_attempt_scope_digests(&mut connection)?;
         validate_attempt_boundary_consistency(&connection)?;
@@ -3304,13 +3336,14 @@ fn validate_native_authority_pin_set(
         }
         tx.execute(
             "INSERT INTO authorization_status_checks
-             (authorization_instance,attempt_id,phase,status_identifier,status_source_digest,
+             (authorization_instance,attempt_id,phase,operation_id,status_identifier,status_source_digest,
               status_observed_at,status_valid_until,status_evidence_digest,boundary_id,
               attempt_scope_digest)
-             VALUES (?1,?2,'pre_entry',?3,?4,?5,?6,?7,?8,?9)",
+             VALUES (?1,?2,'pre_entry',?3,?4,?5,?6,?7,?8,?9,?10)",
             params![
                 record.authorization_instance.as_str(),
                 record.attempt_id.as_str(),
+                record.operation_id.as_str(),
                 pre_entry_status.status_identifier.as_str(),
                 pre_entry_status.status_source_digest.as_str(),
                 pre_entry_status.status_observed_at.as_str(),
@@ -8181,6 +8214,14 @@ mod tests {
         ).unwrap();
         assert_eq!(states.0,"not_entered");
         assert_eq!(states.1,"ready");
+        let status_operation_id: Option<String> = store.connection().unwrap().query_row(
+            "SELECT operation_id
+             FROM authorization_status_checks
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND phase='pre_entry'",
+            params![record.authorization_instance.as_str(),record.attempt_id.as_str()],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(status_operation_id.as_deref(), Some("operation:validity-preentry"));
         let marker_operation_id: Option<String> = store.connection().unwrap().query_row(
             "SELECT operation_id
              FROM authorization_recovery_markers
