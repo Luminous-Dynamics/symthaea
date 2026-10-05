@@ -548,7 +548,7 @@ impl HdcOntologyConformalCalibration {
 /// Versioned machine-readable binding for a real N1 conformal study artifact.
 /// This records the provenance and declared validity target around the isolated
 /// statistical primitive without turning metadata into a coverage theorem.
-pub const HDC_ONTOLOGY_CONFORMAL_EVIDENCE_SCHEMA_VERSION: u16 = 2;
+pub const HDC_ONTOLOGY_CONFORMAL_EVIDENCE_SCHEMA_VERSION: u16 = 3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HdcOntologyCoverageTarget {
@@ -569,6 +569,9 @@ pub struct HdcOntologyConformalEvidenceArtifact {
     /// This binds preprocessing, decoder settings, and other non-model
     /// configuration that can change the score distribution.
     pub inference_config_hash: String,
+    /// Canonical hash of the exact preregistered study/evaluation protocol,
+    /// including declared shift/ablation scenarios and reporting rules.
+    pub study_protocol_hash: String,
     /// Exact calibration split manifest hash.
     pub calibration_split_manifest_hash: String,
     /// Exact untouched evaluation split manifest hash.
@@ -592,6 +595,8 @@ impl HdcOntologyConformalEvidenceArtifact {
             && self.model_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && !self.inference_config_hash.trim().is_empty()
             && self.inference_config_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
+            && !self.study_protocol_hash.trim().is_empty()
+            && self.study_protocol_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && !self.calibration_split_manifest_hash.trim().is_empty()
             && self.calibration_split_manifest_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && !self.evaluation_split_manifest_hash.trim().is_empty()
@@ -2125,6 +2130,7 @@ mod tests {
             calibration,
             model_hash: "model-hash".into(),
             inference_config_hash: "config-hash".into(),
+            study_protocol_hash: "protocol-hash".into(),
             calibration_split_manifest_hash: "calibration-split".into(),
             evaluation_split_manifest_hash: "evaluation-split".into(),
             coverage_target: HdcOntologyCoverageTarget::Marginal,
@@ -2139,7 +2145,7 @@ mod tests {
             .is_ok());
 
         let mut legacy_schema = artifact.clone();
-        legacy_schema.schema_version = 1;
+        legacy_schema.schema_version = 2;
         assert!(!legacy_schema.validates());
         let legacy_encoded = serde_json::to_vec(&legacy_schema).unwrap();
         assert!(HdcOntologyConformalEvidenceArtifact::from_json_bytes(&legacy_encoded).is_err());
@@ -2156,6 +2162,10 @@ mod tests {
         let mut missing_config = artifact.clone();
         missing_config.inference_config_hash.clear();
         assert!(!missing_config.validates());
+
+        let mut missing_protocol = artifact.clone();
+        missing_protocol.study_protocol_hash.clear();
+        assert!(!missing_protocol.validates());
 
         let mut local_execution = artifact.clone();
         local_execution.execution_revision = "local".into();
