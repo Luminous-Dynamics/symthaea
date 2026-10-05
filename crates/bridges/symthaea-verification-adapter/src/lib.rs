@@ -533,9 +533,30 @@ fn validate_multikey_encoding(value: &str) -> Result<(), SnapshotError> {
             "Multikey publicKeyMultibase must contain valid base58-btc data".into(),
         )
     })?;
-    if bytes.len() < 2 {
+
+    let expected_len = match bytes.get(..2) {
+        Some([0x80, 0x24]) => 35, // P-256 public key
+        Some([0x81, 0x24]) => 51, // P-384 public key
+        Some([0xed, 0x01]) => 34, // Ed25519 public key
+        Some([0xeb, 0x01]) => 98, // BLS12-381 G2 public key
+        Some([0x86, 0x24]) => 35, // SM2 public key
+        Some([first, second]) => {
+            return Err(SnapshotError::Malformed(format!(
+                "Multikey publicKeyMultibase contains an unsupported or non-public multicodec header: {first:02x}{second:02x}"
+            )));
+        }
+        _ => {
+            return Err(SnapshotError::Malformed(
+                "Multikey publicKeyMultibase must contain a complete public multicodec header"
+                    .into(),
+            ));
+        }
+    };
+
+    if bytes.len() != expected_len {
         return Err(SnapshotError::Malformed(
-            "Multikey publicKeyMultibase must contain a multicodec header".into(),
+            "Multikey publicKeyMultibase length does not match its public key multicodec header"
+                .into(),
         ));
     }
     Ok(())
@@ -938,7 +959,7 @@ mod tests {
                     "type": "Multikey",
                     "controller": "https://example.test/controller",
                     "expires": "2026-10-06T00:00:00Z",
-                    "publicKeyMultibase": "z6MkfFakeKeyMaterial"
+                    "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
                 }],
                 "assertionMethod": ["#key-1"]
             }"##,
@@ -1110,6 +1131,29 @@ mod tests {
     }
 
     #[test]
+    fn rejects_private_multikey_header_as_public_material() {
+        let request = request();
+        let mut snapshot = snapshot();
+        let secret = format!(
+            "z{}",
+            bs58::encode([0x80, 0x26].into_iter().chain([0u8; 32])).into_string()
+        );
+        snapshot.document = snapshot.document.replace(
+            actual,
+            &secret,
+        );
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("unsupported or non-public")
+        ));
+    }
+
+    #[test]
     fn rejects_symmetric_jwk_as_public_verification_material() {
         let request = request();
         let mut snapshot = snapshot();
@@ -1157,8 +1201,8 @@ mod tests {
         let request = request();
         let mut snapshot = snapshot();
         snapshot.document = snapshot.document.replace(
-            r##""publicKeyMultibase": "z6MkfFakeKeyMaterial""##,
-            r##""publicKeyMultibase": "z6MkfFakeKeyMaterial", "publicKeyJwk": {}"##,
+            r##""publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2""##,
+            r##""publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2", "publicKeyJwk": {}"##,
         );
         let reference = snapshot.snapshot_reference().unwrap();
         let adapter =
@@ -1180,7 +1224,7 @@ mod tests {
                 "id": "https://example.test/controller#key-1",
                 "type": "Multikey",
                 "controller": "https://example.test/controller",
-                "publicKeyMultibase": "z6MkfFakeKeyMaterial"
+                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
             }]
         }"##.into();
 
@@ -1210,7 +1254,7 @@ mod tests {
                 "id": "https://example.test/controller#key-1",
                 "type": "Multikey",
                 "controller": "https://example.test/controller",
-                "publicKeyMultibase": "z6MkfFakeKeyMaterial"
+                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
             }],
             "assertionMethod": [{
                 "id": "https://example.test/controller#key-1",
