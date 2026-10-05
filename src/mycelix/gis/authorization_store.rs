@@ -4344,7 +4344,6 @@ fn validate_native_authority_pin_set(
             for row in rows {
                 recovered.push(row?);
             }
-            drop(rows);
             drop(stmt);
         }
 
@@ -4424,7 +4423,7 @@ fn validate_native_authority_pin_set(
                     receipt.action_digest,
                     receipt.authority_epoch as i64,
                     lease_boundary,
-                    lease_boundary.map(|boundary|
+                    lease_boundary.as_ref().map(|boundary|
                         compute_attempt_scope_digest(boundary.as_str(),&receipt.attempt_id)
                     ).transpose()?,
                 ],
