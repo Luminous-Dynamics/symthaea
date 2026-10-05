@@ -412,9 +412,11 @@ impl<'de> serde::de::Visitor<'de> for StrictJsonValueVisitor {
 
 fn parse_strict_json(bytes: &[u8]) -> Result<Value, SnapshotError> {
     let mut deserializer = serde_json::Deserializer::from_slice(bytes);
-    let value = StrictJsonValue
-        .deserialize(&mut deserializer)
-        .map_err(|error| {
+    let value = serde::de::DeserializeSeed::deserialize(
+        StrictJsonValue,
+        &mut deserializer,
+    )
+    .map_err(|error| {
             SnapshotError::Verification(VerificationFailure::Structural(format!(
                 "strict JSON parsing failed: {error}"
             )))
