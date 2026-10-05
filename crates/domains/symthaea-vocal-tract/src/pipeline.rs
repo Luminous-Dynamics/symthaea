@@ -1095,6 +1095,55 @@ impl VocalTractPipeline {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_pitch_range_is_independent_of_arousal() {
+        let base = FormantFrame {
+            f0: 0.0,
+            energy: 0.5,
+            ..FormantFrame::silent(0.0)
+        };
+
+        let mut narrow = ProsodyContext {
+            utterance_progress: 0.0,
+            phoneme_progress: 0.5,
+            base_f0: 200.0,
+            arousal: 0.5,
+            pitch_range: 0.65,
+            ..Default::default()
+        };
+        let mut wide = narrow;
+        wide.pitch_range = 1.45;
+
+        let mut narrow_frame = base;
+        let mut wide_frame = base;
+        narrow.apply_prosody(&mut narrow_frame);
+        wide.apply_prosody(&mut wide_frame);
+
+        assert!(narrow_frame.f0.is_finite() && wide_frame.f0.is_finite());
+        assert!(wide_frame.f0 > narrow_frame.f0);
+
+        let mut narrow_a2 = ProsodyContext {
+            arousal: 0.2,
+            ..narrow
+        };
+        let mut narrow_b2 = ProsodyContext {
+            arousal: 0.8,
+            ..narrow
+        };
+        let mut frame_a2 = base;
+        let mut frame_b2 = base;
+        narrow_a2.apply_prosody(&mut frame_a2);
+        narrow_b2.apply_prosody(&mut frame_b2);
+
+        assert_ne!(frame_a2.f0, frame_b2.f0);
+        let pitch_shape_narrow_a = frame_a2.f0 / (narrow_a2.base_f0 * (0.9 + 0.2 * 0.2));
+        let pitch_shape_narrow_b = frame_b2.f0 / (narrow_b2.base_f0 * (0.9 + 0.2 * 0.8));
+        assert!(
+            (pitch_shape_narrow_a - pitch_shape_narrow_b).abs() < 1e-6,
+            "pitch range must not depend on arousal: a={pitch_shape_narrow_a}, b={pitch_shape_narrow_b}"
+        );
+    }
     use crate::controller::SpeakerProfile;
     use crate::encoder::VoiceCognitiveState;
     use crate::fep::VocalTractObservation;
