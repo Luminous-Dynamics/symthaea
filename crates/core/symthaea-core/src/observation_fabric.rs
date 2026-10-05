@@ -383,6 +383,69 @@ impl ProcessingActivity {
     }
 }
 
+fn read_u8(bytes: &[u8], cursor: &mut usize) -> Result<u8, ObservationValidationError> {
+    let value = *bytes
+        .get(*cursor)
+        .ok_or(ObservationValidationError::InvalidIndependenceScopeWitnessV3)?;
+    *cursor += 1;
+    Ok(value)
+}
+
+fn read_u64_le(bytes: &[u8], cursor: &mut usize) -> Result<u64, ObservationValidationError> {
+    let end = cursor
+        .checked_add(8)
+        .ok_or(ObservationValidationError::InvalidIndependenceScopeWitnessV3)?;
+    let value = bytes
+        .get(*cursor..end)
+        .and_then(|slice| <[u8; 8]>::try_from(slice).ok())
+        .map(u64::from_le_bytes)
+        .ok_or(ObservationValidationError::InvalidIndependenceScopeWitnessV3)?;
+    *cursor = end;
+    Ok(value)
+}
+
+fn read_canonical_string_le(
+    bytes: &[u8],
+    cursor: &mut usize,
+) -> Result<String, ObservationValidationError> {
+    let length = usize::try_from(read_u64_le(bytes, cursor)?)
+        .map_err(|_| ObservationValidationError::InvalidIndependenceScopeWitnessV3)?;
+    let end = cursor
+        .checked_add(length)
+        .ok_or(ObservationValidationError::InvalidIndependenceScopeWitnessV3)?;
+    let value = bytes
+        .get(*cursor..end)
+        .and_then(|slice| std::str::from_utf8(slice).ok())
+        .map(ToOwned::to_owned)
+        .ok_or(ObservationValidationError::InvalidIndependenceScopeWitnessV3)?;
+    *cursor = end;
+    Ok(value)
+}
+
+fn read_canonical_string_option_le(
+    bytes: &[u8],
+    cursor: &mut usize,
+) -> Result<Option<String>, ObservationValidationError> {
+    match read_u8(bytes, cursor)? {
+        0 => Ok(None),
+        1 => Ok(Some(read_canonical_string_le(bytes, cursor)?)),
+        _ => Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3),
+    }
+}
+
+fn read_canonical_string_vec_le(
+    bytes: &[u8],
+    cursor: &mut usize,
+) -> Result<Vec<String>, ObservationValidationError> {
+    let length = usize::try_from(read_u64_le(bytes, cursor)?)
+        .map_err(|_| ObservationValidationError::InvalidIndependenceScopeWitnessV3)?;
+    let mut values = Vec::with_capacity(length);
+    for _ in 0..length {
+        values.push(read_canonical_string_le(bytes, cursor)?);
+    }
+    Ok(values)
+}
+
 fn is_canonical_hex_fingerprint(value: &str) -> bool {
     value.len() == 64
         && value
@@ -708,6 +771,9 @@ pub const INDEPENDENCE_ASSESSMENT_V3_DOMAIN_SEPARATOR: &[u8] =
     b"symthaea:observation-independence-assessment:v3\n";
 pub const INDEPENDENCE_RECEIPT_V3_DOMAIN_SEPARATOR: &[u8] =
     b"symthaea:observation-independence-receipt:v3\n";
+const INDEPENDENCE_SCOPE_V3_SOURCE_ROLE: u8 = 0b001;
+const INDEPENDENCE_SCOPE_V3_TARGET_ROLE: u8 = 0b010;
+const INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE: u8 = 0b100;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IndependenceVerifierContract {
@@ -816,6 +882,299 @@ impl IndependenceAssessmentV3 {
     pub fn verify_fingerprint(&self) -> bool {
         self.verifier_version == INDEPENDENCE_VERIFIER_VERSION_V3
             && self.assessment_fingerprint == self.compute_fingerprint()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IndependenceScopeAssetV3 {
+    pub hash_algorithm: String,
+    pub content_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IndependenceScopeWitnessRecordV3 {
+    pub observation_id: String,
+    /// Source, target, and recursive-ancestor role bits. A source/target may
+    /// also carry the ancestor bit when it is itself on the other endpoint's
+    /// recursive lineage.
+    pub role: u8,
+    pub sensor_id: Option<String>,
+    pub coverage: Option<ProvenanceCoverage>,
+    pub platform_id: Option<String>,
+    pub parent_observation_ids: Vec<String>,
+    pub processing_activity_id: Option<String>,
+    pub asset_identity: Option<IndependenceScopeAssetV3>,
+}
+
+/// Typed, canonical v3 scope witness.
+///
+/// The wire representation is exactly the existing
+/// `independence_verification_reachable_scope_canonical_bytes_v3` encoding.
+/// This type adds a parser/validator around that representation; it does not
+/// introduce a new fingerprint domain or change existing v3 bytes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IndependenceScopeWitnessV3 {
+    pub records: Vec<IndependenceScopeWitnessRecordV3>,
+}
+
+impl IndependenceScopeWitnessV3 {
+    pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, ObservationValidationError> {
+        let mut cursor = 0usize;
+        if !bytes.starts_with(INDEPENDENCE_SCOPE_V3_DOMAIN_SEPARATOR) {
+            return Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3);
+        }
+        cursor += INDEPENDENCE_SCOPE_V3_DOMAIN_SEPARATOR.len();
+
+        let header_ids = read_canonical_string_vec_le(bytes, &mut cursor)?;
+        if header_ids.len() < 2
+            || header_ids.windows(2).any(|pair| pair[0] >= pair[1])
+            || header_ids.iter().any(|id| id.trim().is_empty())
+        {
+            return Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3);
+        }
+
+        let mut records = Vec::with_capacity(header_ids.len());
+        for expected_id in &header_ids {
+            let observation_id = read_canonical_string_le(bytes, &mut cursor)?;
+            if &observation_id != expected_id {
+                return Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3);
+            }
+
+            let role = read_u8(bytes, &mut cursor)?;
+            if !matches!(
+                role,
+                INDEPENDENCE_SCOPE_V3_SOURCE_ROLE
+                    | INDEPENDENCE_SCOPE_V3_TARGET_ROLE
+                    | INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE
+                    | (INDEPENDENCE_SCOPE_V3_SOURCE_ROLE | INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE)
+                    | (INDEPENDENCE_SCOPE_V3_TARGET_ROLE | INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE)
+            ) {
+                return Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3);
+            }
+
+            let (sensor_id, coverage, platform_id) =
+                if role & (INDEPENDENCE_SCOPE_V3_SOURCE_ROLE | INDEPENDENCE_SCOPE_V3_TARGET_ROLE) != 0
+                {
+                    let sensor_id = read_canonical_string_le(bytes, &mut cursor)?;
+                    if sensor_id.trim().is_empty() {
+                        return Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3);
+                    }
+                    let coverage = match read_u8(bytes, &mut cursor)? {
+                        0 => ProvenanceCoverage::Complete,
+                        1 => ProvenanceCoverage::Partial,
+                        2 => ProvenanceCoverage::Redacted,
+                        _ => {
+                            return Err(
+                                ObservationValidationError::InvalidIndependenceScopeWitnessV3
+                            )
+                        }
+                    };
+                    let platform_id = read_canonical_string_option_le(bytes, &mut cursor)?;
+                    (Some(sensor_id), Some(coverage), platform_id)
+                } else {
+                    (None, None, None)
+                };
+
+            let parent_observation_ids = read_canonical_string_vec_le(bytes, &mut cursor)?;
+            let mut unique_parent_ids = HashSet::with_capacity(parent_observation_ids.len());
+            if parent_observation_ids.iter().any(|parent| {
+                parent.trim().is_empty()
+                    || parent == &observation_id
+                    || !unique_parent_ids.insert(parent.as_str())
+            }) {
+                return Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3);
+            }
+
+            let processing_activity_id =
+                read_canonical_string_option_le(bytes, &mut cursor)?;
+            if processing_activity_id
+                .as_deref()
+                .is_some_and(|id| id.trim().is_empty())
+            {
+                return Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3);
+            }
+
+            let asset_identity =
+                if role & (INDEPENDENCE_SCOPE_V3_SOURCE_ROLE | INDEPENDENCE_SCOPE_V3_TARGET_ROLE) != 0
+                {
+                    match read_u8(bytes, &mut cursor)? {
+                        0 => None,
+                        1 => {
+                            let hash_algorithm = read_canonical_string_le(bytes, &mut cursor)?;
+                            let content_hash = read_canonical_string_le(bytes, &mut cursor)?;
+                            if hash_algorithm != "blake3"
+                                || content_hash.len() != 64
+                                || !content_hash.bytes().all(|byte| byte.is_ascii_hexdigit())
+                            {
+                                return Err(
+                                    ObservationValidationError::InvalidIndependenceScopeWitnessV3
+                                );
+                            }
+                            Some(IndependenceScopeAssetV3 {
+                                hash_algorithm,
+                                content_hash,
+                            })
+                        }
+                        _ => {
+                            return Err(
+                                ObservationValidationError::InvalidIndependenceScopeWitnessV3
+                            )
+                        }
+                    }
+                } else {
+                    None
+                };
+
+            records.push(IndependenceScopeWitnessRecordV3 {
+                observation_id,
+                role,
+                sensor_id,
+                coverage,
+                platform_id,
+                parent_observation_ids,
+                processing_activity_id,
+                asset_identity,
+            });
+        }
+
+        if cursor != bytes.len() {
+            return Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3);
+        }
+
+        let witness = Self { records };
+        if !witness.is_well_formed() || witness.canonical_bytes()? != bytes {
+            return Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3);
+        }
+        Ok(witness)
+    }
+
+    pub fn is_well_formed(&self) -> bool {
+        if self.records.len() < 2 {
+            return false;
+        }
+
+        let mut previous = None::<&str>;
+        let mut endpoint_count = 0usize;
+        for record in &self.records {
+            if record.observation_id.trim().is_empty() {
+                return false;
+            }
+            if previous.is_some_and(|id| id >= record.observation_id.as_str()) {
+                return false;
+            }
+            previous = Some(record.observation_id.as_str());
+
+            let endpoint = record.role
+                & (INDEPENDENCE_SCOPE_V3_SOURCE_ROLE | INDEPENDENCE_SCOPE_V3_TARGET_ROLE)
+                != 0;
+            if endpoint {
+                endpoint_count += 1;
+                if record.sensor_id.as_deref().is_none_or(str::is_empty)
+                    || record.coverage.is_none()
+                {
+                    return false;
+                }
+            } else if record.sensor_id.is_some()
+                || record.coverage.is_some()
+                || record.platform_id.is_some()
+                || record.asset_identity.is_some()
+            {
+                return false;
+            }
+
+            let mut parents = HashSet::with_capacity(record.parent_observation_ids.len());
+            if record.parent_observation_ids.iter().any(|parent| {
+                parent.trim().is_empty()
+                    || parent == &record.observation_id
+                    || !parents.insert(parent.as_str())
+            }) {
+                return false;
+            }
+            if record
+                .processing_activity_id
+                .as_deref()
+                .is_some_and(str::is_empty)
+            {
+                return false;
+            }
+            if record.asset_identity.as_ref().is_some_and(|asset| {
+                asset.hash_algorithm != "blake3"
+                    || asset.content_hash.len() != 64
+                    || !asset.content_hash.bytes().all(|byte| byte.is_ascii_hexdigit())
+            }) {
+                return false;
+            }
+        }
+
+        endpoint_count == 2
+            || endpoint_count == 3
+    }
+
+    pub fn observation_ids(&self) -> Vec<String> {
+        self.records
+            .iter()
+            .map(|record| record.observation_id.clone())
+            .collect()
+    }
+
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, ObservationValidationError> {
+        if !self.is_well_formed() {
+            return Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3);
+        }
+
+        let observation_ids = self.observation_ids();
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(INDEPENDENCE_SCOPE_V3_DOMAIN_SEPARATOR);
+        write_canonical_string_vec_bytes(&mut bytes, &observation_ids);
+
+        for record in &self.records {
+            write_canonical_string_bytes(&mut bytes, &record.observation_id);
+            bytes.push(record.role);
+
+            if record.role
+                & (INDEPENDENCE_SCOPE_V3_SOURCE_ROLE | INDEPENDENCE_SCOPE_V3_TARGET_ROLE)
+                != 0
+            {
+                write_canonical_string_bytes(
+                    &mut bytes,
+                    record.sensor_id.as_deref().expect("well-formed endpoint"),
+                );
+                write_canonical_provenance_coverage_bytes(
+                    &mut bytes,
+                    &record.coverage.expect("well-formed endpoint"),
+                );
+                write_canonical_string_option_bytes(
+                    &mut bytes,
+                    record.platform_id.as_deref(),
+                );
+            }
+
+            write_canonical_string_vec_bytes(&mut bytes, &record.parent_observation_ids);
+            write_canonical_string_option_bytes(
+                &mut bytes,
+                record.processing_activity_id.as_deref(),
+            );
+
+            if record.role
+                & (INDEPENDENCE_SCOPE_V3_SOURCE_ROLE | INDEPENDENCE_SCOPE_V3_TARGET_ROLE)
+                != 0
+            {
+                match &record.asset_identity {
+                    Some(asset) => {
+                        bytes.push(1);
+                        write_canonical_string_bytes(&mut bytes, &asset.hash_algorithm);
+                        write_canonical_string_bytes(&mut bytes, &asset.content_hash);
+                    }
+                    None => bytes.push(0),
+                }
+            }
+        }
+
+        Ok(bytes)
+    }
+
+    pub fn fingerprint(&self) -> Result<String, ObservationValidationError> {
+        Ok(blake3::hash(&self.canonical_bytes()?).to_hex().to_string())
     }
 }
 
@@ -940,10 +1299,16 @@ impl IndependenceVerificationReceiptV3 {
     /// contract. No observation graph traversal or producer-side classifier is
     /// invoked here.
     pub fn verify_against_scope_witness(&self, canonical_scope_bytes: &[u8]) -> bool {
+        let Ok(witness) =
+            IndependenceScopeWitnessV3::from_canonical_bytes(canonical_scope_bytes)
+        else {
+            return false;
+        };
         self.verify_integrity()
-            && canonical_scope_bytes.starts_with(INDEPENDENCE_SCOPE_V3_DOMAIN_SEPARATOR)
             && blake3::hash(canonical_scope_bytes).to_hex().to_string()
                 == self.examined_scope_fingerprint
+            && witness.fingerprint().ok() == Some(self.examined_scope_fingerprint.clone())
+            && witness.observation_ids() == self.examined_observation_ids
     }
 
     pub fn verify_against_graph_detailed(
@@ -1800,21 +2165,23 @@ impl ObservationGraph {
             ObservationValidationError::MissingRelationEndpoint(target_observation_id.to_string())
         })?;
 
-        const SOURCE_ROLE: u8 = 0b001;
-        const TARGET_ROLE: u8 = 0b010;
-        const ANCESTOR_ROLE: u8 = 0b100;
-
         let mut roles = HashMap::<String, u8>::new();
-        roles.insert(source_observation_id.to_string(), SOURCE_ROLE);
-        roles.insert(target_observation_id.to_string(), TARGET_ROLE);
+        roles.insert(
+            source_observation_id.to_string(),
+            INDEPENDENCE_SCOPE_V3_SOURCE_ROLE,
+        );
+        roles.insert(
+            target_observation_id.to_string(),
+            INDEPENDENCE_SCOPE_V3_TARGET_ROLE,
+        );
 
         let source_ancestors = Self::ancestor_ids(source_observation_id, &by_id)?;
         let target_ancestors = Self::ancestor_ids(target_observation_id, &by_id)?;
         for ancestor_id in source_ancestors.into_iter().chain(target_ancestors) {
             roles
                 .entry(ancestor_id)
-                .and_modify(|role| *role |= ANCESTOR_ROLE)
-                .or_insert(ANCESTOR_ROLE);
+                .and_modify(|role| *role |= INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE)
+                .or_insert(INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE);
         }
 
         Ok(roles)
@@ -1880,7 +2247,9 @@ impl ObservationGraph {
                 ObservationValidationError::MissingRelationEndpoint(observation_id.clone())
             })?;
 
-            if role & (SOURCE_ROLE | TARGET_ROLE) != 0 {
+            if role
+                & (INDEPENDENCE_SCOPE_V3_SOURCE_ROLE | INDEPENDENCE_SCOPE_V3_TARGET_ROLE)
+                != 0 {
                 write_canonical_string_bytes(&mut bytes, &observation.provenance.source.sensor_id);
                 write_canonical_provenance_coverage_bytes(
                     &mut bytes,
@@ -1905,7 +2274,9 @@ impl ObservationGraph {
                     .map(|activity| activity.activity_id.as_str()),
             );
 
-            if role & (SOURCE_ROLE | TARGET_ROLE) != 0 {
+            if role
+                & (INDEPENDENCE_SCOPE_V3_SOURCE_ROLE | INDEPENDENCE_SCOPE_V3_TARGET_ROLE)
+                != 0 {
                 match observation.asset.as_ref() {
                     Some(asset) => {
                         bytes.push(1);
@@ -2316,6 +2687,8 @@ pub enum ObservationValidationError {
     DuplicateObservationRelation,
     #[error("relation endpoint is not present in the closed graph: {0}")]
     MissingRelationEndpoint(String),
+    #[error("invalid v3 independence scope witness")]
+    InvalidIndependenceScopeWitnessV3,
     #[error("invalid receipt attestation envelope")]
     InvalidReceiptAttestationEnvelope,
 }
