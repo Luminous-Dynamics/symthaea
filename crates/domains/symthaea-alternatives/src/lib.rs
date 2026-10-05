@@ -26,7 +26,7 @@ pub mod corpus;
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 6;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-diversity-v11";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-diversity-v12";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -205,6 +205,62 @@ pub struct EvidenceSourceIdentity {
     pub artifact_digest: String,
     /// Optional issuer key fingerprint for future cryptographic attestation.
     pub issuer_key_fingerprint: Option<String>,
+    /// Optional externally qualified source-authority admission reference.
+    pub admission: Option<SourceAdmissionRef>,
+}
+
+/// Reference to an externally qualified source-authority admission.
+///
+/// This structure carries the exact policy/admission identity used by an
+/// external authority boundary such as Mycelix. It does not perform or imply
+/// cryptographic verification inside this crate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourceAdmissionRef {
+    /// Stable identifier for the source-admissibility policy.
+    pub policy_id: String,
+    /// Policy revision.
+    pub policy_revision: String,
+    /// Digest of the exact source-admissibility policy.
+    pub policy_digest: String,
+    /// Stable identity of the admission record.
+    pub admission_id: String,
+    /// Authority epoch/generation under which the admission was issued.
+    pub authority_epoch: String,
+    /// Optional canonical fault-domain identity supplied by the authority policy.
+    pub fault_domain_id: Option<String>,
+    /// Optional Unix timestamp from which the admission is valid.
+    pub valid_from_epoch_seconds: Option<i64>,
+    /// Optional Unix timestamp through which the admission is valid.
+    pub valid_until_epoch_seconds: Option<i64>,
+}
+
+impl SourceAdmissionRef {
+    /// Validate the externally supplied admission reference structurally.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.policy_id.is_empty()
+            || self.policy_revision.is_empty()
+            || self.policy_digest.is_empty()
+            || self.admission_id.is_empty()
+            || self.authority_epoch.is_empty()
+        {
+            return Err(AssessmentError::EmptySourceAdmissionReference);
+        }
+        if self
+            .fault_domain_id
+            .as_ref()
+            .is_some_and(String::is_empty)
+        {
+            return Err(AssessmentError::EmptySourceAdmissionReference);
+        }
+        if let (Some(from), Some(until)) = (
+            self.valid_from_epoch_seconds,
+            self.valid_until_epoch_seconds,
+        ) && from > until
+        {
+            return Err(AssessmentError::InvalidSourceAdmissionValidity { from, until });
+        }
+        Ok(())
+    }
 }
 
 impl EvidenceSourceIdentity {
@@ -222,6 +278,9 @@ impl EvidenceSourceIdentity {
             .is_some_and(String::is_empty)
         {
             return Err(AssessmentError::EmptySourceIdentity);
+        }
+        if let Some(admission) = &self.admission {
+            admission.validate()?;
         }
         Ok(())
     }
@@ -1248,6 +1307,10 @@ pub enum AssessmentError {
     DuplicateEvidenceId(String),
     /// Evidence provenance source identity is incomplete.
     EmptySourceIdentity,
+    /// External source admission reference is incomplete.
+    EmptySourceAdmissionReference,
+    /// External source admission validity bounds are inverted.
+    InvalidSourceAdmissionValidity { from: i64, until: i64 },
     /// A requirement set contains no requirements.
     EmptyRequirementSet,
     /// A requirement-set map key does not match the requirement's stable ID.
@@ -1336,6 +1399,12 @@ impl std::fmt::Display for AssessmentError {
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate id {id}"),
             Self::DuplicateEvidenceId(id) => write!(f, "duplicate evidence id {id}"),
             Self::EmptySourceIdentity => write!(f, "evidence source identity is incomplete"),
+            Self::EmptySourceAdmissionReference => {
+                write!(f, "source admission reference is incomplete")
+            }
+            Self::InvalidSourceAdmissionValidity { from, until } => {
+                write!(f, "source admission validity [{from}, {until}] is inverted")
+            },
             Self::EmptyRequirementSet => write!(f, "requirement set is empty"),
             Self::RequirementSetKeyMismatch { key, requirement_id } => write!(
                 f,
@@ -1871,6 +1940,7 @@ mod tests {
                 artifact_id: format!("artifact:{id}"),
                 artifact_digest: format!("fixture-digest:{id}"),
                 issuer_key_fingerprint: None,
+                admission: None,
             },
             scope: "synthetic functional unit".into(),
             unit: Some("unit".into()),
@@ -2651,6 +2721,32 @@ mod tests {
     }
 
     #[test]
+    fn source_admission_reference_validates_without_claiming_authenticity() {
+        let mut source = EvidenceSourceIdentity {
+            authority_id: "authority".into(),
+            artifact_id: "artifact".into(),
+            artifact_digest: "digest".into(),
+            issuer_key_fingerprint: None,
+            admission: Some(SourceAdmissionRef {
+                policy_id: "policy".into(),
+                policy_revision: "r1".into(),
+                policy_digest: "policy-digest".into(),
+                admission_id: "admission".into(),
+                authority_epoch: "epoch-1".into(),
+                fault_domain_id: Some("domain-a".into()),
+                valid_from_epoch_seconds: Some(100),
+                valid_until_epoch_seconds: Some(200),
+            }),
+        };
+        assert!(source.validate().is_ok());
+        source.admission.as_mut().unwrap().valid_until_epoch_seconds = Some(50);
+        assert!(matches!(
+            source.validate().unwrap_err(),
+            AssessmentError::InvalidSourceAdmissionValidity { from: 100, until: 50 }
+        ));
+    }
+
+    #[test]
     fn duplicate_evidence_id_fails_closed() {
         let mut c = candidate(
             "duplicate-evidence",
@@ -2678,18 +2774,21 @@ mod tests {
             artifact_id: "artifact-1".into(),
             artifact_digest: "digest-1".into(),
             issuer_key_fingerprint: None,
+            admission: None,
         };
         let b = EvidenceSourceIdentity {
             authority_id: "authority-a".into(),
             artifact_id: "artifact-2".into(),
             artifact_digest: "digest-2".into(),
             issuer_key_fingerprint: None,
+            admission: None,
         };
         let c = EvidenceSourceIdentity {
             authority_id: "authority-b".into(),
             artifact_id: "artifact-3".into(),
             artifact_digest: "digest-3".into(),
             issuer_key_fingerprint: None,
+            admission: None,
         };
 
         assert_eq!(a.authority_group_id(), b.authority_group_id());
