@@ -177,8 +177,8 @@ The handoff binds identities and provenance but preserves each stage's independe
 
 1. Stabilize #6869 PhysicalType semantics.
 2. Define a canonical Ramanujan hypothesis envelope using existing evidence/result infrastructure. The initial AST-free `ScientificHypothesisHandoff` prototype now lives in `symthaea-types`.
-3. Add a one-way Ramanujan -> EUREKA handoff receipt.
-4. Make EUREKA experiment selection independent of candidate search ranking.
+3. Add a one-way Ramanujan -> EUREKA handoff receipt. The first `ScientificHypothesisHandoff` implementation is now available in `symthaea-types` and is emitted directly from `Conjecture` without consulting EUREKA.
+4. Make EUREKA experiment selection independent of candidate search ranking. The first `ScientificInquirySelectionReceipt` implementation records the exact handoff/set/challenge identities, selector revision, seed, and predicted information value, while remaining explicitly non-outcome.
 5. Add physics-specific discriminative experiments.
 6. Permit model-revision feedback only into a new Ramanujan campaign.
 7. Add cross-domain structural-transfer tests.
@@ -207,3 +207,32 @@ Neither replaces the other.
 
 
 Implementation note: the first AST-free handoff envelope is now available as `symthaea_types::discovery_handoff::ScientificHypothesisHandoff`. It binds candidate identity, PhysicalType identity, model maturity, observation/search/discovery provenance, complexity, source, explicit non-claims, and an optional immutable EUREKA challenge-manifest commitment. It contains no EUREKA outcome field.
+
+
+## Current executable integration slice
+
+The current branch implements the following value-level chain:
+
+```text
+Ramanujan Conjecture
+   -> exact candidate identity digest
+   -> PhysicalType identity digest
+   -> ScientificHypothesisHandoff
+   -> independent experiment selector
+   -> ScientificInquirySelectionReceipt
+```
+
+No EUREKA outcome is written into the handoff or selection receipt.
+
+The candidate digest is derived from the exact symbolic expression AST, source identity, domain tag, and complexity rather than the human-readable formula formatter. This avoids collisions caused by display rounding of floating-point constants.
+
+The experiment selector now explicitly preserves first-occurrence tie breaking, and a dedicated regression covers exact ties.
+
+The current workflow therefore has an intentionally asymmetric dependency:
+
+```text
+Ramanujan -> hypothesis identity -> EUREKA challenge
+EUREKA outcome -X-> original Ramanujan campaign
+```
+
+A later model-revision campaign may consume the closed result as a new input, but it receives a new campaign/search identity.
