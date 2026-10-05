@@ -235,19 +235,25 @@ impl LiveVoice {
             anyhow::bail!("phonological plan is not ready for realization");
         }
 
+        let scheduled_frames_for = |index: usize, segment: &symthaea_broca::PhonemeSlot| {
+            let mut frames = predict_duration(
+                &segment.symbol,
+                segment.stress.ordinal(),
+                false,
+                index + 1 == plan.segments.len(),
+                plan.rate,
+            );
+            if segment.symbol.eq_ignore_ascii_case("SIL") {
+                frames = ((frames as f32) * (1.0 + plan.pause_weight)).round() as usize;
+            }
+            frames
+        };
+
         let total_frames = plan
             .segments
             .iter()
             .enumerate()
-            .map(|(index, segment)| {
-                predict_duration(
-                    &segment.symbol,
-                    segment.stress.ordinal(),
-                    false,
-                    index + 1 == plan.segments.len(),
-                    plan.rate,
-                )
-            })
+            .map(|(index, segment)| scheduled_frames_for(index, segment))
             .sum::<usize>();
 
         let samples_per_frame = (self.sample_rate() / FRAME_RATE.max(1)) as usize;
@@ -256,20 +262,10 @@ impl LiveVoice {
 
         let last_index = plan.segments.len().saturating_sub(1);
         for (index, segment) in plan.segments.iter().enumerate() {
-            let mut frames = predict_duration(
-                &segment.symbol,
-                segment.stress.ordinal(),
-                false,
-                index == last_index,
-                plan.rate,
-            );
-
             // Pause weight is only realized when the phonological plan explicitly encodes
             // a silence segment; this prevents inventing pause locations from an abstract
             // scalar alone.
-            if segment.symbol.eq_ignore_ascii_case("SIL") {
-                frames = ((frames as f32) * (1.0 + plan.pause_weight)).round() as usize;
-            }
+            let frames = scheduled_frames_for(index, segment);
 
             let phoneme = if segment.symbol.eq_ignore_ascii_case("SIL") {
                 None
@@ -916,7 +912,10 @@ mod tests {
                 .to_string()
         );
         assert_eq!(receipt.segment_count, 1);
-        assert_eq!(receipt.sample_count, receipt.scheduler_frames * 120);
+        assert_eq!(
+            receipt.sample_count,
+            receipt.scheduler_frames * (receipt.sample_rate / FRAME_RATE) as usize
+        );
         assert_eq!(receipt.sample_rate, 24_000);
         assert_eq!(receipt.rate, plan.rate);
         assert_eq!(receipt.pitch_range, plan.pitch_range);
