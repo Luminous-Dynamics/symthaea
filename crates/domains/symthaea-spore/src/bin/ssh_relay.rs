@@ -33,6 +33,57 @@ use tokio_rustls::TlsAcceptor;
 
 /// Execute a shell command locally and return stdout/stderr + exit status.
 /// Replaces the previous SSH-to-localhost pattern.
+fn system_owned_executable(candidates: &[&'static str]) -> Result<&'static str, std::io::Error> {
+    candidates
+        .iter()
+        .copied()
+        .find(|path| std::path::Path::new(path).is_file())
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "executable not found in known system-owned paths",
+            )
+        })
+}
+
+fn nixos_rebuild_executable() -> Result<&'static str, std::io::Error> {
+    system_owned_executable(&[
+        "/run/current-system/sw/bin/nixos-rebuild",
+        "/nix/var/nix/profiles/system/sw/bin/nixos-rebuild",
+        "/usr/bin/nixos-rebuild",
+    ])
+}
+
+fn nix_env_executable() -> Result<&'static str, std::io::Error> {
+    system_owned_executable(&[
+        "/run/current-system/sw/bin/nix-env",
+        "/nix/var/nix/profiles/system/sw/bin/nix-env",
+        "/usr/bin/nix-env",
+    ])
+}
+
+fn nmcli_executable() -> Result<&'static str, std::io::Error> {
+    system_owned_executable(&[
+        "/run/current-system/sw/bin/nmcli",
+        "/nix/var/nix/profiles/system/sw/bin/nmcli",
+        "/usr/bin/nmcli",
+        "/bin/nmcli",
+    ])
+}
+
+async fn run_direct_command(executable: &str, args: &[String]) -> Result<CmdResult, std::io::Error> {
+    let output = tokio::process::Command::new(executable)
+        .args(args)
+        .output()
+        .await?;
+
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
 struct CmdResult {
     pub stdout: String,
     pub stderr: String,
@@ -4045,9 +4096,25 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
 
             "rollback" => {
                 eprintln!("[{}] Rolling back...", peer_addr);
-                match run_cmd("nixos-rebuild switch --rollback 2>&1").await {
+                let executable = match nixos_rebuild_executable() {
+                    Ok(path) => path,
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Rollback unavailable: {}", e)).to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let args = vec!["switch".to_string(), "--rollback".to_string()];
+                match run_direct_command(executable, &args).await {
                     Ok(r) => {
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>()}).to_string())).await;
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({
+                            "type": "exit",
+                            "code": r.exit_status,
+                            "data": r.stdout.chars().take(2000).collect::<String>()
+                        }).to_string())).await;
                     }
                     Err(e) => {
                         let _ = ws_tx
@@ -4070,18 +4137,86 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                     continue;
                 }
                 eprintln!("[{}] Switching to generation {}...", peer_addr, r#gen);
-                let cmd = format!(
-                    "nix-env --switch-generation {} -p /nix/var/nix/profiles/system && /nix/var/nix/profiles/system/bin/switch-to-configuration switch 2>&1",
-                    r#gen
-                );
-                match run_cmd(&cmd).await {
-                    Ok(r) => {
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>()}).to_string())).await;
+                let executable = match nix_env_executable() {
+                    Ok(path) => path,
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Generation switch unavailable: {}", e))
+                                    .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let first_args = vec![
+                    "--switch-generation".to_string(),
+                    r#gen.to_string(),
+                    "-p".to_string(),
+                    "/nix/var/nix/profiles/system".to_string(),
+                ];
+                match run_direct_command(executable, &first_args).await {
+                    Ok(first) if first.exit_status == 0 => {
+                        let switch_executable =
+                            "/nix/var/nix/profiles/system/bin/switch-to-configuration";
+                        if !std::path::Path::new(switch_executable).is_file() {
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    RelayMessage::error(
+                                        "Generation switch failed: switch-to-configuration is unavailable",
+                                    )
+                                    .to_json(),
+                                ))
+                                .await;
+                            continue;
+                        }
+                        let second_args = vec!["switch".to_string()];
+                        match run_direct_command(switch_executable, &second_args).await {
+                            Ok(second) => {
+                                let mut data = first.stdout;
+                                data.push_str(&second.stdout);
+                                if second.exit_status == 0 {
+                                    let _ = ws_tx.send(Message::Text(serde_json::json!({
+                                        "type": "exit",
+                                        "code": second.exit_status,
+                                        "data": data.chars().take(2000).collect::<String>()
+                                    }).to_string())).await;
+                                } else {
+                                    let _ = ws_tx.send(Message::Text(RelayMessage::error(
+                                        &format!(
+                                            "Switch-to-configuration failed (exit {}): {}",
+                                            second.exit_status,
+                                            second.stderr.chars().take(500).collect::<String>()
+                                        )
+                                    ).to_json())).await;
+                                }
+                            }
+                            Err(e) => {
+                                let _ = ws_tx
+                                    .send(Message::Text(
+                                        RelayMessage::error(&format!("Switch failed: {}", e)).to_json(),
+                                    ))
+                                    .await;
+                            }
+                        }
+                    }
+                    Ok(first) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Generation switch failed (exit {}): {}",
+                                    first.exit_status,
+                                    first.stderr.chars().take(500).collect::<String>()
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
                     }
                     Err(e) => {
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!("Switch failed: {}", e)).to_json(),
+                                RelayMessage::error(&format!("Generation switch failed: {}", e))
+                                    .to_json(),
                             ))
                             .await;
                     }
@@ -4739,9 +4874,9 @@ echo '}'
             }
 
             "connect_wifi" => {
-                // Reuse hostname field for SSID, command field for WiFi password
+                // Reuse hostname field for SSID, command field for WiFi password.
                 let ssid = client_msg.hostname.trim().to_string();
-                let wifi_pw = &client_msg.command;
+                let wifi_pw = client_msg.command.as_str();
                 if ssid.is_empty() {
                     let _ = ws_tx
                         .send(Message::Text(
@@ -4750,17 +4885,35 @@ echo '}'
                         .await;
                 } else {
                     eprintln!("[{}] Connecting to WiFi: {}", peer_addr, ssid);
-                    let cmd = format!(
-                        "nmcli device wifi connect '{}' password '{}'",
-                        ssid.replace('\'', "'\\''"),
-                        wifi_pw.replace('\'', "'\\''")
-                    );
-                    match run_cmd(&cmd).await {
+                    let executable = match nmcli_executable() {
+                        Ok(path) => path,
+                        Err(e) => {
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    RelayMessage::error(&format!("WiFi unavailable: {}", e)).to_json(),
+                                ))
+                                .await;
+                            continue;
+                        }
+                    };
+                    let args = vec![
+                        "device".to_string(),
+                        "wifi".to_string(),
+                        "connect".to_string(),
+                        ssid.clone(),
+                        "password".to_string(),
+                        wifi_pw.to_string(),
+                    ];
+                    match run_direct_command(executable, &args).await {
                         Ok(r) => {
                             let _ = ws_tx.send(Message::Text(serde_json::json!({
                                 "type": "wifi_result",
                                 "code": r.exit_status,
-                                "data": if r.exit_status == 0 { "WiFi connected".to_string() } else { r.stderr }
+                                "data": if r.exit_status == 0 {
+                                    "WiFi connected".to_string()
+                                } else {
+                                    r.stderr
+                                }
                             }).to_string())).await;
                         }
                         Err(e) => {
@@ -5032,6 +5185,27 @@ echo '}'
     // Cleanup
     tracker.lock().await.release(&peer_addr);
     eprintln!("[{}] WebSocket disconnected", peer_addr);
+}
+
+#[cfg(test)]
+mod management_direct_argv_tests {
+    use super::{system_owned_executable, nix_env_executable, nixos_rebuild_executable, nmcli_executable};
+
+    #[test]
+    fn resolvers_never_fall_back_to_inherited_path_lookup() {
+        let candidates = [
+            "/run/current-system/sw/bin/example",
+            "/nix/var/nix/profiles/system/sw/bin/example",
+            "/usr/bin/example",
+            "/bin/example",
+        ];
+        let _ = system_owned_executable(&candidates);
+        assert!(candidates.iter().all(|path| path.starts_with("/run/current-system/")
+            || path.starts_with("/nix/var/nix/profiles/system/")
+            || path.starts_with("/usr/bin/")
+            || path.starts_with("/bin/")));
+        let _ = (nix_env_executable, nixos_rebuild_executable, nmcli_executable);
+    }
 }
 
 fn generate_auth_token() -> String {
