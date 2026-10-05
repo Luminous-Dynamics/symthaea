@@ -225,6 +225,7 @@ pub enum ChannelOperation {
 pub enum FlakeOperation {
     Update { inputs: Vec<String> },
     Lock { inputs: Vec<String> },
+    Init { template: Option<String> },
     Show,
     Check,
 }
@@ -350,6 +351,9 @@ impl NixOSCommand {
             } => SafetyLevel::UserModify,
             Self::Flake {
                 operation: FlakeOperation::Lock { .. },
+            } => SafetyLevel::UserModify,
+            Self::Flake {
+                operation: FlakeOperation::Init { .. },
             } => SafetyLevel::UserModify,
             Self::HomeManagerSwitch { .. } => SafetyLevel::UserModify,
 
@@ -514,6 +518,14 @@ impl NixOSCommand {
                     for input in inputs {
                         args.push("--update-input".to_string());
                         args.push(input.clone());
+                    }
+                    ("nix".to_string(), args)
+                }
+                FlakeOperation::Init { template } => {
+                    let mut args = vec!["flake".to_string(), "init".to_string()];
+                    if let Some(template) = template {
+                        args.push("--template".to_string());
+                        args.push(template.clone());
                     }
                     ("nix".to_string(), args)
                 }
