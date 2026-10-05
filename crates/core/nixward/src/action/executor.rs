@@ -12,7 +12,6 @@
 use crate::action::authorization::NixLocalExecutionAuthorityV1;
 use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use crate::action::service_manager::ServiceManager;
-#[cfg(test)]
 use crate::action::service_state::NixServiceObservedStateV1;
 use crate::traits::{ActionType, ConsciousnessThresholds, PhiAwareScoring};
 use serde::{Deserialize, Serialize};
@@ -43,7 +42,7 @@ fn parse_generation_pre_state_identity(identity: &str) -> Result<u32, String> {
 
 fn parse_service_pre_state_identity(
     identity: &str,
-) -> Result<(Option<u64>, String, String), String> {
+) -> Result<(u64, String, String), String> {
     let mut parts = identity.split('|');
     if parts.next() != Some(SERVICE_PRE_STATE_IDENTITY_PREFIX_V1)
         || parts.clone().count() != 3
@@ -55,15 +54,14 @@ fn parse_service_pre_state_identity(
         .next()
         .and_then(|part| part.strip_prefix("generation="))
         .ok_or_else(|| format!("service pre-state identity missing generation: {identity}"))?;
-    let generation = if generation == "none" {
+    if generation == "none" {
         return Err(
             "service execution authority requires a bound NixOS generation".to_string(),
         );
-    } else {
-        generation
-            .parse::<u64>()
-            .map_err(|_| format!("invalid service pre-state generation: {identity}"))?
-    };
+    }
+    let generation = generation
+        .parse::<u64>()
+        .map_err(|_| format!("invalid service pre-state generation: {identity}"))?;
 
     let unit = parts
         .next()
@@ -88,9 +86,50 @@ fn parse_service_pre_state_identity(
         ));
     }
 
-    Ok((Some(generation), unit, digest.to_string()))
+    Ok((generation, unit, digest.to_string()))
 }
 
+
+fn validate_service_pre_state_observation(
+    identity: &str,
+    command_unit: &str,
+    actual_generation: u64,
+    observed: &NixServiceObservedStateV1,
+) -> Result<(), String> {
+    let (expected_generation, expected_unit, expected_state_digest) =
+        parse_service_pre_state_identity(identity)?;
+
+    if expected_generation != actual_generation {
+        return Err(format!(
+            "execution authority is stale: approved generation={} but current generation={}",
+            expected_generation, actual_generation
+        ));
+    }
+    if expected_unit != command_unit {
+        return Err(format!(
+            "service execution authority unit mismatch: approved={} command={}",
+            expected_unit, command_unit
+        ));
+    }
+    if observed.unit() != command_unit {
+        return Err(format!(
+            "service observation canonical identity mismatch: requested={} observed={}",
+            command_unit,
+            observed.unit()
+        ));
+    }
+
+    let actual_state_digest = observed
+        .digest()
+        .map_err(|error| format!("could not digest current service pre-state: {error}"))?;
+    if actual_state_digest != expected_state_digest {
+        return Err(format!(
+            "service execution authority is stale: approved pre-state digest={} but current digest={}",
+            expected_state_digest, actual_state_digest
+        ));
+    }
+    Ok(())
+}
 
 fn parse_current_generation(stdout: &str) -> Result<u32, String> {
     let records: Vec<NixOSGenerationRecordV1> = serde_json::from_str(stdout)
@@ -920,52 +959,24 @@ impl NixOSExecutor {
             .ok_or_else(|| "execution authority has no bound pre-state identity".to_string())?;
 
         if let NixOSCommand::Service { unit, .. } = command {
-            let (expected_generation, expected_unit, expected_state_digest) =
-                parse_service_pre_state_identity(identity)?;
-            if &expected_unit != unit {
-                return Err(format!(
-                    "service execution authority unit mismatch: approved={} command={}",
-                    expected_unit, unit
-                ));
-            }
-
             if self.dry_run {
                 return Ok(());
             }
 
-            if let Some(expected_generation) = expected_generation {
-                let actual_generation = self
-                    .capture_generation()
-                    .await
-                    .map_err(|error| {
-                        format!("could not revalidate current NixOS generation: {error}")
-                    })?;
-                if u64::from(actual_generation) != expected_generation {
-                    return Err(format!(
-                        "execution authority is stale: approved generation={} but current generation={}",
-                        expected_generation, actual_generation
-                    ));
-                }
-            }
-
+            let actual_generation = self
+                .capture_generation()
+                .await
+                .map_err(|error| {
+                    format!("could not revalidate current NixOS generation: {error}")
+                })?;
             let observed = ServiceManager::observed_state(unit)
                 .map_err(|error| format!("could not revalidate service pre-state: {error}"))?;
-            if observed.unit() != unit {
-                return Err(format!(
-                    "service observation canonical identity mismatch: requested={} observed={}",
-                    unit,
-                    observed.unit()
-                ));
-            }
-            let actual_state_digest = observed
-                .digest()
-                .map_err(|error| format!("could not digest current service pre-state: {error}"))?;
-            if actual_state_digest != expected_state_digest {
-                return Err(format!(
-                    "service execution authority is stale: approved pre-state digest={} but current digest={}",
-                    expected_state_digest, actual_state_digest
-                ));
-            }
+            validate_service_pre_state_observation(
+                identity,
+                unit,
+                u64::from(actual_generation),
+                &observed,
+            )?;
             return Ok(());
         }
 
@@ -1199,6 +1210,84 @@ mod tests {
             "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=not-a-digest"
         )
         .is_err());
+    }
+
+    #[test]
+    fn service_pre_state_observation_rejects_generation_change() {
+        let state = NixServiceObservedStateV1::parse_systemd_properties(
+            "nginx.service",
+            concat!(
+                "Id=nginx.service\n",
+                "Names=nginx.service\n",
+                "LoadState=loaded\n",
+                "ActiveState=active\n",
+                "SubState=running\n",
+                "UnitFileState=enabled\n",
+            ),
+        )
+        .unwrap();
+        let identity = state.execution_pre_state_identity(42).unwrap();
+
+        let error =
+            validate_service_pre_state_observation(&identity, "nginx.service", 43, &state)
+                .unwrap_err();
+        assert!(error.contains("approved generation=42"));
+    }
+
+    #[test]
+    fn service_pre_state_observation_rejects_state_transition_same_generation() {
+        let active = NixServiceObservedStateV1::parse_systemd_properties(
+            "nginx.service",
+            concat!(
+                "Id=nginx.service\n",
+                "Names=nginx.service\n",
+                "LoadState=loaded\n",
+                "ActiveState=active\n",
+                "SubState=running\n",
+                "UnitFileState=enabled\n",
+            ),
+        )
+        .unwrap();
+        let failed = NixServiceObservedStateV1::parse_systemd_properties(
+            "nginx.service",
+            concat!(
+                "Id=nginx.service\n",
+                "Names=nginx.service\n",
+                "LoadState=loaded\n",
+                "ActiveState=failed\n",
+                "SubState=failed\n",
+                "UnitFileState=enabled\n",
+            ),
+        )
+        .unwrap();
+        let identity = active.execution_pre_state_identity(42).unwrap();
+
+        let error =
+            validate_service_pre_state_observation(&identity, "nginx.service", 42, &failed)
+                .unwrap_err();
+        assert!(error.contains("approved pre-state digest"));
+    }
+
+    #[test]
+    fn service_pre_state_observation_rejects_cross_unit_use() {
+        let nginx = NixServiceObservedStateV1::parse_systemd_properties(
+            "nginx.service",
+            concat!(
+                "Id=nginx.service\n",
+                "Names=nginx.service\n",
+                "LoadState=loaded\n",
+                "ActiveState=active\n",
+                "SubState=running\n",
+                "UnitFileState=enabled\n",
+            ),
+        )
+        .unwrap();
+        let identity = nginx.execution_pre_state_identity(42).unwrap();
+
+        let error =
+            validate_service_pre_state_observation(&identity, "sshd.service", 42, &nginx)
+                .unwrap_err();
+        assert!(error.contains("unit mismatch"));
     }
 
     #[test]
@@ -1528,14 +1617,8 @@ mod tests {
         let b = failed.execution_pre_state_identity(42).unwrap();
 
         assert_ne!(a, b);
-        assert_eq!(
-            parse_service_pre_state_identity(&a).unwrap().0,
-            Some(42)
-        );
-        assert_eq!(
-            parse_service_pre_state_identity(&b).unwrap().0,
-            Some(42)
-        );
+        assert_eq!(parse_service_pre_state_identity(&a).unwrap().0, 42);
+        assert_eq!(parse_service_pre_state_identity(&b).unwrap().0, 42);
     }
 
     #[tokio::test]
