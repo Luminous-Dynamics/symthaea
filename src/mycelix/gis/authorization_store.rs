@@ -1464,6 +1464,30 @@ impl SqliteAuthorizationStore {
              CREATE UNIQUE INDEX IF NOT EXISTS authorization_lease_operation_uq
                ON authorization_leases(operation_id)
                WHERE operation_id IS NOT NULL AND operation_id <> '';
+             CREATE INDEX IF NOT EXISTS authorization_lease_attempt_history_idx
+               ON authorization_leases(attempt_id);
+             CREATE INDEX IF NOT EXISTS authorization_lease_operation_history_idx
+               ON authorization_leases(operation_id);
+             CREATE INDEX IF NOT EXISTS authorization_receipt_attempt_history_idx
+               ON authorization_receipts(attempt_id);
+             CREATE INDEX IF NOT EXISTS authorization_receipt_operation_history_idx
+               ON authorization_receipts(operation_id);
+             CREATE INDEX IF NOT EXISTS authorization_status_attempt_history_idx
+               ON authorization_status_checks(attempt_id);
+             CREATE INDEX IF NOT EXISTS authorization_status_operation_history_idx
+               ON authorization_status_checks(operation_id);
+             CREATE INDEX IF NOT EXISTS authorization_recovery_attempt_history_idx
+               ON authorization_recovery_markers(attempt_id);
+             CREATE INDEX IF NOT EXISTS authorization_recovery_operation_history_idx
+               ON authorization_recovery_markers(operation_id);
+             CREATE INDEX IF NOT EXISTS authorization_terminal_attempt_history_idx
+               ON authorization_terminal_evidence(attempt_id);
+             CREATE INDEX IF NOT EXISTS authorization_terminal_operation_history_idx
+               ON authorization_terminal_evidence(operation_id);
+             CREATE INDEX IF NOT EXISTS authorization_dispatch_attempt_history_idx
+               ON authorization_dispatches(attempt_id);
+             CREATE INDEX IF NOT EXISTS authorization_dispatch_operation_history_idx
+               ON authorization_dispatches(operation_id);
              DROP INDEX IF EXISTS authorization_dispatch_action_fence_idx;
              CREATE INDEX authorization_dispatch_action_fence_idx
                ON authorization_dispatches(relying_party_id, target_identity, action_digest, state);",
