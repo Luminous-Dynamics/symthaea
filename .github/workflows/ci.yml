@@ -42,6 +42,37 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  nixward-direct-spawn-boundary-focused:
+    name: Nixward Direct Spawn Boundary Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check direct NixOSCommand spawns are absent
+        shell: bash
+        run: |
+          if rg -n 'Command::new\(&bin\)|Command::new\(&cmd\)' \
+            crates/core/nixward/src/bin/nixward.rs \
+            crates/core/nixward/src/support/watchdog.rs; then
+            echo 'Direct NixOSCommand tuple spawning remains outside the governed executor.' >&2
+            exit 1
+          fi
+
+      - name: Check caller formatting
+        run: cargo fmt --check -- crates/core/nixward/src/bin/nixward.rs crates/core/nixward/src/support/watchdog.rs
+
+      - name: Compile CLI and run authority regression
+        run: |
+          cargo check -p nixward --features cli
+          cargo test -p nixward custom_command_cannot_mint_authority --lib
+
   nixward-custom-authority-focused:
     name: Nixward Custom Authority Focused
     runs-on: ubuntu-latest
