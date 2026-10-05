@@ -1315,7 +1315,17 @@ fn cmd_watch(timeout: u64, interval: u64, format: OutputFormat) {
     }
 
     let watchdog = Watchdog::new(config);
-    let verdict = watchdog.monitor(&mut codebook, &baseline_hv, current_gen);
+    let runtime = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(e) => {
+            eprintln!("  Failed to initialize watchdog runtime: {e}");
+            return;
+        }
+    };
+    let verdict = runtime.block_on(watchdog.monitor(&mut codebook, &baseline_hv, current_gen));
 
     // Persist verdict for daemon/TUI to pick up
     let verdict_str = match &verdict {
