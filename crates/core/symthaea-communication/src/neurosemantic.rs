@@ -16,6 +16,12 @@ pub const MAX_NEUROSEMANTIC_PAYLOAD_BYTES: usize = 1_048_576;
 /// Maximum number of replay-tracker keys retained in memory.
 pub const MAX_TRACKED_NEUROSEMANTIC_SESSIONS: usize = 4096;
 
+/// Maximum identifier size accepted by protocol constructors and validators.
+pub const MAX_NEUROSEMANTIC_ID_BYTES: usize = 4096;
+
+/// Maximum serialized packet/authorization artifact size before JSON materialization.
+pub const MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES: usize = MAX_NEUROSEMANTIC_PAYLOAD_BYTES;
+
 /// Representation channel used for routing and authorization.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum CognitiveChannel {
@@ -185,10 +191,26 @@ pub struct CognitiveConsentLease {
 }
 
 impl CognitiveConsentLease {
+    /// Deserialize a persisted lease only after enforcing the serialized size ceiling.
+    /// Untrusted callers should use this entry point rather than unbounded `serde_json`
+    /// deserialization.
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic consent lease JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let lease: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("neurosemantic consent lease JSON: {error}"))?;
+        lease.validate()?;
+        Ok(lease)
+    }
+
     pub fn validate(&self) -> Result<(), String> {
-        if self.lease_id.trim().is_empty()
-            || self.subject_id.trim().is_empty()
-            || self.peer_id.trim().is_empty()
+        if !valid_identifier(&self.lease_id)
+            || !valid_identifier(&self.subject_id)
+            || !valid_identifier(&self.peer_id)
             || self.issued_at_unix_s >= self.expires_at_unix_s
         {
             return Err("consent lease identity or time bounds are invalid".into());
@@ -274,6 +296,20 @@ pub struct NeurosemanticPacket {
 }
 
 impl NeurosemanticPacket {
+    /// Deserialize an untrusted packet only after enforcing the raw byte ceiling.
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic packet JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let packet: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("neurosemantic packet JSON: {error}"))?;
+        packet.validate_integrity()?;
+        Ok(packet)
+    }
+
     pub fn new(
         sequence: u64,
         sender_id: impl Into<String>,
@@ -352,8 +388,8 @@ impl NeurosemanticPacket {
 
     pub fn validate_integrity(&self) -> Result<(), String> {
         if self.protocol_version != NEUROSEMANTIC_PROTOCOL_VERSION
-            || self.sender_id.trim().is_empty()
-            || self.recipient_id.trim().is_empty()
+            || !valid_identifier(&self.sender_id)
+            || !valid_identifier(&self.recipient_id)
         {
             return Err("packet identity or protocol version is invalid".into());
         }
@@ -409,6 +445,25 @@ pub struct AuthorizedNeurosemanticMessage {
 }
 
 impl AuthorizedNeurosemanticMessage {
+    /// Deserialize an authorized message only after enforcing the raw byte ceiling
+    /// and re-running packet + consent validation.
+    pub fn from_json_bytes(
+        bytes: &[u8],
+        lease: &CognitiveConsentLease,
+        now_unix_s: u64,
+    ) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "authorized neurosemantic message JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let message: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("authorized neurosemantic message JSON: {error}"))?;
+        message.validate(lease, now_unix_s)?;
+        Ok(message)
+    }
+
     pub fn validate(
         &self,
         lease: &CognitiveConsentLease,
@@ -548,6 +603,10 @@ impl NeurosemanticReplayTracker {
 
 fn default_public_sensitivity() -> CognitiveSensitivity {
     CognitiveSensitivity::Public
+}
+
+fn valid_identifier(value: &str) -> bool {
+    !value.trim().is_empty() && value.len() <= MAX_NEUROSEMANTIC_ID_BYTES
 }
 
 fn validate_payload(payload: &NeurosemanticPayload) -> Result<(), String> {
@@ -703,6 +762,70 @@ mod tests {
         let encoded = serde_json::to_vec(&policy).unwrap();
         let decoded: NeurosemanticDataPolicy = serde_json::from_slice(&encoded).unwrap();
         assert_eq!(decoded, policy);
+    }
+
+    #[test]
+    fn bounded_json_parsers_reject_oversized_artifacts() {
+        let oversized = vec![b' '; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1];
+        assert!(NeurosemanticPacket::from_json_bytes(&oversized).is_err());
+        assert!(CognitiveConsentLease::from_json_bytes(&oversized,).is_err());
+        let lease = lease();
+        assert!(AuthorizedNeurosemanticMessage::from_json_bytes(&oversized, &lease, 150).is_err());
+    }
+
+    #[test]
+    fn identifiers_are_bounded_and_nonempty() {
+        let oversized = "x".repeat(MAX_NEUROSEMANTIC_ID_BYTES + 1);
+        let packet = NeurosemanticPacket::new(
+            105,
+            oversized,
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        );
+        assert!(packet.is_err());
+
+        let mut l = lease();
+        l.peer_id.clear();
+        assert!(l.validate().is_err());
+        l.peer_id = "x".repeat(MAX_NEUROSEMANTIC_ID_BYTES + 1);
+        assert!(l.validate().is_err());
+    }
+
+    #[test]
+    fn bounded_json_parsers_roundtrip_valid_artifacts() {
+        let lease = lease();
+        let encoded_lease = serde_json::to_vec(&lease).unwrap();
+        assert_eq!(CognitiveConsentLease::from_json_bytes(&encoded_lease).unwrap(), lease);
+
+        let packet = NeurosemanticPacket::new_with_policy(
+            106,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            semantic_policy(),
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        ).unwrap();
+        let encoded_packet = serde_json::to_vec(&packet).unwrap();
+        assert_eq!(NeurosemanticPacket::from_json_bytes(&encoded_packet).unwrap(), packet);
+
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: lease.consent_epoch,
+            lease_id: lease.lease_id.clone(),
+        };
+        let encoded_message = serde_json::to_vec(&message).unwrap();
+        assert_eq!(AuthorizedNeurosemanticMessage::from_json_bytes(&encoded_message, &lease, 150).unwrap(), message);
     }
     #[test]
     fn policy_binds_payload_to_declared_data_class() {
