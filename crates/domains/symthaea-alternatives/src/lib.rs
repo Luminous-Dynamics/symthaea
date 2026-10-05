@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 18;
+pub const SCHEMA_VERSION: u16 = 19;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-v27";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-v28";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -1751,6 +1751,105 @@ impl ExperimentalProtocolRef {
     }
 }
 
+/// Typed property surface targeted by an experimental discrimination.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ExperimentalDiscriminationSurface {
+    /// A burden dimension.
+    Burden(Dimension),
+    /// A named constrained performance metric.
+    PerformanceMetric(String),
+    /// A named operating-envelope condition.
+    OperatingCondition(String),
+}
+
+impl ExperimentalDiscriminationSurface {
+    /// Validate named surfaces without inferring their meaning.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        match self {
+            Self::Burden(_) => Ok(()),
+            Self::PerformanceMetric(name) | Self::OperatingCondition(name) => {
+                if name.is_empty() {
+                    Err(AssessmentError::InvalidExperimentalDesign)
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+}
+
+/// Exact identity of the decision rule used to interpret an experimental result.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExperimentalDecisionRuleRef {
+    /// Stable decision-rule identity.
+    pub rule_id: String,
+    /// Rule revision.
+    pub rule_revision: String,
+    /// Digest of the exact decision-rule semantics.
+    pub rule_digest: String,
+}
+
+impl ExperimentalDecisionRuleRef {
+    /// Validate decision-rule identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.rule_id.is_empty() || self.rule_revision.is_empty() || self.rule_digest.is_empty() {
+            Err(AssessmentError::InvalidExperimentalDesign)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// Typed candidate-discrimination target.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExperimentalDiscriminationTarget {
+    /// Stable identity of the target.
+    pub target_id: String,
+    /// Left-hand candidate identity.
+    pub left_candidate_id: String,
+    /// Right-hand candidate identity.
+    pub right_candidate_id: String,
+    /// Exact property/surface to be measured.
+    pub surface: ExperimentalDiscriminationSurface,
+    /// Exact decision rule that determines what result counts as discrimination.
+    pub decision_rule: ExperimentalDecisionRuleRef,
+}
+
+impl ExperimentalDiscriminationTarget {
+    /// Validate the candidate relationship and rule/surface identities.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.target_id.is_empty()
+            || self.left_candidate_id.is_empty()
+            || self.right_candidate_id.is_empty()
+            || self.left_candidate_id == self.right_candidate_id
+        {
+            return Err(AssessmentError::InvalidExperimentalDiscriminationTarget);
+        }
+        self.surface.validate()?;
+        self.decision_rule.validate()
+    }
+
+    fn requirement_basis<'a>(
+        &'a self,
+        requirement: &'a FunctionalRequirement,
+    ) -> Option<&'a ComparisonBasisRef> {
+        match &self.surface {
+            ExperimentalDiscriminationSurface::Burden(dimension) => requirement
+                .comparison_scales
+                .get(dimension)
+                .map(|scale| &scale.basis),
+            ExperimentalDiscriminationSurface::PerformanceMetric(metric) => requirement
+                .performance_scales
+                .get(metric)
+                .map(|scale| &scale.basis),
+            ExperimentalDiscriminationSurface::OperatingCondition(condition) => requirement
+                .operating_envelope
+                .get(condition)
+                .map(|scale| &scale.basis),
+        }
+    }
+}
+
 /// Explicit stopping rule for a proposed measurement campaign.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExperimentalStoppingCriteria {
@@ -1791,8 +1890,8 @@ pub struct ExperimentalDesignProvenance {
     pub unresolved_uncertainty_refs: Vec<String>,
     /// Exact candidate identities included in the discrimination set.
     pub candidate_ids: Vec<String>,
-    /// Explicit discrimination targets, e.g. candidate pairs or threshold decisions.
-    pub expected_discrimination: Vec<String>,
+    /// Typed candidate-discrimination targets.
+    pub expected_discrimination: Vec<ExperimentalDiscriminationTarget>,
     /// Exact documented protocol identity.
     pub protocol: ExperimentalProtocolRef,
     /// Explicit stopping criteria.
@@ -1812,7 +1911,6 @@ impl ExperimentalDesignProvenance {
             || self.expected_discrimination.is_empty()
             || self.unresolved_uncertainty_refs.iter().any(String::is_empty)
             || self.candidate_ids.iter().any(String::is_empty)
-            || self.expected_discrimination.iter().any(String::is_empty)
         {
             return Err(AssessmentError::InvalidExperimentalDesign);
         }
@@ -1822,9 +1920,48 @@ impl ExperimentalDesignProvenance {
         if ids.len() != self.candidate_ids.len() {
             return Err(AssessmentError::InvalidExperimentalDesign);
         }
+        let mut target_ids = BTreeSet::new();
+        for target in &self.expected_discrimination {
+            target.validate()?;
+            if !target_ids.insert(target.target_id.clone()) {
+                return Err(AssessmentError::DuplicateExperimentalDiscriminationTarget(
+                    target.target_id.clone(),
+                ));
+            }
+        }
         self.protocol.validate()?;
         self.stopping_criteria.validate()?;
         self.comparison_basis.validate()
+    }
+
+    /// Validate this design against the exact functional/comparison context.
+    pub fn validate_against(
+        &self,
+        requirement: &FunctionalRequirement,
+    ) -> Result<(), AssessmentError> {
+        self.validate()?;
+        let declared = self.candidate_ids.iter().collect::<BTreeSet<_>>();
+        for target in &self.expected_discrimination {
+            if !declared.contains(&target.left_candidate_id)
+                || !declared.contains(&target.right_candidate_id)
+            {
+                return Err(AssessmentError::ExperimentalDesignTargetCandidateNotDeclared(
+                    target.target_id.clone(),
+                ));
+            }
+            let Some(required_basis) = target.requirement_basis(requirement) else {
+                return Err(AssessmentError::ExperimentalDesignSurfaceUndeclared(
+                    target.target_id.clone(),
+                ));
+            };
+            if required_basis != &self.comparison_basis {
+                return Err(AssessmentError::ExperimentalDesignBasisMismatch {
+                    expected: required_basis.clone(),
+                    actual: self.comparison_basis.clone(),
+                });
+            }
+        }
+        Ok(())
     }
 }
 
@@ -2070,6 +2207,25 @@ pub enum AssessmentError {
     MissingEvidenceReference(String),
     /// Explicit experimental-design provenance is structurally incomplete.
     InvalidExperimentalDesign,
+    /// An experimental discrimination target names a surface absent from the requirement.
+    ExperimentalDesignSurfaceUndeclared(String),
+    /// Two experimental discrimination targets share one target identity.
+    DuplicateExperimentalDiscriminationTarget(String),
+    /// An experimental discrimination target uses a candidate not declared in the design set.
+    ExperimentalDesignTargetCandidateNotDeclared(String),
+    /// An experimental discrimination target has an invalid candidate relationship.
+    InvalidExperimentalDiscriminationTarget,
+    /// An observation references an experimental design that is not present in the assessment.
+    OrphanedExperimentalDesignObservation(String),
+    /// An observation references a different experimental design from the assessment.
+    ExperimentalDesignObservationMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Expected design identity.
+        expected_design_id: String,
+        /// Actual design identity.
+        actual_design_id: String,
+    },
     /// Experimental stopping criteria are structurally invalid.
     InvalidExperimentalStoppingCriteria,
     /// An experimental design references a candidate not present in the assessment.
@@ -2221,6 +2377,33 @@ impl std::fmt::Display for AssessmentError {
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate id {id}"),
             Self::DuplicateEvidenceId(id) => write!(f, "duplicate evidence id {id}"),
             Self::EmptySourceIdentity => write!(f, "evidence source identity is incomplete"),
+            Self::InvalidExperimentalDesign => write!(f, "experimental design provenance is incomplete"),
+            Self::ExperimentalDesignSurfaceUndeclared(id) => write!(
+                f,
+                "experimental discrimination target {id} names a surface absent from the requirement"
+            ),
+            Self::DuplicateExperimentalDiscriminationTarget(id) => {
+                write!(f, "duplicate experimental discrimination target {id}")
+            }
+            Self::ExperimentalDesignTargetCandidateNotDeclared(id) => write!(
+                f,
+                "experimental discrimination target {id} references a candidate outside the design set"
+            ),
+            Self::InvalidExperimentalDiscriminationTarget => {
+                write!(f, "experimental discrimination target is invalid")
+            }
+            Self::OrphanedExperimentalDesignObservation(id) => write!(
+                f,
+                "observation references experimental design {id} but no design was supplied"
+            ),
+            Self::ExperimentalDesignObservationMismatch {
+                evidence_id,
+                expected_design_id,
+                actual_design_id,
+            } => write!(
+                f,
+                "evidence {evidence_id} references design {actual_design_id}, expected {expected_design_id}"
+            ),
             Self::EmptyAssessmentSubject => write!(f, "assessment subject identity is incomplete"),
             Self::EmptySourceAdmissionReference => {
                 write!(f, "source admission reference is incomplete")
@@ -2407,27 +2590,7 @@ impl AlternativesEngine {
         experimental_design: ExperimentalDesignProvenance,
     ) -> Result<AssessmentResult, AssessmentError> {
         requirement.validate()?;
-        experimental_design.validate()?;
-
-        let basis_declared = requirement
-            .comparison_scales
-            .values()
-            .any(|scale| scale.basis == experimental_design.comparison_basis)
-            || requirement
-                .performance_scales
-                .values()
-                .any(|scale| scale.basis == experimental_design.comparison_basis);
-        if !basis_declared {
-            return Err(AssessmentError::ExperimentalDesignBasisMismatch {
-                expected: requirement
-                    .comparison_scales
-                    .values()
-                    .next()
-                    .map(|scale| scale.basis.clone())
-                    .unwrap_or_else(|| experimental_design.comparison_basis.clone()),
-                actual: experimental_design.comparison_basis.clone(),
-            });
-        }
+        experimental_design.validate_against(requirement)?;
 
         for candidate_id in &experimental_design.candidate_ids {
             if !candidates.iter().any(|candidate| &candidate.id == candidate_id) {
@@ -2437,12 +2600,13 @@ impl AlternativesEngine {
             }
         }
 
-        let mut result = self.assess_at_with_freshness(
+        let mut result = self.assess_at_with_freshness_internal(
             requirement,
             candidates,
             incumbent_id,
             assessed_at_epoch_seconds,
             freshness_policy,
+            Some(&experimental_design.design_id),
         )?;
         result.experimental_design = Some(experimental_design);
         result.receipt.payload_hash = canonical_payload_hash(&result)?;
@@ -2478,6 +2642,25 @@ impl AlternativesEngine {
         incumbent_id: Option<&str>,
         assessed_at_epoch_seconds: Option<i64>,
         freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> Result<AssessmentResult, AssessmentError> {
+        self.assess_at_with_freshness_internal(
+            requirement,
+            candidates,
+            incumbent_id,
+            assessed_at_epoch_seconds,
+            freshness_policy,
+            None,
+        )
+    }
+
+    fn assess_at_with_freshness_internal(
+        &self,
+        requirement: &FunctionalRequirement,
+        candidates: &[CandidatePathway],
+        incumbent_id: Option<&str>,
+        assessed_at_epoch_seconds: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+        allowed_experimental_design_id: Option<&str>,
     ) -> Result<AssessmentResult, AssessmentError> {
         requirement.validate()?;
         if freshness_policy.is_some() && assessed_at_epoch_seconds.is_none() {
@@ -2519,6 +2702,27 @@ impl AlternativesEngine {
                 estimate.evidence_ids.sort();
             }
             candidate.validate()?;
+            for evidence in &candidate.evidence {
+                if let Some(observation) = &evidence.observation
+                    && let Some(design_id) = &observation.experimental_design_id
+                {
+                    match allowed_experimental_design_id {
+                        None => {
+                            return Err(AssessmentError::OrphanedExperimentalDesignObservation(
+                                design_id.clone(),
+                            ));
+                        }
+                        Some(expected_design_id) if design_id != expected_design_id => {
+                            return Err(AssessmentError::ExperimentalDesignObservationMismatch {
+                                evidence_id: evidence.id.clone(),
+                                expected_design_id: expected_design_id.to_string(),
+                                actual_design_id: design_id.clone(),
+                            });
+                        }
+                        Some(_) => {}
+                    }
+                }
+            }
         }
 
         let mut assessments = Vec::with_capacity(normalized_candidates.len());
@@ -4742,7 +4946,17 @@ mod tests {
             hypothesis_statement: "A direct measurement can discriminate the unresolved water-burden intervals of the selected frontier candidates.".into(),
             unresolved_uncertainty_refs: vec!["uncertainty:direct-substitute:Water".into()],
             candidate_ids: vec!["direct-substitute".into(), "process-substitute".into()],
-            expected_discrimination: vec!["direct-substitute<->process-substitute:Water".into()],
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "water-discrimination".into(),
+                left_candidate_id: "direct-substitute".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "interval-separation-v1".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "interval-separation-v1-digest".into(),
+                },
+            }],
             protocol: ExperimentalProtocolRef {
                 protocol_id: "protocol:water-test-v1".into(),
                 protocol_revision: "v1".into(),
@@ -4784,7 +4998,17 @@ mod tests {
             hypothesis_statement: "Test.".into(),
             unresolved_uncertainty_refs: vec!["u".into()],
             candidate_ids: vec!["does-not-exist".into()],
-            expected_discrimination: vec!["does-not-exist".into()],
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "invalid-target".into(),
+                left_candidate_id: "does-not-exist".into(),
+                right_candidate_id: "does-not-exist-2".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
             protocol: ExperimentalProtocolRef {
                 protocol_id: "p".into(),
                 protocol_revision: "v1".into(),
@@ -4811,6 +5035,66 @@ mod tests {
                 )
                 .unwrap_err(),
             AssessmentError::ExperimentalDesignCandidateMissing("does-not-exist".into())
+        );
+    }
+
+    #[test]
+    fn experimental_design_rejects_surface_basis_drift() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let mut wrong_basis = basis.clone();
+        wrong_basis.basis_revision = "v2".into();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:drift".into(),
+            hypothesis_id: "hypothesis:drift".into(),
+            hypothesis_statement: "Test water.".into(),
+            unresolved_uncertainty_refs: vec!["u1".into()],
+            candidate_ids: vec!["direct-substitute".into(), "process-substitute".into()],
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                left_candidate_id: "direct-substitute".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                basis: wrong_basis,
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                target_uncertainty_width: None,
+            },
+            comparison_basis: basis,
+        };
+        assert_eq!(
+            design.validate_against(&case.requirement).unwrap_err(),
+            AssessmentError::ExperimentalDesignBasisMismatch {
+                expected: design.comparison_basis.clone(),
+                actual: design.protocol.basis.clone(),
+            }
+        );
+    }
+
+    #[test]
+    fn orphaned_experimental_design_observation_fails_closed() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let mut candidate = case.candidates[0].clone();
+        candidate.evidence[0].observation.as_mut().unwrap().experimental_design_id =
+            Some("design:orphan".into());
+        assert_eq!(
+            AlternativesEngine
+                .assess(&case.requirement, &[candidate], None)
+                .unwrap_err(),
+            AssessmentError::OrphanedExperimentalDesignObservation("design:orphan".into())
         );
     }
 
