@@ -1121,10 +1121,18 @@ mod tests {
         narrow_context.apply_prosody(&mut narrow);
         wide_context.apply_prosody(&mut wide);
 
+        let mut neutral = frame;
+        let neutral_context = ProsodyContext {
+            pitch_range: 1.0,
+            ..narrow_context
+        };
+        neutral_context.apply_prosody(&mut neutral);
+
         assert!(
-            wide.f0 > narrow.f0,
-            "wider plan pitch range must expand the same planned contour: narrow={:.3}, wide={:.3}",
+            (wide.f0 - neutral.f0).abs() > (narrow.f0 - neutral.f0).abs(),
+            "wider plan pitch range must expand deviation from neutral contour: narrow={:.3}, neutral={:.3}, wide={:.3}",
             narrow.f0,
+            neutral.f0,
             wide.f0
         );
 
