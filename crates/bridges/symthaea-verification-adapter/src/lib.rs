@@ -491,6 +491,12 @@ fn verification_method_material_digest(
     method_type: &str,
     object: &serde_json::Map<String, Value>,
 ) -> Result<String, SnapshotError> {
+    if object.contains_key("secretKeyMultibase") || object.contains_key("secretKeyJwk") {
+        return Err(SnapshotError::Malformed(
+            "public verification methods must not expose secret key material".into(),
+        ));
+    }
+
     let material_bytes = match method_type {
         "Multikey" => {
             let public = object
@@ -1350,6 +1356,25 @@ mod tests {
             adapter.resolve_snapshot(&request, snapshot),
             Err(SnapshotError::Malformed(message))
                 if message.contains("multiple public verification material formats")
+        ));
+    }
+
+    #[test]
+    fn public_verification_method_rejects_secret_key_properties() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = snapshot.document.replace(
+            r##""publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2""##,
+            r##""publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2", "secretKeyMultibase": "zFakeSecretKey""##
+        );
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("secret key material")
         ));
     }
 
