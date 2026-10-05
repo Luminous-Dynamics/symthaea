@@ -26,7 +26,7 @@ pub mod corpus;
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 10;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-v18";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-v19";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -2521,6 +2521,20 @@ mod tests {
         }
     }
 
+    fn admitted(mut evidence: EvidenceRecord) -> EvidenceRecord {
+        evidence.source.admission = Some(SourceAdmissionRef {
+            policy_id: "fixture-policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "fixture-policy-digest-v1".into(),
+            admission_id: format!("fixture-admission:{}", evidence.id),
+            authority_epoch: "fixture-epoch-v1".into(),
+            fault_domain_id: Some(format!("fixture-domain:{}", evidence.source.authority_id)),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+        evidence
+    }
+
     fn fixture_requirement() -> FunctionalRequirement {
         FunctionalRequirement {
             id: "seal-v1".into(),
@@ -3053,9 +3067,9 @@ mod tests {
             3.0,
             30.0,
             vec![
-                evidence("d1", "source-b", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
-                evidence("d2", "source-c", EvidenceKind::Reported, EvidenceStance::Supports, 0.9),
-                evidence("d3", "source-lca", EvidenceKind::LifecycleAssessed, EvidenceStance::Supports, 0.9),
+                admitted(evidence("d1", "source-b", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)),
+                admitted(evidence("d2", "source-c", EvidenceKind::Reported, EvidenceStance::Supports, 0.9)),
+                admitted(evidence("d3", "source-lca", EvidenceKind::LifecycleAssessed, EvidenceStance::Supports, 0.9)),
             ],
         );
         let process = candidate(
