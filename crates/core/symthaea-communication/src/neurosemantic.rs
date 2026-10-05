@@ -1019,6 +1019,7 @@ mod tests {
         let mut policy = NeurosemanticHandlingPolicy {
             schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
             policy_provenance_ref: "x".repeat(MAX_NEUROSEMANTIC_ID_BYTES + 1),
+            policy_provenance_hash: content_hash(b"synthetic-policy-record-1"),
             origin_jurisdiction: "ZA".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
             permitted_secondary_uses: BTreeSet::new(),
@@ -1106,6 +1107,7 @@ mod tests {
         let mut policy = NeurosemanticHandlingPolicy {
             schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
             policy_provenance_ref: "synthetic-policy-record-1".into(),
+            policy_provenance_hash: content_hash(b"synthetic-policy-record-1"),
             origin_jurisdiction: "za".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["za".into()]),
             permitted_secondary_uses: BTreeSet::new(),
