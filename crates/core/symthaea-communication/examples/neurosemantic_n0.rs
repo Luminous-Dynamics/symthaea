@@ -169,14 +169,17 @@ fn main() -> Result<(), String> {
         .packet
         .data_policy
         .handling
-        .retention = NeurosemanticRetentionPolicy::Ephemeral;
+        .permitted_secondary_uses
+        .insert(symthaea_communication::NeurosemanticSecondaryUse::Research);
     stale_binding.packet.refresh_hashes()?;
     let stale_policy_binding_blocked = stale_binding
         .validate_for_handling(
             &lease,
             &policy_provenance_binding,
             "ZA",
-            symthaea_communication::NeurosemanticHandlingAction::Transmit,
+            symthaea_communication::NeurosemanticHandlingAction::SecondaryUse(
+                symthaea_communication::NeurosemanticSecondaryUse::Research,
+            ),
             1_500,
         )
         .is_err();

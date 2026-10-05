@@ -1189,7 +1189,15 @@ mod tests {
             .unwrap();
 
         let mut mutated = policy;
-        mutated.retention = NeurosemanticRetentionPolicy::Ephemeral;
+        mutated
+            .permitted_secondary_uses
+            .insert(NeurosemanticSecondaryUse::Research);
+
+        let fresh_binding = mutated
+            .bind_policy_provenance_bytes(b"synthetic-policy-record-1")
+            .unwrap();
+        assert!(!NeurosemanticHandlingAction::SecondaryUse(NeurosemanticSecondaryUse::Research)
+            .eq(&NeurosemanticHandlingAction::SecondaryUse(NeurosemanticSecondaryUse::Research)));
 
         let mut packet = NeurosemanticPacket::new_with_policy(
             18,
@@ -1218,9 +1226,18 @@ mod tests {
         assert!(message
             .validate_for_handling(
                 &lease(),
+                &fresh_binding,
+                "ZA",
+                NeurosemanticHandlingAction::SecondaryUse(NeurosemanticSecondaryUse::Research),
+                150,
+            )
+            .is_ok());
+        assert!(message
+            .validate_for_handling(
+                &lease(),
                 &binding,
                 "ZA",
-                NeurosemanticHandlingAction::Persist,
+                NeurosemanticHandlingAction::SecondaryUse(NeurosemanticSecondaryUse::Research),
                 150,
             )
             .is_err());
