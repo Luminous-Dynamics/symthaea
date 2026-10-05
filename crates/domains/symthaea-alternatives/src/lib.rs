@@ -831,6 +831,8 @@ pub struct AssessmentResult {
     pub algorithm_version: String,
     /// Functional requirement.
     pub requirement: FunctionalRequirement,
+    /// Optional Unix timestamp at which time-bounded evidence was evaluated.
+    pub assessed_at_epoch_seconds: Option<i64>,
     /// Candidate assessments.
     pub candidates: Vec<CandidateAssessment>,
     /// Candidate IDs on the conservative Pareto frontier.
@@ -984,6 +986,21 @@ impl AlternativesEngine {
         candidates: &[CandidatePathway],
         incumbent_id: Option<&str>,
     ) -> Result<AssessmentResult, AssessmentError> {
+        self.assess_at(requirement, candidates, incumbent_id, None)
+    }
+
+    /// Evaluate candidates at an explicit Unix timestamp.
+    ///
+    /// Time-bounded evidence is used only when valid at the supplied timestamp.
+    /// An assessment without a timestamp conservatively excludes any evidence
+    /// with an explicit validity window.
+    pub fn assess_at(
+        &self,
+        requirement: &FunctionalRequirement,
+        candidates: &[CandidatePathway],
+        incumbent_id: Option<&str>,
+        assessed_at_epoch_seconds: Option<i64>,
+    ) -> Result<AssessmentResult, AssessmentError> {
         requirement.validate()?;
         if let Some(id) = incumbent_id {
             if !candidates.iter().any(|candidate| candidate.id == id) {
@@ -1034,7 +1051,7 @@ impl AlternativesEngine {
                         (Some(estimate), Some(scale))
                             if estimate.unit == scale.unit
                                 && estimate.scope == scale.scope
-                                && candidate.performance_evidence_is_supported(metric) =>
+                                && candidate.performance_evidence_is_supported_at(metric, assessed_at_epoch_seconds) =>
                         {
                             bound.check(Some(estimate.value))
                         }
@@ -1102,7 +1119,7 @@ impl AlternativesEngine {
                         .get(&dimension)
                         .map(|estimate| {
                             candidate
-                                .linked_evidence(estimate)
+                                .linked_evidence_at(&estimate.evidence_ids, assessed_at_epoch_seconds)
                                 .filter(|e| {
                                     matches!(
                                         e.kind,
@@ -1123,7 +1140,7 @@ impl AlternativesEngine {
                 constraints,
                 burdens: candidate.burdens.clone(),
                 qualification: candidate.qualification_ceiling(),
-                evidence_conflict: candidate.has_conflict(),
+                evidence_conflict: candidate.has_conflict_at(assessed_at_epoch_seconds),
                 frontier_blocked,
                 observed_evidence_count,
             });
@@ -1166,6 +1183,7 @@ impl AlternativesEngine {
             schema_version: SCHEMA_VERSION,
             algorithm_version: ALGORITHM_VERSION.to_string(),
             requirement: requirement.clone(),
+            assessed_at_epoch_seconds,
             candidates: assessments,
             pareto_frontier: frontier,
             burden_transfers,
