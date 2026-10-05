@@ -189,3 +189,115 @@ The success criterion is not a larger unit catalog. It is that the same candidat
 - dimensioned Rust crate: https://docs.rs/dimensioned/
 - Bobbin et al., Formalizing dimensional analysis using the Lean theorem prover (2025): https://arxiv.org/abs/2509.13142
 - SAIUnit, Nature Communications (2025): https://www.nature.com/articles/s41467-025-58626-4
+
+
+## Engineering integration
+
+Engineering is a primary consumer of the physical type system, not a downstream application.
+
+The existing engineering faculty already contains independent physical models for:
+
+- structural mechanics and factor-of-safety evaluation;
+- radial distribution power flow;
+- thermofluid flow and head loss;
+- control stability and transient metrics;
+- circuit power checks;
+- acoustics and optics;
+- signal processing;
+- materials and aging;
+- robotics and multibody dynamics;
+- CAD/fabrication geometry;
+- digital-twin telemetry;
+- solver-agnostic multi-physics orchestration.
+
+The current interface is partly stringly typed. For example, simulation parameters and metrics use unit strings, and coupled solver stages exchange `consumes`/`produces` names as free-form strings.
+
+The type-system integration should therefore make the physical quantity itself first-class:
+
+```text
+TypedQuantity {
+    id
+    physical_type
+    value_or_domain
+    uncertainty
+    provenance
+}
+```
+
+A multi-physics edge should become a typed transformation:
+
+```text
+producer output
+      -> type judgment
+      -> optional explicit transform
+      -> consumer input
+```
+
+This prevents physically incompatible coupling from surviving until an external solver is invoked.
+
+### Requirements become measurable contracts
+
+An engineering requirement should be able to express a typed quantity and admissible bound, while keeping the natural-language statement for human review.
+
+Example:
+
+```text
+REQ-STRUCT-001
+quantity: MaximumStress
+type: Stress
+constraint: <= allowable_stress
+criticality: Blocking
+evidence: FEA + material data
+```
+
+The type system does not decide whether the allowable stress itself is justified. It ensures the comparison is physically meaningful.
+
+### Engineering discovery
+
+Engineering models should become discoverable dynamical systems.
+
+Candidate discovery can operate over:
+
+- structural oscillators and load-response models;
+- RLC and power-system dynamics;
+- control plants;
+- thermal/flow networks;
+- material degradation trajectories;
+- vehicle and manipulator dynamics.
+
+The same discovery protocol applies:
+
+```text
+engineering model
+  -> cold candidate discovery
+  -> independent holdout
+  -> physical type check
+  -> symbolic establishment
+  -> formal proof where supported
+  -> solver simulation
+  -> telemetry comparison
+  -> safety-case evidence
+```
+
+### Multi-physics interoperability
+
+Keep the internal model solver-neutral.
+
+FMI is a useful adapter boundary because FMI 3.0 defines Model Exchange, Co-Simulation, and Scheduled Execution and includes unit/type metadata in model descriptions. It should remain an optional interoperability layer, not a dependency of the Symthaea core. citeturn972582search0turn972582search2
+
+SysML v2 is similarly relevant at the systems-engineering boundary. The OMG specification provides formal semantics for requirements and other system aspects, plus machine-readable quantities-and-units and requirement-derivation libraries. Symthaea should map to that ecosystem at import/export boundaries rather than reproduce SysML internally. citeturn909167search0turn909167search4
+
+### Important distinction
+
+Engineering evidence should preserve the same epistemic ladder as scientific discovery:
+
+```text
+typed
+  != validated
+  != simulated
+  != verified
+  != certified
+  != physically true
+```
+
+A solver result can discharge a narrowly defined engineering obligation inside its model envelope, but it must not silently elevate the claim beyond that envelope.
