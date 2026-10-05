@@ -711,7 +711,7 @@ fn extract_verification_method(
 
 fn parse_verification_method_definition(
     expected_method: ClaimVerificationMethod,
-    object: &std::collections::Map<String, Value>,
+    object: &serde_json::Map<String, Value>,
     base: &url::Url,
 ) -> Result<ResolvedVerificationMethod, SnapshotError> {
     let id = required_string(object, "id")?;
