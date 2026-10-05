@@ -435,6 +435,47 @@ fn extract_verification_method(
             continue;
         }
 
+        let method_type = required_string(object, "type")?;
+        if object.contains_key("secretKeyJwk") || object.contains_key("secretKeyMultibase") {
+            return Err(SnapshotError::Malformed(
+                "public controller-document snapshots must not expose secret verification material"
+                    .into(),
+            ));
+        }
+        if object.contains_key("publicKeyJwk") && object.contains_key("publicKeyMultibase") {
+            return Err(SnapshotError::Malformed(
+                "verification methods must not contain multiple public verification material formats"
+                    .into(),
+            ));
+        }
+        if let Some(public_jwk) = object.get("publicKeyJwk") {
+            if !public_jwk.is_object() {
+                return Err(SnapshotError::Malformed(
+                    "verification method publicKeyJwk must be a JSON object when present".into(),
+                ));
+            }
+        }
+        if let Some(public_multibase) = object.get("publicKeyMultibase") {
+            if !public_multibase.is_string() {
+                return Err(SnapshotError::Malformed(
+                    "verification method publicKeyMultibase must be a string when present".into(),
+                ));
+            }
+        }
+        match method_type {
+            "Multikey" if object.contains_key("publicKeyJwk") => {
+                return Err(SnapshotError::Malformed(
+                    "Multikey verification methods must not use publicKeyJwk".into(),
+                ));
+            }
+            "JsonWebKey" if object.contains_key("publicKeyMultibase") => {
+                return Err(SnapshotError::Malformed(
+                    "JsonWebKey verification methods must not use publicKeyMultibase".into(),
+                ));
+            }
+            _ => {}
+        }
+
         let controller = required_string(object, "controller")?;
         let controller = ClaimControllerIdentity::new(controller.to_owned())
             .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
@@ -750,6 +791,39 @@ mod tests {
         assert!(matches!(
             adapter.resolve_snapshot(&request, snapshot),
             Err(SnapshotError::SnapshotReferenceMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn verification_method_definition_requires_typed_public_material_shape() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = snapshot.document.replace(
+            r##""type": "Multikey","##,
+            r##""controller": "https://example.test/controller","##,
+        );
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message)) if message.contains("field type")
+        ));
+
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = snapshot.document.replace(
+            r##""publicKeyMultibase": "z6MkfFakeKeyMaterial""##,
+            r##""publicKeyMultibase": "z6MkfFakeKeyMaterial", "publicKeyJwk": {}"##,
+        );
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("multiple public verification material formats")
         ));
     }
 
