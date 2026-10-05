@@ -79,7 +79,7 @@ impl PhonologicalPlanRealizationReceipt {
         plan.validate()
             .map_err(|error| anyhow::anyhow!("invalid phonological plan: {error}"))?;
 
-        if self.schema_version != 1 {
+        if self.schema_version != 2 {
             anyhow::bail!("unsupported realization receipt schema: {}", self.schema_version);
         }
         if self.plan_version != plan.version {
@@ -490,7 +490,7 @@ impl LiveVoice {
             hasher.finalize().to_hex().to_string()
         };
         let receipt = PhonologicalPlanRealizationReceipt {
-            schema_version: 1,
+            schema_version: 2,
             plan_version: plan.version.clone(),
             plan_grounding_blake3: blake3::hash(plan_grounding.as_bytes())
                 .to_hex()
@@ -1074,7 +1074,7 @@ mod tests {
             .speak_phonological_plan_with_receipt(&plan)
             .expect("plan-native receipt should be emitted");
 
-        assert_eq!(receipt.schema_version, 1);
+        assert_eq!(receipt.schema_version, 2);
         assert_eq!(receipt.plan_version, plan.version);
         assert!(receipt.realization_authorized);
         assert_eq!(
