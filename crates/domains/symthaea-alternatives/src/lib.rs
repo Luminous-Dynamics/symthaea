@@ -5288,8 +5288,12 @@ mod tests {
     #[test]
     fn mismatched_experimental_design_observation_fails_closed() {
         let case = crate::corpus::five_pathway_adversarial_case();
-        let mut candidate = case.candidates[0].clone();
-        let observed = candidate
+        let mut candidates = case.candidates.clone();
+        let candidate_index = candidates
+            .iter()
+            .position(|candidate| candidate.id == "product-redesign")
+            .unwrap();
+        let observed = candidates[candidate_index]
             .evidence
             .iter_mut()
             .find(|evidence| evidence.kind == EvidenceKind::Observed)
@@ -5343,7 +5347,7 @@ mod tests {
         let error = AlternativesEngine
             .assess_with_experimental_design(
                 &case.requirement,
-                &case.candidates,
+                &candidates,
                 Some(case.incumbent_id),
                 None,
                 None,
@@ -5364,8 +5368,12 @@ mod tests {
     #[test]
     fn positive_experimental_design_observation_lineage_is_accepted() {
         let case = crate::corpus::five_pathway_adversarial_case();
-        let mut candidate = case.candidates[0].clone();
-        let observed = candidate
+        let mut candidates = case.candidates.clone();
+        let candidate_index = candidates
+            .iter()
+            .position(|candidate| candidate.id == "product-redesign")
+            .unwrap();
+        let observed = candidates[candidate_index]
             .evidence
             .iter_mut()
             .find(|evidence| evidence.kind == EvidenceKind::Observed)
@@ -5413,7 +5421,7 @@ mod tests {
         AlternativesEngine
             .assess_with_experimental_design(
                 &case.requirement,
-                &case.candidates,
+                &candidates,
                 Some(case.incumbent_id),
                 None,
                 None,
