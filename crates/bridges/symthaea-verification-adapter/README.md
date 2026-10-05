@@ -15,6 +15,8 @@ The adapter is deliberately narrower than a complete cryptographic verifier:
 - it checks method/controller binding;
 - it checks membership in the requested verification relationship;
 - it carries method lifecycle timestamps into the resolution;
+- it binds the declared method type and a SHA-256 identity digest of the exact public verification material;
+- it can return that exact public material to a downstream cryptographic verifier without re-resolving the snapshot;
 - it emits an `ApplicationSnapshot` dereference attestation with the exact SHA-256 digest and standards-oriented `digestMultibase` artifact.
 
 It does **not** perform network access, DNS resolution, controller authorization, digital-signature verification, or truth/reliability assessment.
@@ -51,6 +53,8 @@ The raw persisted envelope is bounded to 32 MiB and the decoded controller docum
 ## Standards relationship
 
 The implementation follows the security-critical structure of the W3C Controlled Identifiers v1.0 retrieval algorithm without claiming generic W3C conformance for the Symthaea contract.
+
+The resolution also binds the exact public verification-material identity so a downstream cryptographic verifier can refuse key-material substitution between resolution and signature checking.
 
 The optional `digestMultibase` receipt artifact is aligned with the W3C Verifiable Credential Data Integrity 1.1 Working Draft resource-integrity property. The current implementation intentionally emits one SHA-256 Multibase/Multihash value and binds it to the independently recorded SHA-256 document digest.
 
