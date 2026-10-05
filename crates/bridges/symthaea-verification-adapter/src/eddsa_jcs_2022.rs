@@ -970,6 +970,30 @@ mod tests {
     }
 
     #[test]
+    fn rejects_lifecycle_substitution_before_signature_check() {
+        let request = vector_request();
+        let (resolution, mut resolved_method) = resolved_vector(&request);
+        resolved_method.lifecycle =
+            symthaea_epistemic_types::VerificationMethodLifecycle::new(
+                Some("2026-10-06T00:00:00Z"),
+                Some("2026-10-05T00:30:00Z"),
+            )
+            .unwrap();
+
+        assert!(matches!(
+            verify_eddsa_jcs_2022(
+                &request,
+                &resolution,
+                &resolved_method,
+                &secured_document()
+            ),
+            Err(SnapshotError::Verification(
+                VerificationFailure::ResolutionEvidenceMismatch
+            ))
+        ));
+    }
+
+    #[test]
     fn rejects_key_material_substitution_before_signature_check() {
         let request = vector_request();
         let (resolution, mut resolved_method) = resolved_vector(&request);
