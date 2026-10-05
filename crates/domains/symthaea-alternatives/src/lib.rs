@@ -2424,6 +2424,7 @@ mod tests {
                     ComparisonScale {
                         unit: "unit".into(),
                         scope: "synthetic functional unit".into(),
+                        basis: fixture_basis(),
                     },
                 ),
                 (
@@ -2431,6 +2432,7 @@ mod tests {
                     ComparisonScale {
                         unit: "unit".into(),
                         scope: "synthetic functional unit".into(),
+                        basis: fixture_basis(),
                     },
                 ),
             ]),
