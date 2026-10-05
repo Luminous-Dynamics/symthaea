@@ -145,8 +145,14 @@ pub fn infer_dimensions(expr: &Expr, var_units: &UnitMap) -> InferenceResult {
                             Inconsistent
                         }
                     }
-                    BinOp::Mul => Inferred(a.add(&b)),
-                    BinOp::Div => Inferred(a.sub(&b)),
+                    BinOp::Mul => a
+                        .checked_add(&b)
+                        .map(Inferred)
+                        .unwrap_or(Inconsistent),
+                    BinOp::Div => a
+                        .checked_sub(&b)
+                        .map(Inferred)
+                        .unwrap_or(Inconsistent),
                     BinOp::Pow => {
                         // Only constant integer exponents propagate cleanly.
                         if let Expr::Const(k) = rhs.as_ref() {
@@ -154,11 +160,18 @@ pub fn infer_dimensions(expr: &Expr, var_units: &UnitMap) -> InferenceResult {
                             // like 0.5 (Sqrt is encoded as Pow(_, 0.5) sometimes).
                             // If k is exactly half-integer, we handle Sqrt-like
                             // cases via a separate path below.
-                            if (k - k.round()).abs() < 1e-9 {
-                                let int_k = *k as i8;
-                                match a.scale(int_k) {
-                                    Some(scaled) => Inferred(scaled),
-                                    None => Inconsistent,
+                            if !k.is_finite() {
+                                Inconsistent
+                            } else if (k - k.round()).abs() < 1e-9 {
+                                let rounded = k.round();
+                                if rounded < i8::MIN as f64 || rounded > i8::MAX as f64 {
+                                    Inconsistent
+                                } else {
+                                    let int_k = rounded as i8;
+                                    match a.scale(int_k) {
+                                        Some(scaled) => Inferred(scaled),
+                                        None => Inconsistent,
+                                    }
                                 }
                             } else if (k - 0.5).abs() < 1e-9 {
                                 // Square root via Pow(x, 0.5)
@@ -273,6 +286,66 @@ mod tests {
             result,
             InferenceResult::Inferred(DimensionalSignature::DIMENSIONLESS)
         );
+    }
+
+    #[test]
+    fn test_dimensional_mul_overflow_is_inconsistent() {
+        let lhs = DimensionalSignature::from_array([i8::MAX, 0, 0, 0, 0, 0, 0]);
+        let rhs = DimensionalSignature::from_array([1, 0, 0, 0, 0, 0, 0]);
+        let expr = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("lhs".into())),
+            Box::new(Expr::Var("rhs".into())),
+        );
+        let result = infer_dimensions(
+            &expr,
+            &units(&[("lhs", lhs), ("rhs", rhs)]),
+        );
+        assert_eq!(result, InferenceResult::Inconsistent);
+    }
+
+    #[test]
+    fn test_dimensional_div_overflow_is_inconsistent() {
+        let lhs = DimensionalSignature::from_array([i8::MIN, 0, 0, 0, 0, 0, 0]);
+        let rhs = DimensionalSignature::from_array([1, 0, 0, 0, 0, 0, 0]);
+        let expr = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Var("lhs".into())),
+            Box::new(Expr::Var("rhs".into())),
+        );
+        let result = infer_dimensions(
+            &expr,
+            &units(&[("lhs", lhs), ("rhs", rhs)]),
+        );
+        assert_eq!(result, InferenceResult::Inconsistent);
+    }
+
+    #[test]
+    fn test_oversized_power_exponent_is_inconsistent() {
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(128.0)),
+        );
+        let result = infer_dimensions(
+            &expr,
+            &units(&[("x", DimensionalSignature::LENGTH)]),
+        );
+        assert_eq!(result, InferenceResult::Inconsistent);
+    }
+
+    #[test]
+    fn test_nonfinite_power_exponent_is_inconsistent() {
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(f64::INFINITY)),
+        );
+        let result = infer_dimensions(
+            &expr,
+            &units(&[("x", DimensionalSignature::LENGTH)]),
+        );
+        assert_eq!(result, InferenceResult::Inconsistent);
     }
 
     #[test]
