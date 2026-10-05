@@ -117,6 +117,23 @@ impl LexicalPhonologicalWitness {
         Ok(())
     }
 
+    /// Stable canonical serialization suitable for evidence identity.
+    pub fn grounding_surface(&self) -> String {
+        serde_json::to_string(self).unwrap_or_else(|_| {
+            format!(
+                r#"{{"version":"{}","serialization":"failed"}}"#,
+                self.version
+            )
+        })
+    }
+
+    /// Stable BLAKE3 identity of the complete explicit realization witness.
+    pub fn provenance_token(&self) -> String {
+        blake3::hash(self.grounding_surface().as_bytes())
+            .to_hex()
+            .to_string()
+    }
+
     /// Validate that the witness covers the exact final lexical constituent stream.
     pub fn validate_against_binding(
         &self,
