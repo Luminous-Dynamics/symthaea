@@ -284,10 +284,16 @@ impl LiveVoice {
                     phrase_index,
                     phrase_progress: phrase_progress.clamp(0.0, 1.0),
                     is_focus: segment.is_focus && plan.focus_role.is_some(),
-                    pitch_accent: if segment.is_focus {
-                        PitchAccent::RiseHigh
-                    } else {
-                        PitchAccent::None
+                    pitch_accent: {
+                        if segment.is_focus && plan.prominence >= 0.82 {
+                            PitchAccent::RiseHigh
+                        } else if plan.prominence >= 0.62 {
+                            PitchAccent::High
+                        } else if plan.pause_weight >= 0.65 {
+                            PitchAccent::FallLow
+                        } else {
+                            PitchAccent::None
+                        }
                     },
                     is_syllable_onset: segment.is_syllable_onset,
                     syllable_progress: progress,
