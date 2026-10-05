@@ -23,9 +23,9 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 pub const VERIFICATION_REQUEST_SCHEMA_VERSION: u16 = 1;
-pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 7;
-pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 8;
-pub const CRYPTOGRAPHIC_VERIFICATION_RECEIPT_SCHEMA_VERSION: u16 = 2;
+pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 8;
+pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 9;
+pub const CRYPTOGRAPHIC_VERIFICATION_RECEIPT_SCHEMA_VERSION: u16 = 3;
 
 /// Typed identifier for the verification relationship under which a verification
 /// method is permitted to validate a proof.
@@ -1336,6 +1336,7 @@ pub struct CryptographicVerificationReceipt {
     pub cryptographic_input_digest: String,
     pub proof_digest: String,
     pub proof_value_multibase: String,
+    pub freshness: VerificationFreshnessContext,
 }
 
 impl CryptographicVerificationReceipt {
@@ -1372,6 +1373,7 @@ impl CryptographicVerificationReceipt {
             cryptographic_input_digest: cryptographic_input_digest.into(),
             proof_digest: proof_digest.into(),
             proof_value_multibase: proof_value_multibase.into(),
+            freshness: request.freshness.clone(),
         };
         receipt.validate_against(request, resolution)?;
         Ok(receipt)
@@ -1394,6 +1396,10 @@ impl CryptographicVerificationReceipt {
             &self.cryptographic_input_digest,
             &self.proof_digest,
             &self.proof_value_multibase,
+            &self.freshness.replay_context_digest(),
+            &self.freshness.verification_time,
+            &self.freshness.proof_created,
+            &self.freshness.proof_expires,
         );
         let bytes = serde_json::to_vec(&encoded)
             .expect("cryptographic verification receipt is serializable");
@@ -1473,18 +1479,19 @@ impl CryptographicVerificationReceipt {
                 "cryptographic proofValue must use the base58-btc multibase prefix".into(),
             ));
         }
-        let proof_bytes = bs58::decode(&self.proof_value_multibase[1..])
+        bs58::decode(&self.proof_value_multibase[1..])
             .into_vec()
             .map_err(|_| {
                 VerificationFailure::Structural(
                     "cryptographic proofValue must contain valid base58-btc data".into(),
                 )
             })?;
-        if proof_bytes.len() != 64 {
-            return Err(VerificationFailure::Structural(
-                "Ed25519 cryptographic proofValue must decode to exactly 64 bytes".into(),
-            ));
+
+        self.freshness.validate()?;
+        if self.freshness != request.freshness {
+            return Err(VerificationFailure::FreshnessMismatch);
         }
+
         Ok(())
     }
 }
@@ -2612,6 +2619,7 @@ mod tests {
             cryptographic_input_digest: "44".repeat(32),
             proof_digest: "55".repeat(32),
             proof_value_multibase: format!("z{}", bs58::encode([0u8; 64]).into_string()),
+            freshness: request.freshness.clone(),
         }
     }
 
@@ -2785,6 +2793,33 @@ mod tests {
         assert!(evidence.validate_structure().is_ok());
         assert!(evidence.matches_request(&request));
         assert!(!evidence.evidence_digest().is_empty());
+    }
+
+    #[test]
+    fn cryptographic_receipt_rejects_freshness_substitution() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let mut resolution = resolved_method(&request);
+        resolution.validate_structure().unwrap();
+        let mut receipt = test_cryptographic_receipt(&request, &resolution);
+        receipt.freshness.verification_time = "2026-10-05T02:00:01Z".into();
+
+        assert!(matches!(
+            receipt.validate_against(&request, &resolution),
+            Err(VerificationFailure::FreshnessMismatch)
+        ));
+        assert_ne!(
+            receipt.receipt_digest(),
+            test_cryptographic_receipt(&request, &resolution).receipt_digest()
+        );
     }
 
     #[test]
