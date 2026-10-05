@@ -2630,7 +2630,11 @@ impl<'a> CborReader<'a> {
             return Err(Rfc9162ProofDecodeError::ResourceLimitExceeded);
         }
         if self.offset >= limit_end {
-            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+            return Err(if resource_limits && limit_end < self.bytes.len() {
+                Rfc9162ProofDecodeError::ResourceLimitExceeded
+            } else {
+                Rfc9162ProofDecodeError::InvalidStructure
+            });
         }
         let major = self.peek_major_type()?;
         match major {
@@ -4249,6 +4253,16 @@ mod tests {
             1
         );
         accepted.finish().unwrap();
+    }
+
+    #[test]
+    fn cbor_resource_aware_map_preserves_aggregate_budget_exhaustion() {
+        let wire = vec![0xa1, 0x01, 0x82, 0x00, 0x00];
+        let mut reader = CborReader::new(&wire);
+        assert_eq!(
+            reader.read_map_entries_bounded_with_resource_limits_and_bytes(1, 64, 64, 2),
+            Err(Rfc9162ProofDecodeError::ResourceLimitExceeded)
+        );
     }
 
     #[test]
