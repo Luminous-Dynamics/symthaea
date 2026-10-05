@@ -1442,7 +1442,7 @@ impl Rfc9942ReceiptCollection {
     }
 
     fn from_reader(reader: &mut CborReader<'_>) -> Result<Self, Rfc9942VdpError> {
-        let items=reader.read_bstr_items_bounded(
+        let items=reader.read_bstr_items_bounded_with_resource_limits(
             MAX_RFC9942_RECEIPTS,
             MAX_RFC9942_RECEIPT_BYTES,
             MAX_RFC9942_RECEIPTS_BYTES_TOTAL,
@@ -3044,6 +3044,27 @@ impl<'a> CborReader<'a> {
         max_item_len: usize,
         max_total_len: usize,
     ) -> Result<Vec<Vec<u8>>, Rfc9162ProofDecodeError> {
+        self.read_bstr_items_bounded_with_mode(max_items, max_item_len, max_total_len, false)
+    }
+
+    /// RFC 9942 receipt collections treat their per-receipt and aggregate byte
+    /// ceilings as defensive resource bounds rather than generic structure.
+    fn read_bstr_items_bounded_with_resource_limits(
+        &mut self,
+        max_items: usize,
+        max_item_len: usize,
+        max_total_len: usize,
+    ) -> Result<Vec<Vec<u8>>, Rfc9162ProofDecodeError> {
+        self.read_bstr_items_bounded_with_mode(max_items, max_item_len, max_total_len, true)
+    }
+
+    fn read_bstr_items_bounded_with_mode(
+        &mut self,
+        max_items: usize,
+        max_item_len: usize,
+        max_total_len: usize,
+        oversize_is_resource: bool,
+    ) -> Result<Vec<Vec<u8>>, Rfc9162ProofDecodeError> {
         let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
         self.offset+=1;
         if initial>>5!=4{return Err(Rfc9162ProofDecodeError::InvalidEncoding)}
@@ -3074,11 +3095,14 @@ impl<'a> CborReader<'a> {
                     .checked_sub(total_len)
                     .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
                 let item=self.read_bstr_bounded(max_item_len.min(remaining_total))
-                    .map_err(|error| match error {
-                        Rfc9162ProofDecodeError::InvalidStructure => {
+                    .map_err(|error| {
+                        if oversize_is_resource
+                            && error == Rfc9162ProofDecodeError::InvalidStructure
+                        {
                             Rfc9162ProofDecodeError::ResourceLimitExceeded
+                        } else {
+                            error
                         }
-                        other => other,
                     })?;
                 total_len=total_len
                     .checked_add(item.len())
@@ -3103,11 +3127,14 @@ impl<'a> CborReader<'a> {
                 .checked_sub(total_len)
                 .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
             let item=self.read_bstr_bounded(max_item_len.min(remaining_total))
-                .map_err(|error| match error {
-                    Rfc9162ProofDecodeError::InvalidStructure => {
+                .map_err(|error| {
+                    if oversize_is_resource
+                        && error == Rfc9162ProofDecodeError::InvalidStructure
+                    {
                         Rfc9162ProofDecodeError::ResourceLimitExceeded
+                    } else {
+                        error
                     }
-                    other => other,
                 })?;
             total_len=total_len
                 .checked_add(item.len())
@@ -3118,6 +3145,7 @@ impl<'a> CborReader<'a> {
             items.push(item);
         }
     }
+
 
 }
 
