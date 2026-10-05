@@ -545,6 +545,24 @@ fn observe_openfoam_patch_geometry_with_neighbour(
     let faces = parse_face_list(faces_source_bytes)?;
     let points = parse_points_list(points_source_bytes)?;
     let face_count = faces.len() as u64;
+
+    let start = usize::try_from(record.start_face)
+        .map_err(|_| OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
+    let count = usize::try_from(record.n_faces)
+        .map_err(|_| OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
+    let end = start
+        .checked_add(count)
+        .ok_or(OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
+    if end > faces.len() {
+        return Err(
+            OpenFoamBoundaryObservationError::BoundaryFaceRangeOutOfBounds {
+                start_face: record.start_face,
+                n_faces: record.n_faces,
+                face_count: faces.len() as u64,
+            },
+        );
+    }
+
     let internal_face_count = parse_neighbour_list_count(neighbour_source_bytes)?;
 
     let radius_mm = interface.radius_mm() as f64;
@@ -608,23 +626,6 @@ fn observe_openfoam_patch_geometry_with_neighbour(
         internal_face_count,
         face_count,
     )?;
-
-    let start = usize::try_from(record.start_face)
-        .map_err(|_| OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
-    let count = usize::try_from(record.n_faces)
-        .map_err(|_| OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
-    let end = start
-        .checked_add(count)
-        .ok_or(OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
-    if end > faces.len() {
-        return Err(
-            OpenFoamBoundaryObservationError::BoundaryFaceRangeOutOfBounds {
-                start_face: record.start_face,
-                n_faces: record.n_faces,
-                face_count: faces.len() as u64,
-            },
-        );
-    }
 
     let mut edge_occurrences =
         std::collections::BTreeMap::<
