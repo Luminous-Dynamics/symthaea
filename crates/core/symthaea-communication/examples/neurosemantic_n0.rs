@@ -164,6 +164,23 @@ fn main() -> Result<(), String> {
         1_500,
     )?;
 
+    let mut stale_binding = message.clone();
+    stale_binding
+        .packet
+        .data_policy
+        .handling
+        .retention = NeurosemanticRetentionPolicy::Ephemeral;
+    stale_binding.packet.refresh_hashes()?;
+    let stale_policy_binding_blocked = stale_binding
+        .validate_for_handling(
+            &lease,
+            &policy_provenance_binding,
+            "ZA",
+            symthaea_communication::NeurosemanticHandlingAction::Transmit,
+            1_500,
+        )
+        .is_err();
+
     let mut inference_escalation = message.clone();
     inference_escalation
         .packet
@@ -264,6 +281,7 @@ fn main() -> Result<(), String> {
             handling_policy_provenance_reference_mismatch_blocked,
         ),
         ("handling_policy_provenance_mismatch_blocked", handling_policy_provenance_mismatch_blocked),
+        ("stale_policy_provenance_binding_blocked", stale_policy_binding_blocked),
         ("inference_escalation_blocked", inference_escalation_blocked),
         ("first_packet_accepted", accepted == ReplayDecision::Accept),
         ("exact_replay_detected", duplicate == ReplayDecision::Duplicate),

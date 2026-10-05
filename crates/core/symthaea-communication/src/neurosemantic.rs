@@ -85,7 +85,7 @@ pub enum NeurosemanticInferenceClass {
     Identity,
 }
 
-pub const NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION: u16 = 4;
+pub const NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION: u16 = 5;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum NeurosemanticSecondaryUse {
@@ -152,6 +152,7 @@ impl Default for NeurosemanticHandlingPolicy {
 pub struct NeurosemanticPolicyProvenanceBinding {
     policy_provenance_ref: String,
     policy_provenance_hash: String,
+    handling_policy_fingerprint: String,
 }
 
 impl NeurosemanticPolicyProvenanceBinding {
@@ -162,9 +163,21 @@ impl NeurosemanticPolicyProvenanceBinding {
     pub fn digest(&self) -> &str {
         &self.policy_provenance_hash
     }
+
+    pub fn handling_policy_fingerprint(&self) -> &str {
+        &self.handling_policy_fingerprint
+    }
 }
 
 impl NeurosemanticHandlingPolicy {
+    fn fingerprint(&self) -> Result<String, String> {
+        let mut canonical = self.clone();
+        canonical.policy_provenance_hash.clear();
+        let bytes = serde_json::to_vec(&canonical)
+            .map_err(|error| format!("handling policy serialization: {error}"))?;
+        Ok(content_hash(&bytes))
+    }
+
     pub fn validates(&self) -> bool {
         self.schema_version == NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION
             && valid_identifier(&self.policy_provenance_ref)
@@ -206,6 +219,7 @@ impl NeurosemanticHandlingPolicy {
         Ok(NeurosemanticPolicyProvenanceBinding {
             policy_provenance_ref: self.policy_provenance_ref.clone(),
             policy_provenance_hash: self.policy_provenance_hash.clone(),
+            handling_policy_fingerprint: self.fingerprint()?,
         })
     }
 
@@ -750,8 +764,10 @@ impl AuthorizedNeurosemanticMessage {
             != self.packet.data_policy.handling.policy_provenance_ref
             || provenance.policy_provenance_hash
                 != self.packet.data_policy.handling.policy_provenance_hash
+            || provenance.handling_policy_fingerprint
+                != self.packet.data_policy.handling.fingerprint()?
         {
-            return Err("policy provenance binding does not match the packet handling policy".into());
+            return Err("policy provenance binding does not match the current packet handling policy".into());
         }
         self.validate(lease, now_unix_s)?;
         if !self.packet.data_policy.allows_handling(
@@ -1163,6 +1179,51 @@ mod tests {
         assert!(policy.verify_policy_provenance_bytes(b"synthetic-policy-record-1"));
         policy.policy_provenance_ref = "synthetic-policy-record-2".into();
         assert!(!policy.verify_policy_provenance_bytes(b"synthetic-policy-record-1"));
+    }
+
+    #[test]
+    fn handling_policy_provenance_binding_becomes_stale_after_policy_mutation() {
+        let policy = semantic_policy().handling;
+        let binding = policy
+            .bind_policy_provenance_bytes(b"synthetic-policy-record-1")
+            .unwrap();
+
+        let mut mutated = policy;
+        mutated.retention = NeurosemanticRetentionPolicy::Ephemeral;
+
+        let mut packet = NeurosemanticPacket::new_with_policy(
+            18,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            NeurosemanticDataPolicy {
+                handling: mutated,
+                ..semantic_policy()
+            },
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+
+        packet.refresh_hashes().unwrap();
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: lease().consent_epoch,
+            lease_id: lease().lease_id,
+        };
+        assert!(message
+            .validate_for_handling(
+                &lease(),
+                &binding,
+                "ZA",
+                NeurosemanticHandlingAction::Persist,
+                150,
+            )
+            .is_err());
     }
 
     #[test]
