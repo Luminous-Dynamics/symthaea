@@ -318,3 +318,31 @@ constructor/validator identifiers at 4096 bytes.
 Direct unbounded deserialization remains outside the protocol trust contract. A packet
 that is merely integrity-valid is not thereby authorization-valid: unknown or legacy
 data-policy state remains unable to cross the consent boundary.
+
+### Revocation and replay lifecycle
+
+Consent revocation carries an explicit effective timestamp. A revoked lease without an
+effective timestamp is invalid, while a future effective timestamp permits an explicitly
+scheduled revocation. Authorization checks deny access at or after the effective time.
+
+Replay protection is bounded by consent epoch, sender/recipient, and lease identity. The
+replay tracker records lease expiry with each retained sequence state and can reclaim
+expired entries. This is important because a fixed-capacity replay table without lifecycle
+reclamation would turn normal short-lived leases into a permanent resource-exhaustion path.
+
+### External policy provenance
+
+The handling policy carries an opaque reference to the externally authoritative policy or
+consent record. Symthaea binds that reference into the content-addressed packet policy but
+does not pretend to authenticate the external authority. Mycelix or another designated
+policy authority must resolve and authenticate the reference, signed consent, revocation
+state, and audit history at the system boundary.
+
+Thus there are deliberately separate gates:
+
+1. packet integrity;
+2. consent and data/inference authorization;
+3. downstream handling policy;
+4. external identity/policy provenance and revocation authority.
+
+Passing one gate does not imply passage through the others.
