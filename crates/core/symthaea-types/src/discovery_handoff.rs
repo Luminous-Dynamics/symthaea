@@ -348,6 +348,30 @@ impl ScientificInquirySelectionReceipt {
         Ok(())
     }
 
+    /// Validate the receipt against the concrete, ordered hypothesis set.
+    /// This closes the gap where two independently valid digests could be
+    /// paired even though the anchored handoff is not a member of the set.
+    pub fn validate_against_hypothesis_set(
+        &self,
+        handoffs: &[ScientificHypothesisHandoff],
+    ) -> Result<(), String> {
+        self.validate()?;
+        if handoffs.len() < 2 {
+            return Err("inquiry selection requires a concrete set of at least two hypotheses".into());
+        }
+        let expected_set_digest = scientific_hypothesis_set_digest(handoffs);
+        if self.hypothesis_set_digest != expected_set_digest {
+            return Err("inquiry selection hypothesis-set digest does not match the supplied set".into());
+        }
+        if !handoffs
+            .iter()
+            .any(|handoff| handoff.digest_hex() == self.hypothesis_handoff_digest)
+        {
+            return Err("inquiry selection handoff is not a member of the supplied hypothesis set".into());
+        }
+        Ok(())
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_revision != Self::SCHEMA_REVISION {
             return Err("unsupported inquiry selection schema revision".into());
@@ -612,6 +636,58 @@ mod tests {
 
     fn energy() -> PhysicalType {
         PhysicalType::with_kind(QuantityKind::Energy, PhysicalDimension::ENERGY)
+    }
+
+    #[test]
+    fn inquiry_selection_set_validation_binds_handoff_membership_and_order() {
+        let a = ScientificHypothesisHandoff::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &energy(),
+            ModelMaturity::ResearchPrototype,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            1,
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+        let b = ScientificHypothesisHandoff::new(
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            &energy(),
+            ModelMaturity::ResearchPrototype,
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "1111111111111111111111111111111111111111111111111111111111111111",
+            2,
+            "2222222222222222222222222222222222222222222222222222222222222222",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+        let set = vec![a.clone(), b.clone()];
+        let set_digest = scientific_hypothesis_set_digest(&set);
+        let receipt = ScientificInquirySelectionReceipt::new(
+            a.digest_hex(),
+            set_digest.clone(),
+            "3333333333333333333333333333333333333333333333333333333333333333",
+            "4444444444444444444444444444444444444444444444444444444444444444",
+            "selector-v2",
+            1,
+            1.0,
+            2,
+        )
+        .unwrap();
+
+        assert!(receipt.validate_against_hypothesis_set(&set).is_ok());
+        assert!(receipt
+            .validate_against_hypothesis_set(&[b.clone(), a.clone()])
+            .is_err());
+        let unrelated = b.clone().with_challenge_manifest(
+            "5555555555555555555555555555555555555555555555555555555555555555",
+        );
+        assert!(receipt
+            .validate_against_hypothesis_set(&[a, unrelated])
+            .is_err());
     }
 
     #[test]
