@@ -1,0 +1,249 @@
+name: HDC Linear-Code Bounded Decoder Qualification
+
+on:
+  push:
+    branches:
+      - "research/hdc-linear-code-bounded-decoder-v1"
+  workflow_dispatch:
+
+concurrency:
+  group: hdc-linear-code-bounded-decoder-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  qualify:
+    name: Exact-head bounded syndrome qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout exact workflow head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+
+      - name: Record exact head and parent
+        id: head
+        run: |
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          PARENT_SHA="164d6b94d12bb72a902bdc2164d25cd540d3ba7f"
+          git fetch --no-tags --depth=1 origin "$PARENT_SHA"
+          test "$ACTUAL_SHA" = "${GITHUB_SHA}"
+          git cat-file -e "${PARENT_SHA}^{commit}"
+          echo "sha=$ACTUAL_SHA" >> "$GITHUB_OUTPUT"
+          echo "parent_sha=$PARENT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce stacked research surface
+        id: scope
+        env:
+          HEAD_SHA: ${{ steps.head.outputs.sha }}
+          PARENT_SHA: ${{ steps.head.outputs.parent_sha }}
+        run: |
+          EXPECTED_PATHS="$RUNNER_TEMP/hdc-linear-code-bounded-decoder-expected-paths"
+          CHANGED_PATHS="$RUNNER_TEMP/hdc-linear-code-bounded-decoder-changed-paths"
+          cat > "$EXPECTED_PATHS" <<'EOF'
+          .github/workflows/hdc-linear-code-syndrome-qualify.yml
+          crates/core/symthaea-core/src/hdc/mod.rs
+          crates/core/symthaea-core/src/hdc/syndrome_decoder.rs
+          crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs
+          docs/research/HDC_LINEAR_CODE_BOUNDED_DECODER.md
+          EOF
+          sort -u "$EXPECTED_PATHS" -o "$EXPECTED_PATHS"
+          git diff --name-only "$PARENT_SHA" "$HEAD_SHA" | sort -u > "$CHANGED_PATHS"
+          diff -u "$EXPECTED_PATHS" "$CHANGED_PATHS"
+          test "$(wc -l < "$CHANGED_PATHS" | tr -d ' ')" -eq 5
+          printf "parent_head_sha=%s\n" "$PARENT_SHA" >> "$GITHUB_OUTPUT"
+          printf "stacked_head_sha=%s\n" "$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          printf "changed_paths=" >> "$GITHUB_OUTPUT"
+          paste -sd "|" "$CHANGED_PATHS" >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned Rust toolchain
+        id: toolchain_install
+        run: |
+          rustup toolchain install 1.96.1 --component rustfmt --component clippy --profile minimal --no-self-update
+
+      - name: Verify pinned Rust toolchain
+        id: toolchain
+        run: |
+          test "$(rustc +1.96.1 --version | awk '{print $2}')" = "1.96.1"
+          test "$(cargo +1.96.1 --version | awk '{print $2}')" = "1.96.1"
+
+      - name: Capture source provenance
+        id: provenance
+        run: |
+          sha256sum \
+            crates/core/symthaea-core/src/hdc/linear_code.rs \
+            crates/core/symthaea-core/src/hdc/syndrome_decoder.rs \
+            crates/core/symthaea-core/src/hdc/mod.rs \
+            crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs \
+            crates/core/symthaea-core/tests/linear_code_ambiguity.rs \
+            .github/workflows/hdc-linear-code-syndrome-qualify.yml \
+            docs/research/HDC_LINEAR_CODE_BOUNDED_DECODER.md \
+            > "$RUNNER_TEMP/source-sha256.txt"
+          mkdir -p hdc-linear-code-evidence
+          cp "$RUNNER_TEMP/source-sha256.txt" hdc-linear-code-evidence/source-sha256.txt
+
+      - name: Focused formatting
+        id: format
+        run: |
+          rustfmt +1.96.1 --check --edition 2024 \
+            crates/core/symthaea-core/src/hdc/syndrome_decoder.rs \
+            crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs
+          grep -Eq "^[[:space:]]*pub mod syndrome_decoder;" \
+            crates/core/symthaea-core/src/hdc/mod.rs
+
+      - name: Build isolated stacked harness
+        id: harness
+        run: |
+          HARNESS="$RUNNER_TEMP/hdc-linear-code-bounded-decoder"
+          rm -rf "$HARNESS"
+          mkdir -p "$HARNESS/src" "$HARNESS/tests"
+
+          cat > "$HARNESS/Cargo.toml" <<'EOF'
+          [package]
+          name = "symthaea-core"
+          version = "0.0.0"
+          edition = "2024"
+          publish = false
+
+          [lib]
+          path = "src/lib.rs"
+
+          [dependencies]
+          rand = "=0.8.6"
+          rand_chacha = "=0.3.1"
+          blake3 = "=1.8.2"
+          EOF
+
+          cat > "$HARNESS/src/lib.rs" <<EOF
+          pub mod hdc {
+              #[path = "${GITHUB_WORKSPACE}/crates/core/symthaea-core/src/hdc/linear_code.rs"]
+              pub mod linear_code;
+              #[path = "${GITHUB_WORKSPACE}/crates/core/symthaea-core/src/hdc/syndrome_decoder.rs"]
+              pub mod syndrome_decoder;
+          }
+          EOF
+
+          cp "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_ambiguity.rs" \
+            "$HARNESS/tests/linear_code_ambiguity.rs"
+          cp "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs" \
+            "$HARNESS/tests/linear_code_syndrome_decoder.rs"
+
+          cargo +1.96.1 generate-lockfile --manifest-path "$HARNESS/Cargo.toml"
+          LOCK_SHA256="$(sha256sum "$HARNESS/Cargo.lock" | cut -d" " -f1)"
+          echo "path=$HARNESS" >> "$GITHUB_OUTPUT"
+          echo "lock_sha256=$LOCK_SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Existing linear-code unit suite
+        id: unit_tests
+        run: |
+          cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --lib linear_code
+
+      - name: Existing ambiguity qualification
+        id: inherited_tests
+        run: |
+          cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_ambiguity
+
+      - name: Independent syndrome decoder qualification
+        id: decoder_tests
+        run: |
+          cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder
+
+      - name: Capture syndrome decoder ledger
+        id: decoder_ledger
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            decoder_work_ledger_matches_exact_weight_search_space -- --nocapture 2>&1)"
+          LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SYNDROME_DECODER_LEDGER=')"
+          test "$LEDGER_COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^SYNDROME_DECODER_LEDGER=//p')"
+          test -n "$LEDGER"
+          printf "syndrome_decoder_ledger=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture deterministic random-code sweep
+        id: random_sweep
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            random_small_code_sweep_matches_exhaustive_oracle_within_guaranteed_radius -- --nocapture 2>&1)
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^RANDOM_SYNDROME_SWEEP=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^RANDOM_SYNDROME_SWEEP=//p')"
+          test -n "$LEDGER"
+          printf "random_syndrome_sweep=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture beyond-radius semantics
+        id: beyond_radius
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            beyond_unique_radius_decoder_matches_nearest_or_no_match_without_claiming_target_recovery -- --nocapture 2>&1)
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^BEYOND_RADIUS_LEDGER=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^BEYOND_RADIUS_LEDGER=//p')"
+          test -n "$LEDGER"
+          printf "beyond_radius_ledger=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+      - name: Strict Clippy
+        id: clippy
+        run: |
+          cargo +1.96.1 clippy --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --all-targets \
+            -- -D warnings
+
+      - name: Emit qualification receipt
+        if: always()
+        run: |
+          mkdir -p hdc-linear-code-evidence
+          cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
+          HDC Linear-Code Bounded Decoder Qualification
+          =============================================
+          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v1
+          event_name=${{ github.event_name }}
+          exact_head=${{ steps.head.outputs.sha }}
+          parent_head=${{ steps.head.outputs.parent_sha }}
+          parent_head_required=164d6b94d12bb72a902bdc2164d25cd540d3ba7f
+          research_surface_status=${{ steps.scope.outcome }}
+          research_surface_paths=${{ steps.scope.outputs.changed_paths }}
+          rust_toolchain=1.96.1
+          rust_toolchain_installation_status=${{ steps.toolchain_install.outcome }}
+          rust_toolchain_verification_status=${{ steps.toolchain.outcome }}
+          format_status=${{ steps.format.outcome }}
+          harness_status=${{ steps.harness.outcome }}
+          unit_tests_status=${{ steps.unit_tests.outcome }}
+          inherited_ambiguity_status=${{ steps.inherited_tests.outcome }}
+          syndrome_decoder_status=${{ steps.decoder_tests.outcome }}
+          strict_clippy_status=${{ steps.clippy.outcome }}
+          dependency_lock_sha256=${{ steps.harness.outputs.lock_sha256 }}
+          syndrome_decoder_ledger_status=${{ steps.decoder_ledger.outcome }}
+          syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
+          random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
+          random_syndrome_sweep=${{ steps.random_sweep.outputs.random_syndrome_sweep }}
+          beyond_radius_status=${{ steps.beyond_radius.outcome }}
+          beyond_radius_ledger=${{ steps.beyond_radius.outputs.beyond_radius_ledger }}
+          EOF
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hdc-linear-code-bounded-decoder-${{ steps.head.outputs.sha }}
+          path: hdc-linear-code-evidence
+          if-no-files-found: error
