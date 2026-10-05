@@ -266,9 +266,49 @@ pub struct BenchmarkManifest {
     pub candidate_ids: Vec<String>,
     /// Incumbent identifier.
     pub incumbent_id: String,
+    /// BLAKE3 digest over the complete canonical benchmark input.
+    pub input_hash: String,
 }
 
 impl BenchmarkCase {
+    fn canonical_input_hash(&self) -> String {
+        let mut candidates = self.candidates.clone();
+        candidates.sort_by(|a, b| a.id.cmp(&b.id));
+        for candidate in &mut candidates {
+            candidate.evidence.sort_by(|a, b| a.id.cmp(&b.id));
+            for estimate in candidate.performance.values_mut() {
+                estimate.evidence_ids.sort();
+            }
+            for estimate in candidate.operating_capabilities.values_mut() {
+                estimate.evidence_ids.sort();
+            }
+            for estimate in candidate.burdens.values_mut() {
+                estimate.evidence_ids.sort();
+            }
+        }
+
+        #[derive(Serialize)]
+        struct CanonicalBenchmarkInput {
+            case_id: String,
+            purpose: String,
+            requirement: FunctionalRequirement,
+            candidates: Vec<CandidatePathway>,
+            incumbent_id: String,
+        }
+
+        let input = CanonicalBenchmarkInput {
+            case_id: self.id.into(),
+            purpose: self.purpose.into(),
+            requirement: self.requirement.clone(),
+            candidates,
+            incumbent_id: self.incumbent_id.into(),
+        };
+        let bytes = serde_json::to_vec(&input).expect("benchmark input is serializable");
+        let mut hasher = Hasher::new();
+        hasher.update(&bytes);
+        hasher.finalize().to_hex().to_string()
+    }
+
     /// Build the canonical manifest identity for this case.
     pub fn manifest(&self) -> BenchmarkManifest {
         let mut candidate_ids = self
@@ -285,6 +325,7 @@ impl BenchmarkCase {
             requirement_id: self.requirement.id.clone(),
             candidate_ids,
             incumbent_id: self.incumbent_id.into(),
+            input_hash: self.canonical_input_hash(),
         }
     }
 
@@ -380,6 +421,48 @@ mod tests {
         assert_eq!(case.manifest(), reversed.manifest());
         assert_eq!(case.manifest_hash(), reversed.manifest_hash());
         assert!(!case.manifest_hash().is_empty());
+    }
+
+    #[test]
+    fn manifest_identity_changes_when_input_values_change() {
+        let case = five_pathway_adversarial_case();
+        let original_manifest = case.manifest();
+        let original_hash = case.manifest_hash();
+
+        let mut changed = case.clone();
+        changed
+            .candidates
+            .iter_mut()
+            .find(|candidate| candidate.id == "direct-substitute")
+            .unwrap()
+            .burdens
+            .get_mut(&Dimension::Water)
+            .unwrap()
+            .interval = Interval::new(40.0, 44.0).unwrap();
+
+        let changed_manifest = changed.manifest();
+        assert_ne!(original_manifest.input_hash, changed_manifest.input_hash);
+        assert_ne!(original_hash, changed.manifest_hash());
+    }
+
+    #[test]
+    fn manifest_identity_changes_when_evidence_changes() {
+        let case = five_pathway_adversarial_case();
+        let original_hash = case.manifest_hash();
+
+        let mut changed = case.clone();
+        changed
+            .candidates
+            .iter_mut()
+            .find(|candidate| candidate.id == "process-substitute")
+            .unwrap()
+            .evidence
+            .iter_mut()
+            .find(|evidence| evidence.id == "p1")
+            .unwrap()
+            .confidence = 0.91;
+
+        assert_ne!(original_hash, changed.manifest_hash());
     }
 
     #[test]
