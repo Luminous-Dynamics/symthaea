@@ -152,13 +152,20 @@ fn main() {
         h1_ref.digest_hex(),
         revised.digest_hex(),
         selection.digest_hex(),
-        "3333333333333333333333333333333333333333333333333333333333333333",
+        revised.campaign_digest_hex(),
         "candidate-refinement-after-independent-challenge",
     )
     .expect("revision receipt should be structurally valid");
 
     assert!(revision.validate().is_ok());
+    assert!(revision
+        .validate_against(&h1_ref, &revised)
+        .is_ok());
     assert_ne!(revision.prior_handoff_digest, revision.new_handoff_digest);
+    assert_ne!(
+        h1_ref.campaign_digest_hex(),
+        revised.campaign_digest_hex()
+    );
 
     let mut summary = HashMap::new();
     summary.insert("hypothesis_set_digest", hypothesis_set_digest);
