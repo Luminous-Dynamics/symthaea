@@ -175,6 +175,23 @@ numeric transport compatibility
 
 A solver boundary must therefore never infer a numeric unit merely because the dimensions match.
 
+## Canonical prediction frame
+
+Active inquiry has one additional requirement beyond typed connectivity: predictions must be compared in one explicitly declared physical frame.
+
+```text
+hypothesis prediction
+    -> source PhysicalType
+    -> explicit conversion
+    -> canonical prediction frame
+    -> finite-value check
+    -> disagreement score
+```
+
+The strict selector rejects the challenge when any live hypothesis cannot produce a finite value that is physically convertible into the frame. This prevents unit-scale artifacts such as `1000 J` versus `1 kJ` from being mistaken for scientific disagreement.
+
+The inquiry receipt binds the prediction-frame digest as well as the hypothesis-set, challenge-space, and selected-challenge identities.
+
 ## Formal verification boundary
 
 Formal proof establishes a theorem about the formalized model when the theorem and implementation are correctly bound.
@@ -264,4 +281,4 @@ EUREKA outcome -X-> original Ramanujan campaign
 
 A later model-revision campaign may consume the closed result as a new input, but it receives a new campaign/search identity. The first `ScientificHypothesisRevisionReceipt` implementation enforces this at the value level by requiring distinct prior/new handoff digests and a distinct campaign digest.
 
-The current `ScientificInquirySelectionReceipt` implementation freezes which hypothesis set and challenge space produced an experiment-selection decision. Its disagreement score is a selection heuristic, not realized evidence; the actual experiment must be evaluated separately.
+The current `ScientificInquirySelectionReceipt` implementation freezes which hypothesis set, challenge space, and canonical prediction frame produced an experiment-selection decision. Its disagreement score is a selection heuristic, not realized evidence; the actual experiment must be evaluated separately.
