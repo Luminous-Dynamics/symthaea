@@ -54,6 +54,10 @@ pub enum OpenFoamBoundaryObservationError {
     DuplicateNeighbourList,
     NeighbourCountMismatch { declared: u64, observed: u64 },
     InvalidNeighbourListEntry,
+    MissingOwnerList,
+    DuplicateOwnerList,
+    OwnerCountMismatch { declared: u64, observed: u64 },
+    InvalidOwnerListEntry,
     NonContiguousBoundaryPatchRange {
         patch: String,
         expected_start: u64,
@@ -311,6 +315,49 @@ fn parse_neighbour_list_count(
     Ok(count)
 }
 
+fn parse_owner_list_count(
+    source_bytes: &[u8],
+) -> Result<u64, OpenFoamBoundaryObservationError> {
+    let text = std::str::from_utf8(source_bytes)
+        .map_err(|_| OpenFoamBoundaryObservationError::InvalidUtf8)?;
+    let stripped = strip_comments(text)?;
+    let tokens = tokenize(&stripped)?;
+
+    let (count, mut index) = locate_top_level_list(
+        &tokens,
+        OpenFoamBoundaryObservationError::MissingOwnerList,
+        OpenFoamBoundaryObservationError::DuplicateOwnerList,
+        OpenFoamBoundaryObservationError::InvalidOwnerListEntry,
+    )?;
+
+    let mut observed = 0u64;
+    while index < tokens.len() && !matches!(tokens[index], Token::RParen) {
+        let Token::Number(value) = tokens.get(index).ok_or(
+            OpenFoamBoundaryObservationError::InvalidOwnerListEntry,
+        )? else {
+            return Err(OpenFoamBoundaryObservationError::InvalidOwnerListEntry);
+        };
+        value.parse::<u64>().map_err(|_| {
+            OpenFoamBoundaryObservationError::InvalidOwnerListEntry
+        })?;
+        observed = observed
+            .checked_add(1)
+            .ok_or(OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
+        index += 1;
+    }
+
+    if !matches!(tokens.get(index), Some(Token::RParen)) || index + 1 != tokens.len() {
+        return Err(OpenFoamBoundaryObservationError::InvalidOwnerListEntry);
+    }
+    if observed != count {
+        return Err(OpenFoamBoundaryObservationError::OwnerCountMismatch {
+            declared: count,
+            observed,
+        });
+    }
+    Ok(count)
+}
+
 fn validate_boundary_patch_partition(
     records: &[OpenFoamBoundaryPatchRecord],
     internal_face_count: u64,
@@ -559,6 +606,62 @@ fn observe_openfoam_patch_geometry(
         identity,
         source_digest,
     ).map_err(Into::into)?;
+
+    Ok((record, observation))
+}
+
+fn observe_openfoam_patch_geometry_with_owner_and_neighbour(
+    boundary_source_bytes: &[u8],
+    faces_source_bytes: &[u8],
+    points_source_bytes: &[u8],
+    neighbour_source_bytes: &[u8],
+    owner_source_bytes: &[u8],
+    patch_name: &str,
+    interface: &symthaea_passive_void_compiler::PortInterface,
+    candidate: &symthaea_fabrication_kernel::mesh::TriangleMesh,
+    tolerance_mm: f64,
+    point_scale_mm_per_unit: f64,
+) -> Result<
+    (OpenFoamBoundaryPatchRecord, OpenFoamBoundaryEntityObservation),
+    OpenFoamBoundaryObservationError,
+> {
+    let faces = parse_face_list(faces_source_bytes)?;
+    let owner_count = parse_owner_list_count(owner_source_bytes)?;
+    if owner_count != faces.len() as u64 {
+        return Err(OpenFoamBoundaryObservationError::OwnerCountMismatch {
+            declared: owner_count,
+            observed: faces.len() as u64,
+        });
+    }
+
+    let (record, observation) = observe_openfoam_patch_geometry_with_neighbour(
+        boundary_source_bytes,
+        faces_source_bytes,
+        points_source_bytes,
+        neighbour_source_bytes,
+        patch_name,
+        interface,
+        candidate,
+        tolerance_mm,
+        point_scale_mm_per_unit,
+    )?;
+
+    let mut source_hasher = Hasher::new();
+    source_hasher.update(b"openfoam-polyMesh-patch-geometry-with-owner-neighbour-source:v1");
+    source_hasher.update(&(owner_source_bytes.len() as u64).to_le_bytes());
+    source_hasher.update(owner_source_bytes);
+    source_hasher.update(&observation.source_digest);
+
+    let mut identity = Vec::new();
+    identity.extend_from_slice(b"openfoam-polyMesh-patch-geometry-with-owner-neighbour:v1");
+    identity.extend_from_slice(&observation.digest());
+
+    let observation = SolverBoundaryEntityObservation::new(
+        "openfoam-polyMesh-patch-geometry-with-owner-neighbour:v1",
+        identity,
+        *source_hasher.finalize().as_bytes(),
+    )
+    .map_err(Into::into)?;
 
     Ok((record, observation))
 }
@@ -1258,6 +1361,7 @@ pub struct OpenFoamPassiveBoundaryAdapter {
     faces_source_bytes: Option<Vec<u8>>,
     points_source_bytes: Option<Vec<u8>>,
     neighbour_source_bytes: Option<Vec<u8>>,
+    owner_source_bytes: Option<Vec<u8>>,
     point_scale_mm_per_unit: Option<f64>,
     patch_name: String,
     tolerance_mm: f64,
@@ -1281,6 +1385,7 @@ impl OpenFoamPassiveBoundaryAdapter {
             faces_source_bytes: None,
             points_source_bytes: None,
             neighbour_source_bytes: None,
+            owner_source_bytes: None,
             point_scale_mm_per_unit: None,
             patch_name,
             tolerance_mm,
@@ -1347,6 +1452,31 @@ impl OpenFoamPassiveBoundaryAdapter {
         adapter.neighbour_source_bytes = Some(neighbour_source_bytes.into());
         Ok(adapter)
     }
+
+    /// Construct an input-evidence adapter that also cross-checks the exact
+    /// owner list cardinality against the exact global face list.
+    pub fn new_with_complete_mesh_topology(
+        source_bytes: impl Into<Vec<u8>>,
+        faces_source_bytes: impl Into<Vec<u8>>,
+        points_source_bytes: impl Into<Vec<u8>>,
+        neighbour_source_bytes: impl Into<Vec<u8>>,
+        owner_source_bytes: impl Into<Vec<u8>>,
+        point_scale_mm_per_unit: f64,
+        patch_name: impl Into<String>,
+        tolerance_mm: f64,
+    ) -> Result<Self, OpenFoamBoundaryObservationError> {
+        let mut adapter = Self::new_with_faces_points_and_neighbour(
+            source_bytes,
+            faces_source_bytes,
+            points_source_bytes,
+            neighbour_source_bytes,
+            point_scale_mm_per_unit,
+            patch_name,
+            tolerance_mm,
+        )?;
+        adapter.owner_source_bytes = Some(owner_source_bytes.into());
+        Ok(adapter)
+    }
 }
 
 impl symthaea_passive_solver_binding::SolverBoundaryBindingAdapter
@@ -1401,11 +1531,28 @@ impl symthaea_passive_solver_binding::SolverBoundaryInputEntityObserver
                 Some(points_source_bytes),
                 Some(neighbour_source_bytes),
                 Some(point_scale_mm_per_unit),
-            ) => observe_openfoam_patch_geometry_with_neighbour(
+            ) if self.owner_source_bytes.is_none() => observe_openfoam_patch_geometry_with_neighbour(
                 &self.source_bytes,
                 faces_source_bytes,
                 points_source_bytes,
                 neighbour_source_bytes,
+                &self.patch_name,
+                interface,
+                candidate,
+                self.tolerance_mm,
+                point_scale_mm_per_unit,
+            ),
+            (
+                Some(faces_source_bytes),
+                Some(points_source_bytes),
+                Some(neighbour_source_bytes),
+                Some(point_scale_mm_per_unit),
+            ) => observe_openfoam_patch_geometry_with_owner_and_neighbour(
+                &self.source_bytes,
+                faces_source_bytes,
+                points_source_bytes,
+                neighbour_source_bytes,
+                self.owner_source_bytes.as_ref().expect("owner present"),
                 &self.patch_name,
                 interface,
                 candidate,
@@ -2071,6 +2218,83 @@ mod tests {
         assert!(matches!(
             parse_neighbour_list_count(source),
             Err(OpenFoamBoundaryObservationError::InvalidNeighbourListEntry)
+        ));
+    }
+
+    #[test]
+    fn complete_mesh_topology_requires_owner_count_to_match_faces() {
+        let boundary = br#"1
+(
+    inlet { type patch; nFaces 1; startFace 0; }
+)
+"#;
+        let faces = br#"1
+(
+    4(0 1 2 3)
+)
+"#;
+        let points = br#"4
+(
+    (2 0 0)
+    (0 2 0)
+    (-2 0 0)
+    (0 -2 0)
+)
+"#;
+        let neighbour = br#"0
+(
+)
+"#;
+        let owner = br#"0
+(
+)
+"#;
+
+        let result = parse_owner_list_count(owner);
+        assert!(matches!(
+            result,
+            Ok(0)
+        ));
+        assert!(matches!(
+            observe_openfoam_patch_geometry_with_owner_and_neighbour(
+                boundary,
+                faces,
+                points,
+                neighbour,
+                owner,
+                "inlet",
+                &{
+                    use symthaea_passive_void_compiler::{
+                        BoundaryConditionDomain, InterfacePlane, PortAperture, PortInterface,
+                        SolverBoundaryIdentity,
+                    };
+                    use symthaea_passive_void_graph::PortId;
+                    PortInterface::new(
+                        PortId(10),
+                        [0.0, 0.0, 0.0],
+                        PortAperture::Circular { radius_mm: 2.0 },
+                        [0.0, 0.0, 1.0],
+                        InterfacePlane::new([0.0, 0.0, 0.0], [0.0, 0.0, 1.0]).unwrap(),
+                        SolverBoundaryIdentity {
+                            domain: BoundaryConditionDomain::Fluidic,
+                            id: 7,
+                        },
+                    ).unwrap()
+                },
+                &symthaea_fabrication_kernel::mesh::TriangleMesh {
+                    vertices: vec![
+                        [0.0,0.0,0.0],[2.0,0.0,0.0],[0.0,2.0,0.0],[-2.0,0.0,0.0],[0.0,-2.0,0.0]
+                    ],
+                    normals: vec![[0.0,0.0,1.0];5],
+                    indices: vec![[0,1,2],[0,2,3],[0,3,4],[0,4,1]],
+                },
+                0.05,
+                1.0
+            ),
+            Err(OpenFoamBoundaryObservationError::OwnerCountMismatch {
+                declared: 0,
+                observed: 1
+            })
         ));
     }
 
