@@ -3696,7 +3696,8 @@ fn validate_native_authority_pin_set(
         }
         let mut lease = load_lease(&tx, &record.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
-        if lease.action_id != record.action_id
+        if lease.operation_id.as_deref() != Some(record.operation_id.as_str())
+            || lease.action_id != record.action_id
             || lease.action_digest != record.action_digest
             || lease
                 .provider_idempotency_key_for_native_replay(
@@ -3814,7 +3815,8 @@ fn validate_native_authority_pin_set(
         }
         let mut lease = load_lease(&tx, &record.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
-        if lease.action_id != record.action_id || lease.action_digest != record.action_digest
+        if lease.operation_id.as_deref() != Some(record.operation_id.as_str())
+            || lease.action_id != record.action_id || lease.action_digest != record.action_digest
             || lease
                 .provider_idempotency_key_for_native_replay(
                     &record.native_replay_identity,
@@ -4113,7 +4115,8 @@ fn validate_native_authority_pin_set(
 
         let mut lease = load_lease(&tx, &record.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
-        if lease.action_id != record.action_id || lease.action_digest != record.action_digest
+        if lease.operation_id.as_deref() != Some(record.operation_id.as_str())
+            || lease.action_id != record.action_id || lease.action_digest != record.action_digest
             || lease
                 .provider_idempotency_key_for_native_replay(
                     &record.native_replay_identity,
@@ -6118,6 +6121,242 @@ mod tests {
             |r| r.get(0)
         ).unwrap();
         assert_eq!(persisted,"sha256:tampered-terminal-validity");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn bound_commit_verified_rejects_tampered_lease_operation_id() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-lease-operation-tamper-verified-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=ActionEffectBinding::new(
+            "target-lease-operation-tamper-verified",
+            "prod",
+            "adapter-lease-operation-tamper-verified"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            authorization_instance:"lease-operation-tamper-verified".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-04T07:40:00Z".into(),
+            expires_at:Some("2026-10-05T07:40:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1",
+            "attempt-lease-operation-tamper-verified",
+            "boundary-lease-operation-tamper-verified"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt-lease-operation-tamper-verified",
+            &action,
+            &effect,
+            "boundary-lease-operation-tamper-verified",
+            "operation:lease-operation-tamper-verified",
+            "native-lease-operation-tamper-verified"
+        ).unwrap();
+
+        store.connection().unwrap().execute(
+            "UPDATE authorization_leases
+             SET operation_id='operation:tampered-lease'
+             WHERE authorization_instance=?1",
+            params![record.authorization_instance],
+        ).unwrap();
+
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        let err=store.commit_bound_verified(
+            &record,&evidence,&TestProviderVerifier
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
+        ));
+
+        let state:String=store.connection().unwrap().query_row(
+            "SELECT state FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(state,"dispatch_pending");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn bound_reconciliation_rejects_tampered_lease_operation_id() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-lease-operation-tamper-reconcile-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=ActionEffectBinding::new(
+            "target-lease-operation-tamper-reconcile",
+            "prod",
+            "adapter-lease-operation-tamper-reconcile"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            authorization_instance:"lease-operation-tamper-reconcile".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-04T07:40:00Z".into(),
+            expires_at:Some("2026-10-05T07:40:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1",
+            "attempt-lease-operation-tamper-reconcile",
+            "boundary-lease-operation-tamper-reconcile"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt-lease-operation-tamper-reconcile",
+            &action,
+            &effect,
+            "boundary-lease-operation-tamper-reconcile",
+            "operation:lease-operation-tamper-reconcile",
+            "native-lease-operation-tamper-reconcile"
+        ).unwrap();
+        store.commit_bound(&record,ExecutionOutcome::Indeterminate).unwrap();
+        store.connection().unwrap().execute(
+            "UPDATE authorization_leases
+             SET operation_id='operation:tampered-lease'
+             WHERE authorization_instance=?1",
+            params![record.authorization_instance],
+        ).unwrap();
+
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        let err=store.reconcile_indeterminate_bound_verified(
+            &record,&evidence,&TestProviderVerifier
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
+        ));
+
+        let state:String=store.connection().unwrap().query_row(
+            "SELECT state FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(state,"indeterminate");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn bound_indeterminate_commit_rejects_tampered_lease_operation_id() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-lease-operation-tamper-indeterminate-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=ActionEffectBinding::new(
+            "target-lease-operation-tamper-indeterminate",
+            "prod",
+            "adapter-lease-operation-tamper-indeterminate"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            operation_id: None,
+            authorization_instance:"lease-operation-tamper-indeterminate".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-04T07:40:00Z".into(),
+            expires_at:Some("2026-10-05T07:40:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1",
+            "attempt-lease-operation-tamper-indeterminate",
+            "boundary-lease-operation-tamper-indeterminate"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt-lease-operation-tamper-indeterminate",
+            &action,
+            &effect,
+            "boundary-lease-operation-tamper-indeterminate",
+            "operation:lease-operation-tamper-indeterminate",
+            "native-lease-operation-tamper-indeterminate"
+        ).unwrap();
+
+        store.connection().unwrap().execute(
+            "UPDATE authorization_leases
+             SET operation_id='operation:tampered-lease'
+             WHERE authorization_instance=?1",
+            params![record.authorization_instance],
+        ).unwrap();
+
+        let err=store.commit_bound(
+            &record,ExecutionOutcome::Indeterminate
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
+        ));
+
+        let state:String=store.connection().unwrap().query_row(
+            "SELECT state FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(state,"dispatch_pending");
         let _=std::fs::remove_file(path);
     }
 
