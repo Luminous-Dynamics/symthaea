@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use symthaea_epistemic_types::{
     ClaimControllerDocumentIdentity, ClaimControllerIdentity, ClaimVerificationMethod,
@@ -24,6 +25,7 @@ use symthaea_epistemic_types::{
 
 pub const SNAPSHOT_FILE_SCHEMA_VERSION: u16 = 1;
 const SNAPSHOT_REFERENCE_DOMAIN: &str = "symthaea:controller-document-snapshot:v1";
+const MAX_SNAPSHOT_ENVELOPE_BYTES: u64 = 32 * 1024 * 1024;
 
 /// Durable JSON representation of one exact controller-document state.
 ///
@@ -166,12 +168,24 @@ impl JsonControllerDocumentSnapshotAdapter {
     ) -> Result<VerificationMethodResolution, SnapshotError> {
         request.validate_structure()?;
 
-        let bytes = fs::read(&self.path).map_err(|error| {
+        let mut file = fs::File::open(&self.path).map_err(|error| {
             SnapshotError::Io {
                 path: self.path.clone(),
                 message: error.to_string(),
             }
         })?;
+        let mut bytes = Vec::new();
+        file.take(MAX_SNAPSHOT_ENVELOPE_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|error| SnapshotError::Io {
+                path: self.path.clone(),
+                message: error.to_string(),
+            })?;
+        if bytes.len() as u64 > MAX_SNAPSHOT_ENVELOPE_BYTES {
+            return Err(SnapshotError::Malformed(
+                "controller-document snapshot envelope exceeds the adapter safety limit".into(),
+            ));
+        }
 
         let snapshot: ControllerDocumentSnapshotFile =
             serde_json::from_slice(&bytes).map_err(|error| {
@@ -192,6 +206,16 @@ impl JsonControllerDocumentSnapshotAdapter {
     ) -> Result<VerificationMethodResolution, SnapshotError> {
         request.validate_structure()?;
         snapshot.validate_structure()?;
+
+        if snapshot.document.as_bytes().len() as u64
+            > request.controller_document_network_policy.max_response_bytes
+        {
+            return Err(SnapshotError::Verification(
+                VerificationFailure::ControllerDocumentResponseTooLarge,
+            ));
+        }
+
+        validate_json_media_type(&snapshot.response_media_type)?;
 
         let expected_document_ref = request.controller_document_ref()?;
         if snapshot.controller_document_ref != expected_document_ref {
@@ -333,6 +357,22 @@ fn sha256_multibase(hex_digest: &str) -> Result<String, SnapshotError> {
     multihash.extend_from_slice(&[0x12, 0x20]);
     multihash.extend_from_slice(&digest);
     Ok(format!("z{}", bs58::encode(multihash).into_string()))
+}
+
+fn validate_json_media_type(value: &str) -> Result<(), SnapshotError> {
+    let essence = value
+        .split(';')
+        .next()
+        .map(str::trim)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+
+    match essence.as_str() {
+        "application/cid" | "application/json" | "application/ld+json" => Ok(()),
+        _ => Err(SnapshotError::Malformed(format!(
+            "unsupported controller-document snapshot media type: {value}"
+        ))),
+    }
 }
 
 fn required_string<'a>(
