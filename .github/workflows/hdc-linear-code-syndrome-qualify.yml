@@ -192,7 +192,7 @@ jobs:
           OUTPUT="$(cargo +1.96.1 test --locked \
             --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
             --test linear_code_syndrome_decoder \
-            random_small_code_sweep_matches_exhaustive_oracle_within_guaranteed_radius -- --nocapture 2>&1)
+            random_small_and_low_rate_code_sweep_matches_exhaustive_oracle_within_guaranteed_radius -- --nocapture 2>&1)
           COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^RANDOM_SYNDROME_SWEEP=')"
           test "$COUNT" -eq 1
           LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^RANDOM_SYNDROME_SWEEP=//p')"
