@@ -491,6 +491,20 @@ enum ExecutionBasisV1 {
     },
 }
 
+/// Real service effects require a live Nixward execution-authority capability.
+///
+/// The legacy execute/execute_confirmed paths are intentionally Phi-based
+/// compatibility APIs and may still preview service commands in dry-run mode,
+/// but they must never dispatch a service effect. Custom(systemctl ...) is
+/// likewise treated as a legacy representation and cannot recover authority.
+fn legacy_service_effect_requires_live_authority(command: &NixOSCommand) -> bool {
+    matches!(
+        command,
+        NixOSCommand::Service { .. }
+            | NixOSCommand::Custom { command, .. } if command == "systemctl"
+    )
+}
+
 /// In-memory provenance for an execution that crossed the live Nixward
 /// authority boundary. This is separate from ExecutionRecord, whose
 /// phi_at_execution field is legacy telemetry.
@@ -629,6 +643,13 @@ impl NixOSExecutor {
             };
         }
         let required_phi = safety.required_phi();
+
+        if !self.dry_run && legacy_service_effect_requires_live_authority(&command) {
+            return ExecutionResult::Blocked {
+                reason: "service effects require live Nixward execution authority; Phi confirmation is not execution authority".to_string(),
+                safety_level: safety,
+            };
+        }
 
         if phi < required_phi {
             let confidence = PhiAwareScoring::confidence_level(phi);
@@ -876,6 +897,12 @@ impl NixOSExecutor {
                 safety_level: safety,
             };
         }
+        if !self.dry_run && legacy_service_effect_requires_live_authority(&command) {
+            return ExecutionResult::Blocked {
+                reason: "service effects require live Nixward execution authority; Phi confirmation is not execution authority".to_string(),
+                safety_level: safety,
+            };
+        }
         self.execute_confirmed_inner(command, ExecutionBasisV1::Phi { phi })
             .await
     }
@@ -886,6 +913,21 @@ impl NixOSExecutor {
         basis: ExecutionBasisV1,
     ) -> ExecutionResult {
         let safety = command.safety_level();
+
+        // Keep the invariant at the final shared dispatch helper too:
+        // future Phi-based callers must not accidentally acquire service
+        // execution merely by reaching this private function. Live authority
+        // is the sole non-dry-run service execution basis.
+        if !self.dry_run
+            && matches!(&basis, ExecutionBasisV1::Phi { .. })
+            && legacy_service_effect_requires_live_authority(&command)
+        {
+            return ExecutionResult::Blocked {
+                reason: "service effects require live Nixward execution authority; Phi confirmation is not execution authority".to_string(),
+                safety_level: safety,
+            };
+        }
+
         let (cmd, args) = command.to_command();
 
         match &basis {
@@ -1247,6 +1289,81 @@ mod tests {
         let (bin, args) = command.to_command();
         assert_eq!(bin, "systemctl");
         assert_eq!(args, vec!["restart", "nginx.service"]);
+    }
+
+    #[tokio::test]
+    async fn execute_rejects_valid_service_without_live_authority_even_at_high_phi() {
+        let mut executor = NixOSExecutor::new();
+        let command = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx.service".to_string(),
+        };
+
+        let result = executor.execute(command, 1.0).await;
+
+        assert!(matches!(
+            result,
+            ExecutionResult::Blocked {
+                safety_level: SafetyLevel::SystemModify,
+                reason
+            } if reason.contains("live Nixward execution authority")
+        ));
+    }
+
+    #[tokio::test]
+    async fn execute_confirmed_rejects_valid_service_without_live_authority() {
+        let mut executor = NixOSExecutor::new();
+        let command = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Start,
+            unit: "nginx.service".to_string(),
+        };
+
+        let result = executor.execute_confirmed(command, 1.0).await;
+
+        assert!(matches!(
+            result,
+            ExecutionResult::Blocked {
+                safety_level: SafetyLevel::SystemModify,
+                reason
+            } if reason.contains("live Nixward execution authority")
+        ));
+    }
+
+    #[tokio::test]
+    async fn executor_preserves_dry_run_service_preview_without_authority() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let command = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Stop,
+            unit: "nginx.service".to_string(),
+        };
+
+        let result = executor.execute(command, 1.0).await;
+
+        assert!(matches!(
+            result,
+            ExecutionResult::Success { stdout, .. }
+                if stdout.contains("[DRY-RUN] Would execute: systemctl stop nginx.service")
+        ));
+    }
+
+    #[tokio::test]
+    async fn legacy_custom_systemctl_cannot_execute_without_live_authority() {
+        let mut executor = NixOSExecutor::new();
+        let command = NixOSCommand::Custom {
+            command: "systemctl".to_string(),
+            args: vec!["restart".to_string(), "nginx.service".to_string()],
+            safety_level: SafetyLevel::SystemModify,
+        };
+
+        let result = executor.execute(command, 1.0).await;
+
+        assert!(matches!(
+            result,
+            ExecutionResult::Blocked {
+                safety_level: SafetyLevel::SystemModify,
+                reason
+            } if reason.contains("live Nixward execution authority")
+        ));
     }
 
     #[tokio::test]
