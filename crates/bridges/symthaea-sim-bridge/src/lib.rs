@@ -167,8 +167,36 @@ pub struct MultiPhysicsRequest {
     pub coupling: CouplingMode,
     /// Ordered solver stages.
     pub stages: Vec<CoupledSimulationStage>,
+    /// Explicit typed topology. This is the preferred coupling contract.
+    #[serde(default)]
+    pub typed_connections: Vec<TypedPhysicalConnection>,
     /// Coupling convergence tolerance for iterative/co-simulation workflows.
     pub coupling_tolerance: f64,
+}
+
+/// Explicit typed connection between a producer stage/port and consumer stage/port.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TypedPhysicalConnection {
+    pub producer_stage: String,
+    pub producer_port: String,
+    pub consumer_stage: String,
+    pub consumer_port: String,
+}
+
+impl TypedPhysicalConnection {
+    pub fn new(
+        producer_stage: impl Into<String>,
+        producer_port: impl Into<String>,
+        consumer_stage: impl Into<String>,
+        consumer_port: impl Into<String>,
+    ) -> Self {
+        Self {
+            producer_stage: producer_stage.into(),
+            producer_port: producer_port.into(),
+            consumer_stage: consumer_stage.into(),
+            consumer_port: consumer_port.into(),
+        }
+    }
 }
 
 impl MultiPhysicsRequest {
@@ -183,6 +211,7 @@ impl MultiPhysicsRequest {
             objective: objective.into(),
             coupling,
             stages: Vec::new(),
+            typed_connections: Vec::new(),
             coupling_tolerance: 1e-3,
         }
     }
@@ -191,6 +220,81 @@ impl MultiPhysicsRequest {
     pub fn with_stage(mut self, stage: CoupledSimulationStage) -> Self {
         self.stages.push(stage);
         self
+    }
+
+    /// Append an explicit typed producer-to-consumer connection.
+    pub fn with_typed_connection(mut self, connection: TypedPhysicalConnection) -> Self {
+        self.typed_connections.push(connection);
+        self
+    }
+
+
+    /// Validate explicit stage/port topology. Unknown semantics never pass
+    /// as compatible because an executable coupling requires a known contract.
+    pub fn validate_typed_topology(&self) -> Result<(), SimulationError> {
+        use std::collections::HashMap;
+        let stages = self
+            .stages
+            .iter()
+            .map(|stage| (stage.id.as_str(), stage))
+            .collect::<HashMap<_, _>>();
+
+        for connection in &self.typed_connections {
+            let producer = stages.get(connection.producer_stage.as_str()).ok_or_else(|| {
+                SimulationError::InvalidRequest(format!(
+                    "typed connection references missing producer stage {:?}",
+                    connection.producer_stage
+                ))
+            })?;
+            let consumer = stages.get(connection.consumer_stage.as_str()).ok_or_else(|| {
+                SimulationError::InvalidRequest(format!(
+                    "typed connection references missing consumer stage {:?}",
+                    connection.consumer_stage
+                ))
+            })?;
+
+            let output = producer
+                .typed_produces
+                .iter()
+                .find(|port| port.name == connection.producer_port)
+                .ok_or_else(|| SimulationError::InvalidRequest(format!(
+                    "typed connection references missing producer port {:?}",
+                    connection.producer_port
+                )))?;
+            let input = consumer
+                .typed_consumes
+                .iter()
+                .find(|port| port.name == connection.consumer_port)
+                .ok_or_else(|| SimulationError::InvalidRequest(format!(
+                    "typed connection references missing consumer port {:?}",
+                    connection.consumer_port
+                )))?;
+
+            match output.physical_type.judge_compatibility(&input.physical_type) {
+                TypeJudgement::Valid(()) => {}
+                TypeJudgement::Invalid(error) => {
+                    return Err(SimulationError::InvalidRequest(format!(
+                        "typed connection {}:{} -> {}:{} is incompatible: {}",
+                        connection.producer_stage,
+                        connection.producer_port,
+                        connection.consumer_stage,
+                        connection.consumer_port,
+                        error.reason
+                    )));
+                }
+                TypeJudgement::Unknown(reason) => {
+                    return Err(SimulationError::InvalidRequest(format!(
+                        "typed connection {}:{} -> {}:{} is unknown: {}",
+                        connection.producer_stage,
+                        connection.producer_port,
+                        connection.consumer_stage,
+                        connection.consumer_port,
+                        reason
+                    )));
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Validate typed producer/consumer edges. Unknown semantics never pass
@@ -551,6 +655,9 @@ pub struct SimulationEvidence {
     /// Version of the adapter/parser that normalized the result.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parser_version: Option<String>,
+    /// Maturity of the underlying model, independent of execution provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_maturity: Option<ModelMaturity>,
 }
 
 impl SimulationEvidence {
@@ -1650,6 +1757,43 @@ mod tests {
         let result = SimulationResult::converged("typed-4", 0.9)
             .with_typed_metric("energy", 10.0, "J", energy.clone());
         assert_eq!(result.metrics[0].physical_type, Some(energy));
+    }
+
+    #[test]
+    fn explicit_typed_topology_targets_exact_stage_endpoints() {
+        let pressure = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Pressure,
+            symthaea_types::PhysicalDimension::PRESSURE,
+        );
+        let load = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Force,
+            symthaea_types::PhysicalDimension::FORCE,
+        );
+        let request = MultiPhysicsRequest::new(
+            "typed-topology",
+            "explicit coupling",
+            CouplingMode::OneWay,
+        )
+        .with_stage(
+            CoupledSimulationStage::new(
+                "cfd",
+                EngineeringDomain::Aerospace,
+                SolverKind::ComputationalFluidDynamics,
+            )
+            .typed_produces([TypedPhysicalPort::new("pressure", pressure)]),
+        )
+        .with_stage(
+            CoupledSimulationStage::new(
+                "fea",
+                EngineeringDomain::Materials,
+                SolverKind::FiniteElement,
+            )
+            .typed_consumes([TypedPhysicalPort::new("load", load)]),
+        )
+        .with_typed_connection(TypedPhysicalConnection::new(
+            "cfd", "pressure", "fea", "load",
+        ));
+        assert!(request.validate_typed_topology().is_err());
     }
 
     #[test]
