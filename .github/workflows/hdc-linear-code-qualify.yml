@@ -124,9 +124,6 @@ jobs:
         run: |
           cargo +1.96.1 metadata --no-deps --format-version=1 \
             --manifest-path crates/core/symthaea-core/Cargo.toml > "$RUNNER_TEMP/symthaea-core-metadata.json"
-          MOD_DECLARATION="$RUNNER_TEMP/linear-code-mod-declaration.rs"
-          printf 'pub mod linear_code;\n' > "$MOD_DECLARATION"
-          rustfmt +1.96.1 --check --edition 2024 "$MOD_DECLARATION"
           grep -Eq "^[[:space:]]*pub mod linear_code;" \
             crates/core/symthaea-core/src/hdc/mod.rs
 
