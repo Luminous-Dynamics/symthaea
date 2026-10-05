@@ -42,6 +42,27 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  nixward-custom-risk-focused:
+    name: Nixward Custom Risk Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check Custom risk formatting
+        run: cargo fmt --check -- crates/core/nixward/src/action/executor.rs
+
+      - name: Run Custom risk regressions
+        run: |
+          cargo test -p nixward test_custom_safety_label_cannot_lower_risk --lib
+          cargo test -p nixward test_custom_command_safety --lib
+
   nixward-rebuild-args-focused:
     name: Nixward Rebuild Args Focused
     runs-on: ubuntu-latest
