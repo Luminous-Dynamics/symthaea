@@ -84,6 +84,9 @@ fn pre_state_identity_for_command(
 ) -> Result<Option<String>, String> {
     match command {
         nixward::action::executor::NixOSCommand::Service { unit, .. } => {
+            let generation = generation.ok_or_else(|| {
+                "service execution authority requires a known current NixOS generation".to_string()
+            })?;
             let observed = ServiceManager::observed_state(unit)
                 .map_err(|error| format!("could not observe service pre-state: {error}"))?;
             if observed.unit() != unit {
