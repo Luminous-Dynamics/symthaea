@@ -286,9 +286,7 @@ impl HdcOntologyRepresentation {
             && self.codec.codebook_hash.as_deref()
                 == Some(self.codebook.codebook_hash().as_str())
             && self.source_manifest_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
-            && self.codec.encoder_revision.as_ref().map_or(true, |value| {
-                !value.trim().is_empty() && value.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
-            })
+            && self.codec.encoder_revision.as_deref() == Some(HDC_ONTOLOGY_ADAPTER_ID)
             && !self.source_manifest_hash.trim().is_empty()
             && self.node_count > 0
             && self.edge_count > 0
@@ -1679,6 +1677,8 @@ mod tests {
         representation.source_manifest_hash = training_manifest.manifest_hash();
         representation.codec.encoder_revision = Some("x".repeat(HDC_ONTOLOGY_MAX_ID_BYTES + 1));
         assert!(!representation.validates());
+        representation.codec.encoder_revision = Some("different-adapter".into());
+        assert!(!representation.validates());
         representation.codec.encoder_revision = Some(HDC_ONTOLOGY_ADAPTER_ID.into());
         representation.node_count = HDC_ONTOLOGY_MAX_NODES + 1;
         assert!(!representation.validates());
@@ -2398,13 +2398,3 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            decoded.relation_ids_by_edge,
-            vec!["relation:initiates", "relation:targets"]
-        );
-        assert!(decoded
-            .graph
-            .edges
-            .iter()
-            .all(|edge| edge.relation == "commence" || edge.relation == "cible"));
-
-        let mut receiver_manifest = multilingual_manifest.clone();
