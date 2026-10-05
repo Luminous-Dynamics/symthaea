@@ -29,7 +29,9 @@ use serde::{Deserialize, Serialize};
 use symthaea_core::genesis::GenesisSeed;
 #[cfg(feature = "ssm_language")]
 use symthaea_broca::PhonologicalPlan;
-use symthaea_vocal_tract::pipeline::{Intonation, PitchAccent, ProsodyContext, predict_duration};
+use symthaea_vocal_tract::pipeline::{
+    Intonation, MannerClass, PitchAccent, ProsodyContext, phoneme_manner_class, predict_duration,
+};
 
 use super::audio_out::AudioOutput;
 use super::formant_targets::FormantDatabase;
@@ -328,6 +330,21 @@ impl LiveVoice {
             .map_err(|error| anyhow::anyhow!("invalid phonological plan: {error}"))?;
         if !plan.ready_for_realization() {
             anyhow::bail!("phonological plan is not ready for realization");
+        }
+
+        // The current vocal-tract realization surface consumes canonical ARPABET symbols
+        // (plus explicit SIL). Never silently route an unsupported plan symbol to the
+        // vocal-tract's generic silence fallback: that would change the requested
+        // phonological content while still emitting a successful receipt.
+        for segment in &plan.segments {
+            if !segment.symbol.eq_ignore_ascii_case("SIL")
+                && matches!(phoneme_manner_class(&segment.symbol), MannerClass::Silence)
+            {
+                anyhow::bail!(
+                    "phonological plan contains unsupported realization symbol: {}",
+                    segment.symbol
+                );
+            }
         }
 
         let scheduled_frames_for = |index: usize, segment: &symthaea_broca::PhonemeSlot| {
@@ -1138,6 +1155,47 @@ mod tests {
         tampered.rate = if tampered.rate < 1.0 { 1.2 } else { 0.8 };
         assert!(receipt.verify_against_plan(&tampered).is_err());
         assert!(!receipt.verify_samples(&samples[..samples.len().saturating_sub(1)]));
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_unsupported_plan_phoneme_is_rejected() {
+        use symthaea_broca::{
+            ContentBindingStatus, LinguisticFrame, PhonemeSlot, SpeechPlan, StructuredDecoder,
+            SyllableStress, ThoughtChannels,
+        };
+
+        let genesis = GenesisSeed::from_phrase("plan-native-unsupported-phoneme-test");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(2);
+        let readout = decoder.decode(&channels);
+        let speech_plan = SpeechPlan::from_readout(&channels, &readout);
+        let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+        let mut plan = PhonologicalPlan::from_linguistic_frame(&frame);
+        plan.bind_segments(
+            vec![PhonemeSlot::new(
+                "ZZ",
+                0,
+                SyllableStress::None,
+                true,
+                false,
+                true,
+            )],
+            ContentBindingStatus::PhonologicallyBound,
+        )
+        .expect("phonological binding itself should allow caller-defined identity");
+
+        let genesis = GenesisSeed::from_phrase("plan-native-unsupported-phoneme-test");
+        let mut voice = LiveVoice::new_headless(&genesis);
+        let error = voice
+            .synthesize_phonological_plan(&plan)
+            .expect_err("unsupported realization symbol must fail closed");
+        assert!(
+            error
+                .to_string()
+                .contains("unsupported realization symbol"),
+            "unexpected rejection: {error:#}"
+        );
     }
 
     #[cfg(feature = "ssm_language")]
