@@ -1021,16 +1021,16 @@ async function runMode(mode) {
         && diagnostics.raw_webgpu_compositor_canary?.control_rect) {
         const { webgpu_rect: webgpuRect, control_rect: controlRect } =
           diagnostics.raw_webgpu_compositor_canary;
-        const [webgpuShot, controlShot] = await Promise.all([
-          page.screenshot({
-            clip: webgpuRect,
-            type: 'png',
-          }),
-          page.screenshot({
-            clip: controlRect,
-            type: 'png',
-          }),
-        ]);
+        const webgpuShot = await page.screenshot({
+          clip: webgpuRect,
+          type: 'png',
+        });
+        const controlShot = await page.screenshot({
+          clip: controlRect,
+          type: 'png',
+        });
+        diagnostics.raw_webgpu_compositor_canary.screenshot_bytes = webgpuShot.length;
+        diagnostics.raw_webgpu_compositor_canary.control_screenshot_bytes = controlShot.length;
         diagnostics.raw_webgpu_compositor_canary.screenshot_hash =
           createHash('sha256').update(webgpuShot).digest('hex');
         diagnostics.raw_webgpu_compositor_canary.control_screenshot_hash =
@@ -1097,7 +1097,9 @@ async function runMode(mode) {
           'renderer',
         );
       }
-      if (diagnostics.raw_webgpu_compositor_canary?.screenshot_matches_2d_control !== true) {
+      if (diagnostics.raw_webgpu_compositor_canary?.screenshot_bytes <= 0
+        || diagnostics.raw_webgpu_compositor_canary?.control_screenshot_bytes <= 0
+        || diagnostics.raw_webgpu_compositor_canary?.screenshot_matches_2d_control !== true) {
         throw new QualificationError(
           `Raw WebGPU compositor output does not match the 2D red control: ${JSON.stringify(diagnostics.raw_webgpu_compositor_canary)}`,
           'renderer',
