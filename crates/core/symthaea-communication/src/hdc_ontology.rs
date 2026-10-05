@@ -547,7 +547,7 @@ impl HdcOntologyConformalCalibration {
 /// Versioned machine-readable binding for a real N1 conformal study artifact.
 /// This records the provenance and declared validity target around the isolated
 /// statistical primitive without turning metadata into a coverage theorem.
-pub const HDC_ONTOLOGY_CONFORMAL_EVIDENCE_SCHEMA_VERSION: u16 = 1;
+pub const HDC_ONTOLOGY_CONFORMAL_EVIDENCE_SCHEMA_VERSION: u16 = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HdcOntologyCoverageTarget {
@@ -564,6 +564,10 @@ pub struct HdcOntologyConformalEvidenceArtifact {
     pub calibration: HdcOntologyConformalCalibration,
     /// Exact model/decoder artifact hash used for calibration and evaluation.
     pub model_hash: String,
+    /// Canonical hash of the complete inference/runtime configuration.
+    /// This binds preprocessing, decoder settings, and other non-model
+    /// configuration that can change the score distribution.
+    pub inference_config_hash: String,
     /// Exact calibration split manifest hash.
     pub calibration_split_manifest_hash: String,
     /// Exact untouched evaluation split manifest hash.
@@ -585,6 +589,8 @@ impl HdcOntologyConformalEvidenceArtifact {
             && self.calibration.validates()
             && !self.model_hash.trim().is_empty()
             && self.model_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
+            && !self.inference_config_hash.trim().is_empty()
+            && self.inference_config_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && !self.calibration_split_manifest_hash.trim().is_empty()
             && self.calibration_split_manifest_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && !self.evaluation_split_manifest_hash.trim().is_empty()
@@ -2110,6 +2116,7 @@ mod tests {
             schema_version: HDC_ONTOLOGY_CONFORMAL_EVIDENCE_SCHEMA_VERSION,
             calibration,
             model_hash: "model-hash".into(),
+            inference_config_hash: "config-hash".into(),
             calibration_split_manifest_hash: "calibration-split".into(),
             evaluation_split_manifest_hash: "evaluation-split".into(),
             coverage_target: HdcOntologyCoverageTarget::Marginal,
@@ -2131,6 +2138,10 @@ mod tests {
         overlapping.evaluation_split_manifest_hash =
             overlapping.calibration_split_manifest_hash.clone();
         assert!(!overlapping.validates());
+
+        let mut missing_config = artifact.clone();
+        missing_config.inference_config_hash.clear();
+        assert!(!missing_config.validates());
 
         let mut local_execution = artifact.clone();
         local_execution.execution_revision = "local".into();
