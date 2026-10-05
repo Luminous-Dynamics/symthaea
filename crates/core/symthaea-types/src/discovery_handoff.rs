@@ -419,10 +419,10 @@ mod tests {
     #[test]
     fn inquiry_selection_is_explicitly_not_an_outcome() {
         let receipt = ScientificInquirySelectionReceipt::new(
-            "handoff",
-            "hypotheses",
-            "challenge-space",
-            "experiment-7",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
             "selector-v1",
             9,
             2.5,
