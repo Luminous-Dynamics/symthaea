@@ -28,7 +28,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use symthaea_core::genesis::GenesisSeed;
 #[cfg(feature = "ssm_language")]
-use symthaea_broca::PhonologicalPlan;
+use symthaea_broca::{ContentBindingStatus, PhonologicalPlan};
 use symthaea_vocal_tract::pipeline::{
     Intonation, MannerClass, PitchAccent, ProsodyContext, phoneme_manner_class, predict_duration,
 };
@@ -87,6 +87,11 @@ impl PhonologicalPlanRealizationReceipt {
         }
         if !self.realization_authorized || !plan.realization_authorized {
             anyhow::bail!("realization receipt or plan is not authorized");
+        }
+        if matches!(plan.content_binding, ContentBindingStatus::LexicallyBound) {
+            anyhow::bail!(
+                "lexically bound phonological plans require validated lexical-binding realization"
+            );
         }
 
         let expected_grounding =
@@ -367,6 +372,11 @@ fn progress_within_frame_span(global_frame: usize, start_frame: usize, end_frame
     ) -> Result<(Vec<f32>, PhonologicalPlanRealizationReceipt)> {
         plan.validate()
             .map_err(|error| anyhow::anyhow!("invalid phonological plan: {error}"))?;
+        if matches!(plan.content_binding, ContentBindingStatus::LexicallyBound) {
+            anyhow::bail!(
+                "lexically bound phonological plans require validated lexical-binding realization"
+            );
+        }
         if !plan.ready_for_realization() {
             anyhow::bail!("phonological plan is not ready for realization");
         }
@@ -1391,6 +1401,52 @@ mod tests {
             .synthesize_phonological_plan(&plan)
             .expect_err("non-divisible sample rate must fail closed");
         assert!(error.to_string().contains("sample rate divisible by 200 Hz"));
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_lexically_bound_plan_requires_verified_binding() {
+        use symthaea_broca::{
+            ContentBindingStatus, LinguisticFrame, PhonemeSlot, SpeechPlan, StructuredDecoder,
+            SyllableStress, ThoughtChannels,
+        };
+
+        let genesis = GenesisSeed::from_phrase("plan-native-lexical-boundary-test");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(2);
+        let readout = decoder.decode(&channels);
+        let speech_plan = SpeechPlan::from_readout(&channels, &readout);
+        let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+        let mut plan = PhonologicalPlan::from_linguistic_frame(&frame);
+        plan.bind_segments(
+            vec![PhonemeSlot::new(
+                "AH",
+                0,
+                SyllableStress::Primary,
+                true,
+                false,
+                true,
+            )],
+            ContentBindingStatus::PhonologicallyBound,
+        )
+        .expect("fixture phonology should bind");
+        plan.content_binding = ContentBindingStatus::LexicallyBound;
+        plan.lexical_provenance = Some(
+            blake3::hash(b"self-attested-lexical-binding")
+                .to_hex()
+                .to_string(),
+        );
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("rejected-lexical-bound.wav");
+        let mut voice = LiveVoice::new_headless(&genesis);
+
+        let error = voice
+            .speak_phonological_plan_to_file(&plan, &path)
+            .expect_err("unverified lexical plans must not reach scheduler realization");
+
+        assert!(error.to_string().contains("validated lexical-binding realization"));
+        assert!(!path.exists());
     }
 
     #[cfg(feature = "ssm_language")]
