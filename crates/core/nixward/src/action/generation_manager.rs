@@ -88,31 +88,12 @@ impl GenerationManager {
     ///
     /// `keep_last` specifies how many recent generations to keep.
     pub fn delete_old(keep_last: usize) -> NixOSCommand {
-        // nix-env --delete-generations +N keeps last N generations
-        NixOSCommand::Custom {
-            command: "nix-env".to_string(),
-            args: vec![
-                "--delete-generations".to_string(),
-                format!("+{}", keep_last),
-                "-p".to_string(),
-                "/nix/var/nix/profiles/system".to_string(),
-            ],
-            safety_level: SafetyLevel::Destructive,
-        }
+        NixOSCommand::DeleteGenerations { keep_last }
     }
 
     /// Generate a command to delete generations older than N days.
     pub fn delete_older_than(days: u32) -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "nix-env".to_string(),
-            args: vec![
-                "--delete-generations".to_string(),
-                format!("{}d", days),
-                "-p".to_string(),
-                "/nix/var/nix/profiles/system".to_string(),
-            ],
-            safety_level: SafetyLevel::Destructive,
-        }
+        NixOSCommand::DeleteGenerationsOlderThan { days }
     }
 
     /// Diff two generations by comparing their store closures.
