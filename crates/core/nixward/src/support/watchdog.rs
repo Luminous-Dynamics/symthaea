@@ -212,10 +212,24 @@ impl Watchdog {
                                 ExecutionResult::Success { .. } => {
                                     return WatchdogVerdict::Reverted { reason, pre_gen };
                                 }
-                                ExecutionResult::Blocked { reason: block_reason, .. }
-                                | ExecutionResult::PendingConfirmation { .. } => {
+                                ExecutionResult::Blocked { reason: block_reason, .. } => {
                                     return WatchdogVerdict::Degraded {
-                                        reason: format!("{}; rollback authority rejected: {:?}", reason, block_reason),
+                                        reason: format!("{}; rollback authority rejected: {}", reason, block_reason),
+                                        surprise: last_surprise,
+                                        health: last_health,
+                                        checks_performed,
+                                    };
+                                }
+                                ExecutionResult::PendingConfirmation {
+                                    required_phi,
+                                    phi,
+                                    ..
+                                } => {
+                                    return WatchdogVerdict::Degraded {
+                                        reason: format!(
+                                            "{}; governed rollback unexpectedly pending confirmation (phi={:.3}, required={:.3})",
+                                            reason, phi, required_phi
+                                        ),
                                         surprise: last_surprise,
                                         health: last_health,
                                         checks_performed,
