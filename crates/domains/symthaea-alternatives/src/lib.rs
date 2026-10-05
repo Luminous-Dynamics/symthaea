@@ -26,7 +26,7 @@ pub mod corpus;
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 10;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-v16";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-v17";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -916,8 +916,64 @@ impl CandidatePathway {
         self.performance
             .get(metric)
             .map(|estimate| {
-                self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
-                    .any(|e| {
+                let linked = self
+                    .linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+                    .collect::<Vec<_>>();
+                let supports = linked.iter().any(|e| {
+                    matches!(
+                        e.kind,
+                        EvidenceKind::Observed
+                            | EvidenceKind::Reported
+                            | EvidenceKind::Derived
+                            | EvidenceKind::ManufacturingObserved
+                            | EvidenceKind::FieldObserved
+                            | EvidenceKind::ContinuouslyMonitored
+                    ) && e.stance == EvidenceStance::Supports
+                        && e.confidence >= 0.7
+                });
+                let contradicts = linked
+                    .iter()
+                    .any(|e| e.stance == EvidenceStance::Contradicts);
+                supports && !contradicts
+            })
+            .unwrap_or(false)
+    }
+
+    fn performance_evidence_conflicts_at(
+        &self,
+        metric: &str,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        self.performance
+            .get(metric)
+            .map(|estimate| {
+                let linked = self
+                    .linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+                    .collect::<Vec<_>>();
+                linked.iter().any(|e| e.stance == EvidenceStance::Supports)
+                    && linked.iter().any(|e| e.stance == EvidenceStance::Contradicts)
+            })
+            .unwrap_or(false)
+    }
+
+    fn operating_evidence_conflicts_at(
+        &self,
+        condition: &str,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        self.operating_capabilities
+            .get(condition)
+            .map(|estimate| {
+                let linked = self
+                    .linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+                    .collect::<Vec<_>>();
+                linked.iter().any(|e| e.stance == EvidenceStance::Supports)
+                    && linked.iter().any(|e| e.stance == EvidenceStance::Contradicts)
+            })
+            .unwrap_or(false)
+    }
                         matches!(
                             e.kind,
                             EvidenceKind::Observed
@@ -942,8 +998,10 @@ impl CandidatePathway {
         self.operating_capabilities
             .get(condition)
             .map(|estimate| {
-                self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
-                    .any(|e| {
+                let linked = self
+                    .linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+                    .collect::<Vec<_>>();
+                linked.iter().any(|e| {
                         matches!(
                             e.kind,
                             EvidenceKind::Observed
@@ -954,7 +1012,7 @@ impl CandidatePathway {
                                 | EvidenceKind::ContinuouslyMonitored
                         ) && e.stance == EvidenceStance::Supports
                             && e.confidence >= 0.7
-                    })
+                    }) && !linked.iter().any(|e| e.stance == EvidenceStance::Contradicts)
             })
             .unwrap_or(false)
     }
@@ -1087,7 +1145,9 @@ impl CandidatePathway {
             return QualificationState::Hypothesis;
         }
 
-        if self.has_conflict_at(as_of, freshness_policy) {
+        if self.has_conflict_at(as_of, freshness_policy)
+            || requirement_conflicts(requirement, self, as_of, freshness_policy)
+        {
             return QualificationState::ComputationallyPlausible;
         }
 
@@ -1273,6 +1333,19 @@ impl CandidatePathway {
             QualificationState::Hypothesis
         }
     }
+}
+
+fn requirement_conflicts(
+    requirement: &FunctionalRequirement,
+    candidate: &CandidatePathway,
+    as_of: Option<i64>,
+    freshness_policy: Option<&EvidenceFreshnessPolicy>,
+) -> bool {
+    requirement.constraints.keys().any(|metric| {
+        candidate.performance_evidence_conflicts_at(metric, as_of, freshness_policy)
+    }) || requirement.operating_envelope.keys().any(|condition| {
+        candidate.operating_evidence_conflicts_at(condition, as_of, freshness_policy)
+    })
 }
 
 /// Qualification ceiling derived only from supplied evidence.
