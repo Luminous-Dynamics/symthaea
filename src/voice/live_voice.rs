@@ -28,7 +28,10 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use symthaea_core::genesis::GenesisSeed;
 #[cfg(feature = "ssm_language")]
-use symthaea_broca::{ContentBindingStatus, PhonologicalPlan};
+use symthaea_broca::{
+    ContentBindingStatus, LexicalMorphosyntacticBinding, LexicalPhonologicalWitness,
+    LinguisticFrame, PhonologicalPlan,
+};
 use symthaea_vocal_tract::pipeline::{
     Intonation, MannerClass, PitchAccent, ProsodyContext, phoneme_manner_class, predict_duration,
 };
@@ -76,6 +79,14 @@ pub struct PhonologicalPlanRealizationReceipt {
 impl PhonologicalPlanRealizationReceipt {
     /// Independently verify the receipt's plan-bound fields and internal sample accounting.
     pub fn verify_against_plan(&self, plan: &PhonologicalPlan) -> Result<()> {
+        self.verify_against_plan_internal(plan, false)
+    }
+
+    fn verify_against_plan_internal(
+        &self,
+        plan: &PhonologicalPlan,
+        allow_verified_lexical: bool,
+    ) -> Result<()> {
         plan.validate()
             .map_err(|error| anyhow::anyhow!("invalid phonological plan: {error}"))?;
 
@@ -88,7 +99,7 @@ impl PhonologicalPlanRealizationReceipt {
         if !self.realization_authorized || !plan.realization_authorized {
             anyhow::bail!("realization receipt or plan is not authorized");
         }
-        if matches!(plan.content_binding, ContentBindingStatus::LexicallyBound) {
+        if matches!(plan.content_binding, ContentBindingStatus::LexicallyBound) && !allow_verified_lexical {
             anyhow::bail!(
                 "lexically bound phonological plans require validated lexical-binding realization"
             );
@@ -175,6 +186,44 @@ impl PhonologicalPlanRealizationReceipt {
             && samples.len() == self.sample_count
             && is_hex_digest(&self.audio_blake3)
             && hash_audio_binding(self.sample_rate, samples) == self.audio_blake3
+    }
+}
+
+#[cfg(feature = "ssm_language")]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct VerifiedLexicalPhonologicalRealizationReceipt {
+    /// Existing v3 realization receipt, preserving its independent plan/audio accounting.
+    pub realization: PhonologicalPlanRealizationReceipt,
+    /// Canonical witness identity used to authorize the lexical realization.
+    pub witness_blake3: String,
+}
+
+#[cfg(feature = "ssm_language")]
+impl VerifiedLexicalPhonologicalRealizationReceipt {
+    pub fn verify_against_plan(
+        &self,
+        plan: &PhonologicalPlan,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        witness: &LexicalPhonologicalWitness,
+    ) -> Result<()> {
+        binding
+            .validate_against_frame(frame)
+            .map_err(|_| anyhow::anyhow!("invalid lexical binding"))?;
+        plan.validate_against_lexical_binding_and_witness(frame, binding, witness)
+            .map_err(|error| anyhow::anyhow!("invalid lexical realization witness: {error}"))?;
+
+        let expected_witness =
+            blake3::hash(witness.grounding_surface().as_bytes()).to_hex().to_string();
+        if self.witness_blake3 != expected_witness {
+            anyhow::bail!("verified realization receipt witness hash does not match witness");
+        }
+
+        self.realization.verify_against_plan_internal(plan, true)
+    }
+
+    pub fn verify_samples(&self, samples: &[f32]) -> bool {
+        self.realization.verify_samples(samples)
     }
 }
 
@@ -341,6 +390,37 @@ impl LiveVoice {
         Ok(receipt.sample_count)
     }
 
+    /// Realize a lexicalized plan only after the exact lexical binding and realization witness
+    /// have been independently validated.
+    ///
+    /// The witness is retained by the caller and its canonical identity is included in the
+    /// returned evidence wrapper; the underlying v3 realization receipt remains unchanged.
+    #[cfg(feature = "ssm_language")]
+    pub fn speak_verified_lexical_phonological_plan_with_receipt(
+        &mut self,
+        plan: &PhonologicalPlan,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        witness: &LexicalPhonologicalWitness,
+    ) -> Result<VerifiedLexicalPhonologicalRealizationReceipt> {
+        binding
+            .validate_against_frame(frame)
+            .map_err(|_| anyhow::anyhow!("invalid lexical binding"))?;
+        plan.validate_against_lexical_binding_and_witness(frame, binding, witness)
+            .map_err(|error| anyhow::anyhow!("invalid lexical realization witness: {error}"))?;
+
+        let (samples, realization) =
+            self.synthesize_phonological_plan_with_admission(plan, true)?;
+        self.push_with_backpressure(&samples);
+
+        Ok(VerifiedLexicalPhonologicalRealizationReceipt {
+            realization,
+            witness_blake3: blake3::hash(witness.grounding_surface().as_bytes())
+                .to_hex()
+                .to_string(),
+        })
+    }
+
     #[cfg(feature = "ssm_language")]
     fn pitch_accent_for_plan(segment_is_focus: bool, prominence: f32) -> PitchAccent {
         if segment_is_focus && prominence >= 0.82 {
@@ -370,9 +450,20 @@ fn progress_within_frame_span(global_frame: usize, start_frame: usize, end_frame
         &mut self,
         plan: &PhonologicalPlan,
     ) -> Result<(Vec<f32>, PhonologicalPlanRealizationReceipt)> {
+        self.synthesize_phonological_plan_with_admission(plan, false)
+    }
+
+    #[cfg(feature = "ssm_language")]
+    fn synthesize_phonological_plan_with_admission(
+        &mut self,
+        plan: &PhonologicalPlan,
+        allow_verified_lexical: bool,
+    ) -> Result<(Vec<f32>, PhonologicalPlanRealizationReceipt)> {
         plan.validate()
             .map_err(|error| anyhow::anyhow!("invalid phonological plan: {error}"))?;
-        if matches!(plan.content_binding, ContentBindingStatus::LexicallyBound) {
+        if matches!(plan.content_binding, ContentBindingStatus::LexicallyBound)
+            && !allow_verified_lexical
+        {
             anyhow::bail!(
                 "lexically bound phonological plans require validated lexical-binding realization"
             );
