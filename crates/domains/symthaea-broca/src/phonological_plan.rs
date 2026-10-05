@@ -217,6 +217,9 @@ impl PhonologicalPlan {
         if provenance.trim().is_empty() {
             return Err(PhonologicalPlanError::EmptyLexicalProvenance);
         }
+        if !is_blake3_token(&provenance) {
+            return Err(PhonologicalPlanError::InvalidLexicalProvenanceFormat);
+        }
         validate_segment_sequence(&segments)?;
         if segments.is_empty() {
             return Err(PhonologicalPlanError::LexicalBindingWithoutSegments);
@@ -385,6 +388,9 @@ impl std::fmt::Display for PhonologicalPlanError {
             Self::EmptyLexicalProvenance => {
                 write!(f, "lexically bound plans require non-empty lexical provenance")
             }
+            Self::InvalidLexicalProvenanceFormat => {
+                write!(f, "lexical provenance must be a 64-character BLAKE3 hexadecimal token")
+            }
             Self::NonLexicalProvenance => {
                 write!(f, "non-lexical plans must not carry lexical provenance")
             }
@@ -484,6 +490,10 @@ fn validate_segment_sequence(segments: &[PhonemeSlot]) -> Result<(), Phonologica
     }
 
     Ok(())
+}
+
+fn is_blake3_token(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn derive_syllables(segments: &[PhonemeSlot]) -> Vec<SyllableSlot> {
@@ -654,6 +664,7 @@ mod tests {
     #[test]
     fn lexical_binding_records_non_empty_provenance() {
         let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        let provenance = blake3::hash(b"lexeme:answer:v1").to_hex().to_string();
         plan.bind_lexical_segments(
             vec![PhonemeSlot::new(
                 "AE",
@@ -663,16 +674,37 @@ mod tests {
                 false,
                 true,
             )],
-            "lexeme:answer:v1",
+            provenance.clone(),
         )
-        .expect("explicit provenance should permit lexical binding");
+        .expect("explicit BLAKE3 provenance should permit lexical binding");
 
         assert_eq!(plan.content_binding, ContentBindingStatus::LexicallyBound);
-        assert_eq!(
-            plan.lexical_provenance.as_deref(),
-            Some("lexeme:answer:v1")
-        );
+        assert_eq!(plan.lexical_provenance.as_deref(), Some(provenance.as_str()));
         assert!(plan.grounding_surface().contains("lexical_provenance=true"));
+    }
+
+    #[test]
+    fn lexical_binding_rejects_non_blake3_provenance() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+
+        let error = plan
+            .bind_lexical_segments(
+                vec![PhonemeSlot::new(
+                    "AE",
+                    0,
+                    SyllableStress::Primary,
+                    true,
+                    false,
+                    true,
+                )],
+                "arbitrary-provenance",
+            )
+            .expect_err("arbitrary provenance must not elevate lexical binding");
+
+        assert_eq!(
+            error,
+            PhonologicalPlanError::InvalidLexicalProvenanceFormat
+        );
     }
 
     #[test]
