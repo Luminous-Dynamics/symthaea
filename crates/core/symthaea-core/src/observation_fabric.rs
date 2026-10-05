@@ -2412,7 +2412,9 @@ mod tests {
     ) {
         fn ancestors(seed: &str, by_id: &HashMap<&str, &Observation>) -> HashSet<String> {
             let mut result = HashSet::new();
-            let mut stack = by_id[seed]
+            let mut stack = by_id
+                .get(seed)
+                .expect("validated observation")
                 .provenance
                 .parent_observation_ids
                 .clone();
@@ -2421,7 +2423,9 @@ mod tests {
                 if !result.insert(current.clone()) {
                     continue;
                 }
-                for parent in &by_id[&current.as_str()]
+                for parent in &by_id
+                    .get(current.as_str())
+                    .expect("validated observation")
                     .provenance
                     .parent_observation_ids
                 {
@@ -2502,8 +2506,12 @@ mod tests {
             .iter()
             .map(|observation| (observation.id.as_str(), observation))
             .collect::<HashMap<_, _>>();
-        let source = by_id[source_observation_id];
-        let target = by_id[target_observation_id];
+        let source = by_id
+            .get(source_observation_id)
+            .expect("validated source observation");
+        let target = by_id
+            .get(target_observation_id)
+            .expect("validated target observation");
         let source_ancestors = ancestors(source_observation_id, &by_id);
         let target_ancestors = ancestors(target_observation_id, &by_id);
 
@@ -4021,6 +4029,18 @@ mod tests {
             observations: vec![fixture(), second.clone(), unrelated],
             relations: vec![],
         };
+        let mut with_unrelated = graph.clone();
+        let mut unrelated = fixture();
+        unrelated.id = "unrelated".into();
+        unrelated.provenance.source.sensor_id = "camera-9".into();
+        unrelated.provenance.source.platform_id = Some("platform-shared".into());
+        unrelated.asset = Some(AssetRef::blake3(b"unrelated-frame"));
+        with_unrelated.observations.push(unrelated);
+        assert_eq!(
+            receipt.verify_against_graph_detailed(&with_unrelated),
+            Ok(ReceiptVerificationOutcome::VerifiedAgainstGraph)
+        );
+
         let v2 = graph
             .assess_independence_detailed("obs-001", "obs-002")
             .expect("v2 assessment");
