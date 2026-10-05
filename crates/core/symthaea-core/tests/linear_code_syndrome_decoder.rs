@@ -366,6 +366,68 @@ fn boundary_decoder_preserves_the_same_geometry_around_every_codeword() {
 }
 
 #[test]
+fn minimum_weight_syndrome_multiplicity_matches_nearest_codeword_multiplicity_exhaustively() {
+    let code = boundary_code();
+    let codewords = code.enumerate();
+    let decoder = BoundedDistanceSyndromeDecoder::from_code(&code).expect("decoder");
+
+    let mut observations = 0usize;
+    let mut unique = 0usize;
+    let mut ambiguous = 0usize;
+    let mut total_nearest_codewords = 0usize;
+
+    // The [8,2,4] fixture has covering radius 4, so bound=4 reaches the
+    // minimum possible distance for every ambient observation.
+    for mask in 0..(1usize << 8) {
+        let observation = error_from_mask(mask, 8);
+        let (nearest_distance, nearest) = nearest_codewords(&observation, &codewords);
+        let (result, work) = decoder.decode_with_work(&observation, 4);
+
+        assert_eq!(
+            work.matching_error_patterns,
+            nearest.len(),
+            "minimum syndrome multiplicity must equal nearest-codeword multiplicity for observation={mask:#x}"
+        );
+
+        match result {
+            BoundedDistanceDecode::Unique {
+                codeword, distance, ..
+            } => {
+                assert_eq!(nearest.len(), 1);
+                assert_eq!(distance, nearest_distance);
+                assert_eq!(codeword, codewords[nearest[0]]);
+                unique += 1;
+            }
+            BoundedDistanceDecode::Ambiguous {
+                distance,
+                matching_error_patterns,
+            } => {
+                assert!(nearest.len() > 1);
+                assert_eq!(distance, nearest_distance);
+                assert_eq!(matching_error_patterns, nearest.len());
+                ambiguous += 1;
+            }
+            other => panic!(
+                "covering-radius bound must decode every ambient observation, got {other:?}"
+            ),
+        }
+
+        total_nearest_codewords += nearest.len();
+        observations += 1;
+    }
+
+    assert_eq!(observations, 256);
+    assert_eq!(unique + ambiguous, 256);
+    assert_eq!(ambiguous, 192);
+    assert_eq!(unique, 64);
+    assert_eq!(total_nearest_codewords, 448);
+
+    println!(
+        "MIN_SYNDROME_MULTIPLICITY_LEDGER=observations={observations};bound=4;unique={unique};ambiguous={ambiguous};total_nearest_codewords={total_nearest_codewords};multiplicity_identity=true"
+    );
+}
+
+#[test]
 fn decoder_refuses_observations_outside_the_declared_bound() {
     let code = boundary_code();
     let decoder = BoundedDistanceSyndromeDecoder::from_code(&code).expect("decoder");
