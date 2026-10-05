@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 
 use symthaea_core::hdc::ContinuousHV;
 
+use crate::action::executor::NixOSExecutor;
 use crate::action::generation_manager::GenerationManager;
 use crate::encoding::{NixCodebook, SystemStateEncoder, SystemStateSnapshot};
 use crate::observe::SystemObserver;
@@ -112,7 +113,7 @@ impl Watchdog {
     /// # Returns
     /// A `WatchdogVerdict` indicating whether the system stabilized, degraded,
     /// or was reverted.
-    pub fn monitor(
+    pub async fn monitor(
         &self,
         codebook: &mut NixCodebook,
         baseline_hv: &ContinuousHV,
@@ -204,27 +205,30 @@ impl Watchdog {
                         }
                         AutonomyLevel::FullAutonomous => {
                             let cmd = GenerationManager::switch_to(pre_gen as u32);
-                            let (bin, args) = cmd.to_command();
-                            let result = std::process::Command::new(&bin).args(&args).status();
+                            let mut executor = NixOSExecutor::new();
+                            // FullAutonomous is the explicit watchdog authorization; the
+                            // execute_confirmed API records the supplied value only and does
+                            // not pretend that Phi itself authorizes the rollback.
+                            let result = executor.execute_confirmed(cmd, 0.0).await;
                             match result {
-                                Ok(status) if status.success() => {
+                                crate::action::executor::ExecutionResult::Success { .. } => {
                                     return WatchdogVerdict::Reverted { reason, pre_gen };
                                 }
-                                Ok(status) => {
-                                    return WatchdogVerdict::Degraded {
-                                        reason: format!(
-                                            "{}; rollback failed (exit {})",
-                                            reason,
-                                            status.code().unwrap_or(-1)
-                                        ),
-                                        surprise: last_surprise,
-                                        health: last_health,
-                                        checks_performed,
-                                    };
+                                crate::action::executor::ExecutionResult::Blocked { reason: block_reason, .. }
+                                | crate::action::executor::ExecutionResult::FailedNoRollback {
+                                    error: block_reason,
+                                    ..
                                 }
-                                Err(e) => {
+                                | crate::action::executor::ExecutionResult::RolledBack {
+                                    error: block_reason,
+                                    ..
+                                }
+                                | crate::action::executor::ExecutionResult::PendingConfirmation {
+                                    confidence: block_reason,
+                                    ..
+                                } => {
                                     return WatchdogVerdict::Degraded {
-                                        reason: format!("{}; rollback exec error: {}", reason, e),
+                                        reason: format!("{}; governed rollback failed: {}", reason, block_reason),
                                         surprise: last_surprise,
                                         health: last_health,
                                         checks_performed,
