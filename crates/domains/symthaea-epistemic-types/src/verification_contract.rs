@@ -955,6 +955,38 @@ mod tests {
 
     #[test]
     #[test]
+    fn evidence_cannot_be_replayed_under_a_different_freshness_context() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let evidence = VerificationEvidence::from_adapter_attestation(
+            &request,
+            "https://example.test/controller",
+            &"11".repeat(32),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
+            "assertionMethod",
+            "ed25519",
+            &"22".repeat(32),
+            &"33".repeat(32),
+        )
+        .unwrap();
+
+        let mut replayed = evidence.clone();
+        replayed.freshness.proof_challenge = Some("challenge-2".into());
+
+        assert!(!replayed.matches_request(&request));
+        assert_ne!(evidence.evidence_digest(), replayed.evidence_digest());
+    }
+
+    #[test]
     fn evidence_digest_covers_resolved_method_and_controller_assertions() {
         let claim = fixture_claim();
         let request = VerificationRequest::from_claim(
