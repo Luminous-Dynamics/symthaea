@@ -28,6 +28,15 @@ pub const HDC_SEMANTIC_CODEBOOK_ALGORITHM: &str = "blake3-seeded-random-atoms-v1
 pub const HDC_SEMANTIC_ROLE_REVISION: &str = "source-relation-target-node-v2";
 pub const HDC_EDGE_TARGET_PERMUTATION: usize = 1;
 
+pub const HDC_SEMANTIC_MAX_SERIALIZED_ARTIFACT_BYTES: usize = 1_048_576;
+pub const HDC_SEMANTIC_MAX_NODES: usize = 256;
+pub const HDC_SEMANTIC_MAX_EDGES: usize = 2_048;
+pub const HDC_SEMANTIC_MAX_ATOMS: usize = 4_096;
+pub const HDC_SEMANTIC_MAX_GROUNDING_IDS_PER_NODE: usize = 256;
+pub const HDC_SEMANTIC_MAX_ID_BYTES: usize = 4_096;
+pub const HDC_SEMANTIC_MAX_TRAINING_GRAPHS: usize = 4_096;
+pub const HDC_SEMANTIC_MAX_EDGE_CANDIDATES: usize = 1_000_000;
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HdcSemanticCodebookDescriptor {
     pub schema_version: u16,
@@ -50,11 +59,31 @@ impl HdcSemanticCodebookDescriptor {
             && self.generation_algorithm == HDC_SEMANTIC_CODEBOOK_ALGORITHM
             && self.role_revision == HDC_SEMANTIC_ROLE_REVISION
             && self.dimension == HDC_DIMENSION
-            && !self.node_manifest_hash.is_empty()
-            && !self.relation_manifest_hash.is_empty()
-            && !self.training_manifest_hash.is_empty()
+            && self.node_manifest_hash.len() <= HDC_SEMANTIC_MAX_ID_BYTES
+            && self.relation_manifest_hash.len() <= HDC_SEMANTIC_MAX_ID_BYTES
+            && self.training_manifest_hash.len() <= HDC_SEMANTIC_MAX_ID_BYTES
+            && !self.node_manifest_hash.trim().is_empty()
+            && !self.relation_manifest_hash.trim().is_empty()
+            && !self.training_manifest_hash.trim().is_empty()
             && self.node_atom_count > 0
+            && self.node_atom_count <= HDC_SEMANTIC_MAX_ATOMS
             && self.relation_atom_count > 0
+            && self.relation_atom_count <= HDC_SEMANTIC_MAX_ATOMS
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > HDC_SEMANTIC_MAX_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "HDC semantic codebook descriptor JSON exceeds {} bytes",
+                HDC_SEMANTIC_MAX_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let descriptor: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("HDC semantic codebook descriptor JSON: {error}"))?;
+        if !descriptor.validates() {
+            return Err("HDC semantic codebook descriptor failed bounded validation".into());
+        }
+        Ok(descriptor)
     }
 
     pub fn codebook_hash(&self) -> String {
@@ -96,6 +125,21 @@ pub struct HdcSemanticRepresentation {
 }
 
 impl HdcSemanticRepresentation {
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > HDC_SEMANTIC_MAX_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "HDC semantic representation JSON exceeds {} bytes",
+                HDC_SEMANTIC_MAX_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let representation: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("HDC semantic representation JSON: {error}"))?;
+        if !representation.validates() {
+            return Err("HDC semantic representation failed bounded validation".into());
+        }
+        Ok(representation)
+    }
+
     pub fn validates(&self) -> bool {
         self.schema_version == HDC_SEMANTIC_INTERLINGUA_SCHEMA_VERSION
             && self.adapter_id == HDC_SEMANTIC_ADAPTER_ID
@@ -103,7 +147,9 @@ impl HdcSemanticRepresentation {
             && self.codec.validates()
             && self.codec.codebook_hash.as_deref() == Some(self.codebook.codebook_hash().as_str())
             && self.node_count > 0
+            && self.node_count <= HDC_SEMANTIC_MAX_NODES
             && self.edge_count > 0
+            && self.edge_count <= HDC_SEMANTIC_MAX_EDGES
             && self.node_quantization.validates()
             && self.edge_quantization.validates()
             && self.node_quantization.dimension == HDC_DIMENSION
@@ -238,6 +284,12 @@ impl HdcSemanticCodebook {
         if training_graphs.is_empty() {
             return Err("HDC semantic codebook requires at least one training graph".into());
         }
+        if training_graphs.len() > HDC_SEMANTIC_MAX_TRAINING_GRAPHS {
+            return Err(format!(
+                "HDC semantic codebook exceeds {} training graphs",
+                HDC_SEMANTIC_MAX_TRAINING_GRAPHS
+            ));
+        }
 
         let mut nodes = BTreeMap::<String, (ConceptKind, Vec<String>)>::new();
         let mut relations = BTreeSet::<String>::new();
@@ -254,6 +306,18 @@ impl HdcSemanticCodebook {
 
             for edge in &graph.edges {
                 relations.insert(edge.relation.clone());
+                if relations.len() > HDC_SEMANTIC_MAX_ATOMS {
+                    return Err(format!(
+                        "HDC semantic codebook exceeds {} relation atoms",
+                        HDC_SEMANTIC_MAX_ATOMS
+                    ));
+                }
+            }
+            if nodes.len() > HDC_SEMANTIC_MAX_ATOMS {
+                return Err(format!(
+                    "HDC semantic codebook exceeds {} node atoms",
+                    HDC_SEMANTIC_MAX_ATOMS
+                ));
             }
         }
 
@@ -670,7 +734,19 @@ impl HdcSemanticCodebook {
             .map(|candidate| candidate.key.clone())
             .collect::<Vec<_>>();
 
-        let mut edge_candidates = Vec::<HdcRetrievalCandidate>::new();
+        let edge_candidate_count = selected_nodes
+            .len()
+            .checked_mul(self.relations.len())
+            .and_then(|count| count.checked_mul(selected_nodes.len()))
+            .ok_or_else(|| "HDC edge candidate count overflowed".to_string())?;
+        if edge_candidate_count > HDC_SEMANTIC_MAX_EDGE_CANDIDATES {
+            return Err(format!(
+                "HDC edge candidate budget exceeds {} candidates",
+                HDC_SEMANTIC_MAX_EDGE_CANDIDATES
+            ));
+        }
+
+        let mut edge_candidates = Vec::with_capacity(edge_candidate_count); = Vec::<HdcRetrievalCandidate>::new();
         for source in &selected_nodes {
             for relation in self.relations.keys() {
                 for target in &selected_nodes {
@@ -754,11 +830,39 @@ fn validate_graph_shape(graph: &GroundedConceptGraph) -> Result<(), String> {
     if graph.nodes.is_empty() || graph.edges.is_empty() {
         return Err("HDC semantic interlingua currently requires at least one node and edge".into());
     }
+    if graph.nodes.len() > HDC_SEMANTIC_MAX_NODES {
+        return Err(format!(
+            "HDC semantic graph exceeds {} nodes",
+            HDC_SEMANTIC_MAX_NODES
+        ));
+    }
+    if graph.edges.len() > HDC_SEMANTIC_MAX_EDGES {
+        return Err(format!(
+            "HDC semantic graph exceeds {} edges",
+            HDC_SEMANTIC_MAX_EDGES
+        ));
+    }
 
     let mut ids = BTreeSet::new();
     for node in &graph.nodes {
-        if node.id.trim().is_empty() || !ids.insert(node.id.clone()) {
-            return Err("graph node identifiers must be unique and non-empty".into());
+        if node.id.trim().is_empty()
+            || node.id.len() > HDC_SEMANTIC_MAX_ID_BYTES
+            || !ids.insert(node.id.clone())
+        {
+            return Err("graph node identifiers must be unique, non-empty, and bounded".into());
+        }
+        if node.grounded_by.len() > HDC_SEMANTIC_MAX_GROUNDING_IDS_PER_NODE {
+            return Err(format!(
+                "graph node grounding references exceed {} entries",
+                HDC_SEMANTIC_MAX_GROUNDING_IDS_PER_NODE
+            ));
+        }
+        if node
+            .grounded_by
+            .iter()
+            .any(|value| value.len() > HDC_SEMANTIC_MAX_ID_BYTES)
+        {
+            return Err("graph node grounding identifiers are oversized".into());
         }
         if !crate::valid_confidence(node.confidence) {
             return Err("graph node confidence must be finite and within [0, 1]".into());
@@ -769,8 +873,8 @@ fn validate_graph_shape(graph: &GroundedConceptGraph) -> Result<(), String> {
         if !ids.contains(&edge.source) || !ids.contains(&edge.target) {
             return Err("graph edge references an unknown node identifier".into());
         }
-        if edge.relation.trim().is_empty() {
-            return Err("graph edge relations must be non-empty".into());
+        if edge.relation.trim().is_empty() || edge.relation.len() > HDC_SEMANTIC_MAX_ID_BYTES {
+            return Err("graph edge relations must be non-empty and bounded".into());
         }
         if !crate::valid_confidence(edge.confidence) {
             return Err("graph edge confidence must be finite and within [0, 1]".into());
@@ -988,6 +1092,57 @@ mod tests {
             base,
             reordered,
         ]
+    }
+
+    #[test]
+    fn bounded_json_parsers_roundtrip_and_reject_oversized_artifacts() {
+        let training = training_graphs();
+        let codebook = HdcSemanticCodebook::from_training_graphs(77, &training).unwrap();
+        let representation = codebook.encode_graph(&training[0]).unwrap();
+
+        let descriptor_bytes = serde_json::to_vec(codebook.descriptor()).unwrap();
+        assert_eq!(
+            HdcSemanticCodebookDescriptor::from_json_bytes(&descriptor_bytes).unwrap(),
+            *codebook.descriptor()
+        );
+        let representation_bytes = serde_json::to_vec(&representation).unwrap();
+        assert_eq!(
+            HdcSemanticRepresentation::from_json_bytes(&representation_bytes).unwrap(),
+            representation
+        );
+
+        let oversized = vec![b' '; HDC_SEMANTIC_MAX_SERIALIZED_ARTIFACT_BYTES + 1];
+        assert!(HdcSemanticCodebookDescriptor::from_json_bytes(&oversized).is_err());
+        assert!(HdcSemanticRepresentation::from_json_bytes(&oversized).is_err());
+    }
+
+    #[test]
+    fn graph_and_training_resource_bounds_fail_closed() {
+        let mut oversized_graph = graph_a();
+        for index in 0..HDC_SEMANTIC_MAX_NODES {
+            oversized_graph.nodes.push(ConceptNode {
+                id: format!("extra-{index}"),
+                kind: ConceptKind::Object,
+                label: None,
+                grounded_by: vec![format!("extra-grounding-{index}")],
+                confidence: 1.0,
+            });
+        }
+        assert!(validate_graph_shape(&oversized_graph).is_err());
+
+        let training = training_graphs();
+        let too_many_training_graphs = vec![training[0].clone(); HDC_SEMANTIC_MAX_TRAINING_GRAPHS + 1];
+        assert!(HdcSemanticCodebook::from_training_graphs(77, &too_many_training_graphs).is_err());
+    }
+
+    #[test]
+    fn edge_candidate_budget_fails_closed_before_allocation() {
+        let training = training_graphs();
+        let codebook = HdcSemanticCodebook::from_training_graphs(77, &training).unwrap();
+        let representation = codebook.encode_graph(&training[0]).unwrap();
+        let mut oversized = representation.clone();
+        oversized.node_count = HDC_SEMANTIC_MAX_NODES;
+        assert!(codebook.decode_graph(&oversized).is_err());
     }
 
     #[test]
