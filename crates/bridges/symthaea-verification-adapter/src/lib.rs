@@ -762,6 +762,47 @@ mod tests {
     }
 
     #[test]
+    fn payload_size_limit_applies_to_document_not_snapshot_metadata() {
+        let request = request()
+            .with_controller_document_network_policy(
+                symthaea_epistemic_types::ControllerDocumentNetworkPolicy {
+                    allowed_schemes: vec!["https".into()],
+                    max_response_bytes: 32,
+                    max_redirects: 0,
+                    require_effective_url_match: true,
+                },
+            )
+            .unwrap();
+        let snapshot = snapshot();
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Verification(
+                VerificationFailure::ControllerDocumentResponseTooLarge
+            ))
+        ));
+    }
+
+    #[test]
+    fn unsupported_snapshot_media_type_fails_closed_before_resolution() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.response_media_type = "text/plain".into();
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("unsupported controller-document snapshot media type")
+        ));
+    }
+
+    #[test]
     fn filesystem_path_is_anchored_to_content_reference() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("controller-snapshot.json");
