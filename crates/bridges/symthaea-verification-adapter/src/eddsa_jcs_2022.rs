@@ -459,8 +459,7 @@ fn validate_strict_ijson_value(value: &Value) -> Result<(), SnapshotError> {
         Value::Null | Value::Bool(_) => Ok(()),
         Value::Number(number) => {
             if let Some(value) = number.as_i64() {
-                let round_tripped = value as f64;
-                if round_tripped as i64 != value {
+                if !is_binary64_integer_exact(value.unsigned_abs()) {
                     return Err(SnapshotError::Verification(
                         VerificationFailure::Structural(
                             "strict I-JSON parsing rejected an integer that cannot be represented exactly by IEEE-754 binary64"
@@ -469,8 +468,7 @@ fn validate_strict_ijson_value(value: &Value) -> Result<(), SnapshotError> {
                     ));
                 }
             } else if let Some(value) = number.as_u64() {
-                let round_tripped = value as f64;
-                if round_tripped as u64 != value {
+                if !is_binary64_integer_exact(value) {
                     return Err(SnapshotError::Verification(
                         VerificationFailure::Structural(
                             "strict I-JSON parsing rejected an integer that cannot be represented exactly by IEEE-754 binary64"
@@ -522,6 +520,18 @@ fn validate_strict_ijson_value(value: &Value) -> Result<(), SnapshotError> {
             Ok(())
         }
     }
+}
+
+fn is_binary64_integer_exact(value: u64) -> bool {
+    if value == 0 {
+        return true;
+    }
+    let significant_bits = 64 - value.leading_zeros();
+    if significant_bits <= 53 {
+        return true;
+    }
+    let discarded_bits = significant_bits - 53;
+    (value & ((1u64 << discarded_bits) - 1)) == 0
 }
 
 fn is_ijson_forbidden_code_point(ch: char) -> bool {
@@ -984,6 +994,17 @@ mod tests {
                 VerificationFailure::Structural(message)
             )) if message.contains("IEEE-754")
         ));
+
+        let max_integer: Value = serde_json::json!({"value": u64::MAX});
+        assert!(matches!(
+            validate_strict_ijson_value(&max_integer),
+            Err(SnapshotError::Verification(
+                VerificationFailure::Structural(message)
+            )) if message.contains("IEEE-754")
+        ));
+
+        let exact_large_integer: Value = serde_json::json!({"value": 1u64 << 53});
+        assert!(validate_strict_ijson_value(&exact_large_integer).is_ok());
     }
 
     #[test]
