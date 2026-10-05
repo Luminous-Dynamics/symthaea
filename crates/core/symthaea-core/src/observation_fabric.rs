@@ -1381,14 +1381,14 @@ impl ObservationGraph {
         ))
     }
 
-    /// Return canonical bytes for the graph state relevant to the current
-    /// bounded independence verifier.
+    /// Return the canonical bytes for the frozen v2 independence-scope representation.
     ///
     /// These bytes are the exact preimage used by
-    /// independence_verification_scope_fingerprint. They are intentionally not
-    /// a serialization of the entire ObservationGraph: only the verifier-relevant
-    /// provenance projection is included. The bytes establish state identity for
-    /// this verifier, not freshness or substantive truth.
+    /// independence_verification_scope_fingerprint. They intentionally are not a
+    /// serialization of the entire ObservationGraph. v2 is retained for historical
+    /// reproducibility; its representation is broader than the predicate-relative
+    /// reachable scope planned for the next explicit verifier/scope version.
+    /// The bytes establish state identity, not freshness or substantive truth.
     pub fn independence_verification_scope_canonical_bytes(
         &self,
     ) -> Result<Vec<u8>, ObservationValidationError> {
@@ -1407,14 +1407,13 @@ impl ObservationGraph {
         self.compute_independence_scope_canonical_bytes(&by_id, &examined_observation_ids)
     }
 
-    /// Compute the deterministic identity of the graph state relevant to the
-    /// current bounded independence verifier.
+    /// Compute the deterministic identity of the frozen v2 independence-scope representation.
     ///
     /// This is intentionally a **verification-scope fingerprint**, not a fingerprint
-    /// of every field in the ObservationGraph. It commits exactly the provenance
-    /// projection used by assess_independence_detailed, so callers can record which
-    /// relevant graph state was used without implying that unrelated graph fields were
-    /// evaluated. It is state identity, not freshness or a truth claim.
+    /// of every field in the ObservationGraph. Historical v2 identity is preserved
+    /// exactly; the next version may narrow this to the predicate-reachable,
+    /// role-sensitive field set without reinterpreting existing receipts.
+    /// It is state identity, not freshness or a truth claim.
     pub fn independence_verification_scope_fingerprint(
         &self,
     ) -> Result<String, ObservationValidationError> {
