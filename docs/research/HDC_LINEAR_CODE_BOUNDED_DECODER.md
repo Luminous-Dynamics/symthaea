@@ -118,6 +118,25 @@ are distinct evidence fields. Work on computing coset leaders likewise treats
 complete leader sets and covering-radius structure as explicit finite-code
 properties.
 
+## Random-code list qualification and independent parity-check oracle
+
+The randomized qualification surface now probes deterministic observations from the
+existing moderate-rate and low-rate regimes, using an independent test-side
+parity-check construction based on u64 nullspace elimination. It does not call the
+decoder's parity-check constructor. The resulting syndrome is compared directly
+with the production parity-check syndrome for every probe.
+
+For each generated code, the probe bound is one above the guaranteed unique-decoding
+radius. When the independent nearest-codeword oracle places the observation within
+that bound, every minimum-syndrome error and corresponding nearest codeword must be
+returned completely with capture cap 32. Their syndromes, weights, distances, and
+set membership are independently checked. Observations outside the bound must
+remain explicit NoMatchWithinBound results.
+
+The entire probe is repeated with identical seeds and observations and the
+list-size distributions must be byte-for-byte identical. This makes the empirical
+random-code ledger deterministic without pretending it is an asymptotic theorem.
+
 ## Why this is an independent algorithm
 
 The existing finite oracle enumerates codewords, computes Hamming distances, and

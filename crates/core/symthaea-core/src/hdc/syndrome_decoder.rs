@@ -294,11 +294,11 @@ impl BoundedDistanceSyndromeDecoder {
             &mut result.minimum_errors,
         );
 
-        let expected_matches = match &result.outcome {
+        let expected_matches = match result.outcome {
             BoundedDistanceDecode::Ambiguous {
                 matching_error_patterns,
                 ..
-            } => *matching_error_patterns,
+            } => matching_error_patterns,
             _ => unreachable!("unique outcome returned above"),
         };
         debug_assert_eq!(matching_errors, expected_matches);

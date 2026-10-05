@@ -673,6 +673,246 @@ fn error_words_up_to_weight(dimension: usize, max_weight: usize) -> Vec<BinaryCo
     output
 }
 
+// Independent test oracle: derive H as a nullspace basis using u64 row operations.
+// This intentionally does not call ParityCheckMatrix::from_code.
+fn independent_parity_check_rows(code: &RandomLinearCode) -> Vec<u64> {
+    let dimension = code.dimension();
+    assert!(dimension <= 64);
+
+    let mut reduced = code
+        .basis()
+        .iter()
+        .map(|word| word.words()[0])
+        .collect::<Vec<_>>();
+    let mut pivots = Vec::with_capacity(code.rank());
+    let mut pivot_row = 0usize;
+
+    for column in 0..dimension {
+        let found = (pivot_row..reduced.len()).find(|&row| {
+            ((reduced[row] >> column) & 1) == 1
+        });
+        let Some(found) = found else {
+            continue;
+        };
+
+        reduced.swap(pivot_row, found);
+        for row in 0..reduced.len() {
+            if row != pivot_row && ((reduced[row] >> column) & 1) == 1 {
+                reduced[row] ^= reduced[pivot_row];
+            }
+        }
+        pivots.push(column);
+        pivot_row += 1;
+        if pivot_row == reduced.len() {
+            break;
+        }
+    }
+
+    assert_eq!(pivots.len(), code.rank());
+
+    let mut is_pivot = vec![false; dimension];
+    for &pivot in &pivots {
+        is_pivot[pivot] = true;
+    }
+
+    let mut checks = Vec::with_capacity(dimension - code.rank());
+    for free_column in 0..dimension {
+        if is_pivot[free_column] {
+            continue;
+        }
+
+        let mut check = 1u64 << free_column;
+        for (row, &pivot_column) in pivots.iter().enumerate() {
+            if ((reduced[row] >> free_column) & 1) == 1 {
+                check |= 1u64 << pivot_column;
+            }
+        }
+        checks.push(check);
+    }
+    assert_eq!(checks.len(), dimension - code.rank());
+    checks
+}
+
+fn independent_syndrome(mask: u64, checks: &[u64]) -> u64 {
+    let mut syndrome = 0u64;
+    for (index, &check) in checks.iter().enumerate() {
+        if (mask & check).count_ones() % 2 == 1 {
+            syndrome |= 1u64 << index;
+        }
+    }
+    syndrome
+}
+
+fn deterministic_probe_masks(mut state: u64, count: usize, dimension: usize) -> Vec<u64> {
+    let mask = if dimension == 64 {
+        u64::MAX
+    } else {
+        (1u64 << dimension) - 1
+    };
+    let mut output = Vec::with_capacity(count);
+    for _ in 0..count {
+        state = state
+            .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+            .wrapping_add(0xD1B5_4A32_D192_ED03);
+        output.push(state & mask);
+    }
+    output
+}
+
+#[test]
+fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
+    let regimes = [
+        (12usize, 4usize, 64u64, 0xE100_0000u64, 24usize),
+        (20usize, 3usize, 32u64, 0xE200_0000u64, 24usize),
+    ];
+
+    fn probe(
+        regimes: &[(usize, usize, u64, u64, usize)],
+    ) -> Vec<(usize, usize, usize, usize, usize, [usize; 17])> {
+        let mut ledgers = Vec::with_capacity(regimes.len());
+
+        for &(dimension, rank, trials, seed_base, probes_per_code) in regimes {
+            let mut qualifying_codes = 0usize;
+            let mut checked_observations = 0usize;
+            let mut no_match = 0usize;
+            let mut max_multiplicity = 0usize;
+            let mut histogram = [0usize; 17];
+
+            for seed_offset in 0..trials {
+                let seed = seed_base + seed_offset;
+                let code = RandomLinearCode::generate(dimension, rank, seed);
+                let codewords = code.enumerate();
+                let min_distance = codewords
+                    .iter()
+                    .filter(|word| word.weight() > 0)
+                    .map(|word| word.weight())
+                    .min()
+                    .expect("non-zero codeword");
+                let unique_radius = (min_distance - 1) / 2;
+                let bound = unique_radius + 1;
+                let decoder =
+                    BoundedDistanceSyndromeDecoder::from_code(&code).expect("decoder");
+                let checks = independent_parity_check_rows(&code);
+
+                assert_eq!(checks.len(), dimension - rank);
+                for &codeword in &codewords {
+                    let mask = codeword.words()[0];
+                    assert_eq!(independent_syndrome(mask, &checks), 0);
+                }
+
+                for mask in deterministic_probe_masks(seed ^ 0x5A17_0A1E, probes_per_code, dimension) {
+                    let observation = error_from_mask(mask as usize, dimension);
+                    let (nearest_distance, nearest) =
+                        nearest_codewords(&observation, &codewords);
+                    let observed_syndrome = independent_syndrome(mask, &checks);
+                    let parity_check_syndrome = decoder
+                        .parity_check()
+                        .syndrome(&observation)
+                        .expect("same dimension");
+                    assert_eq!(
+                        parity_check_syndrome.words()[0],
+                        observed_syndrome,
+                        "production and independent parity-check oracles diverged: regime={dimension}x{rank} seed=0x{seed:X} mask={mask:#x}"
+                    );
+
+                    let listed_a =
+                        decoder.decode_with_minimum_list(&observation, bound, 32);
+                    let listed_b =
+                        decoder.decode_with_minimum_list(&observation, bound, 32);
+                    assert_eq!(
+                        listed_a, listed_b,
+                        "list surface was not deterministic: regime={dimension}x{rank} seed=0x{seed:X} mask={mask:#x}"
+                    );
+
+                    if nearest_distance > bound {
+                        assert!(matches!(
+                            listed_a.outcome,
+                            BoundedDistanceDecode::NoMatchWithinBound { .. }
+                        ));
+                        assert!(listed_a.minimum_errors.is_empty());
+                        assert!(listed_a.nearest_codewords.is_empty());
+                        assert!(listed_a.list_complete);
+                        no_match += 1;
+                    } else {
+                        assert!(listed_a.list_complete);
+                        assert_eq!(listed_a.minimum_errors.len(), nearest.len());
+                        assert_eq!(listed_a.nearest_codewords.len(), nearest.len());
+                        assert_eq!(listed_a.outcome, decoder.decode(&observation, bound));
+
+                        let mut seen = vec![false; nearest.len()];
+                        for (error, codeword) in listed_a
+                            .minimum_errors
+                            .iter()
+                            .zip(&listed_a.nearest_codewords)
+                        {
+                            assert_eq!(error.weight(), nearest_distance);
+                            let error_syndrome =
+                                independent_syndrome(error.words()[0], &checks);
+                            assert_eq!(error_syndrome, observed_syndrome);
+                            assert_eq!(
+                                hamming_distance(&observation, codeword),
+                                nearest_distance
+                            );
+
+                            let index = nearest
+                                .iter()
+                                .position(|&candidate| codewords[candidate] == *codeword)
+                                .expect("listed codeword must be nearest");
+                            assert!(!seen[index], "duplicate nearest codeword in list");
+                            seen[index] = true;
+                        }
+                        assert!(seen.into_iter().all(|present| present));
+
+                        max_multiplicity = max_multiplicity.max(nearest.len());
+                        histogram[nearest.len()] += 1;
+                    }
+
+                    checked_observations += 1;
+                }
+
+                qualifying_codes += 1;
+            }
+
+            assert!(qualifying_codes >= 8);
+            assert_eq!(
+                histogram[0],
+                0,
+                "zero multiplicity must never be recorded as a decoded list"
+            );
+            assert!(max_multiplicity <= (1usize << rank));
+            ledgers.push((
+                dimension,
+                rank,
+                checked_observations,
+                no_match,
+                max_multiplicity,
+                histogram,
+            ));
+        }
+
+        ledgers
+    }
+
+    let first = probe(&regimes);
+    let second = probe(&regimes);
+    assert_eq!(
+        first, second,
+        "deterministic random-code list-size distribution changed between identical probes"
+    );
+
+    for (dimension, rank, observations, no_match, max_multiplicity, histogram) in &first {
+        let total_decoded = histogram.iter().skip(1).sum::<usize>();
+        assert_eq!(total_decoded + no_match, *observations);
+        println!(
+            "RANDOM_LIST_ORACLE=dimension={dimension};rank={rank};observations={observations};no_match={no_match};max_multiplicity={max_multiplicity};histogram_1={};histogram_2={};histogram_3={};histogram_4={};deterministic=true;independent_syndrome_oracle=true",
+            histogram[1],
+            histogram[2],
+            histogram[3],
+            histogram[4],
+        );
+    }
+}
+
 #[test]
 fn random_small_and_low_rate_code_sweep_matches_exhaustive_oracle_within_guaranteed_radius() {
     let regimes = [
