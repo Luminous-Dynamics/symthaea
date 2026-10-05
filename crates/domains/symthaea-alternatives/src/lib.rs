@@ -960,6 +960,58 @@ impl CandidatePathway {
         })
     }
 
+    fn performance_has_supported_kind_at(
+        &self,
+        requirement: &FunctionalRequirement,
+        kind: EvidenceKind,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        requirement.constraints.keys().all(|metric| {
+            self.performance
+                .get(metric)
+                .map(|estimate| {
+                    self.linked_evidence_at(
+                        &estimate.evidence_ids,
+                        as_of,
+                        freshness_policy,
+                    )
+                    .any(|e| {
+                        e.kind == kind
+                            && e.stance == EvidenceStance::Supports
+                            && e.confidence >= 0.7
+                    })
+                })
+                .unwrap_or(false)
+        })
+    }
+
+    fn operating_has_supported_kind_at(
+        &self,
+        requirement: &FunctionalRequirement,
+        kind: EvidenceKind,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        requirement.operating_envelope.keys().all(|condition| {
+            self.operating_capabilities
+                .get(condition)
+                .map(|estimate| {
+                    self.linked_evidence_at(
+                        &estimate.evidence_ids,
+                        as_of,
+                        freshness_policy,
+                    )
+                    .any(|e| {
+                        e.kind == kind
+                            && e.stance == EvidenceStance::Supports
+                            && e.confidence >= 0.7
+                    })
+                })
+                .unwrap_or(false)
+        })
+    }
+
     fn qualification_ceiling(
         &self,
         requirement: &FunctionalRequirement,
@@ -1094,22 +1146,64 @@ impl CandidatePathway {
                 })
                 .unwrap_or(false)
         });
-        let has_manufacturing_observation = self.burdens.values().any(|estimate| {
-            self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy).any(|e| {
-                e.kind == EvidenceKind::ManufacturingObserved
-                    && e.stance == EvidenceStance::Supports
-                    && e.confidence >= 0.7
-            })
+        let all_dimensions_manufacturing_observed = Dimension::ALL.iter().all(|dimension| {
+            self.burdens
+                .get(dimension)
+                .map(|estimate| {
+                    self.linked_evidence_at(
+                        &estimate.evidence_ids,
+                        as_of,
+                        freshness_policy,
+                    )
+                    .any(|e| {
+                        e.kind == EvidenceKind::ManufacturingObserved
+                            && e.stance == EvidenceStance::Supports
+                            && e.confidence >= 0.7
+                    })
+                })
+                .unwrap_or(false)
         });
+        let performance_field_observed = self.performance_has_supported_kind_at(
+            requirement,
+            EvidenceKind::FieldObserved,
+            as_of,
+            freshness_policy,
+        );
+        let operating_field_observed = self.operating_has_supported_kind_at(
+            requirement,
+            EvidenceKind::FieldObserved,
+            as_of,
+            freshness_policy,
+        );
+        let performance_monitored = self.performance_has_supported_kind_at(
+            requirement,
+            EvidenceKind::ContinuouslyMonitored,
+            as_of,
+            freshness_policy,
+        );
+        let operating_monitored = self.operating_has_supported_kind_at(
+            requirement,
+            EvidenceKind::ContinuouslyMonitored,
+            as_of,
+            freshness_policy,
+        );
 
-        if all_dimensions_monitored && monitoring_distinct_authority_sources >= 2 {
+        if all_dimensions_monitored
+            && performance_monitored
+            && operating_monitored
+            && monitoring_distinct_authority_sources >= 2
+        {
             QualificationState::ContinuouslyMonitored
-        } else if all_dimensions_field_observed && field_distinct_authority_sources >= 2 {
+        } else if all_dimensions_field_observed
+            && performance_field_observed
+            && operating_field_observed
+            && field_distinct_authority_sources >= 2
+        {
             QualificationState::FieldQualified
         } else if any_supported_measurement
             && distinct_authority_sources >= 2
             && has_all_dimension_evidence
-            && has_manufacturing_observation
+            && all_dimensions_manufacturing_observed
         {
             QualificationState::ManufacturingQualified
         } else if any_supported_measurement
