@@ -23,9 +23,9 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 pub const VERIFICATION_REQUEST_SCHEMA_VERSION: u16 = 1;
-pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 6;
-pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 7;
-pub const CRYPTOGRAPHIC_VERIFICATION_RECEIPT_SCHEMA_VERSION: u16 = 1;
+pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 7;
+pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 8;
+pub const CRYPTOGRAPHIC_VERIFICATION_RECEIPT_SCHEMA_VERSION: u16 = 2;
 
 /// Typed identifier for the verification relationship under which a verification
 /// method is permitted to validate a proof.
@@ -1321,6 +1321,10 @@ impl VerificationRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CryptographicVerificationReceipt {
     pub schema_version: u16,
+    /// Identity of the exact claim representation this receipt is attached to.
+    pub claim_representation_digest: String,
+    /// Identity of the exact proposition/statement this receipt is attached to.
+    pub statement_digest: String,
     pub cryptosuite: String,
     pub proof_type: String,
     pub proof_purpose: ClaimProofPurpose,
@@ -1354,6 +1358,8 @@ impl CryptographicVerificationReceipt {
 
         let receipt = Self {
             schema_version: CRYPTOGRAPHIC_VERIFICATION_RECEIPT_SCHEMA_VERSION,
+            claim_representation_digest: request.claim_representation_digest.clone(),
+            statement_digest: request.statement_digest.clone(),
             cryptosuite: cryptosuite.into(),
             proof_type: proof_type.into(),
             proof_purpose: request.proof_purpose.clone(),
@@ -1375,6 +1381,8 @@ impl CryptographicVerificationReceipt {
         let encoded = (
             "symthaea:cryptographic-verification-receipt:v1",
             self.schema_version,
+            &self.claim_representation_digest,
+            &self.statement_digest,
             &self.cryptosuite,
             &self.proof_type,
             &self.proof_purpose,
@@ -1404,6 +1412,20 @@ impl CryptographicVerificationReceipt {
         }
         if !resolution.matches_request(request) {
             return Err(VerificationFailure::ResolutionRequestMismatch);
+        }
+        if !is_hex_digest(&self.claim_representation_digest)
+            || self.claim_representation_digest != request.claim_representation_digest
+        {
+            return Err(VerificationFailure::Structural(
+                "cryptographic receipt claim representation identity does not match request"
+                    .into(),
+            ));
+        }
+        if !is_hex_digest(&self.statement_digest) || self.statement_digest != request.statement_digest
+        {
+            return Err(VerificationFailure::Structural(
+                "cryptographic receipt statement identity does not match request".into(),
+            ));
         }
         if self.proof_type.trim().is_empty() || self.cryptosuite.trim().is_empty() {
             return Err(VerificationFailure::Structural(
@@ -2576,6 +2598,8 @@ mod tests {
     ) -> CryptographicVerificationReceipt {
         CryptographicVerificationReceipt {
             schema_version: CRYPTOGRAPHIC_VERIFICATION_RECEIPT_SCHEMA_VERSION,
+            claim_representation_digest: request.claim_representation_digest.clone(),
+            statement_digest: request.statement_digest.clone(),
             cryptosuite: "ed25519-test".into(),
             proof_type: "DataIntegrityProof".into(),
             proof_purpose: request.proof_purpose.clone(),
@@ -2761,6 +2785,45 @@ mod tests {
         assert!(evidence.validate_structure().is_ok());
         assert!(evidence.matches_request(&request));
         assert!(!evidence.evidence_digest().is_empty());
+    }
+
+    #[test]
+    fn cryptographic_receipt_is_request_identity_bound() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+        let evidence = make_evidence(
+            &request,
+            &"11".repeat(32),
+            "ed25519",
+            &"22".repeat(32),
+            &"33".repeat(32),
+        )
+        .unwrap();
+
+        let mut tampered = evidence.clone();
+        tampered
+            .cryptographic_verification
+            .claim_representation_digest = "77".repeat(32);
+        assert!(matches!(
+            tampered.validate_structure(),
+            Err(VerificationFailure::Structural(message))
+                if message.contains("claim representation identity")
+        ));
+
+        let mut statement_tampered = evidence.clone();
+        statement_tampered.cryptographic_verification.statement_digest = "88".repeat(32);
+        assert!(matches!(
+            statement_tampered.validate_structure(),
+            Err(VerificationFailure::Structural(message))
+                if message.contains("statement identity")
+        ));
     }
 
     #[test]
