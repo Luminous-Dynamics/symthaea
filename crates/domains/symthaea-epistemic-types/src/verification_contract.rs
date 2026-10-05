@@ -23,8 +23,8 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 pub const VERIFICATION_REQUEST_SCHEMA_VERSION: u16 = 1;
-pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 4;
-pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 5;
+pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 5;
+pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 6;
 
 /// Typed identifier for the verification relationship under which a verification
 /// method is permitted to validate a proof.
