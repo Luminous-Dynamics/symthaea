@@ -601,6 +601,23 @@ impl CandidatePathway {
             .unwrap_or(false)
     }
 
+    fn operating_envelope_is_supported(
+        &self,
+        requirement: &FunctionalRequirement,
+        as_of: Option<i64>,
+    ) -> bool {
+        requirement.operating_envelope.iter().all(|(condition, required)| {
+            let Some(capability) = self.operating_capabilities.get(condition) else {
+                return false;
+            };
+            capability.unit == required.unit
+                && capability.scope == required.scope
+                && capability.interval.lower <= required.interval.lower
+                && capability.interval.upper >= required.interval.upper
+                && self.operating_evidence_is_supported_at(condition, as_of)
+        })
+    }
+
     fn performance_is_supported(
         &self,
         requirement: &FunctionalRequirement,
@@ -625,6 +642,7 @@ impl CandidatePathway {
         as_of: Option<i64>,
     ) -> QualificationState {
         if !self.performance_is_supported(requirement, as_of)
+            || !self.operating_envelope_is_supported(requirement, as_of)
             || self.burdens.is_empty()
             || self.burdens.values().all(|estimate| {
                 let linked = self
@@ -809,6 +827,8 @@ pub struct CandidateAssessment {
     pub candidate_id: String,
     /// Evidence-linked functional performance estimates.
     pub performance: BTreeMap<String, PerformanceEstimate>,
+    /// Evidence-linked operating capabilities.
+    pub operating_capabilities: BTreeMap<String, PerformanceEstimate>,
     /// Per-constraint outcomes.
     pub constraints: Vec<ConstraintEvaluation>,
     /// Burdens with dimension-specific evidence linkage.
@@ -1149,6 +1169,9 @@ impl AlternativesEngine {
             for estimate in candidate.operating_capabilities.values_mut() {
                 estimate.evidence_ids.sort();
             }
+            for estimate in candidate.operating_capabilities.values_mut() {
+                estimate.evidence_ids.sort();
+            }
             for estimate in candidate.burdens.values_mut() {
                 estimate.evidence_ids.sort();
             }
@@ -1201,6 +1224,43 @@ impl AlternativesEngine {
                         expected_scope: scale.scope.clone(),
                         actual_scope: estimate.scope.clone(),
                     });
+                }
+            }
+            for (condition, required) in &requirement.operating_envelope {
+                match candidate.operating_capabilities.get(condition) {
+                    None => candidate_blockers.push(FrontierBlocker::OperatingConditionUnresolved(
+                        condition.clone(),
+                    )),
+                    Some(capability)
+                        if capability.unit != required.unit || capability.scope != required.scope =>
+                    {
+                        candidate_blockers.push(FrontierBlocker::PerformanceIncompatibleScale {
+                            metric: format!("operating:{condition}"),
+                            expected_unit: required.unit.clone(),
+                            actual_unit: capability.unit.clone(),
+                            expected_scope: required.scope.clone(),
+                            actual_scope: capability.scope.clone(),
+                        });
+                    }
+                    Some(capability)
+                        if capability.interval.lower > required.interval.lower
+                            || capability.interval.upper < required.interval.upper =>
+                    {
+                        candidate_blockers.push(FrontierBlocker::OperatingConditionFailed(
+                            condition.clone(),
+                        ));
+                    }
+                    Some(capability)
+                        if !candidate.operating_evidence_is_supported_at(
+                            condition,
+                            assessed_at_epoch_seconds,
+                        ) =>
+                    {
+                        candidate_blockers.push(FrontierBlocker::OperatingConditionUnresolved(
+                            condition.clone(),
+                        ));
+                    }
+                    Some(_) => {}
                 }
             }
             for evaluation in &constraints {
@@ -1256,6 +1316,7 @@ d::ContinuouslyMonitored
             assessments.push(CandidateAssessment {
                 candidate_id: candidate.id.clone(),
                 performance: candidate.performance.clone(),
+                operating_capabilities: candidate.operating_capabilities.clone(),
                 constraints,
                 burdens: candidate.burdens.clone(),
                 qualification: candidate.qualification_ceiling(
