@@ -121,6 +121,33 @@ impl RationalScale {
         self.denominator > 0
     }
 
+    /// Canonical mathematical representation: reduced fraction with positive denominator.
+    pub fn normalized(self) -> Self {
+        if self.denominator <= 0 {
+            return self;
+        }
+        if self.numerator == 0 {
+            return Self { numerator: 0, denominator: 1 };
+        }
+
+        fn gcd(mut a: i64, mut b: i64) -> i64 {
+            a = a.abs();
+            b = b.abs();
+            while b != 0 {
+                let remainder = a % b;
+                a = b;
+                b = remainder;
+            }
+            a
+        }
+
+        let divisor = gcd(self.numerator, self.denominator);
+        Self {
+            numerator: self.numerator / divisor,
+            denominator: self.denominator / divisor,
+        }
+    }
+
     pub fn as_f64(self) -> Result<f64, PhysicalTypeError> {
         if !self.is_valid() {
             return Err(PhysicalTypeError {
@@ -336,8 +363,28 @@ impl PhysicalType {
         self.refinements.contains(&refinement)
     }
 
+    /// Canonicalize representation details that do not change physical meaning
+    /// before producing an identity digest.
+    pub fn canonicalized(&self) -> Self {
+        let mut canonical = self.clone();
+        if let Some(unit) = &mut canonical.unit {
+            unit.transform_to_si.scale = unit.transform_to_si.scale.normalized();
+            unit.transform_to_si.offset = unit.transform_to_si.offset.normalized();
+        }
+        canonical.refinements.sort_by_key(|refinement| match refinement {
+            Refinement::Positive => 0,
+            Refinement::NonNegative => 1,
+            Refinement::NonZero => 2,
+            Refinement::Bounded => 3,
+            Refinement::Periodic => 4,
+        });
+        canonical.refinements.dedup();
+        canonical
+    }
+
     pub fn canonical_bytes(&self) -> Vec<u8> {
-        serde_json::to_vec(self).expect("PhysicalType serialization must be infallible")
+        serde_json::to_vec(&self.canonicalized())
+            .expect("PhysicalType serialization must be infallible")
     }
 
     pub fn digest(&self) -> [u8; 32] {
@@ -662,6 +709,47 @@ mod tests {
             PhysicalDimension::FORCE.add(PhysicalDimension::LENGTH),
             PhysicalDimension::ENERGY
         );
+    }
+
+    #[test]
+    fn rational_scale_normalization_is_digest_stable() {
+        let base = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH)
+            .with_unit(UnitRef {
+                symbol: "m".into(),
+                transform_to_si: UnitTransform::new(
+                    RationalScale { numerator: 1, denominator: 1 },
+                    RationalScale { numerator: 0, denominator: 1 },
+                ),
+                semantic_id: None,
+            });
+        let equivalent = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH)
+            .with_unit(UnitRef {
+                symbol: "m".into(),
+                transform_to_si: UnitTransform::new(
+                    RationalScale { numerator: 2, denominator: 2 },
+                    RationalScale { numerator: 0, denominator: 5 },
+                ),
+                semantic_id: None,
+            });
+
+        assert_eq!(base.digest_hex(), equivalent.digest_hex());
+    }
+
+    #[test]
+    fn refinement_order_and_duplicates_do_not_change_digest() {
+        let mut first =
+            PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH);
+        first.refinements = vec![
+            Refinement::NonZero,
+            Refinement::Positive,
+            Refinement::Positive,
+        ];
+
+        let mut second =
+            PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH);
+        second.refinements = vec![Refinement::Positive, Refinement::NonZero];
+
+        assert_eq!(first.digest_hex(), second.digest_hex());
     }
 
     #[test]
