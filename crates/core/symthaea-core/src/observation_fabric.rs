@@ -4975,7 +4975,27 @@ mod tests {
             assert_eq!(receipt.examined_observation_ids, examined_ids);
             assert_eq!(receipt.examined_scope_fingerprint, scope_fingerprint);
             assert_eq!(receipt.assessment_fingerprint, assessment_fingerprint);
+
+            let scope = graph
+                .independence_verification_reachable_scope_canonical_bytes_v3(
+                    "obs-001",
+                    "obs-002",
+                )
+                .expect("v3 scope bytes");
+            let witness =
+                IndependenceScopeWitnessV3::from_canonical_bytes(&scope).expect("decode witness");
+            assert_eq!(
+                witness.endpoint_ids(),
+                Some(("obs-001", "obs-002"))
+            );
+            assert_eq!(
+                witness.assess_independence().expect("witness assessment"),
+                (classification, basis)
+            );
+            assert_eq!(witness.observation_ids(), examined_ids);
+            assert_eq!(witness.fingerprint().expect("witness fingerprint"), scope_fingerprint);
             assert!(receipt.verify_integrity());
+            assert!(receipt.verify_against_scope_witness(&scope));
             assert_eq!(
                 receipt.verify_against_graph_detailed(&graph),
                 Ok(ReceiptVerificationOutcome::VerifiedAgainstGraph)
