@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 14;
+pub const SCHEMA_VERSION: u16 = 15;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-v23";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-v24";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -364,6 +364,46 @@ impl EvidenceSourceIdentity {
     }
 }
 
+/// Exact provenance reference for a physical or operational observation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ObservationProvenanceRef {
+    /// Stable identity of the observation result/record.
+    pub observation_id: String,
+    /// Exact specimen, lot, batch, product instance, or process-run identity observed.
+    pub subject_id: String,
+    /// Stable identity of the measurement/test activity.
+    pub activity_id: String,
+    /// Digest of the underlying measurement record or canonical observation payload.
+    pub record_digest: String,
+    /// Optional measurement-system identity.
+    pub measurement_system_id: Option<String>,
+    /// Canonical references forming the declared calibration/traceability chain.
+    pub calibration_chain_refs: Vec<String>,
+}
+
+impl ObservationProvenanceRef {
+    /// Validate the structural observation-provenance reference.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.observation_id.is_empty()
+            || self.subject_id.is_empty()
+            || self.activity_id.is_empty()
+            || self.record_digest.is_empty()
+            || self.calibration_chain_refs.is_empty()
+            || self.calibration_chain_refs.iter().any(String::is_empty)
+        {
+            return Err(AssessmentError::InvalidObservationProvenance);
+        }
+        if self
+            .measurement_system_id
+            .as_ref()
+            .is_some_and(String::is_empty)
+        {
+            return Err(AssessmentError::InvalidObservationProvenance);
+        }
+        Ok(())
+    }
+}
+
 /// Provenance-aware evidence metadata.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EvidenceRecord {
@@ -379,6 +419,8 @@ pub struct EvidenceRecord {
     pub source: EvidenceSourceIdentity,
     /// Exact methodological/comparability basis of the evidence itself.
     pub basis: ComparisonBasisRef,
+    /// Exact observation/test provenance when the evidence represents a physical observation.
+    pub observation: Option<ObservationProvenanceRef>,
     /// Human-readable scope: functional unit, geography, process, etc.
     pub scope: String,
     /// Optional unit for the associated quantity.
@@ -408,6 +450,18 @@ impl EvidenceRecord {
         }
         self.source.validate()?;
         self.basis.validate()?;
+        let observation_required = matches!(
+            self.kind,
+            EvidenceKind::Observed
+                | EvidenceKind::ManufacturingObserved
+                | EvidenceKind::FieldObserved
+                | EvidenceKind::ContinuouslyMonitored
+        );
+        match (&self.observation, observation_required) {
+            (Some(observation), _) => observation.validate()?,
+            (None, true) => return Err(AssessmentError::MissingObservationProvenance(self.kind)),
+            (None, false) => {}
+        }
         if let (Some(from), Some(until)) = (
             self.valid_from_epoch_seconds,
             self.valid_until_epoch_seconds,
@@ -1780,6 +1834,10 @@ pub enum AssessmentError {
         /// Exact basis declared by the evidence record.
         actual: ComparisonBasisRef,
     },
+    /// A physical/operational observation lacks its exact observation provenance.
+    MissingObservationProvenance(EvidenceKind),
+    /// Observation provenance identity is structurally incomplete.
+    InvalidObservationProvenance,
     /// A burden references unknown evidence.
     MissingEvidenceReference(String),
     /// Requested incumbent does not exist.
@@ -1894,6 +1952,12 @@ impl std::fmt::Display for AssessmentError {
             }
             Self::EvidenceBasisMismatch { evidence_id, .. } => {
                 write!(f, "evidence {evidence_id} comparison basis does not match linked estimate")
+            }
+            Self::MissingObservationProvenance(kind) => {
+                write!(f, "{kind:?} evidence is missing observation provenance")
+            }
+            Self::InvalidObservationProvenance => {
+                write!(f, "observation provenance reference is incomplete")
             }
             Self::MissingEvidenceReference(id) => {
                 write!(f, "missing evidence reference {id}")
@@ -2603,33 +2667,7 @@ mod tests {
         }
     }
 
-    fn admitted(mut evidence: EvidenceRecord) -> EvidenceRecord {
-        evidence.source.admission = Some(SourceAdmissionRef {
-            authority_id: evidence.source.authority_id.clone(),
-            policy_id: "fixture-policy".into(),
-            policy_revision: "v1".into(),
-            policy_digest: "fixture-policy-digest-v1".into(),
-            admission_id: format!("fixture-admission:{}", evidence.id),
-            authority_epoch: "fixture-epoch-v1".into(),
-            fault_domain_id: Some(format!("fixture-domain:{}", evidence.source.authority_id)),
-            valid_from_epoch_seconds: None,
-            valid_until_epoch_seconds: None,
-        });
-        evidence
-    }
-
-    fn fixture_requirement() -> FunctionalRequirement {
-        FunctionalRequirement {
-            id: "seal-v1".into(),
-            subject: AssessmentSubjectRef {
-                subject_id: "fixture-product".into(),
-                profile_id: "fixture-product-profile".into(),
-                profile_revision: "v1".into(),
-                subject_digest: "fixture-product-digest".into(),
-            },
-            description: "Provide a durable chemical-resistant seal.".into(),
-            constraints: BTreeMap::from([
-                ("service_life_years".into(), RequirementBound::AtLeast(10.0)),
+ars".into(), RequirementBound::AtLeast(10.0)),
                 ("throughput_per_hour".into(), RequirementBound::AtLeast(100.0)),
             ]),
             comparison_scales: Dimension::ALL
@@ -2791,6 +2829,44 @@ mod tests {
             AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap_err(),
             AssessmentError::EvidenceBasisMismatch { .. }
         ));
+    }
+
+    #[test]
+    fn observed_evidence_requires_observation_provenance() {
+        let mut e = evidence(
+            "observed-missing-provenance",
+            "source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        e.observation = None;
+        assert_eq!(
+            e.validate().unwrap_err(),
+            AssessmentError::MissingObservationProvenance(EvidenceKind::Observed)
+        );
+    }
+
+    #[test]
+    fn observation_provenance_mutation_changes_receipt_identity() {
+        let c = candidate(
+            "observation-bound",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "obs", "source", EvidenceKind::Observed, EvidenceStance::Supports, 0.9,
+            )],
+        );
+        let baseline = AlternativesEngine.assess(&fixture_requirement(), &[c.clone()], None).unwrap();
+        let mut changed = c;
+        changed.evidence[0].observation.as_mut().unwrap().record_digest = "different-record".into();
+        let updated = AlternativesEngine.assess(&fixture_requirement(), &[changed], None).unwrap();
+        assert_ne!(
+            baseline.candidates[0].evidence_digest,
+            updated.candidates[0].evidence_digest
+        );
+        assert_ne!(baseline.receipt.payload_hash, updated.receipt.payload_hash);
     }
 
     #[test]
