@@ -132,6 +132,12 @@ fn main() -> Result<(), String> {
     let mut replay = NeurosemanticReplayTracker::default();
     let accepted = replay.observe_authorized(&message, &lease, 1_500)?;
     let duplicate = replay.observe_authorized(&message, &lease, 1_500)?;
+    let expired_replay_state_reclaimed = replay.prune_expired(2_000) == 1;
+
+    let mut scheduled_revocation = lease.clone();
+    scheduled_revocation.revoked_at_unix_s = Some(1_750);
+    let scheduled_revocation_honored = message.validate(&scheduled_revocation, 1_500).is_ok()
+        && message.validate(&scheduled_revocation, 1_750).is_err();
 
     let mut tampered = message.clone();
     if let NeurosemanticPayload::SemanticGraph(bytes) = &mut tampered.packet.payload {
@@ -194,6 +200,8 @@ fn main() -> Result<(), String> {
         ("handling_policy_provenance_hash_valid", handling_policy_provenance_hash_valid),
         ("first_packet_accepted", accepted == ReplayDecision::Accept),
         ("exact_replay_detected", duplicate == ReplayDecision::Duplicate),
+        ("expired_replay_state_reclaimed", expired_replay_state_reclaimed),
+        ("scheduled_revocation_honored", scheduled_revocation_honored),
         ("tamper_detected", tamper_detected),
         ("unauthorized_channel_blocked", unauthorized_blocked),
         ("expired_lease_blocked", expired_blocked),
