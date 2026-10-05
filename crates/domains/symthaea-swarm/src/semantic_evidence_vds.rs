@@ -3073,7 +3073,13 @@ impl<'a> CborReader<'a> {
                 let remaining_total = max_total_len
                     .checked_sub(total_len)
                     .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
-                let item=self.read_bstr_bounded(max_item_len.min(remaining_total))?;
+                let item=self.read_bstr_bounded(max_item_len.min(remaining_total))
+                    .map_err(|error| match error {
+                        Rfc9162ProofDecodeError::InvalidStructure => {
+                            Rfc9162ProofDecodeError::ResourceLimitExceeded
+                        }
+                        other => other,
+                    })?;
                 total_len=total_len
                     .checked_add(item.len())
                     .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
@@ -3096,7 +3102,13 @@ impl<'a> CborReader<'a> {
             let remaining_total = max_total_len
                 .checked_sub(total_len)
                 .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
-            let item=self.read_bstr_bounded(max_item_len.min(remaining_total))?;
+            let item=self.read_bstr_bounded(max_item_len.min(remaining_total))
+                .map_err(|error| match error {
+                    Rfc9162ProofDecodeError::InvalidStructure => {
+                        Rfc9162ProofDecodeError::ResourceLimitExceeded
+                    }
+                    other => other,
+                })?;
             total_len=total_len
                 .checked_add(item.len())
                 .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
