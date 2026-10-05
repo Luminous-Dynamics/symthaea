@@ -1434,7 +1434,7 @@ mod tests {
         let result = AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap();
         assert_eq!(
             result.candidates[0].qualification,
-            QualificationState::LifecycleQualified
+            QualificationState::EvidenceSupported
         );
     }
 
