@@ -253,6 +253,24 @@ impl NeurosemanticDataPolicy {
         self.validates() && self.permitted_purposes.contains(&purpose)
     }
 
+    /// Secondary uses that explicitly infer affective state or identity must also
+    /// be represented in the packet's declared inference classes. This prevents a
+    /// downstream-use flag from escalating the inference capability beyond the
+    /// data product's declared boundary.
+    fn allows_secondary_inference(&self, secondary_use: NeurosemanticSecondaryUse) -> bool {
+        match secondary_use {
+            NeurosemanticSecondaryUse::AffectiveInference => {
+                self.inference_classes
+                    .contains(&NeurosemanticInferenceClass::AffectiveState)
+            }
+            NeurosemanticSecondaryUse::IdentityInference => {
+                self.inference_classes
+                    .contains(&NeurosemanticInferenceClass::Identity)
+            }
+            _ => true,
+        }
+    }
+
     pub fn allows_handling(
         &self,
         destination_jurisdiction: &str,
@@ -260,6 +278,12 @@ impl NeurosemanticDataPolicy {
         now_unix_s: u64,
     ) -> bool {
         self.validates()
+            && match action {
+                NeurosemanticHandlingAction::SecondaryUse(secondary_use) => {
+                    self.allows_secondary_inference(secondary_use)
+                }
+                _ => true,
+            }
             && self.handling.allows_destination(destination_jurisdiction)
             && self.handling.allows_action(action, now_unix_s)
     }
@@ -1120,6 +1144,77 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn inference_sensitive_secondary_uses_cannot_escalate_declared_inference_classes() {
+        let lease = lease();
+        let mut policy = semantic_policy();
+        policy.handling.permitted_secondary_uses =
+            BTreeSet::from([NeurosemanticSecondaryUse::AffectiveInference]);
+        let packet = NeurosemanticPacket::new_with_policy(
+            109,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            policy.clone(),
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: lease.consent_epoch,
+            lease_id: lease.lease_id.clone(),
+        };
+        assert!(message
+            .validate_for_handling(
+                &lease,
+                "ZA",
+                NeurosemanticHandlingAction::SecondaryUse(
+                    NeurosemanticSecondaryUse::AffectiveInference
+                ),
+                150
+            )
+            .is_err());
+
+        policy.inference_classes =
+            BTreeSet::from([NeurosemanticInferenceClass::AffectiveState]);
+        policy.permitted_secondary_uses =
+            BTreeSet::from([NeurosemanticSecondaryUse::AffectiveInference]);
+        let packet = NeurosemanticPacket::new_with_policy(
+            110,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            policy,
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: lease.consent_epoch,
+            lease_id: lease.lease_id,
+        };
+        assert!(message
+            .validate_for_handling(
+                &lease,
+                "ZA",
+                NeurosemanticHandlingAction::SecondaryUse(
+                    NeurosemanticSecondaryUse::AffectiveInference
+                ),
+                150
+            )
+            .is_ok());
+    }
+
     fn authorized_handling_respects_secondary_use_jurisdiction_and_retention() {
         let lease = lease();
         let packet = NeurosemanticPacket::new_with_policy(
