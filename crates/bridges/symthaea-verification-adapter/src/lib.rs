@@ -1355,30 +1355,54 @@ mod tests {
 
     #[test]
     fn public_jwk_requires_key_type_specific_parameters() {
-        let request = request();
-        let mut snapshot = snapshot();
-        snapshot.document = r##"{
-            "id": "https://example.test/controller",
-            "verificationMethod": [{
-                "id": "https://example.test/controller#jwk-1",
-                "type": "JsonWebKey",
-                "controller": "https://example.test/controller",
-                "publicKeyJwk": {
-                    "kty": "OKP",
-                    "crv": "Ed25519"
-                }
-            }],
-            "assertionMethod": ["https://example.test/controller#jwk-1"]
-        }"##.into();
-        let reference = snapshot.snapshot_reference().unwrap();
-        let adapter =
-            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+        let make_snapshot = |jwk: &str| {
+            let mut snapshot = snapshot();
+            snapshot.document = format!(
+                r##"{{
+                    "id": "https://example.test/controller",
+                    "verificationMethod": [{{
+                        "id": "https://example.test/controller#jwk-1",
+                        "type": "JsonWebKey",
+                        "controller": "https://example.test/controller",
+                        "publicKeyJwk": {jwk}
+                    }}],
+                    "assertionMethod": ["https://example.test/controller#jwk-1"]
+                }}"##
+            );
+            snapshot
+        };
 
-        assert!(matches!(
-            adapter.resolve_snapshot(&request, snapshot),
-            Err(SnapshotError::Malformed(message))
-                if message.contains("requires a non-empty x")
-        ));
+        let cases = [
+            (
+                r##"{"kty":"OKP","crv":"Ed25519"}"##,
+                "requires a non-empty x",
+            ),
+            (
+                r##"{"kty":"EC","crv":"P-256","x":"AQ"}"##,
+                "requires a non-empty y",
+            ),
+            (
+                r##"{"kty":"RSA","n":"AQ"}"##,
+                "requires a non-empty e",
+            ),
+        ];
+
+        for (jwk, expected_message) in cases {
+            let request = request();
+            let snapshot = make_snapshot(jwk);
+            let reference = snapshot.snapshot_reference().unwrap();
+            let adapter = JsonControllerDocumentSnapshotAdapter::new(
+                "/tmp/does-not-matter",
+                reference,
+            )
+            .unwrap();
+
+            assert!(matches!(
+                adapter.resolve_snapshot(&request, snapshot),
+                Err(SnapshotError::Malformed(message))
+                    if message.contains(expected_message)
+            ));
+        }
     }
 
     #[test]
