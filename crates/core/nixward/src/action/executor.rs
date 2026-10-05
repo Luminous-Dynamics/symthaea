@@ -1168,9 +1168,9 @@ mod tests {
 
     #[test]
     fn test_custom_auto_classify_unknown() {
-        // Unknown commands default to SystemCritical (conservative)
+        // Unknown Custom commands are always treated as Destructive.
         let cmd = NixOSCommand::custom_auto("some-unknown-tool", vec![]);
-        assert_eq!(cmd.safety_level(), SafetyLevel::SystemCritical);
+        assert_eq!(cmd.safety_level(), SafetyLevel::Destructive);
     }
 
     #[test]
