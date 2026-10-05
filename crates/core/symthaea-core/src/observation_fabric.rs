@@ -775,6 +775,11 @@ pub const INDEPENDENCE_ASSESSMENT_V3_DOMAIN_SEPARATOR: &[u8] =
     b"symthaea:observation-independence-assessment:v3\n";
 pub const INDEPENDENCE_RECEIPT_V3_DOMAIN_SEPARATOR: &[u8] =
     b"symthaea:observation-independence-receipt:v3\n";
+pub const INDEPENDENCE_VERIFIER_VERSION_V4: &str = "observation-fabric-independence-v4";
+pub const INDEPENDENCE_ASSESSMENT_V4_DOMAIN_SEPARATOR: &[u8] =
+    b"symthaea:observation-independence-assessment:v4\n";
+pub const INDEPENDENCE_RECEIPT_V4_DOMAIN_SEPARATOR: &[u8] =
+    b"symthaea:observation-independence-receipt:v4\n";
 const INDEPENDENCE_SCOPE_V3_SOURCE_ROLE: u8 = 0b001;
 const INDEPENDENCE_SCOPE_V3_TARGET_ROLE: u8 = 0b010;
 const INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE: u8 = 0b100;
@@ -864,6 +869,38 @@ pub struct IndependenceAssessmentV3 {
     pub verifier_version: &'static str,
     pub examined_scope_fingerprint: String,
     pub assessment_fingerprint: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IndependenceAssessmentV4 {
+    pub source_observation_id: String,
+    pub target_observation_id: String,
+    pub classification: EvidenceIndependence,
+    pub basis: IndependenceBasis,
+    pub examined_observation_ids: Vec<String>,
+    pub verifier_version: &'static str,
+    pub examined_scope_fingerprint: String,
+    pub assessment_fingerprint: String,
+}
+
+impl IndependenceAssessmentV4 {
+    fn compute_fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(INDEPENDENCE_ASSESSMENT_V4_DOMAIN_SEPARATOR);
+        write_canonical_string(&mut hasher, &self.source_observation_id);
+        write_canonical_string(&mut hasher, &self.target_observation_id);
+        write_canonical_string_vec(&mut hasher, &self.examined_observation_ids);
+        write_canonical_string(&mut hasher, &self.examined_scope_fingerprint);
+        write_canonical_string(&mut hasher, self.verifier_version);
+        write_canonical_independence(&mut hasher, &self.classification);
+        write_canonical_independence_basis(&mut hasher, &self.basis);
+        hasher.finalize().to_hex().to_string()
+    }
+
+    pub fn verify_fingerprint(&self) -> bool {
+        self.verifier_version == INDEPENDENCE_VERIFIER_VERSION_V4
+            && self.assessment_fingerprint == self.compute_fingerprint()
+    }
 }
 
 impl IndependenceAssessmentV3 {
@@ -1254,6 +1291,131 @@ impl IndependenceScopeWitnessV3 {
     ///
     /// This is intentionally independent of ObservationGraph and provides a
     /// downstream verification path that consumes only the canonical v3 witness.
+    pub fn assess_independence_v4(
+        &self,
+    ) -> Result<(EvidenceIndependence, IndependenceBasis), ObservationValidationError> {
+        if !self.is_well_formed() {
+            return Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3);
+        }
+
+        let by_id = self
+            .records
+            .iter()
+            .map(|record| (record.observation_id.as_str(), record))
+            .collect::<HashMap<_, _>>();
+        let (source_id, target_id) = self
+            .endpoint_ids()
+            .ok_or(ObservationValidationError::InvalidIndependenceScopeWitnessV3)?;
+        let source = by_id
+            .get(source_id)
+            .expect("well-formed source endpoint");
+        let target = by_id
+            .get(target_id)
+            .expect("well-formed target endpoint");
+
+        if source.coverage != Some(ProvenanceCoverage::Complete)
+            || target.coverage != Some(ProvenanceCoverage::Complete)
+        {
+            let coverage = source
+                .coverage
+                .filter(|coverage| *coverage != ProvenanceCoverage::Complete)
+                .or_else(|| target.coverage.filter(|coverage| *coverage != ProvenanceCoverage::Complete))
+                .expect("at least one endpoint is incomplete");
+            return Ok((
+                EvidenceIndependence::Unknown,
+                IndependenceBasis::InsufficientProvenance { coverage },
+            ));
+        }
+
+        if source.sensor_id == target.sensor_id {
+            return Ok((
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedSensor {
+                    sensor_id: source.sensor_id.clone().expect("well-formed source"),
+                },
+            ));
+        }
+
+        if let (Some(source_platform), Some(target_platform)) =
+            (source.platform_id.as_ref(), target.platform_id.as_ref())
+            && source_platform == target_platform
+        {
+            return Ok((
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedPlatform {
+                    platform_id: source_platform.clone(),
+                },
+            ));
+        }
+
+        let source_ancestors = self.ancestor_ids_from(source_id);
+        let target_ancestors = self.ancestor_ids_from(target_id);
+        if source_ancestors.contains(target_id) {
+            return Ok((
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedAncestor {
+                    observation_id: target_id.to_string(),
+                },
+            ));
+        }
+        if target_ancestors.contains(source_id) {
+            return Ok((
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedAncestor {
+                    observation_id: source_id.to_string(),
+                },
+            ));
+        }
+        if let Some(shared_ancestor) = source_ancestors.intersection(&target_ancestors).min() {
+            return Ok((
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedAncestor {
+                    observation_id: shared_ancestor.clone(),
+                },
+            ));
+        }
+
+        let source_activities = source_ancestors
+            .iter()
+            .filter_map(|id| by_id.get(id.as_str()))
+            .chain(std::iter::once(source))
+            .filter_map(|record| record.processing_activity_id.as_deref())
+            .collect::<HashSet<_>>();
+        let target_activities = target_ancestors
+            .iter()
+            .filter_map(|id| by_id.get(id.as_str()))
+            .chain(std::iter::once(target))
+            .filter_map(|record| record.processing_activity_id.as_deref())
+            .collect::<HashSet<_>>();
+        if let Some(shared_activity) = source_activities.intersection(&target_activities).min() {
+            return Ok((
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedProcessingActivity {
+                    activity_id: (*shared_activity).to_string(),
+                },
+            ));
+        }
+
+        if let (Some(source_asset), Some(target_asset)) =
+            (source.asset_identity.as_ref(), target.asset_identity.as_ref())
+            && source_asset.hash_algorithm == target_asset.hash_algorithm
+            && source_asset.content_hash == target_asset.content_hash
+        {
+            return Ok((
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::IdenticalAsset {
+                    hash_algorithm: source_asset.hash_algorithm.clone(),
+                    content_hash: source_asset.content_hash.clone(),
+                },
+            ));
+        }
+
+        Ok((
+            EvidenceIndependence::VerifiedIndependent,
+            IndependenceBasis::NoSharedProvenance,
+        ))
+    }
+
     pub fn assess_independence(
         &self,
     ) -> Result<(EvidenceIndependence, IndependenceBasis), ObservationValidationError> {
@@ -1421,6 +1583,196 @@ impl IndependenceScopeWitnessV3 {
 
     pub fn fingerprint(&self) -> Result<String, ObservationValidationError> {
         Ok(blake3::hash(&self.canonical_bytes()?).to_hex().to_string())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IndependenceVerificationReceiptV4 {
+    pub source_observation_id: String,
+    pub target_observation_id: String,
+    pub classification: EvidenceIndependence,
+    pub basis: IndependenceBasis,
+    pub examined_observation_ids: Vec<String>,
+    pub verifier_version: &'static str,
+    pub examined_scope_fingerprint: String,
+    pub assessment_fingerprint: String,
+}
+
+impl IndependenceVerificationReceiptV4 {
+    pub const DOMAIN_SEPARATOR: &'static [u8] = INDEPENDENCE_RECEIPT_V4_DOMAIN_SEPARATOR;
+
+    pub fn from_assessment(assessment: &IndependenceAssessmentV4) -> Self {
+        Self {
+            source_observation_id: assessment.source_observation_id.clone(),
+            target_observation_id: assessment.target_observation_id.clone(),
+            classification: assessment.classification.clone(),
+            basis: assessment.basis.clone(),
+            examined_observation_ids: assessment.examined_observation_ids.clone(),
+            verifier_version: assessment.verifier_version,
+            examined_scope_fingerprint: assessment.examined_scope_fingerprint.clone(),
+            assessment_fingerprint: assessment.assessment_fingerprint.clone(),
+        }
+    }
+
+    pub fn is_well_formed(&self) -> bool {
+        if self.verifier_version != INDEPENDENCE_VERIFIER_VERSION_V4
+            || self.source_observation_id.trim().is_empty()
+            || self.target_observation_id.trim().is_empty()
+            || self.source_observation_id == self.target_observation_id
+            || !is_canonical_hex_fingerprint(&self.examined_scope_fingerprint)
+            || !is_canonical_hex_fingerprint(&self.assessment_fingerprint)
+        {
+            return false;
+        }
+
+        if self.examined_observation_ids.len() < 2
+            || self.examined_observation_ids.windows(2).any(|pair| pair[0] >= pair[1])
+            || self
+                .examined_observation_ids
+                .iter()
+                .any(|id| id.trim().is_empty())
+            || !self
+                .examined_observation_ids
+                .iter()
+                .any(|id| id == &self.source_observation_id)
+            || !self
+                .examined_observation_ids
+                .iter()
+                .any(|id| id == &self.target_observation_id)
+        {
+            return false;
+        }
+
+        matches!(
+            (&self.classification, &self.basis),
+            (
+                EvidenceIndependence::VerifiedIndependent,
+                IndependenceBasis::NoSharedProvenance,
+            )
+            | (
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedSensor { .. },
+            )
+            | (
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedPlatform { .. },
+            )
+            | (
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedAncestor { .. },
+            )
+            | (
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedProcessingActivity { .. },
+            )
+            | (
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::IdenticalAsset { .. },
+            )
+            | (
+                EvidenceIndependence::Unknown,
+                IndependenceBasis::InsufficientProvenance { .. },
+            )
+        )
+    }
+
+    fn compute_assessment_fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(INDEPENDENCE_ASSESSMENT_V4_DOMAIN_SEPARATOR);
+        write_canonical_string(&mut hasher, &self.source_observation_id);
+        write_canonical_string(&mut hasher, &self.target_observation_id);
+        write_canonical_string_vec(&mut hasher, &self.examined_observation_ids);
+        write_canonical_string(&mut hasher, &self.examined_scope_fingerprint);
+        write_canonical_string(&mut hasher, self.verifier_version);
+        write_canonical_independence(&mut hasher, &self.classification);
+        write_canonical_independence_basis(&mut hasher, &self.basis);
+        hasher.finalize().to_hex().to_string()
+    }
+
+    pub fn verify_integrity(&self) -> bool {
+        self.is_well_formed()
+            && self.assessment_fingerprint == self.compute_assessment_fingerprint()
+    }
+
+    pub fn verify_against_scope_witness(&self, canonical_scope_bytes: &[u8]) -> bool {
+        if !self.verify_integrity() {
+            return false;
+        }
+        let Ok(witness) =
+            IndependenceScopeWitnessV3::from_canonical_bytes(canonical_scope_bytes)
+        else {
+            return false;
+        };
+        let Ok((classification, basis)) = witness.assess_independence_v4() else {
+            return false;
+        };
+        let Some((source_id, target_id)) = witness.endpoint_ids() else {
+            return false;
+        };
+
+        source_id == self.source_observation_id
+            && target_id == self.target_observation_id
+            && classification == self.classification
+            && basis == self.basis
+            && blake3::hash(canonical_scope_bytes).to_hex().to_string()
+                == self.examined_scope_fingerprint
+            && witness.fingerprint().ok() == Some(self.examined_scope_fingerprint.clone())
+            && witness.observation_ids() == self.examined_observation_ids
+    }
+
+    pub fn verify_against_graph_detailed(
+        &self,
+        graph: &ObservationGraph,
+    ) -> Result<ReceiptVerificationOutcome, ObservationValidationError> {
+        if self.verifier_version != INDEPENDENCE_VERIFIER_VERSION_V4 {
+            return Ok(ReceiptVerificationOutcome::UnsupportedVerifierVersion);
+        }
+        if !self.verify_integrity() {
+            return Ok(ReceiptVerificationOutcome::InvalidReceiptIntegrity);
+        }
+
+        let assessment = graph.assess_independence_detailed_v4(
+            &self.source_observation_id,
+            &self.target_observation_id,
+        )?;
+        let matches = assessment.classification == self.classification
+            && assessment.basis == self.basis
+            && assessment.examined_observation_ids == self.examined_observation_ids
+            && assessment.examined_scope_fingerprint == self.examined_scope_fingerprint
+            && assessment.verifier_version == self.verifier_version
+            && assessment.assessment_fingerprint == self.assessment_fingerprint;
+
+        Ok(if matches {
+            ReceiptVerificationOutcome::VerifiedAgainstGraph
+        } else {
+            ReceiptVerificationOutcome::GraphMismatch
+        })
+    }
+
+    pub fn verify_against_graph(
+        &self,
+        graph: &ObservationGraph,
+    ) -> Result<bool, ObservationValidationError> {
+        Ok(self.verify_against_graph_detailed(graph)?
+            == ReceiptVerificationOutcome::VerifiedAgainstGraph)
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(Self::DOMAIN_SEPARATOR);
+        write_canonical_string_bytes(&mut bytes, &self.source_observation_id);
+        write_canonical_string_bytes(&mut bytes, &self.target_observation_id);
+        write_canonical_independence_bytes(&mut bytes, &self.classification);
+        write_canonical_independence_basis_bytes(&mut bytes, &self.basis);
+        write_canonical_string_vec_bytes(&mut bytes, &self.examined_observation_ids);
+        write_canonical_string_bytes(&mut bytes, self.verifier_version);
+        write_canonical_string_bytes(&mut bytes, &self.examined_scope_fingerprint);
+        write_canonical_string_bytes(&mut bytes, &self.assessment_fingerprint);
+        bytes
+    }
+
+    pub fn fingerprint(&self) -> String {
+        blake3::hash(&self.canonical_bytes()).to_hex().to_string()
     }
 }
 
@@ -2188,6 +2540,42 @@ impl ObservationGraph {
         })
     }
 
+    fn classify_independence_v4(
+        source_observation_id: &str,
+        target_observation_id: &str,
+        source: &Observation,
+        target: &Observation,
+        by_id: &HashMap<&str, &Observation>,
+    ) -> Result<(EvidenceIndependence, IndependenceBasis), ObservationValidationError> {
+        let source_ancestors = Self::ancestor_ids(source_observation_id, by_id)?;
+        let target_ancestors = Self::ancestor_ids(target_observation_id, by_id)?;
+
+        if source_ancestors.contains(target_observation_id) {
+            return Ok((
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedAncestor {
+                    observation_id: target_observation_id.to_string(),
+                },
+            ));
+        }
+        if target_ancestors.contains(source_observation_id) {
+            return Ok((
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedAncestor {
+                    observation_id: source_observation_id.to_string(),
+                },
+            ));
+        }
+
+        Self::classify_independence(
+            source_observation_id,
+            target_observation_id,
+            source,
+            target,
+            by_id,
+        )
+    }
+
     fn classify_independence(
         source_observation_id: &str,
         target_observation_id: &str,
@@ -2356,6 +2744,74 @@ impl ObservationGraph {
             basis,
             examined_observation_ids,
             verifier_version: INDEPENDENCE_VERIFIER_VERSION_V3,
+            examined_scope_fingerprint,
+            assessment_fingerprint: hasher.finalize().to_hex().to_string(),
+        })
+    }
+
+    /// Assess provenance independence under the versioned v4 contract.
+    ///
+    /// v4 keeps the existing v3 scope witness representation but corrects one
+    /// semantic hole: when either endpoint is itself an ancestor of the other,
+    /// the pair is classified as shared provenance.
+    pub fn assess_independence_detailed_v4(
+        &self,
+        source_observation_id: &str,
+        target_observation_id: &str,
+    ) -> Result<IndependenceAssessmentV4, ObservationValidationError> {
+        self.validate()?;
+        if source_observation_id == target_observation_id {
+            return Err(ObservationValidationError::SelfRelation);
+        }
+
+        let by_id = self
+            .observations
+            .iter()
+            .map(|observation| (observation.id.as_str(), observation))
+            .collect::<HashMap<_, _>>();
+
+        let source = by_id.get(source_observation_id).ok_or_else(|| {
+            ObservationValidationError::MissingRelationEndpoint(source_observation_id.to_string())
+        })?;
+        let target = by_id.get(target_observation_id).ok_or_else(|| {
+            ObservationValidationError::MissingRelationEndpoint(target_observation_id.to_string())
+        })?;
+
+        let examined_observation_ids =
+            self.independence_verification_reachable_scope_observation_ids(
+                source_observation_id,
+                target_observation_id,
+            )?;
+        let examined_scope_fingerprint =
+            self.independence_verification_reachable_scope_fingerprint_v3(
+                source_observation_id,
+                target_observation_id,
+            )?;
+        let (classification, basis) = Self::classify_independence_v4(
+            source_observation_id,
+            target_observation_id,
+            source,
+            target,
+            &by_id,
+        )?;
+
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(INDEPENDENCE_ASSESSMENT_V4_DOMAIN_SEPARATOR);
+        write_canonical_string(&mut hasher, source_observation_id);
+        write_canonical_string(&mut hasher, target_observation_id);
+        write_canonical_string_vec(&mut hasher, &examined_observation_ids);
+        write_canonical_string(&mut hasher, &examined_scope_fingerprint);
+        write_canonical_string(&mut hasher, INDEPENDENCE_VERIFIER_VERSION_V4);
+        write_canonical_independence(&mut hasher, &classification);
+        write_canonical_independence_basis(&mut hasher, &basis);
+
+        Ok(IndependenceAssessmentV4 {
+            source_observation_id: source_observation_id.to_string(),
+            target_observation_id: target_observation_id.to_string(),
+            classification,
+            basis,
+            examined_observation_ids,
+            verifier_version: INDEPENDENCE_VERIFIER_VERSION_V4,
             examined_scope_fingerprint,
             assessment_fingerprint: hasher.finalize().to_hex().to_string(),
         })
