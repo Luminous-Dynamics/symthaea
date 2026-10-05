@@ -123,11 +123,12 @@ representation, or conformal artifact is outside this contract. Conformal artifa
 parsing validates structural state, but score-set verification must additionally
 recompute the threshold from the separately retained calibration scores and alpha.
 
-The repository now provides a machine-readable `HdcOntologyConformalEvidenceArtifact` binding around the isolated conformal primitive. It records the model hash, distinct calibration and evaluation split-manifest hashes, the declared coverage target, exchangeability-assumption statement, exact execution revision, and evidence-bundle identity. The execution revision is fail-closed to a canonical 40- or 64-hex Git object ID, so placeholders such as `local` or arbitrary prose cannot satisfy the provenance field. This binding is provenance infrastructure only: selecting `LabelConditional` as a declared target does not create a label-conditional theorem, and distinct split hashes do not by themselves prove that the underlying populations are exchangeable or disjoint.
+The repository now provides a versioned machine-readable `HdcOntologyConformalEvidenceArtifact` binding around the isolated conformal primitive. It records the model hash, an exact inference-configuration hash, distinct calibration and evaluation split-manifest hashes, the declared coverage target, exchangeability-assumption statement, exact execution revision, and evidence-bundle identity. The inference-configuration hash is required because changing preprocessing, decoder settings, or other runtime configuration can alter the calibration/test score distribution even when the model artifact is unchanged. The execution revision is fail-closed to a canonical 40- or 64-hex Git object ID, so placeholders such as `local` or arbitrary prose cannot satisfy the provenance field. This binding is provenance infrastructure only: selecting `LabelConditional` as a declared target does not create a label-conditional theorem, and distinct split hashes do not by themselves prove that the underlying populations are exchangeable or disjoint.
 
 A conformal N1 artifact should bind at minimum:
 
 - exact codebook/model hash;
+- exact inference-configuration hash;
 - exact calibration and evaluation split-manifest hashes;
 - the named nonconformity score definition and revision;
 - the exact calibration-score hash;
@@ -144,6 +145,9 @@ not provide the intended statistical guarantee.
 
 The preregistration must also declare the coverage target explicitly: marginal
 coverage, label-conditional coverage, or another precisely defined criterion.
+The declared inference configuration must remain fixed across calibration and
+evaluation unless a preregistered configuration-shift analysis explicitly
+models the change and re-establishes the intended statistical validity.
 Marginal finite-sample validity must not be reported as subgroup-, participant-,
 or feature-conditional validity. Conditional coverage can fail for specific
 subpopulations even when marginal coverage is satisfactory, so any stronger
