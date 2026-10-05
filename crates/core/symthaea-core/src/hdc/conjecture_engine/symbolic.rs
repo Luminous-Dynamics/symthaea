@@ -194,32 +194,55 @@ impl fmt::Display for SymExpr {
     }
 }
 
+/// Evidence produced by differentiating a candidate conservation law against
+/// symbolic dynamics and then evaluating the resulting derivative at six fixed
+/// numeric points.
+///
+/// This is deliberately an *assessment*, not a proof: finite-point sampling
+/// cannot establish a universal conservation law. Formal proof status belongs
+/// to a separate proof backend (for example, the Z3 path for supported
+/// polynomial statements).
 #[derive(Debug)]
-pub struct ConservationProof {
+pub struct ConservationCheck {
     pub quantity: String,
     pub total_derivative: String,
-    pub is_conserved: bool,
+    /// True only when the current simplifier reduces the full derivative to a
+    /// constant numerical zero. This is structural evidence about the current
+    /// simplifier, not a universal proof.
+    pub symbolic_derivative_simplified_to_zero: bool,
+    /// True when the derived symbolic derivative has absolute residual below
+    /// 1e-10 at all six fixed numeric test points.
+    pub sampled_residual_passed: bool,
     pub max_numerical_residual: f64,
 }
 
-impl fmt::Display for ConservationProof {
+impl fmt::Display for ConservationCheck {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Conservation test for {}:", self.quantity)?;
+        writeln!(f, "Conservation assessment for {}:", self.quantity)?;
         writeln!(f, "  dE/dt = {}", self.total_derivative)?;
         writeln!(
             f,
-            "  Conserved: {} (numerical residual: {:.2e})",
-            if self.is_conserved { "YES" } else { "NO" },
+            "  Simplified to zero: {}",
+            if self.symbolic_derivative_simplified_to_zero { "YES" } else { "NO" }
+        )?;
+        writeln!(
+            f,
+            "  Six-point residual check: {} (max residual: {:.2e})",
+            if self.sampled_residual_passed { "PASS" } else { "FAIL" },
             self.max_numerical_residual
         )?;
         Ok(())
     }
 }
 
-pub fn verify_conservation_symbolic(
+/// Differentiate a candidate conservation law against the supplied symbolic
+/// dynamics and assess the result using both the local simplifier and six
+/// fixed numeric sample points. The sample points are evidence only; they do
+/// not establish a universal identity.
+pub fn assess_conservation_symbolic(
     energy: &SymExpr,
     dynamics: &[(&str, SymExpr)],
-) -> ConservationProof {
+) -> ConservationCheck {
     let mut total_deriv = SymExpr::Const(0.0);
     for (var, dvar_dt) in dynamics {
         let partial = energy.diff(var).simplify();
@@ -227,6 +250,8 @@ pub fn verify_conservation_symbolic(
         total_deriv = SymExpr::Add(Box::new(total_deriv), Box::new(term));
     }
     let total_deriv = total_deriv.simplify();
+    let symbolic_derivative_simplified_to_zero =
+        matches!(total_deriv, SymExpr::Const(c) if c.abs() < 1e-15);
     let test_points: Vec<Vec<(&str, f64)>> = vec![
         vec![("x", 1.0), ("v", 0.0)],
         vec![("x", 0.0), ("v", 1.0)],
@@ -243,13 +268,31 @@ pub fn verify_conservation_symbolic(
         .map(|pt| total_deriv.eval(pt).abs())
         .fold(0.0f64, f64::max);
 
-    ConservationProof {
+    ConservationCheck {
         quantity: format!("{}", energy),
         total_derivative: format!("{}", total_deriv),
-        is_conserved: max_residual < 1e-10,
+        symbolic_derivative_simplified_to_zero,
+        sampled_residual_passed: max_residual < 1e-10,
         max_numerical_residual: max_residual,
     }
 }
+
+/// Backward-compatible name for assess_conservation_symbolic.
+///
+/// Deprecated because the former name implied a proof while the implementation
+/// provides finite-point numerical evidence plus a local symbolic simplifier.
+#[deprecated(note = "use assess_conservation_symbolic; this check is evidence, not a proof")]
+pub fn verify_conservation_symbolic(
+    energy: &SymExpr,
+    dynamics: &[(&str, SymExpr)],
+) -> ConservationCheck {
+    assess_conservation_symbolic(energy, dynamics)
+}
+
+/// Backward-compatible type name for callers that referred to the former
+/// proof-shaped result. The fields now expose assessment evidence explicitly.
+#[deprecated(note = "use ConservationCheck; the result is evidence, not a proof")]
+pub type ConservationProof = ConservationCheck;
 
 pub fn expr_to_sym(expr: &Expr) -> Option<SymExpr> {
     match expr {
@@ -335,4 +378,38 @@ pub struct DerivativeVerification {
     pub derivative_str: String,
     pub max_relative_error: f64,
     pub is_consistent: bool,
+}
+
+#[cfg(test)]
+mod conservation_evidence_tests {
+    use super::*;
+
+    fn harmonic_dynamics() -> Vec<(&'static str, SymExpr)> {
+        vec![
+            ("x", SymExpr::Var("v".into())),
+            ("v", SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
+        ]
+    }
+
+    #[test]
+    fn assessment_does_not_report_sampling_as_symbolic_proof() {
+        let energy = SymExpr::Add(
+            Box::new(SymExpr::Pow(Box::new(SymExpr::Var("x".into())), 2.0)),
+            Box::new(SymExpr::Pow(Box::new(SymExpr::Var("v".into())), 2.0)),
+        );
+        let check = assess_conservation_symbolic(&energy, &harmonic_dynamics());
+
+        assert!(check.sampled_residual_passed);
+        assert!(!check.symbolic_derivative_simplified_to_zero);
+        assert!(check.max_numerical_residual < 1e-10);
+    }
+
+    #[test]
+    fn non_conserved_candidate_fails_sampled_residual_check() {
+        let energy = SymExpr::Var("x".into());
+        let check = assess_conservation_symbolic(&energy, &harmonic_dynamics());
+
+        assert!(!check.sampled_residual_passed);
+        assert!(check.max_numerical_residual > 0.0);
+    }
 }
