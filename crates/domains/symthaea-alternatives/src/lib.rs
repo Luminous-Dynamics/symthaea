@@ -20,6 +20,9 @@ use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Reusable adversarial benchmark scenarios.
+pub mod corpus;
+
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 1;
 /// Assessment algorithm version.
