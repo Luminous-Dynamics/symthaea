@@ -266,76 +266,11 @@ where
     Ok(Some((selected, receipt)))
 }
 
-pub fn select_most_discriminative_experiment_with_receipt<'a, H, E, P, D>(
-    candidates: &'a [E],
-    hypotheses: &[H],
-    predict: P,
-    hypothesis_handoff_digest: impl Into<String>,
-    hypothesis_set_digest: impl Into<String>,
-    challenge_space_digest: impl Into<String>,
-    selector_revision: impl Into<String>,
-    selection_seed: u64,
-    challenge_digest: D,
-) -> Result<Option<(&'a E, ScientificInquirySelectionReceipt)>, String>
-where
-    P: Fn(&H, &E) -> Option<f64> + Copy,
-    D: Fn(&E) -> String,
-{
-    let Some((selected, predicted, prediction_count)) =
-        select_most_discriminative_experiment(candidates, hypotheses, predict)
-    else {
-        return Ok(None);
-    };
-
-    let receipt = ScientificInquirySelectionReceipt::new(
-        hypothesis_handoff_digest,
-        hypothesis_set_digest,
-        challenge_space_digest,
-        challenge_digest(selected),
-        selector_revision,
-        selection_seed,
-        prediction_frame_digest,
-        predicted,
-        prediction_count,
-        prediction_count,
-    )?;
-    Ok(Some((selected, receipt)))
-}
-
-/// Backward-compatible receipt-selection name.
-pub fn select_most_informative_experiment_with_receipt<'a, H, E, P, D>(
-    candidates: &'a [E],
-    hypotheses: &[H],
-    predict: P,
-    hypothesis_handoff_digest: impl Into<String>,
-    hypothesis_set_digest: impl Into<String>,
-    challenge_space_digest: impl Into<String>,
-    selector_revision: impl Into<String>,
-    selection_seed: u64,
-    challenge_digest: D,
-) -> Result<Option<(&'a E, ScientificInquirySelectionReceipt)>, String>
-where
-    P: Fn(&H, &E) -> Option<f64> + Copy,
-    D: Fn(&E) -> String,
-{
-    select_most_discriminative_experiment_with_receipt(
-        candidates,
-        hypotheses,
-        predict,
-        hypothesis_handoff_digest,
-        hypothesis_set_digest,
-        challenge_space_digest,
-        selector_revision,
-        selection_seed,
-        challenge_digest,
-    )
-}
 
 
 #[cfg(test)]
 mod tests {
     use super::*;
-use symthaea_types::ScientificInquirySelectionReceipt;
     use crate::hdc::conjecture_engine::Expr;
 
     #[test]
@@ -404,32 +339,105 @@ use symthaea_types::ScientificInquirySelectionReceipt;
     }
 
     #[test]
-    fn selection_receipt_binds_the_chosen_experiment() {
+    fn typed_selector_normalizes_prediction_units_before_scoring() {
+        let frame = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Energy,
+            symthaea_types::PhysicalDimension::ENERGY,
+        )
+        .with_unit(symthaea_types::UnitRef {
+            symbol: "J".into(),
+            transform_to_si: symthaea_types::UnitTransform::IDENTITY,
+            semantic_id: None,
+        });
+        let kilojoule = frame.clone().with_unit(symthaea_types::UnitRef {
+            symbol: "kJ".into(),
+            transform_to_si: symthaea_types::UnitTransform::new(
+                symthaea_types::RationalScale { numerator: 1000, denominator: 1 },
+                symthaea_types::RationalScale { numerator: 0, denominator: 1 },
+            ),
+            semantic_id: None,
+        });
+
         let hypotheses = [0u8, 1u8];
-        let candidates = [1.0f64, 3.0f64];
-        let predict = |h: &u8, x: &f64| Some(if *h == 0 { *x } else { *x * 2.0 });
-        let (chosen, receipt) = select_most_informative_experiment_with_receipt(
-            &candidates,
-            &hypotheses,
-            predict,
+        let candidates = [0u8, 1u8];
+        let predict = |h: &u8, candidate: &u8| {
+            match (*h, *candidate) {
+                (0, 0) => Some((1000.0, frame.clone())),
+                (1, 0) => Some((1.0, kilojoule.clone())),
+                (0, 1) => Some((1000.0, frame.clone())),
+                (1, 1) => Some((2.0, kilojoule.clone())),
+                _ => None,
+            }
+        };
+
+        let (chosen, score, count) =
+            select_most_discriminative_experiment_typed(
+                &candidates, &hypotheses, &frame, predict
+            )
+            .unwrap()
+            .expect("complete physical predictions");
+
+        assert_eq!(*chosen, 1);
+        assert!(score > 0.0);
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn typed_selector_rejects_semantically_incompatible_prediction() {
+        let frame = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Energy,
+            symthaea_types::PhysicalDimension::ENERGY,
+        );
+        let torque = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Torque,
+            symthaea_types::PhysicalDimension::ENERGY,
+        );
+        let hypotheses = [0u8, 1u8];
+        let candidates = [0u8];
+        let predict = |h: &u8, _candidate: &u8| {
+            if *h == 0 {
+                Some((1.0, frame.clone()))
+            } else {
+                Some((1.0, torque.clone()))
+            }
+        };
+
+        assert!(
+            select_most_discriminative_experiment_typed(
+                &candidates, &hypotheses, &frame, predict
+            )
+            .unwrap()
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn typed_receipt_binds_prediction_frame_and_full_coverage() {
+        let frame = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Length,
+            symthaea_types::PhysicalDimension::LENGTH,
+        );
+        let hypotheses = [0u8, 1u8];
+        let candidates = [1u8];
+        let predict = |_h: &u8, _candidate: &u8| Some((1.0, frame.clone()));
+
+        let (_, receipt) = select_most_discriminative_experiment_with_typed_receipt(
+            &candidates, &hypotheses, &frame, predict,
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            "selector-v1",
-            17,
-            |x| format!("experiment:{x:.1}"),
+            "selector-v3", 17,
+            |candidate| format!("experiment:{candidate}"),
         )
         .unwrap()
-        .expect("candidate pool is non-empty");
+        .expect("typed candidate should be eligible");
 
-        assert_eq!(*chosen, 3.0);
+        assert_eq!(receipt.prediction_count, 2);
+        assert_eq!(receipt.hypothesis_count, 2);
+        assert_eq!(receipt.prediction_frame_digest, frame.digest_hex());
         assert!(receipt.validate().is_ok());
-        assert_eq!(
-            receipt.selected_challenge_digest,
-            "experiment:3.0"
-        );
-        assert!(receipt.predicted_disagreement_score() > 0.0);
     }
+
 
     #[test]
     fn strict_selector_rejects_single_prediction_candidates() {
