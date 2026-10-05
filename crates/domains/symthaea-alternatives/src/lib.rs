@@ -1922,6 +1922,7 @@ impl AlternativesEngine {
                                 .linked_evidence_at(
                                     &estimate.evidence_ids,
                                     assessed_at_epoch_seconds,
+                                    freshness_policy,
                                 )
                                 .next()
                                 .is_none() =>
@@ -2195,6 +2196,7 @@ mod tests {
             scope: "synthetic functional unit".into(),
             unit: Some("unit".into()),
             as_of: Some("fixture-v1".into()),
+            observed_at_epoch_seconds: Some(1_000),
             valid_from_epoch_seconds: None,
             valid_until_epoch_seconds: None,
             derivation: matches!(kind, EvidenceKind::Simulated | EvidenceKind::Derived).then(
