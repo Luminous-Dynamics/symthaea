@@ -61,7 +61,9 @@ The resolution also binds the exact public verification-material identity so a d
 
 ### Cryptographic profile
 
-The `eddsa-jcs-2022` path is intentionally a single-suite profile. It requires `DataIntegrityProof`, `eddsa-jcs-2022`, `verificationMethod`, `proofPurpose`, base58-btc `proofValue`, and an Ed25519 `Multikey` carrying the `0xed01` multicodec header. Its cryptographic input is exactly `SHA-256(proofConfig) || SHA-256(transformedDocument)`, followed by pure Ed25519 verification. The typed receipt records the canonical-document digest, proof-configuration digest, the digest of that 64-byte cryptographic input, the full proof identity, and the detached proof value.
+The `eddsa-jcs-2022` path is intentionally a single-suite profile. It requires `DataIntegrityProof`, `eddsa-jcs-2022`, `verificationMethod`, `proofPurpose`, base58-btc `proofValue`, and an Ed25519 `Multikey` carrying the `0xed01` multicodec header. The resolver also recognizes the normative CID public Multikey headers and rejects private-key encodings as public material. Its cryptographic input is exactly `SHA-256(proofConfig) || SHA-256(transformedDocument)`, followed by pure Ed25519 verification. The typed receipt records the canonical-document digest, proof-configuration digest, the digest of that 64-byte cryptographic input, the full proof identity, and the detached proof value.
+
+The wire entry point additionally enforces I-JSON member-name uniqueness before canonicalization, rejecting duplicate object properties and trailing JSON data. This prevents a parser-dependent representation from reaching the cryptographic step.
 
 The implementation deliberately does not claim conformance to the complete W3C Verifiable Credential Data Integrity processing model. It implements the specified `eddsa-jcs-2022` cryptographic core and keeps the controller-document/admission/replay boundaries explicit.
 
