@@ -23,7 +23,8 @@ pub mod threshold_overrides;
 pub use threshold_overrides::{THRESHOLD_OVERRIDES_PATH_ENV, ThresholdOverrideValues};
 pub use discovery_handoff::{
     InquirySelectionScope, ScientificHypothesisHandoff, ScientificHypothesisRevisionReceipt,
-    ScientificInquirySelectionReceipt, scientific_hypothesis_set_digest, HYPOTHESIS_HANDOFF_SCHEMA,
+    ScientificInquiryExecutionReceipt, ScientificInquirySelectionReceipt,
+    scientific_hypothesis_set_digest, HYPOTHESIS_HANDOFF_SCHEMA,
 };
 pub use physical_type::{ModelMaturity, PhysicalDimension, PhysicalType, PhysicalTypeError, QuantityKind, RationalScale, Refinement, ScalarDomain, TypeJudgement, UnitRef, UnitScale, UnitTransform};
 
