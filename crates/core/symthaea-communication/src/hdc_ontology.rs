@@ -591,6 +591,7 @@ impl HdcOntologyConformalEvidenceArtifact {
             && !self.exchangeability_assumptions.trim().is_empty()
             && self.exchangeability_assumptions.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && !self.execution_revision.trim().is_empty()
+            && self.execution_revision != "local"
             && self.execution_revision.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && !self.evidence_bundle_id.trim().is_empty()
             && self.evidence_bundle_id.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
@@ -2108,6 +2109,10 @@ mod tests {
         overlapping.evaluation_split_manifest_hash =
             overlapping.calibration_split_manifest_hash.clone();
         assert!(!overlapping.validates());
+
+        let mut local_execution = artifact.clone();
+        local_execution.execution_revision = "local".into();
+        assert!(!local_execution.validates());
 
         let mut forged_threshold = artifact.clone();
         forged_threshold.calibration.threshold = 0.10;
