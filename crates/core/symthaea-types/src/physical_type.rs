@@ -36,7 +36,10 @@ impl PhysicalDimension {
     pub const MOMENTUM: Self = Self { mass: 1, length: 1, time: -1, ..Self::DIMENSIONLESS };
     pub const FORCE: Self = Self { mass: 1, length: 1, time: -2, ..Self::DIMENSIONLESS };
     pub const ENERGY: Self = Self { mass: 1, length: 2, time: -2, ..Self::DIMENSIONLESS };
+    pub const POWER: Self = Self { mass: 1, length: 2, time: -3, ..Self::DIMENSIONLESS };
     pub const PRESSURE: Self = Self { mass: 1, length: -1, time: -2, ..Self::DIMENSIONLESS };
+    pub const FREQUENCY: Self = Self { time: -1, ..Self::DIMENSIONLESS };
+    pub const TEMPERATURE: Self = Self { temperature: 1, ..Self::DIMENSIONLESS };
     pub const CHARGE: Self = Self { time: 1, current: 1, ..Self::DIMENSIONLESS };
 
     pub const fn from_array(e: [i8; 7]) -> Self {
@@ -96,8 +99,7 @@ impl PhysicalDimension {
     }
 }
 
-/// Exact rational scale to SI base units. Affine offsets are deliberately not
-/// modeled yet; absolute-vs-delta temperature semantics remain an adapter concern.
+/// Exact rational coefficient used by UnitTransform for scale or affine offset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct RationalScale {
     pub numerator: i64,
@@ -113,6 +115,10 @@ impl RationalScale {
         } else {
             Some(Self { numerator, denominator })
         }
+    }
+
+    pub const fn is_valid(self) -> bool {
+        self.denominator > 0
     }
 }
 
@@ -132,6 +138,22 @@ impl UnitTransform {
 
     pub const fn new(scale: RationalScale, offset: RationalScale) -> Self {
         Self { scale, offset }
+    }
+
+    pub fn validate(self) -> Result<(), PhysicalTypeError> {
+        if !self.scale.is_valid() || self.scale.numerator == 0 {
+            return Err(PhysicalTypeError {
+                operation: "unit_transform".into(),
+                reason: "unit scale must have a positive denominator and non-zero numerator".into(),
+            });
+        }
+        if !self.offset.is_valid() {
+            return Err(PhysicalTypeError {
+                operation: "unit_transform".into(),
+                reason: "unit offset denominator must be positive".into(),
+            });
+        }
+        Ok(())
     }
 }
 
@@ -156,6 +178,16 @@ impl SemanticIdentifier {
             Some(Self { namespace, identifier })
         }
     }
+
+    fn validate(&self) -> Result<(), PhysicalTypeError> {
+        if self.namespace.trim().is_empty() || self.identifier.trim().is_empty() {
+            return Err(PhysicalTypeError {
+                operation: "semantic_identifier".into(),
+                reason: "semantic identifier namespace and identifier must be non-empty".into(),
+            });
+        }
+        Ok(())
+    }
 }
 
 /// Named unit identity plus exact conversion to canonical SI semantics.
@@ -165,6 +197,22 @@ pub struct UnitRef {
     pub transform_to_si: UnitTransform,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub semantic_id: Option<SemanticIdentifier>,
+}
+
+impl UnitRef {
+    pub fn validate(&self) -> Result<(), PhysicalTypeError> {
+        if self.symbol.trim().is_empty() {
+            return Err(PhysicalTypeError {
+                operation: "unit".into(),
+                reason: "unit symbol cannot be empty".into(),
+            });
+        }
+        self.transform_to_si.validate()?;
+        if let Some(semantic_id) = &self.semantic_id {
+            semantic_id.validate()?;
+        }
+        Ok(())
+    }
 }
 
 /// Physical quantity meaning, distinct from evidence about that meaning.
@@ -266,7 +314,46 @@ impl PhysicalType {
         TypeJudgement::Valid(Self::with_kind(kind, dimension))
     }
 
+    pub fn validate(&self) -> Result<(), PhysicalTypeError> {
+        if let Some(expected) = self.kind.expected_dimension() {
+            match self.dimension {
+                Some(actual) if actual == expected => {}
+                Some(_) => {
+                    return Err(PhysicalTypeError {
+                        operation: "physical_type".into(),
+                        reason: format!(
+                            "quantity kind {:?} has an incompatible physical dimension",
+                            self.kind
+                        ),
+                    });
+                }
+                None => {
+                    return Err(PhysicalTypeError {
+                        operation: "physical_type".into(),
+                        reason: format!(
+                            "quantity kind {:?} requires a known physical dimension",
+                            self.kind
+                        ),
+                    });
+                }
+            }
+        }
+        if let Some(unit) = &self.unit {
+            unit.validate()?;
+        }
+        if let Some(semantic_id) = &self.semantic_id {
+            semantic_id.validate()?;
+        }
+        Ok(())
+    }
+
     pub fn judge_compatibility(&self, other: &Self) -> TypeJudgement<()> {
+        if let Err(error) = self.validate() {
+            return TypeJudgement::Invalid(error);
+        }
+        if let Err(error) = other.validate() {
+            return TypeJudgement::Invalid(error);
+        }
         let (Some(a), Some(b)) = (self.dimension, other.dimension) else {
             return TypeJudgement::Unknown(
                 "physical dimension is unknown on one or both sides of the boundary".into(),
@@ -315,6 +402,33 @@ pub enum QuantityKind {
     Strain,
     Frequency,
     Custom,
+}
+
+impl QuantityKind {
+    /// Canonical SI dimension for quantity kinds with a fixed physical meaning.
+    /// Unknown and Custom remain gradual and therefore do not constrain the
+    /// dimension to a single built-in interpretation.
+    pub const fn expected_dimension(self) -> Option<PhysicalDimension> {
+        match self {
+            Self::Unknown | Self::Custom => None,
+            Self::Dimensionless | Self::Angle | Self::Strain => {
+                Some(PhysicalDimension::DIMENSIONLESS)
+            }
+            Self::Length => Some(PhysicalDimension::LENGTH),
+            Self::Mass => Some(PhysicalDimension::MASS),
+            Self::Time => Some(PhysicalDimension::TIME),
+            Self::Velocity => Some(PhysicalDimension::VELOCITY),
+            Self::Acceleration => Some(PhysicalDimension::ACCELERATION),
+            Self::Momentum => Some(PhysicalDimension::MOMENTUM),
+            Self::Force => Some(PhysicalDimension::FORCE),
+            Self::Energy | Self::Torque => Some(PhysicalDimension::ENERGY),
+            Self::Power => Some(PhysicalDimension::POWER),
+            Self::Charge => Some(PhysicalDimension::CHARGE),
+            Self::Temperature => Some(PhysicalDimension::TEMPERATURE),
+            Self::Pressure | Self::Stress => Some(PhysicalDimension::PRESSURE),
+            Self::Frequency => Some(PhysicalDimension::FREQUENCY),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
@@ -419,6 +533,36 @@ mod tests {
             ),
         };
         assert_eq!(celsius.transform_to_si.offset.numerator, 27315);
+    }
+
+    #[test]
+    fn known_quantity_kind_cannot_carry_arbitrary_dimension() {
+        let malformed =
+            PhysicalType::with_kind(QuantityKind::Energy, PhysicalDimension::LENGTH);
+        assert!(malformed.validate().is_err());
+        assert!(matches!(
+            malformed.judge_compatibility(&PhysicalType::with_kind(
+                QuantityKind::Energy,
+                PhysicalDimension::LENGTH,
+            )),
+            TypeJudgement::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn malformed_unit_transform_is_rejected() {
+        let unit = UnitRef {
+            symbol: "broken".into(),
+            transform_to_si: UnitTransform::new(
+                RationalScale { numerator: 0, denominator: 1 },
+                RationalScale { numerator: 0, denominator: 1 },
+            ),
+            semantic_id: None,
+        };
+        let typed =
+            PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH)
+                .with_unit(unit);
+        assert!(typed.validate().is_err());
     }
 
     #[test]
