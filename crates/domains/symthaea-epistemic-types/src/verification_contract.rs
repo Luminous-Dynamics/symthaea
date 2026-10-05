@@ -23,8 +23,8 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 pub const VERIFICATION_REQUEST_SCHEMA_VERSION: u16 = 1;
-pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 1;
-pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 2;
+pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 2;
+pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 3;
 
 /// Typed identifier for the verification relationship under which a verification
 /// method is permitted to validate a proof.
@@ -50,6 +50,10 @@ impl ClaimVerificationRelationship {
         &self.0
     }
 
+    fn controller_document_integrity_digest(&self) -> String {
+        self.resolution.controller_document_integrity.identity_digest()
+    }
+
     pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
         if self.0.trim().is_empty() {
             Err(VerificationFailure::Structural(
@@ -63,6 +67,193 @@ impl ClaimVerificationRelationship {
 
 fn is_hex_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+/// Policy describing whether a controller-document snapshot must match a known
+/// cryptographic content pin. Unpinned is explicitly weaker: it records the
+/// observed document digest without claiming that the verifier had a trusted
+/// expected value for it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ControllerDocumentIntegrityPolicy {
+    Unpinned,
+    Sha256Digest(String),
+}
+
+impl ControllerDocumentIntegrityPolicy {
+    pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
+        match self {
+            Self::Unpinned => Ok(()),
+            Self::Sha256Digest(expected) if is_hex_digest(expected) => Ok(()),
+            Self::Sha256Digest(_) => Err(VerificationFailure::Structural(
+                "expected controller document digest must be a 64-character hexadecimal digest"
+                    .into(),
+            )),
+        }
+    }
+}
+
+/// Adapter-produced statement about whether the dereferenced controller document
+/// matched the requested content-integrity policy.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ControllerDocumentIntegrityAttestation {
+    Unpinned { actual_digest: String },
+    Sha256Digest {
+        expected_digest: String,
+        actual_digest: String,
+    },
+}
+
+impl ControllerDocumentIntegrityAttestation {
+    pub fn from_policy(
+        policy: &ControllerDocumentIntegrityPolicy,
+        actual_digest: impl Into<String>,
+    ) -> Result<Self, VerificationFailure> {
+        policy.validate_structure()?;
+        let actual_digest = actual_digest.into();
+        if !is_hex_digest(&actual_digest) {
+            return Err(VerificationFailure::Structural(
+                "controller document digest must be a 64-character hexadecimal digest".into(),
+            ));
+        }
+
+        match policy {
+            ControllerDocumentIntegrityPolicy::Unpinned => {
+                Ok(Self::Unpinned { actual_digest })
+            }
+            ControllerDocumentIntegrityPolicy::Sha256Digest(expected_digest) => {
+                if expected_digest != &actual_digest {
+                    return Err(VerificationFailure::ControllerDocumentIntegrityMismatch {
+                        expected: expected_digest.clone(),
+                        actual: actual_digest,
+                    });
+                }
+                Ok(Self::Sha256Digest {
+                    expected_digest: expected_digest.clone(),
+                    actual_digest,
+                })
+            }
+        }
+    }
+
+    pub fn actual_digest(&self) -> &str {
+        match self {
+            Self::Unpinned { actual_digest }
+            | Self::Sha256Digest {
+                actual_digest, ..
+            } => actual_digest,
+        }
+    }
+
+    pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
+        match self {
+            Self::Unpinned { actual_digest } if is_hex_digest(actual_digest) => Ok(()),
+            Self::Sha256Digest {
+                expected_digest,
+                actual_digest,
+            } if is_hex_digest(expected_digest) && actual_digest == expected_digest => Ok(()),
+            Self::Unpinned { .. } | Self::Sha256Digest { .. } => {
+                Err(VerificationFailure::Structural(
+                    "controller document integrity attestation is malformed".into(),
+                ))
+            }
+        }
+    }
+
+    pub fn matches_policy(&self, policy: &ControllerDocumentIntegrityPolicy) -> bool {
+        match (policy, self) {
+            (
+                ControllerDocumentIntegrityPolicy::Unpinned,
+                Self::Unpinned { .. },
+            ) => true,
+            (
+                ControllerDocumentIntegrityPolicy::Sha256Digest(expected),
+                Self::Sha256Digest {
+                    expected_digest,
+                    actual_digest,
+                },
+            ) => expected == expected_digest && expected == actual_digest,
+            _ => false,
+        }
+    }
+
+    pub fn identity_digest(&self) -> String {
+        let encoded = (
+            "symthaea:controller-document-integrity:v1",
+            self,
+        );
+        let bytes =
+            serde_json::to_vec(&encoded).expect("controller document integrity is serializable");
+        crate::sha256_hex(&bytes)
+    }
+}
+
+/// Lifecycle metadata read from the resolved verification-method definition.
+///
+/// The W3C Controlled Identifiers model treats expires and revoked as method-level
+/// timestamps. The core does not infer lifecycle state from absence of either property;
+/// it only evaluates the explicit timestamps supplied by the adapter for the snapshot
+/// it resolved.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerificationMethodLifecycle {
+    pub expires: Option<String>,
+    pub revoked: Option<String>,
+}
+
+impl VerificationMethodLifecycle {
+    pub fn new(
+        expires: Option<&str>,
+        revoked: Option<&str>,
+    ) -> Result<Self, VerificationFailure> {
+        let value = Self {
+            expires: expires.map(str::to_owned),
+            revoked: revoked.map(str::to_owned),
+        };
+        value.validate_structure()?;
+        Ok(value)
+    }
+
+    pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
+        for (field, value) in [
+            ("verification method expires", self.expires.as_deref()),
+            ("verification method revoked", self.revoked.as_deref()),
+        ] {
+            if let Some(value) = value {
+                parse_timestamp(field, value)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Reject the verification method at or after an explicit expiry/revocation.
+    ///
+    /// This evaluates only the supplied snapshot facts. Historical acceptance after
+    /// a later revocation therefore requires a historical snapshot whose lifecycle
+    /// state can be established by the adapter.
+    pub fn validate_for_use_at(&self, reference_time: &str) -> Result<(), VerificationFailure> {
+        self.validate_structure()?;
+        let reference_time =
+            parse_timestamp("verification method evaluation time", reference_time)?;
+
+        if let Some(revoked) = self.revoked.as_deref() {
+            let revoked_at = parse_timestamp("verification method revoked", revoked)?;
+            if reference_time >= revoked_at {
+                return Err(VerificationFailure::VerificationMethodRevoked {
+                    at: revoked.to_owned(),
+                });
+            }
+        }
+
+        if let Some(expires) = self.expires.as_deref() {
+            let expires_at = parse_timestamp("verification method expires", expires)?;
+            if reference_time >= expires_at {
+                return Err(VerificationFailure::VerificationMethodExpired {
+                    at: expires.to_owned(),
+                });
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /// Temporal and anti-replay inputs supplied by the proof and the verifier.
@@ -145,6 +336,12 @@ impl VerificationFreshnessContext {
         Ok(())
     }
 
+    pub fn lifecycle_reference_time(&self) -> &str {
+        self.proof_created
+            .as_deref()
+            .unwrap_or(self.verification_time.as_str())
+    }
+
     pub fn replay_context_digest(&self) -> String {
         let encoded = (
             "symthaea:verification-freshness:v1",
@@ -223,10 +420,12 @@ pub struct VerificationMethodResolution {
     pub relationship_methods: Vec<ClaimVerificationMethod>,
     pub relationship_methods_digest: String,
     pub controller_document_digest: String,
+    pub controller_document_integrity: ControllerDocumentIntegrityAttestation,
+    pub verification_method_lifecycle: VerificationMethodLifecycle,
 }
 
 impl VerificationMethodResolution {
-    pub const SCHEMA_VERSION: u16 = 1;
+    pub const SCHEMA_VERSION: u16 = 2;
 
     pub fn from_controller_document(
         request: &VerificationRequest,
@@ -236,6 +435,7 @@ impl VerificationMethodResolution {
         resolved_verification_method_controller: ClaimControllerIdentity,
         relationship_methods: &[ClaimVerificationMethod],
         controller_document_digest: impl Into<String>,
+        verification_method_lifecycle: VerificationMethodLifecycle,
     ) -> Result<Self, VerificationFailure> {
         request.validate_structure()?;
         let controller_document_ref = controller_document_ref.into();
@@ -323,8 +523,14 @@ impl VerificationMethodResolution {
                 "controller document digest must be a 64-character hexadecimal digest".into(),
             ));
         }
+        let controller_document_integrity =
+            ControllerDocumentIntegrityAttestation::from_policy(
+                &request.controller_document_integrity_policy,
+                &controller_document_digest,
+            )?;
+        verification_method_lifecycle.validate_structure()?;
 
-        Ok(Self {
+        let resolution = Self {
             schema_version: Self::SCHEMA_VERSION,
             verification_method: request.verification_method.clone(),
             controller_document_ref,
@@ -334,7 +540,13 @@ impl VerificationMethodResolution {
             relationship_methods: methods,
             relationship_methods_digest,
             controller_document_digest,
-        })
+            controller_document_integrity,
+            verification_method_lifecycle,
+        };
+        resolution.verification_method_lifecycle.validate_for_use_at(
+            request.freshness.lifecycle_reference_time(),
+        )?;
+        Ok(resolution)
     }
 
     pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
@@ -425,6 +637,16 @@ impl VerificationMethodResolution {
                 "controller document digest must be a 64-character hexadecimal digest".into(),
             ));
         }
+        self.controller_document_integrity.validate_structure()?;
+        if self.controller_document_integrity.actual_digest()
+            != self.controller_document_digest
+        {
+            return Err(VerificationFailure::ControllerDocumentIntegrityMismatch {
+                expected: self.controller_document_digest.clone(),
+                actual: self.controller_document_integrity.actual_digest().to_owned(),
+            });
+        }
+        self.verification_method_lifecycle.validate_structure()?;
         Ok(())
     }
 
@@ -439,6 +661,8 @@ impl VerificationMethodResolution {
             self.verification_relationship.as_str(),
             self.relationship_methods_digest.as_str(),
             self.controller_document_digest.as_str(),
+            &self.controller_document_integrity,
+            &self.verification_method_lifecycle,
         );
         let bytes = serde_json::to_vec(&encoded)
             .expect("verification method resolution is serializable");
@@ -450,6 +674,13 @@ impl VerificationMethodResolution {
             && self.verification_method == request.verification_method
             && self.resolved_verification_method_controller == request.expected_controller
             && self.verification_relationship == request.expected_verification_relationship
+            && self
+                .controller_document_integrity
+                .matches_policy(&request.controller_document_integrity_policy)
+            && self
+                .verification_method_lifecycle
+                .validate_for_use_at(request.freshness.lifecycle_reference_time())
+                .is_ok()
     }
 }
 
@@ -468,6 +699,7 @@ pub struct VerificationRequest {
     pub verification_method: ClaimVerificationMethod,
     pub expected_controller: ClaimControllerIdentity,
     pub expected_verification_relationship: ClaimVerificationRelationship,
+    pub controller_document_integrity_policy: ControllerDocumentIntegrityPolicy,
     pub freshness: VerificationFreshnessContext,
 }
 
@@ -536,8 +768,18 @@ impl VerificationRequest {
             verification_method,
             expected_controller,
             expected_verification_relationship,
+            controller_document_integrity_policy: ControllerDocumentIntegrityPolicy::Unpinned,
             freshness,
         })
+    }
+
+    pub fn with_controller_document_integrity(
+        mut self,
+        policy: ControllerDocumentIntegrityPolicy,
+    ) -> Result<Self, VerificationFailure> {
+        policy.validate_structure()?;
+        self.controller_document_integrity_policy = policy;
+        Ok(self)
     }
 
     pub fn controller_document_ref(&self) -> Result<String, VerificationFailure> {
@@ -592,6 +834,7 @@ impl VerificationRequest {
             .validate_structure()
             .map_err(|reason| VerificationFailure::Structural(reason.to_owned()))?;
         self.expected_verification_relationship.validate_structure()?;
+        self.controller_document_integrity_policy.validate_structure()?;
         self.freshness.validate()?;
         Ok(())
     }
@@ -710,6 +953,7 @@ impl VerificationEvidence {
             self.controller_document_verification_method.as_str(),
             &self.controller_document_ref,
             &self.controller_document_digest,
+            &self.controller_document_integrity_digest(),
             &self.resolution.resolution_digest(),
             &self.verification_relationship,
             &self.cryptosuite,
@@ -740,6 +984,16 @@ impl VerificationEvidence {
             verification_method: self.verification_method.clone(),
             expected_controller: self.controller.clone(),
             expected_verification_relationship: self.verification_relationship.clone(),
+            controller_document_integrity_policy:
+                match &self.resolution.controller_document_integrity {
+                    ControllerDocumentIntegrityAttestation::Unpinned { .. } => {
+                        ControllerDocumentIntegrityPolicy::Unpinned
+                    }
+                    ControllerDocumentIntegrityAttestation::Sha256Digest {
+                        expected_digest,
+                        ..
+                    } => ControllerDocumentIntegrityPolicy::Sha256Digest(expected_digest.clone()),
+                },
             freshness: self.freshness.clone(),
         };
         request.validate_structure()?;
@@ -881,6 +1135,16 @@ pub enum VerificationFailure {
     FreshnessMismatch,
     ResolutionRequestMismatch,
     ResolutionEvidenceMismatch,
+    ControllerDocumentIntegrityMismatch {
+        expected: String,
+        actual: String,
+    },
+    VerificationMethodExpired {
+        at: String,
+    },
+    VerificationMethodRevoked {
+        at: String,
+    },
     CryptographicVerificationFailed,
 }
 
@@ -981,6 +1245,7 @@ mod tests {
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             &[request.verification_method.clone()],
             &"11".repeat(32),
+            VerificationMethodLifecycle::new(None, None).unwrap(),
         )
         .unwrap()
     }
@@ -1020,6 +1285,7 @@ mod tests {
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             &[],
             &"11".repeat(32),
+            VerificationMethodLifecycle::new(None, None).unwrap(),
         );
 
         assert!(matches!(
@@ -1097,6 +1363,114 @@ mod tests {
             decoded.validate_structure(),
             Err(VerificationFailure::Structural(_))
         ));
+    }
+
+    #[test]
+    fn controller_document_integrity_policy_binds_the_resolved_snapshot() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap()
+        .with_controller_document_integrity(
+            ControllerDocumentIntegrityPolicy::Sha256Digest("11".repeat(32)),
+        )
+        .unwrap();
+
+        let resolution = VerificationMethodResolution::from_controller_document(
+            &request,
+            "https://example.test/controller",
+            ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
+            request.verification_method.clone(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            &[request.verification_method.clone()],
+            &"11".repeat(32),
+            VerificationMethodLifecycle::new(None, None).unwrap(),
+        )
+        .unwrap();
+        assert!(resolution
+            .controller_document_integrity
+            .matches_policy(&ControllerDocumentIntegrityPolicy::Sha256Digest(
+                "11".repeat(32)
+            )));
+
+        assert!(matches!(
+            VerificationMethodResolution::from_controller_document(
+                &request,
+                "https://example.test/controller",
+                ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
+                request.verification_method.clone(),
+                ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+                &[request.verification_method.clone()],
+                &"22".repeat(32),
+                VerificationMethodLifecycle::new(None, None).unwrap(),
+            ),
+            Err(VerificationFailure::ControllerDocumentIntegrityMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn lifecycle_respects_proof_time_and_requires_historical_state_for_post_revocation_use() {
+        let revoked_later =
+            VerificationMethodLifecycle::new(None, Some("2026-10-05T02:30:00Z")).unwrap();
+        assert!(revoked_later
+            .validate_for_use_at("2026-10-05T02:29:59Z")
+            .is_ok());
+        assert!(matches!(
+            revoked_later.validate_for_use_at("2026-10-05T02:30:00Z"),
+            Err(VerificationFailure::VerificationMethodRevoked { .. })
+        ));
+
+        let expired =
+            VerificationMethodLifecycle::new(Some("2026-10-05T02:00:00Z"), None).unwrap();
+        assert!(matches!(
+            expired.validate_for_use_at("2026-10-05T02:00:00Z"),
+            Err(VerificationFailure::VerificationMethodExpired { .. })
+        ));
+
+        let freshness_before_revocation = freshness(
+            Some("2026-10-05T02:20:00Z"),
+            None,
+            Some("example.test"),
+            Some("challenge-1"),
+            "2026-10-05T03:00:00Z",
+            Some("example.test"),
+            Some("challenge-1"),
+        );
+        assert!(revoked_later
+            .validate_for_use_at(freshness_before_revocation.lifecycle_reference_time())
+            .is_ok());
+    }
+
+    #[test]
+    fn resolution_digest_changes_when_integrity_policy_or_lifecycle_changes() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let base = resolved_method(&request);
+        let mut pinned = base.clone();
+        pinned.controller_document_integrity =
+            ControllerDocumentIntegrityAttestation::Sha256Digest {
+                expected_digest: "11".repeat(32),
+                actual_digest: "11".repeat(32),
+            };
+        assert_ne!(base.resolution_digest(), pinned.resolution_digest());
+
+        let mut lifecycle = base;
+        lifecycle.verification_method_lifecycle =
+            VerificationMethodLifecycle::new(None, Some("2026-10-05T02:30:00Z")).unwrap();
+        assert_ne!(pinned.resolution_digest(), lifecycle.resolution_digest());
     }
 
     fn make_evidence(
