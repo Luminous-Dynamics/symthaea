@@ -1897,6 +1897,8 @@ impl ExperimentalStoppingCriteria {
 pub struct ExperimentalDesignProvenance {
     /// Stable identity for this exact proposed campaign.
     pub design_id: String,
+    /// Exact functional-requirement identity this campaign is scoped to.
+    pub requirement_id: String,
     /// Exact hypothesis identity.
     pub hypothesis_id: String,
     /// Human-readable statement of the hypothesis being tested.
@@ -1919,6 +1921,7 @@ impl ExperimentalDesignProvenance {
     /// Validate the design's structural identity and deterministic scope.
     pub fn validate(&self) -> Result<(), AssessmentError> {
         if self.design_id.is_empty()
+            || self.requirement_id.is_empty()
             || self.hypothesis_id.is_empty()
             || self.hypothesis_statement.is_empty()
             || self.unresolved_uncertainty_refs.is_empty()
@@ -1962,6 +1965,12 @@ impl ExperimentalDesignProvenance {
         requirement: &FunctionalRequirement,
     ) -> Result<(), AssessmentError> {
         self.validate()?;
+        if self.requirement_id != requirement.id {
+            return Err(AssessmentError::ExperimentalDesignRequirementMismatch {
+                expected_requirement_id: requirement.id.clone(),
+                actual_requirement_id: self.requirement_id.clone(),
+            });
+        }
         let declared = self.candidate_ids.iter().collect::<BTreeSet<_>>();
         for target in &self.expected_discrimination {
             if !declared.contains(&target.left_candidate_id)
@@ -2231,6 +2240,13 @@ pub enum AssessmentError {
     MissingEvidenceReference(String),
     /// Explicit experimental-design provenance is structurally incomplete.
     InvalidExperimentalDesign,
+    /// An experimental design is bound to a different functional requirement.
+    ExperimentalDesignRequirementMismatch {
+        /// Requirement identity expected by the assessment.
+        expected_requirement_id: String,
+        /// Requirement identity carried by the design.
+        actual_requirement_id: String,
+    },
     /// An experimental discrimination target names a surface absent from the requirement.
     ExperimentalDesignSurfaceUndeclared(String),
     /// Two experimental discrimination targets share one target identity.
@@ -2432,6 +2448,13 @@ impl std::fmt::Display for AssessmentError {
             Self::DuplicateEvidenceId(id) => write!(f, "duplicate evidence id {id}"),
             Self::EmptySourceIdentity => write!(f, "evidence source identity is incomplete"),
             Self::InvalidExperimentalDesign => write!(f, "experimental design provenance is incomplete"),
+            Self::ExperimentalDesignRequirementMismatch {
+                expected_requirement_id,
+                actual_requirement_id,
+            } => write!(
+                f,
+                "experimental design requirement {actual_requirement_id} does not match assessment requirement {expected_requirement_id}"
+            ),
             Self::ExperimentalDesignSurfaceUndeclared(id) => write!(
                 f,
                 "experimental discrimination target {id} names a surface absent from the requirement"
