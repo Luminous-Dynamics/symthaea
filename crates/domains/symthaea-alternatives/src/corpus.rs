@@ -331,7 +331,7 @@ impl BenchmarkCase {
         }
     }
 
-    /// Compute a stable BLAKE3 identity for the frozen benchmark topology.
+    /// Compute a stable BLAKE3 identity for the frozen benchmark topology and complete input.
     pub fn manifest_hash(&self) -> String {
         let bytes = serde_json::to_vec(&self.manifest()).expect("manifest is serializable");
         let mut hasher = Hasher::new();
