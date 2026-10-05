@@ -10788,6 +10788,16 @@ mod tests {
                  )",
                 [],
             ).unwrap();
+            conn.execute(
+                "INSERT INTO authorization_receipts(
+                    authorization_instance,action_id,attempt_id,phase,outcome,action_digest,
+                    authority_epoch,provider_idempotency_key)
+                 VALUES(
+                    'auth-status','action-status','attempt-status','indeterminate','indeterminate',
+                    'digest-status',1,'provider-status'
+                 )",
+                [],
+            ).unwrap();
         }
 
         let reopened=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-status").unwrap();
@@ -10799,6 +10809,14 @@ mod tests {
             [],
             |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
         ).unwrap();
+        let receipt_operation_id: String = conn.query_row(
+            "SELECT operation_id
+             FROM authorization_receipts
+             WHERE authorization_instance='auth-status' AND attempt_id='attempt-status' AND phase='indeterminate'",
+            [],
+            |row| row.get(0)
+        ).unwrap();
+        assert_eq!(receipt_operation_id,"op-status");
         assert_eq!(boundary,"boundary-authoritative");
         assert_eq!(
             scope,
