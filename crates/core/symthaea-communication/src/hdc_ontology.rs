@@ -59,6 +59,8 @@ pub const HDC_ONTOLOGY_MAX_GROUNDING_IDS_PER_CONCEPT: usize = 256;
 pub const HDC_ONTOLOGY_MAX_EDGE_CANDIDATES: usize = 1_000_000;
 /// Versioned HDC nonconformity score used by the isolated N1 conformal primitive.
 pub const HDC_ONTOLOGY_CONFORMAL_SCORE_REVISION: &str = "cosine-nonconformity-v1";
+/// Maximum raw JSON byte length accepted by bounded ontology artifact parsers.
+pub const HDC_ONTOLOGY_MAX_SERIALIZED_ARTIFACT_BYTES: usize = 1_048_576;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HdcConceptIdentityBinding {
@@ -122,6 +124,23 @@ impl HdcOntologyManifest {
             && unique_concept_node_ids(&self.concepts)
             && unique_graph_local_relations(&self.relations)
             && concept_kinds_consistent(&self.concepts)
+    }
+
+    /// Deserialize only after enforcing the raw byte-size ceiling, then require
+    /// the fully materialized manifest to satisfy all ontology bounds.
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > HDC_ONTOLOGY_MAX_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "ontology manifest JSON exceeds {} bytes",
+                HDC_ONTOLOGY_MAX_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let manifest: Self =
+            serde_json::from_slice(bytes).map_err(|error| format!("ontology manifest JSON: {error}"))?;
+        if !manifest.validates() {
+            return Err("ontology manifest failed bounded validation".into());
+        }
+        Ok(manifest)
     }
 
     pub fn canonicalized(&self) -> Self {
@@ -234,6 +253,23 @@ impl HdcOntologyCodebookDescriptor {
             && self.concept_count <= HDC_ONTOLOGY_MAX_CODEBOOK_CONCEPTS
             && self.relation_count > 0
             && self.relation_count <= HDC_ONTOLOGY_MAX_CODEBOOK_RELATIONS
+    }
+
+    /// Deserialize a persisted descriptor only after enforcing the raw byte-size
+    /// ceiling and the descriptor's semantic/resource invariants.
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > HDC_ONTOLOGY_MAX_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "ontology codebook descriptor JSON exceeds {} bytes",
+                HDC_ONTOLOGY_MAX_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let descriptor: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("ontology codebook descriptor JSON: {error}"))?;
+        if !descriptor.validates() {
+            return Err("ontology codebook descriptor failed bounded validation".into());
+        }
+        Ok(descriptor)
     }
 
     pub fn codebook_hash(&self) -> String {
@@ -449,6 +485,23 @@ impl HdcOntologyConformalCalibration {
             return Err("conformal alpha must be finite and within (0, 1)".into());
         }
         Ok(((2.0 / alpha) - 1.0).ceil() as usize)
+    }
+
+    /// Deserialize a persisted conformal artifact only after enforcing the raw
+    /// byte-size ceiling and the serialized artifact invariants.
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > HDC_ONTOLOGY_MAX_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "ontology conformal calibration JSON exceeds {} bytes",
+                HDC_ONTOLOGY_MAX_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let calibration: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("ontology conformal calibration JSON: {error}"))?;
+        if !calibration.validates() {
+            return Err("ontology conformal calibration failed bounded validation".into());
+        }
+        Ok(calibration)
     }
 
     pub fn validates(&self) -> bool {
@@ -2150,6 +2203,38 @@ mod tests {
     }
 
     #[test]
+    fn bounded_json_artifact_parsers_fail_closed_before_materialization() {
+        let oversized = vec![b' '; HDC_ONTOLOGY_MAX_SERIALIZED_ARTIFACT_BYTES + 1];
+        assert!(HdcOntologyManifest::from_json_bytes(&oversized).is_err());
+        assert!(HdcOntologyCodebookDescriptor::from_json_bytes(&oversized).is_err());
+        assert!(HdcOntologyConformalCalibration::from_json_bytes(&oversized).is_err());
+
+        let (training, manifest) = training_graph_and_manifest();
+        let codebook =
+            HdcOntologyCodebook::from_training_graphs(77, &[training], &manifest).unwrap();
+        let descriptor_json = serde_json::to_vec(codebook.descriptor()).unwrap();
+        let restored_descriptor =
+            HdcOntologyCodebookDescriptor::from_json_bytes(&descriptor_json).unwrap();
+        assert_eq!(restored_descriptor, *codebook.descriptor());
+
+        let manifest_json = serde_json::to_vec(&manifest).unwrap();
+        let restored_manifest = HdcOntologyManifest::from_json_bytes(&manifest_json).unwrap();
+        assert_eq!(restored_manifest.manifest_hash(), manifest.manifest_hash());
+
+        let calibration = HdcOntologyConformalCalibration::from_nonconformity_scores(
+            "codebook",
+            &["a".into(), "b".into(), "c".into()],
+            &[0.10, 0.20, 0.30],
+            0.10,
+        )
+        .unwrap();
+        let calibration_json = serde_json::to_vec(&calibration).unwrap();
+        let restored_calibration =
+            HdcOntologyConformalCalibration::from_json_bytes(&calibration_json).unwrap();
+        assert_eq!(restored_calibration, calibration);
+    }
+
+    #[test]
     fn manifest_identity_hash_is_independent_of_collection_order() {
         let (_training, manifest) = training_graph_and_manifest();
         let mut reordered = manifest.clone();
@@ -2398,4 +2483,3 @@ mod tests {
         let (training, training_manifest) = training_graph_and_manifest();
         let codebook =
             HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
-                .unwrap();
