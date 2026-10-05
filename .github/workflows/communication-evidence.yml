@@ -42,7 +42,13 @@ jobs:
 
           checked_out = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           provenance = {
+              "schema_version": 1,
               "event_name": os.environ["GITHUB_EVENT_NAME"],
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "workflow": os.environ["GITHUB_WORKFLOW"],
+              "workflow_run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "workflow_run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+              "ref": os.environ["GITHUB_REF"],
               "github_sha": os.environ["GITHUB_SHA"],
               "checked_out_revision": checked_out,
               "pr_head_sha": os.environ["PR_HEAD_SHA"],
@@ -78,6 +84,14 @@ jobs:
           from pathlib import Path
 
           provenance = json.loads(Path("target/communication-evidence/execution-provenance.json").read_text())
+          assert provenance["schema_version"] == 1
+          assert provenance["repository"] == os.environ["GITHUB_REPOSITORY"]
+          assert provenance["workflow"] == os.environ["GITHUB_WORKFLOW"]
+          assert provenance["workflow_run_id"] == int(os.environ["GITHUB_RUN_ID"])
+          assert provenance["workflow_run_attempt"] == int(os.environ["GITHUB_RUN_ATTEMPT"])
+          assert provenance["workflow_run_id"] > 0
+          assert provenance["workflow_run_attempt"] > 0
+
           expected_revision = provenance["pr_head_sha"] if provenance["event_name"] == "pull_request" else provenance["github_sha"]
           checked_out = provenance["checked_out_revision"]
           assert checked_out == expected_revision
