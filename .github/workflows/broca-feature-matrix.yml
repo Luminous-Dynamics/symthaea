@@ -45,8 +45,8 @@ jobs:
           - name: canonical-quality-gate
             command: cargo test -p symthaea-broca --lib evaluation::tests::test_quality_gate_thresholds_fail
           - name: root-live-voice-ssm-language
-            # Root defaults enable `broca_lite`, which is mutually exclusive with `ssm_language`.\
-            # Disable defaults so this leg actually exercises the native Broca voice path.\
+            # Root defaults enable `broca_lite`, which is mutually exclusive with `ssm_language`.
+            # Disable defaults so this leg actually exercises the native Broca voice path.
             command: cargo test -p symthaea --no-default-features --features "live-voice,ssm_language" --lib voice::live_voice::tests
 
     steps:
