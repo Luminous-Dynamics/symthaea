@@ -284,6 +284,7 @@ pub struct HdcOntologyDecodePolicy {
 /// experiment before the theorem applies.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HdcOntologyConformalCalibration {
+    pub schema_version: u16,
     pub alpha: f64,
     pub threshold: f64,
     pub calibration_case_count: usize,
@@ -334,6 +335,7 @@ impl HdcOntologyConformalCalibration {
         let rank = rank.clamp(1, n);
 
         Ok(Self {
+            schema_version: HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION,
             alpha,
             threshold: sorted[rank - 1],
             calibration_case_count: n,
@@ -403,7 +405,8 @@ impl HdcOntologyConformalCalibration {
     }
 
     pub fn validates(&self) -> bool {
-        self.alpha.is_finite()
+        self.schema_version == HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION
+            && self.alpha.is_finite()
             && (0.0..1.0).contains(&self.alpha)
             && self.threshold.is_finite()
             && (0.0..=1.0).contains(&self.threshold)
@@ -1669,6 +1672,7 @@ mod tests {
             0.50,
         )
         .unwrap();
+        assert_eq!(calibration.schema_version, HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION);
         assert_eq!(calibration.threshold, 0.1);
         assert_eq!(calibration.score_revision, HDC_ONTOLOGY_CONFORMAL_SCORE_REVISION);
         let candidates = vec![
