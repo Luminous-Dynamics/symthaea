@@ -16406,6 +16406,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
+name = "ryu-js"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6518fc26bced4d53678a22d6e423e9d8716377def84545fe328236e3af070e7f"
+
+[[package]]
 name = "safe_arch"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -16712,6 +16718,17 @@ dependencies = [
  "serde",
  "serde_core 1.0.228 (registry+https://github.com/rust-lang/crates.io-index)",
  "zmij",
+]
+
+[[package]]
+name = "serde_jcs"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3a60f3fda61525e439ef6d67422118f11e986566997d9021c56867ad814a0aa"
+dependencies = [
+ "ryu-js",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -20164,8 +20181,10 @@ name = "symthaea-verification-adapter"
 version = "0.1.0"
 dependencies = [
  "bs58",
+ "ed25519-dalek",
  "serde",
  "serde_json",
+ "serde_jcs",
  "sha2",
  "symthaea-epistemic-types",
  "tempfile",
