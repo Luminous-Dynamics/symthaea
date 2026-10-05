@@ -71,6 +71,7 @@ fn evidence(
 
 fn admitted(mut evidence: EvidenceRecord) -> EvidenceRecord {
     evidence.source.admission = Some(SourceAdmissionRef {
+        authority_id: evidence.source.authority_id.clone(),
         policy_id: "benchmark-policy".into(),
         policy_revision: "v1".into(),
         policy_digest: "benchmark-policy-digest-v1".into(),
