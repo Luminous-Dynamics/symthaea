@@ -346,11 +346,13 @@ mod tests {
         )
         .with_unit(symthaea_types::UnitRef {
             symbol: "J".into(),
+            dimension: symthaea_types::PhysicalDimension::ENERGY,
             transform_to_si: symthaea_types::UnitTransform::IDENTITY,
             semantic_id: None,
         });
         let kilojoule = frame.clone().with_unit(symthaea_types::UnitRef {
             symbol: "kJ".into(),
+            dimension: symthaea_types::PhysicalDimension::ENERGY,
             transform_to_si: symthaea_types::UnitTransform::new(
                 symthaea_types::RationalScale { numerator: 1000, denominator: 1 },
                 symthaea_types::RationalScale { numerator: 0, denominator: 1 },
