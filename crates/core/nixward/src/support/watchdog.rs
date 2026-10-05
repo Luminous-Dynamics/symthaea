@@ -82,7 +82,7 @@ pub enum WatchdogVerdict {
     Error { message: String },
 }
 
-/// Post-rebuild consciousness monitor.
+/// Verify the observed active generation matches the generation targeted by rollback.
 fn verify_active_generation(pre_gen: u64, observed: Result<u32, std::io::Error>) -> Result<(), String> {
     match observed {
         Ok(generation) if generation as u64 == pre_gen => Ok(()),
@@ -94,6 +94,7 @@ fn verify_active_generation(pre_gen: u64, observed: Result<u32, std::io::Error>)
     }
 }
 
+/// Post-rebuild consciousness monitor.
 pub struct Watchdog {
     config: WatchdogConfig,
     assessor: HealthAssessor,
