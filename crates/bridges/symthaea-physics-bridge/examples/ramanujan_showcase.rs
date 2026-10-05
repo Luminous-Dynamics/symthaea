@@ -369,11 +369,11 @@ fn run_problem(
         };
         println!("  ⏵ Search:   {}", provenance);
 
-        // Z3 status (already determined inside discover_invariants_autonomous when
-        // dynamics were provided — symbolically_proven means the chain rule proof
-        // succeeded against the supplied dynamics)
-        let z3_status = if inv.symbolically_proven {
-            "PROVEN ✓".to_string()
+        // Conservation evidence from the symbolic assessor. This is a
+        // chain-rule derivation plus six fixed numeric residual samples, not
+        // a universal theorem and not a Z3 proof.
+        let z3_status = if inv.symbolic_check_passed {
+            "Symbolic check + 6-point residual".to_string()
         } else if inv.variance < 1e-6 {
             "Numerical".to_string()
         } else {
