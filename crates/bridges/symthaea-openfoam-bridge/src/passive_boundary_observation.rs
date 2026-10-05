@@ -250,6 +250,170 @@ fn parse_face_list(
     Ok(faces)
 }
 
+fn observe_openfoam_patch_geometry(
+    boundary_source_bytes: &[u8],
+    faces_source_bytes: &[u8],
+    points_source_bytes: &[u8],
+    patch_name: &str,
+    interface: &symthaea_passive_void_compiler::PortInterface,
+    candidate: &symthaea_fabrication_kernel::mesh::TriangleMesh,
+    tolerance_mm: f64,
+    point_scale_mm_per_unit: f64,
+) -> Result<
+    (OpenFoamBoundaryPatchRecord, OpenFoamBoundaryEntityObservation),
+    OpenFoamBoundaryObservationError,
+> {
+    if !point_scale_mm_per_unit.is_finite() || point_scale_mm_per_unit <= 0.0 {
+        return Err(OpenFoamBoundaryObservationError::InvalidPointScale);
+    }
+
+    let (record, _) =
+        observe_openfoam_boundary_patch(boundary_source_bytes, patch_name)?;
+    let faces = parse_face_list(faces_source_bytes)?;
+    let points = parse_points_list(points_source_bytes)?;
+
+    let start = usize::try_from(record.start_face)
+        .map_err(|_| OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
+    let count = usize::try_from(record.n_faces)
+        .map_err(|_| OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
+    let end = start
+        .checked_add(count)
+        .ok_or(OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
+    if end > faces.len() {
+        return Err(
+            OpenFoamBoundaryObservationError::BoundaryFaceRangeOutOfBounds {
+                start_face: record.start_face,
+                n_faces: record.n_faces,
+                face_count: faces.len() as u64,
+            },
+        );
+    }
+
+    let mut edge_occurrences =
+        std::collections::BTreeMap::<
+            symthaea_passive_solver_binding::BoundaryEdgeKey,
+            u32,
+        >::new();
+
+    for (offset, face) in faces[start..end].iter().enumerate() {
+        if face.len() < 3 {
+            return Err(OpenFoamBoundaryObservationError::InvalidFaceRecord {
+                face_index: record.start_face + offset as u64,
+            });
+        }
+
+        for edge_index in 0..face.len() {
+            let a_index = face[edge_index];
+            let b_index = face[(edge_index + 1) % face.len()];
+            let a = points
+                .get(usize::try_from(a_index).map_err(|_| {
+                    OpenFoamBoundaryObservationError::PointIndexOutOfBounds {
+                        face_index: record.start_face + offset as u64,
+                        point_index: a_index,
+                    }
+                })?)
+                .ok_or(OpenFoamBoundaryObservationError::PointIndexOutOfBounds {
+                    face_index: record.start_face + offset as u64,
+                    point_index: a_index,
+                })?;
+            let b = points
+                .get(usize::try_from(b_index).map_err(|_| {
+                    OpenFoamBoundaryObservationError::PointIndexOutOfBounds {
+                        face_index: record.start_face + offset as u64,
+                        point_index: b_index,
+                    }
+                })?)
+                .ok_or(OpenFoamBoundaryObservationError::PointIndexOutOfBounds {
+                    face_index: record.start_face + offset as u64,
+                    point_index: b_index,
+                })?;
+
+            let a_mm = scaled_point_to_f32(*a, point_scale_mm_per_unit)?;
+            let b_mm = scaled_point_to_f32(*b, point_scale_mm_per_unit)?;
+            let edge = symthaea_passive_solver_binding::BoundaryEdgeKey::new(a_mm, b_mm)
+                .map_err(|_| OpenFoamBoundaryObservationError::PatchGeometryMismatch)?;
+            let count = edge_occurrences.entry(edge).or_insert(0);
+            *count = count
+                .checked_add(1)
+                .ok_or(OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
+        }
+    }
+
+    let solver_boundary_edges: std::collections::BTreeSet<_> = edge_occurrences
+        .into_iter()
+        .filter_map(|(edge, occurrences)| (occurrences == 1).then_some(edge))
+        .collect();
+
+    if solver_boundary_edges.is_empty() {
+        return Err(OpenFoamBoundaryObservationError::PatchGeometryMismatch);
+    }
+
+    let candidate_selection =
+        symthaea_passive_solver_binding::select_boundary_patch(
+            interface,
+            candidate,
+            tolerance_mm,
+        )
+        .map_err(|_| OpenFoamBoundaryObservationError::PatchGeometryMismatch)?;
+
+    let candidate_edges: std::collections::BTreeSet<_> =
+        candidate_selection.edges().iter().copied().collect();
+    if solver_boundary_edges != candidate_edges {
+        return Err(OpenFoamBoundaryObservationError::PatchGeometryMismatch);
+    }
+
+    let mut source_hasher = Hasher::new();
+    source_hasher.update(b"openfoam-polyMesh-patch-geometry-source:v1");
+    source_hasher.update(&(boundary_source_bytes.len() as u64).to_le_bytes());
+    source_hasher.update(boundary_source_bytes);
+    source_hasher.update(&(faces_source_bytes.len() as u64).to_le_bytes());
+    source_hasher.update(faces_source_bytes);
+    source_hasher.update(&(points_source_bytes.len() as u64).to_le_bytes());
+    source_hasher.update(points_source_bytes);
+    let source_digest = *source_hasher.finalize().as_bytes();
+
+    let mut identity = Vec::new();
+    identity.extend_from_slice(b"openfoam-polyMesh-patch-geometry:v1");
+    let boundary_identity = record.canonical_identity_bytes();
+    identity.extend_from_slice(&(boundary_identity.len() as u64).to_le_bytes());
+    identity.extend_from_slice(&boundary_identity);
+    identity.extend_from_slice(&point_scale_mm_per_unit.to_le_bytes());
+    identity.extend_from_slice(&(solver_boundary_edges.len() as u64).to_le_bytes());
+    for edge in &solver_boundary_edges {
+        identity.extend_from_slice(&edge.a[0].to_le_bytes());
+        identity.extend_from_slice(&edge.a[1].to_le_bytes());
+        identity.extend_from_slice(&edge.a[2].to_le_bytes());
+        identity.extend_from_slice(&edge.b[0].to_le_bytes());
+        identity.extend_from_slice(&edge.b[1].to_le_bytes());
+        identity.extend_from_slice(&edge.b[2].to_le_bytes());
+    }
+
+    let observation = SolverBoundaryEntityObservation::new(
+        "openfoam-polyMesh-patch-geometry:v1",
+        identity,
+        source_digest,
+    )
+    .map_err(Into::into)?;
+
+    Ok((record, observation))
+}
+
+fn scaled_point_to_f32(
+    point: [f64; 3],
+    scale_mm_per_unit: f64,
+) -> Result<[f32; 3], OpenFoamBoundaryObservationError> {
+    let mut scaled = [0.0f32; 3];
+    for (index, value) in point.into_iter().enumerate() {
+        let value = value * scale_mm_per_unit;
+        let value = value as f32;
+        if !value.is_finite() {
+            return Err(OpenFoamBoundaryObservationError::PatchGeometryMismatch);
+        }
+        scaled[index] = value;
+    }
+    Ok(scaled)
+}
+
 fn parse_points_list(
     source_bytes: &[u8],
 ) -> Result<Vec<[f64; 3]>, OpenFoamBoundaryObservationError> {
@@ -640,6 +804,8 @@ fn skip_value(tokens: &[Token], index: &mut usize) -> Result<(), OpenFoamBoundar
 pub struct OpenFoamPassiveBoundaryAdapter {
     source_bytes: Vec<u8>,
     faces_source_bytes: Option<Vec<u8>>,
+    points_source_bytes: Option<Vec<u8>>,
+    point_scale_mm_per_unit: Option<f64>,
     patch_name: String,
     tolerance_mm: f64,
 }
@@ -660,6 +826,8 @@ impl OpenFoamPassiveBoundaryAdapter {
         Ok(Self {
             source_bytes: source_bytes.into(),
             faces_source_bytes: None,
+            points_source_bytes: None,
+            point_scale_mm_per_unit: None,
             patch_name,
             tolerance_mm,
         })
@@ -675,6 +843,30 @@ impl OpenFoamPassiveBoundaryAdapter {
     ) -> Result<Self, OpenFoamBoundaryObservationError> {
         let mut adapter = Self::new(source_bytes, patch_name, tolerance_mm)?;
         adapter.faces_source_bytes = Some(faces_source_bytes.into());
+        Ok(adapter)
+    }
+
+    /// Construct an input-evidence adapter that also requires the rendered
+    /// OpenFOAM patch perimeter to match the candidate's certified rim.
+    pub fn new_with_faces_and_points(
+        source_bytes: impl Into<Vec<u8>>,
+        faces_source_bytes: impl Into<Vec<u8>>,
+        points_source_bytes: impl Into<Vec<u8>>,
+        point_scale_mm_per_unit: f64,
+        patch_name: impl Into<String>,
+        tolerance_mm: f64,
+    ) -> Result<Self, OpenFoamBoundaryObservationError> {
+        let mut adapter = Self::new_with_faces(
+            source_bytes,
+            faces_source_bytes,
+            patch_name,
+            tolerance_mm,
+        )?;
+        if !point_scale_mm_per_unit.is_finite() || point_scale_mm_per_unit <= 0.0 {
+            return Err(OpenFoamBoundaryObservationError::InvalidPointScale);
+        }
+        adapter.points_source_bytes = Some(points_source_bytes.into());
+        adapter.point_scale_mm_per_unit = Some(point_scale_mm_per_unit);
         Ok(adapter)
     }
 }
@@ -720,13 +912,24 @@ impl symthaea_passive_solver_binding::SolverBoundaryInputEntityObserver
         symthaea_passive_solver_binding::SolverBoundaryEntityAttestation,
         symthaea_passive_solver_binding::SolverBindingError,
     > {
-        let (_, observation) = match &self.faces_source_bytes {
-            Some(faces_source_bytes) => observe_openfoam_boundary_patch_and_faces(
+        let (_, observation) = match (&self.faces_source_bytes, &self.points_source_bytes, self.point_scale_mm_per_unit) {
+            (Some(faces_source_bytes), Some(points_source_bytes), Some(point_scale_mm_per_unit)) =>
+                observe_openfoam_patch_geometry(
+                    &self.source_bytes,
+                    faces_source_bytes,
+                    points_source_bytes,
+                    &self.patch_name,
+                    interface,
+                    candidate,
+                    self.tolerance_mm,
+                    point_scale_mm_per_unit,
+                ),
+            (Some(faces_source_bytes), _, _) => observe_openfoam_boundary_patch_and_faces(
                 &self.source_bytes,
                 faces_source_bytes,
                 &self.patch_name,
             ),
-            None => observe_openfoam_boundary_patch(
+            _ => observe_openfoam_boundary_patch(
                 &self.source_bytes,
                 &self.patch_name,
             ),
@@ -981,6 +1184,85 @@ mod tests {
             observe_openfoam_boundary_patch_and_faces(boundary, changed_faces, "inlet").unwrap();
         assert_ne!(first.source_digest, second.source_digest);
         assert_ne!(first.digest(), second.digest());
+    }
+
+    #[test]
+    fn patch_geometry_must_match_candidate_rim() {
+        use symthaea_fabrication_kernel::mesh::TriangleMesh;
+        use symthaea_passive_solver_binding::BoundaryEdgeKey;
+        use symthaea_passive_void_compiler::{
+            BoundaryConditionDomain, InterfacePlane, PortAperture, PortInterface,
+            SolverBoundaryIdentity,
+        };
+        use symthaea_passive_void_graph::PortId;
+
+        let interface = PortInterface::new(
+            PortId(10),
+            [0.0, 0.0, 0.0],
+            PortAperture::Circular { radius_mm: 2.0 },
+            [0.0, 0.0, 1.0],
+            InterfacePlane::new([0.0, 0.0, 0.0], [0.0, 0.0, 1.0]).unwrap(),
+            SolverBoundaryIdentity {
+                domain: BoundaryConditionDomain::Fluidic,
+                id: 7,
+            },
+        )
+        .unwrap();
+        let candidate = TriangleMesh {
+            vertices: vec![
+                [0.0, 0.0, 0.0],
+                [2.0, 0.0, 0.0],
+                [0.0, 2.0, 0.0],
+                [-2.0, 0.0, 0.0],
+                [0.0, -2.0, 0.0],
+            ],
+            normals: vec![[0.0, 0.0, 1.0]; 5],
+            indices: vec![[0,1,2],[0,2,3],[0,3,4],[0,4,1]],
+        };
+
+        let boundary = br#"1
+(
+    inlet { type patch; nFaces 1; startFace 0; }
+)
+"#;
+        let faces = br#"1
+(
+    4(0 1 2 3)
+)
+"#;
+        let points = br#"4
+(
+    (2 0 0)
+    (0 2 0)
+    (-2 0 0)
+    (0 -2 0)
+)
+"#;
+
+        let (_, observation) = observe_openfoam_patch_geometry(
+            boundary, faces, points, "inlet", &interface, &candidate, 0.05, 1.0,
+        ).unwrap();
+        assert_eq!(
+            observation.entity_kind,
+            "openfoam-polyMesh-patch-geometry:v1"
+        );
+
+        let changed_points = br#"4
+(
+    (2 0 0)
+    (0 2 0)
+    (-1 0 0)
+    (0 -2 0)
+)
+"#;
+        assert!(matches!(
+            observe_openfoam_patch_geometry(
+                boundary, faces, changed_points, "inlet", &interface, &candidate, 0.05, 1.0
+            ),
+            Err(OpenFoamBoundaryObservationError::PatchGeometryMismatch)
+        ));
+
+        let _ = BoundaryEdgeKey::new([2.0,0.0,0.0],[0.0,2.0,0.0]).unwrap();
     }
 
     #[test]
