@@ -677,18 +677,6 @@ mod tests {
         .unwrap()
     }
 
-    fn default_freshness() -> VerificationFreshnessContext {
-        VerificationFreshnessContext {
-            proof_created: Some("2026-10-05T00:00:00Z".into()),
-            proof_expires: Some("2026-10-05T03:00:00Z".into()),
-            proof_domain: Some("example.test".into()),
-            proof_challenge: Some("challenge-1".into()),
-            verification_time: "2026-10-05T02:00:00Z".into(),
-            expected_domain: Some("example.test".into()),
-            expected_challenge: Some("challenge-1".into()),
-        }
-    }
-
     #[test]
     fn freshness_context_rejects_future_expiry_and_mismatched_replay_inputs() {
         let valid = default_freshness();
