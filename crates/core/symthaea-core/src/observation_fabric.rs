@@ -694,9 +694,9 @@ pub enum IndependenceVerifierPredicate {
 /// no shared provenance basis in a validated closed-world graph. The verifier
 /// does not evaluate relation semantics, modality, observation time/location,
 /// measurement quality, credential validity, or substantive truth.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub const INDEPENDENCE_SCOPE_VERSION_V3: &str = "observation-fabric-independence-scope-v3";
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IndependenceVerifierContract {
     pub version: &'static str,
     pub predicates: &'static [IndependenceVerifierPredicate],
