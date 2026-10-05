@@ -2057,22 +2057,6 @@ impl<'a> CborReader<'a> {
         }
     }
 
-    fn read_map_len(&mut self) -> Result<usize, Rfc9162ProofDecodeError> {
-        let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
-        self.offset+=1;
-        if initial>>5!=5 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
-        let ai=initial&0x1f;
-        let n=match ai {
-            0..=23=>ai as u64,
-            24=>self.read_uint(1,24)?,
-            25=>self.read_uint(2,256)?,
-            26=>self.read_uint(4,65_536)?,
-            27=>self.read_uint(8,4_294_967_296)?,
-            _=>return Err(Rfc9162ProofDecodeError::InvalidEncoding),
-        };
-        usize::try_from(n).map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)
-    }
-
     fn read_map_entries_bounded(
         &mut self,
         max_entries: usize,
@@ -2249,26 +2233,6 @@ impl<'a> CborReader<'a> {
         }
     }
 
-    fn read_array_len(&mut self)->Result<usize,Rfc9162ProofDecodeError>{
-        let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
-        self.offset+=1;
-        if initial>>5!=4{return Err(Rfc9162ProofDecodeError::InvalidEncoding)}
-        let ai=initial&0x1f;
-        let n=match ai{
-            0..=23=>ai as u64,
-            24=>self.read_uint(1,24)?,
-            25=>self.read_uint(2,256)?,
-            26=>self.read_uint(4,65536)?,
-            27=>self.read_uint(8,4294967296)?,
-            _=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)
-        };
-        usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)
-    }
-
-    /// Start a fixed-cardinality CBOR array. Indefinite-length arrays are
-    /// accepted when the caller already knows exactly how many elements the
-    /// protocol structure requires; the caller must then consume the matching
-    /// break stop code with finish_indefinite_array after those elements.
     fn read_array_len_exact(&mut self, expected: usize)->Result<bool,Rfc9162ProofDecodeError>{
         let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
         self.offset+=1;
@@ -2902,24 +2866,6 @@ impl<'a> CborReader<'a> {
         }
         self.offset = end;
         Ok(())
-    }
-
-    fn skip_integer(&mut self) -> Result<(), Rfc9162ProofDecodeError> {
-        let initial = *self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
-        let major = initial >> 5;
-        if major != 0 && major != 1 {
-            return Err(Rfc9162ProofDecodeError::InvalidEncoding);
-        }
-        self.offset += 1;
-        let ai = initial & 0x1f;
-        match ai {
-            0..=23 => Ok(()),
-            24 => { self.read_uint(1, 24)?; Ok(()) },
-            25 => { self.read_uint(2, 256)?; Ok(()) },
-            26 => { self.read_uint(4, 65_536)?; Ok(()) },
-            27 => { self.read_uint(8, 4_294_967_296)?; Ok(()) },
-            _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
-        }
     }
 
     fn take(&mut self, n:usize)->Result<&[u8],Rfc9162ProofDecodeError>{
