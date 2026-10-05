@@ -281,6 +281,8 @@ impl SemanticIdentifier {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct UnitRef {
     pub symbol: String,
+    /// SI base-dimension signature of the quantity represented by this unit.
+    pub dimension: PhysicalDimension,
     pub transform_to_si: UnitTransform,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub semantic_id: Option<SemanticIdentifier>,
@@ -447,6 +449,12 @@ impl PhysicalType {
         }
         if let Some(unit) = &self.unit {
             unit.validate()?;
+            if Some(unit.dimension) != self.dimension {
+                return Err(PhysicalTypeError {
+                    operation: "physical_type".into(),
+                    reason: "unit dimension does not match physical type dimension".into(),
+                });
+            }
             if self.kind == QuantityKind::TemperatureDifference
                 && unit.transform_to_si.offset.numerator != 0
             {
@@ -745,6 +753,7 @@ mod tests {
         let base = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH)
             .with_unit(UnitRef {
                 symbol: "m".into(),
+                dimension: PhysicalDimension::LENGTH,
                 transform_to_si: UnitTransform::new(
                     RationalScale { numerator: 1, denominator: 1 },
                     RationalScale { numerator: 0, denominator: 1 },
@@ -754,6 +763,7 @@ mod tests {
         let equivalent = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH)
             .with_unit(UnitRef {
                 symbol: "m".into(),
+                dimension: PhysicalDimension::LENGTH,
                 transform_to_si: UnitTransform::new(
                     RationalScale { numerator: 2, denominator: 2 },
                     RationalScale { numerator: 0, denominator: 5 },
@@ -800,6 +810,8 @@ mod tests {
     fn affine_unit_transform_preserves_offset_semantics() {
         let celsius = UnitRef {
             symbol: "degC".into(),
+            dimension: PhysicalDimension::TEMPERATURE,
+                dimension: PhysicalDimension::TEMPERATURE,
             transform_to_si: UnitTransform::new(
                 RationalScale::ONE,
                 RationalScale { numerator: 27315, denominator: 100 },
@@ -814,12 +826,14 @@ mod tests {
         let length_m = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH)
             .with_unit(UnitRef {
                 symbol: "m".into(),
+                dimension: PhysicalDimension::LENGTH,
                 transform_to_si: UnitTransform::IDENTITY,
                 semantic_id: None,
             });
         let length_ft = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH)
             .with_unit(UnitRef {
                 symbol: "ft".into(),
+                dimension: PhysicalDimension::LENGTH,
                 transform_to_si: UnitTransform::new(
                     RationalScale { numerator: 3048, denominator: 10000 },
                     RationalScale { numerator: 0, denominator: 1 },
@@ -838,6 +852,8 @@ mod tests {
         )
         .with_unit(UnitRef {
             symbol: "degC".into(),
+            dimension: PhysicalDimension::TEMPERATURE,
+                dimension: PhysicalDimension::TEMPERATURE,
             transform_to_si: UnitTransform::new(
                 RationalScale::ONE,
                 RationalScale { numerator: 27315, denominator: 100 },
@@ -850,6 +866,8 @@ mod tests {
         )
         .with_unit(UnitRef {
             symbol: "K".into(),
+            dimension: PhysicalDimension::TEMPERATURE,
+                dimension: PhysicalDimension::TEMPERATURE,
             transform_to_si: UnitTransform::IDENTITY,
             semantic_id: None,
         });
@@ -868,6 +886,8 @@ mod tests {
         )
         .with_unit(UnitRef {
             symbol: "delta_degF".into(),
+            dimension: PhysicalDimension::TEMPERATURE,
+                dimension: PhysicalDimension::TEMPERATURE,
             transform_to_si: UnitTransform::new(
                 RationalScale { numerator: 5, denominator: 9 },
                 RationalScale { numerator: 0, denominator: 1 },
@@ -880,6 +900,8 @@ mod tests {
         )
         .with_unit(UnitRef {
             symbol: "delta_K".into(),
+            dimension: PhysicalDimension::TEMPERATURE,
+                dimension: PhysicalDimension::TEMPERATURE,
             transform_to_si: UnitTransform::IDENTITY,
             semantic_id: None,
         });
@@ -895,6 +917,8 @@ mod tests {
         let metres = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH);
         let feet = metres.clone().with_unit(UnitRef {
             symbol: "ft".into(),
+            dimension: PhysicalDimension::LENGTH,
+                dimension: PhysicalDimension::LENGTH,
             transform_to_si: UnitTransform::new(
                 RationalScale { numerator: 3048, denominator: 10000 },
                 RationalScale { numerator: 0, denominator: 1 },
@@ -916,6 +940,8 @@ mod tests {
         )
         .with_unit(UnitRef {
             symbol: "degC".into(),
+            dimension: PhysicalDimension::TEMPERATURE,
+                dimension: PhysicalDimension::TEMPERATURE,
             transform_to_si: UnitTransform::new(
                 RationalScale::ONE,
                 RationalScale { numerator: 27315, denominator: 100 },
@@ -928,6 +954,8 @@ mod tests {
         )
         .with_unit(UnitRef {
             symbol: "delta_K".into(),
+            dimension: PhysicalDimension::TEMPERATURE,
+                dimension: PhysicalDimension::TEMPERATURE,
             transform_to_si: UnitTransform::IDENTITY,
             semantic_id: None,
         });
@@ -944,6 +972,8 @@ mod tests {
         let metres = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH);
         let metres_explicit = metres.clone().with_unit(UnitRef {
             symbol: "m".into(),
+            dimension: PhysicalDimension::LENGTH,
+                dimension: PhysicalDimension::LENGTH,
             transform_to_si: UnitTransform::IDENTITY,
             semantic_id: None,
         });
@@ -987,12 +1017,14 @@ mod tests {
         let metres = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH)
             .with_unit(UnitRef {
                 symbol: "m".into(),
+                dimension: PhysicalDimension::LENGTH,
                 transform_to_si: UnitTransform::IDENTITY,
                 semantic_id: None,
             });
         let feet = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH)
             .with_unit(UnitRef {
                 symbol: "ft".into(),
+                dimension: PhysicalDimension::LENGTH,
                 transform_to_si: UnitTransform::new(
                     RationalScale { numerator: 3048, denominator: 10000 },
                     RationalScale { numerator: 0, denominator: 1 },
@@ -1059,6 +1091,8 @@ mod tests {
     fn negative_unit_scale_is_rejected() {
         let unit = UnitRef {
             symbol: "reverse_m".into(),
+            dimension: PhysicalDimension::LENGTH,
+                dimension: PhysicalDimension::LENGTH,
             transform_to_si: UnitTransform::new(
                 RationalScale { numerator: -1, denominator: 1 },
                 RationalScale { numerator: 0, denominator: 1 },
@@ -1075,6 +1109,8 @@ mod tests {
     fn malformed_unit_transform_is_rejected() {
         let unit = UnitRef {
             symbol: "broken".into(),
+            dimension: PhysicalDimension::LENGTH,
+                dimension: PhysicalDimension::LENGTH,
             transform_to_si: UnitTransform::new(
                 RationalScale { numerator: 0, denominator: 1 },
                 RationalScale { numerator: 0, denominator: 1 },
