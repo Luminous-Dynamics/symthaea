@@ -666,6 +666,45 @@ fn validate_attempt_boundary_consistency_for_attempt(
     Ok(())
 }
 
+fn validate_attempt_operation_consistency_for_attempt(
+    tx: &Transaction<'_>,
+    authorization_instance: &str,
+    attempt_id: &str,
+    expected_operation_id: &str,
+) -> Result<(), AuthorizationStoreError> {
+    if authorization_instance.is_empty()
+        || attempt_id.is_empty()
+        || expected_operation_id.is_empty()
+    {
+        return Err(AuthorizationConsumptionError::InvalidBinding.into());
+    }
+    for table in [
+        "authorization_leases",
+        "authorization_recovery_markers",
+        "authorization_terminal_evidence",
+        "authorization_dispatches",
+    ] {
+        let mut stmt = tx.prepare(&format!(
+            "SELECT operation_id
+             FROM {table}
+             WHERE authorization_instance=?1
+               AND attempt_id=?2
+               AND operation_id IS NOT NULL
+               AND operation_id <> ''"
+        ))?;
+        let rows = stmt.query_map(
+            params![authorization_instance,attempt_id],
+            |row| row.get::<_,String>(0),
+        )?;
+        for row in rows {
+            if row? != expected_operation_id {
+                return Err(AuthorizationConsumptionError::InvalidBinding.into());
+            }
+        }
+    }
+    Ok(())
+}
+
 fn backfill_attempt_scope_digests(
     connection: &mut Connection,
 ) -> Result<(), AuthorizationStoreError> {
@@ -3495,6 +3534,12 @@ fn validate_native_authority_pin_set(
             &record.authorization_instance,
             &record.attempt_id,
             &record.boundary_id,
+        )?;
+        validate_attempt_operation_consistency_for_attempt(
+            tx,
+            &record.authorization_instance,
+            &record.attempt_id,
+            &record.operation_id,
         )?;
         let row = tx.query_row(
             "SELECT operation_id,native_replay_identity,native_issuer,native_authority_namespace,
