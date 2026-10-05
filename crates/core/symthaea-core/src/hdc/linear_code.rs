@@ -1208,7 +1208,7 @@ fn factor_offsets(factors: &[&RandomLinearCode]) -> Option<Vec<usize>> {
             offsets
                 .last()
                 .copied()
-                .unwrap_or(0)
+                .unwrap_or(0usize)
                 .checked_add(factor.rank())?,
         );
     }
