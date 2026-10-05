@@ -576,6 +576,18 @@ mod tests {
     }
 
     #[test]
+    fn legacy_schema_version_fails_closed() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        plan.version = "broca-phonological-plan-v1".to_string();
+
+        assert_eq!(
+            plan.validate()
+                .expect_err("legacy phonological schema must be rejected"),
+            PhonologicalPlanError::InvalidVersion
+        );
+    }
+
+    #[test]
     fn unbound_plan_is_explicitly_not_ready() {
         let plan = PhonologicalPlan::from_speech_plan(&plan());
         assert_eq!(plan.content_binding, ContentBindingStatus::RoleStructureOnly);
