@@ -90,6 +90,19 @@ fn analytic_scalar(input: ScalarDomain) -> ScalarDomain {
     }
 }
 
+/// A variable exponent makes even a dimensionless power conservative:
+/// unknown/complex/approximate scalar information must not collapse to Real.
+fn power_scalar(base: ScalarDomain, exponent: ScalarDomain) -> ScalarDomain {
+    match (base, exponent) {
+        (ScalarDomain::Unknown, _) | (_, ScalarDomain::Unknown) => ScalarDomain::Unknown,
+        (ScalarDomain::Complex, _) | (_, ScalarDomain::Complex) => ScalarDomain::Complex,
+        (ScalarDomain::ApproximateReal, _) | (_, ScalarDomain::ApproximateReal) => {
+            ScalarDomain::ApproximateReal
+        }
+        _ => ScalarDomain::Real,
+    }
+}
+
 fn additive_result(
     left: &PhysicalType,
     right: &PhysicalType,
@@ -476,14 +489,38 @@ where
                         })
                     }
                 }
-                _ => {
-                    if dimension.is_dimensionless() {
-                        valid(PhysicalType::dimensionless())
-                    } else {
-                        TypeJudgement::Invalid(PhysicalTypeError {
+                exponent_expr => {
+                    let exponent_ty = match infer_expr_type_with_lookup(exponent_expr, lookup) {
+                        TypeJudgement::Valid(t) => t,
+                        other => return other,
+                    };
+
+                    if !exponent_ty
+                        .dimension
+                        .is_some_and(PhysicalDimension::is_dimensionless)
+                    {
+                        return TypeJudgement::Invalid(PhysicalTypeError {
+                            operation: "pow".into(),
+                            reason: "exponent must be dimensionless".into(),
+                        });
+                    }
+
+                    if !dimension.is_dimensionless() {
+                        return TypeJudgement::Invalid(PhysicalTypeError {
                             operation: "pow".into(),
                             reason: "variable exponent requires dimensionless base".into(),
-                        })
+                        });
+                    }
+
+                    let mut result = PhysicalType::dimensionless();
+                    result.scalar = power_scalar(b.scalar, exponent_ty.scalar);
+                    if result.scalar == ScalarDomain::Unknown {
+                        TypeJudgement::Unknown(
+                            "variable power requires known scalar domains for base and exponent"
+                                .into(),
+                        )
+                    } else {
+                        valid(result)
                     }
                 }
             }
@@ -773,6 +810,74 @@ mod tests {
             TypeJudgement::Valid(result) => {
                 assert_eq!(result.kind, QuantityKind::Power);
                 assert_eq!(result.scalar, ScalarDomain::ApproximateReal);
+            }
+            other => panic!("unexpected judgment: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn variable_exponent_requires_dimensionless_exponent() {
+        let base = PhysicalType::dimensionless();
+        let exponent = PhysicalType::with_kind(
+            QuantityKind::Length,
+            PhysicalDimension::LENGTH,
+        );
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("base".into())),
+            Box::new(Expr::Var("exponent".into())),
+        );
+        let variables = HashMap::from([
+            ("base".into(), base),
+            ("exponent".into(), exponent),
+        ]);
+
+        assert!(matches!(
+            infer_expr_type_with_variables(&expr, &variables),
+            TypeJudgement::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn variable_exponent_with_unknown_scalar_stays_unknown() {
+        let base = PhysicalType::dimensionless();
+        let mut exponent = PhysicalType::dimensionless();
+        exponent.scalar = ScalarDomain::Unknown;
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("base".into())),
+            Box::new(Expr::Var("exponent".into())),
+        );
+        let variables = HashMap::from([
+            ("base".into(), base),
+            ("exponent".into(), exponent),
+        ]);
+
+        assert!(matches!(
+            infer_expr_type_with_variables(&expr, &variables),
+            TypeJudgement::Unknown(_)
+        ));
+    }
+
+    #[test]
+    fn complex_variable_exponent_preserves_complex_power_domain() {
+        let mut base = PhysicalType::dimensionless();
+        base.scalar = ScalarDomain::Real;
+        let mut exponent = PhysicalType::dimensionless();
+        exponent.scalar = ScalarDomain::Complex;
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("base".into())),
+            Box::new(Expr::Var("exponent".into())),
+        );
+        let variables = HashMap::from([
+            ("base".into(), base),
+            ("exponent".into(), exponent),
+        ]);
+
+        match infer_expr_type_with_variables(&expr, &variables) {
+            TypeJudgement::Valid(result) => {
+                assert_eq!(result.scalar, ScalarDomain::Complex);
             }
             other => panic!("unexpected judgment: {other:?}"),
         }
