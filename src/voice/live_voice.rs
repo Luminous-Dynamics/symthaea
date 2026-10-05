@@ -873,31 +873,46 @@ mod tests {
 
         let genesis = GenesisSeed::from_phrase("plan-native-pitch-test");
         let mut voice = LiveVoice::new_headless(&genesis);
-        let narrow = make_plan(0.65);
-        let wide = make_plan(1.45);
 
-        let (narrow_samples, _) = voice
-            .synthesize_phonological_plan(&narrow)
-            .expect("narrow pitch plan should synthesize");
-        voice.reset();
-        let (wide_samples, _) = voice
-            .synthesize_phonological_plan(&wide)
-            .expect("wide pitch plan should synthesize");
+        for arousal in [0.0_f32, 1.0_f32] {
+            voice.set_cognitive_state(VoiceCognitiveState {
+                emotional_arousal: arousal,
+                ..Default::default()
+            });
 
-        assert_eq!(
-            narrow_samples.len(),
-            wide_samples.len(),
-            "pitch range should change realization, not deterministic duration"
-        );
-        let difference = narrow_samples
-            .iter()
-            .zip(&wide_samples)
-            .map(|(left, right)| (left - right).abs())
-            .sum::<f32>();
-        assert!(
-            difference > 1e-3,
-            "plan pitch range must reach phonological realization: absolute sample difference={difference}"
-        );
+            let narrow = make_plan(0.65);
+            let (narrow_samples, _) = voice
+                .synthesize_phonological_plan(&narrow)
+                .expect("narrow pitch plan should synthesize");
+
+            voice.reset();
+
+            voice.set_cognitive_state(VoiceCognitiveState {
+                emotional_arousal: arousal,
+                ..Default::default()
+            });
+
+            let wide = make_plan(1.45);
+            let (wide_samples, _) = voice
+                .synthesize_phonological_plan(&wide)
+                .expect("wide pitch plan should synthesize");
+
+            assert_eq!(
+                narrow_samples.len(),
+                wide_samples.len(),
+                "pitch range should change realization, not deterministic duration"
+            );
+
+            let difference = narrow_samples
+                .iter()
+                .zip(&wide_samples)
+                .map(|(left, right)| (left - right).abs())
+                .sum::<f32>();
+            assert!(
+                difference > 1e-3,
+                "plan pitch range must remain observable at arousal {arousal}: absolute sample difference={difference}"
+            );
+        }
     }
 
     #[cfg(feature = "ssm_language")]
