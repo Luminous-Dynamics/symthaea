@@ -25,6 +25,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use symthaea_core::genesis::GenesisSeed;
 #[cfg(feature = "ssm_language")]
 use symthaea_broca::PhonologicalPlan;
@@ -45,6 +46,25 @@ const DT: f32 = 1.0 / FRAME_RATE as f32;
 
 /// Base phoneme duration (seconds) for G2P timing.
 const BASE_PHONEME_DURATION: f32 = 0.06;
+
+/// Evidence emitted by the explicit phonological-plan realization path.
+#[cfg(feature = "ssm_language")]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PhonologicalPlanRealizationReceipt {
+    /// Receipt schema, independent from the phonological-plan contract version.
+    pub schema_version: u32,
+    pub plan_version: String,
+    pub plan_grounding_blake3: String,
+    pub segment_count: usize,
+    pub scheduler_frames: usize,
+    pub sample_count: usize,
+    pub sample_rate: u32,
+    pub rate: f32,
+    pub pitch_range: f32,
+    pub prominence: f32,
+    pub pause_weight: f32,
+    pub audio_blake3: String,
+}
 
 /// Handle to a background `speak_async()` call.
 ///
@@ -164,9 +184,19 @@ impl LiveVoice {
     /// the audio sink, so this method does not claim first-audio latency.
     #[cfg(feature = "ssm_language")]
     pub fn speak_phonological_plan(&mut self, plan: &PhonologicalPlan) -> Result<usize> {
-        let samples = self.synthesize_phonological_plan(plan)?;
+        Ok(self.speak_phonological_plan_with_receipt(plan)?.sample_count)
+    }
+
+    /// Realize an explicit phonological plan and return an evidence receipt that binds
+    /// the validated plan grounding to the generated audio buffer.
+    #[cfg(feature = "ssm_language")]
+    pub fn speak_phonological_plan_with_receipt(
+        &mut self,
+        plan: &PhonologicalPlan,
+    ) -> Result<PhonologicalPlanRealizationReceipt> {
+        let (samples, receipt) = self.synthesize_phonological_plan(plan)?;
         self.push_with_backpressure(&samples);
-        Ok(samples.len())
+        Ok(receipt)
     }
 
     /// Synthesize an explicit phonological plan directly to WAV without an audio device.
@@ -178,10 +208,9 @@ impl LiveVoice {
         plan: &PhonologicalPlan,
         path: &Path,
     ) -> Result<usize> {
-        let samples = self.synthesize_phonological_plan(plan)?;
-        let sample_rate = self.streaming.vocoder.sample_rate();
-        write_wav(path, &samples, sample_rate)?;
-        Ok(samples.len())
+        let (samples, receipt) = self.synthesize_phonological_plan(plan)?;
+        write_wav(path, &samples, receipt.sample_rate)?;
+        Ok(receipt.sample_count)
     }
 
     #[cfg(feature = "ssm_language")]
@@ -196,7 +225,10 @@ impl LiveVoice {
     }
 
     #[cfg(feature = "ssm_language")]
-    fn synthesize_phonological_plan(&mut self, plan: &PhonologicalPlan) -> Result<Vec<f32>> {
+    fn synthesize_phonological_plan(
+        &mut self,
+        plan: &PhonologicalPlan,
+    ) -> Result<(Vec<f32>, PhonologicalPlanRealizationReceipt)> {
         plan.validate()
             .map_err(|error| anyhow::anyhow!("invalid phonological plan: {error}"))?;
         if !plan.ready_for_realization() {
@@ -308,7 +340,32 @@ impl LiveVoice {
             }
         }
 
-        Ok(all_samples)
+        let plan_grounding = plan.grounding_surface();
+        let audio_blake3 = {
+            let mut hasher = blake3::Hasher::new();
+            for sample in &all_samples {
+                hasher.update(&sample.to_le_bytes());
+            }
+            hasher.finalize().to_hex().to_string()
+        };
+        let receipt = PhonologicalPlanRealizationReceipt {
+            schema_version: 1,
+            plan_version: plan.version.clone(),
+            plan_grounding_blake3: blake3::hash(plan_grounding.as_bytes())
+                .to_hex()
+                .to_string(),
+            segment_count: plan.segments.len(),
+            scheduler_frames: total_frames,
+            sample_count: all_samples.len(),
+            sample_rate: self.streaming.vocoder.sample_rate(),
+            rate: plan.rate,
+            pitch_range: plan.pitch_range,
+            prominence: plan.prominence,
+            pause_weight: plan.pause_weight,
+            audio_blake3,
+        };
+
+        Ok((all_samples, receipt))
     }
 
     /// Speak text in real time with enhanced prosody control
@@ -730,11 +787,11 @@ mod tests {
         let narrow = make_plan(0.65);
         let wide = make_plan(1.45);
 
-        let narrow_samples = voice
+        let (narrow_samples, _) = voice
             .synthesize_phonological_plan(&narrow)
             .expect("narrow pitch plan should synthesize");
         voice.reset();
-        let wide_samples = voice
+        let (wide_samples, _) = voice
             .synthesize_phonological_plan(&wide)
             .expect("wide pitch plan should synthesize");
 
@@ -803,11 +860,11 @@ mod tests {
         let no_pause = make_plan(0.0);
         let explicit_pause = make_plan(1.0);
 
-        let no_pause_samples = voice
+        let (no_pause_samples, _) = voice
             .synthesize_phonological_plan(&no_pause)
             .expect("no-pause plan should synthesize");
         voice.reset();
-        let explicit_pause_samples = voice
+        let (explicit_pause_samples, _) = voice
             .synthesize_phonological_plan(&explicit_pause)
             .expect("explicit pause plan should synthesize");
 
@@ -815,6 +872,57 @@ mod tests {
             explicit_pause_samples.len() > no_pause_samples.len(),
             "pause weight must extend only the explicitly encoded silence segment"
         );
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_phonological_plan_receipt_binds_plan_and_audio() {
+        use symthaea_broca::{
+            ContentBindingStatus, LinguisticFrame, PhonemeSlot, SpeechPlan, StructuredDecoder,
+            SyllableStress, ThoughtChannels,
+        };
+
+        let genesis = GenesisSeed::from_phrase("plan-native-receipt-test");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(2);
+        let readout = decoder.decode(&channels);
+        let speech_plan = SpeechPlan::from_readout(&channels, &readout);
+        let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+        let mut plan = PhonologicalPlan::from_linguistic_frame(&frame);
+        plan.bind_segments(
+            vec![PhonemeSlot::new(
+                "AH",
+                0,
+                SyllableStress::Primary,
+                true,
+                false,
+                true,
+            )],
+            ContentBindingStatus::PhonologicallyBound,
+        )
+        .expect("explicit receipt fixture");
+
+        let mut voice = LiveVoice::new_headless(&genesis);
+        let receipt = voice
+            .speak_phonological_plan_with_receipt(&plan)
+            .expect("plan-native receipt should be emitted");
+
+        assert_eq!(receipt.schema_version, 1);
+        assert_eq!(receipt.plan_version, plan.version);
+        assert_eq!(
+            receipt.plan_grounding_blake3,
+            blake3::hash(plan.grounding_surface().as_bytes())
+                .to_hex()
+                .to_string()
+        );
+        assert_eq!(receipt.segment_count, 1);
+        assert_eq!(receipt.sample_count, receipt.scheduler_frames * 120);
+        assert_eq!(receipt.sample_rate, 24_000);
+        assert_eq!(receipt.rate, plan.rate);
+        assert_eq!(receipt.pitch_range, plan.pitch_range);
+        assert_eq!(receipt.prominence, plan.prominence);
+        assert_eq!(receipt.pause_weight, plan.pause_weight);
+        assert_eq!(receipt.audio_blake3.len(), 64);
     }
 
     #[cfg(feature = "ssm_language")]
