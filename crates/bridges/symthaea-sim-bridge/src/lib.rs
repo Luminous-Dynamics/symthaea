@@ -233,11 +233,52 @@ impl MultiPhysicsRequest {
     /// as compatible because an executable coupling requires a known contract.
     pub fn validate_typed_topology(&self) -> Result<(), SimulationError> {
         use std::collections::HashMap;
-        let stages = self
-            .stages
-            .iter()
-            .map(|stage| (stage.id.as_str(), stage))
-            .collect::<HashMap<_, _>>();
+        let mut stages = HashMap::new();
+        for stage in &self.stages {
+            if stage.id.trim().is_empty() {
+                return Err(SimulationError::InvalidRequest(
+                    "typed topology stage id cannot be empty".into(),
+                ));
+            }
+            if stages.insert(stage.id.as_str(), stage).is_some() {
+                return Err(SimulationError::InvalidRequest(format!(
+                    "typed topology contains duplicate stage id {:?}",
+                    stage.id
+                )));
+            }
+
+            let mut inputs = HashMap::new();
+            for port in &stage.typed_consumes {
+                if port.name.trim().is_empty() {
+                    return Err(SimulationError::InvalidRequest(format!(
+                        "typed input name cannot be empty in stage {:?}",
+                        stage.id
+                    )));
+                }
+                if inputs.insert(port.name.as_str(), port).is_some() {
+                    return Err(SimulationError::InvalidRequest(format!(
+                        "typed stage {:?} contains duplicate input port {:?}",
+                        stage.id, port.name
+                    )));
+                }
+            }
+
+            let mut outputs = HashMap::new();
+            for port in &stage.typed_produces {
+                if port.name.trim().is_empty() {
+                    return Err(SimulationError::InvalidRequest(format!(
+                        "typed output name cannot be empty in stage {:?}",
+                        stage.id
+                    )));
+                }
+                if outputs.insert(port.name.as_str(), port).is_some() {
+                    return Err(SimulationError::InvalidRequest(format!(
+                        "typed stage {:?} contains duplicate output port {:?}",
+                        stage.id, port.name
+                    )));
+                }
+            }
+        }
 
         for connection in &self.typed_connections {
             let producer = stages.get(connection.producer_stage.as_str()).ok_or_else(|| {
@@ -270,7 +311,10 @@ impl MultiPhysicsRequest {
                     connection.consumer_port
                 )))?;
 
-            match output.physical_type.judge_compatibility(&input.physical_type) {
+            match output
+                .physical_type
+                .judge_numeric_compatibility(&input.physical_type)
+            {
                 TypeJudgement::Valid(()) => {}
                 TypeJudgement::Invalid(error) => {
                     return Err(SimulationError::InvalidRequest(format!(
@@ -327,7 +371,7 @@ impl MultiPhysicsRequest {
                         port.name
                     )));
                 };
-                match source.judge_compatibility(&port.physical_type) {
+                match source.judge_numeric_compatibility(&port.physical_type) {
                     TypeJudgement::Valid(()) => {}
                     TypeJudgement::Invalid(error) => {
                         return Err(SimulationError::InvalidRequest(format!(
@@ -1450,6 +1494,103 @@ mod tests {
         fn run(&self, request: &SimulationRequest) -> Result<SimulationResult, SimulationError> {
             Ok(SimulationResult::converged(&request.id, 1.0))
         }
+    }
+
+    #[test]
+    fn explicit_typed_topology_rejects_unit_presence_mismatch() {
+        let metres = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Length,
+            symthaea_types::PhysicalDimension::LENGTH,
+        )
+        .with_unit(symthaea_types::UnitRef {
+            symbol: "m".into(),
+            transform_to_si: symthaea_types::UnitTransform::IDENTITY,
+            semantic_id: None,
+        });
+        let unlabelled = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Length,
+            symthaea_types::PhysicalDimension::LENGTH,
+        );
+
+        let producer = CoupledSimulationStage::new(
+            "producer",
+            EngineeringDomain::Mechanical,
+            SolverKind::FiniteElement,
+        )
+        .typed_produces([TypedPhysicalPort::new("length", metres)]);
+
+        let consumer = CoupledSimulationStage::new(
+            "consumer",
+            EngineeringDomain::Mechanical,
+            SolverKind::MultibodyDynamics,
+        )
+        .typed_consumes([TypedPhysicalPort::new("length", unlabelled)]);
+
+        let request = MultiPhysicsRequest::new(
+            "unit-mismatch",
+            "numeric transport must be explicit",
+            CouplingMode::OneWay,
+        )
+        .with_stage(producer)
+        .with_stage(consumer)
+        .with_typed_connection(TypedPhysicalConnection::new(
+            "producer",
+            "length",
+            "consumer",
+            "length",
+        ));
+
+        assert!(request.validate_typed_topology().is_err());
+    }
+
+    #[test]
+    fn explicit_typed_topology_rejects_duplicate_stage_ids() {
+        let producer = CoupledSimulationStage::new(
+            "duplicate",
+            EngineeringDomain::Mechanical,
+            SolverKind::FiniteElement,
+        );
+        let consumer = CoupledSimulationStage::new(
+            "duplicate",
+            EngineeringDomain::Electrical,
+            SolverKind::Circuit,
+        );
+
+        let request = MultiPhysicsRequest::new(
+            "duplicate-stage",
+            "reject ambiguous stage identity",
+            CouplingMode::OneWay,
+        )
+        .with_stage(producer)
+        .with_stage(consumer);
+
+        assert!(request.validate_typed_topology().is_err());
+    }
+
+    #[test]
+    fn explicit_typed_topology_rejects_duplicate_port_names() {
+        let length = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Length,
+            symthaea_types::PhysicalDimension::LENGTH,
+        );
+        let producer = CoupledSimulationStage::new(
+            "producer",
+            EngineeringDomain::Mechanical,
+            SolverKind::FiniteElement,
+        )
+        .typed_produces([
+            TypedPhysicalPort::new("length", length.clone()),
+            TypedPhysicalPort::new("length", length),
+        ]);
+
+        let request = MultiPhysicsRequest::new(
+            "duplicate-port",
+            "reject ambiguous port identity",
+            CouplingMode::OneWay,
+        )
+        .with_stage(producer);
+
+        assert!(request.validate_typed_topology().is_err());
     }
 
     #[test]
