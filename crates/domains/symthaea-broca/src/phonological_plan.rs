@@ -287,6 +287,9 @@ impl PhonologicalPlan {
                 if provenance.trim().is_empty() {
                     return Err(PhonologicalPlanError::EmptyLexicalProvenance);
                 }
+                if !is_blake3_token(provenance) {
+                    return Err(PhonologicalPlanError::InvalidLexicalProvenanceFormat);
+                }
             }
             ContentBindingStatus::RoleStructureOnly | ContentBindingStatus::PhonologicallyBound => {
                 if self.lexical_provenance.is_some() {
@@ -778,6 +781,28 @@ mod tests {
 
         assert_eq!(
             error,
+            PhonologicalPlanError::InvalidLexicalProvenanceFormat
+        );
+    }
+
+    #[test]
+    fn persisted_lexical_binding_rejects_malformed_provenance() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        plan.content_binding = ContentBindingStatus::LexicallyBound;
+        plan.segments = vec![PhonemeSlot::new(
+            "AE",
+            0,
+            SyllableStress::Primary,
+            true,
+            false,
+            true,
+        )];
+        plan.syllables = derive_syllables(&plan.segments);
+        plan.lexical_provenance = Some("arbitrary-persisted-provenance".to_string());
+
+        assert_eq!(
+            plan.validate()
+                .expect_err("persisted lexical provenance must be canonical"),
             PhonologicalPlanError::InvalidLexicalProvenanceFormat
         );
     }
