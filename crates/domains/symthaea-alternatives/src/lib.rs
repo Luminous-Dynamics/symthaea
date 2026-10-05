@@ -26,7 +26,7 @@ pub mod corpus;
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 4;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-v7";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-v8";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -721,6 +721,30 @@ impl CandidatePathway {
                     && e.confidence >= 0.7
             })
         });
+        let field_independent_sources = self
+            .burdens
+            .values()
+            .flat_map(|estimate| self.linked_evidence_at(&estimate.evidence_ids, as_of))
+            .filter(|e| {
+                e.kind == EvidenceKind::FieldObserved
+                    && e.stance == EvidenceStance::Supports
+                    && e.confidence >= 0.7
+            })
+            .map(|e| e.source_id.as_str())
+            .collect::<BTreeSet<_>>()
+            .len();
+        let monitoring_independent_sources = self
+            .burdens
+            .values()
+            .flat_map(|estimate| self.linked_evidence_at(&estimate.evidence_ids, as_of))
+            .filter(|e| {
+                e.kind == EvidenceKind::ContinuouslyMonitored
+                    && e.stance == EvidenceStance::Supports
+                    && e.confidence >= 0.7
+            })
+            .map(|e| e.source_id.as_str())
+            .collect::<BTreeSet<_>>()
+            .len();
         let all_dimensions_field_observed = Dimension::ALL.iter().all(|dimension| {
             self.burdens
                 .get(dimension)
@@ -753,9 +777,9 @@ impl CandidatePathway {
             })
         });
 
-        if all_dimensions_monitored {
+        if all_dimensions_monitored && monitoring_independent_sources >= 2 {
             QualificationState::ContinuouslyMonitored
-        } else if all_dimensions_field_observed {
+        } else if all_dimensions_field_observed && field_independent_sources >= 2 {
             QualificationState::FieldQualified
         } else if any_supported_measurement
             && independent_sources >= 2
@@ -1706,6 +1730,35 @@ mod tests {
             ConstraintStatus::Unresolved
         );
         assert!(result.frontier_blockers.contains_key("uncertain-performance"));
+    }
+
+    #[test]
+    fn one_field_source_cannot_promote_field_qualification() {
+        let mut c = candidate(
+            "single-field-source",
+            PathwayKind::ProcessSubstitution,
+            1.0,
+            1.0,
+            vec![evidence(
+                "field",
+                "field-source",
+                EvidenceKind::FieldObserved,
+                EvidenceStance::Supports,
+                0.95,
+            )],
+        );
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["field".into()];
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_ne!(
+            result.candidates[0].qualification,
+            QualificationState::FieldQualified
+        );
     }
 
     #[test]
