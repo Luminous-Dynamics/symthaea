@@ -118,6 +118,9 @@ pub struct NeurosemanticHandlingPolicy {
     /// BLAKE3-256 digest of the exact externally authoritative policy/consent record bytes
     /// (or its separately specified canonical form). This is a binding, not an authority signature.
     pub policy_provenance_hash: String,
+    /// BLAKE3-256 digest of the exact externally authoritative policy/consent record bytes
+    /// (or its separately specified canonical form). This is a binding, not an authority signature.
+    pub policy_provenance_hash: String,
     /// Jurisdiction identifier asserted for the originating data/controller context.
     /// This is an interoperable policy identifier, not a legal determination.
     pub origin_jurisdiction: String,
@@ -522,7 +525,8 @@ impl NeurosemanticPacket {
         let mut packet = Self::new(
             sequence,
             sender_id,
-            recipient_id,            purpose,
+            recipient_id,
+            purpose,
             channel,
             direction,
             representation,
@@ -1073,7 +1077,8 @@ mod tests {
         assert!(!policy.allows_action(NeurosemanticHandlingAction::Persist, 200));
         assert!(policy.allows_action(
             NeurosemanticHandlingAction::SecondaryUse(NeurosemanticSecondaryUse::Research),
-            150        ));
+            150
+        ));
         assert!(!policy.allows_action(
             NeurosemanticHandlingAction::SecondaryUse(NeurosemanticSecondaryUse::ModelTraining),
             150
@@ -1555,3 +1560,242 @@ mod tests {
         };
 
         assert!(message.validate(&lease(), 150).is_ok());
+    }
+
+    #[test]
+    fn read_direction_rejects_peer_to_subject_packet() {
+        let base = lease();
+        let packet = NeurosemanticPacket::new_with_policy(
+            10,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Read,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            semantic_policy(),
+            0.77,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: base.consent_epoch,
+            lease_id: base.lease_id,
+        };
+
+        assert!(message.validate(&lease(), 150).is_err());
+    }
+
+    #[test]
+    fn nonfinite_derived_features_are_rejected() {
+        let result = NeurosemanticPacket::new(
+            11,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            semantic_policy(),
+            0.5,
+            NeurosemanticPayload::DerivedNeuralFeature(vec![0.1, f32::NAN]),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn unsupported_protocol_versions_are_rejected() {
+        let mut packet = NeurosemanticPacket::new(
+            12,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        packet.protocol_version += 1;
+        assert!(packet.validate_integrity().is_err());
+    }
+
+    #[test]
+    fn payload_size_is_bounded() {
+        let values = vec![1_i8; MAX_NEUROSEMANTIC_PAYLOAD_BYTES];
+        let result = NeurosemanticPacket::new(
+            13,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            0.5,
+            NeurosemanticPayload::Hypervector(values),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn zero_sequence_is_rejected_at_construction() {
+        let result = NeurosemanticPacket::new(
+            0,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn authorized_replay_path_requires_active_consent() {
+        let base = lease();
+        let packet = NeurosemanticPacket::new_with_policy(
+            14,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            semantic_policy(),
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: base.consent_epoch,
+            lease_id: base.lease_id.clone(),
+        };
+        let mut tracker = NeurosemanticReplayTracker::default();
+        assert_eq!(
+            tracker.observe_authorized(&message, &base, 150).unwrap(),
+            ReplayDecision::Accept
+        );
+        let mut revoked = base.clone();
+        revoked.revoked = true;
+        revoked.revoked_at_unix_s = Some(150);
+        assert!(tracker
+            .observe_authorized(&message, &revoked, 150)
+            .is_err());
+
+        let mut malformed_revoked = base.clone();
+        malformed_revoked.revoked = true;
+        malformed_revoked.revoked_at_unix_s = None;
+        assert!(malformed_revoked.validate().is_err());
+    }
+
+    #[test]
+    fn replay_state_is_reclaimed_after_lease_expiry() {
+        let base = lease();
+        let packet = NeurosemanticPacket::new_with_policy(
+            16,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            semantic_policy(),
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: base.consent_epoch,
+            lease_id: base.lease_id.clone(),
+        };
+        let mut tracker = NeurosemanticReplayTracker::default();
+        assert_eq!(
+            tracker.observe_authorized(&message, &base, 150).unwrap(),
+            ReplayDecision::Accept
+        );
+        assert_eq!(tracker.prune_expired(199), 0);
+        assert_eq!(tracker.prune_expired(200), 1);
+        assert_eq!(tracker.prune_expired(200), 0);
+    }
+
+    #[test]
+    fn sensitivity_ceiling_is_enforced() {
+        let base = lease();
+        let packet = NeurosemanticPacket::new_with_policy(
+            15,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::HighlyPrivate,
+            semantic_policy(),
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: base.consent_epoch,
+            lease_id: base.lease_id.clone(),
+        };
+        assert!(message.validate(&base, 150).is_err());
+        let mut elevated = base.clone();
+        elevated.max_write_sensitivity = CognitiveSensitivity::HighlyPrivate;
+        assert!(message.validate(&elevated, 150).is_ok());
+    }
+
+    #[test]
+    fn revoked_leases_require_effective_timestamp() {
+        let mut l = lease();
+        l.revoked = true;
+        assert!(l.validate().is_err());
+        l.revoked_at_unix_s = Some(150);
+        assert!(l.validate().is_ok());
+        assert!(l.authorizes(
+            CognitiveChannel::Semantic,
+            ChannelDirection::Read,
+            CommunicationPurpose::HumanCollaboration,
+            "peer",
+            149
+        ) == false);
+    }
+
+    #[test]
+    fn legacy_leases_default_to_public_sensitivity() {
+        let lease = lease();
+        let mut value = serde_json::to_value(&lease).unwrap();
+        let object = value.as_object_mut().unwrap();
+        object.remove("max_read_sensitivity");
+        object.remove("max_write_sensitivity");
+        let restored: CognitiveConsentLease = serde_json::from_value(value).unwrap();
+        assert_eq!(restored.max_read_sensitivity, CognitiveSensitivity::Public);
+        assert_eq!(restored.max_write_sensitivity, CognitiveSensitivity::Public);
+    }
+
+    #[test]
+    fn raw_neural_samples_are_not_a_payload_variant() {
+        let encoded = serde_json::to_string(
+            &NeurosemanticPayload::DerivedNeuralFeature(vec![0.1, 0.2]),
+        )
+        .unwrap();
+        assert!(encoded.contains("DerivedNeuralFeature"));
+        assert!(!encoded.contains("RawNeural"));
+    }
+}
