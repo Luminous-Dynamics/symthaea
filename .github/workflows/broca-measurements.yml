@@ -7,6 +7,8 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/domains/symthaea-broca/**"
+      - "crates/domains/symthaea-vocal-tract/**"
+      - "src/voice/**"
       - "scripts/broca_measurement_artifacts.sh"
       - "scripts/broca_measurement_summary.py"
       - "scripts/broca_capture_baseline.sh"
