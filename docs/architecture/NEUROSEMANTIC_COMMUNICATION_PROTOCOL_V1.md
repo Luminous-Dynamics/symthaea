@@ -290,6 +290,21 @@ Policy-bearing packets also bind the declared data class to the payload's intrin
 
 Recent iBCI governance work likewise distinguishes raw recordings, processed features, decoded inferences, and personalized model parameters, while identifying conflated consent and weak misuse guardrails as important gaps. (see Sandbrink & Young, *Communications Medicine*, 27 July 2026, DOI 10.1038/s43856-026-01797-y; Young et al., *Device*, available 11 August 2026, DOI 10.1016/j.device.2026.101271).
 
+### Downstream handling sovereignty
+
+The v2 data policy also declares downstream handling constraints separately from transport sensitivity:
+
+- an origin jurisdiction and an explicit destination-jurisdiction allow-list;
+- a retention policy (`Ephemeral` or an explicit Unix-time expiry);
+- an explicit secondary-use allow-list, empty by default;
+- a concrete handling action at the enforcement boundary (`Transmit`, `Persist`, or `SecondaryUse(...)`).
+
+Destination identifiers currently use two-character uppercase jurisdiction codes (for example `ZA` and `GB`) as an interoperable policy identifier. This is a representation constraint, not a legal determination of which law applies.
+
+A packet being valid and consent-authorized does not imply that it may be persisted indefinitely, transferred to another jurisdiction, used for model training, commercial analytics, behavioral profiling, affective inference, or identity inference. Those downstream actions require an explicit matching handling policy. The handling check is intentionally an additional gate rather than a replacement for identity, signed-consent, revocation, audit, or legal/policy provenance managed outside this crate.
+
+This design responds directly to current neurotechnology governance concerns about permissive secondary-use clauses, inference-sensitive misuse, and the need to preserve individual control over downstream processing. UNESCO's 2025 Recommendation emphasizes mental privacy, freedom of thought, consent, and restrictions on coercive or surveillance uses; 2026 iBCI governance work likewise highlights secondary-use and inference-level risks.
+
 
 ## Serialized artifact trust boundary
 
