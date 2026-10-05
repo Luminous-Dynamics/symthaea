@@ -159,6 +159,31 @@ impl PhysicalType {
     pub fn digest(&self) -> [u8; 32] {
         *blake3::hash(&self.canonical_bytes()).as_bytes()
     }
+
+    /// Fail-closed compatibility judgment for a typed signal/port boundary.
+    pub fn judge_compatibility(&self, other: &Self) -> TypeJudgement<()> {
+        let (Some(a), Some(b)) = (self.dimension, other.dimension) else {
+            return TypeJudgement::Unknown(
+                "physical dimension is unknown on one or both sides of the boundary".into(),
+            );
+        };
+        if a != b {
+            return TypeJudgement::Invalid(PhysicalTypeError {
+                operation: "compatibility".into(),
+                reason: "physical dimensions differ".into(),
+            });
+        }
+        if self.kind != QuantityKind::Unknown
+            && other.kind != QuantityKind::Unknown
+            && self.kind != other.kind
+        {
+            return TypeJudgement::Invalid(PhysicalTypeError {
+                operation: "compatibility".into(),
+                reason: "physical quantity kinds differ".into(),
+            });
+        }
+        TypeJudgement::Valid(())
+    }
 }
 
 /// Physical quantity kinds are stricter than dimensions. Energy and Torque,
