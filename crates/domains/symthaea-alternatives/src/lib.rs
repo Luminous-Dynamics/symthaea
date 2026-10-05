@@ -418,7 +418,7 @@ impl MeasurementUncertaintyStatement {
     pub fn validate(&self) -> Result<(), AssessmentError> {
         match self {
             Self::Standard { value, unit } => {
-                if !value.is_finite() || *value < 0.0 || unit.is_empty() {
+                if !value.is_finite() || *value <= 0.0 || unit.is_empty() {
                     return Err(AssessmentError::InvalidMeasurementUncertainty);
                 }
             }
