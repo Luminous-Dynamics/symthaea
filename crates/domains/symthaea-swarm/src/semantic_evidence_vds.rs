@@ -1457,7 +1457,12 @@ impl Rfc9942ReceiptCollection {
         let mut receipts = Vec::with_capacity(items.len());
         for encoded in items {
             let receipt = Rfc9942ReceiptEnvelope::from_cbor(&encoded)
-                .map_err(|_|Rfc9942VdpError::InvalidReceiptStructure)?;
+                .map_err(|error| match error {
+                    Rfc9942VdpError::ResourceLimitExceeded => {
+                        Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded
+                    }
+                    _ => Rfc9942VdpError::InvalidReceiptStructure,
+                })?;
             receipts.push(receipt);
         }
         Self::new(receipts)
