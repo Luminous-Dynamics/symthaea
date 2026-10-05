@@ -376,10 +376,9 @@ impl NixOSCommand {
     pub fn rollback_command(&self) -> Option<NixOSCommand> {
         match self {
             Self::RebuildSwitch { .. } | Self::RebuildTest { .. } | Self::RebuildBoot { .. } => {
-                Some(NixOSCommand::Custom {
-                    command: "nixos-rebuild".to_string(),
-                    args: vec!["switch".to_string(), "--rollback".to_string()],
-                    safety_level: SafetyLevel::SystemCritical,
+                Some(NixOSCommand::RebuildSwitch {
+                    flake: None,
+                    extra_args: vec!["--rollback".to_string()],
                 })
             }
             Self::EnvInstall { .. } | Self::EnvRemove { .. } => {
@@ -1623,7 +1622,54 @@ mod tests {
             ExecutionResult::Blocked {
                 safety_level: SafetyLevel::SystemModify,
                 reason
-            } if reason.contains("live Nixward execution authority")
+            } if reason.contains("typed Nixward command")
+        ));
+    }
+
+    #[tokio::test]
+    async fn arbitrary_custom_wrapper_cannot_reach_service_effects() {
+        let mut executor = NixOSExecutor::new();
+        for (command, args) in [
+            ("sh", vec!["-c".to_string(), "systemctl restart nginx.service".to_string()]),
+            ("env", vec!["systemctl".to_string(), "restart".to_string(), "nginx.service".to_string()]),
+        ] {
+            let result = executor
+                .execute(
+                    NixOSCommand::Custom {
+                        command: command.to_string(),
+                        args,
+                        safety_level: SafetyLevel::SystemModify,
+                    },
+                    1.0,
+                )
+                .await;
+            assert!(matches!(
+                result,
+                ExecutionResult::Blocked {
+                    safety_level: SafetyLevel::SystemModify,
+                    reason
+                } if reason.contains("typed Nixward command")
+            ));
+        }
+    }
+
+    #[tokio::test]
+    async fn custom_commands_remain_previewable_in_dry_run() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let result = executor
+            .execute(
+                NixOSCommand::Custom {
+                    command: "sh".to_string(),
+                    args: vec!["-c".to_string(), "systemctl restart nginx.service".to_string()],
+                    safety_level: SafetyLevel::SystemModify,
+                },
+                1.0,
+            )
+            .await;
+        assert!(matches!(
+            result,
+            ExecutionResult::Success { stdout, .. }
+                if stdout.contains("[DRY-RUN] Would execute: sh -c systemctl restart nginx.service")
         ));
     }
 
@@ -1927,7 +1973,10 @@ mod tests {
         assert!(switch.rollback_command().is_some());
         assert!(test.rollback_command().is_some());
         assert!(boot.rollback_command().is_some());
-        assert!(hm.rollback_command().is_some());
+        assert!(
+            hm.rollback_command().is_none(),
+            "Home Manager rollback must not use an arbitrary shell command"
+        );
         assert!(
             gc.rollback_command().is_none(),
             "GC should not have rollback"
