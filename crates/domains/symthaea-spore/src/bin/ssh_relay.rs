@@ -43,7 +43,7 @@ fn shell_single_quote(value: &str) -> String {
     // POSIX single quotes preserve every character except a literal single
     // quote. Represent that one byte by closing the quote, emitting an escaped
     // quote, then reopening it.
-    format!("'{}'", value.replace('\\'', "'\\\\''"))
+    format!("'{}'", value.replace(char::from(39), "'\\''"))
 }
 
 async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
@@ -5051,8 +5051,8 @@ mod installer_shell_tests {
             "a'b; $(touch /tmp/pwned) \n \\ " .to_string()
                 + "\u{60}echo pwned\u{60}";
         let quoted = shell_single_quote(&value);
-        assert!(quoted.starts_with('\\''));
-        assert!(quoted.ends_with('\\''));
+        assert!(quoted.starts_with("'"));
+        assert!(quoted.ends_with("'"));
         assert!(quoted.contains("'\\''"));
         assert!(quoted.contains("$("));
         assert!(quoted.contains(";"));
