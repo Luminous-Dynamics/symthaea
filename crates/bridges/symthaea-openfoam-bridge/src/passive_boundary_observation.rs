@@ -166,23 +166,11 @@ fn parse_face_list_count(
     let tokens = tokenize(&stripped)?;
 
     let mut brace_depth = 0usize;
+    let mut paren_depth = 0usize;
     let mut list_count = None;
     for index in 0..tokens.len().saturating_sub(1) {
-        match tokens[index] {
-            Token::LBrace => {
-                brace_depth = brace_depth
-                    .checked_add(1)
-                    .ok_or(OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
-            }
-            Token::RBrace => {
-                brace_depth = brace_depth
-                    .checked_sub(1)
-                    .ok_or(OpenFoamBoundaryObservationError::InvalidFaceListEntry)?;
-            }
-            Token::Number(_) | Token::Ident(_) | Token::LParen | Token::RParen | Token::Semi => {}
-        }
-
         if brace_depth == 0
+            && paren_depth == 0
             && matches!(&tokens[index], Token::Number(_))
             && matches!(tokens[index + 1], Token::LParen)
         {
@@ -196,6 +184,34 @@ fn parse_face_list_count(
                 OpenFoamBoundaryObservationError::InvalidFaceListEntry
             })?);
         }
+
+        match tokens[index] {
+            Token::LBrace => {
+                brace_depth = brace_depth
+                    .checked_add(1)
+                    .ok_or(OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
+            }
+            Token::RBrace => {
+                brace_depth = brace_depth
+                    .checked_sub(1)
+                    .ok_or(OpenFoamBoundaryObservationError::InvalidFaceListEntry)?;
+            }
+            Token::LParen => {
+                paren_depth = paren_depth
+                    .checked_add(1)
+                    .ok_or(OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
+            }
+            Token::RParen => {
+                paren_depth = paren_depth
+                    .checked_sub(1)
+                    .ok_or(OpenFoamBoundaryObservationError::InvalidFaceListEntry)?;
+            }
+            Token::Number(_) | Token::Ident(_) | Token::Semi => {}
+        }
+    }
+
+    if brace_depth != 0 || paren_depth != 0 {
+        return Err(OpenFoamBoundaryObservationError::InvalidFaceListEntry);
     }
 
     list_count.ok_or(OpenFoamBoundaryObservationError::MissingFaceList)
@@ -205,30 +221,22 @@ fn parse_boundary_patch_list(
     tokens: &[Token],
 ) -> Result<Vec<OpenFoamBoundaryPatchRecord>, OpenFoamBoundaryObservationError> {
     let mut brace_depth = 0usize;
+    let mut paren_depth = 0usize;
     let mut list_start = None;
     let mut list_count = None;
 
     for index in 0..tokens.len().saturating_sub(1) {
-        match tokens[index] {
-            Token::LBrace => brace_depth = brace_depth.checked_add(1).ok_or(
-                OpenFoamBoundaryObservationError::ArithmeticOverflow,
-            )?,
-            Token::RBrace => {
-                brace_depth = brace_depth.checked_sub(1).ok_or(
-                    OpenFoamBoundaryObservationError::UnexpectedEndOfInput,
-                )?
-            }
-            Token::Number(_) | Token::Ident(_) | Token::LParen | Token::RParen
-            | Token::Semi => {}
-        }
-
-        if brace_depth == 0 && matches!(&tokens[index], Token::Number(_))
+        if brace_depth == 0
+            && paren_depth == 0
+            && matches!(&tokens[index], Token::Number(_))
             && matches!(tokens[index + 1], Token::LParen)
         {
             if list_start.is_some() {
                 return Err(OpenFoamBoundaryObservationError::DuplicatePatchList);
             }
-            let Token::Number(count) = &tokens[index] else { unreachable!() };
+            let Token::Number(count) = &tokens[index] else {
+                unreachable!();
+            };
             let declared = count.parse::<u64>().map_err(|_| {
                 OpenFoamBoundaryObservationError::InvalidNumericField {
                     patch: "<boundary-list>".to_string(),
@@ -238,6 +246,34 @@ fn parse_boundary_patch_list(
             list_count = Some(declared);
             list_start = Some(index + 2);
         }
+
+        match tokens[index] {
+            Token::LBrace => {
+                brace_depth = brace_depth.checked_add(1).ok_or(
+                    OpenFoamBoundaryObservationError::ArithmeticOverflow,
+                )?
+            }
+            Token::RBrace => {
+                brace_depth = brace_depth.checked_sub(1).ok_or(
+                    OpenFoamBoundaryObservationError::UnexpectedEndOfInput,
+                )?
+            }
+            Token::LParen => {
+                paren_depth = paren_depth.checked_add(1).ok_or(
+                    OpenFoamBoundaryObservationError::ArithmeticOverflow,
+                )?
+            }
+            Token::RParen => {
+                paren_depth = paren_depth.checked_sub(1).ok_or(
+                    OpenFoamBoundaryObservationError::UnexpectedEndOfInput,
+                )?
+            }
+            Token::Number(_) | Token::Ident(_) | Token::Semi => {}
+        }
+    }
+
+    if brace_depth != 0 || paren_depth != 0 {
+        return Err(OpenFoamBoundaryObservationError::UnexpectedEndOfInput);
     }
 
     let mut index = list_start.ok_or(OpenFoamBoundaryObservationError::MissingPatchList)?;
