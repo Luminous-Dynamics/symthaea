@@ -11,7 +11,8 @@
 #![cfg(all(feature = "ssm_language", feature = "vocal-tract"))]
 
 use symthaea_broca::{IntonationIntent, PhonemeSlot, ProsodicIntent, SpeechPlan, SpeechSensoryTarget};
-use symthaea_vocal_tract::pipeline::{Intonation, PitchAccent, ProsodyContext, SourceType, predict_duration};
+use symthaea_vocal_tract::pipeline::{Intonation, PitchAccent, ProsodyContext, predict_duration};
+use symthaea_vocal_tract::types::SourceType;
 
 /// Timing/articulation state supplied by the phonological/realization layer.
 #[derive(Debug, Clone, Copy)]
@@ -76,7 +77,7 @@ impl Default for BrocaFramePosition {
 }
 
 /// Root-layer adapter from Broca's production plan into the existing vocal tract API.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct BrocaProsodyAdapter {
     plan: SpeechPlan,
 }
