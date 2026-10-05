@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 12
+pub const SCHEMA_VERSION: u16 = 13;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-v21";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-v22";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -266,6 +266,8 @@ pub struct EvidenceSourceIdentity {
 /// cryptographic verification inside this crate.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SourceAdmissionRef {
+    /// Stable authority identity to which this admission belongs.
+    pub authority_id: String,
     /// Stable identifier for the source-admissibility policy.
     pub policy_id: String,
     /// Policy revision.
@@ -287,7 +289,8 @@ pub struct SourceAdmissionRef {
 impl SourceAdmissionRef {
     /// Validate the externally supplied admission reference structurally.
     pub fn validate(&self) -> Result<(), AssessmentError> {
-        if self.policy_id.is_empty()
+        if self.authority_id.is_empty()
+            || self.policy_id.is_empty()
             || self.policy_revision.is_empty()
             || self.policy_digest.is_empty()
             || self.admission_id.is_empty()
@@ -331,6 +334,12 @@ impl EvidenceSourceIdentity {
         }
         if let Some(admission) = &self.admission {
             admission.validate()?;
+            if admission.authority_id != self.authority_id {
+                return Err(AssessmentError::SourceAdmissionAuthorityMismatch {
+                    source_authority_id: self.authority_id.clone(),
+                    admission_authority_id: admission.authority_id.clone(),
+                });
+            }
         }
         Ok(())
     }
@@ -1752,6 +1761,13 @@ pub enum AssessmentError {
     EmptyAssessmentSubject,
     /// External source admission reference is incomplete.
     EmptySourceAdmissionReference,
+    /// The admission authority does not match the evidence source authority.
+    SourceAdmissionAuthorityMismatch {
+        /// Authority named by the evidence source identity.
+        source_authority_id: String,
+        /// Authority named by the admission reference.
+        admission_authority_id: String,
+    },
     /// Freshness policy identity is incomplete.
     EmptyFreshnessPolicyIdentity,
     /// Comparison methodology/basis identity is incomplete.
@@ -2552,6 +2568,7 @@ mod tests {
 
     fn admitted(mut evidence: EvidenceRecord) -> EvidenceRecord {
         evidence.source.admission = Some(SourceAdmissionRef {
+            authority_id: evidence.source.authority_id.clone(),
             policy_id: "fixture-policy".into(),
             policy_revision: "v1".into(),
             policy_digest: "fixture-policy-digest-v1".into(),
@@ -3696,6 +3713,7 @@ mod tests {
             .payload_hash;
 
         evidence.source.admission = Some(SourceAdmissionRef {
+            authority_id: evidence.source.authority_id.clone(),
             policy_id: "policy".into(),
             policy_revision: "r1".into(),
             policy_digest: "policy-digest".into(),
@@ -3716,6 +3734,35 @@ mod tests {
     }
 
     #[test]
+    fn source_admission_authority_mismatch_fails_closed() {
+        let source = EvidenceSourceIdentity {
+            authority_id: "authority-a".into(),
+            artifact_id: "artifact".into(),
+            artifact_digest: "digest".into(),
+            issuer_key_fingerprint: None,
+            admission: Some(SourceAdmissionRef {
+                authority_id: "authority-b".into(),
+                policy_id: "policy".into(),
+                policy_revision: "r1".into(),
+                policy_digest: "policy-digest".into(),
+                admission_id: "admission".into(),
+                authority_epoch: "epoch-1".into(),
+                fault_domain_id: Some("domain-b".into()),
+                valid_from_epoch_seconds: None,
+                valid_until_epoch_seconds: None,
+            }),
+        };
+
+        assert_eq!(
+            source.validate().unwrap_err(),
+            AssessmentError::SourceAdmissionAuthorityMismatch {
+                source_authority_id: "authority-a".into(),
+                admission_authority_id: "authority-b".into(),
+            }
+        );
+    }
+
+    #[test]
     fn source_admission_reference_validates_without_claiming_authenticity() {
         let mut source = EvidenceSourceIdentity {
             authority_id: "authority".into(),
@@ -3723,6 +3770,7 @@ mod tests {
             artifact_digest: "digest".into(),
             issuer_key_fingerprint: None,
             admission: Some(SourceAdmissionRef {
+                authority_id: "authority".into(),
                 policy_id: "policy".into(),
                 policy_revision: "r1".into(),
                 policy_digest: "policy-digest".into(),
@@ -3816,6 +3864,7 @@ mod tests {
 
         let mut admitted_a = a.clone();
         admitted_a.admission = Some(SourceAdmissionRef {
+            authority_id: "a".into(),
             policy_id: "policy".into(),
             policy_revision: "v1".into(),
             policy_digest: "digest".into(),
@@ -3845,6 +3894,7 @@ mod tests {
             0.9,
         );
         e.source.admission = Some(SourceAdmissionRef {
+            authority_id: "admitted-authority".into(),
             policy_id: "policy".into(),
             policy_revision: "v1".into(),
             policy_digest: "policy-digest".into(),
