@@ -3268,31 +3268,6 @@ mod tests {
     }
 
 
-        let claim = fixture_claim();
-        let request = VerificationRequest::from_claim(
-            &claim,
-            ClaimProofPurpose::new("assertionMethod").unwrap(),
-            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
-            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
-            default_freshness(),
-        )
-        .unwrap()
-        .with_expected_transformed_document_digest("22".repeat(32))
-        .unwrap();
-
-        let resolution = resolved_method(&request);
-        let mut receipt = test_cryptographic_receipt(&request, &resolution);
-        receipt.transformed_document_digest = "33".repeat(32);
-
-        assert!(matches!(
-            receipt.validate_against(&request, &resolution),
-            Err(VerificationFailure::TransformedDocumentDigestMismatch {
-                expected: Some(expected),
-                actual: Some(actual),
-            }) if expected == "22".repeat(32) && actual == "33".repeat(32)
-        ));
-    }
-
     #[test]
     fn evidence_rejects_top_level_transformed_document_binding_substitution() {
         let claim = fixture_claim();
