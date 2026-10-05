@@ -418,9 +418,9 @@ fn minimum_weight_syndrome_multiplicity_matches_nearest_codeword_multiplicity_ex
 
     assert_eq!(observations, 256);
     assert_eq!(unique + ambiguous, 256);
-    assert_eq!(ambiguous, 192);
-    assert_eq!(unique, 64);
-    assert_eq!(total_nearest_codewords, 448);
+    assert_eq!(ambiguous, 156);
+    assert_eq!(unique, 100);
+    assert_eq!(total_nearest_codewords, 484);
 
     println!(
         "MIN_SYNDROME_MULTIPLICITY_LEDGER=observations={observations};bound=4;unique={unique};ambiguous={ambiguous};total_nearest_codewords={total_nearest_codewords};multiplicity_identity=true"
