@@ -234,6 +234,11 @@ graph shape and the receiver-side candidate universe: a small authenticated
 frame must not be able to induce unbounded ranking work by pairing with an
 unbounded local ontology.
 
+Manifest identity/provenance strings are additionally bounded to 4096 UTF-8
+bytes, and each concept may carry at most 256 grounding references. These
+limits keep manifest canonicalization and authority metadata within a declared
+operating envelope rather than leaving per-entry amplification unconstrained.
+
 These are implementation safety bounds, not evidence of scalability. Raising
 them should require a new benchmark tranche that measures runtime, memory, and
 retrieval margins at the larger operating point rather than silently widening
