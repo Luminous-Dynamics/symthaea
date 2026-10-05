@@ -1455,6 +1455,7 @@ mod tests {
     fn execution_receipt_is_not_an_authorization_witness() {
         let receipt = ExecutionReceipt {
             action_id: "a-receipt".into(), authorization_instance: "approval-1".into(),
+            operation_id: None,
             action_digest: "sha256:execution-only".into(),
             provider_idempotency_key: "sha256:provider".into(),
             attempt_id: "attempt-1".into(), authority_epoch: 1, outcome: ExecutionOutcome::Succeeded,
