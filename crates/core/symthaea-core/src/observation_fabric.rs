@@ -2231,6 +2231,7 @@ pub enum ObservationValidationError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::{HashMap, HashSet};
 
     fn fixture() -> Observation {
         Observation {
@@ -2409,8 +2410,6 @@ mod tests {
         String,
         String,
     ) {
-        use std::collections::{HashMap, HashSet};
-
         fn ancestors(seed: &str, by_id: &HashMap<&str, &Observation>) -> HashSet<String> {
             let mut result = HashSet::new();
             let mut stack = by_id[seed]
@@ -2543,7 +2542,7 @@ mod tests {
                         },
                     )
                 } else {
-                    Self::oracle_v3_no_shared_basis(
+                    oracle_v3_no_shared_basis(
                         source,
                         target,
                         &source_ancestors,
@@ -2552,7 +2551,7 @@ mod tests {
                     )
                 }
             } else {
-                Self::oracle_v3_no_shared_basis(
+                oracle_v3_no_shared_basis(
                     source,
                     target,
                     &source_ancestors,
