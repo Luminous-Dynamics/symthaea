@@ -38,6 +38,8 @@ pub enum OpenFoamBoundaryObservationError {
     InvalidFaceListEntry,
     FacesCountMismatch { declared: u64, observed: u64 },
     InvalidFaceRecord { face_index: u64 },
+    DegenerateFace { face_index: u64 },
+    NonManifoldPatchEdge { face_index: u64, point_a: u64, point_b: u64 },
     BoundaryFaceRangeOutOfBounds {
         start_face: u64,
         n_faces: u64,
@@ -419,6 +421,55 @@ fn observe_openfoam_patch_geometry(
             }
         }
 
+        let first_point = points
+            .get(usize::try_from(face[0]).map_err(|_| {
+                OpenFoamBoundaryObservationError::PointIndexOutOfBounds {
+                    face_index: record.start_face + offset as u64,
+                    point_index: face[0],
+                }
+            })?)
+            .ok_or(OpenFoamBoundaryObservationError::PointIndexOutOfBounds {
+                face_index: record.start_face + offset as u64,
+                point_index: face[0],
+            })?;
+        let mut normal = [0.0f64; 3];
+        for index in 0..face.len() {
+            let a = points
+                .get(usize::try_from(face[index]).map_err(|_| {
+                    OpenFoamBoundaryObservationError::PointIndexOutOfBounds {
+                        face_index: record.start_face + offset as u64,
+                        point_index: face[index],
+                    }
+                })?)
+                .ok_or(OpenFoamBoundaryObservationError::PointIndexOutOfBounds {
+                    face_index: record.start_face + offset as u64,
+                    point_index: face[index],
+                })?;
+            let b = points
+                .get(usize::try_from(face[(index + 1) % face.len()]).map_err(|_| {
+                    OpenFoamBoundaryObservationError::PointIndexOutOfBounds {
+                        face_index: record.start_face + offset as u64,
+                        point_index: face[(index + 1) % face.len()],
+                    }
+                })?)
+                .ok_or(OpenFoamBoundaryObservationError::PointIndexOutOfBounds {
+                    face_index: record.start_face + offset as u64,
+                    point_index: face[(index + 1) % face.len()],
+                })?;
+            normal[0] += (a[1] - b[1]) * (a[2] + b[2]);
+            normal[1] += (a[2] - b[2]) * (a[0] + b[0]);
+            normal[2] += (a[0] - b[0]) * (a[1] + b[1]);
+        }
+        let normal_magnitude = (normal[0] * normal[0]
+            + normal[1] * normal[1]
+            + normal[2] * normal[2]).sqrt();
+        if !normal_magnitude.is_finite() || normal_magnitude <= 1.0e-12 {
+            return Err(OpenFoamBoundaryObservationError::DegenerateFace {
+                face_index: record.start_face + offset as u64,
+            });
+        }
+        let _ = first_point;
+
         for edge_index in 0..face.len() {
             let a_index = face[edge_index];
             let b_index = face[(edge_index + 1) % face.len()];
@@ -697,6 +748,13 @@ fn observe_openfoam_patch_geometry_with_neighbour(
             *count = count
                 .checked_add(1)
                 .ok_or(OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
+            if *count > 2 {
+                return Err(OpenFoamBoundaryObservationError::NonManifoldPatchEdge {
+                    face_index: record.start_face + offset as u64,
+                    point_a: a_index,
+                    point_b: b_index,
+                });
+            }
         }
     }
 
@@ -1944,6 +2002,68 @@ mod tests {
                 boundary, faces, points, "inlet", &interface, &candidate, 0.05, 1.0
             ),
             Err(OpenFoamBoundaryObservationError::InvalidFaceRecord { face_index: 0 })
+        ));
+    }
+
+    #[test]
+    fn degenerate_face_fails_closed() {
+        let boundary = br#"1
+(
+    inlet { type patch; nFaces 1; startFace 0; }
+)
+"#;
+        let faces = br#"1
+(
+    3(0 1 2)
+)
+"#;
+        let points = br#"3
+(
+    (0 0 0)
+    (1 0 0)
+    (2 0 0)
+)
+"#;
+        let interface = {
+            use symthaea_passive_void_compiler::{
+                BoundaryConditionDomain, InterfacePlane, PortAperture, PortInterface,
+                SolverBoundaryIdentity,
+            };
+            use symthaea_passive_void_graph::PortId;
+            PortInterface::new(
+                PortId(10),
+                [0.0, 0.0, 0.0],
+                PortAperture::Circular { radius_mm: 2.0 },
+                [0.0, 0.0, 1.0],
+                InterfacePlane::new([0.0, 0.0, 0.0], [0.0, 0.0, 1.0]).unwrap(),
+                SolverBoundaryIdentity {
+                    domain: BoundaryConditionDomain::Fluidic,
+                    id: 7,
+                },
+            )
+            .unwrap()
+        };
+        let candidate = symthaea_fabrication_kernel::mesh::TriangleMesh {
+            vertices: vec![
+                [0.0, 0.0, 0.0],
+                [2.0, 0.0, 0.0],
+                [0.0, 2.0, 0.0],
+                [-2.0, 0.0, 0.0],
+                [0.0, -2.0, 0.0],
+            ],
+            normals: vec![[0.0, 0.0, 1.0]; 5],
+            indices: vec![[0,1,2],[0,2,3],[0,3,4],[0,4,1]],
+        };
+        let neighbour = br#"0
+(
+)
+"#;
+        assert!(matches!(
+            observe_openfoam_patch_geometry_with_neighbour(
+                boundary, faces, points, neighbour, "inlet",
+                &interface, &candidate, 0.05, 1.0
+            ),
+            Err(OpenFoamBoundaryObservationError::DegenerateFace { face_index: 0 })
         ));
     }
 
