@@ -324,16 +324,38 @@ impl ControllerDocumentSnapshotScope {
         reference_time: &str,
     ) -> Result<(), VerificationFailure> {
         self.validate_structure()?;
-        parse_timestamp("verification method evaluation time", reference_time)?;
+        let reference_time =
+            parse_timestamp("verification method evaluation time", reference_time)?;
 
         match self {
-            Self::Current { resolved_at } if resolved_at == reference_time => Ok(()),
-            Self::Current { .. } => Err(VerificationFailure::HistoricalStateRequired),
-            Self::HistoricalAt { state_at, .. } if state_at == reference_time => Ok(()),
-            Self::HistoricalAt { .. } => Err(VerificationFailure::HistoricalStateMismatch),
+            Self::Current { resolved_at } => {
+                let resolved_at =
+                    parse_timestamp("controller document resolved at", resolved_at)?;
+                if resolved_at == reference_time {
+                    Ok(())
+                } else {
+                    Err(VerificationFailure::HistoricalStateRequired)
+                }
+            }
+            Self::HistoricalAt {
+                state_at,
+                resolved_at,
+                ..
+            } => {
+                let state_at =
+                    parse_timestamp("controller document state at", state_at)?;
+                if state_at != reference_time {
+                    return Err(VerificationFailure::HistoricalStateMismatch);
+                }
+                let resolved_at =
+                    parse_timestamp("controller document resolved at", resolved_at)?;
+                if resolved_at < state_at {
+                    return Err(VerificationFailure::InvalidSnapshotOrdering);
+                }
+                Ok(())
+            }
         }
     }
-}
 
 /// Temporal and anti-replay inputs supplied by the proof and the verifier.
 ///
@@ -1242,6 +1264,7 @@ pub enum VerificationFailure {
     },
     HistoricalStateRequired,
     HistoricalStateMismatch,
+    InvalidSnapshotOrdering,
     CryptographicVerificationFailed,
 }
 
@@ -1370,11 +1393,22 @@ mod tests {
         )
         .unwrap();
         assert!(historical
-            .validate_for_reference_time("2026-10-05T01:00:00Z")
+            .validate_for_reference_time("2026-10-05T01:00:00+00:00")
             .is_ok());
         assert!(matches!(
             historical.validate_for_reference_time("2026-10-05T01:00:01Z"),
             Err(VerificationFailure::HistoricalStateMismatch)
+        ));
+
+        let backwards = ControllerDocumentSnapshotScope::historical_at(
+            "2026-10-05T02:00:00Z",
+            "snapshot:future",
+            "2026-10-05T01:59:59Z",
+        )
+        .unwrap();
+        assert!(matches!(
+            backwards.validate_for_reference_time("2026-10-05T02:00:00Z"),
+            Err(VerificationFailure::InvalidSnapshotOrdering)
         ));
     }
 
