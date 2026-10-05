@@ -28,7 +28,7 @@ use anyhow::Result;
 use symthaea_core::genesis::GenesisSeed;
 #[cfg(feature = "ssm_language")]
 use symthaea_broca::PhonologicalPlan;
-use symthaea_vocal_tract::pipeline::predict_duration;
+use symthaea_vocal_tract::pipeline::{Intonation, PitchAccent, ProsodyContext, predict_duration};
 
 use super::audio_out::AudioOutput;
 use super::formant_targets::FormantDatabase;
@@ -210,22 +210,64 @@ impl LiveVoice {
 
         let last_index = plan.segments.len().saturating_sub(1);
         for (index, segment) in plan.segments.iter().enumerate() {
-            let frames = predict_duration(
+            let mut frames = predict_duration(
                 &segment.symbol,
                 segment.stress.ordinal(),
                 false,
                 index == last_index,
                 plan.rate,
             );
+
+            // Pause weight is only realized when the phonological plan explicitly encodes
+            // a silence segment; this prevents inventing pause locations from an abstract
+            // scalar alone.
+            if segment.symbol.eq_ignore_ascii_case("SIL") {
+                frames = ((frames as f32) * (1.0 + plan.pause_weight)).round() as usize;
+            }
+
             let phoneme = if segment.symbol.eq_ignore_ascii_case("SIL") {
                 None
             } else {
                 Some(segment.symbol.as_str())
             };
             let state = self.cognitive_state.lock().clone();
+            let total_frames_for_prosody = total_frames.max(1);
+            let utterance_progress = index as f32 / total_frames_for_prosody.saturating_sub(1).max(1) as f32;
+            let intonation = match plan.intonation {
+                symthaea_broca::IntonationIntent::Statement => Intonation::Statement,
+                symthaea_broca::IntonationIntent::Question => Intonation::Question,
+                symthaea_broca::IntonationIntent::Exclamation => Intonation::Exclamation,
+            };
 
-            for _ in 0..frames {
-                let chunk = self.streaming.tick(&state, None, DT, phoneme);
+            for frame_index in 0..frames {
+                let progress = if frames > 1 {
+                    frame_index as f32 / (frames - 1) as f32
+                } else {
+                    0.0
+                };
+                let prosody = ProsodyContext {
+                    utterance_progress: utterance_progress.clamp(0.0, 1.0),
+                    phoneme_progress: progress,
+                    stress: segment.stress.ordinal(),
+                    base_f0: 120.0 * plan.pitch_range.clamp(0.5, 1.5),
+                    arousal: state.emotional_arousal.clamp(0.0, 1.0),
+                    intonation,
+                    phrase_index: 0,
+                    phrase_progress: utterance_progress.clamp(0.0, 1.0),
+                    is_focus: segment.is_focus && plan.focus_role.is_some(),
+                    pitch_accent: if segment.is_focus {
+                        PitchAccent::RiseHigh
+                    } else {
+                        PitchAccent::None
+                    },
+                    is_syllable_onset: segment.is_syllable_onset,
+                    syllable_progress: progress,
+                    prev_source_type: None,
+                    next_source_type: None,
+                };
+                let chunk = self
+                    .streaming
+                    .tick_with_prosody(&state, None, DT, phoneme, &prosody);
                 all_samples.extend_from_slice(&chunk);
             }
         }
