@@ -147,6 +147,40 @@ pub enum EvidenceKind {
     ContinuouslyMonitored,
 }
 
+/// Reproducible provenance for a simulated or derived evidence record.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DerivationRecord {
+    /// Stable identifier for the model, solver, transformation, or reasoning procedure.
+    pub method_id: String,
+    /// Version of the derivation method.
+    pub method_version: String,
+    /// Stable references to the inputs consumed by the derivation.
+    pub input_refs: Vec<String>,
+    /// Optional digest of the derivation configuration or source artifact.
+    pub configuration_hash: Option<String>,
+}
+
+impl DerivationRecord {
+    /// Validate derivation identity and input references.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.method_id.is_empty() || self.method_version.is_empty() || self.input_refs.is_empty()
+        {
+            return Err(AssessmentError::EmptyDerivationIdentity);
+        }
+        if self.input_refs.iter().any(|input| input.is_empty()) {
+            return Err(AssessmentError::EmptyDerivationInput);
+        }
+        if self
+            .configuration_hash
+            .as_ref()
+            .is_some_and(String::is_empty)
+        {
+            return Err(AssessmentError::EmptyDerivationConfigurationHash);
+        }
+        Ok(())
+    }
+}
+
 /// Whether evidence supports or contradicts the linked assertion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EvidenceStance {
@@ -179,6 +213,8 @@ pub struct EvidenceRecord {
     pub valid_from_epoch_seconds: Option<i64>,
     /// Optional Unix timestamp through which this evidence is valid.
     pub valid_until_epoch_seconds: Option<i64>,
+    /// Reproducible derivation provenance for simulated/derived evidence.
+    pub derivation: Option<DerivationRecord>,
 }
 
 impl EvidenceRecord {
@@ -196,6 +232,14 @@ impl EvidenceRecord {
         ) && from > until
         {
             return Err(AssessmentError::InvalidEvidenceValidity { from, until });
+        }
+        if matches!(self.kind, EvidenceKind::Simulated | EvidenceKind::Derived) {
+            let Some(derivation) = &self.derivation else {
+                return Err(AssessmentError::MissingDerivationMetadata(self.kind));
+            };
+            derivation.validate()?;
+        } else if let Some(derivation) = &self.derivation {
+            derivation.validate()?;
         }
         Ok(())
     }
@@ -1060,6 +1104,14 @@ pub enum AssessmentError {
     MissingIncumbent(String),
     /// Two candidates have the same stable identifier.
     DuplicateCandidateId(String),
+    /// Simulated or derived evidence lacks reproducible derivation provenance.
+    MissingDerivationMetadata(EvidenceKind),
+    /// Derivation metadata has incomplete identity.
+    EmptyDerivationIdentity,
+    /// Derivation metadata contains an empty input reference.
+    EmptyDerivationInput,
+    /// Derivation metadata contains an empty configuration hash.
+    EmptyDerivationConfigurationHash,
 }
 
 impl std::fmt::Display for AssessmentError {
@@ -1134,6 +1186,14 @@ impl std::fmt::Display for AssessmentError {
             }
             Self::MissingIncumbent(id) => write!(f, "incumbent {id} not found"),
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate id {id}"),
+            Self::MissingDerivationMetadata(kind) => {
+                write!(f, "evidence kind {kind:?} requires derivation metadata")
+            }
+            Self::EmptyDerivationIdentity => write!(f, "derivation identity is incomplete"),
+            Self::EmptyDerivationInput => write!(f, "derivation input reference is empty"),
+            Self::EmptyDerivationConfigurationHash => {
+                write!(f, "derivation configuration hash is empty")
+            }
         }
     }
 }
@@ -1562,6 +1622,14 @@ mod tests {
             as_of: Some("fixture-v1".into()),
             valid_from_epoch_seconds: None,
             valid_until_epoch_seconds: None,
+            derivation: matches!(kind, EvidenceKind::Simulated | EvidenceKind::Derived).then(
+                || DerivationRecord {
+                    method_id: "synthetic-fixture".into(),
+                    method_version: "fixture-v1".into(),
+                    input_refs: vec!["fixture-input".into()],
+                    configuration_hash: Some("fixture-config-v1".into()),
+                },
+            ),
         }
     }
 
@@ -2253,6 +2321,40 @@ mod tests {
 
         assert_eq!(first, second);
         assert_eq!(first.pareto_frontier, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn simulated_evidence_requires_derivation_metadata() {
+        let mut evidence = evidence(
+            "simulated",
+            "model",
+            EvidenceKind::Simulated,
+            EvidenceStance::Supports,
+            0.8,
+        );
+        evidence.derivation = None;
+
+        assert!(matches!(
+            evidence.validate().unwrap_err(),
+            AssessmentError::MissingDerivationMetadata(EvidenceKind::Simulated)
+        ));
+    }
+
+    #[test]
+    fn derived_evidence_rejects_empty_derivation_inputs() {
+        let mut evidence = evidence(
+            "derived",
+            "model",
+            EvidenceKind::Derived,
+            EvidenceStance::Supports,
+            0.8,
+        );
+        evidence.derivation.as_mut().unwrap().input_refs.clear();
+
+        assert!(matches!(
+            evidence.validate().unwrap_err(),
+            AssessmentError::EmptyDerivationIdentity
+        ));
     }
 
     #[test]
