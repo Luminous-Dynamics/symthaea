@@ -57,12 +57,34 @@ impl PhysicalDimension {
         self.amount == 0 && self.luminous == 0
     }
 
+    pub fn checked_add(self, rhs: Self) -> Option<Self> {
+        let a = self.as_array();
+        let b = rhs.as_array();
+        let mut out = [0i8; 7];
+        for i in 0..7 {
+            out[i] = a[i].checked_add(b[i])?;
+        }
+        Some(Self::from_array(out))
+    }
+
+    pub fn checked_sub(self, rhs: Self) -> Option<Self> {
+        let a = self.as_array();
+        let b = rhs.as_array();
+        let mut out = [0i8; 7];
+        for i in 0..7 {
+            out[i] = a[i].checked_sub(b[i])?;
+        }
+        Some(Self::from_array(out))
+    }
+
+    /// Convenience arithmetic for already-bounded exponents.
+    /// New fail-closed inference code should prefer checked_add/checked_sub.
     pub fn add(self, rhs: Self) -> Self {
-        Self::from_array(std::array::from_fn(|i| self.as_array()[i] + rhs.as_array()[i]))
+        self.checked_add(rhs).expect("physical dimension exponent overflow")
     }
 
     pub fn sub(self, rhs: Self) -> Self {
-        Self::from_array(std::array::from_fn(|i| self.as_array()[i] - rhs.as_array()[i]))
+        self.checked_sub(rhs).expect("physical dimension exponent overflow")
     }
 
     pub fn scale(self, factor: i8) -> Option<Self> {
