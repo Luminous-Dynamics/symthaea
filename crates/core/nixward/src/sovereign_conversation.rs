@@ -132,7 +132,10 @@ impl SovereignConversation {
             msg.push(format!("  Existing OS: {}", os_names.join(", ")));
         }
         if self.hardware.has_tpm {
-            msg.push("  TPM 2.0: available (can auto-unlock disk encryption at boot)".into());
+            msg.push(
+                "  TPM 2.0: available (can protect disk-unlock keys; presence alone is not an attestation)"
+                    .into(),
+            );
         }
 
         // Migration insights
@@ -868,6 +871,8 @@ mod tests {
         assert!(greeting.message.contains("Tristan"));
         assert!(greeting.message.contains("NVIDIA"));
         assert!(greeting.message.contains("TPM"));
+        assert!(greeting.message.contains("TPM 2.0: available (can protect disk-unlock keys; presence alone is not an attestation)"));
+        assert!(!greeting.message.contains("TPM 2.0: available (can auto-unlock disk encryption at boot)"));
         assert!(greeting.message.contains("neovim"));
         assert!(greeting.message.contains("Rust"));
         assert!(greeting.is_question);

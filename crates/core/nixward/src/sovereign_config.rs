@@ -29,6 +29,13 @@ pub struct HardwareProfile {
     pub gpu_hybrid: bool,
     pub has_wifi: bool,
     pub has_tpm: bool,
+    /// Observed TCG TPM specification major version when available.
+    #[serde(default)]
+    pub tpm2_spec_major: Option<u8>,
+    /// Whether measured Unified Kernel Image state was observed.
+    /// This remains an observation, not attestation.
+    #[serde(default)]
+    pub measured_uki: bool,
     pub has_secure_boot: bool,
     pub setup_mode: bool,
     pub efi_available: bool,
@@ -246,10 +253,40 @@ impl SovereignConfigGenerator {
             warnings.push(conflict.clone());
         }
 
-        // ── Step 9: Reason about packages from migration data ──
+        // ── Step 9: Preserve the TPM trust boundary ──
+        if choices.tpm2_unlock {
+            if hardware.has_tpm {
+                match hardware.tpm2_spec_major {
+                    Some(2) => warnings.push(
+                        "TPM 2.0 is confirmed for LUKS key protection, but TPM presence/enrollment is not an attestation or freshness proof; authoritative recovery trust requires separately verified evidence."
+                            .into(),
+                    ),
+                    Some(version) => warnings.push(format!(
+                        "A TPM device is present but the observed TCG specification major is {version}; TPM2 unlock policy is not eligible until major version 2 is confirmed."
+                    )),
+                    None => warnings.push(
+                        "A TPM device is present but its TCG specification major is unconfirmed; TPM2 unlock policy is not eligible until the target is re-probed."
+                            .into(),
+                    ),
+                }
+                if hardware.measured_uki {
+                    warnings.push(
+                        "Measured UKI state was observed; it may inform boot-policy selection, but it does not by itself constitute a verified attestation."
+                            .into(),
+                    );
+                }
+            } else {
+                warnings.push(
+                    "TPM2 unlock was requested but no TPM was reported by the hardware profile; enrollment must be treated as failed until the target is re-probed."
+                        .into(),
+                );
+            }
+        }
+
+        // ── Step 10: Reason about packages from migration data ──
         let packages = self.reason_about_packages(migration);
 
-        // ── Step 10: Generate the config files ──
+        // ── Step 11: Generate the config files ──
         let sovereign_config_nix = self.render_sovereign_config(&nix_options, &packages);
         let welcome_message = self.compose_welcome(hardware, choices, migration, &decisions);
 
@@ -898,6 +935,84 @@ struct ReasonedOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tpm_observations_inform_policy_without_minting_attestation() {
+        let mut generator = SovereignConfigGenerator::new();
+        let hardware = HardwareProfile {
+            has_tpm: true,
+            tpm2_spec_major: Some(2),
+            measured_uki: true,
+            ..Default::default()
+        };
+        let choices = UserChoices {
+            tpm2_unlock: true,
+            encryption: true,
+            ..Default::default()
+        };
+        let result = generator.generate(&hardware, &choices, &MigrationData::default());
+        assert!(result.warnings.iter().any(|warning| warning.contains("Measured UKI")));
+        assert!(result.warnings.iter().any(|warning| warning.contains("not an attestation or freshness proof")));
+    }
+
+    #[test]
+    fn non_tpm2_spec_version_warns_without_becoming_authority() {
+        let mut generator = SovereignConfigGenerator::new();
+        let hardware = HardwareProfile {
+            has_tpm: true,
+            tpm2_spec_major: Some(1),
+            ..Default::default()
+        };
+        let choices = UserChoices {
+            tpm2_unlock: true,
+            encryption: true,
+            ..Default::default()
+        };
+        let result = generator.generate(&hardware, &choices, &MigrationData::default());
+        assert!(result.warnings.iter().any(|warning| warning.contains("major version 1")));
+    }
+
+    #[test]
+    fn unconfirmed_tpm_version_never_counts_as_tpm2_policy_support() {
+        let mut generator = SovereignConfigGenerator::new();
+        let hardware = HardwareProfile {
+            has_tpm: true,
+            tpm2_spec_major: None,
+            ..Default::default()
+        };
+        let choices = UserChoices {
+            tpm2_unlock: true,
+            encryption: true,
+            ..Default::default()
+        };
+        let result = generator.generate(&hardware, &choices, &MigrationData::default());
+        assert!(result.warnings.iter().any(|warning| {
+            warning.contains("TCG specification major is unconfirmed")
+                && warning.contains("not eligible")
+        }));
+        assert!(!result.warnings.iter().any(|warning| {
+            warning.contains("TPM 2.0 is confirmed for LUKS key protection")
+        }));
+    }
+
+    #[test]
+    fn tpm_unlock_warning_does_not_claim_attestation() {
+        let mut generator = SovereignConfigGenerator::new();
+        let hardware = HardwareProfile {
+            has_tpm: true,
+            ..Default::default()
+        };
+        let choices = UserChoices {
+            tpm2_unlock: true,
+            encryption: true,
+            ..Default::default()
+        };
+        let result = generator.generate(&hardware, &choices, &MigrationData::default());
+        assert!(result
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("not an attestation or freshness proof")));
+    }
 
     #[test]
     fn test_generate_gnome_nvidia() {

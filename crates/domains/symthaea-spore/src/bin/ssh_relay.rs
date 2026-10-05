@@ -334,29 +334,72 @@ fn tpm2_postinstall() -> &'static str {
 # ── TPM2 Auto-Unlock Enrollment ──
 echo "STAGE: Enrolling TPM2 auto-unlock..."
 
-# Check TPM availability
+# TPM presence is a capability check only; successful LUKS enrollment is not attestation.
 if [ ! -e /dev/tpmrm0 ]; then
   echo "WARNING: TPM 2.0 not detected. Skipping auto-unlock enrollment."
   echo "You will need to enter your passphrase at every boot."
 else
-  # Find the LUKS device
+  # A TPM resource-manager node is only a capability signal. Confirm the
+  # observed TCG specification major before issuing a TPM2 enrollment request.
+  TPM2_SPEC_MAJOR=""
+  if [ -r /sys/class/tpm/tpm0/tpm_version_major ]; then
+    TPM2_SPEC_MAJOR=$(cat /sys/class/tpm/tpm0/tpm_version_major)
+  fi
+  if [ "$TPM2_SPEC_MAJOR" != "2" ]; then
+    echo "WARNING: TPM specification major is not confirmed as 2. Skipping TPM2 enrollment."
+    echo "A passphrase remains the recovery path; retry after first boot when TPM2 is confirmed."
+  else
+    # Find the LUKS device
   LUKS_DEV=$(blkid -t TYPE=crypto_LUKS -o device 2>/dev/null | head -1)
   if [ -n "$LUKS_DEV" ]; then
-    # Enroll TPM2 with PCR 0 (firmware) and PCR 7 (Secure Boot state)
-    # The passphrase is required to authorize the enrollment
-    echo "Enrolling TPM2 on $LUKS_DEV (PCR 0+7)..."
-    systemd-cryptenroll "$LUKS_DEV" --tpm2-device=auto --tpm2-pcrs=0+7 2>&1 || echo "WARNING: TPM2 enrollment failed. You can retry after first boot with: sudo systemd-cryptenroll $LUKS_DEV --tpm2-device=auto --tpm2-pcrs=0+7"
-
-    # Update NixOS config to use systemd initrd (required for TPM2 unlock)
-    if [ -f /mnt/etc/nixos/configuration.nix ]; then
-      # Add systemd initrd and TPM2 config
-      sed -i '/boot.initrd.luks.devices/a\    cryptTabExtraOpts = [ "tpm2-device=auto" ];' /mnt/etc/nixos/configuration.nix 2>/dev/null || true
-      sed -i '/imports = /a\  boot.initrd.systemd.enable = true;' /mnt/etc/nixos/configuration.nix 2>/dev/null || true
-      echo "  TPM2 enrollment complete. Disk will auto-unlock at boot."
-      echo "  Passphrase is kept as fallback (firmware updates will require it)."
+    # PCR 0+7 is retained for compatibility with the existing installer policy.
+    # This is LUKS key-release policy, not regenerative-health attestation.
+    TPM2_PCRS="0+7"
+    echo "Enrolling TPM2 on $LUKS_DEV (PCR $TPM2_PCRS)..."
+    if systemd-cryptenroll "$LUKS_DEV" --tpm2-device=auto --tpm2-pcrs="$TPM2_PCRS" 2>&1; then
+      echo "  TPM2 enrollment command succeeded."
+      if [ -f /mnt/etc/nixos/configuration.nix ]; then
+        # Apply boot-configuration changes to a temporary copy, then replace the
+        # original only after every edit succeeds. Enrollment success must never
+        # leave a half-patched configuration behind.
+        CONFIG_FILE="/mnt/etc/nixos/configuration.nix"
+        if grep -q 'boot.initrd.luks.devices."cryptroot"' "$CONFIG_FILE"; then
+          CONFIG_TMP=$(mktemp "${CONFIG_FILE}.tpm2.XXXXXX")
+          if cp "$CONFIG_FILE" "$CONFIG_TMP" \
+            && {
+              if ! grep -q 'tpm2-device=auto' "$CONFIG_TMP"; then
+                sed -i '/boot.initrd.luks.devices."cryptroot"/a\    cryptTabExtraOpts = [ "tpm2-device=auto" ];' "$CONFIG_TMP"
+              fi
+              if ! grep -q 'boot.initrd.systemd.enable = true' "$CONFIG_TMP"; then
+                sed -i '/imports = /a\  boot.initrd.systemd.enable = true;' "$CONFIG_TMP"
+              fi
+              test -s "$CONFIG_TMP"
+            }; then
+            if mv -f "$CONFIG_TMP" "$CONFIG_FILE"; then
+              echo "  TPM2 enrollment complete. Disk will auto-unlock at boot."
+              echo "  Passphrase is kept as fallback (firmware updates may require it)."
+            else
+              rm -f "$CONFIG_TMP"
+              echo "WARNING: TPM2 enrollment succeeded, but atomic boot-configuration replacement failed. Original configuration was preserved."
+            fi
+          else
+            rm -f "$CONFIG_TMP"
+            echo "WARNING: TPM2 enrollment succeeded, but boot-configuration staging failed. Original configuration was preserved."
+          fi
+        else
+          echo "WARNING: cryptroot configuration was not found. TPM2 enrollment succeeded, but boot configuration was not modified."
+        fi
+      else
+        echo "WARNING: NixOS configuration not found. TPM2 enrollment succeeded, but boot configuration was not modified."
+      fi
+    else
+      echo "WARNING: TPM2 enrollment failed. Installed configuration was not modified."
+      echo "You can retry after first boot with: sudo systemd-cryptenroll $LUKS_DEV --tpm2-device=auto --tpm2-pcrs=$TPM2_PCRS"
+      echo "A passphrase remains the recovery path."
     fi
-  else
-    echo "WARNING: No LUKS device found. TPM2 enrollment skipped."
+    else
+      echo "WARNING: No LUKS device found. TPM2 enrollment skipped."
+    fi
   fi
 fi
 "#
@@ -3229,8 +3272,24 @@ echo ',"setup_mode":'
 bootctl status 2>/dev/null | grep -q "Setup Mode: setup" && echo 'true' || echo 'false'
 
 # TPM
+TPM2_AVAILABLE=false
+[ -e /dev/tpmrm0 ] && TPM2_AVAILABLE=true
 echo ',"tpm2_available":'
-[ -e /dev/tpmrm0 ] && echo 'true' || echo 'false'
+echo "$TPM2_AVAILABLE"
+
+echo ',"tpm2_spec_major":'
+if [ "$TPM2_AVAILABLE" = true ]; then
+  TPM2_SPEC_MAJOR=$(cat /sys/class/tpm/tpm0/tpm_version_major 2>/dev/null || true)
+  case "$TPM2_SPEC_MAJOR" in
+    ''|*[!0-9]*) echo 'null' ;;
+    *) echo "$TPM2_SPEC_MAJOR" ;;
+  esac
+else
+  echo 'null'
+fi
+
+echo ',"measured_uki":'
+bootctl status 2>/dev/null | grep -q "Measured UKI: yes" && echo 'true' || echo 'false'
 
 # Architecture (for Apple Silicon detection)
 echo ',"arch": "'$(uname -m)'"'
@@ -5490,6 +5549,39 @@ mod tests {
     fn hostname_rejects_too_long() {
         let long = "a".repeat(64);
         assert!(validate_hostname_relay(&long).is_err());
+    }
+
+    // ── TPM2 enrollment fail-closed contract ──
+
+    #[test]
+    fn tpm2_enrollment_is_transactional() {
+        let script = tpm2_postinstall();
+        assert!(script.contains("if systemd-cryptenroll"));
+        assert!(script.contains("echo \"  TPM2 enrollment command succeeded.\""));
+        assert!(script.contains("echo \"WARNING: TPM2 enrollment failed. Installed configuration was not modified.\""));
+        assert!(script.contains("CONFIG_TMP=$(mktemp"));
+        assert!(script.contains("atomic boot-configuration replacement failed"));
+        assert!(script.contains("if grep -q 'boot.initrd.luks.devices.\\"cryptroot\\"'"));
+        assert!(script.contains("TPM2_SPEC_MAJOR"));
+        assert!(script.contains("/sys/class/tpm/tpm0/tpm_version_major"));
+        assert!(!script.contains("/sys/class/tpm/tpm*/tpm_version_major"));
+        assert!(script.contains("TPM specification major is not confirmed as 2"));
+        assert!(script.contains("TPM2_PCRS=\"0+7\""));
+        assert!(script.contains("This is LUKS key-release policy, not regenerative-health attestation."));
+
+        let version_gate = script.find("if [ \"$TPM2_SPEC_MAJOR\" != \"2\" ]").unwrap();
+        let enroll_call = script.find("systemd-cryptenroll").unwrap();
+        assert!(version_gate < enroll_call);
+
+        let config_stage = script.find("CONFIG_TMP=$(mktemp").unwrap();
+        let config_replace = script.find("mv -f \"$CONFIG_TMP\" \"$CONFIG_FILE\"").unwrap();
+        assert!(config_stage < config_replace);
+
+        let staged_sed = script
+            .find("sed -i '/boot.initrd.luks.devices.\"cryptroot\"")
+            .unwrap();
+        assert!(config_stage < staged_sed);
+        assert!(staged_sed < config_replace);
     }
 
     // ── config_write_commands (heredoc safety) ──

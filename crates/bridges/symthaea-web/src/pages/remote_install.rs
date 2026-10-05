@@ -115,6 +115,12 @@ pub struct RemoteHardware {
     pub gpu_model: String,
     pub gpu_hybrid: bool,
     pub tpm2: bool,
+    /// TCG TPM specification major version when the relay can observe it.
+    /// This is an observation, not attestation.
+    pub tpm2_spec_major: Option<u8>,
+    /// Whether bootctl reports a measured Unified Kernel Image.
+    /// This is an observation, not attestation.
+    pub measured_uki: bool,
     pub secure_boot: bool,
     pub setup_mode: bool,
     pub efi: bool,
@@ -367,6 +373,18 @@ fn optional_bool(value: Option<&serde_json::Value>, field: &str) -> Result<bool,
     }
 }
 
+fn optional_u8(value: Option<&serde_json::Value>, field: &str) -> Result<Option<u8>, String> {
+    match value {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(serde_json::Value::Number(value)) => value
+            .as_u64()
+            .and_then(|number| u8::try_from(number).ok())
+            .map(Some)
+            .ok_or_else(|| format!("{field} must be an integer between 0 and 255")),
+        Some(_) => Err(format!("{field} must be an integer")),
+    }
+}
+
 fn parse_hardware_probe(data: &str) -> Result<RemoteHardware, String> {
     let data: serde_json::Value = serde_json::from_str(data)
         .map_err(|error| format!("invalid hardware response: {error}"))?;
@@ -385,6 +403,8 @@ fn parse_hardware_probe(data: &str) -> Result<RemoteHardware, String> {
     let mut hardware = RemoteHardware {
         arch,
         tpm2: optional_bool(object.get("tpm2_available"), "tpm2_available")?,
+        tpm2_spec_major: optional_u8(object.get("tpm2_spec_major"), "tpm2_spec_major")?,
+        measured_uki: optional_bool(object.get("measured_uki"), "measured_uki")?,
         secure_boot: optional_bool(object.get("secure_boot"), "secure_boot")?,
         setup_mode: optional_bool(object.get("setup_mode"), "setup_mode")?,
         efi: optional_bool(object.get("efi_available"), "efi_available")?,
@@ -1805,6 +1825,26 @@ mod tests {
         assert!(validate_relay_url("https://relay.example").is_err());
         assert!(validate_relay_url("wss://user@relay.example").is_err());
         assert!(validate_relay_url("wss:///missing-host").is_err());
+    }
+
+    #[test]
+    fn hardware_probe_preserves_tpm_observation_metadata() {
+        let hardware = parse_hardware_probe(
+            r#"{"arch":"x86_64","tpm2_available":true,"tpm2_spec_major":2,"measured_uki":true}"#,
+        )
+        .unwrap();
+        assert!(hardware.tpm2);
+        assert_eq!(hardware.tpm2_spec_major, Some(2));
+        assert!(hardware.measured_uki);
+
+        assert!(parse_hardware_probe(
+            r#"{"arch":"x86_64","tpm2_available":true,"tpm2_spec_major":256}"#
+        )
+        .is_err());
+        assert!(parse_hardware_probe(
+            r#"{"arch":"x86_64","tpm2_available":true,"tpm2_spec_major":"2"}"#
+        )
+        .is_err());
     }
 
     #[test]
