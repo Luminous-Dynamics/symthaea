@@ -2539,7 +2539,10 @@ impl<'a> CborReader<'a> {
         max_array_items: usize,
         limit_end: usize,
     ) -> Result<(), Rfc9162ProofDecodeError> {
-        if depth > 16 || self.offset >= limit_end {
+        if depth > 16 {
+            return Err(Rfc9162ProofDecodeError::ResourceLimitExceeded);
+        }
+        if self.offset >= limit_end {
             return Err(Rfc9162ProofDecodeError::InvalidStructure);
         }
         let major = self.peek_major_type()?;
