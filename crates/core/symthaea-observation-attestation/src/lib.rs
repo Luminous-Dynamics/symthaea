@@ -1370,6 +1370,11 @@ pub struct EvaluationContextSupplement {
     pub attachment_phase: &'static str,
     /// Exact execution-context identity this annotation applies to.
     pub applies_to_context_fingerprint: Option<String>,
+    /// Exact verification-report identity this annotation applies to.
+    ///
+    /// This avoids allowing a post-evaluation annotation to migrate between
+    /// distinct evaluations that happened to share the same execution context.
+    pub applies_to_report_fingerprint: Option<String>,
     pub evaluator_identity_fingerprint: Option<String>,
     pub trust_root_fingerprint: Option<String>,
     pub authorization_policy_fingerprint: Option<String>,
@@ -1381,14 +1386,20 @@ impl EvaluationContextSupplement {
             supplement_version: EVALUATION_CONTEXT_SUPPLEMENT_VERSION,
             attachment_phase: EVALUATION_CONTEXT_SUPPLEMENT_ATTACHMENT_PHASE,
             applies_to_context_fingerprint: None,
+            applies_to_report_fingerprint: None,
             evaluator_identity_fingerprint: None,
             trust_root_fingerprint: None,
             authorization_policy_fingerprint: None,
         }
     }
 
-    fn bind_to_context(mut self, context: &VerificationContextV5) -> Self {
+    fn bind_to_evaluation(
+        mut self,
+        context: &VerificationContextV5,
+        report_fingerprint: &str,
+    ) -> Self {
         self.applies_to_context_fingerprint = Some(context.fingerprint());
+        self.applies_to_report_fingerprint = Some(report_fingerprint.to_string());
         self
     }
 
@@ -1414,6 +1425,12 @@ impl EvaluationContextSupplement {
                 .applies_to_context_fingerprint
                 .as_deref()
                 .is_none_or(is_blake3_fingerprint)
+            && self
+                .applies_to_report_fingerprint
+                .as_deref()
+                .is_none_or(is_blake3_fingerprint)
+            && (self.applies_to_context_fingerprint.is_some()
+                == self.applies_to_report_fingerprint.is_some())
             && self
                 .evaluator_identity_fingerprint
                 .as_deref()
@@ -1452,6 +1469,10 @@ impl EvaluationContextSupplement {
         write_option(
             &mut bytes,
             self.applies_to_context_fingerprint.as_deref(),
+        );
+        write_option(
+            &mut bytes,
+            self.applies_to_report_fingerprint.as_deref(),
         );
         write_option(
             &mut bytes,
@@ -2020,6 +2041,11 @@ impl EvidenceEvaluationV9 {
                 return Err(EvidenceEvaluationConstructionError::InvalidSupplementalContext);
             }
         }
+        if let Some(bound_report) = supplement.applies_to_report_fingerprint.as_deref() {
+            if bound_report != report.fingerprint() {
+                return Err(EvidenceEvaluationConstructionError::InvalidSupplementalContext);
+            }
+        }
         let evaluation = Self::from_report_with_supplement(report, supplement);
         evaluation
             .is_well_formed()
@@ -2040,8 +2066,10 @@ impl EvidenceEvaluationV9 {
         // materialization time. A supplement already carrying a context binding must
         // retain that binding; checked construction rejects foreign bindings rather
         // than silently rebinding provenance from one evaluation to another.
-        let supplement = if supplement.applies_to_context_fingerprint.is_none() {
-            supplement.bind_to_context(&context)
+        let supplement = if supplement.applies_to_context_fingerprint.is_none()
+            && supplement.applies_to_report_fingerprint.is_none()
+        {
+            supplement.bind_to_evaluation(&context, &report.fingerprint())
         } else {
             supplement
         };
@@ -2078,6 +2106,11 @@ impl EvidenceEvaluationV9 {
             && self.supplement.applies_to_context_fingerprint
                 .as_deref()
                 .is_some_and(|value| value == self.context_fingerprint)
+            && self
+                .supplement
+                .applies_to_report_fingerprint
+                .as_deref()
+                .is_some_and(|value| value == self.verification_report_fingerprint)
             && self.execution_trace.is_well_formed()
             && self.execution_trace.terminal_outcome() == Some(self.outcome)
             && self.boundary.is_well_formed()
@@ -6282,6 +6315,49 @@ mod tests {
             VerificationContextV5::from_report(&report_a).fingerprint(),
             VerificationContextV5::from_report(&report_b).fingerprint()
         );
+        assert_eq!(
+            report_b.try_to_evidence_evaluation_v9_with_supplement(bound),
+            Err(EvidenceEvaluationConstructionError::InvalidSupplementalContext)
+        );
+    }
+
+    #[test]
+    fn checked_v9_constructor_rejects_same_context_different_report_transplantation() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report_a = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let bound = report_a
+            .try_to_evidence_evaluation_v9_with_supplement(
+                EvaluationContextSupplement::empty().with_trust_root_fingerprint(
+                    blake3::hash(b"trust-root-a").to_hex().to_string(),
+                ),
+            )
+            .expect("v9 evaluation")
+            .supplement;
+
+        // Same execution context, different evaluation subject: context binding alone
+        // would not distinguish these reports.
+        let mut envelope_b = envelope.clone();
+        envelope_b.domain = Some("different-domain".into());
+        sign_envelope(&mut envelope_b, &signing_key, "did:example:attester-a#key-1")
+            .expect("resign");
+        let report_b = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope_b, &receipt);
+
+        assert_eq!(
+            VerificationContextV5::from_report(&report_a).fingerprint(),
+            VerificationContextV5::from_report(&report_b).fingerprint()
+        );
+        assert_ne!(report_a.fingerprint(), report_b.fingerprint());
         assert_eq!(
             report_b.try_to_evidence_evaluation_v9_with_supplement(bound),
             Err(EvidenceEvaluationConstructionError::InvalidSupplementalContext)
