@@ -131,6 +131,32 @@ fn main() -> Result<(), String> {
     let unauthorized_blocked = unauthorized.validate(&lease, 1_500).is_err();
 
     let expired_blocked = message.validate(&lease, 2_000).is_err();
+    let cross_jurisdiction_blocked = message
+        .validate_for_handling(
+            &lease,
+            "GB",
+            symthaea_communication::NeurosemanticHandlingAction::Transmit,
+            1_500,
+        )
+        .is_err();
+    let persistence_after_expiry_blocked = message
+        .validate_for_handling(
+            &lease,
+            "ZA",
+            symthaea_communication::NeurosemanticHandlingAction::Persist,
+            2_000,
+        )
+        .is_err();
+    let secondary_research_blocked = message
+        .validate_for_handling(
+            &lease,
+            "ZA",
+            symthaea_communication::NeurosemanticHandlingAction::SecondaryUse(
+                symthaea_communication::NeurosemanticSecondaryUse::Research,
+            ),
+            1_500,
+        )
+        .is_err();
 
     let mut sensitivity_escalation = message.clone();
     sensitivity_escalation.packet.sensitivity = CognitiveSensitivity::HighlyPrivate;
@@ -155,6 +181,9 @@ fn main() -> Result<(), String> {
         ("tamper_detected", tamper_detected),
         ("unauthorized_channel_blocked", unauthorized_blocked),
         ("expired_lease_blocked", expired_blocked),
+        ("cross_jurisdiction_blocked", cross_jurisdiction_blocked),
+        ("persistence_after_expiry_blocked", persistence_after_expiry_blocked),
+        ("secondary_research_blocked", secondary_research_blocked),
         ("sensitivity_escalation_blocked", sensitivity_blocked),
         ("insufficient_capability_blocked", expression_blocked),
     ]);
