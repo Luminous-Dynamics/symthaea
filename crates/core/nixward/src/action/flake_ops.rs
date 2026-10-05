@@ -239,6 +239,7 @@ mod tests {
         assert_eq!(bin, "nix");
         assert!(args.contains(&"init".to_string()));
         assert!(args.contains(&"--template".to_string()));
+        assert_eq!(cmd.safety_level(), crate::action::executor::SafetyLevel::UserModify);
     }
 
     #[test]
