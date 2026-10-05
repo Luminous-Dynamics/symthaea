@@ -914,6 +914,11 @@ pub(crate) fn executor_command_requires_governed_authority(program: &str, args: 
         // for the explicit query forms.
         "nix-env" => !matches!(verb.as_deref(), Some("-q" | "--query")),
 
+        // `nix-shell` can execute arbitrary commands inside the constructed
+        // environment (for example via `--run`), so it is a second-stage
+        // execution wrapper rather than a generic observational command.
+        "nix-shell" => true,
+
         // `nix` is capability-broad. Only a small, explicit observational
         // subset is safe to leave in the generic executor.
         "nix" => match (verb.as_deref(), args.get(1).map(|arg| arg.to_ascii_lowercase())) {
@@ -1862,6 +1867,10 @@ mod executor_authority_tests {
         assert!(executor_command_requires_governed_authority(
             "/usr/bin/env",
             &args(&["nix", "profile", "install", "nixpkgs#hello"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "nix-shell",
+            &args(&["-p", "hello", "--run", "systemctl restart sshd.service"])
         ));
         assert!(!executor_command_requires_governed_authority(
             "find",
