@@ -325,6 +325,11 @@ impl NeurosemanticPacket {
         if sequence == 0 {
             return Err("packet sequence must be non-zero".into());
         }
+        let sender_id = sender_id.into();
+        let recipient_id = recipient_id.into();
+        if !valid_identifier(&sender_id) || !valid_identifier(&recipient_id) {
+            return Err("packet sender and recipient identifiers are invalid or oversized".into());
+        }
         if !confidence.is_finite() || !(0.0..=1.0).contains(&confidence) {
             return Err("confidence must be finite and in [0, 1]".into());
         }
@@ -333,8 +338,8 @@ impl NeurosemanticPacket {
         let mut packet = Self {
             protocol_version: NEUROSEMANTIC_PROTOCOL_VERSION,
             sequence,
-            sender_id: sender_id.into(),
-            recipient_id: recipient_id.into(),
+            sender_id,
+            recipient_id,
             purpose,
             channel,
             direction,
