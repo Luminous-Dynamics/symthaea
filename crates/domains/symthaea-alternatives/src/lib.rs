@@ -390,7 +390,6 @@ pub struct CandidatePathway {
 impl CandidatePathway {
     /// Validate the candidate, performance values, burden intervals, evidence
     /// references, and evidence records.
-    /// evidence records.
     pub fn validate(&self) -> Result<(), AssessmentError> {
         if self.id.is_empty() || self.name.is_empty() {
             return Err(AssessmentError::EmptyCandidateIdentity);
@@ -408,10 +407,26 @@ impl CandidatePathway {
             .collect::<BTreeSet<_>>();
         for performance in self.performance.values() {
             for evidence_id in &performance.evidence_ids {
-                if !evidence_ids.contains(evidence_id.as_str()) {
+                let Some(evidence) = self.evidence.iter().find(|e| e.id == *evidence_id) else {
                     return Err(AssessmentError::MissingEvidenceReference(
                         evidence_id.clone(),
                     ));
+                };
+                if evidence.scope != performance.scope {
+                    return Err(AssessmentError::PerformanceEvidenceScopeMismatch {
+                        evidence_id: evidence.id.clone(),
+                        performance_scope: performance.scope.clone(),
+                        evidence_scope: evidence.scope.clone(),
+                    });
+                }
+                if let Some(evidence_unit) = &evidence.unit
+                    && evidence_unit != &performance.unit
+                {
+                    return Err(AssessmentError::PerformanceEvidenceUnitMismatch {
+                        evidence_id: evidence.id.clone(),
+                        performance_unit: performance.unit.clone(),
+                        evidence_unit: evidence_unit.clone(),
+                    });
                 }
             }
         }
@@ -890,6 +905,24 @@ pub enum AssessmentError {
     MissingComparisonScale(Dimension),
     /// The requirement does not declare a comparison scale for a performance metric.
     MissingPerformanceScale(String),
+    /// Linked evidence uses a different scope from a performance estimate.
+    PerformanceEvidenceScopeMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Performance comparison scope.
+        performance_scope: String,
+        /// Evidence scope.
+        evidence_scope: String,
+    },
+    /// Linked evidence uses a different unit from a performance estimate.
+    PerformanceEvidenceUnitMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Performance comparison unit.
+        performance_unit: String,
+        /// Evidence unit.
+        evidence_unit: String,
+    },
     /// Linked evidence uses a different scope from the burden estimate.
     EvidenceScopeMismatch {
         /// Evidence identifier.
@@ -944,6 +977,22 @@ impl std::fmt::Display for AssessmentError {
             Self::MissingPerformanceScale(metric) => {
                 write!(f, "missing performance scale for {metric}")
             }
+            Self::PerformanceEvidenceScopeMismatch {
+                evidence_id,
+                performance_scope,
+                evidence_scope,
+            } => write!(
+                f,
+                "evidence {evidence_id} scope {evidence_scope} does not match performance scope {performance_scope}"
+            ),
+            Self::PerformanceEvidenceUnitMismatch {
+                evidence_id,
+                performance_unit,
+                evidence_unit,
+            } => write!(
+                f,
+                "evidence {evidence_id} unit {evidence_unit} does not match performance unit {performance_unit}"
+            ),
             Self::EvidenceScopeMismatch {
                 evidence_id,
                 burden_scope,
@@ -1025,6 +1074,9 @@ impl AlternativesEngine {
             candidate
                 .evidence
                 .sort_by(|a, b| a.id.cmp(&b.id));
+            for estimate in candidate.performance.values_mut() {
+                estimate.evidence_ids.sort();
+            }
             for estimate in candidate.burdens.values_mut() {
                 estimate.evidence_ids.sort();
             }
