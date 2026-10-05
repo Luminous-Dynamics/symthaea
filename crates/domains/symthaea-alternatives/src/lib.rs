@@ -1938,6 +1938,14 @@ impl ExperimentalDesignProvenance {
         if ids.len() != self.candidate_ids.len() {
             return Err(AssessmentError::InvalidExperimentalDesign);
         }
+
+        let mut uncertainty_ids = self.unresolved_uncertainty_refs.clone();
+        uncertainty_ids.sort();
+        uncertainty_ids.dedup();
+        if uncertainty_ids.len() != self.unresolved_uncertainty_refs.len() {
+            return Err(AssessmentError::DuplicateExperimentalUncertaintyReference);
+        }
+
         let mut target_ids = BTreeSet::new();
         for target in &self.expected_discrimination {
             target.validate()?;
@@ -1957,6 +1965,18 @@ impl ExperimentalDesignProvenance {
             });
         }
         Ok(())
+    }
+
+    /// Return the deterministic canonical representation of this design.
+    ///
+    /// Candidate, uncertainty-reference, and target collections are sets for
+    /// semantic purposes, so their insertion order must not alter the receipt.
+    pub fn canonicalized(mut self) -> Self {
+        self.candidate_ids.sort();
+        self.unresolved_uncertainty_refs.sort();
+        self.expected_discrimination
+            .sort_by(|a, b| a.target_id.cmp(&b.target_id));
+        self
     }
 
     /// Validate this design against the exact functional/comparison context.
@@ -2249,6 +2269,8 @@ pub enum AssessmentError {
     },
     /// An experimental discrimination target names a surface absent from the requirement.
     ExperimentalDesignSurfaceUndeclared(String),
+    /// Two unresolved experimental uncertainty references share one identity.
+    DuplicateExperimentalUncertaintyReference,
     /// Two experimental discrimination targets share one target identity.
     DuplicateExperimentalDiscriminationTarget(String),
     /// An experimental discrimination target uses a candidate not declared in the design set.
@@ -2448,6 +2470,9 @@ impl std::fmt::Display for AssessmentError {
             Self::DuplicateEvidenceId(id) => write!(f, "duplicate evidence id {id}"),
             Self::EmptySourceIdentity => write!(f, "evidence source identity is incomplete"),
             Self::InvalidExperimentalDesign => write!(f, "experimental design provenance is incomplete"),
+            Self::DuplicateExperimentalUncertaintyReference => {
+                write!(f, "duplicate experimental uncertainty reference")
+            }
             Self::ExperimentalDesignRequirementMismatch {
                 expected_requirement_id,
                 actual_requirement_id,
@@ -2774,6 +2799,7 @@ impl AlternativesEngine {
             }
         }
 
+        let experimental_design = experimental_design.canonicalized();
         let mut result = self.assess_at_with_freshness_internal(
             requirement,
             candidates,
@@ -5253,6 +5279,90 @@ mod tests {
                 )
                 .unwrap_err(),
             AssessmentError::ExperimentalDesignCandidateMissing("does-not-exist".into())
+        );
+    }
+
+    #[test]
+    fn equivalent_experimental_design_order_produces_identical_receipt() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let target_a = ExperimentalDiscriminationTarget {
+            target_id: "a-target".into(),
+            measurand_id: "fixture-measurand:Water".into(),
+            left_candidate_id: "product-redesign".into(),
+            right_candidate_id: "process-substitute".into(),
+            surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+            decision_rule: ExperimentalDecisionRuleRef {
+                rule_id: "rule-a".into(),
+                rule_revision: "v1".into(),
+                rule_digest: "digest-a".into(),
+            },
+        };
+        let target_b = ExperimentalDiscriminationTarget {
+            target_id: "b-target".into(),
+            measurand_id: "fixture-measurand:Water".into(),
+            left_candidate_id: "product-redesign".into(),
+            right_candidate_id: "process-substitute".into(),
+            surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+            decision_rule: ExperimentalDecisionRuleRef {
+                rule_id: "rule-b".into(),
+                rule_revision: "v1".into(),
+                rule_digest: "digest-b".into(),
+            },
+        };
+
+        let mut first = ExperimentalDesignProvenance {
+            design_id: "design:order".into(),
+            requirement_id: case.requirement.id.clone(),
+            hypothesis_id: "hypothesis:order".into(),
+            hypothesis_statement: "Test water.".into(),
+            unresolved_uncertainty_refs: vec!["u2".into(), "u1".into()],
+            candidate_ids: vec!["process-substitute".into(), "product-redesign".into()],
+            expected_discrimination: vec![target_b.clone(), target_a.clone()],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                target_uncertainty_width: None,
+            },
+            comparison_basis: basis.clone(),
+        };
+        let mut second = first.clone();
+        second.candidate_ids.reverse();
+        second.unresolved_uncertainty_refs.reverse();
+        second.expected_discrimination.reverse();
+
+        let a = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &case.candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                first.clone(),
+            )
+            .unwrap();
+        let b = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &case.candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                second,
+            )
+            .unwrap();
+
+        assert_eq!(a.receipt, b.receipt);
+        assert_eq!(
+            a.experimental_design.unwrap(),
+            first.canonicalized()
         );
     }
 
