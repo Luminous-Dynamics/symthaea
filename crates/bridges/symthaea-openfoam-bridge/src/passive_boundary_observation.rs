@@ -1247,6 +1247,33 @@ mod tests {
             "openfoam-polyMesh-patch-geometry:v1"
         );
 
+        let adapter = OpenFoamPassiveBoundaryAdapter::new_with_faces_and_points(
+            boundary.to_vec(),
+            faces.to_vec(),
+            points.to_vec(),
+            1.0,
+            "inlet",
+            0.05,
+        )
+        .unwrap();
+        let binding =
+            symthaea_passive_solver_binding::bind_with_adapter_and_input_entity_attestation(
+                &adapter,
+                &interface,
+                &candidate,
+                [7; 32],
+                0.05,
+            )
+            .unwrap();
+        assert_eq!(
+            binding.evidence_level(),
+            symthaea_passive_solver_binding::SolverBoundaryEvidenceLevel::SolverInputEntityAttested
+        );
+        assert_eq!(
+            binding.solver_entity_observation_kind(),
+            Some("openfoam-polyMesh-patch-geometry:v1")
+        );
+
         let changed_points = br#"4
 (
     (2 0 0)
