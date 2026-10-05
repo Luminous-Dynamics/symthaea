@@ -2505,12 +2505,24 @@ fn validate_native_authority_pin_set(
                      AND attempt_id IS NOT NULL
                      AND attempt_id <> ''
                    UNION ALL
-                   SELECT 'authorization_dispatches' AS source
-                   FROM authorization_dispatches
+                   SELECT 'authorization_receipts' AS source
+                   FROM authorization_receipts
+                   WHERE attempt_id=?1
+                   UNION ALL
+                   SELECT 'authorization_status_checks' AS source
+                   FROM authorization_status_checks
                    WHERE attempt_id=?1
                    UNION ALL
                    SELECT 'authorization_recovery_markers' AS source
                    FROM authorization_recovery_markers
+                   WHERE attempt_id=?1
+                   UNION ALL
+                   SELECT 'authorization_terminal_evidence' AS source
+                   FROM authorization_terminal_evidence
+                   WHERE attempt_id=?1
+                   UNION ALL
+                   SELECT 'authorization_dispatches' AS source
+                   FROM authorization_dispatches
                    WHERE attempt_id=?1
                  )
                  LIMIT 1",
@@ -2533,12 +2545,32 @@ fn validate_native_authority_pin_set(
                          AND operation_id IS NOT NULL
                          AND operation_id <> ''
                        UNION ALL
-                       SELECT 'authorization_dispatches' AS source
-                       FROM authorization_dispatches
+                       SELECT 'authorization_receipts' AS source
+                       FROM authorization_receipts
                        WHERE operation_id=?1
+                         AND operation_id IS NOT NULL
+                         AND operation_id <> ''
+                       UNION ALL
+                       SELECT 'authorization_status_checks' AS source
+                       FROM authorization_status_checks
+                       WHERE operation_id=?1
+                         AND operation_id IS NOT NULL
+                         AND operation_id <> ''
                        UNION ALL
                        SELECT 'authorization_recovery_markers' AS source
                        FROM authorization_recovery_markers
+                       WHERE operation_id=?1
+                         AND operation_id IS NOT NULL
+                         AND operation_id <> ''
+                       UNION ALL
+                       SELECT 'authorization_terminal_evidence' AS source
+                       FROM authorization_terminal_evidence
+                       WHERE operation_id=?1
+                         AND operation_id IS NOT NULL
+                         AND operation_id <> ''
+                       UNION ALL
+                       SELECT 'authorization_dispatches' AS source
+                       FROM authorization_dispatches
                        WHERE operation_id=?1
                          AND operation_id IS NOT NULL
                          AND operation_id <> ''
