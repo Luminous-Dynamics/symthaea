@@ -398,7 +398,7 @@ impl NixActiveInference {
         // Record in episodic memory (Φ-gated)
         #[cfg(feature = "native")]
         {
-            use crate::action::executor::{NixOSCommand, ServiceOperation};
+            use crate::action::executor::NixOSCommand;
             let cmd = match &action {
                 ActionCategory::Install => Some(NixOSCommand::EnvInstall {
                     packages: vec!["unknown".into()],
@@ -418,14 +418,8 @@ impl NixActiveInference {
                 ActionCategory::Update => Some(NixOSCommand::Channel {
                     operation: crate::action::executor::ChannelOperation::Update { channel: None },
                 }),
-                ActionCategory::Enable => Some(NixOSCommand::Service {
-                    operation: ServiceOperation::Enable,
-                    name: "unknown.service".into(),
-                }),
-                ActionCategory::Disable => Some(NixOSCommand::Service {
-                    operation: ServiceOperation::Disable,
-                    name: "unknown.service".into(),
-                }),
+                // Enable/Disable and Custom actions do not carry a concrete
+                // target here, so omit them rather than fabricate one for memory.
                 _ => None,
             };
 
