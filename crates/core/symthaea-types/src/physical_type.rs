@@ -491,6 +491,23 @@ impl PhysicalType {
                 reason: "physical quantity kinds differ".into(),
             });
         }
+
+        match (&self.semantic_id, &other.semantic_id) {
+            (Some(left), Some(right)) if left != right => {
+                return TypeJudgement::Invalid(PhysicalTypeError {
+                    operation: "compatibility".into(),
+                    reason: "semantic quantity identifiers differ".into(),
+                });
+            }
+            (Some(_), None) | (None, Some(_)) => {
+                return TypeJudgement::Unknown(
+                    "one side carries a semantic quantity identifier and the other does not"
+                        .into(),
+                );
+            }
+            _ => {}
+        }
+
         TypeJudgement::Valid(())
     }
 
@@ -986,6 +1003,41 @@ mod tests {
         assert!(matches!(
             metres.judge_numeric_compatibility(&feet),
             TypeJudgement::Valid(())
+        ));
+    }
+
+    #[test]
+    fn semantic_quantity_identifiers_distinguish_same_dimension_custom_kinds() {
+        let frequency = PhysicalType::with_kind(
+            QuantityKind::Custom,
+            PhysicalDimension::FREQUENCY,
+        )
+        .with_semantic_id(SemanticIdentifier::new("qudt", "Frequency").unwrap());
+        let angular_velocity = PhysicalType::with_kind(
+            QuantityKind::Custom,
+            PhysicalDimension::FREQUENCY,
+        )
+        .with_semantic_id(SemanticIdentifier::new("qudt", "AngularVelocity").unwrap());
+
+        assert!(matches!(
+            frequency.judge_compatibility(&angular_velocity),
+            TypeJudgement::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn missing_semantic_identifier_is_unknown_against_identified_custom_quantity() {
+        let identified = PhysicalType::with_kind(
+            QuantityKind::Custom,
+            PhysicalDimension::FREQUENCY,
+        )
+        .with_semantic_id(SemanticIdentifier::new("qudt", "Frequency").unwrap());
+        let unidentified =
+            PhysicalType::with_kind(QuantityKind::Custom, PhysicalDimension::FREQUENCY);
+
+        assert!(matches!(
+            identified.judge_compatibility(&unidentified),
+            TypeJudgement::Unknown(_)
         ));
     }
 
