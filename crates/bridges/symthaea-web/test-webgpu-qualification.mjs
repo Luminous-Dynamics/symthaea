@@ -405,12 +405,28 @@ async function rawWebGpuExecutionCanary(page) {
       await readback.mapAsync(GPUMapMode.READ);
 
       const bytes = new Uint8Array(readback.getMappedRange());
-      const offset = bytesPerRow + 4;
-      const pixel = [...bytes.slice(offset, offset + 4)];
-      const executedRed = pixel[0] > 240
-        && pixel[1] < 16
-        && pixel[2] < 16
-        && pixel[3] === 255;
+      const pixels = [];
+      let nonRedPixels = 0;
+      let minRed = 255;
+      let maxGreen = 0;
+      let maxBlue = 0;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const offset = y * bytesPerRow + x * 4;
+          const pixel = [...bytes.slice(offset, offset + 4)];
+          pixels.push(pixel);
+          minRed = Math.min(minRed, pixel[0]);
+          maxGreen = Math.max(maxGreen, pixel[1]);
+          maxBlue = Math.max(maxBlue, pixel[2]);
+          if (!(pixel[0] > 240
+            && pixel[1] < 16
+            && pixel[2] < 16
+            && pixel[3] === 255)) {
+            nonRedPixels++;
+          }
+        }
+      }
+      const executedRed = nonRedPixels === 0;
 
       readback.unmap();
 
@@ -418,7 +434,14 @@ async function rawWebGpuExecutionCanary(page) {
         supported: true,
         adapter_name: adapter.name || null,
         format: 'rgba8unorm',
-        pixel,
+        width,
+        height,
+        pixel_count: pixels.length,
+        representative_pixel: pixels[Math.floor(pixels.length / 2)] || null,
+        non_red_pixels: nonRedPixels,
+        min_red: minRed,
+        max_green: maxGreen,
+        max_blue: maxBlue,
         executed_red: executedRed,
         uncaptured_errors: uncapturedErrors,
         device_lost: deviceLost,
@@ -528,7 +551,25 @@ async function rawWebGpuCanvasCanary(page) {
         };
       }
       probeContext.drawImage(image, 0, 0);
-      const pixel = [...probeContext.getImageData(32, 32, 1, 1).data];
+      const imageData = probeContext.getImageData(0, 0, canvas.width, canvas.height).data;
+      const centerOffset = ((32 * canvas.width) + 32) * 4;
+      const pixel = [...imageData.slice(centerOffset, centerOffset + 4)];
+      let nonRedPixels = 0;
+      let minRed = 255;
+      let maxGreen = 0;
+      let maxBlue = 0;
+      for (let offset = 0; offset < imageData.length; offset += 4) {
+        const r = imageData[offset];
+        const g = imageData[offset + 1];
+        const b = imageData[offset + 2];
+        const a = imageData[offset + 3];
+        minRed = Math.min(minRed, r);
+        maxGreen = Math.max(maxGreen, g);
+        maxBlue = Math.max(maxBlue, b);
+        if (!(r > 200 && g < 40 && b < 40 && a === 255)) {
+          nonRedPixels++;
+        }
+      }
 
       const configuration = context.getConfiguration();
       return {
@@ -543,11 +584,15 @@ async function rawWebGpuCanvasCanary(page) {
           viewFormats: configuration?.viewFormats ? [...configuration.viewFormats] : [],
           desiredMaximumFrameLatency: configuration?.desiredMaximumFrameLatency || null,
         },
+        width: canvas.width,
+        height: canvas.height,
+        pixel_count: canvas.width * canvas.height,
         pixel,
-        painted_red: pixel[0] > 200
-          && pixel[1] < 40
-          && pixel[2] < 40
-          && pixel[3] === 255,
+        non_red_pixels: nonRedPixels,
+        min_red: minRed,
+        max_green: maxGreen,
+        max_blue: maxBlue,
+        painted_red: nonRedPixels === 0,
         uncaptured_errors: uncapturedErrors,
       };
     } catch (error) {
