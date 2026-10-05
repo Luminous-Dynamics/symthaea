@@ -1204,7 +1204,13 @@ fn factor_offsets(factors: &[&RandomLinearCode]) -> Option<Vec<usize>> {
     let mut offsets = Vec::with_capacity(factors.len() + 1);
     offsets.push(0);
     for factor in factors {
-        offsets.push(offsets.last().copied().unwrap_or(0).checked_add(factor.rank())?);
+        offsets.push(
+            offsets
+                .last()
+                .copied()
+                .unwrap_or(0)
+                .checked_add(factor.rank())?,
+        );
     }
     Some(offsets)
 }
