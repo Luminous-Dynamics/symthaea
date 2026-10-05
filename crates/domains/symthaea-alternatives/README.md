@@ -8,6 +8,7 @@ The model is:
 
 1. Define the function that must be satisfied.
 2. Bind the requirement to the exact product/component/design context being assessed.
+3. Represent candidate material/process/product pathways.
 4. Declare an explicit comparison scale (unit + functional/lifecycle scope) for every burden dimension; candidates cannot define their own cohort.
 5. Represent functional-performance values as evidence-linked, scoped measurements rather than bare claims.
 6. Declare the physical operating envelope explicitly; a candidate must demonstrate coverage of the required ranges.
