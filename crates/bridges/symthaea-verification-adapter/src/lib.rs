@@ -453,6 +453,8 @@ pub(crate) fn verification_method_material_digest(
                 ));
             }
 
+            validate_multikey_encoding(public)?;
+
             serde_json::to_vec(&("Multikey", public))
                 .map_err(|_| SnapshotError::Malformed("verification method material serialization failed".into()))?
         }
@@ -483,9 +485,14 @@ pub(crate) fn verification_method_material_digest(
                     ));
                 }
             }
-            if public_object.get("kty").and_then(Value::as_str).is_none() {
-                return Err(SnapshotError::Malformed(
+            let kty = public_object.get("kty").and_then(Value::as_str).ok_or_else(|| {
+                SnapshotError::Malformed(
                     "public JWK verification material requires a string kty".into(),
+                )
+            })?;
+            if kty == "oct" {
+                return Err(SnapshotError::Malformed(
+                    "JsonWebKey verification material must not use a symmetric oct key".into(),
                 ));
             }
 
@@ -513,6 +520,25 @@ pub(crate) fn verification_method_material_digest(
     let bytes = serde_json::to_vec(&encoded)
         .map_err(|_| SnapshotError::Malformed("verification method material serialization failed".into()))?;
     Ok(sha256_hex(&bytes))
+}
+
+fn validate_multikey_encoding(value: &str) -> Result<(), SnapshotError> {
+    let encoded = value.strip_prefix('z').ok_or_else(|| {
+        SnapshotError::Malformed(
+            "Multikey publicKeyMultibase must use the base58-btc multibase prefix".into(),
+        )
+    })?;
+    let bytes = bs58::decode(encoded).into_vec().map_err(|_| {
+        SnapshotError::Malformed(
+            "Multikey publicKeyMultibase must contain valid base58-btc data".into(),
+        )
+    })?;
+    if bytes.len() < 2 {
+        return Err(SnapshotError::Malformed(
+            "Multikey publicKeyMultibase must contain a multicodec header".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_snapshot_reference(value: &str) -> Result<(), SnapshotError> {
@@ -1062,6 +1088,53 @@ mod tests {
         .unwrap();
 
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn rejects_malformed_multikey_encoding_at_resolution() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = snapshot.document.replace(
+            r##""publicKeyMultibase": "z6MkFakeKeyMaterial""##,
+            r##""publicKeyMultibase": "not-base58-multikey""##,
+        );
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("base58-btc")
+        ));
+    }
+
+    #[test]
+    fn rejects_symmetric_jwk_as_public_verification_material() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "verificationMethod": [{
+                "id": "https://example.test/controller#jwk-1",
+                "type": "JsonWebKey",
+                "controller": "https://example.test/controller",
+                "publicKeyJwk": {
+                    "kty": "oct",
+                    "k": "ZmFrZS1zZWNyZXQ"
+                }
+            }],
+            "assertionMethod": ["https://example.test/controller#jwk-1"]
+        }"##.into();
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("symmetric oct key")
+        ));
     }
 
     #[test]
