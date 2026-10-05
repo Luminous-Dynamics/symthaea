@@ -556,6 +556,7 @@ impl ControllerDocumentSnapshotScope {
             }
         }
     }
+}
 
 /// Temporal and anti-replay inputs supplied by the proof and the verifier.
 ///
