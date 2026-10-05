@@ -73,16 +73,7 @@ impl GenerationManager {
 
     /// Generate a command to switch to a specific generation.
     pub fn switch_to(generation: u32) -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "nix-env".to_string(),
-            args: vec![
-                "--switch-generation".to_string(),
-                generation.to_string(),
-                "-p".to_string(),
-                "/nix/var/nix/profiles/system".to_string(),
-            ],
-            safety_level: SafetyLevel::SystemCritical,
-        }
+        NixOSCommand::SwitchGeneration { generation }
     }
 
     /// Generate a rollback command (switch to previous generation).
