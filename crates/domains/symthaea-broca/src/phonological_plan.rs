@@ -382,6 +382,7 @@ pub enum PhonologicalPlanError {
     ConflictingSyllableStress { syllable_index: usize },
     MixedSyllableFocus { syllable_index: usize },
     MultipleSyllableOnsets { syllable_index: usize },
+    MissingSyllableOnset { syllable_index: usize },
     MidSyllablePhraseBoundary { syllable_index: usize },
     EmptySegmentSymbol { index: usize },
     NonContiguousSyllableIndex { expected: usize, found: usize },
@@ -412,6 +413,7 @@ impl std::fmt::Display for PhonologicalPlanError {
             Self::ConflictingSyllableStress { syllable_index } => write!(f, "syllable {syllable_index} contains conflicting stress annotations"),
             Self::MixedSyllableFocus { syllable_index } => write!(f, "syllable {syllable_index} contains mixed focus annotations"),
             Self::MultipleSyllableOnsets { syllable_index } => write!(f, "syllable {syllable_index} contains multiple onset markers"),
+            Self::MissingSyllableOnset { syllable_index } => write!(f, "syllable {syllable_index} must contain exactly one onset marker"),
             Self::MidSyllablePhraseBoundary { syllable_index } => write!(f, "syllable {syllable_index} has an internal phrase boundary"),
             Self::EmptySegmentSymbol { index } => {
                 write!(f, "phoneme slot {index} has an empty symbol")
@@ -501,6 +503,13 @@ fn validate_segment_sequence(segments: &[PhonemeSlot]) -> Result<(), Phonologica
 
     for segment in segments {
         if last_syllable != Some(segment.syllable_index) {
+            if let Some(previous_syllable) = last_syllable {
+                if onset_count != 1 {
+                    return Err(PhonologicalPlanError::MissingSyllableOnset {
+                        syllable_index: previous_syllable,
+                    });
+                }
+            }
             if segment.syllable_index != expected_syllable {
                 return Err(PhonologicalPlanError::NonContiguousSyllableIndex {
                     expected: expected_syllable,
@@ -532,6 +541,14 @@ fn validate_segment_sequence(segments: &[PhonemeSlot]) -> Result<(), Phonologica
                     syllable_index: segment.syllable_index,
                 });
             }
+        }
+    }
+
+    if let Some(last_syllable) = last_syllable {
+        if onset_count != 1 {
+            return Err(PhonologicalPlanError::MissingSyllableOnset {
+                syllable_index: last_syllable,
+            });
         }
     }
 
@@ -743,6 +760,29 @@ mod tests {
                 .validate_against_lexical_binding(&frame, &tampered)
                 .expect_err("tampered lexical identity must be rejected"),
             PhonologicalPlanError::LexicalBindingMismatch
+        );
+    }
+
+    #[test]
+    fn missing_syllable_onset_fails_closed() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        let error = plan
+            .bind_segments(
+                vec![PhonemeSlot::new(
+                    "AH",
+                    0,
+                    SyllableStress::Primary,
+                    false,
+                    false,
+                    true,
+                )],
+                ContentBindingStatus::PhonologicallyBound,
+            )
+            .expect_err("every syllable needs exactly one explicit onset");
+
+        assert_eq!(
+            error,
+            PhonologicalPlanError::MissingSyllableOnset { syllable_index: 0 }
         );
     }
 
