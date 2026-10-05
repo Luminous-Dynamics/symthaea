@@ -881,7 +881,7 @@ impl From<PolicyViolation> for ExecutionError {
 /// to stop executable-name allowlisting from becoming implicit authority for
 /// system lifecycle, Nix profile/system mutation, or command-wrapper escape
 /// hatches.
-fn executor_command_requires_governed_authority(program: &str, args: &[String]) -> bool {
+pub(crate) fn executor_command_requires_governed_authority(program: &str, args: &[String]) -> bool {
     let basename = Path::new(program)
         .file_name()
         .and_then(|name| name.to_str())
