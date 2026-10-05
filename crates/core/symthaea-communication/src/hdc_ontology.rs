@@ -355,6 +355,7 @@ impl HdcOntologyConformalCalibration {
         }
 
         let threshold = conformal_threshold(calibration_scores, alpha)?;
+        let n = calibration_scores.len();
 
         Ok(Self {
             schema_version: HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION,
@@ -2397,9 +2398,3 @@ mod tests {
         let codebook =
             HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
                 .unwrap();
-
-        let multilingual = graph(
-            &[
-                ("agent-fr", ConceptKind::Agent, "fr-a"),
-                ("event-fr", ConceptKind::Event, "fr-e"),
-                ("object-fr", ConceptKind::Object, "fr-o"),
