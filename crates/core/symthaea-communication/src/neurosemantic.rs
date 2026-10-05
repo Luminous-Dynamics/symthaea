@@ -308,6 +308,9 @@ pub struct CognitiveConsentLease {
     pub expires_at_unix_s: u64,
     pub consent_epoch: u64,
     pub revoked: bool,
+    /// Effective timestamp for a revocation record. A revoked lease must carry this value.
+    #[serde(default)]
+    pub revoked_at_unix_s: Option<u64>,
 }
 
 impl CognitiveConsentLease {
@@ -334,6 +337,14 @@ impl CognitiveConsentLease {
             || self.issued_at_unix_s >= self.expires_at_unix_s
         {
             return Err("consent lease identity or time bounds are invalid".into());
+        }
+        if self.revoked && self.revoked_at_unix_s.is_none() {
+            return Err("revoked consent leases require an explicit effective timestamp".into());
+        }
+        if let Some(revoked_at) = self.revoked_at_unix_s {
+            if revoked_at < self.issued_at_unix_s {
+                return Err("consent revocation effective time cannot precede lease issuance".into());
+            }
         }
         Ok(())
     }
@@ -380,6 +391,9 @@ impl CognitiveConsentLease {
         now_unix_s: u64,
     ) -> bool {
         if self.revoked
+            || self
+                .revoked_at_unix_s
+                .is_some_and(|revoked_at| now_unix_s >= revoked_at)
             || self.peer_id != peer_id
             || self.purpose != purpose
             || now_unix_s < self.issued_at_unix_s
@@ -677,6 +691,7 @@ pub struct NeurosemanticReplayTracker {
 struct ReplayState {
     sequence: u64,
     packet_hash: String,
+    expires_at_unix_s: u64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -694,12 +709,31 @@ impl NeurosemanticReplayTracker {
         now_unix_s: u64,
     ) -> Result<ReplayDecision, String> {
         message.validate(lease, now_unix_s)?;
-        self.observe(message)
+        self.prune_expired(now_unix_s);
+        self.observe_with_expiry(message, lease.expires_at_unix_s)
+    }
+
+    /// Explicitly reclaim replay state whose authorization lease has expired.
+    /// This makes the bounded tracker a reclaimable resource rather than a
+    /// permanent accumulation vector across short-lived leases.
+    pub fn prune_expired(&mut self, now_unix_s: u64) -> usize {
+        let before = self.latest.len();
+        self.latest
+            .retain(|_, state| now_unix_s < state.expires_at_unix_s);
+        before - self.latest.len()
     }
 
     pub fn observe(
         &mut self,
         message: &AuthorizedNeurosemanticMessage,
+    ) -> Result<ReplayDecision, String> {
+        self.observe_with_expiry(message, u64::MAX)
+    }
+
+    fn observe_with_expiry(
+        &mut self,
+        message: &AuthorizedNeurosemanticMessage,
+        expires_at_unix_s: u64,
     ) -> Result<ReplayDecision, String> {
         message.packet.validate_integrity()?;
         if message.packet.sequence == 0 {
@@ -723,6 +757,7 @@ impl NeurosemanticReplayTracker {
                     ReplayState {
                         sequence: message.packet.sequence,
                         packet_hash: message.packet.packet_hash.clone(),
+                        expires_at_unix_s,
                     },
                 );
                 Ok(ReplayDecision::Accept)
@@ -733,6 +768,7 @@ impl NeurosemanticReplayTracker {
                     ReplayState {
                         sequence: message.packet.sequence,
                         packet_hash: message.packet.packet_hash.clone(),
+                        expires_at_unix_s,
                     },
                 );
                 Ok(ReplayDecision::Accept)
@@ -1531,9 +1567,47 @@ mod tests {
         );
         let mut revoked = base.clone();
         revoked.revoked = true;
+        revoked.revoked_at_unix_s = Some(150);
         assert!(tracker
             .observe_authorized(&message, &revoked, 150)
             .is_err());
+
+        let mut malformed_revoked = base.clone();
+        malformed_revoked.revoked = true;
+        malformed_revoked.revoked_at_unix_s = None;
+        assert!(malformed_revoked.validate().is_err());
+    }
+
+    #[test]
+    fn replay_state_is_reclaimed_after_lease_expiry() {
+        let base = lease();
+        let packet = NeurosemanticPacket::new_with_policy(
+            16,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            semantic_policy(),
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: base.consent_epoch,
+            lease_id: base.lease_id.clone(),
+        };
+        let mut tracker = NeurosemanticReplayTracker::default();
+        assert_eq!(
+            tracker.observe_authorized(&message, &base, 150).unwrap(),
+            ReplayDecision::Accept
+        );
+        assert_eq!(tracker.prune_expired(199), 0);
+        assert_eq!(tracker.prune_expired(200), 1);
+        assert_eq!(tracker.prune_expired(200), 0);
     }
 
     #[test]
@@ -1562,6 +1636,22 @@ mod tests {
         let mut elevated = base.clone();
         elevated.max_write_sensitivity = CognitiveSensitivity::HighlyPrivate;
         assert!(message.validate(&elevated, 150).is_ok());
+    }
+
+    #[test]
+    fn revoked_leases_require_effective_timestamp() {
+        let mut l = lease();
+        l.revoked = true;
+        assert!(l.validate().is_err());
+        l.revoked_at_unix_s = Some(150);
+        assert!(l.validate().is_ok());
+        assert!(l.authorizes(
+            CognitiveChannel::Semantic,
+            ChannelDirection::Read,
+            CommunicationPurpose::HumanCollaboration,
+            "peer",
+            149
+        ) == false);
     }
 
     #[test]
