@@ -6,7 +6,7 @@
 //! This type intentionally carries identities and provenance, not EUREKA outcomes.
 
 use serde::{Deserialize, Serialize};
-use crate::physical_type::{ModelMaturity, PhysicalType};
+use crate::physical_type::{ModelMaturity, PhysicalType, TypeJudgement};
 
 pub const HYPOTHESIS_HANDOFF_SCHEMA: &str = "SCIENTIFIC_HYPOTHESIS_HANDOFF.v1";
 
