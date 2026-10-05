@@ -204,9 +204,21 @@ impl Watchdog {
                             };
                         }
                         AutonomyLevel::FullAutonomous => {
-                            let cmd = NixOSCommand::SwitchGeneration {
-                                generation: pre_gen as u32,
+                            let generation = match u32::try_from(pre_gen) {
+                                Ok(generation) => generation,
+                                Err(_) => {
+                                    return WatchdogVerdict::Degraded {
+                                        reason: format!(
+                                            "{}; rollback authority rejected: generation {} exceeds u32 range",
+                                            reason, pre_gen
+                                        ),
+                                        surprise: last_surprise,
+                                        health: last_health,
+                                        checks_performed,
+                                    };
+                                }
                             };
+                            let cmd = NixOSCommand::SwitchGeneration { generation };
                             let mut executor = NixOSExecutor::new();
                             match executor.execute_confirmed_blocking(cmd, 0.0) {
                                 ExecutionResult::Success { .. } => {
@@ -277,6 +289,11 @@ impl Watchdog {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn watchdog_rollback_rejects_generation_overflow() {
+        assert!(u32::try_from(u64::from(u32::MAX) + 1).is_err());
+    }
 
     #[test]
     fn watchdog_rollback_uses_typed_generation_switch_effect() {
