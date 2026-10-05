@@ -1385,6 +1385,7 @@ jobs:
           - symthaea-consciousness-equation
           - symthaea-embeddings
           - symthaea-evidence-plane
+          - symthaea-epistemic-types
           - symthaea-harmonies
           - symthaea-observability
           - nixward
@@ -1412,6 +1413,7 @@ jobs:
           - symthaea-humanoid
           - symthaea-vehicle
           - symthaea-fabrication-kernel
+          - symthaea-verification-adapter
           # symthaea-perception is deliberately in the workspace `exclude` list
           # (ARCHIVED 2026-07-16, vision review P2.2 — real ONNX stack, zero
           # consumers). `cargo test -p symthaea-perception` therefore cannot
