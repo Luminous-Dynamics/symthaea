@@ -26,6 +26,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::Result;
 use symthaea_core::genesis::GenesisSeed;
+#[cfg(feature = "ssm_language")]
+use symthaea_broca::PhonologicalPlan;
+use symthaea_vocal_tract::pipeline::{Intonation, PitchAccent, ProsodyContext, predict_duration};
 
 use super::audio_out::AudioOutput;
 use super::formant_targets::FormantDatabase;
@@ -149,6 +152,175 @@ impl LiveVoice {
         }
     }
 
+    /// Synthesize an explicit phonological plan through the live audio output path.
+    ///
+    /// This is intentionally plan-native: no text, G2P reconstruction, or lexical inference
+    /// occurs here. The validated plan supplies explicit phoneme identity, stress, rate,
+    /// phrase boundaries, and prosodic intent. The vocal-tract controller supplies
+    /// speaker/anatomical parameters. Word-final timing remains unasserted because the current
+    /// phonological contract does not encode word boundaries.
+    ///
+    /// The current implementation pre-synthesizes the validated plan before enqueueing it to
+    /// the audio sink, so this method does not claim first-audio latency.
+    #[cfg(feature = "ssm_language")]
+    pub fn speak_phonological_plan(&mut self, plan: &PhonologicalPlan) -> Result<usize> {
+        let samples = self.synthesize_phonological_plan(plan)?;
+        self.push_with_backpressure(&samples);
+        Ok(samples.len())
+    }
+
+    /// Synthesize an explicit phonological plan directly to WAV without an audio device.
+    ///
+    /// The same scheduler-owned duration calculation is used by the real-time path.
+    #[cfg(feature = "ssm_language")]
+    pub fn speak_phonological_plan_to_file(
+        &mut self,
+        plan: &PhonologicalPlan,
+        path: &Path,
+    ) -> Result<usize> {
+        let samples = self.synthesize_phonological_plan(plan)?;
+        let sample_rate = self.streaming.vocoder.sample_rate();
+        write_wav(path, &samples, sample_rate)?;
+        Ok(samples.len())
+    }
+
+    #[cfg(feature = "ssm_language")]
+    fn pitch_accent_for_plan(
+        segment_is_focus: bool,
+        prominence: f32,
+        pause_weight: f32,
+    ) -> PitchAccent {
+        if segment_is_focus && prominence >= 0.82 {
+            PitchAccent::RiseHigh
+        } else if prominence >= 0.62 {
+            PitchAccent::High
+        } else if pause_weight >= 0.65 {
+            PitchAccent::FallLow
+        } else {
+            PitchAccent::None
+        }
+    }
+
+    #[cfg(feature = "ssm_language")]
+    fn synthesize_phonological_plan(&mut self, plan: &PhonologicalPlan) -> Result<Vec<f32>> {
+        plan.validate()
+            .map_err(|error| anyhow::anyhow!("invalid phonological plan: {error}"))?;
+        if !plan.ready_for_realization() {
+            anyhow::bail!("phonological plan is not ready for realization");
+        }
+
+        let total_frames = plan
+            .segments
+            .iter()
+            .enumerate()
+            .map(|(index, segment)| {
+                predict_duration(
+                    &segment.symbol,
+                    segment.stress.ordinal(),
+                    false,
+                    index + 1 == plan.segments.len(),
+                    plan.rate,
+                )
+            })
+            .sum::<usize>();
+
+        let samples_per_frame = (self.sample_rate() / FRAME_RATE.max(1)) as usize;
+        let mut all_samples =
+            Vec::with_capacity(total_frames.saturating_mul(samples_per_frame.max(1)));
+
+        let last_index = plan.segments.len().saturating_sub(1);
+        for (index, segment) in plan.segments.iter().enumerate() {
+            let mut frames = predict_duration(
+                &segment.symbol,
+                segment.stress.ordinal(),
+                false,
+                index == last_index,
+                plan.rate,
+            );
+
+            // Pause weight is only realized when the phonological plan explicitly encodes
+            // a silence segment; this prevents inventing pause locations from an abstract
+            // scalar alone.
+            if segment.symbol.eq_ignore_ascii_case("SIL") {
+                frames = ((frames as f32) * (1.0 + plan.pause_weight)).round() as usize;
+            }
+
+            let phoneme = if segment.symbol.eq_ignore_ascii_case("SIL") {
+                None
+            } else {
+                Some(segment.symbol.as_str())
+            };
+            let state = self.cognitive_state.lock().clone();
+            let segment_count = plan.segments.len();
+            let utterance_progress =
+                index as f32 / segment_count.saturating_sub(1).max(1) as f32;
+            let phrase_index = plan.segments[..index]
+                .iter()
+                .filter(|slot| slot.phrase_boundary_after)
+                .count()
+                .min(u8::MAX as usize) as u8;
+            let phrase_start = plan.segments[..index]
+                .iter()
+                .rposition(|slot| slot.phrase_boundary_after)
+                .map(|boundary| boundary + 1)
+                .unwrap_or(0);
+            let phrase_end = plan.segments[index..]
+                .iter()
+                .position(|slot| slot.phrase_boundary_after)
+                .map(|offset| index + offset)
+                .unwrap_or(segment_count.saturating_sub(1));
+            let phrase_span = phrase_end.saturating_sub(phrase_start).max(1);
+            let phrase_progress =
+                index.saturating_sub(phrase_start) as f32 / phrase_span as f32;
+            let intonation = match plan.intonation {
+                symthaea_broca::IntonationIntent::Statement => Intonation::Statement,
+                symthaea_broca::IntonationIntent::Question => Intonation::Question,
+                symthaea_broca::IntonationIntent::Exclamation => Intonation::Exclamation,
+            };
+
+            for frame_index in 0..frames {
+                let progress = if frames > 1 {
+                    frame_index as f32 / (frames - 1) as f32
+                } else {
+                    0.0
+                };
+                let prosody = ProsodyContext {
+                    utterance_progress: utterance_progress.clamp(0.0, 1.0),
+                    phoneme_progress: progress,
+                    stress: segment.stress.ordinal(),
+                    // StreamingVocalTract::new() uses the default speaker profile (120 Hz).
+                    // Broca's pitch_range widens/narrows F0 excursion via the existing
+                    // arousal channel rather than overwriting the speaker's base pitch.
+                    base_f0: 120.0,
+                    arousal: {
+                        let normalized = state.emotional_arousal.clamp(0.0, 1.0);
+                        let range = plan.pitch_range.clamp(0.65, 1.45);
+                        (0.5 + (normalized - 0.5) * range).clamp(0.0, 1.0)
+                    },
+                    intonation,
+                    phrase_index,
+                    phrase_progress: phrase_progress.clamp(0.0, 1.0),
+                    is_focus: segment.is_focus && plan.focus_role.is_some(),
+                    pitch_accent: Self::pitch_accent_for_plan(
+                        segment.is_focus,
+                        plan.prominence,
+                        plan.pause_weight,
+                    ),
+                    is_syllable_onset: segment.is_syllable_onset,
+                    syllable_progress: progress,
+                    prev_source_type: None,
+                    next_source_type: None,
+                };
+                let chunk = self
+                    .streaming
+                    .tick_with_prosody(&state, None, DT, phoneme, &prosody);
+                all_samples.extend_from_slice(&chunk);
+            }
+        }
+
+        Ok(all_samples)
+    }
+
     /// Speak text in real time with enhanced prosody control
     pub fn speak(&mut self, text: &str) -> Result<()> {
         self.speaking.store(true, Ordering::SeqCst);
@@ -196,7 +368,7 @@ impl LiveVoice {
         }
     }
 
-    fn apply_prosody(&self, state: &mut VoiceCognitiveState, prosody: &ProsodyAnalysis) {
+    fn apply_prosody(&mut self, state: &mut VoiceCognitiveState, prosody: &ProsodyAnalysis) {
         state.emotional_arousal = prosody.pitch_range.clamp(0.0, 1.0);
         self.modulate_tau(1.0 / prosody.speaking_rate);
     }
@@ -434,6 +606,253 @@ mod tests {
 
         flag.store(false, Ordering::SeqCst);
         assert!(!flag.load(Ordering::SeqCst));
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_plan_prominence_selects_typed_pitch_accent() {
+        assert_eq!(
+            LiveVoice::pitch_accent_for_plan(true, 0.90, 0.0),
+            PitchAccent::RiseHigh
+        );
+        assert_eq!(
+            LiveVoice::pitch_accent_for_plan(false, 0.70, 0.0),
+            PitchAccent::High
+        );
+        assert_eq!(
+            LiveVoice::pitch_accent_for_plan(false, 0.20, 0.80),
+            PitchAccent::FallLow
+        );
+        assert_eq!(
+            LiveVoice::pitch_accent_for_plan(false, 0.20, 0.20),
+            PitchAccent::None
+        );
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_phonological_plan_rate_reaches_real_scheduler() {
+        fn make_plan(rate: f32) -> PhonologicalPlan {
+            use symthaea_broca::{
+                ContentBindingStatus, LinguisticFrame, PhonemeSlot, SpeechPlan, StructuredDecoder,
+                SyllableStress, ThoughtChannels,
+            };
+
+            let genesis = GenesisSeed::from_phrase("plan-native-rate-test");
+            let decoder = StructuredDecoder::new(&genesis);
+            let channels = ThoughtChannels::with_intent(4);
+            let readout = decoder.decode(&channels);
+            let mut speech_plan = SpeechPlan::from_readout(&channels, &readout);
+            speech_plan.prosody.rate = rate;
+
+            let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+            let mut plan = PhonologicalPlan::from_linguistic_frame(&frame);
+            plan.bind_segments(
+                vec![PhonemeSlot::new(
+                    "AH",
+                    0,
+                    SyllableStress::Primary,
+                    true,
+                    false,
+                    true,
+                )],
+                ContentBindingStatus::PhonologicallyBound,
+            )
+            .expect("explicit phonological fixture");
+            plan
+        }
+
+        let genesis = GenesisSeed::from_phrase("plan-native-rate-test");
+        let mut voice = LiveVoice::new_headless(&genesis);
+
+        let slow = make_plan(0.70);
+        let fast = make_plan(1.30);
+
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea-plan-native-rate-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).expect("create temporary output directory");
+        let slow_path = dir.join("slow.wav");
+        let fast_path = dir.join("fast.wav");
+
+        let slow_samples = voice
+            .speak_phonological_plan_to_file(&slow, &slow_path)
+            .expect("slow plan should synthesize");
+
+        voice.reset();
+
+        let fast_samples = voice
+            .speak_phonological_plan_to_file(&fast, &fast_path)
+            .expect("fast plan should synthesize");
+
+        assert!(
+            slow_samples > fast_samples,
+            "scheduler must consume plan rate: slow={slow_samples}, fast={fast_samples}"
+        );
+        let slow_frames = predict_duration("AH", 1, false, true, slow.rate);
+        let samples_per_frame = (voice.sample_rate() / FRAME_RATE) as usize;
+        assert_eq!(
+            slow_samples,
+            slow_frames * samples_per_frame,
+            "scheduler sample count must equal deterministic frame count"
+        );
+
+        std::fs::remove_dir_all(&dir).expect("remove temporary output directory");
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_phonological_plan_consumes_pitch_range() {
+        fn make_plan(pitch_range: f32) -> PhonologicalPlan {
+            use symthaea_broca::{
+                ContentBindingStatus, LinguisticFrame, PhonemeSlot, SpeechPlan, StructuredDecoder,
+                SyllableStress, ThoughtChannels,
+            };
+
+            let genesis = GenesisSeed::from_phrase("plan-native-pitch-test");
+            let decoder = StructuredDecoder::new(&genesis);
+            let channels = ThoughtChannels::with_intent(2);
+            let readout = decoder.decode(&channels);
+            let mut speech_plan = SpeechPlan::from_readout(&channels, &readout);
+            speech_plan.prosody.pitch_range = pitch_range;
+
+            let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+            let mut plan = PhonologicalPlan::from_linguistic_frame(&frame);
+            plan.bind_segments(
+                vec![PhonemeSlot::new(
+                    "AH",
+                    0,
+                    SyllableStress::Primary,
+                    true,
+                    false,
+                    true,
+                )],
+                ContentBindingStatus::PhonologicallyBound,
+            )
+            .expect("explicit phonological fixture");
+            plan
+        }
+
+        let genesis = GenesisSeed::from_phrase("plan-native-pitch-test");
+        let mut voice = LiveVoice::new_headless(&genesis);
+        voice.set_cognitive_state(VoiceCognitiveState {
+            emotional_arousal: 0.75,
+            ..Default::default()
+        });
+
+        let narrow = make_plan(0.65);
+        let wide = make_plan(1.45);
+
+        let narrow_samples = voice
+            .synthesize_phonological_plan(&narrow)
+            .expect("narrow pitch plan should synthesize");
+        voice.reset();
+        let wide_samples = voice
+            .synthesize_phonological_plan(&wide)
+            .expect("wide pitch plan should synthesize");
+
+        assert_eq!(
+            narrow_samples.len(),
+            wide_samples.len(),
+            "pitch range should change realization, not deterministic duration"
+        );
+        let difference = narrow_samples
+            .iter()
+            .zip(&wide_samples)
+            .map(|(left, right)| (left - right).abs())
+            .sum::<f32>();
+        assert!(
+            difference > 1e-3,
+            "plan pitch range must reach phonological realization: absolute sample difference={difference}"
+        );
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_phonological_plan_consumes_explicit_pause_weight() {
+        fn make_plan(pause_weight: f32) -> PhonologicalPlan {
+            use symthaea_broca::{
+                ContentBindingStatus, LinguisticFrame, PhonemeSlot, SpeechPlan, StructuredDecoder,
+                SyllableStress, ThoughtChannels,
+            };
+
+            let genesis = GenesisSeed::from_phrase("plan-native-pause-test");
+            let decoder = StructuredDecoder::new(&genesis);
+            let channels = ThoughtChannels::with_intent(2);
+            let readout = decoder.decode(&channels);
+            let mut speech_plan = SpeechPlan::from_readout(&channels, &readout);
+            speech_plan.prosody.pause_weight = pause_weight;
+
+            let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+            let mut plan = PhonologicalPlan::from_linguistic_frame(&frame);
+            plan.bind_segments(
+                vec![
+                    PhonemeSlot::new(
+                        "AH",
+                        0,
+                        SyllableStress::Primary,
+                        true,
+                        false,
+                        true,
+                    ),
+                    PhonemeSlot::new(
+                        "SIL",
+                        1,
+                        SyllableStress::None,
+                        true,
+                        false,
+                        true,
+                    ),
+                ],
+                ContentBindingStatus::PhonologicallyBound,
+            )
+            .expect("explicit phonological fixture");
+            plan
+        }
+
+        let genesis = GenesisSeed::from_phrase("plan-native-pause-test");
+        let mut voice = LiveVoice::new_headless(&genesis);
+
+        let no_pause = make_plan(0.0);
+        let explicit_pause = make_plan(1.0);
+
+        let no_pause_samples = voice
+            .synthesize_phonological_plan(&no_pause)
+            .expect("no-pause plan should synthesize");
+        voice.reset();
+        let explicit_pause_samples = voice
+            .synthesize_phonological_plan(&explicit_pause)
+            .expect("explicit pause plan should synthesize");
+
+        assert!(
+            explicit_pause_samples.len() > no_pause_samples.len(),
+            "pause weight must extend only the explicitly encoded silence segment"
+        );
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_role_only_phonological_plan_is_rejected() {
+        use symthaea_broca::{LinguisticFrame, SpeechPlan, StructuredDecoder, ThoughtChannels};
+
+        let genesis = GenesisSeed::from_phrase("plan-native-rejection-test");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(4);
+        let readout = decoder.decode(&channels);
+        let frame = LinguisticFrame::from_speech_plan(&SpeechPlan::from_readout(&channels, &readout));
+        let plan = PhonologicalPlan::from_linguistic_frame(&frame);
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("rejected.wav");
+        let mut voice = LiveVoice::new_headless(&genesis);
+
+        let error = voice
+            .speak_phonological_plan_to_file(&plan, &path)
+            .expect_err("role-only plans must not reach synthesis");
+
+        assert!(error.to_string().contains("not ready for realization"));
+        assert!(!path.exists());
     }
 
     #[test]
