@@ -134,6 +134,13 @@ impl PhonologicalPlanRealizationReceipt {
 
         let samples_per_frame = (self.sample_rate / FRAME_RATE) as usize;
         let expected_samples = self.scheduler_frames.saturating_mul(samples_per_frame);
+        if self.sample_rate < FRAME_RATE {
+            anyhow::bail!(
+                "realization receipt sample rate is below the motor-frame rate: {} < {}",
+                self.sample_rate,
+                FRAME_RATE
+            );
+        }
         if self.sample_count != expected_samples || self.sample_count == 0 {
             anyhow::bail!("realization receipt sample accounting is inconsistent");
         }
@@ -151,7 +158,10 @@ impl PhonologicalPlanRealizationReceipt {
     /// together with the exact f32 sample buffer, so metadata-only rate tampering cannot
     /// preserve a previously valid audio receipt.
     pub fn verify_samples(&self, samples: &[f32]) -> bool {
-        samples.len() == self.sample_count
+        self.sample_rate >= FRAME_RATE
+            && self.sample_count > 0
+            && samples.len() == self.sample_count
+            && is_hex_digest(&self.audio_blake3)
             && hash_audio_binding(self.sample_rate, samples) == self.audio_blake3
     }
 }
@@ -1225,6 +1235,19 @@ mod tests {
             !tampered_rate.verify_samples(&samples),
             "audio receipt must bind sample-rate metadata to the sample digest"
         );
+
+        let mut impossible_rate = receipt.clone();
+        impossible_rate.sample_rate = FRAME_RATE - 1;
+        assert!(
+            impossible_rate.verify_against_plan(&plan).is_err(),
+            "receipt verification must reject a sample rate that cannot produce a motor-frame sample"
+        );
+        assert!(!impossible_rate.verify_samples(&samples));
+
+        let mut empty = receipt.clone();
+        empty.sample_count = 0;
+        empty.audio_blake3 = hash_audio_binding(empty.sample_rate, &[]);
+        assert!(!empty.verify_samples(&[]), "empty audio receipts must not self-validate");
 
         let mut tampered_schedule = receipt.clone();
         tampered_schedule.segment_frame_counts[0] =
