@@ -76,12 +76,14 @@ similarities fail closed, and the emitted set is canonicalized by stable
 identifier.
 
 This is deliberately a baseline score, not a claim that cosine alone is the
-best N1 uncertainty statistic. Recent 2026 HDC/conformal work combines prototype
-distance, runner-up gap, and internal vote dispersion, and uses label-conditional
-thresholds to improve uncertainty behavior under subject and distribution shifts.
-Those richer terms are candidates for a later preregistered score revision rather
-than silent post-hoc tuning here. The full candidate universe must be part of the
-N1 protocol: a conformal set over an incomplete or opportunistically filtered
+best N1 uncertainty statistic. Because (1 - cosine) / 2 is an affine monotone
+transform of negative cosine, it retains the basic prototype-distance ordering
+but does not model interactions among competing candidates. Recent ConformalHDC
+work explicitly introduces HDC-specific conformity scores that combine similarity
+with class-interaction information and supports set-valued abstention. Those
+richer terms are candidates for a later preregistered score revision rather than
+silent post-hoc tuning here. The full candidate universe must be part of the N1
+protocol: a conformal set over an incomplete or opportunistically filtered
 candidate pool cannot inherit the intended coverage statement.
 
 Small calibration sets are structurally weak. At alpha=0.10, at least 19
