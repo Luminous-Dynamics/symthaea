@@ -232,8 +232,8 @@ impl BoundedDistanceSyndromeDecoder {
 
         if observation.dimension() != self.parity_check.dimension() {
             return (
-                BoundedDistanceDecode::InvalidBound {
-                    max_error_weight,
+                BoundedDistanceDecode::InvalidObservationDimension {
+                    observation_dimension: observation.dimension(),
                     dimension: self.parity_check.dimension(),
                 },
                 work,
