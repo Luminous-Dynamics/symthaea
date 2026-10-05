@@ -1044,6 +1044,8 @@ impl VerificationMethodResolution {
             && self.verification_method == request.verification_method
             && self.resolved_verification_method_controller == request.expected_controller
             && self.verification_relationship == request.expected_verification_relationship
+            && self.controller_document_network_policy
+                == request.controller_document_network_policy
             && self
                 .controller_document_integrity
                 .matches_policy(&request.controller_document_integrity_policy)
@@ -1391,16 +1393,10 @@ impl VerificationEvidence {
                         ..
                     } => ControllerDocumentIntegrityPolicy::Sha256Digest(expected_digest.clone()),
                 },
-            controller_document_network_policy:
-                self
-                    .resolution
-                    .controller_document_dereference
-                    .as_ref()
-                    .map(|_| ControllerDocumentNetworkPolicy::strict_for_url(
-                        &self.resolution.controller_document_ref,
-                    ))
-                    .transpose()?
-                    .ok_or(VerificationFailure::MissingControllerDocumentDereference)?,
+            controller_document_network_policy: self
+                .resolution
+                .controller_document_network_policy
+                .clone(),
             freshness: self.freshness.clone(),
         };
         request.validate_structure()?;
@@ -1654,7 +1650,7 @@ mod tests {
     }
 
     fn resolved_method(request: &VerificationRequest) -> VerificationMethodResolution {
-        VerificationMethodResolution::from_controller_document(
+        let resolution = VerificationMethodResolution::from_controller_document(
             request,
             "https://example.test/controller",
             ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
@@ -1670,7 +1666,21 @@ mod tests {
             )
             .unwrap(),
         )
-        .unwrap()
+        .unwrap();
+        let dereference = ControllerDocumentDereferenceAttestation::from_adapter(
+            request,
+            "https://example.test/controller",
+            "application/cid",
+            1024,
+            0,
+            request.freshness.verification_time.clone(),
+            ControllerDocumentResolutionSource::HistoricalRegistry,
+            &"11".repeat(32),
+        )
+        .unwrap();
+        resolution
+            .with_controller_document_dereference(dereference, request)
+            .unwrap()
     }
 
     #[test]
@@ -1846,23 +1856,39 @@ mod tests {
         )
         .unwrap();
 
-        let resolution = VerificationMethodResolution::from_controller_document(
-            &request,
-            "https://example.test/controller",
-            ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
-            request.verification_method.clone(),
-            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
-            &[request.verification_method.clone()],
-            &"11".repeat(32),
-            VerificationMethodLifecycle::new(None, None).unwrap(),
-            ControllerDocumentSnapshotScope::historical_at(
-                request.freshness.lifecycle_reference_time(),
-                "snapshot:verification-history",
-                request.freshness.verification_time.as_str(),
+        let resolution = {
+            let resolution = VerificationMethodResolution::from_controller_document(
+                &request,
+                "https://example.test/controller",
+                ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
+                request.verification_method.clone(),
+                ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+                &[request.verification_method.clone()],
+                &"11".repeat(32),
+                VerificationMethodLifecycle::new(None, None).unwrap(),
+                ControllerDocumentSnapshotScope::historical_at(
+                    request.freshness.lifecycle_reference_time(),
+                    "snapshot:verification-history",
+                    request.freshness.verification_time.as_str(),
+                )
+                .unwrap(),
             )
-            .unwrap(),
-        )
-        .unwrap();
+            .unwrap();
+            let dereference = ControllerDocumentDereferenceAttestation::from_adapter(
+                &request,
+                "https://example.test/controller",
+                "application/cid",
+                1024,
+                0,
+                request.freshness.verification_time.clone(),
+                ControllerDocumentResolutionSource::HistoricalRegistry,
+                &"11".repeat(32),
+            )
+            .unwrap();
+            resolution
+                .with_controller_document_dereference(dereference, &request)
+                .unwrap()
+        };
         assert!(resolution
             .controller_document_integrity
             .matches_policy(&ControllerDocumentIntegrityPolicy::Sha256Digest(
@@ -1888,6 +1914,34 @@ mod tests {
             ),
             Err(VerificationFailure::ControllerDocumentIntegrityMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn resolution_cannot_downgrade_request_network_policy() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let weaker = ControllerDocumentNetworkPolicy {
+            allowed_schemes: vec!["https".into()],
+            max_response_bytes: 16 * 1024 * 1024,
+            max_redirects: 4,
+            require_effective_url_match: false,
+        };
+        let weaker_request = request
+            .clone()
+            .with_controller_document_network_policy(weaker)
+            .unwrap();
+
+        let resolution = resolved_method(&weaker_request);
+        assert!(resolution.matches_request(&weaker_request));
+        assert!(!resolution.matches_request(&request));
     }
 
     #[test]
@@ -2022,6 +2076,67 @@ mod tests {
             };
         assert!(evidence.validate_structure().is_ok());
         assert!(!evidence.matches_request(&request));
+    }
+
+    #[test]
+    fn dereference_attestation_rejects_redirects_oversize_and_scheme_downgrade() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let redirected = ControllerDocumentDereferenceAttestation::from_adapter(
+            &request,
+            "https://other.example/controller",
+            "application/cid",
+            1024,
+            1,
+            request.freshness.verification_time.clone(),
+            ControllerDocumentResolutionSource::Network,
+            &"11".repeat(32),
+        );
+        assert!(matches!(
+            redirected,
+            Err(VerificationFailure::ControllerDocumentEffectiveUrlMismatch)
+        ));
+
+        let oversized = ControllerDocumentDereferenceAttestation::from_adapter(
+            &request,
+            "https://example.test/controller",
+            "application/cid",
+            5 * 1024 * 1024,
+            0,
+            request.freshness.verification_time.clone(),
+            ControllerDocumentResolutionSource::Network,
+            &"11".repeat(32),
+        );
+        assert!(matches!(
+            oversized,
+            Err(VerificationFailure::ControllerDocumentResponseTooLarge)
+        ));
+
+        let mut downgrade_policy = request.clone();
+        downgrade_policy.controller_document_network_policy.allowed_schemes =
+            vec!["http".into()];
+        let scheme = ControllerDocumentDereferenceAttestation::from_adapter(
+            &downgrade_policy,
+            "https://example.test/controller",
+            "application/cid",
+            1024,
+            0,
+            downgrade_policy.freshness.verification_time.clone(),
+            ControllerDocumentResolutionSource::Network,
+            &"11".repeat(32),
+        );
+        assert!(matches!(
+            scheme,
+            Err(VerificationFailure::ControllerDocumentNetworkPolicyViolation)
+        ));
     }
 
     #[test]
