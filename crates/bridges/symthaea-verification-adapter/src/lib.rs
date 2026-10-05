@@ -141,11 +141,7 @@ impl JsonControllerDocumentSnapshotAdapter {
             path: path.into(),
             expected_snapshot_reference: expected_snapshot_reference.into(),
         };
-        if adapter.expected_snapshot_reference.trim().is_empty() {
-            return Err(SnapshotError::Malformed(
-                "expected snapshot reference must be non-empty".into(),
-            ));
-        }
+        validate_snapshot_reference(&adapter.expected_snapshot_reference)?;
         Ok(adapter)
     }
 
@@ -359,6 +355,20 @@ fn sha256_multibase(hex_digest: &str) -> Result<String, SnapshotError> {
     Ok(format!("z{}", bs58::encode(multihash).into_string()))
 }
 
+fn validate_snapshot_reference(value: &str) -> Result<(), SnapshotError> {
+    let digest = value.strip_prefix("sha256:").ok_or_else(|| {
+        SnapshotError::Malformed(
+            "snapshot reference must use the sha256:<hex-digest> format".into(),
+        )
+    })?;
+    if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(SnapshotError::Malformed(
+            "snapshot reference must contain a 64-character hexadecimal SHA-256 digest".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn validate_json_media_type(value: &str) -> Result<(), SnapshotError> {
     let essence = value
         .split(';')
@@ -436,10 +446,7 @@ fn extract_verification_method(
 
     match matching.len() {
         0 => Err(SnapshotError::Verification(
-            VerificationFailure::VerificationMethodMismatch {
-                expected: request.verification_method.clone(),
-                actual: request.verification_method.clone(),
-            },
+            VerificationFailure::VerificationMethodNotFound,
         )),
         1 => Ok(matching.remove(0)),
         _ => Err(SnapshotError::Malformed(
@@ -672,6 +679,25 @@ mod tests {
             }"##,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn snapshot_reference_is_typed_as_a_sha256_anchor() {
+        let snapshot = snapshot();
+        let reference = snapshot.snapshot_reference().unwrap();
+        assert!(JsonControllerDocumentSnapshotAdapter::new(
+            "/tmp/does-not-matter",
+            reference
+        )
+        .is_ok());
+        assert!(matches!(
+            JsonControllerDocumentSnapshotAdapter::new(
+                "/tmp/does-not-matter",
+                "not-content-addressed",
+            ),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("snapshot reference must use the sha256")
+        ));
     }
 
     #[test]
