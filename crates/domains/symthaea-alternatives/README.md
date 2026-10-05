@@ -9,8 +9,8 @@ The model is:
 1. Define the function that must be satisfied.
 2. Bind the requirement to the exact product/component/design context being assessed.
 3. Represent candidate material/process/product pathways.
-4. Declare an explicit comparison scale (unit + functional/lifecycle scope) for every burden dimension; candidates cannot define their own cohort.
-5. Represent functional-performance values as evidence-linked, scoped measurements rather than bare claims.
+4. Declare an explicit comparison scale (unit + functional/lifecycle scope + exact methodology/comparability basis identity) for every burden dimension; candidates cannot define their own cohort.
+5. Represent functional-performance values as evidence-linked, scoped measurements tied to the exact comparison/test basis rather than bare claims.
 6. Declare the physical operating envelope explicitly; a candidate must demonstrate coverage of the required ranges.
 7. Keep multi-axis burdens separate.
 8. Evaluate hard constraints fail-closed.
@@ -38,3 +38,10 @@ This temporal model follows a provenance-friendly boundary: W3C PROV treats enti
 
 
 Global qualification states are tier-consistent. Field qualification requires field-observed support across all burden dimensions and across every required functional/operating evidence surface; continuous monitoring applies the corresponding monitoring requirement. Manufacturing qualification likewise requires manufacturing-scale observations across every burden dimension. This prevents a candidate from being promoted by a strong burden dataset while its actual functional qualification remains at a lower evidence tier.
+
+
+## Comparability boundary
+
+Unit and scope equality are necessary but not sufficient for industrial comparison. Every burden, performance estimate, operating requirement, and candidate capability therefore carries a `ComparisonBasisRef` consisting of a stable basis ID, revision, and digest. The basis is intentionally opaque to this crate: it can identify the exact functional-unit definition, system boundary, allocation/normalisation rules, lifecycle accounting profile, or engineering test protocol selected by the authoritative assessment context. Cross-basis Pareto dominance, burden-transfer claims, functional constraint passes, and qualification are fail-closed.
+
+This mirrors an important limitation in existing product accounting practice: the GHG Protocol Product Standard explains that additional accounting specifications are needed for defensible product comparisons, and comparative GHG work emphasizes using the same functional unit for like-for-like comparison. citeturn457334search0turn457334search49
