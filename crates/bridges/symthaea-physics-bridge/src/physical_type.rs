@@ -189,7 +189,13 @@ where
     use QuantityKind::*;
 
     match expr {
-        Expr::Var(name) => valid(lookup(name)),
+        Expr::Var(name) => {
+            let physical_type = lookup(name);
+            match physical_type.validate() {
+                Ok(()) => valid(physical_type),
+                Err(error) => TypeJudgement::Invalid(error),
+            }
+        },
         Expr::Const(value) => constant_type(*value),
         Expr::Sum(body, _) => infer_expr_type_with_lookup(body, lookup),
 
@@ -505,6 +511,21 @@ mod tests {
         );
         assert!(matches!(
             infer_expr_type(&e, &units()),
+            TypeJudgement::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn explicit_variable_with_incoherent_physical_type_is_rejected() {
+        let malformed = PhysicalType::with_kind(
+            QuantityKind::Energy,
+            PhysicalDimension::LENGTH,
+        );
+        let expr = Expr::Var("bad".into());
+        let variables = HashMap::from([("bad".into(), malformed)]);
+
+        assert!(matches!(
+            infer_expr_type_with_variables(&expr, &variables),
             TypeJudgement::Invalid(_)
         ));
     }
