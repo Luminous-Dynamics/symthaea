@@ -346,7 +346,11 @@ mod tests {
             .unwrap();
 
         assert_eq!(elimination.qualification, QualificationState::Hypothesis);
-        assert!(!elimination.frontier_blocked);
+        assert!(elimination.frontier_blocked);
+        assert!(matches!(
+            result.frontier_blockers["elimination"][0],
+            FrontierBlocker::ConstraintUnresolved(_)
+        ));
     }
 
     #[test]
