@@ -1629,6 +1629,7 @@ impl VerificationEvidence {
             &self.statement_digest,
             self.author.as_str(),
             self.proof_purpose.as_str(),
+            &self.expected_transformed_document_digest,
             self.verification_method.as_str(),
             self.controller.as_str(),
             self.resolved_verification_method_controller.as_str(),
@@ -3211,6 +3212,37 @@ mod tests {
         controller.resolved_verification_method_controller =
             ClaimControllerIdentity::new("https://example.test/other").unwrap();
         assert_ne!(controller.evidence_digest(), method.evidence_digest());
+    }
+
+    #[test]
+    fn evidence_digest_covers_expected_transformed_document_binding() {
+        let claim = fixture_claim();
+        let mut request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap()
+        .with_expected_transformed_document_digest("22".repeat(32))
+        .unwrap();
+
+        let resolution = resolved_method(&request);
+        let receipt = test_cryptographic_receipt(&request, &resolution);
+        let base =
+            VerificationEvidence::from_adapter_attestation(&request, resolution, receipt).unwrap();
+
+        request.expected_transformed_document_digest = Some("33".repeat(32));
+        let mut rebound = base.clone();
+        rebound.expected_transformed_document_digest = request
+            .expected_transformed_document_digest
+            .clone();
+        rebound.cryptographic_verification.expected_transformed_document_digest = request
+            .expected_transformed_document_digest
+            .clone();
+
+        assert_ne!(base.evidence_digest(), rebound.evidence_digest());
     }
 
     #[test]
