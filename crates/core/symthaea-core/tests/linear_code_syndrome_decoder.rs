@@ -135,6 +135,96 @@ fn parity_check_derivation_is_deterministic_for_same_code() {
 }
 
 #[test]
+fn small_fixture_kernel_equals_code_and_syndrome_cosets_are_exact() {
+    let code = boundary_code();
+    let parity_check = ParityCheckMatrix::from_code(&code).expect("parity-check matrix");
+    let codewords = code.enumerate();
+    let dimension = parity_check.dimension();
+    let syndrome_dimension = parity_check.syndrome_dimension();
+    let syndrome_space_size = 1usize << syndrome_dimension;
+
+    assert_eq!(dimension, 8);
+    assert_eq!(code.rank(), 2);
+    assert_eq!(syndrome_dimension, 6);
+    assert_eq!(syndrome_space_size, 64);
+    assert_eq!(codewords.len(), 4);
+
+    // Exhaustively partition all 2^8 ambient observations by syndrome.
+    let mut buckets = vec![Vec::<usize>::new(); syndrome_space_size];
+    for mask in 0..(1usize << dimension) {
+        let word = error_from_mask(mask, dimension);
+        let syndrome = parity_check.syndrome(&word).expect("same dimension");
+        assert_eq!(syndrome.words().len(), 1);
+        let syndrome_index = syndrome.words()[0] as usize;
+        assert!(syndrome_index < buckets.len());
+        buckets[syndrome_index].push(mask);
+    }
+
+    // Every syndrome occurs and every fiber has exactly |C| = 2^k elements.
+    assert_eq!(buckets.iter().filter(|bucket| !bucket.is_empty()).count(), 64);
+    assert!(buckets.iter().all(|bucket| bucket.len() == codewords.len()));
+
+    // The zero-syndrome kernel is exactly the code, element-for-element.
+    let kernel = &buckets[0];
+    assert_eq!(kernel.len(), codewords.len());
+    for &mask in kernel {
+        let word = error_from_mask(mask, dimension);
+        assert!(
+            code.contains(&word),
+            "zero-syndrome word is outside the code: mask={mask:#x}"
+        );
+    }
+    for codeword in &codewords {
+        let mask = codeword.words()[0] as usize;
+        assert!(
+            kernel.contains(&mask),
+            "codeword is missing from zero-syndrome kernel: mask={mask:#x}"
+        );
+    }
+
+    // Same syndrome iff the difference is in C. Each bucket is checked in
+    // both directions against translation by every codeword.
+    for bucket in &buckets {
+        let representative = error_from_mask(bucket[0], dimension);
+        let representative_syndrome = parity_check
+            .syndrome(&representative)
+            .expect("same dimension");
+
+        for &mask in bucket {
+            let member = error_from_mask(mask, dimension);
+            let mut difference = member.clone();
+            difference.xor_assign(&representative);
+            assert!(
+                code.contains(&difference),
+                "same-syndrome words differed by a non-codeword: representative={:#x}, member={mask:#x}",
+                bucket[0]
+            );
+        }
+
+        for codeword in &codewords {
+            let mut translated = representative.clone();
+            translated.xor_assign(codeword);
+            assert_eq!(
+                parity_check.syndrome(&translated),
+                Some(representative_syndrome.clone())
+            );
+        }
+    }
+
+    println!(
+        "SYNDROME_COSET_LEDGER=dimension={};code_rank={};syndrome_dimension={};kernel_size={};code_size={};syndrome_count={};min_coset_size={};max_coset_size={};kernel_equals_code=true;coset_partition_exact=true",
+        dimension,
+        code.rank(),
+        syndrome_dimension,
+        kernel.len(),
+        codewords.len(),
+        buckets.iter().filter(|bucket| !bucket.is_empty()).count(),
+        buckets.iter().map(Vec::len).min().unwrap_or(0),
+        buckets.iter().map(Vec::len).max().unwrap_or(0),
+    );
+}
+
+#[test]
 fn bounded_distance_decoder_matches_exhaustive_oracle_below_half_distance() {
     let code = boundary_code();
     let codewords = code.enumerate();
