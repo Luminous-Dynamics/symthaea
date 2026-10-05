@@ -227,22 +227,21 @@ pub enum RequirementBound {
 }
 
 impl RequirementBound {
-    fn check(self, value: Option<f64>) -> ConstraintStatus {
-        let Some(value) = value else {
+    fn check(self, interval: Option<Interval>) -> ConstraintStatus {
+        let Some(interval) = interval else {
             return ConstraintStatus::Unresolved;
         };
-        if !value.is_finite() {
-            return ConstraintStatus::Unresolved;
-        }
-        let pass = match self {
-            Self::AtLeast(min) => value >= min,
-            Self::AtMost(max) => value <= max,
-            Self::Between { min, max } => value >= min && value <= max,
-        };
-        if pass {
-            ConstraintStatus::Pass
-        } else {
-            ConstraintStatus::Fail
+        match self {
+            Self::AtLeast(min) if interval.lower >= min => ConstraintStatus::Pass,
+            Self::AtLeast(min) if interval.upper < min => ConstraintStatus::Fail,
+            Self::AtMost(max) if interval.upper <= max => ConstraintStatus::Pass,
+            Self::AtMost(max) if interval.lower > max => ConstraintStatus::Fail,
+            Self::Between { min, max } if interval.lower >= min && interval.upper <= max => {
+                ConstraintStatus::Pass
+            }
+            Self::Between { max, .. } if interval.lower > max => ConstraintStatus::Fail,
+            Self::Between { min, .. } if interval.upper < min => ConstraintStatus::Fail,
+            _ => ConstraintStatus::Unresolved,
         }
     }
 }
@@ -347,8 +346,8 @@ pub enum PathwayKind {
 /// Evidence-linked functional performance measurement.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PerformanceEstimate {
-    /// Performance value.
-    pub value: f64,
+    /// Plausible performance interval.
+    pub interval: Interval,
     /// Unit declared by the functional requirement.
     pub unit: String,
     /// Scope in which this performance value applies.
@@ -360,9 +359,7 @@ pub struct PerformanceEstimate {
 impl PerformanceEstimate {
     /// Validate the performance value and scale metadata.
     pub fn validate(&self) -> Result<(), AssessmentError> {
-        if !self.value.is_finite() {
-            return Err(AssessmentError::NonFinite);
-        }
+        Interval::new(self.interval.lower, self.interval.upper)?;
         if self.unit.is_empty() || self.scope.is_empty() {
             return Err(AssessmentError::EmptyPerformanceScale);
         }
@@ -1105,7 +1102,7 @@ impl AlternativesEngine {
                                 && estimate.scope == scale.scope
                                 && candidate.performance_evidence_is_supported_at(metric, assessed_at_epoch_seconds) =>
                         {
-                            bound.check(Some(estimate.value))
+                            bound.check(Some(estimate.interval))
                         }
                         _ => ConstraintStatus::Unresolved,
                     };
@@ -1506,6 +1503,35 @@ mod tests {
             burdens,
             evidence,
         }
+    }
+
+    #[test]
+    fn overlapping_performance_interval_cannot_satisfy_requirement() {
+        let mut c = candidate(
+            "uncertain-performance",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "p1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.performance.get_mut("service_life_years").unwrap().interval =
+            Interval::new(8.0, 12.0).unwrap();
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].constraints[0].status,
+            ConstraintStatus::Unresolved
+        );
+        assert!(result.frontier_blockers.contains_key("uncertain-performance"));
     }
 
     #[test]
