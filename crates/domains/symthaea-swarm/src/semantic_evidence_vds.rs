@@ -3976,6 +3976,30 @@ mod tests {
     }
 
     #[test]
+    fn rfc9942_receipt_truncated_extended_header_is_not_a_resource_limit() {
+        let protected = {
+            let mut bytes = Vec::new();
+            cbor_map_len(&mut bytes, 2);
+            cbor_int(&mut bytes, COSE_ALG_HEADER_LABEL);
+            cbor_int(&mut bytes, COSE_ES256_ALGORITHM_ID);
+            cbor_int(&mut bytes, RFC9942_VDS_HEADER_LABEL);
+            cbor_uint(&mut bytes, RFC9162_VDS_ID);
+            bytes
+        };
+
+        let mut wire = vec![0xd2, 0x84];
+        cbor_bytes(&mut wire, &protected);
+        // A truncated extended-length map header: 0xb8 declares a one-byte
+        // count argument, but the argument never arrives.
+        wire.push(0xb8);
+
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&wire),
+            Err(Rfc9942VdpError::InvalidEncoding)
+        );
+    }
+
+    #[test]
     fn cbor_bounded_map_distinguishes_truncated_header_from_budget_exhaustion() {
         // A missing extended-length byte is malformed input, not a resource
         // limit violation. A present byte that lies beyond the configured
