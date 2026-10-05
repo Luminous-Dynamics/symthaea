@@ -38,6 +38,12 @@ pub enum NixOSCommand {
     SwitchGeneration { generation: u32 },
     /// Activate an exact NixOS system generation in the running system.
     ActivateGeneration { generation: u32 },
+    /// Systemd service lifecycle operation.
+    Service { operation: ServiceOperation },
+    /// Delete a bounded number of old NixOS generations.
+    DeleteGenerations { keep_last: usize },
+    /// Delete NixOS generations older than a bounded age.
+    DeleteGenerationsOlderThan { days: u32 },
     /// nix-env -i (user package install)
     EnvInstall { packages: Vec<String> },
     /// nix-env -e (user package remove)
@@ -63,6 +69,17 @@ pub enum NixOSCommand {
         args: Vec<String>,
         safety_level: SafetyLevel,
     },
+}
+
+/// Systemd service lifecycle operations.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ServiceOperation {
+    Start { name: String },
+    Stop { name: String },
+    Restart { name: String },
+    Reload { name: String },
+    Enable { name: String },
+    Disable { name: String },
 }
 
 /// Channel operations
@@ -167,11 +184,16 @@ impl NixOSCommand {
 
             Self::RebuildTest { .. } => SafetyLevel::SystemModify,
             Self::RebuildBoot { .. } => SafetyLevel::SystemModify,
+            Self::Service { .. } => SafetyLevel::SystemModify,
             Self::SwitchGeneration { .. } | Self::ActivateGeneration { .. } => {
                 SafetyLevel::SystemCritical
             }
 
             Self::RebuildSwitch { .. } => SafetyLevel::SystemCritical,
+
+            Self::DeleteGenerations { .. } | Self::DeleteGenerationsOlderThan { .. } => {
+                SafetyLevel::Destructive
+            }
 
             Self::CollectGarbage { .. } => SafetyLevel::Destructive,
 
@@ -255,6 +277,35 @@ impl NixOSCommand {
                     "/nix/var/nix/profiles/system-{generation}-link/bin/switch-to-configuration"
                 ),
                 vec!["switch".to_string()],
+            ),
+            Self::Service { operation } => {
+                let (verb, name) = match operation {
+                    ServiceOperation::Start { name } => ("start", name),
+                    ServiceOperation::Stop { name } => ("stop", name),
+                    ServiceOperation::Restart { name } => ("restart", name),
+                    ServiceOperation::Reload { name } => ("reload", name),
+                    ServiceOperation::Enable { name } => ("enable", name),
+                    ServiceOperation::Disable { name } => ("disable", name),
+                };
+                ("systemctl".to_string(), vec![verb.to_string(), name.clone()])
+            }
+            Self::DeleteGenerations { keep_last } => (
+                "nix-env".to_string(),
+                vec![
+                    "--delete-generations".to_string(),
+                    format!("+{keep_last}"),
+                    "-p".to_string(),
+                    "/nix/var/nix/profiles/system".to_string(),
+                ],
+            ),
+            Self::DeleteGenerationsOlderThan { days } => (
+                "nix-env".to_string(),
+                vec![
+                    "--delete-generations".to_string(),
+                    format!("{days}d"),
+                    "-p".to_string(),
+                    "/nix/var/nix/profiles/system".to_string(),
+                ],
             ),
             Self::EnvInstall { packages } => {
                 let mut args = Vec::with_capacity(1 + packages.len());
@@ -728,6 +779,29 @@ mod tests {
             "/nix/var/nix/profiles/system-42-link/bin/switch-to-configuration"
         );
         assert_eq!(args, vec!["switch"]);
+    }
+
+    #[test]
+    fn test_typed_service_operations_are_system_modify() {
+        let cmd = NixOSCommand::Service {
+            operation: ServiceOperation::Restart { name: "sshd.service".into() },
+        };
+        assert_eq!(cmd.safety_level(), SafetyLevel::SystemModify);
+        let (bin, args) = cmd.to_command();
+        assert_eq!(bin, "systemctl");
+        assert_eq!(args, vec!["restart", "sshd.service"]);
+    }
+
+    #[test]
+    fn test_typed_generation_deletions_are_destructive() {
+        let keep = NixOSCommand::DeleteGenerations { keep_last: 5 };
+        assert_eq!(keep.safety_level(), SafetyLevel::Destructive);
+        let (_, keep_args) = keep.to_command();
+        assert!(keep_args.contains(&"+5".into()));
+        let age = NixOSCommand::DeleteGenerationsOlderThan { days: 30 };
+        assert_eq!(age.safety_level(), SafetyLevel::Destructive);
+        let (_, age_args) = age.to_command();
+        assert!(age_args.contains(&"30d".into()));
     }
 
     #[test]
