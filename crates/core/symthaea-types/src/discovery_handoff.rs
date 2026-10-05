@@ -273,11 +273,11 @@ impl ScientificInquirySelectionReceipt {
             ("hypothesis_set_digest", self.hypothesis_set_digest.as_str()),
             ("challenge_space_digest", self.challenge_space_digest.as_str()),
             ("selected_challenge_digest", self.selected_challenge_digest.as_str()),
-            ("selector_revision", self.selector_revision.as_str()),
         ] {
-            if value.trim().is_empty() {
-                return Err(format!("{label} cannot be empty"));
-            }
+            validate_digest(label, value)?;
+        }
+        if self.selector_revision.trim().is_empty() {
+            return Err("selector_revision cannot be empty".into());
         }
         let predicted = self.predicted_information_gain();
         if !predicted.is_finite() || predicted < 0.0 {
