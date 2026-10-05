@@ -26,7 +26,7 @@ pub mod corpus;
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 3;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-v5";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-v6";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -867,6 +867,10 @@ pub enum FrontierBlocker {
     },
     /// A burden has explicit evidence references, but none are valid at assessment time.
     EvidenceUnavailable(Dimension),
+    /// A required operating condition is not covered by the candidate.
+    OperatingConditionUnresolved(String),
+    /// A required operating condition lies outside the candidate capability.
+    OperatingConditionFailed(String),
     /// Functional performance uses a different unit or scope from the requirement.
     PerformanceIncompatibleScale {
         /// Functional requirement metric.
