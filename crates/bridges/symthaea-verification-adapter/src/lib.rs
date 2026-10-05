@@ -698,28 +698,17 @@ fn extract_verification_method(
             VerificationFailure::VerificationMethodNotFound,
         ));
     }
-
-    let mut resolved = Vec::new();
-    for object in candidates {
-        resolved.push(parse_verification_method_definition(
-            request.verification_method.clone(),
-            object,
-            &base,
-        )?);
-    }
-
-    let first = resolved
-        .first()
-        .cloned()
-        .expect("non-empty candidate set");
-
-    if resolved.iter().any(|candidate| candidate != &first) {
+    if candidates.len() > 1 {
         return Err(SnapshotError::Malformed(
-            "verification method has conflicting embedded definitions".into(),
+            "verification method has multiple matching embedded definitions".into(),
         ));
     }
 
-    Ok(first)
+    parse_verification_method_definition(
+        request.verification_method.clone(),
+        candidates[0],
+        &base,
+    )
 }
 
 fn parse_verification_method_definition(
@@ -1470,6 +1459,40 @@ mod tests {
     }
 
     #[test]
+    fn identical_nested_duplicate_method_definition_fails_closed() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "verificationMethod": [{
+                "id": "#key-1",
+                "type": "Multikey",
+                "controller": "https://example.test/controller",
+                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+            }],
+            "assertionMethod": ["#key-1"],
+            "extension": {
+                "method": {
+                    "id": "https://example.test/controller#key-1",
+                    "type": "Multikey",
+                    "controller": "https://example.test/controller",
+                    "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+                }
+            }
+        }"##.into();
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+
+        let err = adapter.resolve_snapshot(&request, snapshot).unwrap_err();
+        assert!(matches!(
+            err,
+            SnapshotError::Malformed(message)
+                if message.contains("multiple matching embedded definitions")
+        ));
+    }
+
+    #[test]
     fn nested_duplicate_method_definition_fails_closed() {
         let request = request();
         let mut snapshot = snapshot();
@@ -1499,7 +1522,7 @@ mod tests {
         assert!(matches!(
             err,
             SnapshotError::Malformed(message)
-                if message.contains("conflicting embedded definitions")
+                if message.contains("multiple matching embedded definitions")
         ));
     }
 
@@ -1530,7 +1553,7 @@ mod tests {
         assert!(matches!(
             adapter.resolve_snapshot(&request, snapshot),
             Err(SnapshotError::Malformed(message))
-                if message.contains("conflicting embedded definitions")
+                if message.contains("multiple matching embedded definitions")
         ));
     }
 
