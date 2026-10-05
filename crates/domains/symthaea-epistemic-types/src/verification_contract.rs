@@ -1494,6 +1494,14 @@ impl CryptographicVerificationReceipt {
                 ));
             }
         }
+        if let Some(expected) = &self.expected_transformed_document_digest {
+            if expected != &self.transformed_document_digest {
+                return Err(VerificationFailure::TransformedDocumentDigestMismatch {
+                    expected: Some(expected.clone()),
+                    actual: Some(self.transformed_document_digest.clone()),
+                });
+            }
+        }
         if self.verification_method != resolution.verification_method {
             return Err(VerificationFailure::VerificationMethodMismatch {
                 expected: resolution.verification_method.clone(),
@@ -3222,6 +3230,33 @@ mod tests {
         controller.resolved_verification_method_controller =
             ClaimControllerIdentity::new("https://example.test/other").unwrap();
         assert_ne!(controller.evidence_digest(), method.evidence_digest());
+    }
+
+    #[test]
+    fn cryptographic_receipt_rejects_transformed_document_binding_substitution() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap()
+        .with_expected_transformed_document_digest("22".repeat(32))
+        .unwrap();
+
+        let resolution = resolved_method(&request);
+        let mut receipt = test_cryptographic_receipt(&request, &resolution);
+        receipt.transformed_document_digest = "33".repeat(32);
+
+        assert!(matches!(
+            receipt.validate_against(&request, &resolution),
+            Err(VerificationFailure::TransformedDocumentDigestMismatch {
+                expected: Some(expected),
+                actual: Some(actual),
+            }) if expected == "22".repeat(32) && actual == "33".repeat(32)
+        ));
     }
 
     #[test]
