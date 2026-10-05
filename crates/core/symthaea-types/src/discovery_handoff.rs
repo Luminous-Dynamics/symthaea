@@ -10,6 +10,18 @@ use crate::physical_type::{ModelMaturity, PhysicalType};
 
 pub const HYPOTHESIS_HANDOFF_SCHEMA: &str = "SCIENTIFIC_HYPOTHESIS_HANDOFF.v1";
 
+fn validate_digest(label: &str, value: &str) -> Result<(), String> {
+    if value.len() != 64
+        || !value
+            .as_bytes()
+            .iter()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    {
+        return Err(format!("{label} must be canonical lowercase 64-hex"));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScientificHypothesisHandoff {
     pub schema_revision: String,
@@ -94,11 +106,11 @@ impl ScientificHypothesisHandoff {
             ("source_observation_digest", self.source_observation_digest.as_str()),
             ("search_configuration_digest", self.search_configuration_digest.as_str()),
             ("discovery_manifest_digest", self.discovery_manifest_digest.as_str()),
-            ("discovery_source", self.discovery_source.as_str()),
         ] {
-            if value.trim().is_empty() {
-                return Err(format!("{label} cannot be empty"));
-            }
+            validate_digest(label, value)?;
+        }
+        if self.discovery_source.trim().is_empty() {
+            return Err("discovery_source cannot be empty".into());
         }
         if self.non_claims.is_empty() {
             return Err("hypothesis handoff requires explicit non-claims".into());
@@ -106,10 +118,8 @@ impl ScientificHypothesisHandoff {
         if self.non_claims.iter().any(|claim| claim.trim().is_empty()) {
             return Err("hypothesis handoff contains an empty non-claim".into());
         }
-        if let Some(digest) = &self.challenge_manifest_digest
-            && digest.trim().is_empty()
-        {
-            return Err("challenge manifest digest cannot be empty".into());
+        if let Some(digest) = &self.challenge_manifest_digest {
+            validate_digest("challenge_manifest_digest", digest)?;
         }
         Ok(())
     }
@@ -270,6 +280,16 @@ mod tests {
             "obs", "search", 1, "manifest", 1, "ramanujan", vec!["none".into()],
         );
         assert_ne!(a.digest(), b.digest());
+    }
+
+    #[test]
+    fn malformed_digest_fails_closed() {
+        let mut h = ScientificHypothesisHandoff::new(
+            "candidate", &energy(), ModelMaturity::ResearchPrototype,
+            "obs", "search", 1, "manifest", 1, "ramanujan", vec!["none".into()],
+        );
+        h.candidate_digest = "not-a-digest".into();
+        assert!(h.validate().is_err());
     }
 
     #[test]
