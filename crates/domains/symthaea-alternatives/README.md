@@ -58,6 +58,10 @@ Admission is also temporally scoped. When a source carries an admission validity
 
 Candidate generation is a separate provenance surface from evidence provenance. A generated pathway can carry optional reproducible derivation lineage describing the generating activity/method, exact input identities, and configuration hash. The lineage is validated structurally, copied into the candidate assessment, and included in the deterministic assessment receipt. This makes “how was this candidate proposed?” auditable without treating generation provenance as evidence quality, source authority, or physical qualification.
 
+### Evidence-basis binding
+
+Evidence records also carry their own exact `ComparisonBasisRef`. Every evidence record linked to a burden, functional-performance estimate, or operating capability must match the linked estimate's basis exactly. Unit and scope agreement alone is insufficient. A methodology/test-protocol mismatch fails closed during candidate validation, and the evidence basis is included in the canonical evidence digest and assessment receipt.
+
 The assessment receipt also binds a canonical BLAKE3 digest of the complete evidence bundle for each candidate. That prevents a provenance-only mutation—such as an artifact digest, admission reference, observation timestamp, validity window, or evidence derivation change—from becoming invisible merely because the downstream qualification result happens to remain unchanged. Evidence is therefore both evaluated and integrity-bound.
 
 Source admission is authority-bound: an EvidenceSourceIdentity whose admission reference names a different authority is rejected. This keeps authority admission from becoming a detached capability token that could be attached to an unrelated source identity.
