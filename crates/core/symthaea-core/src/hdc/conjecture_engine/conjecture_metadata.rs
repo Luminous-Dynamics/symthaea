@@ -59,7 +59,7 @@ fn canonical_expr(expr: &Expr, out: &mut String) {
     }
 }
 
-fn candidate_identity_digest(conjecture: &Conjecture) -> String {
+pub fn scientific_candidate_digest(conjecture: &Conjecture) -> String {
     // Candidate identity binds the exact discovered mathematical object and
     // source/domain identity. Mutable confidence and downstream evidence are
     // deliberately excluded so qualification cannot retroactively mutate it.
@@ -88,6 +88,23 @@ fn candidate_identity_digest(conjecture: &Conjecture) -> String {
     blake3::hash(canonical.as_bytes()).to_hex().to_string()
 }
 
+
+/// Compute an order-sensitive identity for the exact hypothesis list supplied
+/// to an independent challenge. Selection order is part of the reproducibility
+/// surface because deterministic ties depend on candidate order.
+pub fn scientific_hypothesis_set_digest(conjectures: &[Conjecture]) -> String {
+    let mut canonical = String::from("hypothesis-set-v1|count=");
+    canonical.push_str(&conjectures.len().to_string());
+    canonical.push('|');
+    for (index, conjecture) in conjectures.iter().enumerate() {
+        canonical.push_str(&index.to_string());
+        canonical.push(':');
+        canonical.push_str(&scientific_candidate_digest(conjecture));
+        canonical.push(';');
+    }
+    blake3::hash(canonical.as_bytes()).to_hex().to_string()
+}
+
 impl Conjecture {
     /// Export this conjecture as an evidence-neutral scientific hypothesis.
     ///
@@ -104,7 +121,7 @@ impl Conjecture {
         non_claims: Vec<String>,
     ) -> ScientificHypothesisHandoff {
         ScientificHypothesisHandoff::new(
-            candidate_identity_digest(self),
+            scientific_candidate_digest(self),
             physical_type,
             model_maturity,
             source_observation_digest,
@@ -276,6 +293,65 @@ static EML_METADATA_CACHE: Lazy<RwLock<std::collections::HashMap<String, EmlMeta
 mod hypothesis_handoff_tests {
     use super::*;
     use symthaea_types::{PhysicalDimension, QuantityKind};
+
+    #[test]
+    fn candidate_digest_uses_exact_constant_bits() {
+        let base = Conjecture {
+            formula: Expr::Const(1.0000001),
+            formula_str: "1.000000".into(),
+            source: "test".into(),
+            domain: MathDomain::Physics,
+            training_mse: 0.0,
+            complexity: 1,
+            fitness: 0.0,
+            status: ConjectureStatus::Proposed,
+            confidence: 0.5,
+            macro_promotion_tier: MacroPromotionTier::RecurrentNumerical,
+            eml_compiled: None,
+            eml_metrics: None,
+            eml_verified_real: None,
+            eml_real_domain: None,
+            eml_verified_complex: None,
+            eml_constructive_compiled: None,
+            eml_constructive_metrics: None,
+            eml_verified_constructive_real: None,
+        };
+        let mut changed = base.clone();
+        changed.formula = Expr::Const(1.0000002);
+        assert_ne!(
+            scientific_candidate_digest(&base),
+            scientific_candidate_digest(&changed)
+        );
+    }
+
+    #[test]
+    fn hypothesis_set_digest_binds_order() {
+        let a = Conjecture {
+            formula: Expr::Var("x".into()),
+            formula_str: "x".into(),
+            source: "a".into(),
+            domain: MathDomain::Physics,
+            training_mse: 0.0,
+            complexity: 1,
+            fitness: 0.0,
+            status: ConjectureStatus::Proposed,
+            confidence: 0.5,
+            macro_promotion_tier: MacroPromotionTier::RecurrentNumerical,
+            eml_compiled: None,
+            eml_metrics: None,
+            eml_verified_real: None,
+            eml_real_domain: None,
+            eml_verified_complex: None,
+            eml_constructive_compiled: None,
+            eml_constructive_metrics: None,
+            eml_verified_constructive_real: None,
+        };
+        let mut b = a.clone();
+        b.source = "b".into();
+        let first = scientific_hypothesis_set_digest(&[a.clone(), b.clone()]);
+        let reversed = scientific_hypothesis_set_digest(&[b, a]);
+        assert_ne!(first, reversed);
+    }
 
     #[test]
     fn handoff_is_independent_of_mutable_confidence() {
