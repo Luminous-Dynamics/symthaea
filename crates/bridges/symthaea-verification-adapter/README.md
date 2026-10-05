@@ -19,7 +19,10 @@ The adapter is deliberately narrower than a complete cryptographic verifier:
 - it can return that exact public material to a downstream cryptographic verifier without re-resolving the snapshot;
 - it emits an `ApplicationSnapshot` dereference attestation with the exact SHA-256 digest and standards-oriented `digestMultibase` artifact.
 
-It does **not** perform network access, DNS resolution, controller authorization, digital-signature verification, or truth/reliability assessment.
+The structural resolver does **not** perform network access, DNS resolution, controller authorization, or digital-signature verification.
+The crate now also contains a deliberately narrow `eddsa-jcs-2022` verifier: it consumes the already-resolved `Multikey` material, applies RFC 8785 JCS, computes the W3C SHA-256 pair-hash input, and verifies the detached Ed25519 signature. It is not a generic Data Integrity 1.1 processor and does not implement the RDF canonicalization suite, proof sets/chains, network retrieval, or controller-document resolution itself.
+
+Truth/reliability assessment remains outside this cryptographic boundary.
 
 ## Snapshot identity
 
@@ -55,6 +58,12 @@ The raw persisted envelope is bounded to 32 MiB and the decoded controller docum
 The implementation follows the security-critical structure of the W3C Controlled Identifiers v1.0 retrieval algorithm without claiming generic W3C conformance for the Symthaea contract.
 
 The resolution also binds the exact public verification-material identity so a downstream cryptographic verifier can refuse key-material substitution between resolution and signature checking.
+
+### Cryptographic profile
+
+The `eddsa-jcs-2022` path is intentionally a single-suite profile. It requires `DataIntegrityProof`, `eddsa-jcs-2022`, `verificationMethod`, `proofPurpose`, base58-btc `proofValue`, and an Ed25519 `Multikey` carrying the `0xed01` multicodec header. Its cryptographic input is exactly `SHA-256(proofConfig) || SHA-256(transformedDocument)`, followed by pure Ed25519 verification. The typed receipt records the canonical-document digest, proof-configuration digest, the digest of that 64-byte cryptographic input, the full proof identity, and the detached proof value.
+
+The implementation deliberately does not claim conformance to the complete W3C Verifiable Credential Data Integrity processing model. It implements the specified `eddsa-jcs-2022` cryptographic core and keeps the controller-document/admission/replay boundaries explicit.
 
 The optional `digestMultibase` receipt artifact is aligned with the W3C Verifiable Credential Data Integrity 1.1 Working Draft resource-integrity property. The current implementation intentionally emits one SHA-256 Multibase/Multihash value and binds it to the independently recorded SHA-256 document digest.
 
