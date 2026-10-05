@@ -34,6 +34,7 @@ bytemuck = { version = "1", features = ["derive"] }
 
 ndarray = { workspace = true }
 rand = { workspace = true }
+rand_chacha = "=0.3.1"
 rand_distr = "0.4"
 serde = { workspace = true }
 serde_json = { workspace = true }
