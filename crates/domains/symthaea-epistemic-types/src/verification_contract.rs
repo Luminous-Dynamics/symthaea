@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 
 pub const VERIFICATION_REQUEST_SCHEMA_VERSION: u16 = 1;
 pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 1;
+pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 2;
 
 /// Typed identifier for the verification relationship under which a verification
 /// method is permitted to validate a proof.
@@ -429,14 +430,17 @@ impl VerificationEvidence {
     /// verification it describes.
     pub fn evidence_digest(&self) -> String {
         let encoded = (
-            "symthaea:verification-evidence:v1",
+            "symthaea:verification-evidence:v2",
             self.schema_version,
+            VERIFICATION_EVIDENCE_DIGEST_VERSION,
             &self.claim_representation_digest,
             &self.statement_digest,
             self.author.as_str(),
             self.proof_purpose.as_str(),
             self.verification_method.as_str(),
             self.controller.as_str(),
+            self.resolved_verification_method_controller.as_str(),
+            self.controller_document_verification_method.as_str(),
             &self.controller_document_ref,
             &self.controller_document_digest,
             &self.verification_relationship,
@@ -950,6 +954,42 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn evidence_digest_covers_resolved_method_and_controller_assertions() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let base = VerificationEvidence::from_adapter_attestation(
+            &request,
+            "https://example.test/controller",
+            &"11".repeat(32),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
+            "assertionMethod",
+            "ed25519",
+            &"22".repeat(32),
+            &"33".repeat(32),
+        )
+        .unwrap();
+
+        let mut method = base.clone();
+        method.controller_document_verification_method =
+            ClaimVerificationMethod::new("https://example.test/controller#key-2").unwrap();
+        assert_ne!(base.evidence_digest(), method.evidence_digest());
+
+        let mut controller = base;
+        controller.resolved_verification_method_controller =
+            ClaimControllerIdentity::new("https://example.test/other").unwrap();
+        assert_ne!(controller.evidence_digest(), method.evidence_digest());
+    }
+
     fn evidence_changes_when_controller_snapshot_or_claim_changes() {
         let claim = fixture_claim();
         let request = VerificationRequest::from_claim(
