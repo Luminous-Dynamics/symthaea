@@ -1794,7 +1794,10 @@ impl Rfc9942Vdp {
 
     fn from_reader(reader: &mut CborReader<'_>) -> Result<Self, Rfc9942VdpError> {
         let entries=reader.read_map_entries_bounded_with_limits_and_bytes(1, MAX_RFC9942_PROOF_BYTES, MAX_RFC9942_PROOFS, MAX_RFC9942_VDP_ENCODED_BYTES)
-            .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            .map_err(|error|match error {
+                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+                _=>Rfc9942VdpError::InvalidEncoding,
+            })?;
         if entries.len()!=1{return Err(Rfc9942VdpError::InvalidStructure);}
 
         let (label_bytes,value_bytes)=&entries[0];
