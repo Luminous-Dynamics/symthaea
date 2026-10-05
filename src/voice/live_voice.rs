@@ -420,9 +420,15 @@ impl LiveVoice {
                     prev_source_type: None,
                     next_source_type: None,
                 };
-                let chunk = self
+                let mut chunk = self
                     .streaming
                     .tick_with_prosody(&state, None, DT, phoneme, &prosody);
+                if phoneme.is_none() {
+                    // An explicit SIL slot is a phonological timing decision, not merely an
+                    // instruction to advance the motor clock. Force its emitted PCM to zero so
+                    // pause-weight evidence cannot hide residual voiced/noise energy.
+                    chunk.fill(0.0);
+                }
                 all_samples.extend_from_slice(&chunk);
             }
         }
@@ -954,6 +960,20 @@ mod tests {
         assert!(
             explicit_pause_samples.len() > no_pause_samples.len(),
             "pause weight must extend only the explicitly encoded silence segment"
+        );
+
+        let samples_per_frame = (voice.sample_rate() / FRAME_RATE) as usize;
+        let first_segment_frames = predict_duration("AH", 1, false, false, 1.0);
+        let silence_start = first_segment_frames * samples_per_frame;
+        let silence_frames = ((predict_duration("SIL", 0, false, true, 1.0) as f32)
+            * 2.0)
+            .round() as usize;
+        let silence_end = silence_start + silence_frames * samples_per_frame;
+        assert!(
+            explicit_pause_samples[silence_start..silence_end]
+                .iter()
+                .all(|sample| *sample == 0.0),
+            "explicit SIL must emit zero PCM across its scheduled pause window"
         );
     }
 
