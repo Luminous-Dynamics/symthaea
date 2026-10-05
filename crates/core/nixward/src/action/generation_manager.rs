@@ -76,6 +76,11 @@ impl GenerationManager {
         NixOSCommand::SwitchGeneration { generation }
     }
 
+    /// Generate the typed runtime activation for an exact system generation.
+    pub fn activate(generation: u32) -> NixOSCommand {
+        NixOSCommand::ActivateGeneration { generation }
+    }
+
     /// Generate a rollback command (switch to previous generation).
     pub fn rollback() -> NixOSCommand {
         NixOSCommand::RebuildSwitch {
@@ -299,6 +304,19 @@ mod tests {
         assert_eq!(bin, "nix-env");
         assert!(args.contains(&"--switch-generation".to_string()));
         assert!(args.contains(&"42".to_string()));
+    }
+
+    #[test]
+    fn test_activate_generation_is_typed_system_activation() {
+        let cmd = GenerationManager::activate(42);
+        assert!(matches!(cmd, NixOSCommand::ActivateGeneration { generation: 42 }));
+        let (bin, args) = cmd.to_command();
+        assert_eq!(
+            bin,
+            "/nix/var/nix/profiles/system-42-link/bin/switch-to-configuration"
+        );
+        assert_eq!(args, vec!["switch"]);
+        assert_eq!(cmd.safety_level(), SafetyLevel::SystemCritical);
     }
 
     #[test]
