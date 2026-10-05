@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 8;
+pub const SCHEMA_VERSION: u16 = 9;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-v14";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-v15";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -865,7 +865,33 @@ impl CandidatePathway {
         self.performance
             .get(metric)
             .map(|estimate| {
-                self.linked_evidence_at(&estimate.evidence_ids, as_of)
+                self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+                    .any(|e| {
+                        matches!(
+                            e.kind,
+                            EvidenceKind::Observed
+                                | EvidenceKind::Reported
+                                | EvidenceKind::Derived
+                                | EvidenceKind::ManufacturingObserved
+                                | EvidenceKind::FieldObserved
+                                | EvidenceKind::ContinuouslyMonitored
+                        ) && e.stance == EvidenceStance::Supports
+                            && e.confidence >= 0.7
+                    })
+            })
+            .unwrap_or(false)
+    }
+
+    fn operating_evidence_is_supported_at(
+        &self,
+        condition: &str,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        self.operating_capabilities
+            .get(condition)
+            .map(|estimate| {
+                self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
                     .any(|e| {
                         matches!(
                             e.kind,
@@ -941,7 +967,7 @@ impl CandidatePathway {
             return QualificationState::Hypothesis;
         }
 
-        if self.has_conflict_at(as_of) {
+        if self.has_conflict_at(as_of, freshness_policy) {
             return QualificationState::ComputationallyPlausible;
         }
 
@@ -1026,7 +1052,7 @@ impl CandidatePathway {
                     && e.stance == EvidenceStance::Supports
                     && e.confidence >= 0.7
             })
-            .map(|e| e.source_id.as_str())
+            .map(|e| e.source.authority_group_id())
             .collect::<BTreeSet<_>>()
             .len();
         let all_dimensions_field_observed = Dimension::ALL.iter().all(|dimension| {
@@ -1315,6 +1341,8 @@ pub struct AssessmentResult {
     pub requirement: FunctionalRequirement,
     /// Optional Unix timestamp at which time-bounded evidence was evaluated.
     pub assessed_at_epoch_seconds: Option<i64>,
+    /// Exact evidence-freshness policy applied during the assessment.
+    pub freshness_policy: Option<EvidenceFreshnessPolicy>,
     /// Candidate assessments.
     pub candidates: Vec<CandidateAssessment>,
     /// Candidate IDs on the conservative Pareto frontier.
@@ -1428,6 +1456,12 @@ pub enum AssessmentError {
     EmptyAssessmentSubject,
     /// External source admission reference is incomplete.
     EmptySourceAdmissionReference,
+    /// Freshness policy identity is incomplete.
+    EmptyFreshnessPolicyIdentity,
+    /// Freshness policy contains no rules.
+    EmptyFreshnessPolicy,
+    /// A freshness policy was supplied without an assessment timestamp.
+    FreshnessPolicyRequiresAssessmentTimestamp,
     /// External source admission validity bounds are inverted.
     InvalidSourceAdmissionValidity { from: i64, until: i64 },
     /// A requirement set contains no requirements.
@@ -1522,6 +1556,13 @@ impl std::fmt::Display for AssessmentError {
             Self::EmptySourceAdmissionReference => {
                 write!(f, "source admission reference is incomplete")
             }
+            Self::EmptyFreshnessPolicyIdentity => {
+                write!(f, "freshness policy identity is incomplete")
+            }
+            Self::EmptyFreshnessPolicy => write!(f, "freshness policy has no rules"),
+            Self::FreshnessPolicyRequiresAssessmentTimestamp => {
+                write!(f, "freshness policy requires an assessment timestamp")
+            }
             Self::InvalidSourceAdmissionValidity { from, until } => {
                 write!(f, "source admission validity [{from}, {until}] is inverted")
             },
@@ -1561,14 +1602,39 @@ impl AlternativesEngine {
         incumbent_id: Option<&str>,
         assessed_at_epoch_seconds: Option<i64>,
     ) -> Result<RequirementSetAssessment, AssessmentError> {
+        self.assess_requirement_set_with_freshness(
+            requirement_set,
+            candidates,
+            incumbent_id,
+            assessed_at_epoch_seconds,
+            None,
+        )
+    }
+
+    /// Evaluate a requirement set with an explicit evidence-freshness policy.
+    pub fn assess_requirement_set_with_freshness(
+        &self,
+        requirement_set: &FunctionalRequirementSet,
+        candidates: &[CandidatePathway],
+        incumbent_id: Option<&str>,
+        assessed_at_epoch_seconds: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> Result<RequirementSetAssessment, AssessmentError> {
         requirement_set.validate()?;
+        if freshness_policy.is_some() && assessed_at_epoch_seconds.is_none() {
+            return Err(AssessmentError::FreshnessPolicyRequiresAssessmentTimestamp);
+        }
+        if let Some(policy) = freshness_policy {
+            policy.validate()?;
+        }
         let mut assessments = BTreeMap::new();
         for (requirement_id, requirement) in &requirement_set.requirements {
-            let assessment = self.assess_at(
+            let assessment = self.assess_at_with_freshness(
                 requirement,
                 candidates,
                 incumbent_id,
                 assessed_at_epoch_seconds,
+                freshness_policy,
             )?;
             assessments.insert(requirement_id.clone(), assessment);
         }
@@ -1666,7 +1732,31 @@ impl AlternativesEngine {
         incumbent_id: Option<&str>,
         assessed_at_epoch_seconds: Option<i64>,
     ) -> Result<AssessmentResult, AssessmentError> {
+        self.assess_at_with_freshness(
+            requirement,
+            candidates,
+            incumbent_id,
+            assessed_at_epoch_seconds,
+            None,
+        )
+    }
+
+    /// Evaluate candidates at an explicit timestamp with an explicit freshness policy.
+    pub fn assess_at_with_freshness(
+        &self,
+        requirement: &FunctionalRequirement,
+        candidates: &[CandidatePathway],
+        incumbent_id: Option<&str>,
+        assessed_at_epoch_seconds: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> Result<AssessmentResult, AssessmentError> {
         requirement.validate()?;
+        if freshness_policy.is_some() && assessed_at_epoch_seconds.is_none() {
+            return Err(AssessmentError::FreshnessPolicyRequiresAssessmentTimestamp);
+        }
+        if let Some(policy) = freshness_policy {
+            policy.validate()?;
+        };
         if let Some(id) = incumbent_id {
             if !candidates.iter().any(|candidate| candidate.id == id) {
                 return Err(AssessmentError::MissingIncumbent(id.to_string()));
@@ -1722,7 +1812,7 @@ impl AlternativesEngine {
                         (Some(estimate), Some(scale))
                             if estimate.unit == scale.unit
                                 && estimate.scope == scale.scope
-                                && candidate.performance_evidence_is_supported_at(metric, assessed_at_epoch_seconds) =>
+                                && candidate.performance_evidence_is_supported_at(metric, assessed_at_epoch_seconds, freshness_policy) =>
                         {
                             bound.check(Some(estimate.interval))
                         }
@@ -1778,6 +1868,7 @@ impl AlternativesEngine {
                         if !candidate.operating_evidence_is_supported_at(
                             condition,
                             assessed_at_epoch_seconds,
+                            freshness_policy,
                         ) =>
                     {
                         candidate_blockers.push(FrontierBlocker::OperatingConditionUnresolved(
@@ -1846,8 +1937,12 @@ d::ContinuouslyMonitored
                 qualification: candidate.qualification_ceiling(
                     requirement,
                     assessed_at_epoch_seconds,
+                    freshness_policy,
                 ),
-                evidence_conflict: candidate.has_conflict_at(assessed_at_epoch_seconds),
+                evidence_conflict: candidate.has_conflict_at(
+                    assessed_at_epoch_seconds,
+                    freshness_policy,
+                ),
                 frontier_blocked,
                 observed_evidence_count,
             });
@@ -1891,6 +1986,7 @@ d::ContinuouslyMonitored
             algorithm_version: ALGORITHM_VERSION.to_string(),
             requirement: requirement.clone(),
             assessed_at_epoch_seconds,
+            freshness_policy: freshness_policy.cloned(),
             candidates: assessments,
             pareto_frontier: frontier,
             burden_transfers,
