@@ -841,7 +841,7 @@ impl CandidatePathway {
             .linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
             .any(|e| e.stance == EvidenceStance::Supports);
         let contradict = self
-            .linked_evidence_at(&estimate.evidence_ids, as_of)
+            .linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
             .any(|e| e.stance == EvidenceStance::Contradicts);
         support && contradict
     }
@@ -956,7 +956,7 @@ impl CandidatePathway {
             || self.burdens.is_empty()
             || self.burdens.values().all(|estimate| {
                 let linked = self
-                    .linked_evidence_at(&estimate.evidence_ids, as_of)
+                    .linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
                     .collect::<Vec<_>>();
                 linked.is_empty()
                     || linked
@@ -972,11 +972,11 @@ impl CandidatePathway {
         }
 
         let any_simulation = self.burdens.values().any(|estimate| {
-            self.linked_evidence_at(&estimate.evidence_ids, as_of)
+            self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
                 .any(|e| e.kind == EvidenceKind::Simulated)
         });
         let any_supported_measurement = self.burdens.values().any(|estimate| {
-            self.linked_evidence_at(&estimate.evidence_ids, as_of).any(|e| {
+            self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy).any(|e| {
                 matches!(
                     e.kind,
                     EvidenceKind::Observed | EvidenceKind::Reported | EvidenceKind::Derived
@@ -987,7 +987,7 @@ impl CandidatePathway {
         let distinct_authority_sources = self
             .burdens
             .values()
-            .flat_map(|estimate| self.linked_evidence_at(&estimate.evidence_ids, as_of))
+            .flat_map(|estimate| self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy))
             .filter(|e| {
                 matches!(
                     e.kind,
@@ -1008,7 +1008,7 @@ impl CandidatePathway {
             self.burdens
                 .get(dimension)
                 .map(|estimate| {
-                    self.linked_evidence_at(&estimate.evidence_ids, as_of).any(|e| {
+                    self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy).any(|e| {
                         matches!(
                             e.kind,
                             EvidenceKind::Observed
@@ -1025,7 +1025,7 @@ impl CandidatePathway {
                 .unwrap_or(false)
         });
         let has_lifecycle_assessment = self.burdens.values().any(|estimate| {
-            self.linked_evidence_at(&estimate.evidence_ids, as_of).any(|e| {
+            self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy).any(|e| {
                 e.kind == EvidenceKind::LifecycleAssessed
                     && e.stance == EvidenceStance::Supports
                     && e.confidence >= 0.7
@@ -1034,7 +1034,7 @@ impl CandidatePathway {
         let field_distinct_authority_sources = self
             .burdens
             .values()
-            .flat_map(|estimate| self.linked_evidence_at(&estimate.evidence_ids, as_of))
+            .flat_map(|estimate| self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy))
             .filter(|e| {
                 e.kind == EvidenceKind::FieldObserved
                     && e.stance == EvidenceStance::Supports
@@ -1046,7 +1046,7 @@ impl CandidatePathway {
         let monitoring_distinct_authority_sources = self
             .burdens
             .values()
-            .flat_map(|estimate| self.linked_evidence_at(&estimate.evidence_ids, as_of))
+            .flat_map(|estimate| self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy))
             .filter(|e| {
                 e.kind == EvidenceKind::ContinuouslyMonitored
                     && e.stance == EvidenceStance::Supports
@@ -1059,7 +1059,7 @@ impl CandidatePathway {
             self.burdens
                 .get(dimension)
                 .map(|estimate| {
-                    self.linked_evidence_at(&estimate.evidence_ids, as_of).any(|e| {
+                    self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy).any(|e| {
                         e.kind == EvidenceKind::FieldObserved
                             && e.stance == EvidenceStance::Supports
                             && e.confidence >= 0.7
@@ -1071,7 +1071,7 @@ impl CandidatePathway {
             self.burdens
                 .get(dimension)
                 .map(|estimate| {
-                    self.linked_evidence_at(&estimate.evidence_ids, as_of).any(|e| {
+                    self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy).any(|e| {
                         e.kind == EvidenceKind::ContinuouslyMonitored
                             && e.stance == EvidenceStance::Supports
                             && e.confidence >= 0.7
@@ -1080,7 +1080,7 @@ impl CandidatePathway {
                 .unwrap_or(false)
         });
         let has_manufacturing_observation = self.burdens.values().any(|estimate| {
-            self.linked_evidence_at(&estimate.evidence_ids, as_of).any(|e| {
+            self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy).any(|e| {
                 e.kind == EvidenceKind::ManufacturingObserved
                     && e.stance == EvidenceStance::Supports
                     && e.confidence >= 0.7
