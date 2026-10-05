@@ -69,6 +69,20 @@ fn evidence(
     }
 }
 
+fn admitted(mut evidence: EvidenceRecord) -> EvidenceRecord {
+    evidence.source.admission = Some(SourceAdmissionRef {
+        policy_id: "benchmark-policy".into(),
+        policy_revision: "v1".into(),
+        policy_digest: "benchmark-policy-digest-v1".into(),
+        admission_id: format!("benchmark-admission:{}", evidence.id),
+        authority_epoch: "benchmark-epoch-v1".into(),
+        fault_domain_id: Some(format!("benchmark-domain:{}", evidence.source.authority_id)),
+        valid_from_epoch_seconds: None,
+        valid_until_epoch_seconds: None,
+    });
+    evidence
+}
+
 fn freshness_policy(max_age_seconds: u64) -> EvidenceFreshnessPolicy {
     EvidenceFreshnessPolicy {
         policy_id: "benchmark-freshness".into(),
@@ -283,9 +297,9 @@ pub fn five_pathway_adversarial_case() -> BenchmarkCase {
                 (2.0, 3.0),
                 (28.0, 32.0),
                 vec![
-                    evidence("d3", "source-lca", EvidenceKind::LifecycleAssessed, EvidenceStance::Supports, 0.9),
-                    evidence("d1", "source-measure", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
-                    evidence("d2", "source-report", EvidenceKind::Reported, EvidenceStance::Supports, 0.9),
+                    admitted(evidence("d3", "source-lca", EvidenceKind::LifecycleAssessed, EvidenceStance::Supports, 0.9)),
+                    admitted(evidence("d1", "source-measure", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)),
+                    admitted(evidence("d2", "source-report", EvidenceKind::Reported, EvidenceStance::Supports, 0.9)),
                 ],
             ),
             candidate(
