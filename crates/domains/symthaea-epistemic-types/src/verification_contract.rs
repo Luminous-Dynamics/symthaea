@@ -23,8 +23,9 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 pub const VERIFICATION_REQUEST_SCHEMA_VERSION: u16 = 1;
-pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 5;
-pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 6;
+pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 6;
+pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 7;
+pub const CRYPTOGRAPHIC_VERIFICATION_RECEIPT_SCHEMA_VERSION: u16 = 1;
 
 /// Typed identifier for the verification relationship under which a verification
 /// method is permitted to validate a proof.
@@ -1131,6 +1132,10 @@ impl VerificationMethodResolution {
                 .controller_document_dereference
                 .as_ref()
                 .is_some_and(|value| value.validate_against_request(request).is_ok())
+            && self
+                .cryptographic_verification
+                .validate_against(request, &self.resolution)
+                .is_ok()
     }
 }
 
@@ -1311,6 +1316,163 @@ impl VerificationRequest {
 /// exact request succeeded: method resolution, controller binding, permitted
 /// verification relationship, proof-purpose match, and cryptographic verification.
 /// The core does not independently establish any of those external facts.
+/// Typed cryptographic proof result produced by a concrete adapter.
+///
+/// This receipt binds the exact cryptographic suite, proof representation,
+/// proof-purpose/method identity, resolved public-key identity, suite-stage
+/// hashes, cryptographic input, proof identity, and detached proof value.
+///
+/// It is an adapter attestation; the substrate-neutral core does not itself
+/// perform cryptographic verification.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CryptographicVerificationReceipt {
+    pub schema_version: u16,
+    pub cryptosuite: String,
+    pub proof_type: String,
+    pub proof_purpose: ClaimProofPurpose,
+    pub verification_method: ClaimVerificationMethod,
+    pub verification_method_type: String,
+    pub verification_method_material_digest: String,
+    pub transformed_document_digest: String,
+    pub proof_configuration_digest: String,
+    pub cryptographic_input_digest: String,
+    pub proof_digest: String,
+    pub proof_value_multibase: String,
+}
+
+impl CryptographicVerificationReceipt {
+    pub fn from_adapter_verification(
+        request: &VerificationRequest,
+        resolution: &VerificationMethodResolution,
+        proof_type: impl Into<String>,
+        cryptosuite: impl Into<String>,
+        transformed_document_digest: impl Into<String>,
+        proof_configuration_digest: impl Into<String>,
+        cryptographic_input_digest: impl Into<String>,
+        proof_digest: impl Into<String>,
+        proof_value_multibase: impl Into<String>,
+    ) -> Result<Self, VerificationFailure> {
+        request.validate_structure()?;
+        resolution.validate_structure()?;
+        if !resolution.matches_request(request) {
+            return Err(VerificationFailure::ResolutionRequestMismatch);
+        }
+
+        let receipt = Self {
+            schema_version: CRYPTOGRAPHIC_VERIFICATION_RECEIPT_SCHEMA_VERSION,
+            cryptosuite: cryptosuite.into(),
+            proof_type: proof_type.into(),
+            proof_purpose: request.proof_purpose.clone(),
+            verification_method: resolution.verification_method.clone(),
+            verification_method_type: resolution.verification_method_type.clone(),
+            verification_method_material_digest:
+                resolution.verification_method_material_digest.clone(),
+            transformed_document_digest: transformed_document_digest.into(),
+            proof_configuration_digest: proof_configuration_digest.into(),
+            cryptographic_input_digest: cryptographic_input_digest.into(),
+            proof_digest: proof_digest.into(),
+            proof_value_multibase: proof_value_multibase.into(),
+        };
+        receipt.validate_against(request, resolution)?;
+        Ok(receipt)
+    }
+
+    pub fn receipt_digest(&self) -> String {
+        let encoded = (
+            "symthaea:cryptographic-verification-receipt:v1",
+            self.schema_version,
+            &self.cryptosuite,
+            &self.proof_type,
+            &self.proof_purpose,
+            &self.verification_method,
+            &self.verification_method_type,
+            &self.verification_method_material_digest,
+            &self.transformed_document_digest,
+            &self.proof_configuration_digest,
+            &self.cryptographic_input_digest,
+            &self.proof_digest,
+            &self.proof_value_multibase,
+        );
+        let bytes = serde_json::to_vec(&encoded)
+            .expect("cryptographic verification receipt is serializable");
+        crate::sha256_hex(&bytes)
+    }
+
+    pub fn validate_against(
+        &self,
+        request: &VerificationRequest,
+        resolution: &VerificationMethodResolution,
+    ) -> Result<(), VerificationFailure> {
+        if self.schema_version != CRYPTOGRAPHIC_VERIFICATION_RECEIPT_SCHEMA_VERSION {
+            return Err(VerificationFailure::Structural(
+                "unsupported cryptographic verification receipt schema version".into(),
+            ));
+        }
+        if !resolution.matches_request(request) {
+            return Err(VerificationFailure::ResolutionRequestMismatch);
+        }
+        if self.proof_type.trim().is_empty() || self.cryptosuite.trim().is_empty() {
+            return Err(VerificationFailure::Structural(
+                "cryptographic proof type and cryptosuite must be non-empty".into(),
+            ));
+        }
+        if self.proof_purpose != request.proof_purpose {
+            return Err(VerificationFailure::ProofPurposeMismatch {
+                expected: request.proof_purpose.clone(),
+                actual: self.proof_purpose.clone(),
+            });
+        }
+        if self.verification_method != resolution.verification_method {
+            return Err(VerificationFailure::VerificationMethodMismatch {
+                expected: resolution.verification_method.clone(),
+                actual: self.verification_method.clone(),
+            });
+        }
+        if self.verification_method_type != resolution.verification_method_type {
+            return Err(VerificationFailure::Structural(
+                "cryptographic receipt verification method type does not match resolution".into(),
+            ));
+        }
+        if self.verification_method_material_digest
+            != resolution.verification_method_material_digest
+        {
+            return Err(VerificationFailure::Structural(
+                "cryptographic receipt verification material does not match resolution".into(),
+            ));
+        }
+        for (name, value) in [
+            ("transformed document digest", self.transformed_document_digest.as_str()),
+            ("proof configuration digest", self.proof_configuration_digest.as_str()),
+            ("cryptographic input digest", self.cryptographic_input_digest.as_str()),
+            ("proof digest", self.proof_digest.as_str()),
+        ] {
+            if !is_hex_digest(value) {
+                return Err(VerificationFailure::Structural(format!(
+                    "{name} must be a 64-character hexadecimal digest"
+                )));
+            }
+        }
+        if !self.proof_value_multibase.starts_with('z') {
+            return Err(VerificationFailure::Structural(
+                "cryptographic proofValue must use the base58-btc multibase prefix".into(),
+            ));
+        }
+        let proof_bytes = bs58::decode(&self.proof_value_multibase[1..])
+            .into_vec()
+            .map_err(|_| {
+                VerificationFailure::Structural(
+                    "cryptographic proofValue must contain valid base58-btc data".into(),
+                )
+            })?;
+        if proof_bytes.len() != 64 {
+            return Err(VerificationFailure::Structural(
+                "Ed25519 cryptographic proofValue must decode to exactly 64 bytes".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerificationEvidence {
     pub schema_version: u16,
@@ -1331,10 +1493,8 @@ pub struct VerificationEvidence {
     pub controller_document_ref: String,
     pub controller_document_digest: String,
     pub resolution: VerificationMethodResolution,
-    pub cryptosuite: String,
+    pub cryptographic_verification: CryptographicVerificationReceipt,
     pub freshness: VerificationFreshnessContext,
-    pub signed_payload_digest: String,
-    pub proof_digest: String,
 }
 
 impl VerificationEvidence {
@@ -1343,39 +1503,14 @@ impl VerificationEvidence {
     pub fn from_adapter_attestation(
         request: &VerificationRequest,
         resolution: VerificationMethodResolution,
-        cryptosuite: impl Into<String>,
-        signed_payload_digest: impl Into<String>,
-        proof_digest: impl Into<String>,
+        cryptographic_verification: CryptographicVerificationReceipt,
     ) -> Result<Self, VerificationFailure> {
         request.validate_structure()?;
         resolution.validate_structure()?;
         if !resolution.matches_request(request) {
             return Err(VerificationFailure::ResolutionRequestMismatch);
         }
-        let cryptosuite = cryptosuite.into();
-        let signed_payload_digest = signed_payload_digest.into();
-        let proof_digest = proof_digest.into();
-
-        for (name, value) in [
-            ("cryptosuite", cryptosuite.as_str()),
-        ] {
-            if value.trim().is_empty() {
-                return Err(VerificationFailure::Structural(format!(
-                    "{name} must be non-empty"
-                )));
-            }
-        }
-
-        for (name, value) in [
-            ("signed payload digest", signed_payload_digest.as_str()),
-            ("proof digest", proof_digest.as_str()),
-        ] {
-            if !is_hex_digest(value) {
-                return Err(VerificationFailure::Structural(format!(
-                    "{name} must be a 64-character hexadecimal digest"
-                )));
-            }
-        }
+        cryptographic_verification.validate_against(request, &resolution)?;
 
         Ok(Self {
             schema_version: VERIFICATION_EVIDENCE_SCHEMA_VERSION,
@@ -1392,10 +1527,8 @@ impl VerificationEvidence {
             controller_document_ref: resolution.controller_document_ref.clone(),
             controller_document_digest: resolution.controller_document_digest.clone(),
             resolution,
-            cryptosuite,
+            cryptographic_verification,
             freshness: request.freshness.clone(),
-            signed_payload_digest,
-            proof_digest,
         })
     }
 
@@ -1421,9 +1554,7 @@ impl VerificationEvidence {
             &self.controller_document_integrity_digest(),
             &self.resolution.resolution_digest(),
             &self.verification_relationship,
-            &self.cryptosuite,
-            &self.signed_payload_digest,
-            &self.proof_digest,
+            &self.cryptographic_verification.receipt_digest(),
             &self.freshness.replay_context_digest(),
             &self.freshness.verification_time,
             &self.freshness.proof_created,
@@ -1513,16 +1644,13 @@ impl VerificationEvidence {
                 )));
             }
         }
-        for (name, value) in [
-            ("controller document digest", self.controller_document_digest.as_str()),
-            ("signed payload digest", self.signed_payload_digest.as_str()),
-            ("proof digest", self.proof_digest.as_str()),
-        ] {
-            if !is_hex_digest(value) {
-                return Err(VerificationFailure::Structural(format!(
-                    "{name} must be a 64-character hexadecimal digest"
-                )));
-            }
+        self.cryptographic_verification
+            .validate_against(&request, &self.resolution)?;
+
+        if !is_hex_digest(&self.controller_document_digest) {
+            return Err(VerificationFailure::Structural(
+                "controller document digest must be a 64-character hexadecimal digest".into(),
+            ));
         }
         Ok(())
     }
@@ -2448,6 +2576,27 @@ mod tests {
         assert_ne!(pinned.resolution_digest(), lifecycle.resolution_digest());
     }
 
+    fn test_cryptographic_receipt(
+        request: &VerificationRequest,
+        resolution: &VerificationMethodResolution,
+    ) -> CryptographicVerificationReceipt {
+        CryptographicVerificationReceipt {
+            schema_version: CRYPTOGRAPHIC_VERIFICATION_RECEIPT_SCHEMA_VERSION,
+            cryptosuite: "ed25519-test".into(),
+            proof_type: "DataIntegrityProof".into(),
+            proof_purpose: request.proof_purpose.clone(),
+            verification_method: resolution.verification_method.clone(),
+            verification_method_type: resolution.verification_method_type.clone(),
+            verification_method_material_digest:
+                resolution.verification_method_material_digest.clone(),
+            transformed_document_digest: "22".repeat(32),
+            proof_configuration_digest: "33".repeat(32),
+            cryptographic_input_digest: "44".repeat(32),
+            proof_digest: "55".repeat(32),
+            proof_value_multibase: format!("z{}", bs58::encode([0u8; 64]).into_string()),
+        }
+    }
+
     fn make_evidence(
         request: &VerificationRequest,
         controller_document_digest: &str,
@@ -2460,10 +2609,8 @@ mod tests {
         resolution.validate_structure()?;
         VerificationEvidence::from_adapter_attestation(
             request,
-            resolution,
-            cryptosuite,
-            signed_payload_digest,
-            proof_digest,
+            resolution.clone(),
+            test_cryptographic_receipt(request, &resolution),
         )
     }
 
@@ -2638,11 +2785,9 @@ mod tests {
         resolution.controller_document_digest = "not-a-digest".into();
         let result = VerificationEvidence::from_adapter_attestation(
             &request,
-            resolution,
-            "ed25519",
-            &"22".repeat(32),
-            &"33".repeat(32),
-        );
+            resolution.clone(),
+            test_cryptographic_receipt(&request, &resolution),
+            );
         assert!(matches!(
             result,
             Err(VerificationFailure::Structural(_))
@@ -2668,11 +2813,9 @@ mod tests {
                 ClaimVerificationRelationship::new("authentication").unwrap();
             VerificationEvidence::from_adapter_attestation(
                 &request,
-                resolution,
-                "ed25519",
-                &"22".repeat(32),
-                &"33".repeat(32),
-            )
+                resolution.clone(),
+                test_cryptographic_receipt(&request, &resolution),
+                )
         },
             Err(VerificationFailure::VerificationRelationshipMismatch { .. })
         ));
@@ -2695,11 +2838,9 @@ mod tests {
             ClaimControllerIdentity::new("https://example.test/other").unwrap();
         let result = VerificationEvidence::from_adapter_attestation(
             &request,
-            resolution,
-            "ed25519",
-            &"22".repeat(32),
-            &"33".repeat(32),
-        );
+            resolution.clone(),
+            test_cryptographic_receipt(&request, &resolution),
+            );
 
         assert!(matches!(
             result,
@@ -2737,11 +2878,9 @@ mod tests {
             crate::sha256_hex(&serde_json::to_vec(&encoded_members).unwrap());
         let result = VerificationEvidence::from_adapter_attestation(
             &request,
-            resolution,
-            "ed25519",
-            &"22".repeat(32),
-            &"33".repeat(32),
-        );
+            resolution.clone(),
+            test_cryptographic_receipt(&request, &resolution),
+            );
 
         assert!(matches!(
             result,
