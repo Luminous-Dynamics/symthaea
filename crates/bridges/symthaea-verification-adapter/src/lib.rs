@@ -947,6 +947,67 @@ mod tests {
     }
 
     #[test]
+    fn embedded_relationship_method_can_supply_the_definition() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "assertionMethod": [{
+                "id": "https://example.test/controller#key-1",
+                "type": "Multikey",
+                "controller": "https://example.test/controller",
+                "publicKeyMultibase": "z6MkfFakeKeyMaterial"
+            }]
+        }"##.into();
+
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+        let resolution = adapter.resolve_snapshot(&request, snapshot).unwrap();
+
+        assert_eq!(resolution.verification_method_type, "Multikey");
+        assert_eq!(
+            resolution.resolved_verification_method_controller.as_str(),
+            "https://example.test/controller"
+        );
+        assert!(resolution
+            .verification_method_material_digest
+            .len()
+            == 64);
+    }
+
+    #[test]
+    fn conflicting_embedded_and_top_level_method_definitions_fail_closed() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "verificationMethod": [{
+                "id": "https://example.test/controller#key-1",
+                "type": "Multikey",
+                "controller": "https://example.test/controller",
+                "publicKeyMultibase": "z6MkfFakeKeyMaterial"
+            }],
+            "assertionMethod": [{
+                "id": "https://example.test/controller#key-1",
+                "type": "Multikey",
+                "controller": "https://example.test/controller",
+                "publicKeyMultibase": "z6MkDifferentKeyMaterial"
+            }]
+        }"##.into();
+
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("conflicting embedded definitions")
+        ));
+    }
+
+    #[test]
     fn relationship_controller_substitution_is_definitively_rejected() {
         let request = request();
         let mut snapshot = snapshot();
