@@ -122,10 +122,10 @@ impl FlakeOps {
             args.push("--template".to_string());
             args.push(tmpl.to_string());
         }
-        NixOSCommand::Custom {
-            command: "nix".to_string(),
-            args,
-            safety_level: SafetyLevel::UserModify,
+        NixOSCommand::Flake {
+            operation: FlakeOperation::Init {
+                template: template.map(str::to_string),
+            },
         }
     }
 
