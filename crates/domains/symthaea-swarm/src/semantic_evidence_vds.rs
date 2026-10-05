@@ -203,6 +203,7 @@ impl Rfc9942Es256CoseKey {
     pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9942VdpError> {
         let mut reader=CborReader::new(bytes);
         let entries=reader.read_map_entries_bounded(32).map_err(|error|match error {
+            Rfc9162ProofDecodeError::ResourceLimitExceeded => Rfc9942VdpError::ResourceLimitExceeded,
             Rfc9162ProofDecodeError::InvalidStructure => Rfc9942VdpError::InvalidEs256CoseKey,
             _ => Rfc9942VdpError::InvalidEncoding,
         })?;
@@ -4631,6 +4632,21 @@ mod tests {
         assert_eq!(
             Rfc9942SignatureWithReceipts::from_cbor(&bytes),
             Err(Rfc9942VdpError::InvalidEncoding)
+        );
+    }
+
+    #[test]
+    fn rfc9942_es256_key_map_resource_limit_is_typed() {
+        let mut key = Vec::new();
+        cbor_map_len(&mut key, 33);
+        for label in 0..33 {
+            cbor_int(&mut key, label);
+            cbor_uint(&mut key, 0);
+        }
+
+        assert_eq!(
+            Rfc9942Es256CoseKey::from_cbor(&key),
+            Err(Rfc9942VdpError::ResourceLimitExceeded)
         );
     }
 
