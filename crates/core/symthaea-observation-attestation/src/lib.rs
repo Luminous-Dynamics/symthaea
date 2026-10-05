@@ -1999,11 +1999,11 @@ impl EvidenceEvaluationV9 {
             .ok_or(EvidenceEvaluationConstructionError::InvalidSupplementalContext)
     }
 
-    pub fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
+    fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
         Self::from_report_with_supplement(report, EvaluationContextSupplement::empty())
     }
 
-    pub fn from_report_with_supplement(
+    fn from_report_with_supplement(
         report: &ReceiptAttestationVerificationReport,
         supplement: EvaluationContextSupplement,
     ) -> Self {
@@ -2108,16 +2108,16 @@ impl ReceiptAttestationVerificationReport {
         EvidenceEvaluation::try_from_report(self)
     }
 
-    /// Materialize the additive v9 representation with an empty annotation supplement.
-    pub fn to_evidence_evaluation_v9(&self) -> EvidenceEvaluationV9 {
-        EvidenceEvaluationV9::from_report(self)
-    }
-
+    /// Fallible v9 materialization for untrusted reports.
+    ///
+    /// Unlike the historical v8 convenience constructor, v9 does not expose
+    /// an infallible public path that can deliberately create self-invalid evidence.
     pub fn try_to_evidence_evaluation_v9(
         &self,
     ) -> Result<EvidenceEvaluationV9, EvidenceEvaluationConstructionError> {
         EvidenceEvaluationV9::try_from_report(self)
     }
+
 
     pub fn try_to_evidence_evaluation_v9_with_supplement(
         &self,
@@ -6143,7 +6143,7 @@ mod tests {
         assert!(evaluation.context.is_well_formed());
         assert!(evaluation.supplement.is_well_formed());
 
-        let empty = report.to_evidence_evaluation_v9();
+        let empty = report.try_to_evidence_evaluation_v9().expect("v9 evaluation");
         assert_eq!(evaluation.context_fingerprint, empty.context_fingerprint);
         assert_ne!(evaluation.supplement_fingerprint, empty.supplement_fingerprint);
         assert_ne!(evaluation.fingerprint(), empty.fingerprint());
