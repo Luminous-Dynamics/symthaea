@@ -1187,8 +1187,9 @@ mod tests {
         let second = plan.grounding_surface();
 
         assert_eq!(first, second);
-        assert!(first.contains("binding=PhonologicallyBound"));
-        assert!(first.contains("IY@0"));
+        assert!(first.contains(""version""));
+        assert!(first.contains(""content_binding":"PhonologicallyBound""));
+        assert!(first.contains(""symbol":"IY""));
     }
 }
 
