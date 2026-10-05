@@ -665,6 +665,136 @@ mod tests {
 
     #[cfg(feature = "ssm_language")]
     #[test]
+    fn test_phonological_plan_consumes_pitch_range() {
+        fn make_plan(pitch_range: f32) -> PhonologicalPlan {
+            use symthaea_broca::{
+                ContentBindingStatus, LinguisticFrame, PhonemeSlot, SpeechPlan, StructuredDecoder,
+                SyllableStress, ThoughtChannels,
+            };
+
+            let genesis = GenesisSeed::from_phrase("plan-native-pitch-test");
+            let decoder = StructuredDecoder::new(&genesis);
+            let channels = ThoughtChannels::with_intent(2);
+            let readout = decoder.decode(&channels);
+            let mut speech_plan = SpeechPlan::from_readout(&channels, &readout);
+            speech_plan.prosody.pitch_range = pitch_range;
+
+            let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+            let mut plan = PhonologicalPlan::from_linguistic_frame(&frame);
+            plan.bind_segments(
+                vec![PhonemeSlot::new(
+                    "AH",
+                    0,
+                    SyllableStress::Primary,
+                    true,
+                    false,
+                    true,
+                )],
+                ContentBindingStatus::PhonologicallyBound,
+            )
+            .expect("explicit phonological fixture");
+            plan
+        }
+
+        let genesis = GenesisSeed::from_phrase("plan-native-pitch-test");
+        let mut voice = LiveVoice::new_headless(&genesis);
+        voice.set_cognitive_state(VoiceCognitiveState {
+            emotional_arousal: 0.75,
+            ..Default::default()
+        });
+
+        let narrow = make_plan(0.65);
+        let wide = make_plan(1.45);
+
+        let narrow_samples = voice
+            .synthesize_phonological_plan(&narrow)
+            .expect("narrow pitch plan should synthesize");
+        voice.reset();
+        let wide_samples = voice
+            .synthesize_phonological_plan(&wide)
+            .expect("wide pitch plan should synthesize");
+
+        assert_eq!(
+            narrow_samples.len(),
+            wide_samples.len(),
+            "pitch range should change realization, not deterministic duration"
+        );
+        let difference = narrow_samples
+            .iter()
+            .zip(&wide_samples)
+            .map(|(left, right)| (left - right).abs())
+            .sum::<f32>();
+        assert!(
+            difference > 1e-3,
+            "plan pitch range must reach phonological realization: absolute sample difference={difference}"
+        );
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_phonological_plan_consumes_explicit_pause_weight() {
+        fn make_plan(pause_weight: f32) -> PhonologicalPlan {
+            use symthaea_broca::{
+                ContentBindingStatus, LinguisticFrame, PhonemeSlot, SpeechPlan, StructuredDecoder,
+                SyllableStress, ThoughtChannels,
+            };
+
+            let genesis = GenesisSeed::from_phrase("plan-native-pause-test");
+            let decoder = StructuredDecoder::new(&genesis);
+            let channels = ThoughtChannels::with_intent(2);
+            let readout = decoder.decode(&channels);
+            let mut speech_plan = SpeechPlan::from_readout(&channels, &readout);
+            speech_plan.prosody.pause_weight = pause_weight;
+
+            let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+            let mut plan = PhonologicalPlan::from_linguistic_frame(&frame);
+            plan.bind_segments(
+                vec![
+                    PhonemeSlot::new(
+                        "AH",
+                        0,
+                        SyllableStress::Primary,
+                        true,
+                        false,
+                        true,
+                    ),
+                    PhonemeSlot::new(
+                        "SIL",
+                        1,
+                        SyllableStress::None,
+                        true,
+                        false,
+                        true,
+                    ),
+                ],
+                ContentBindingStatus::PhonologicallyBound,
+            )
+            .expect("explicit phonological fixture");
+            plan
+        }
+
+        let genesis = GenesisSeed::from_phrase("plan-native-pause-test");
+        let mut voice = LiveVoice::new_headless(&genesis);
+
+        let no_pause = make_plan(0.0);
+        let explicit_pause = make_plan(1.0);
+
+        let no_pause_samples = voice
+            .synthesize_phonological_plan(&no_pause)
+            .expect("no-pause plan should synthesize");
+        voice.reset();
+        let explicit_pause_samples = voice
+            .synthesize_phonological_plan(&explicit_pause)
+            .expect("explicit pause plan should synthesize");
+
+        assert!(
+            explicit_pause_samples.len() > no_pause_samples.len(),
+            "pause weight must extend only the explicitly encoded silence segment"
+        );
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
     fn test_role_only_phonological_plan_is_rejected() {
         use symthaea_broca::{LinguisticFrame, SpeechPlan, StructuredDecoder, ThoughtChannels};
 
