@@ -60,6 +60,7 @@ pub enum OpenFoamBoundaryObservationError {
     DuplicateOwnerList,
     OwnerCountMismatch { declared: u64, observed: u64 },
     InvalidOwnerListEntry,
+    InternalFaceSelfLoop { face_index: u64, cell: u64 },
     NonContiguousBoundaryPatchRange {
         patch: String,
         expected_start: u64,
@@ -274,9 +275,9 @@ fn parse_face_list(
     Ok(faces)
 }
 
-fn parse_neighbour_list_count(
+fn parse_neighbour_list(
     source_bytes: &[u8],
-) -> Result<u64, OpenFoamBoundaryObservationError> {
+) -> Result<Vec<u64>, OpenFoamBoundaryObservationError> {
     let text = std::str::from_utf8(source_bytes)
         .map_err(|_| OpenFoamBoundaryObservationError::InvalidUtf8)?;
     let stripped = strip_comments(text)?;
@@ -289,19 +290,17 @@ fn parse_neighbour_list_count(
         OpenFoamBoundaryObservationError::InvalidNeighbourListEntry,
     )?;
 
-    let mut observed = 0u64;
+    let mut neighbours = Vec::new();
     while index < tokens.len() && !matches!(tokens[index], Token::RParen) {
         let Token::Number(value) = tokens.get(index).ok_or(
             OpenFoamBoundaryObservationError::InvalidNeighbourListEntry,
         )? else {
             return Err(OpenFoamBoundaryObservationError::InvalidNeighbourListEntry);
         };
-        value.parse::<u64>().map_err(|_| {
+        let value = value.parse::<u64>().map_err(|_| {
             OpenFoamBoundaryObservationError::InvalidNeighbourListEntry
         })?;
-        observed = observed
-            .checked_add(1)
-            .ok_or(OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
+        neighbours.push(value);
         index += 1;
     }
 
@@ -309,18 +308,25 @@ fn parse_neighbour_list_count(
         return Err(OpenFoamBoundaryObservationError::InvalidNeighbourListEntry);
     }
 
+    let observed = neighbours.len() as u64;
     if observed != count {
         return Err(OpenFoamBoundaryObservationError::NeighbourCountMismatch {
             declared: count,
             observed,
         });
     }
-    Ok(count)
+    Ok(neighbours)
 }
 
-fn parse_owner_list_count(
+fn parse_neighbour_list_count(
     source_bytes: &[u8],
 ) -> Result<u64, OpenFoamBoundaryObservationError> {
+    Ok(parse_neighbour_list(source_bytes)?.len() as u64)
+}
+
+fn parse_owner_list(
+    source_bytes: &[u8],
+) -> Result<Vec<u64>, OpenFoamBoundaryObservationError> {
     let text = std::str::from_utf8(source_bytes)
         .map_err(|_| OpenFoamBoundaryObservationError::InvalidUtf8)?;
     let stripped = strip_comments(text)?;
@@ -333,32 +339,63 @@ fn parse_owner_list_count(
         OpenFoamBoundaryObservationError::InvalidOwnerListEntry,
     )?;
 
-    let mut observed = 0u64;
+    let mut owners = Vec::new();
     while index < tokens.len() && !matches!(tokens[index], Token::RParen) {
         let Token::Number(value) = tokens.get(index).ok_or(
             OpenFoamBoundaryObservationError::InvalidOwnerListEntry,
-        )? else {
+        ) else {
             return Err(OpenFoamBoundaryObservationError::InvalidOwnerListEntry);
         };
-        value.parse::<u64>().map_err(|_| {
+        let value = value.parse::<u64>().map_err(|_| {
             OpenFoamBoundaryObservationError::InvalidOwnerListEntry
         })?;
-        observed = observed
-            .checked_add(1)
-            .ok_or(OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
+        owners.push(value);
         index += 1;
     }
 
     if !matches!(tokens.get(index), Some(Token::RParen)) || index + 1 != tokens.len() {
         return Err(OpenFoamBoundaryObservationError::InvalidOwnerListEntry);
     }
+
+    let observed = owners.len() as u64;
     if observed != count {
         return Err(OpenFoamBoundaryObservationError::OwnerCountMismatch {
             declared: count,
             observed,
         });
     }
-    Ok(count)
+    Ok(owners)
+}
+
+fn parse_owner_list_count(
+    source_bytes: &[u8],
+) -> Result<u64, OpenFoamBoundaryObservationError> {
+    Ok(parse_owner_list(source_bytes)?.len() as u64)
+}
+
+fn validate_internal_face_cells(
+    owners: &[u64],
+    neighbours: &[u64],
+) -> Result<(), OpenFoamBoundaryObservationError> {
+    if neighbours.len() > owners.len() {
+        return Err(
+            OpenFoamBoundaryObservationError::BoundaryPatchRangeExceedsFaces {
+                patch: "<internal-faces>".to_string(),
+                end_face: neighbours.len() as u64,
+                face_count: owners.len() as u64,
+            },
+        );
+    }
+
+    for (face_index, (&owner, &neighbour)) in owners.iter().zip(neighbours).enumerate() {
+        if owner == neighbour {
+            return Err(OpenFoamBoundaryObservationError::InternalFaceSelfLoop {
+                face_index: face_index as u64,
+                cell: owner,
+            });
+        }
+    }
+    Ok(())
 }
 
 fn validate_boundary_patch_partition(
@@ -638,13 +675,15 @@ fn observe_openfoam_patch_geometry_with_owner_and_neighbour(
     OpenFoamBoundaryObservationError,
 > {
     let faces = parse_face_list(faces_source_bytes)?;
-    let owner_count = parse_owner_list_count(owner_source_bytes)?;
-    if owner_count != faces.len() as u64 {
+    let owners = parse_owner_list(owner_source_bytes)?;
+    if owners.len() != faces.len() {
         return Err(OpenFoamBoundaryObservationError::OwnerCountMismatch {
-            declared: owner_count,
+            declared: owners.len() as u64,
             observed: faces.len() as u64,
         });
     }
+    let neighbours = parse_neighbour_list(neighbour_source_bytes)?;
+    validate_internal_face_cells(&owners, &neighbours)?;
 
     let (record, observation) = observe_openfoam_patch_geometry_with_neighbour(
         boundary_source_bytes,
@@ -2397,6 +2436,22 @@ mod tests {
             ),
             Err(OpenFoamBoundaryObservationError::DegenerateFace { face_index: 0 })
         ));
+    }
+
+    #[test]
+    fn internal_face_self_loop_fails_closed() {
+        let owners = [3, 7];
+        let neighbours = [3, 8];
+        assert!(matches!(
+            validate_internal_face_cells(&owners, &neighbours),
+            Err(OpenFoamBoundaryObservationError::InternalFaceSelfLoop {
+                face_index: 0,
+                cell: 3
+            })
+        ));
+
+        let valid_neighbours = [4, 8];
+        assert!(validate_internal_face_cells(&owners, &valid_neighbours).is_ok());
     }
 
     #[test]
