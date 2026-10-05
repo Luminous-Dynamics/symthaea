@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 11;
+pub const SCHEMA_VERSION: u16 = 12
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-v20";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-v21";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -1440,6 +1440,12 @@ pub struct CandidateAssessment {
     pub candidate_id: String,
     /// Candidate-generation derivation lineage, when declared.
     pub derivation: Option<DerivationRecord>,
+    /// BLAKE3 digest of the complete canonical candidate evidence bundle.
+    ///
+    /// This binds source identity, admission, timestamps, validity, stance,
+    /// confidence, and evidence derivation metadata into the receipt without
+    /// duplicating the full bundle in every assessment.
+    pub evidence_digest: String,
     /// Evidence-linked functional performance estimates.
     pub performance: BTreeMap<String, PerformanceEstimate>,
     /// Evidence-linked operating capabilities.
@@ -2272,9 +2278,11 @@ impl AlternativesEngine {
                 })
                 .collect();
 
+            let evidence_digest = canonical_candidate_evidence_hash(candidate)?;
             assessments.push(CandidateAssessment {
                 candidate_id: candidate.id.clone(),
                 derivation: candidate.derivation.clone(),
+                evidence_digest,
                 performance: candidate.performance.clone(),
                 operating_capabilities: candidate.operating_capabilities.clone(),
                 constraints,
@@ -2456,6 +2464,15 @@ impl AlternativesEngine {
             rationale: "heuristic: largest count of unresolved frontier candidates for one dimension; no cross-dimension unit scalarization".to_string(),
         })
     }
+}
+
+fn canonical_candidate_evidence_hash(candidate: &CandidatePathway) -> Result<String, AssessmentError> {
+    let mut evidence = candidate.evidence.clone();
+    evidence.sort_by(|a, b| a.id.cmp(&b.id));
+    let bytes = serde_json::to_vec(&evidence).map_err(|_| AssessmentError::NonFinite)?;
+    let mut hasher = Hasher::new();
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
 }
 
 fn canonical_payload_hash(result: &AssessmentResult) -> Result<String, AssessmentError> {
@@ -2738,6 +2755,68 @@ mod tests {
             baseline.receipt.payload_hash,
             generated.receipt.payload_hash
         );
+    }
+
+    #[test]
+    fn evidence_provenance_mutation_changes_receipt_identity() {
+        let c = candidate(
+            "evidence-bound",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "e1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let baseline = AlternativesEngine
+            .assess(&fixture_requirement(), &[c.clone()], None)
+            .unwrap();
+
+        let mut changed = c;
+        changed.evidence[0].source.artifact_digest = "different-artifact-digest".into();
+        let changed_result = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap();
+
+        assert_ne!(
+            baseline.candidates[0].evidence_digest,
+            changed_result.candidates[0].evidence_digest
+        );
+        assert_ne!(
+            baseline.receipt.payload_hash,
+            changed_result.receipt.payload_hash
+        );
+    }
+
+    #[test]
+    fn candidate_evidence_digest_is_order_independent() {
+        let mut c = candidate(
+            "evidence-order",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![
+                evidence("e1", "source-a", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("e2", "source-b", EvidenceKind::Reported, EvidenceStance::Supports, 0.9),
+            ],
+        );
+        let first = AlternativesEngine
+            .assess(&fixture_requirement(), &[c.clone()], None)
+            .unwrap();
+        c.evidence.reverse();
+        let second = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            first.candidates[0].evidence_digest,
+            second.candidates[0].evidence_digest
+        );
+        assert_eq!(first.receipt, second.receipt);
     }
 
     #[test]
