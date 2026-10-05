@@ -631,6 +631,34 @@ fn resolve_document_url(
         })
 }
 
+fn collect_matching_id_objects<'a>(
+    value: &'a Value,
+    base: &url::Url,
+    requested_id: &str,
+    candidates: &mut Vec<&'a serde_json::Map<String, Value>>,
+) -> Result<(), SnapshotError> {
+    match value {
+        Value::Object(object) => {
+            if let Some(id) = object.get("id").and_then(Value::as_str) {
+                let absolute_id = resolve_document_url(base, id, "verification method id")?;
+                if absolute_id == requested_id {
+                    candidates.push(object);
+                }
+            }
+            for child in object.values() {
+                collect_matching_id_objects(child, base, requested_id, candidates)?;
+            }
+        }
+        Value::Array(values) => {
+            for child in values {
+                collect_matching_id_objects(child, base, requested_id, candidates)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 fn extract_verification_method(
     request: &VerificationRequest,
     document: &serde_json::Map<String, Value>,
@@ -639,7 +667,6 @@ fn extract_verification_method(
     let requested_id = request.verification_method.as_str();
     let base = url::Url::parse(document_ref)
         .map_err(|_| SnapshotError::Malformed("controller document id must be a valid URL".into()))?;
-    let mut candidates = Vec::new();
 
     if let Some(methods) = document
         .get("verificationMethod")
@@ -654,31 +681,17 @@ fn extract_verification_method(
             })?;
             let id = required_string(object, "id")?;
             let absolute_id = resolve_document_url(&base, id, "verificationMethod id")?;
-            if !all_ids.insert(absolute_id.clone()) {
+            if !all_ids.insert(absolute_id) {
                 return Err(SnapshotError::Malformed(
                     "controller document verificationMethod identifiers must be unique after URL resolution".into(),
                 ));
             }
-            if absolute_id == requested_id {
-                candidates.push(object);
-            }
         }
     }
 
-    if let Some(entries) = document
-        .get(request.expected_verification_relationship.as_str())
-        .and_then(Value::as_array)
-    {
-        for entry in entries {
-            if let Some(object) = entry.as_object() {
-                let id = required_string(object, "id")?;
-                let absolute_id = resolve_document_url(&base, id, "verification relationship member id")?;
-                if absolute_id == requested_id {
-                    candidates.push(object);
-                }
-            }
-        }
-    }
+    let document_value = Value::Object(document.clone());
+    let mut candidates = Vec::new();
+    collect_matching_id_objects(&document_value, &base, requested_id, &mut candidates)?;
 
     if candidates.is_empty() {
         return Err(SnapshotError::Verification(
@@ -1428,6 +1441,60 @@ mod tests {
             resolution.resolved_verification_method_controller.as_str(),
             "https://example.test/controller"
         );
+    }
+
+    #[test]
+    fn nested_embedded_method_can_be_resolved_by_fragment_semantics() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "assertionMethod": ["#key-1"],
+            "extension": {
+                "method": {
+                    "id": "#key-1",
+                    "type": "Multikey",
+                    "controller": "https://example.test/controller",
+                    "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+                }
+            }
+        }"##.into();
+
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+        let resolution = adapter.resolve_snapshot(&request, snapshot).unwrap();
+
+        assert_eq!(resolution.verification_method, request.verification_method);
+        assert_eq!(resolution.verification_method_type, "Multikey");
+    }
+
+    #[test]
+    fn nested_duplicate_method_definition_fails_closed() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "assertionMethod": ["#key-1"],
+            "extension": {
+                "method": {
+                    "id": "https://example.test/controller#key-1",
+                    "type": "Multikey",
+                    "controller": "https://example.test/controller",
+                    "publicKeyMultibase": "z6MkDifferentKeyMaterial"
+                }
+            }
+        }"##.into();
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+
+        let err = adapter.resolve_snapshot(&request, snapshot).unwrap_err();
+        assert!(matches!(
+            err,
+            SnapshotError::Malformed(message)
+                if message.contains("conflicting embedded definitions")
+        ));
     }
 
     #[test]
