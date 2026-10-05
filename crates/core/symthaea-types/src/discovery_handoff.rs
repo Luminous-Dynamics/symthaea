@@ -447,6 +447,32 @@ impl ScientificInquiryExecutionReceipt {
         blake3::hash(&self.canonical_bytes()).to_hex().to_string()
     }
 
+    pub fn validate_against_selection_and_observation(
+        &self,
+        selection: &ScientificInquirySelectionReceipt,
+        prediction_frame: &PhysicalType,
+        observation_physical_type: &PhysicalType,
+    ) -> Result<(), String> {
+        self.validate_against_selection(selection)?;
+        selection.validate_against_prediction_frame(prediction_frame)?;
+        observation_physical_type
+            .validate()
+            .map_err(|error| format!("invalid observation physical type: {}", error.reason))?;
+        if self.observation_physical_type_digest != observation_physical_type.digest_hex() {
+            return Err("execution receipt observation type does not match supplied observation type".into());
+        }
+        match observation_physical_type.judge_numeric_compatibility(prediction_frame) {
+            TypeJudgement::Valid(()) => Ok(()),
+            TypeJudgement::Invalid(error) => Err(format!(
+                "observation physical type is incompatible with prediction frame: {}",
+                error.reason
+            )),
+            TypeJudgement::Unknown(reason) => Err(format!(
+                "observation numeric compatibility is unknown: {reason}"
+            )),
+        }
+    }
+
     pub fn validate_against_selection(
         &self,
         selection: &ScientificInquirySelectionReceipt,
@@ -538,6 +564,9 @@ mod tests {
 
         assert!(observation.validate().is_ok());
         assert!(observation.validate_against_selection(&selection).is_ok());
+        assert!(observation
+            .validate_against_selection_and_observation(&selection, &frame, &frame)
+            .is_ok());
         assert_eq!(
             observation.selected_challenge_digest,
             selection.selected_challenge_digest
