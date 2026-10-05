@@ -694,7 +694,8 @@ pub enum IndependenceVerifierPredicate {
 /// no shared provenance basis in a validated closed-world graph. The verifier
 /// does not evaluate relation semantics, modality, observation time/location,
 /// measurement quality, credential validity, or substantive truth.
-pub const INDEPENDENCE_SCOPE_VERSION_V3: &str = "observation-fabric-independence-scope-v3";
+pub const INDEPENDENCE_SCOPE_V3_DOMAIN_SEPARATOR: &[u8] =
+    b"symthaea:observation-independence-scope:v3\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IndependenceVerifierContract {
@@ -1517,7 +1518,7 @@ impl ObservationGraph {
         examined_observation_ids.sort();
 
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea:observation-independence-scope:v3\n");
+        bytes.extend_from_slice(INDEPENDENCE_SCOPE_V3_DOMAIN_SEPARATOR);
         write_canonical_string_vec_bytes(&mut bytes, &examined_observation_ids);
 
         for observation_id in examined_observation_ids {
