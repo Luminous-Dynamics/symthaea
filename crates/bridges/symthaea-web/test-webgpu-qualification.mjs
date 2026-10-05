@@ -353,6 +353,10 @@ async function waitForQualificationReady(page, selector, probe) {
     const blank = document.createElement('canvas');
     blank.width = canvas.width;
     blank.height = canvas.height;
+    const context = blank.getContext('2d');
+    if (!context) return null;
+    context.fillStyle = '#000';
+    context.fillRect(0, 0, blank.width, blank.height);
     return blank.toDataURL('image/png');
   }, { selector });
   if (!blankDataUrl) {
