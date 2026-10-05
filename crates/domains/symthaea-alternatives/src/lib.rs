@@ -1189,9 +1189,13 @@ impl AlternativesEngine {
 
             assessments.push(CandidateAssessment {
                 candidate_id: candidate.id.clone(),
+                performance: candidate.performance.clone(),
                 constraints,
                 burdens: candidate.burdens.clone(),
-                qualification: candidate.qualification_ceiling(),
+                qualification: candidate.qualification_ceiling(
+                    requirement,
+                    assessed_at_epoch_seconds,
+                ),
                 evidence_conflict: candidate.has_conflict_at(assessed_at_epoch_seconds),
                 frontier_blocked,
                 observed_evidence_count,
