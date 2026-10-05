@@ -749,6 +749,12 @@ impl SimulationResult {
         self
     }
 
+    /// Record model maturity separately from solver execution provenance.
+    pub fn with_model_maturity(mut self, maturity: ModelMaturity) -> Self {
+        self.evidence.model_maturity = Some(maturity);
+        self
+    }
+
     /// True only for a parsed external-solver result with complete provenance.
     pub fn is_engineering_evidence(&self) -> bool {
         self.validate().is_ok()
@@ -1575,6 +1581,7 @@ mod tests {
             input_digest: Some("input-digest".into()),
             output_digest: Some("output-digest".into()),
             parser_version: Some("parser-1".into()),
+            model_maturity: Some(ModelMaturity::ValidatedNumerical),
         };
         let valid = SimulationResult::converged("run-1", 0.9)
             .with_metric("stress", 12.0, "MPa")
