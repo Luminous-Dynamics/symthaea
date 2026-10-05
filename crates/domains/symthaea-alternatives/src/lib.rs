@@ -714,12 +714,10 @@ pub enum FrontierBlocker {
         actual_unit: String,
         /// Expected comparison scope.
         expected_scope: String,
-        /// Candidate scope.
+        /// Candidate comparison scope.
         actual_scope: String,
     },
-}
-
-/// Functional performance uses a different unit or scope from the requirement.
+    /// Functional performance uses a different unit or scope from the requirement.
     PerformanceIncompatibleScale {
         /// Functional requirement metric.
         metric: String,
@@ -732,6 +730,8 @@ pub enum FrontierBlocker {
         /// Candidate scope.
         actual_scope: String,
     },
+}
+
 /// Candidate-versus-incumbent burden transfer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BurdenTransfer {
