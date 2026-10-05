@@ -280,7 +280,7 @@ impl LiveVoice {
         }
     }
 
-    fn apply_prosody(&self, state: &mut VoiceCognitiveState, prosody: &ProsodyAnalysis) {
+    fn apply_prosody(&mut self, state: &mut VoiceCognitiveState, prosody: &ProsodyAnalysis) {
         state.emotional_arousal = prosody.pitch_range.clamp(0.0, 1.0);
         self.modulate_tau(1.0 / prosody.speaking_rate);
     }
@@ -559,9 +559,13 @@ mod tests {
         let slow = make_plan(0.70);
         let fast = make_plan(1.30);
 
-        let dir = tempfile::tempdir().expect("tempdir");
-        let slow_path = dir.path().join("slow.wav");
-        let fast_path = dir.path().join("fast.wav");
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea-plan-native-rate-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).expect("create temporary output directory");
+        let slow_path = dir.join("slow.wav");
+        let fast_path = dir.join("fast.wav");
 
         let slow_samples = voice
             .speak_phonological_plan_to_file(&slow, &slow_path)
@@ -584,6 +588,8 @@ mod tests {
             slow_frames * samples_per_frame,
             "scheduler sample count must equal deterministic frame count"
         );
+
+        std::fs::remove_dir_all(&dir).expect("remove temporary output directory");
     }
 
     #[cfg(feature = "ssm_language")]
