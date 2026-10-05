@@ -421,13 +421,24 @@ impl PhysicalType {
         }
         if let Some(unit) = &self.unit {
             unit.validate()?;
-            if self.kind == QuantityKind::TemperatureDifference
-                && unit.transform_to_si.offset.numerator != 0
+            if unit.transform_to_si.offset.numerator != 0
+                && self.kind == QuantityKind::TemperatureDifference
             {
                 return Err(PhysicalTypeError {
                     operation: "physical_type".into(),
                     reason:
                         "temperature differences cannot use affine unit offsets; use a delta unit"
+                            .into(),
+                });
+            }
+            if unit.transform_to_si.offset.numerator != 0
+                && self.kind != QuantityKind::Temperature
+                && self.kind != QuantityKind::TemperatureDifference
+            {
+                return Err(PhysicalTypeError {
+                    operation: "physical_type".into(),
+                    reason:
+                        "affine unit offsets are supported only for absolute temperature quantities"
                             .into(),
                 });
             }
@@ -661,6 +672,42 @@ mod tests {
         let unknown = PhysicalType::unknown();
         assert_eq!(unknown.kind, QuantityKind::Unknown);
         assert_eq!(unknown.dimension, None);
+    }
+
+    #[test]
+    fn affine_unit_offset_is_rejected_for_non_temperature_quantities() {
+        let affine_length = PhysicalType::with_kind(
+            QuantityKind::Length,
+            PhysicalDimension::LENGTH,
+        )
+        .with_unit(UnitRef {
+            symbol: "affine_length".into(),
+            transform_to_si: UnitTransform::new(
+                RationalScale::ONE,
+                RationalScale { numerator: 27315, denominator: 100 },
+            ),
+            semantic_id: None,
+        });
+
+        assert!(affine_length.validate().is_err());
+    }
+
+    #[test]
+    fn absolute_temperature_affine_unit_remains_valid() {
+        let celsius = PhysicalType::with_kind(
+            QuantityKind::Temperature,
+            PhysicalDimension::TEMPERATURE,
+        )
+        .with_unit(UnitRef {
+            symbol: "degC".into(),
+            transform_to_si: UnitTransform::new(
+                RationalScale::ONE,
+                RationalScale { numerator: 27315, denominator: 100 },
+            ),
+            semantic_id: None,
+        });
+
+        assert!(celsius.validate().is_ok());
     }
 
     #[test]
