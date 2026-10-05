@@ -94,8 +94,14 @@ The neutral core now has an explicit evidence ladder:
 
 `SolverEntityAttested` is still an adapter provenance claim. The neutral core can verify that the receipt refers to the exact binding it is promoting, but it cannot independently inspect vendor-specific solver state. The OpenFOAM bridge now also exposes an evidence-only observer for `constant/polyMesh/boundary`.
 It canonicalizes patch name, type, startFace, and nFaces and records an exact source-file digest.
-That receipt belongs to `SolverInputEntityAttested`; it is not a claim that a live solver loaded or accepted the file.
-A live-capable adapter may still use the higher `SolverEntityAttested` rung after inspecting actual solver state.
+With the exact `constant/polyMesh/faces` artifact, it parses the referenced face records and checks the
+declared patch range against actual serialized faces. With the exact `constant/polyMesh/points` artifact
+and an explicit coordinate-unit scale, it derives the exposed perimeter edges of the referenced patch
+faces and requires that perimeter to equal the candidate's independently certified interface rim.
+The combined observation commits to the exact source artifacts and scale. This remains
+`SolverInputEntityAttested`: it is not a claim that a live solver loaded or accepted the files, nor
+that numerical physics is valid. A live-capable adapter may still use the higher
+`SolverEntityAttested` rung after inspecting actual solver state.
 The OpenFOAM input observer is deliberately conservative: it accepts only the declared patch-list
 grammar it can parse, requires the declared patch count to equal the number of parsed patch entries,
 rejects duplicate patch names, and fails closed on unsupported directives/characters rather than guessing.
