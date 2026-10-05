@@ -152,13 +152,16 @@ impl LiveVoice {
         }
     }
 
-    /// Synthesize an explicit phonological plan into the real-time audio path.
+    /// Synthesize an explicit phonological plan through the live audio output path.
     ///
     /// This is intentionally plan-native: no text, G2P reconstruction, or lexical inference
-    /// occurs here. The validated plan supplies explicit phoneme identity, stress, and rate;
-    /// the vocal-tract controller supplies speaker/anatomical parameters. Word-final timing
-    /// remains unasserted because the current phonological contract does not encode word
-    /// boundaries.
+    /// occurs here. The validated plan supplies explicit phoneme identity, stress, rate,
+    /// phrase boundaries, and prosodic intent. The vocal-tract controller supplies
+    /// speaker/anatomical parameters. Word-final timing remains unasserted because the current
+    /// phonological contract does not encode word boundaries.
+    ///
+    /// The current implementation pre-synthesizes the validated plan before enqueueing it to
+    /// the audio sink, so this method does not claim first-audio latency.
     #[cfg(feature = "ssm_language")]
     pub fn speak_phonological_plan(&mut self, plan: &PhonologicalPlan) -> Result<usize> {
         let samples = self.synthesize_phonological_plan(plan)?;
@@ -231,8 +234,27 @@ impl LiveVoice {
                 Some(segment.symbol.as_str())
             };
             let state = self.cognitive_state.lock().clone();
-            let total_frames_for_prosody = total_frames.max(1);
-            let utterance_progress = index as f32 / total_frames_for_prosody.saturating_sub(1).max(1) as f32;
+            let segment_count = plan.segments.len();
+            let utterance_progress =
+                index as f32 / segment_count.saturating_sub(1).max(1) as f32;
+            let phrase_index = plan.segments[..index]
+                .iter()
+                .filter(|slot| slot.phrase_boundary_after)
+                .count()
+                .min(u8::MAX as usize) as u8;
+            let phrase_start = plan.segments[..index]
+                .iter()
+                .rposition(|slot| slot.phrase_boundary_after)
+                .map(|boundary| boundary + 1)
+                .unwrap_or(0);
+            let phrase_end = plan.segments[index..]
+                .iter()
+                .position(|slot| slot.phrase_boundary_after)
+                .map(|offset| index + offset)
+                .unwrap_or(segment_count.saturating_sub(1));
+            let phrase_span = phrase_end.saturating_sub(phrase_start).max(1);
+            let phrase_progress =
+                index.saturating_sub(phrase_start) as f32 / phrase_span as f32;
             let intonation = match plan.intonation {
                 symthaea_broca::IntonationIntent::Statement => Intonation::Statement,
                 symthaea_broca::IntonationIntent::Question => Intonation::Question,
@@ -249,11 +271,18 @@ impl LiveVoice {
                     utterance_progress: utterance_progress.clamp(0.0, 1.0),
                     phoneme_progress: progress,
                     stress: segment.stress.ordinal(),
-                    base_f0: 120.0 * plan.pitch_range.clamp(0.5, 1.5),
-                    arousal: state.emotional_arousal.clamp(0.0, 1.0),
+                    // StreamingVocalTract::new() uses the default speaker profile (120 Hz).
+                    // Broca's pitch_range widens/narrows F0 excursion via the existing
+                    // arousal channel rather than overwriting the speaker's base pitch.
+                    base_f0: 120.0,
+                    arousal: {
+                        let normalized = state.emotional_arousal.clamp(0.0, 1.0);
+                        let range = plan.pitch_range.clamp(0.65, 1.45);
+                        (0.5 + (normalized - 0.5) * range).clamp(0.0, 1.0)
+                    },
                     intonation,
-                    phrase_index: 0,
-                    phrase_progress: utterance_progress.clamp(0.0, 1.0),
+                    phrase_index,
+                    phrase_progress: phrase_progress.clamp(0.0, 1.0),
                     is_focus: segment.is_focus && plan.focus_role.is_some(),
                     pitch_accent: if segment.is_focus {
                         PitchAccent::RiseHigh
