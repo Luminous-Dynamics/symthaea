@@ -70,9 +70,11 @@ candidate universe must reproduce that hash exactly. Missing, extra, or duplicat
 candidate IDs therefore cannot silently reuse the threshold; reordering is
 allowed because the canonical universe hash is deliberately order-insensitive.
 The external calibration scores can be independently checked against their stored
-count and hash before an artifact is trusted. The primitive turns that complete,
-deterministic candidate universe into a set-valued prediction by including every
-candidate whose nonconformity is at most the calibrated q. Invalid identifiers or
+count and hash before an artifact is trusted. Verification also recomputes q from
+the supplied score set and the artifact's alpha; a numerically well-formed but
+forged threshold therefore does not validate merely because the score hash matches.
+The primitive turns that complete, deterministic candidate universe into a set-valued
+prediction by including every candidate whose nonconformity is at most the calibrated q. Invalid identifiers or
 similarities fail closed, and the emitted set is canonicalized by stable
 identifier.
 
