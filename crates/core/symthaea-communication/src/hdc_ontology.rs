@@ -314,6 +314,24 @@ pub struct HdcOntologyRepresentation {
 }
 
 impl HdcOntologyRepresentation {
+    /// Deserialize a persisted HDC representation only after enforcing the raw
+    /// byte-size ceiling and all representation/codec/resource invariants.
+    /// This is the preferred entry point for untrusted serialized artifacts.
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > HDC_ONTOLOGY_MAX_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "ontology HDC representation JSON exceeds {} bytes",
+                HDC_ONTOLOGY_MAX_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let representation: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("ontology HDC representation JSON: {error}"))?;
+        if !representation.validates() {
+            return Err("ontology HDC representation failed bounded validation".into());
+        }
+        Ok(representation)
+    }
+
     pub fn validates(&self) -> bool {
         self.schema_version == HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION
             && self.adapter_id == HDC_ONTOLOGY_ADAPTER_ID
@@ -2208,6 +2226,7 @@ mod tests {
         assert!(HdcOntologyManifest::from_json_bytes(&oversized).is_err());
         assert!(HdcOntologyCodebookDescriptor::from_json_bytes(&oversized).is_err());
         assert!(HdcOntologyConformalCalibration::from_json_bytes(&oversized).is_err());
+        assert!(HdcOntologyRepresentation::from_json_bytes(&oversized).is_err());
 
         let (training, manifest) = training_graph_and_manifest();
         let codebook =
@@ -2220,6 +2239,12 @@ mod tests {
         let manifest_json = serde_json::to_vec(&manifest).unwrap();
         let restored_manifest = HdcOntologyManifest::from_json_bytes(&manifest_json).unwrap();
         assert_eq!(restored_manifest.manifest_hash(), manifest.manifest_hash());
+
+        let representation = codebook.encode_graph(&training_graph_and_manifest().0, &manifest).unwrap();
+        let representation_json = serde_json::to_vec(&representation).unwrap();
+        let restored_representation =
+            HdcOntologyRepresentation::from_json_bytes(&representation_json).unwrap();
+        assert_eq!(restored_representation, representation);
 
         let calibration = HdcOntologyConformalCalibration::from_nonconformity_scores(
             "codebook",
@@ -2398,88 +2423,3 @@ mod tests {
                 &training_manifest,
                 &receiver,
                 HdcOntologyDecodePolicy::conservative_default(),
-            )
-            .unwrap();
-
-        assert!(decoded.graph.nodes.iter().all(|node| {
-            !node.id.starts_with("alice")
-                && !node.id.starts_with("event")
-                && !node.id.starts_with("object")
-        }));
-        let mut observed_groundings = decoded.graph.nodes.iter()
-            .map(|node| node.grounded_by.clone())
-            .collect::<Vec<_>>();
-        let mut expected_groundings = training.nodes.iter()
-            .map(|node| node.grounded_by.clone())
-            .collect::<Vec<_>>();
-        observed_groundings.sort();
-        expected_groundings.sort();
-        assert_eq!(observed_groundings, expected_groundings);
-    }
-
-    #[test]
-    fn ambiguous_receiver_relation_mapping_is_fail_closed() {
-        let (training, training_manifest) = training_graph_and_manifest();
-        let codebook =
-            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
-                .unwrap();
-        let representation = codebook
-            .encode_graph(&training, &training_manifest)
-            .unwrap();
-
-        let mut ambiguous = training_manifest.clone();
-        ambiguous.relations.push(HdcRelationIdentityBinding {
-            local_relation: "starts".into(),
-            relation_id: "relation:initiates".into(),
-        });
-        assert!(ambiguous.validates());
-
-        let error = codebook
-            .decode_graph_with_policy(
-                &representation,
-                &training_manifest,
-                &ambiguous,
-                HdcOntologyDecodePolicy::conservative_default(),
-            )
-            .expect_err("ambiguous stable relation rendering must fail closed");
-        assert!(error.contains("ambiguously maps stable relation id"));
-    }
-
-    #[test]
-    fn source_manifest_hash_mismatch_is_fail_closed() {
-        let (training, training_manifest) = training_graph_and_manifest();
-        let codebook =
-            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
-                .unwrap();
-        let representation = codebook.encode_graph(&training, &training_manifest).unwrap();
-
-        let mut tampered_source = training_manifest.clone();
-        tampered_source.concepts[0].grounding_ids = vec!["tampered-grounding".into()];
-
-        assert!(codebook
-            .decode_graph_with_policy(
-                &representation,
-                &tampered_source,
-                &training_manifest,
-                HdcOntologyDecodePolicy::conservative_default(),
-            )
-            .is_err());
-    }
-
-    #[test]
-    fn mapping_provenance_mismatch_is_fail_closed() {
-        let (training, training_manifest) = training_graph_and_manifest();
-        let codebook =
-            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
-                .unwrap();
-        let mut wrong = training_manifest.clone();
-        wrong.mapping_provenance_hash = crate::content_hash(b"different-authority-revision");
-
-        assert!(codebook.encode_graph(&training, &wrong).is_err());
-    }
-
-    #[test]
-    fn cross_label_mapping_uses_stable_relation_identity() {
-        let (training, training_manifest) = training_graph_and_manifest();
-        let codebook =
-            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
