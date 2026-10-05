@@ -254,8 +254,12 @@ impl JsonControllerDocumentSnapshotAdapter {
             ));
         }
 
-        let (resolved_method_controller, lifecycle) =
-            extract_verification_method(request, object)?;
+        let (
+            resolved_method_controller,
+            verification_method_type,
+            verification_method_material_digest,
+            lifecycle,
+        ) = extract_verification_method(request, object)?;
         let relationship_methods =
             extract_relationship_methods(request, object, &snapshot.controller_document_ref)?;
 
@@ -270,6 +274,8 @@ impl JsonControllerDocumentSnapshotAdapter {
             snapshot.controller_document_ref.clone(),
             ClaimControllerDocumentIdentity::new(snapshot.controller_document_ref.clone())?,
             request.verification_method.clone(),
+            verification_method_type,
+            verification_method_material_digest,
             resolved_method_controller,
             &relationship_methods,
             actual_document_digest.clone(),
@@ -355,6 +361,88 @@ fn sha256_multibase(hex_digest: &str) -> Result<String, SnapshotError> {
     Ok(format!("z{}", bs58::encode(multihash).into_string()))
 }
 
+fn verification_method_material_digest(
+    method_id: &ClaimVerificationMethod,
+    method_type: &str,
+    object: &serde_json::Map<String, Value>,
+) -> Result<String, SnapshotError> {
+    let material = match method_type {
+        "Multikey" => {
+            let public = object
+                .get("publicKeyMultibase")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| {
+                    SnapshotError::Malformed(
+                        "Multikey verification methods require publicKeyMultibase".into(),
+                    )
+                })?;
+
+            if object.contains_key("publicKeyJwk") {
+                return Err(SnapshotError::Malformed(
+                    "Multikey verification methods must not use publicKeyJwk".into(),
+                ));
+            }
+
+            serde_json::json!({
+                "type": "Multikey",
+                "publicKeyMultibase": public,
+            })
+        }
+        "JsonWebKey" => {
+            let public = object.get("publicKeyJwk").ok_or_else(|| {
+                SnapshotError::Malformed(
+                    "JsonWebKey verification methods require publicKeyJwk".into(),
+                )
+            })?;
+
+            if !public.is_object() {
+                return Err(SnapshotError::Malformed(
+                    "verification method publicKeyJwk must be a JSON object".into(),
+                ));
+            }
+            if object.contains_key("publicKeyMultibase") {
+                return Err(SnapshotError::Malformed(
+                    "JsonWebKey verification methods must not use publicKeyMultibase".into(),
+                ));
+            }
+
+            for private_member in ["d", "p", "q", "dp", "dq", "qi", "oth"] {
+                if public.get(private_member).is_some() {
+                    return Err(SnapshotError::Malformed(
+                        "public JWK verification material must not contain private key parameters"
+                            .into(),
+                    ));
+                }
+            }
+            if public.get("kty").and_then(Value::as_str).is_none() {
+                return Err(SnapshotError::Malformed(
+                    "public JWK verification material requires a string kty".into(),
+                ));
+            }
+
+            serde_json::json!({
+                "type": "JsonWebKey",
+                "publicKeyJwk": public,
+            })
+        }
+        other => {
+            return Err(SnapshotError::Malformed(format!(
+                "unsupported verification method type: {other}"
+            )));
+        }
+    };
+
+    let encoded = serde_json::json!([
+        "symthaea:verification-method-material:v1",
+        method_id.as_str(),
+        material
+    ]);
+    let bytes = serde_json::to_vec(&encoded)
+        .map_err(|_| SnapshotError::Malformed("verification method material serialization failed".into()))?;
+    Ok(sha256_hex(&bytes))
+}
+
 fn validate_snapshot_reference(value: &str) -> Result<(), SnapshotError> {
     let digest = value.strip_prefix("sha256:").ok_or_else(|| {
         SnapshotError::Malformed(
@@ -403,7 +491,15 @@ fn required_string<'a>(
 fn extract_verification_method(
     request: &VerificationRequest,
     document: &serde_json::Map<String, Value>,
-) -> Result<(ClaimControllerIdentity, VerificationMethodLifecycle), SnapshotError> {
+) -> Result<
+    (
+        ClaimControllerIdentity,
+        String,
+        String,
+        VerificationMethodLifecycle,
+    ),
+    SnapshotError,
+> {
     let methods = document
         .get("verificationMethod")
         .and_then(Value::as_array)
@@ -436,45 +532,11 @@ fn extract_verification_method(
         }
 
         let method_type = required_string(object, "type")?;
-        if object.contains_key("secretKeyJwk") || object.contains_key("secretKeyMultibase") {
-            return Err(SnapshotError::Malformed(
-                "public controller-document snapshots must not expose secret verification material"
-                    .into(),
-            ));
-        }
-        if object.contains_key("publicKeyJwk") && object.contains_key("publicKeyMultibase") {
-            return Err(SnapshotError::Malformed(
-                "verification methods must not contain multiple public verification material formats"
-                    .into(),
-            ));
-        }
-        if let Some(public_jwk) = object.get("publicKeyJwk") {
-            if !public_jwk.is_object() {
-                return Err(SnapshotError::Malformed(
-                    "verification method publicKeyJwk must be a JSON object when present".into(),
-                ));
-            }
-        }
-        if let Some(public_multibase) = object.get("publicKeyMultibase") {
-            if !public_multibase.is_string() {
-                return Err(SnapshotError::Malformed(
-                    "verification method publicKeyMultibase must be a string when present".into(),
-                ));
-            }
-        }
-        match method_type {
-            "Multikey" if object.contains_key("publicKeyJwk") => {
-                return Err(SnapshotError::Malformed(
-                    "Multikey verification methods must not use publicKeyJwk".into(),
-                ));
-            }
-            "JsonWebKey" if object.contains_key("publicKeyMultibase") => {
-                return Err(SnapshotError::Malformed(
-                    "JsonWebKey verification methods must not use publicKeyMultibase".into(),
-                ));
-            }
-            _ => {}
-        }
+        let material_digest = verification_method_material_digest(
+            &method_id,
+            method_type,
+            object,
+        )?;
 
         let controller = required_string(object, "controller")?;
         let controller = ClaimControllerIdentity::new(controller.to_owned())
@@ -482,7 +544,12 @@ fn extract_verification_method(
         let expires = optional_timestamp(object, "expires")?;
         let revoked = optional_timestamp(object, "revoked")?;
         let lifecycle = VerificationMethodLifecycle::new(expires.as_deref(), revoked.as_deref())?;
-        matching.push((controller, lifecycle));
+        matching.push((
+            controller,
+            method_type.to_owned(),
+            material_digest,
+            lifecycle,
+        ));
     }
 
     match matching.len() {
@@ -563,7 +630,8 @@ fn extract_relationship_methods(
                 }
             }
             if relationship_expires.is_some() || relationship_revoked.is_some() {
-                let (method_controller, lifecycle) = extract_verification_method(request, document)?;
+                let (method_controller, _, _, lifecycle) =
+                    extract_verification_method(request, document)?;
                 if let Some(expires) = relationship_expires {
                     if lifecycle.expires.as_deref() != Some(expires.as_str()) {
                         return Err(SnapshotError::Malformed(
