@@ -1331,6 +1331,33 @@ jobs:
             fi
           }
 
+  epf-verification:
+    name: EPF Verification Contract
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-epf-verification-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-epf-verification-
+
+      - name: Verify epistemic contract
+        run: cargo test -p symthaea-epistemic-types --lib verification_contract --locked -- --nocapture
+
+      - name: Verify durable snapshot adapter
+        run: cargo test -p symthaea-verification-adapter --all-targets --locked -- --nocapture
+
   sbom:
     name: SBOM Generation
     runs-on: ubuntu-latest
