@@ -450,9 +450,10 @@ mod tests {
             "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
             "1111111111111111111111111111111111111111111111111111111111111111",
             "2222222222222222222222222222222222222222222222222222222222222222",
-            "selector-v1",
+            "selector-v2",
             1,
             1.0,
+            2,
         )
         .unwrap();
         assert!(receipt
@@ -492,16 +493,18 @@ mod tests {
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-            "selector-v1",
+            "selector-v2",
             9,
             2.5,
+            3,
         )
         .unwrap();
         assert_eq!(
             receipt.scope,
             InquirySelectionScope::ExperimentSelectionOnly
         );
-        assert!((receipt.predicted_information_gain() - 2.5).abs() < f64::EPSILON);
+        assert!((receipt.predicted_disagreement_score() - 2.5).abs() < f64::EPSILON);
+        assert_eq!(receipt.prediction_count, 3);
         assert!(receipt.validate().is_ok());
     }
 
@@ -511,6 +514,21 @@ mod tests {
 
     fn energy() -> PhysicalType {
         PhysicalType::with_kind(QuantityKind::Energy, PhysicalDimension::ENERGY)
+    }
+
+    #[test]
+    fn inquiry_selection_rejects_insufficient_prediction_coverage() {
+        let result = ScientificInquirySelectionReceipt::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "selector-v2",
+            9,
+            2.5,
+            1,
+        );
+        assert!(result.is_err());
     }
 
     #[test]
