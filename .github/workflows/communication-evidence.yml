@@ -116,8 +116,8 @@ jobs:
           assert report["handling_policy_provenance_hash_valid"] is True
           assert report["first_packet_accepted"] is True
           assert report["exact_replay_detected"] is True
-           assert report["expired_replay_state_reclaimed"] is True
-           assert report["scheduled_revocation_honored"] is True
+          assert report["expired_replay_state_reclaimed"] is True
+          assert report["scheduled_revocation_honored"] is True
           assert report["tamper_detected"] is True
           assert report["unauthorized_channel_blocked"] is True
           assert report["expired_lease_blocked"] is True
@@ -128,7 +128,7 @@ jobs:
           assert report["insufficient_capability_blocked"] is True
 
           codec_report = json.loads(Path("target/communication-evidence/neurosemantic_hdc_codec_n0.json").read_text())
-           assert codec_report["binary_frame_roundtrip_exact"] is True
+          assert codec_report["binary_frame_roundtrip_exact"] is True
           assert codec_report["deterministic_repeat_exact"] is True
           assert codec_report["semantic_decoder_invoked"] is False
           assert codec_report["codec_descriptor"]["codec_id"] == "symthaea.hdc.continuous-sign-v1"
