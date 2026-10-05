@@ -383,10 +383,10 @@ mod hypothesis_handoff_tests {
         let ha = a.scientific_hypothesis_handoff(
             &energy,
             ModelMaturity::ResearchPrototype,
-            "obs",
-            "search",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             7,
-            "manifest",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             vec!["not qualification".into()],
         );
         let hb = b.scientific_hypothesis_handoff(
