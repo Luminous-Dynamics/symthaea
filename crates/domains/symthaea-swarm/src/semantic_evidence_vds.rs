@@ -224,7 +224,10 @@ impl Rfc9942Es256CoseKey {
         for (raw_key, raw_value) in entries {
             let mut key_reader=CborReader::new(&raw_key);
             let label=key_reader.read_cose_label_key()
-                .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                .map_err(|error|match error {
+                    Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                    _=>Rfc9942VdpError::InvalidEncoding,
+                })?;
             key_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             if !seen.insert(label.clone()) { return Err(Rfc9942VdpError::InvalidEs256CoseKey); }
 
@@ -780,7 +783,10 @@ impl Rfc9942ReceiptEnvelope {
         let mut protected_labels=std::collections::HashSet::new();
         for (raw_key,raw_value) in protected_entries{
             let mut key_reader=CborReader::new(&raw_key);
-            let label_key=key_reader.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            let label_key=key_reader.read_cose_label_key().map_err(|error|match error {
+                    Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                    _=>Rfc9942VdpError::InvalidEncoding,
+                })?;
             key_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             if !protected_labels.insert(label_key.clone()) { return Err(Rfc9942VdpError::InvalidStructure); }
             let label=match &label_key { CborLabelKey::Integer(value)=>Some(*value), CborLabelKey::Unsigned(_) | CborLabelKey::Negative(_) | CborLabelKey::Text(_)=>None };
@@ -807,7 +813,10 @@ impl Rfc9942ReceiptEnvelope {
                     let mut seen_crit=std::collections::HashSet::new();
                     for item in items{
                         let mut item_reader=CborReader::new(&item);
-                        let key=item_reader.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                        let key=item_reader.read_cose_label_key().map_err(|error|match error {
+                    Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                    _=>Rfc9942VdpError::InvalidEncoding,
+                })?;
                         item_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
                         if !seen_crit.insert(key.clone()){return Err(Rfc9942VdpError::InvalidStructure);}
                         crit_labels.push(key);
@@ -838,7 +847,10 @@ impl Rfc9942ReceiptEnvelope {
         let mut unprotected_labels=std::collections::HashSet::new();
         for (raw_key,raw_value) in unprotected_entries{
             let mut key_reader=CborReader::new(&raw_key);
-            let label_key=key_reader.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            let label_key=key_reader.read_cose_label_key().map_err(|error|match error {
+                    Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                    _=>Rfc9942VdpError::InvalidEncoding,
+                })?;
             key_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             if !unprotected_labels.insert(label_key.clone()) { return Err(Rfc9942VdpError::InvalidStructure); }
             let label=match &label_key { CborLabelKey::Integer(value)=>Some(*value), CborLabelKey::Unsigned(_) | CborLabelKey::Negative(_) | CborLabelKey::Text(_)=>None };
@@ -1025,7 +1037,10 @@ impl Rfc9942SignatureWithReceipts {
         let mut seen_labels=std::collections::HashSet::new();
         for (raw_key,raw_value) in entries {
             let mut key_reader=CborReader::new(&raw_key);
-            let label=key_reader.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            let label=key_reader.read_cose_label_key().map_err(|error|match error {
+                    Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                    _=>Rfc9942VdpError::InvalidEncoding,
+                })?;
             key_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             if !seen_labels.insert(label.clone()) {
                 return Err(Rfc9942VdpError::InvalidStructure);
@@ -1264,7 +1279,10 @@ impl Rfc9942SignatureWithReceipts {
         for (raw_key,raw_value) in protected_entries {
             let mut key_reader=CborReader::new(&raw_key);
             let label_key=key_reader.read_cose_label_key()
-                .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                .map_err(|error|match error {
+                    Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                    _=>Rfc9942VdpError::InvalidEncoding,
+                })?;
             key_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             if !protected_labels.insert(label_key.clone()) {
                 return Err(Rfc9942VdpError::InvalidStructure);
@@ -1297,7 +1315,10 @@ impl Rfc9942SignatureWithReceipts {
                 for item in items {
                     let mut item_reader=CborReader::new(&item);
                     let key=item_reader.read_cose_label_key()
-                        .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                        .map_err(|error|match error {
+                    Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                    _=>Rfc9942VdpError::InvalidEncoding,
+                })?;
                     item_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
                     if !seen_crit.insert(key.clone()) {
                         return Err(Rfc9942VdpError::InvalidStructure);
@@ -2422,7 +2443,14 @@ impl<'a> CborReader<'a> {
                     Ok(CborLabelKey::Negative(argument))
                 }
             },
-            3 => self.read_text_bounded(256).map(CborLabelKey::Text),
+            3 => self.read_text_bounded(256)
+                .map(CborLabelKey::Text)
+                .map_err(|error| match error {
+                    Rfc9162ProofDecodeError::InvalidStructure => {
+                        Rfc9162ProofDecodeError::ResourceLimitExceeded
+                    }
+                    other => other,
+                }),
             _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
         }
     }
@@ -4889,6 +4917,36 @@ mod tests {
         assert_eq!(
             Rfc9942SignatureWithReceipts::from_cbor(&bytes),
             Err(Rfc9942VdpError::InvalidEncoding)
+        );
+    }
+
+    #[test]
+    fn rfc9942_cose_text_label_resource_limit_is_typed() {
+        let mut key = Vec::new();
+        cbor_map_len(&mut key, 1);
+        cbor_text(&mut key, &vec![b'x'; 257]);
+        cbor_uint(&mut key, 0);
+
+        assert_eq!(
+            Rfc9942Es256CoseKey::from_cbor(&key),
+            Err(Rfc9942VdpError::ResourceLimitExceeded)
+        );
+
+        let mut outer = Vec::new();
+        cbor_tag(&mut outer, COSE_SIGN1_TAG);
+        cbor_array_len(&mut outer, 4);
+        let mut protected = Vec::new();
+        cbor_map_len(&mut protected, 1);
+        cbor_text(&mut protected, &vec![b'x'; 257]);
+        cbor_uint(&mut protected, 0);
+        cbor_bytes(&mut outer, &protected);
+        cbor_map_len(&mut outer, 0);
+        outer.push(0xf6);
+        cbor_bytes(&mut outer, &[0; 64]);
+
+        assert_eq!(
+            Rfc9942SignatureWithReceipts::from_cbor(&outer),
+            Err(Rfc9942VdpError::ResourceLimitExceeded)
         );
     }
 
