@@ -16,6 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod discovery_handoff;
 pub mod physical_type;
 pub mod threshold_overrides;
 
