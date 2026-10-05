@@ -371,6 +371,7 @@ pub enum PhonologicalPlanError {
     LexicalBindingWithoutSegments,
     LexicalBindingWithoutProvenance,
     EmptyLexicalProvenance,
+    InvalidLexicalProvenanceFormat,
     NonLexicalProvenance,
     SyllableSummaryMismatch,
     PhonologicalBindingWithoutSegments,
