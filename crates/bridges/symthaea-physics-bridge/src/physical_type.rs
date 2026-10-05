@@ -41,6 +41,81 @@ fn derived_kind_div(a: QuantityKind, b: QuantityKind) -> QuantityKind {
     }
 }
 
+fn derived_kind_add(a: QuantityKind, b: QuantityKind) -> QuantityKind {
+    use QuantityKind::*;
+    match (a, b) {
+        (Temperature, TemperatureDifference)
+        | (TemperatureDifference, Temperature) => Temperature,
+        (TemperatureDifference, TemperatureDifference) => TemperatureDifference,
+        (left, right) if left == right => left,
+        _ => Unknown,
+    }
+}
+
+fn derived_kind_sub(a: QuantityKind, b: QuantityKind) -> QuantityKind {
+    use QuantityKind::*;
+    match (a, b) {
+        (Temperature, Temperature) => TemperatureDifference,
+        (Temperature, TemperatureDifference) => Temperature,
+        (TemperatureDifference, TemperatureDifference) => TemperatureDifference,
+        (left, right) if left == right => left,
+        _ => Unknown,
+    }
+}
+
+fn additive_result(
+    left: &PhysicalType,
+    right: &PhysicalType,
+    operation: BinOp,
+) -> TypeJudgement<PhysicalType> {
+    let (Some(left_dimension), Some(right_dimension)) = (left.dimension, right.dimension) else {
+        return TypeJudgement::Unknown(
+            "one or both additive operands have unknown physical type".into(),
+        );
+    };
+    if left_dimension != right_dimension {
+        return TypeJudgement::Invalid(PhysicalTypeError {
+            operation: "add/sub".into(),
+            reason: "operands require compatible physical kind and dimension".into(),
+        });
+    }
+
+    if left.kind == QuantityKind::Unknown || right.kind == QuantityKind::Unknown {
+        return valid(left.clone());
+    }
+
+    let result_kind = match operation {
+        BinOp::Add => derived_kind_add(left.kind, right.kind),
+        BinOp::Sub => derived_kind_sub(left.kind, right.kind),
+        _ => unreachable!("additive_result only accepts add/sub"),
+    };
+
+    if result_kind == QuantityKind::Unknown {
+        return TypeJudgement::Invalid(PhysicalTypeError {
+            operation: "add/sub".into(),
+            reason: "operands require compatible physical kind and dimension".into(),
+        });
+    }
+
+    let mut result = if result_kind == left.kind && operation == BinOp::Add {
+        left.clone()
+    } else if result_kind == right.kind && operation == BinOp::Add {
+        right.clone()
+    } else {
+        PhysicalType::with_kind(result_kind, left_dimension)
+    };
+
+    // Subtracting two absolute temperatures yields a temperature difference.
+    // Do not carry a Celsius/Fahrenheit affine offset into the delta result.
+    if result_kind == QuantityKind::TemperatureDifference
+        && (left.kind == QuantityKind::Temperature || right.kind == QuantityKind::Temperature)
+    {
+        result.unit = None;
+    }
+
+    TypeJudgement::Valid(result)
+}
+
 fn kind_from_dimension(d: DimensionalSignature) -> QuantityKind {
     use QuantityKind::*;
     if d.is_dimensionless() { Dimensionless }
@@ -185,7 +260,7 @@ where
             }
         }
 
-        Expr::BinOp(Add, left, right) | Expr::BinOp(Sub, left, right) => {
+        Expr::BinOp(Add, left, right) => {
             let l = match infer_expr_type_with_lookup(left, lookup) {
                 TypeJudgement::Valid(t) => t,
                 other => return other,
@@ -194,20 +269,19 @@ where
                 TypeJudgement::Valid(t) => t,
                 other => return other,
             };
-            match (l.dimension, r.dimension) {
-                (Some(ld), Some(rd)) if ld == rd
-                    && (l.kind == Unknown || r.kind == Unknown || l.kind == r.kind) =>
-                {
-                    valid(l)
-                }
-                (Some(_), Some(_)) => TypeJudgement::Invalid(PhysicalTypeError {
-                    operation: "add/sub".into(),
-                    reason: "operands require compatible physical kind and dimension".into(),
-                }),
-                _ => TypeJudgement::Unknown(
-                    "one or both additive operands have unknown physical type".into(),
-                ),
-            }
+            additive_result(&l, &r, Add)
+        }
+
+        Expr::BinOp(Sub, left, right) => {
+            let l = match infer_expr_type_with_lookup(left, lookup) {
+                TypeJudgement::Valid(t) => t,
+                other => return other,
+            };
+            let r = match infer_expr_type_with_lookup(right, lookup) {
+                TypeJudgement::Valid(t) => t,
+                other => return other,
+            };
+            additive_result(&l, &r, Sub)
         }
 
         Expr::BinOp(Mul, left, right) => {
@@ -342,6 +416,84 @@ mod tests {
             ("E".into(), DimensionalSignature::ENERGY),
             ("x".into(), DimensionalSignature::LENGTH),
         ])
+    }
+
+    #[test]
+    fn temperature_subtraction_yields_temperature_difference() {
+        let absolute = PhysicalType::with_kind(
+            QuantityKind::Temperature,
+            PhysicalDimension::TEMPERATURE,
+        );
+        let expr = Expr::BinOp(
+            BinOp::Sub,
+            Box::new(Expr::Var("t1".into())),
+            Box::new(Expr::Var("t2".into())),
+        );
+        let variables = HashMap::from([
+            ("t1".into(), absolute.clone()),
+            ("t2".into(), absolute),
+        ]);
+
+        match infer_expr_type_with_variables(&expr, &variables) {
+            TypeJudgement::Valid(result) => {
+                assert_eq!(result.kind, QuantityKind::TemperatureDifference);
+                assert_eq!(result.dimension, Some(PhysicalDimension::TEMPERATURE));
+                assert!(result.unit.is_none());
+            }
+            other => panic!("unexpected temperature subtraction judgment: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn temperature_plus_difference_yields_absolute_temperature() {
+        let absolute = PhysicalType::with_kind(
+            QuantityKind::Temperature,
+            PhysicalDimension::TEMPERATURE,
+        );
+        let difference = PhysicalType::with_kind(
+            QuantityKind::TemperatureDifference,
+            PhysicalDimension::TEMPERATURE,
+        );
+        let expr = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Var("t".into())),
+            Box::new(Expr::Var("dt".into())),
+        );
+        let variables = HashMap::from([
+            ("t".into(), absolute.clone()),
+            ("dt".into(), difference),
+        ]);
+
+        match infer_expr_type_with_variables(&expr, &variables) {
+            TypeJudgement::Valid(result) => assert_eq!(result.kind, QuantityKind::Temperature),
+            other => panic!("unexpected temperature addition judgment: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn temperature_difference_minus_absolute_temperature_is_invalid() {
+        let difference = PhysicalType::with_kind(
+            QuantityKind::TemperatureDifference,
+            PhysicalDimension::TEMPERATURE,
+        );
+        let absolute = PhysicalType::with_kind(
+            QuantityKind::Temperature,
+            PhysicalDimension::TEMPERATURE,
+        );
+        let expr = Expr::BinOp(
+            BinOp::Sub,
+            Box::new(Expr::Var("dt".into())),
+            Box::new(Expr::Var("t".into())),
+        );
+        let variables = HashMap::from([
+            ("dt".into(), difference),
+            ("t".into(), absolute),
+        ]);
+
+        assert!(matches!(
+            infer_expr_type_with_variables(&expr, &variables),
+            TypeJudgement::Invalid(_)
+        ));
     }
 
     #[test]
