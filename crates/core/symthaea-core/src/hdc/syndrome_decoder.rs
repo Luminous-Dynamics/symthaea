@@ -47,6 +47,11 @@ pub enum BoundedDistanceDecode {
     /// No error pattern at or below the requested bound has the received
     /// syndrome, so the observation is not decoded by this bounded search.
     NoMatchWithinBound { max_error_weight: usize },
+    /// The observation length does not match the code block length.
+    InvalidObservationDimension {
+        observation_dimension: usize,
+        dimension: usize,
+    },
     /// The requested bound exceeds the ambient block length.
     InvalidBound {
         max_error_weight: usize,
