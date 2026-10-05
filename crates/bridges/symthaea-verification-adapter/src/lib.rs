@@ -381,7 +381,7 @@ fn verification_method_material_digest(
     method_type: &str,
     object: &serde_json::Map<String, Value>,
 ) -> Result<String, SnapshotError> {
-    let material = match method_type {
+    let material_bytes = match method_type {
         "Multikey" => {
             let public = object
                 .get("publicKeyMultibase")
@@ -399,10 +399,8 @@ fn verification_method_material_digest(
                 ));
             }
 
-            serde_json::json!({
-                "type": "Multikey",
-                "publicKeyMultibase": public,
-            })
+            serde_json::to_vec(&("Multikey", public))
+                .map_err(|_| SnapshotError::Malformed("verification method material serialization failed".into()))?
         }
         "JsonWebKey" => {
             let public = object.get("publicKeyJwk").ok_or_else(|| {
@@ -411,11 +409,12 @@ fn verification_method_material_digest(
                 )
             })?;
 
-            if !public.is_object() {
-                return Err(SnapshotError::Malformed(
+            let public_object = public.as_object().ok_or_else(|| {
+                SnapshotError::Malformed(
                     "verification method publicKeyJwk must be a JSON object".into(),
-                ));
-            }
+                )
+            })?;
+
             if object.contains_key("publicKeyMultibase") {
                 return Err(SnapshotError::Malformed(
                     "JsonWebKey verification methods must not use publicKeyMultibase".into(),
@@ -423,23 +422,26 @@ fn verification_method_material_digest(
             }
 
             for private_member in ["d", "p", "q", "dp", "dq", "qi", "oth"] {
-                if public.get(private_member).is_some() {
+                if public_object.get(private_member).is_some() {
                     return Err(SnapshotError::Malformed(
                         "public JWK verification material must not contain private key parameters"
                             .into(),
                     ));
                 }
             }
-            if public.get("kty").and_then(Value::as_str).is_none() {
+            if public_object.get("kty").and_then(Value::as_str).is_none() {
                 return Err(SnapshotError::Malformed(
                     "public JWK verification material requires a string kty".into(),
                 ));
             }
 
-            serde_json::json!({
-                "type": "JsonWebKey",
-                "publicKeyJwk": public,
-            })
+            let canonical_jwk: std::collections::BTreeMap<String, Value> = public_object
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect();
+
+            serde_json::to_vec(&("JsonWebKey", canonical_jwk))
+                .map_err(|_| SnapshotError::Malformed("verification method material serialization failed".into()))?
         }
         other => {
             return Err(SnapshotError::Malformed(format!(
@@ -448,11 +450,12 @@ fn verification_method_material_digest(
         }
     };
 
-    let encoded = serde_json::json!([
+    let encoded = (
         "symthaea:verification-method-material:v1",
         method_id.as_str(),
-        material
-    ]);
+        method_type,
+        material_bytes,
+    );
     let bytes = serde_json::to_vec(&encoded)
         .map_err(|_| SnapshotError::Malformed("verification method material serialization failed".into()))?;
     Ok(sha256_hex(&bytes))
@@ -926,6 +929,52 @@ mod tests {
             adapter.resolve_snapshot(&request, snapshot),
             Err(SnapshotError::SnapshotReferenceMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn jwk_material_digest_is_independent_of_json_member_order() {
+        let first: Value = serde_json::from_str(
+            r##"{"kty":"OKP","crv":"Ed25519","x":"VCpo2LMLhn6iWku8MKvSLg2ZAoC-nlOyPVQaO3FxVeQ","kid":"one"}"##
+        )
+        .unwrap();
+        let second: Value = serde_json::from_str(
+            r##"{"kid":"one","x":"VCpo2LMLhn6iWku8MKvSLg2ZAoC-nlOyPVQaO3FxVeQ","kty":"OKP","crv":"Ed25519"}"##
+        )
+        .unwrap();
+
+        let first_object = serde_json::json!({
+            "id": "https://example.test/controller#jwk-1",
+            "type": "JsonWebKey",
+            "controller": "https://example.test/controller",
+            "publicKeyJwk": first
+        });
+        let second_object = serde_json::json!({
+            "id": "https://example.test/controller#jwk-1",
+            "type": "JsonWebKey",
+            "controller": "https://example.test/controller",
+            "publicKeyJwk": second
+        });
+
+        let a = verification_method_material_digest(
+            &ClaimVerificationMethod::new(
+                "https://example.test/controller#jwk-1"
+            )
+            .unwrap(),
+            "JsonWebKey",
+            first_object.as_object().unwrap(),
+        )
+        .unwrap();
+        let b = verification_method_material_digest(
+            &ClaimVerificationMethod::new(
+                "https://example.test/controller#jwk-1"
+            )
+            .unwrap(),
+            "JsonWebKey",
+            second_object.as_object().unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(a, b);
     }
 
     #[test]
