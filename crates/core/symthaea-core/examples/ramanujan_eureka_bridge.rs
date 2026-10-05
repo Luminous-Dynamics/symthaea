@@ -154,6 +154,13 @@ fn main() {
     )
     .expect("execution receipt should be structurally valid");
     assert!(execution.validate_against_selection(&selection).is_ok());
+    assert!(execution
+        .validate_against_selection_and_observation(
+            &selection,
+            &prediction_frame,
+            &prediction_frame,
+        )
+        .is_ok());
 
     // A later revision is a new lineage, never a mutation of the original handoff.
     let revised = ScientificHypothesisHandoff::new(
