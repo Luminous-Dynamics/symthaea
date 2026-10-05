@@ -1089,6 +1089,8 @@ pub const VERIFICATION_CONTEXT_V5_VERSION: &str =
     "symthaea-observation-verification-context-v5";
 /// Versioned annotation/provenance record for evaluator, trust-root, and authorization identities.
 pub const EVALUATION_CONTEXT_SUPPLEMENT_VERSION: &str =
+    "symthaea-observation-evaluation-context-supplement-v2";
+const LEGACY_EVALUATION_CONTEXT_SUPPLEMENT_V1_VERSION: &str =
     "symthaea-observation-evaluation-context-supplement-v1";
 pub const EVALUATION_CONTEXT_SUPPLEMENT_ATTACHMENT_PHASE: &str = "post-evaluation";
 /// Future evaluation representation that separates execution context from supplemental annotations.
@@ -1462,7 +1464,7 @@ impl EvaluationContextSupplement {
 
         let mut bytes = Vec::new();
         bytes.extend_from_slice(
-            b"symthaea:observation-evaluation-context-supplement:v1\n",
+            b"symthaea:observation-evaluation-context-supplement:v2\n",
         );
         write_string(&mut bytes, self.supplement_version);
         write_string(&mut bytes, self.attachment_phase);
@@ -1488,7 +1490,7 @@ impl EvaluationContextSupplement {
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:observation-evaluation-context-supplement:v1\n");
+        hasher.update(b"symthaea:observation-evaluation-context-supplement:v2\n");
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
@@ -6274,6 +6276,22 @@ mod tests {
         evaluation.context.verifier_version = "attacker-verifier-version";
         evaluation.context_fingerprint = evaluation.context.fingerprint();
         assert!(!evaluation.is_well_formed());
+    }
+
+    #[test]
+    fn v9_supplement_contract_uses_explicit_v2_identity() {
+        assert_eq!(
+            EVALUATION_CONTEXT_SUPPLEMENT_VERSION,
+            "symthaea-observation-evaluation-context-supplement-v2"
+        );
+        assert_eq!(
+            LEGACY_EVALUATION_CONTEXT_SUPPLEMENT_V1_VERSION,
+            "symthaea-observation-evaluation-context-supplement-v1"
+        );
+        assert_eq!(
+            EvaluationContextSupplement::empty().attachment_phase,
+            EVALUATION_CONTEXT_SUPPLEMENT_ATTACHMENT_PHASE
+        );
     }
 
     #[test]
