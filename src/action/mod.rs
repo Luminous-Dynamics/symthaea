@@ -637,7 +637,7 @@ pub fn classify_remote_command_capability(
 
     match program.as_str() {
         "pwd" | "echo" | "true" | "false" | "date" | "whoami" | "id" | "uname" | "hostname"
-        | "printenv" | "env" | "ls" | "cat" | "head" | "tail" | "stat" | "which" | "rg"
+        | "printenv" | "ls" | "cat" | "head" | "tail" | "stat" | "which" | "rg"
         | "grep" | "find" | "journalctl" | "ps" | "df" | "du" | "free" | "sleep" => {
             Ok(RemoteCommandCapability::ReadOnly)
         }
