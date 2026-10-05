@@ -283,6 +283,21 @@ impl ScientificInquirySelectionReceipt {
         blake3::hash(&self.canonical_bytes()).to_hex().to_string()
     }
 
+    pub fn validate_against(
+        &self,
+        hypothesis_handoff: &ScientificHypothesisHandoff,
+        hypothesis_set_digest: &str,
+    ) -> Result<(), String> {
+        self.validate()?;
+        if self.hypothesis_handoff_digest != hypothesis_handoff.digest_hex() {
+            return Err("inquiry selection is bound to a different hypothesis handoff".into());
+        }
+        if self.hypothesis_set_digest != hypothesis_set_digest {
+            return Err("inquiry selection is bound to a different hypothesis set".into());
+        }
+        Ok(())
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_revision != Self::SCHEMA_REVISION {
             return Err("unsupported inquiry selection schema revision".into());
@@ -341,6 +356,42 @@ mod tests {
             scientific_hypothesis_set_digest(&[a.clone(), b.clone()]),
             scientific_hypothesis_set_digest(&[b, a])
         );
+    }
+
+    #[test]
+    fn inquiry_selection_cross_link_validation_rejects_wrong_handoff() {
+        let energy = energy();
+        let h1 = ScientificHypothesisHandoff::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &energy,
+            ModelMaturity::ResearchPrototype,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            1,
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+        let h2 = h1.clone().with_challenge_manifest(
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        );
+        let receipt = ScientificInquirySelectionReceipt::new(
+            h1.digest_hex(),
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "1111111111111111111111111111111111111111111111111111111111111111",
+            "2222222222222222222222222222222222222222222222222222222222222222",
+            "selector-v1",
+            1,
+            1.0,
+        )
+        .unwrap();
+        assert!(receipt
+            .validate_against(&h1, "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+            .is_ok());
+        assert!(receipt
+            .validate_against(&h2, "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+            .is_err());
     }
 
     #[test]
