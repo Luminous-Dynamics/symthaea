@@ -1,7 +1,8 @@
 //! Session 18: does Kepler macro priming accelerate PCR3BP autonomous
 //! discovery?
 //!
-//! A/B benchmark over N seeds: runs `discover_invariants_autonomous_with_seed_templates`
+//! A/B benchmark over N seeds: runs the true-cold entry point for the unprimed arm
+//! and the seeded entry point for the primed arm
 //! on the Planar Circular Restricted Three-Body Problem (PCR3BP) in two conditions:
 //!
 //! - **cold**: no `extra_seed_templates`
@@ -32,7 +33,7 @@
 
 use symthaea_core::hdc::conjecture_engine::{
     AutonomousInvariant, BinOp, Expr, RegressorConfig, UnaryFn,
-    discover_invariants_autonomous_with_seed_templates,
+    discover_invariants_autonomous_cold, discover_invariants_autonomous_with_seed_templates,
 };
 
 const SEEDS: &[u64] = &[42, 1337, 2718, 7919, 31415];
@@ -219,16 +220,31 @@ fn run_s25(
         prior_fragment_bonus: fragment_bonus,
         ..RegressorConfig::default()
     };
-    discover_invariants_autonomous_with_seed_templates(
-        pcr3bp_rhs,
-        &[0.8, 0.1, 0.05, 0.3],
-        &["x", "y", "vx", "vy"],
-        None,
-        &config,
-        T_MAX,
-        DT,
-        priors,
-    )
+    if priors.is_empty() {
+        // The true cold arm must bypass the built-in invariant-template library.
+        // Passing an empty slice to the seeded API is NOT sufficient because the
+        // seeded API still injects built-in templates.
+        discover_invariants_autonomous_cold(
+            pcr3bp_rhs,
+            &[0.8, 0.1, 0.05, 0.3],
+            &["x", "y", "vx", "vy"],
+            None,
+            &config,
+            T_MAX,
+            DT,
+        )
+    } else {
+        discover_invariants_autonomous_with_seed_templates(
+            pcr3bp_rhs,
+            &[0.8, 0.1, 0.05, 0.3],
+            &["x", "y", "vx", "vy"],
+            None,
+            &config,
+            T_MAX,
+            DT,
+            priors,
+        )
+    }
 }
 
 #[derive(Debug, Clone)]
