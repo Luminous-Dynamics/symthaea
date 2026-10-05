@@ -229,8 +229,13 @@ impl JsonControllerDocumentSnapshotAdapter {
             ));
         }
 
+        let snapshot_value = strict_json::parse_strict_json(&bytes).map_err(|error| {
+            SnapshotError::Malformed(format!(
+                "snapshot file is not valid strict I-JSON in the expected envelope: {error}"
+            ))
+        })?;
         let snapshot: ControllerDocumentSnapshotFile =
-            serde_json::from_slice(&bytes).map_err(|error| {
+            serde_json::from_value(snapshot_value).map_err(|error| {
                 SnapshotError::Malformed(format!(
                     "snapshot file is not valid JSON in the expected envelope: {error}"
                 ))
