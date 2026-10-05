@@ -103,7 +103,7 @@ impl Watchdog {
         }
     }
 
-    /// Monitor the system after a rebuild. Blocks until a verdict is reached.
+    /// Monitor the system after a rebuild until a verdict is reached.
     ///
     /// # Arguments
     /// * `codebook` — shared codebook for encoding system state as HDC vectors
@@ -136,7 +136,7 @@ impl Watchdog {
             }
 
             // Wait for check interval
-            std::thread::sleep(self.config.check_interval);
+            tokio::time::sleep(self.config.check_interval).await;
             checks_performed += 1;
 
             // Take a snapshot
