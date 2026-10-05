@@ -63,7 +63,7 @@ The resolution also binds the exact public verification-material identity so a d
 
 The `eddsa-jcs-2022` path is intentionally a single-suite profile. It requires `DataIntegrityProof`, `eddsa-jcs-2022`, `verificationMethod`, `proofPurpose`, base58-btc `proofValue`, and an Ed25519 `Multikey` carrying the `0xed01` multicodec header. The resolver also recognizes the normative CID public Multikey headers and rejects private-key encodings as public material. Its cryptographic input is exactly `SHA-256(proofConfig) || SHA-256(transformedDocument)`, followed by pure Ed25519 verification. The typed receipt records the canonical-document digest, proof-configuration digest, the digest of that 64-byte cryptographic input, the full proof identity, and the detached proof value.
 
-The wire entry point additionally enforces the strict I-JSON boundary before canonicalization: duplicate object properties, Unicode surrogate/noncharacter code points, and trailing JSON data are rejected. For `eddsa-jcs-2022`, the caller must also bind the exact expected transformed-document SHA-256 digest into the `VerificationRequest`; the adapter refuses to verify when that binding is absent or mismatched, and the typed cryptographic receipt preserves it for replay/audit.
+The wire and programmatic entry points enforce the same strict I-JSON boundary before canonicalization: duplicate object properties, Unicode surrogate/noncharacter code points, non-IEEE-754-exact integers, and trailing JSON data are rejected. For `eddsa-jcs-2022`, the caller must also bind the exact expected transformed-document SHA-256 digest into the `VerificationRequest`; the adapter refuses to verify when that binding is absent or mismatched, and the typed cryptographic receipt preserves it for replay/audit.
 
 The implementation deliberately does not claim conformance to the complete W3C Verifiable Credential Data Integrity processing model. It implements the specified `eddsa-jcs-2022` cryptographic core and keeps the controller-document/admission/replay boundaries explicit.
 
@@ -72,3 +72,8 @@ The optional `digestMultibase` receipt artifact is aligned with the W3C Verifiab
 ## CI
 
 The repository sub-crate matrix includes both `symthaea-epistemic-types` and `symthaea-verification-adapter`, so these contracts are exercised by ordinary CI rather than existing only as locally targeted tests.
+
+
+## Standards status
+
+The concrete `eddsa-jcs-2022` cryptographic core targets the W3C Data Integrity EdDSA Cryptosuites v1.0 Recommendation published 15 May 2025. The broader Data Integrity 1.1 document is still a Working Draft as of 30 September 2026, so this crate does not claim v1.1 processor conformance.
