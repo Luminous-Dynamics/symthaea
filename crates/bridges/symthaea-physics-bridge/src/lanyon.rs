@@ -512,6 +512,15 @@ impl LanyonVerificationReceipt {
         Ok(())
     }
 
+    pub fn validate_against_bundle(&self, bundle: &LanyonSpecificationBundle) -> Result<(), String> {
+        self.validate()?;
+        bundle.validate()?;
+        if self.bundle_digest != bundle.digest_hex()? {
+            return Err("verification receipt references a different solver bundle".into());
+        }
+        Ok(())
+    }
+
     pub fn canonical_bytes(&self) -> Vec<u8> {
         serde_json::to_vec(self).expect("Lanyon verification receipt serialization is infallible")
     }
@@ -825,6 +834,25 @@ mod tests {
 
         assert_eq!(receipt.bundle_digest, bundle.digest_hex().unwrap());
         assert!(receipt.validate().is_ok());
+    }
+
+    #[test]
+    fn verification_receipt_rejects_a_different_bundle() {
+        let first = LanyonSpecificationBundle::new(fixture(), Vec::new()).unwrap();
+        let mut second_spec = fixture();
+        second_spec.name = "different-system".into();
+        let second = LanyonSpecificationBundle::new(second_spec, Vec::new()).unwrap();
+        let receipt = LanyonVerificationReceipt::new(
+            &first,
+            LanyonVerificationStatus::NotObserved,
+            "lanyon",
+            "public-verifier-v1",
+            vec!["no verification observed".into()],
+            Vec::new(),
+        ).unwrap();
+
+        assert!(receipt.validate_against_bundle(&first).is_ok());
+        assert!(receipt.validate_against_bundle(&second).is_err());
     }
 
     #[test]
