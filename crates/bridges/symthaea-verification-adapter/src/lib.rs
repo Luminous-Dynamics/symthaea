@@ -16,6 +16,10 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+mod eddsa_jcs_2022;
+
+pub use eddsa_jcs_2022::{verify_eddsa_jcs_2022, EDDSA_JCS_2022};
+
 use symthaea_epistemic_types::{
     ClaimControllerDocumentIdentity, ClaimControllerIdentity, ClaimVerificationMethod,
     FederationDependency,
@@ -426,7 +430,7 @@ fn sha256_multibase(hex_digest: &str) -> Result<String, SnapshotError> {
     Ok(format!("z{}", bs58::encode(multihash).into_string()))
 }
 
-fn verification_method_material_digest(
+pub(crate) fn verification_method_material_digest(
     method_id: &ClaimVerificationMethod,
     method_type: &str,
     object: &serde_json::Map<String, Value>,
