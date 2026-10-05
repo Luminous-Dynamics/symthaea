@@ -612,6 +612,130 @@ pub fn discover_invariants_autonomous_cold(
     )
 }
 
+/// Independent holdout assessment for an invariant discovered by the autonomous
+/// search.
+///
+/// The holdout initial conditions are generated from a caller-supplied seed that
+/// must be kept distinct from the search seed. No search result is used to
+/// construct the holdout trajectories. A passing result is generalization
+/// evidence only; it is not a symbolic or formal proof.
+#[derive(Debug, Clone)]
+pub struct AutonomousHoldoutValidation {
+    /// Seed used only for holdout initial-condition generation.
+    pub holdout_seed: u64,
+    /// Number of holdout trajectories requested.
+    pub requested_trajectories: usize,
+    /// Number of trajectories with enough finite samples to score.
+    pub trajectories_checked: usize,
+    /// Largest Lie-derivative variance observed across checked holdouts.
+    pub max_lie_derivative_variance: f64,
+    /// Median Lie-derivative variance across checked holdouts.
+    pub median_lie_derivative_variance: f64,
+    /// Maximum allowed Lie-derivative variance.
+    pub threshold: f64,
+    /// True only when every requested trajectory was checkable and stayed
+    /// below the supplied threshold.
+    pub passed: bool,
+}
+
+/// Validate one candidate on fresh trajectories generated independently from
+/// the discovery trajectories.
+///
+/// holdout_seed is intentionally explicit so experiment records can bind the
+/// validation split independently from RegressorConfig::seed.
+pub fn validate_invariant_holdout(
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    candidate: &Expr,
+    initial_state: &[f64],
+    var_names: &[&str],
+    t_max: f64,
+    dt: f64,
+    holdout_trajectories: usize,
+    holdout_seed: u64,
+    threshold: f64,
+) -> AutonomousHoldoutValidation {
+    assert_eq!(var_names.len(), initial_state.len());
+
+    let requested = holdout_trajectories;
+    if requested == 0 {
+        return AutonomousHoldoutValidation {
+            holdout_seed,
+            requested_trajectories: 0,
+            trajectories_checked: 0,
+            max_lie_derivative_variance: f64::MAX,
+            median_lie_derivative_variance: f64::MAX,
+            threshold,
+            passed: false,
+        };
+    }
+
+    let sample_orbit = |ic: &[f64]| -> Option<Vec<Vec<f64>>> {
+        let (_t, states) = rk45_trajectory(rhs, ic, t_max, dt);
+        let n_samples = 200.min(states.len());
+        if n_samples < 20 {
+            return None;
+        }
+        let step = states.len() / n_samples.max(1);
+        Some(
+            states
+                .iter()
+                .step_by(step.max(1))
+                .take(n_samples)
+                .cloned()
+                .collect(),
+        )
+    };
+
+    let mut prng = holdout_seed;
+    let mut variances = Vec::with_capacity(requested);
+    for _ in 0..requested {
+        let mut ic = initial_state.to_vec();
+        for x in &mut ic {
+            prng = lcg_step(prng);
+            let u = (prng as f64 / u64::MAX as f64) * 2.0 - 1.0;
+            let scale = x.abs().max(0.05);
+            *x += u * 0.25 * scale;
+        }
+        let Some(orbit) = sample_orbit(&ic) else {
+            continue;
+        };
+        let variance = lie_derivative_variance(candidate, rhs, &orbit, var_names);
+        if variance.is_finite() {
+            variances.push(variance);
+        }
+    }
+
+    if variances.len() != requested || variances.is_empty() {
+        return AutonomousHoldoutValidation {
+            holdout_seed,
+            requested_trajectories: requested,
+            trajectories_checked: variances.len(),
+            max_lie_derivative_variance: variances.iter().copied().fold(0.0, f64::max),
+            median_lie_derivative_variance: f64::MAX,
+            threshold,
+            passed: false,
+        };
+    }
+
+    variances.sort_by(f64::total_cmp);
+    let max_variance = variances.last().copied().unwrap_or(f64::MAX);
+    let mid = variances.len() / 2;
+    let median = if variances.len() % 2 == 0 {
+        (variances[mid - 1] + variances[mid]) * 0.5
+    } else {
+        variances[mid]
+    };
+
+    AutonomousHoldoutValidation {
+        holdout_seed,
+        requested_trajectories: requested,
+        trajectories_checked: variances.len(),
+        max_lie_derivative_variance: max_variance,
+        median_lie_derivative_variance: median,
+        threshold,
+        passed: max_variance <= threshold,
+    }
+}
 pub fn discover_invariants_autonomous_with_seed_templates(
     rhs: fn(&[f64], f64) -> Vec<f64>,
     initial_state: &[f64],
@@ -1542,6 +1666,67 @@ fn find_lyapunov_candidate(
 }
 
 
+#[cfg(test)]
+mod holdout_validation_tests {
+    use super::*;
+
+    fn harmonic_rhs(s: &[f64], _t: f64) -> Vec<f64> {
+        vec![s[1], -s[0]]
+    }
+
+    #[test]
+    fn holdout_rejects_nonconserved_candidate() {
+        let candidate = Expr::Var("x".into());
+        let result = validate_invariant_holdout(
+            harmonic_rhs,
+            &candidate,
+            &[1.0, 0.2],
+            &["x", "v"],
+            1.0,
+            0.02,
+            4,
+            0x1234_5678,
+            1e-8,
+        );
+
+        assert_eq!(result.requested_trajectories, 4);
+        assert_eq!(result.trajectories_checked, 4);
+        assert!(!result.passed);
+        assert!(result.max_lie_derivative_variance > result.threshold);
+    }
+
+    #[test]
+    fn holdout_validates_harmonic_energy_on_fresh_initial_conditions() {
+        let candidate = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("x".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("v".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let result = validate_invariant_holdout(
+            harmonic_rhs,
+            &candidate,
+            &[1.0, 0.2],
+            &["x", "v"],
+            1.0,
+            0.02,
+            4,
+            0x9abc_def0,
+            1e-8,
+        );
+
+        assert!(result.passed);
+        assert_eq!(result.trajectories_checked, 4);
+        assert!(result.max_lie_derivative_variance <= result.threshold);
+    }
+}
 #[cfg(test)]
 mod discovery_provenance_tests {
     use super::*;
