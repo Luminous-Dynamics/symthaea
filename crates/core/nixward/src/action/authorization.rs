@@ -79,6 +79,15 @@ pub enum NixActionDescriptorV1 {
         packages: Vec<String>,
     },
     EnvRollback,
+    EnvSwitchGeneration {
+        generation: u32,
+    },
+    EnvDeleteGenerations {
+        keep_last: usize,
+    },
+    EnvDeleteGenerationsOlderThan {
+        days: u32,
+    },
     Search {
         query: String,
         json: bool,
@@ -99,6 +108,9 @@ pub enum NixActionDescriptorV1 {
     },
     FlakeLock {
         inputs: Vec<String>,
+    },
+    FlakeInit {
+        template: Option<String>,
     },
     FlakeShow,
     FlakeCheck,
@@ -148,6 +160,15 @@ impl TryFrom<&NixOSCommand> for NixActionDescriptorV1 {
                 packages: packages.clone(),
             },
             NixOSCommand::EnvRollback => Self::EnvRollback,
+            NixOSCommand::EnvSwitchGeneration { generation } => Self::EnvSwitchGeneration {
+                generation: *generation,
+            },
+            NixOSCommand::EnvDeleteGenerations { keep_last } => Self::EnvDeleteGenerations {
+                keep_last: *keep_last,
+            },
+            NixOSCommand::EnvDeleteGenerationsOlderThan { days } => {
+                Self::EnvDeleteGenerationsOlderThan { days: *days }
+            }
             NixOSCommand::Search { query, json } => Self::Search {
                 query: query.clone(),
                 json: *json,
@@ -169,6 +190,9 @@ impl TryFrom<&NixOSCommand> for NixActionDescriptorV1 {
                 },
                 FlakeOperation::Lock { inputs } => Self::FlakeLock {
                     inputs: inputs.clone(),
+                },
+                FlakeOperation::Init { template } => Self::FlakeInit {
+                    template: template.clone(),
                 },
                 FlakeOperation::Show => Self::FlakeShow,
                 FlakeOperation::Check => Self::FlakeCheck,
@@ -580,6 +604,27 @@ fn validate_action_shape(action: &NixActionDescriptorV1) -> Result<(), NixAuthor
         | NixActionDescriptorV1::EnvRemove { packages } => {
             validate_nonempty_list(packages, "package")?;
         }
+        NixActionDescriptorV1::EnvSwitchGeneration { generation } => {
+            if *generation == 0 {
+                return Err(NixAuthorizationErrorV1::InvalidTypedCommand(
+                    "generation number must be greater than zero".to_string(),
+                ));
+            }
+        }
+        NixActionDescriptorV1::EnvDeleteGenerations { keep_last } => {
+            if *keep_last == 0 {
+                return Err(NixAuthorizationErrorV1::InvalidTypedCommand(
+                    "keep_last must be greater than zero".to_string(),
+                ));
+            }
+        }
+        NixActionDescriptorV1::EnvDeleteGenerationsOlderThan { days } => {
+            if *days == 0 {
+                return Err(NixAuthorizationErrorV1::InvalidTypedCommand(
+                    "age in days must be greater than zero".to_string(),
+                ));
+            }
+        }
         NixActionDescriptorV1::Search { query, .. } => require_nonempty(query, "search query")?,
         NixActionDescriptorV1::ChannelUpdate { channel } => {
             validate_optional_nonempty(channel.as_deref(), "channel")?
@@ -591,6 +636,9 @@ fn validate_action_shape(action: &NixActionDescriptorV1) -> Result<(), NixAuthor
         NixActionDescriptorV1::ChannelRemove { name } => require_nonempty(name, "channel name")?,
         NixActionDescriptorV1::FlakeUpdate { inputs }
         | NixActionDescriptorV1::FlakeLock { inputs } => validate_list(inputs, "flake input")?,
+        NixActionDescriptorV1::FlakeInit { template } => {
+            validate_optional_nonempty(template.as_deref(), "flake init template")?
+        }
         NixActionDescriptorV1::HomeManagerSwitch { flake } => {
             validate_optional_nonempty(flake.as_deref(), "home-manager flake ref")?
         }
@@ -645,7 +693,11 @@ fn minimum_scope_for_action(action: &NixActionDescriptorV1) -> NixActionScopeV1 
         | NixActionDescriptorV1::ChannelRemove { .. }
         | NixActionDescriptorV1::FlakeUpdate { .. }
         | NixActionDescriptorV1::FlakeLock { .. }
+        | NixActionDescriptorV1::FlakeInit { .. }
         | NixActionDescriptorV1::HomeManagerSwitch { .. } => NixActionScopeV1::UserModify,
+        NixActionDescriptorV1::EnvSwitchGeneration { .. } => NixActionScopeV1::SystemCritical,
+        NixActionDescriptorV1::EnvDeleteGenerations { .. }
+        | NixActionDescriptorV1::EnvDeleteGenerationsOlderThan { .. } => NixActionScopeV1::Destructive,
 
         NixActionDescriptorV1::RebuildTest { .. }
         | NixActionDescriptorV1::RebuildBoot { .. }
@@ -778,6 +830,18 @@ fn put_action(h: &mut Hasher, action: &NixActionDescriptorV1) {
             put_str_vec(h, packages);
         }
         NixActionDescriptorV1::EnvRollback => put_u8(h, 5),
+        NixActionDescriptorV1::EnvSwitchGeneration { generation } => {
+            put_u8(h, 19);
+            put_u32(h, *generation);
+        }
+        NixActionDescriptorV1::EnvDeleteGenerations { keep_last } => {
+            put_u8(h, 20);
+            put_u64(h, *keep_last as u64);
+        }
+        NixActionDescriptorV1::EnvDeleteGenerationsOlderThan { days } => {
+            put_u8(h, 21);
+            put_u32(h, *days);
+        }
         NixActionDescriptorV1::Search { query, json } => {
             put_u8(h, 6);
             put_str(h, query);
@@ -804,6 +868,10 @@ fn put_action(h: &mut Hasher, action: &NixActionDescriptorV1) {
         NixActionDescriptorV1::FlakeLock { inputs } => {
             put_u8(h, 12);
             put_str_vec(h, inputs);
+        }
+        NixActionDescriptorV1::FlakeInit { template } => {
+            put_u8(h, 22);
+            put_opt_str(h, template.as_deref());
         }
         NixActionDescriptorV1::FlakeShow => put_u8(h, 13),
         NixActionDescriptorV1::FlakeCheck => put_u8(h, 14),
