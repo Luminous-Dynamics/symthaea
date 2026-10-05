@@ -6334,39 +6334,20 @@ mod tests {
             }
         }
 
-        let mut canonical = Vec::new();
-        canonical.extend_from_slice(b"symthaea:observation-verification-context:v5\\n");
-        put_string_bytes(&mut canonical, context.context_version);
-        put_string_bytes(&mut canonical, &context.policy_fingerprint);
-        put_string_bytes(&mut canonical, context.verifier_id);
-        put_string_bytes(&mut canonical, context.verifier_version);
-        put_string_bytes(&mut canonical, &context.environment_fingerprint);
-        put_string_bytes(&mut canonical, context.procedure_id);
-        put_string_bytes(&mut canonical, &context.procedure_fingerprint);
-        put_option_bytes(
-            &mut canonical,
-            context.resolution_snapshot_fingerprint.as_deref(),
-        );
-        canonical.extend_from_slice(&context.evaluated_at_unix_ns.to_be_bytes());
-
-        fn put_string_bytes(bytes: &mut Vec<u8>, value: &str) {
-            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
-            bytes.extend_from_slice(value.as_bytes());
-        }
-
-        fn put_option_bytes(bytes: &mut Vec<u8>, value: Option<&str>) {
-            match value {
-                Some(value) => {
-                    bytes.push(1);
-                    put_string_bytes(bytes, value);
-                }
-                None => bytes.push(0),
-            }
-        }
-
         let mut expected = blake3::Hasher::new();
         expected.update(b"symthaea:observation-verification-context:v5\\n");
-        expected.update(&canonical);
+        put_string(&mut expected, context.context_version);
+        put_string(&mut expected, &context.policy_fingerprint);
+        put_string(&mut expected, context.verifier_id);
+        put_string(&mut expected, context.verifier_version);
+        put_string(&mut expected, &context.environment_fingerprint);
+        put_string(&mut expected, context.procedure_id);
+        put_string(&mut expected, &context.procedure_fingerprint);
+        put_option(
+            &mut expected,
+            context.resolution_snapshot_fingerprint.as_deref(),
+        );
+        expected.update(&context.evaluated_at_unix_ns.to_be_bytes());
 
         assert_eq!(
             context.fingerprint(),
