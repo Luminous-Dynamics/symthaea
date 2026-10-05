@@ -3248,6 +3248,230 @@ mod tests {
         );
     }
     #[test]
+    fn independence_v3_scope_reaches_only_pair_ancestors_and_preserves_role_identity() {
+        let mut parent = fixture();
+        parent.id = "parent".into();
+
+        let mut source = fixture();
+        source.provenance.parent_observation_ids = vec!["parent".into()];
+
+        let mut target = fixture();
+        target.id = "obs-002".into();
+        target.provenance.source.sensor_id = "camera-2".into();
+
+        let mut unrelated = fixture();
+        unrelated.id = "unrelated".into();
+        unrelated.provenance.source.sensor_id = "camera-3".into();
+
+        let graph = ObservationGraph {
+            observations: vec![unrelated, target, parent, source],
+            relations: vec![],
+        };
+
+        // Independent oracle for reachability: source/target plus recursive parents.
+        let mut oracle = vec![
+            "obs-001".to_string(),
+            "obs-002".to_string(),
+            "parent".to_string(),
+        ];
+        oracle.sort();
+
+        assert_eq!(
+            graph
+                .independence_verification_reachable_scope_observation_ids(
+                    "obs-001",
+                    "obs-002"
+                )
+                .expect("reachable scope ids"),
+            oracle
+        );
+
+        let baseline = graph
+            .independence_verification_reachable_scope_fingerprint_v3(
+                "obs-001",
+                "obs-002"
+            )
+            .expect("v3 scope fingerprint");
+
+        let without_unrelated = ObservationGraph {
+            observations: graph
+                .observations
+                .iter()
+                .filter(|observation| observation.id != "unrelated")
+                .cloned()
+                .collect(),
+            relations: vec![],
+        };
+        assert_eq!(
+            without_unrelated
+                .independence_verification_reachable_scope_fingerprint_v3(
+                    "obs-001",
+                    "obs-002"
+                )
+                .expect("scope without unrelated observation"),
+            baseline
+        );
+
+        let reversed = ObservationGraph {
+            observations: graph.observations.iter().cloned().rev().collect(),
+            relations: vec![],
+        };
+        assert_eq!(
+            reversed
+                .independence_verification_reachable_scope_fingerprint_v3(
+                    "obs-001",
+                    "obs-002"
+                )
+                .expect("reordered scope"),
+            baseline
+        );
+
+        assert_ne!(
+            graph
+                .independence_verification_reachable_scope_fingerprint_v3(
+                    "obs-002",
+                    "obs-001"
+                )
+                .expect("reverse scope"),
+            baseline
+        );
+    }
+
+    #[test]
+    fn independence_v3_scope_tracks_direct_fields_but_not_unread_ancestor_fields() {
+        let mut parent = fixture();
+        parent.id = "parent".into();
+        parent.provenance.processing_activity = Some(ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec![],
+            output_observation_ids: vec!["parent".into()],
+            derivations: Vec::new(),
+        });
+
+        let mut source = fixture();
+        source.provenance.parent_observation_ids = vec!["parent".into()];
+
+        let mut target = fixture();
+        target.id = "obs-002".into();
+        target.provenance.source.sensor_id = "camera-2".into();
+
+        let graph = ObservationGraph {
+            observations: vec![parent, source, target],
+            relations: vec![],
+        };
+        let baseline = graph
+            .independence_verification_reachable_scope_fingerprint_v3(
+                "obs-001",
+                "obs-002"
+            )
+            .expect("baseline scope");
+
+        let mut direct_change = graph.clone();
+        direct_change
+            .observations
+            .iter_mut()
+            .find(|observation| observation.id == "obs-001")
+            .expect("source")
+            .provenance
+            .source
+            .sensor_id = "camera-9".into();
+        assert_ne!(
+            direct_change
+                .independence_verification_reachable_scope_fingerprint_v3(
+                    "obs-001",
+                    "obs-002"
+                )
+                .expect("direct field scope"),
+            baseline
+        );
+
+        let mut ancestor_unread_change = graph.clone();
+        let ancestor = ancestor_unread_change
+            .observations
+            .iter_mut()
+            .find(|observation| observation.id == "parent")
+            .expect("ancestor");
+        ancestor.provenance.source.sensor_id = "camera-9".into();
+        ancestor.provenance.coverage = ProvenanceCoverage::Partial;
+        ancestor.provenance.source.platform_id = Some("platform-9".into());
+        ancestor.asset = Some(AssetRef::blake3(b"changed"));
+        assert_eq!(
+            ancestor_unread_change
+                .independence_verification_reachable_scope_fingerprint_v3(
+                    "obs-001",
+                    "obs-002"
+                )
+                .expect("ancestor unread fields scope"),
+            baseline
+        );
+
+        let mut ancestor_lineage_change = graph.clone();
+        ancestor_lineage_change
+            .observations
+            .iter_mut()
+            .find(|observation| observation.id == "parent")
+            .expect("ancestor")
+            .provenance
+            .parent_observation_ids = vec!["missing-parent".into()];
+        assert_eq!(
+            ancestor_lineage_change
+                .independence_verification_reachable_scope_fingerprint_v3(
+                    "obs-001",
+                    "obs-002"
+                )
+                .expect("invalid graph should fail closed"),
+            baseline
+        );
+    }
+
+    #[test]
+    fn independence_v3_scope_hashes_exact_canonical_bytes_and_rejects_invalid_graphs() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+
+        let bytes = graph
+            .independence_verification_reachable_scope_canonical_bytes_v3(
+                "obs-001",
+                "obs-002"
+            )
+            .expect("canonical scope bytes");
+        assert!(bytes.starts_with(
+            b"symthaea:observation-independence-scope:v3\\n"
+        ));
+        assert_eq!(
+            blake3::hash(&bytes).to_hex().to_string(),
+            graph
+                .independence_verification_reachable_scope_fingerprint_v3(
+                    "obs-001",
+                    "obs-002"
+                )
+                .expect("scope fingerprint")
+        );
+
+        let mut malformed = graph;
+        malformed.observations[1].quality.confidence = 2.0;
+        assert_eq!(
+            malformed.independence_verification_reachable_scope_canonical_bytes_v3(
+                "obs-001",
+                "obs-002"
+            ),
+            Err(ObservationValidationError::InvalidQuality)
+        );
+    }
+
+    #[test]
     fn independence_scope_identity_preserves_historical_processing_activity_commitment() {
         let mut source = fixture();
         source.provenance.processing_activity = Some(ProcessingActivity {
