@@ -1074,6 +1074,52 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_envelope_rejects_duplicate_member_names() {
+        let request = request();
+        let snapshot = snapshot();
+        let reference = snapshot.snapshot_reference().unwrap();
+        let document_json = serde_json::to_string(&snapshot.document).unwrap();
+        let envelope = format!(
+            r#"{{"schema_version":1,"schema_version":1,"controller_document_ref":"https://example.test/controller","state_at":"2026-10-05T00:00:00Z","resolved_at":"2026-10-05T02:00:00Z","response_media_type":"application/ld+json","document":{document_json}}}"#
+        );
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("controller-snapshot.json");
+        std::fs::write(&path, envelope).unwrap();
+
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new(&path, reference).unwrap();
+
+        assert!(matches!(
+            adapter.resolve(&request),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("strict I-JSON")
+        ));
+    }
+
+    #[test]
+    fn snapshot_envelope_rejects_trailing_wire_data() {
+        let request = request();
+        let snapshot = snapshot();
+        let reference = snapshot.snapshot_reference().unwrap();
+        let mut envelope = serde_json::to_string(&snapshot).unwrap();
+        envelope.push_str("\n{}");
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("controller-snapshot.json");
+        std::fs::write(&path, envelope).unwrap();
+
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new(&path, reference).unwrap();
+
+        assert!(matches!(
+            adapter.resolve(&request),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("strict I-JSON")
+        ));
+    }
+
+    #[test]
     fn tampering_snapshot_bytes_fails_content_address_before_resolution() {
         let request = request();
         let mut snapshot = snapshot();
