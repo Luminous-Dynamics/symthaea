@@ -214,7 +214,7 @@ impl UnitTransform {
                 reason: "conversion from SI produced a non-finite value".into(),
             })
         }
-    }
+  }
 
 /// Backward-compatible name for multiplicative units.
 pub type UnitScale = RationalScale;
