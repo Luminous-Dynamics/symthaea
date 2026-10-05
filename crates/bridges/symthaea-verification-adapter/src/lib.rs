@@ -1134,10 +1134,9 @@ mod tests {
     fn rejects_private_multikey_header_as_public_material() {
         let request = request();
         let mut snapshot = snapshot();
-        let secret = format!(
-            "z{}",
-            bs58::encode([0x80, 0x26].into_iter().chain([0u8; 32])).into_string()
-        );
+        let mut secret_bytes = vec![0x80, 0x26];
+        secret_bytes.extend([0u8; 32]);
+        let secret = format!("z{}", bs58::encode(secret_bytes).into_string());
         snapshot.document = snapshot.document.replace(
             actual,
             &secret,
