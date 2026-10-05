@@ -1023,7 +1023,7 @@ mod tests {
         let mut tampered = plan.clone();
         tampered.rate = if tampered.rate < 1.0 { 1.2 } else { 0.8 };
         assert!(receipt.verify_against_plan(&tampered).is_err());
-        assert!(receipt.verify_samples(&samples[..samples.len().saturating_sub(1)]).not());
+        assert!(!receipt.verify_samples(&samples[..samples.len().saturating_sub(1)]));
     }
 
     #[cfg(feature = "ssm_language")]
