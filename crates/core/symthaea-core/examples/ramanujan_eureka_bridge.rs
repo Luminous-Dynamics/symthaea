@@ -12,10 +12,10 @@ use std::collections::HashMap;
 
 use symthaea_core::hdc::conjecture_engine::{
     BinOp, Conjecture, ConjectureStatus, Expr, MathDomain, MacroPromotionTier,
-    select_most_discriminative_experiment_with_receipt, scientific_hypothesis_set_digest,
+    select_most_discriminative_experiment_with_typed_receipt, scientific_hypothesis_set_digest,
 };
 use symthaea_types::{
-    ModelMaturity, PhysicalDimension, PhysicalType, QuantityKind,
+    ModelMaturity, PhysicalDimension, PhysicalType, QuantityKind, UnitRef, UnitTransform,
     ScientificHypothesisHandoff, ScientificHypothesisRevisionReceipt,
 };
 
@@ -43,8 +43,16 @@ fn candidate(formula: Expr, source: &str) -> Conjecture {
     }
 }
 
+fn energy_frame() -> PhysicalType {
+    PhysicalType::with_kind(QuantityKind::Energy, PhysicalDimension::ENERGY).with_unit(UnitRef {
+        symbol: "J".into(),
+        transform_to_si: UnitTransform::IDENTITY,
+        semantic_id: None,
+    })
+}
+
 fn handoff(conjecture: &Conjecture) -> ScientificHypothesisHandoff {
-    let energy = PhysicalType::with_kind(QuantityKind::Energy, PhysicalDimension::ENERGY);
+    let energy = energy_frame();
     conjecture.scientific_hypothesis_handoff(
         &energy,
         ModelMaturity::ResearchPrototype,
@@ -109,19 +117,21 @@ fn main() {
     // disagreement is the selector's criterion; it is not experimental evidence.
     let experiments = vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (2.0, 3.0)];
     let hypotheses = vec![c1.formula.clone(), c2.formula.clone()];
+    let prediction_frame = energy_frame();
     let predict = |formula: &Expr, initial: &(f64, f64)| {
         let value = formula.eval(&[("x", initial.0), ("v", initial.1)]);
-        value.is_finite().then_some(value)
+        value.is_finite().then_some((value, prediction_frame.clone()))
     };
 
-    let (selected, selection) = select_most_discriminative_experiment_with_receipt(
+    let (selected, selection) = select_most_discriminative_experiment_with_typed_receipt(
         &experiments,
         &hypotheses,
+        &prediction_frame,
         predict,
         &h1_ref.digest_hex(),
         &hypothesis_set_digest,
         "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        "ramanujan-eureka-selector-v2",
+        "ramanujan-eureka-selector-v3",
         7,
         |initial| format!("harmonic:{:.6}:{:.6}", initial.0, initial.1),
     )
@@ -170,7 +180,7 @@ fn main() {
     println!("  hypothesis set: {}", summary["hypothesis_set_digest"]);
     println!("  selected challenge: {}", summary["selected_challenge_digest"]);
     println!(
-        "  predicted disagreement score: {:.6}",
+        "  predicted disagreement score (canonical J frame): {:.6}",
         selection.predicted_disagreement_score()
     );
     println!("  selection receipt: {}", selection.digest_hex());
