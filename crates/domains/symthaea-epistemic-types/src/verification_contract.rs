@@ -1507,14 +1507,6 @@ impl CryptographicVerificationReceipt {
                 });
             }
         }
-        if let Some(expected) = &self.expected_transformed_document_digest {
-            if expected != &self.transformed_document_digest {
-                return Err(VerificationFailure::TransformedDocumentDigestMismatch {
-                    expected: Some(expected.clone()),
-                    actual: Some(self.transformed_document_digest.clone()),
-                });
-            }
-        }
         if self.verification_method != resolution.verification_method {
             return Err(VerificationFailure::VerificationMethodMismatch {
                 expected: resolution.verification_method.clone(),
