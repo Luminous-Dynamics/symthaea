@@ -344,7 +344,7 @@ impl PhonologicalPlan {
             self.rate,
             self.pause_weight,
             self.syllables.len(),
-            self.lexical_provenance.is_some(),
+            self.lexical_provenance.as_deref().unwrap_or("NONE"),
             segment_surface,
         )
     }
@@ -984,6 +984,34 @@ mod tests {
             false,
             true,
         )]
+    }
+
+    #[test]
+    fn lexical_provenance_is_part_of_grounding_identity() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        let first_provenance = blake3::hash(b"lexeme:first:v1").to_hex().to_string();
+        let second_provenance = blake3::hash(b"lexeme:second:v1").to_hex().to_string();
+
+        plan.bind_lexical_segments(
+            vec![PhonemeSlot::new(
+                "IY",
+                0,
+                SyllableStress::Primary,
+                true,
+                false,
+                true,
+            )],
+            first_provenance,
+        )
+        .unwrap();
+        let first_grounding = plan.grounding_surface();
+
+        plan.lexical_provenance = Some(second_provenance);
+        assert_ne!(
+            first_grounding,
+            plan.grounding_surface(),
+            "lexical provenance mutation must change the plan grounding identity"
+        );
     }
 
     #[test]
