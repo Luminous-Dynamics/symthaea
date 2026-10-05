@@ -220,18 +220,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rustc +${FUZZ_RUST_TOOLCHAIN} --version --verbose
-          cargo +${FUZZ_RUST_TOOLCHAIN} fuzz --version
+          rustc +\${FUZZ_RUST_TOOLCHAIN} --version --verbose
+          cargo +\${FUZZ_RUST_TOOLCHAIN} fuzz --version
           for target in \
             fuzz_cose_key_es256 \
             fuzz_rfc9942_receipt \
             fuzz_rfc9942_signature_with_receipts \
             fuzz_rfc9942_proofs
           do
-            cargo +${FUZZ_RUST_TOOLCHAIN} fuzz run "$target" -- \
-              -runs="${FUZZ_RUNS}" \
-              -seed="${FUZZ_SEED}" \
-              -max_len="${FUZZ_MAX_LEN}" \
-              -timeout="${FUZZ_TIMEOUT_SECONDS}" \
-              -print_final_stats=1
+            log_file="$(mktemp)"
+            trap 'rm -f "\${log_file}"' EXIT
+            cargo +\${FUZZ_RUST_TOOLCHAIN} fuzz run "$target" -- \
+              -runs="\${FUZZ_RUNS}" \
+              -seed="\${FUZZ_SEED}" \
+              -max_len="\${FUZZ_MAX_LEN}" \
+              -timeout="\${FUZZ_TIMEOUT_SECONDS}" \
+              -print_final_stats=1 2>&1 | tee "\${log_file}"
+            # Qualification evidence must prove that the requested run budget
+            # actually executed; a zero/partial run must not be treated as PASS.
+            grep -Fqx "stat::number_of_executed_units: \${FUZZ_RUNS}" "\${log_file}"
+            rm -f "\${log_file}"
+            trap - EXIT
           done
