@@ -1591,6 +1591,120 @@ mod tests {
 
     #[cfg(feature = "ssm_language")]
     #[test]
+    fn test_verified_lexical_phonological_path_emits_witness_bound_receipt() {
+        use symthaea_broca::{
+            ContentBindingStatus, GrammaticalFunction, LanguageRuleBinding, LanguageRuleStatus,
+            LexemeBinding, LexicalPhonologicalMapping, LexicalPhonologicalWitness, LexicalSource,
+            LinguisticFrame, PhonemeSlot, SpeechPlan, StructuredDecoder, SyllableStress,
+            ThoughtChannels, LexicalMorphosyntacticBinding,
+        };
+
+        let genesis = GenesisSeed::from_phrase("verified-lexical-voice-path");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(2);
+        let readout = decoder.decode(&channels);
+        let speech_plan = SpeechPlan::from_readout(&channels, &readout);
+        let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+
+        let constituents = frame
+            .constituents
+            .iter()
+            .map(|slot| LexemeBinding {
+                position: slot.position,
+                source: LexicalSource::SemanticConstituent {
+                    role: slot.role.clone(),
+                    prime: slot.prime.clone(),
+                },
+                lemma: slot.prime.to_ascii_lowercase(),
+                lexeme_id: format!("fixture:lexeme:{}", slot.position),
+                grammatical_function: GrammaticalFunction::Other("fixture".into()),
+                morphology: Vec::new(),
+                morphophonological_form: Some(slot.prime.to_ascii_lowercase()),
+                provenance: "fixture:lexicon:v1".into(),
+                semantic_payload: true,
+            })
+            .collect::<Vec<_>>();
+
+        let binding = LexicalMorphosyntacticBinding::new(
+            &frame,
+            LanguageRuleBinding {
+                language_tag: "en".into(),
+                status: LanguageRuleStatus::Bound,
+                rule_id: Some("fixture:rules:v1".into()),
+                provenance: Some("fixture:rules:v1".into()),
+                unbound_reason: None,
+            },
+            constituents,
+            Vec::new(),
+            Vec::new(),
+        )
+        .expect("fixture lexical binding");
+
+        let phoneme_symbols = ["AH", "B", "K", "D", "EH", "F", "G", "M", "N", "P", "R", "S"];
+        let segments = binding
+            .constituents
+            .iter()
+            .enumerate()
+            .map(|(index, _)| {
+                PhonemeSlot::new(
+                    phoneme_symbols[index % phoneme_symbols.len()],
+                    index,
+                    SyllableStress::Primary,
+                    true,
+                    false,
+                    index + 1 == binding.constituents.len(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let witness = LexicalPhonologicalWitness::new(
+            &binding,
+            segments
+                .iter()
+                .enumerate()
+                .map(|(index, segment)| LexicalPhonologicalMapping {
+                    lexical_position: index,
+                    segment_indices: vec![index],
+                    symbols: vec![segment.symbol.clone()],
+                })
+                .collect(),
+        )
+        .expect("fixture realization witness");
+
+        let mut plan = symthaea_broca::PhonologicalPlan::from_linguistic_frame(&frame);
+        plan.bind_lexical_segments_from_binding_with_witness(
+            &frame,
+            &binding,
+            &witness,
+            segments,
+        )
+        .expect("witness-backed lexical plan");
+
+        assert_eq!(plan.content_binding, ContentBindingStatus::LexicallyBound);
+
+        let mut voice = LiveVoice::new_headless(&genesis);
+        let receipt = voice
+            .speak_verified_lexical_phonological_plan_with_receipt(
+                &plan,
+                &frame,
+                &binding,
+                &witness,
+            )
+            .expect("verified lexical plan should realize");
+
+        receipt
+            .verify_against_plan(&plan, &frame, &binding, &witness)
+            .expect("verified receipt should independently revalidate");
+        assert_eq!(
+            receipt.witness_blake3,
+            witness.provenance_token(),
+            "receipt must retain the exact witness identity"
+        );
+        assert!(receipt.realization.sample_count > 0);
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
     fn test_role_only_phonological_plan_is_rejected() {
         use symthaea_broca::{LinguisticFrame, SpeechPlan, StructuredDecoder, ThoughtChannels};
 
