@@ -10792,18 +10792,33 @@ mod tests {
 
         let reopened=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-status").unwrap();
         let conn=reopened.connection().unwrap();
-        let (boundary,scope):(String,String)=conn.query_row(
-            "SELECT boundary_id,attempt_scope_digest
+        let (boundary,scope,operation_id):(String,String,String)=conn.query_row(
+            "SELECT boundary_id,attempt_scope_digest,operation_id
              FROM authorization_status_checks
              WHERE authorization_instance='auth-status' AND attempt_id='attempt-status'",
             [],
-            |row| Ok((row.get(0)?,row.get(1)?)),
+            |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
         ).unwrap();
         assert_eq!(boundary,"boundary-authoritative");
         assert_eq!(
             scope,
             compute_attempt_scope_digest("boundary-authoritative","attempt-status").unwrap()
         );
+        assert_eq!(operation_id,"op-status");
+
+        conn.execute(
+            "UPDATE authorization_status_checks
+             SET operation_id='op-forged'
+             WHERE authorization_instance='auth-status' AND attempt_id='attempt-status' AND phase='pre_entry'",
+            [],
+        ).unwrap();
+        drop(conn);
+        drop(reopened);
+        assert!(matches!(
+            SqliteAuthorizationStore::open_with_relying_party(&path,"rp-status"),
+            Err(AuthorizationStoreError::InvalidState(message))
+                if message.contains("attempt operation mismatch")
+        ));
         let _=std::fs::remove_file(path);
     }
 
