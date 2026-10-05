@@ -309,6 +309,18 @@ jobs:
               path = Path("corpus") / relative
               path.parent.mkdir(parents=True, exist_ok=True)
               path.write_bytes(data)
+
+          expected = sorted(set(seeds) | set(generated))
+          actual = sorted(
+              str(path.relative_to("corpus"))
+              for path in Path("corpus").rglob("*")
+              if path.is_file()
+          )
+          if actual != expected:
+              raise SystemExit(
+                  "deterministic corpus inventory mismatch: "
+                  f"expected={expected!r} actual={actual!r}"
+              )
           PY
       - name: Run bounded fuzz smoke corpus
         working-directory: crates/domains/symthaea-swarm/fuzz
