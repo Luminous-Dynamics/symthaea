@@ -761,9 +761,6 @@ impl VerificationEvidence {
         {
             return Err(VerificationFailure::ResolutionEvidenceMismatch);
         }
-        if self.freshness != request.freshness {
-            return Err(VerificationFailure::FreshnessMismatch);
-        }
         self.freshness.validate()?;
         if self.freshness != request.freshness {
             return Err(VerificationFailure::FreshnessMismatch);
@@ -793,11 +790,6 @@ impl VerificationEvidence {
                     "{name} must be non-empty"
                 )));
             }
-        }
-        if !is_hex_digest(&self.resolution_digest) {
-            return Err(VerificationFailure::Structural(
-                "resolution digest must be a 64-character hexadecimal digest".into(),
-            ));
         }
         for (name, value) in [
             ("controller document digest", self.controller_document_digest.as_str()),
@@ -998,6 +990,92 @@ mod tests {
         .unwrap()
     }
 
+    #[test]
+    fn controller_document_identity_is_a_distinct_namespace() {
+        assert!(ClaimControllerDocumentIdentity::new(
+            "https://example.test/controller"
+        ).unwrap().validate_structure().is_ok());
+        assert!(matches!(
+            ClaimControllerDocumentIdentity::new("   "),
+            Err(VerificationFailure::Structural(_))
+        ));
+        assert!(matches!(
+            ClaimControllerDocumentIdentity::new("not-a-url"),
+            Err(VerificationFailure::InvalidControllerDocumentId)
+        ));
+    }
+
+    #[test]
+    fn resolution_receipt_enforces_exact_retrieval_invariants() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let resolution = resolved_method(&request);
+        assert!(resolution.validate_structure().is_ok());
+        assert!(resolution.matches_request(&request));
+        assert!(!resolution.resolution_digest().is_empty());
+
+        let mut wrong_ref = resolution.clone();
+        wrong_ref.controller_document_ref = "https://other.example".into();
+        assert!(matches!(
+            wrong_ref.validate_structure(),
+            Err(VerificationFailure::ControllerDocumentMismatch { .. })
+        ));
+
+        let mut wrong_controller = resolution.clone();
+        wrong_controller.resolved_verification_method_controller =
+            ClaimControllerIdentity::new("https://other.example").unwrap();
+        assert!(matches!(
+            wrong_controller.validate_structure(),
+            Err(VerificationFailure::ControllerMismatch { .. })
+        ));
+
+        let mut missing_method = resolution.clone();
+        missing_method.relationship_methods.clear();
+        assert!(matches!(
+            missing_method.validate_structure(),
+            Err(VerificationFailure::VerificationMethodNotInRelationship)
+        ));
+    }
+
+    #[test]
+    fn deserialized_resolution_rechecks_relationship_membership_and_digest() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let resolution = resolved_method(&request);
+        let mut value = serde_json::to_value(&resolution).unwrap();
+
+        value["relationship_methods"] = serde_json::json!([]);
+        let decoded: VerificationMethodResolution = serde_json::from_value(value).unwrap();
+        assert!(matches!(
+            decoded.validate_structure(),
+            Err(VerificationFailure::VerificationMethodNotInRelationship)
+        ));
+
+        let mut value = serde_json::to_value(&resolution).unwrap();
+        value["relationship_methods_digest"] = serde_json::json!("22".repeat(32));
+        let decoded: VerificationMethodResolution = serde_json::from_value(value).unwrap();
+        assert!(matches!(
+            decoded.validate_structure(),
+            Err(VerificationFailure::Structural(_))
+        ));
+    }
+
     fn make_evidence(
         request: &VerificationRequest,
         controller_document_digest: &str,
@@ -1007,6 +1085,7 @@ mod tests {
     ) -> Result<VerificationEvidence, VerificationFailure> {
         let mut resolution = resolved_method(request);
         resolution.controller_document_digest = controller_document_digest.to_owned();
+        resolution.validate_structure()?;
         VerificationEvidence::from_adapter_attestation(
             request,
             resolution,
