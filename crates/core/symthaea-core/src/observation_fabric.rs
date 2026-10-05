@@ -4720,6 +4720,55 @@ mod tests {
         );
     }
     #[test]
+    fn independence_v3_endpoint_ancestry_semantics_are_version_locked() {
+        let mut source = fixture();
+        source.provenance.source.sensor_id = "camera-source".into();
+        source.asset = Some(AssetRef::blake3(b"source-frame"));
+
+        let mut target = fixture();
+        target.id = "obs-002".into();
+        target.provenance.source.sensor_id = "camera-target".into();
+        target.asset = Some(AssetRef::blake3(b"target-frame"));
+        target.provenance.parent_observation_ids = vec!["obs-001".into()];
+
+        let graph = ObservationGraph {
+            observations: vec![source, target],
+            relations: vec![],
+        };
+
+        let v2 = graph
+            .assess_independence_detailed("obs-001", "obs-002")
+            .expect("v2 assessment");
+        let v3 = graph
+            .assess_independence_detailed_v3("obs-001", "obs-002")
+            .expect("v3 assessment");
+
+        // v3 deliberately preserves the current classifier semantics until the
+        // versioned correction tracked in issue #6805 is introduced.
+        assert_eq!(v2.classification, EvidenceIndependence::VerifiedIndependent);
+        assert_eq!(v2.basis, IndependenceBasis::NoSharedProvenance);
+        assert_eq!(v3.classification, v2.classification);
+        assert_eq!(v3.basis, v2.basis);
+        assert_eq!(v3.examined_observation_ids, vec!["obs-001", "obs-002"]);
+        assert!(v3.verify_fingerprint());
+
+        let scope = graph
+            .independence_verification_reachable_scope_canonical_bytes_v3(
+                "obs-001",
+                "obs-002",
+            )
+            .expect("v3 scope");
+        let witness =
+            IndependenceScopeWitnessV3::from_canonical_bytes(&scope).expect("decode witness");
+        assert_eq!(
+            witness.assess_independence().expect("witness assessment"),
+            (v3.classification, v3.basis)
+        );
+        assert!(IndependenceVerificationReceiptV3::from_assessment(&v3)
+            .verify_against_scope_witness(&scope));
+    }
+
+    #[test]
     fn independence_v3_typed_scope_witness_is_exact_wire_serializer() {
         let mut parent = fixture();
         parent.id = "parent".into();
