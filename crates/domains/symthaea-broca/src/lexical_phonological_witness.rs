@@ -271,41 +271,45 @@ mod tests {
 
     fn binding() -> LexicalMorphosyntacticBinding {
         let frame = frame();
-        let constituents = vec![
-            LexemeBinding {
-                position: 0,
-                source: LexicalSource::SemanticConstituent { role: "AGENT".into(), prime: "I".into() },
-                lemma: "I".into(),
-                lexeme_id: "en:pronoun:I".into(),
-                grammatical_function: GrammaticalFunction::Subject,
-                morphology: vec![MorphologicalFeature { category: "person".into(), value: "1".into() }],
-                morphophonological_form: Some("I".into()),
+        let mut constituents = frame
+            .constituents
+            .iter()
+            .map(|slot| LexemeBinding {
+                position: slot.position,
+                source: LexicalSource::SemanticConstituent {
+                    role: slot.role.clone(),
+                    prime: slot.prime.clone(),
+                },
+                lemma: slot.prime.to_ascii_lowercase(),
+                lexeme_id: format!("en:fixture:{}", slot.position),
+                grammatical_function: GrammaticalFunction::Other("fixture".into()),
+                morphology: Vec::new(),
+                morphophonological_form: Some(slot.prime.to_ascii_lowercase()),
                 provenance: "fixture:v1".into(),
                 semantic_payload: true,
-            },
+            })
+            .collect::<Vec<_>>();
+
+        constituents.insert(
+            1,
             LexemeBinding {
                 position: 1,
-                source: LexicalSource::InsertedFunctionWord { insertion_reason: "fixture:article".into() },
+                source: LexicalSource::InsertedFunctionWord {
+                    insertion_reason: "fixture:article".into(),
+                },
                 lemma: "the".into(),
                 lexeme_id: "en:det:the".into(),
                 grammatical_function: GrammaticalFunction::FunctionWord,
-                morphology: vec![],
+                morphology: Vec::new(),
                 morphophonological_form: Some("the".into()),
                 provenance: "fixture:v1".into(),
                 semantic_payload: false,
             },
-            LexemeBinding {
-                position: 2,
-                source: LexicalSource::SemanticConstituent { role: "ACTION".into(), prime: "DO".into() },
-                lemma: "do".into(),
-                lexeme_id: "en:verb:do".into(),
-                grammatical_function: GrammaticalFunction::Verb,
-                morphology: vec![],
-                morphophonological_form: Some("do".into()),
-                provenance: "fixture:v1".into(),
-                semantic_payload: true,
-            },
-        ];
+        );
+        for (position, constituent) in constituents.iter_mut().enumerate() {
+            constituent.position = position;
+        }
+
         LexicalMorphosyntacticBinding::new(
             &frame,
             LanguageRuleBinding {
@@ -316,32 +320,42 @@ mod tests {
                 unbound_reason: None,
             },
             constituents,
-            vec![ConstituentDependency {
-                governor_position: 2,
-                dependent_position: 0,
-                relation: "subject".into(),
-            }],
-            vec![],
+            Vec::new(),
+            Vec::new(),
         )
         .expect("fixture lexical binding")
     }
 
-    fn segments() -> Vec<PhonemeSlot> {
-        vec![
-            PhonemeSlot::new("AY", 0, crate::SyllableStress::Primary, true, false, true),
-            PhonemeSlot::new("DH", 1, crate::SyllableStress::None, true, false, false),
-            PhonemeSlot::new("IY", 2, crate::SyllableStress::Primary, true, false, false),
-        ]
+    fn segments(binding: &LexicalMorphosyntacticBinding) -> Vec<PhonemeSlot> {
+        (0..binding.constituents.len())
+            .map(|index| {
+                PhonemeSlot::new(
+                    format!("P{index}"),
+                    index,
+                    crate::SyllableStress::Primary,
+                    true,
+                    false,
+                    true,
+                )
+            })
+            .collect()
     }
 
-    fn witness_for_segments(binding: &LexicalMorphosyntacticBinding) -> LexicalPhonologicalWitness {
+    fn witness_for_segments(
+        binding: &LexicalMorphosyntacticBinding,
+    ) -> LexicalPhonologicalWitness {
+        let segments = segments(binding);
         LexicalPhonologicalWitness::new(
             binding,
-            vec![
-                LexicalPhonologicalMapping { lexical_position: 0, segment_indices: vec![0], symbols: vec!["AY".into()] },
-                LexicalPhonologicalMapping { lexical_position: 1, segment_indices: vec![1], symbols: vec!["DH".into()] },
-                LexicalPhonologicalMapping { lexical_position: 2, segment_indices: vec![2], symbols: vec!["IY".into()] },
-            ],
+            segments
+                .iter()
+                .enumerate()
+                .map(|(index, segment)| LexicalPhonologicalMapping {
+                    lexical_position: index,
+                    segment_indices: vec![index],
+                    symbols: vec![segment.symbol.clone()],
+                })
+                .collect(),
         )
         .expect("explicit witness")
     }
@@ -350,7 +364,7 @@ mod tests {
     fn valid_witness_covers_semantic_and_inserted_function_word_positions() {
         let binding = binding();
         let witness = witness_for_segments(&binding);
-        assert!(witness.validate_against_segments(&binding, &segments()).is_ok());
+        assert!(witness.validate_against_segments(&binding, &segments(&binding)).is_ok());
         assert_eq!(witness.mappings.len(), 3);
     }
 
@@ -360,11 +374,11 @@ mod tests {
         let witness = LexicalPhonologicalWitness {
             version: LEXICAL_PHONOLOGICAL_WITNESS_VERSION.into(),
             lexical_binding_provenance: binding.provenance_token(),
-            mappings: vec![
-                LexicalPhonologicalMapping { lexical_position: 0, segment_indices: vec![1], symbols: vec!["DH".into()] },
-                LexicalPhonologicalMapping { lexical_position: 1, segment_indices: vec![0], symbols: vec!["AY".into()] },
-                LexicalPhonologicalMapping { lexical_position: 2, segment_indices: vec![2], symbols: vec!["IY".into()] },
-            ],
+            mappings: {
+                let mut mappings = witness_for_segments(&binding).mappings;
+                mappings.swap(0, 1);
+                mappings
+            },
         };
 
         assert_eq!(
@@ -416,12 +430,16 @@ mod tests {
     fn unmapped_silence_is_allowed_but_not_lexicalized() {
         let binding = binding();
         let witness = witness_for_segments(&binding);
-        let mut segments = segments();
-        segments.insert(
-            2,
-            PhonemeSlot::new("SIL", 2, crate::SyllableStress::None, true, false, true),
-        );
-        segments[3].syllable_index = 3;
+        let mut segments = segments(&binding);
+        let silence_index = segments.len();
+        segments.push(PhonemeSlot::new(
+            "SIL",
+            silence_index,
+            crate::SyllableStress::None,
+            true,
+            false,
+            true,
+        ));
 
         assert!(witness.validate_against_segments(&binding, &segments).is_ok());
     }
