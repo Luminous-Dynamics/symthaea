@@ -171,6 +171,34 @@ fn parse_timestamp(
     })
 }
 
+/// Typed identity of the concrete controlled-identifier document resource
+/// dereferenced for a verification method. This is intentionally distinct from the
+/// controller identity expressed by a verification method.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ClaimControllerDocumentIdentity(String);
+
+impl ClaimControllerDocumentIdentity {
+    pub fn new(value: impl Into<String>) -> Result<Self, VerificationFailure> {
+        let value = value.into();
+        if value.trim().is_empty() {
+            return Err(VerificationFailure::Structural(
+                "controller document identity must be non-empty".into(),
+            ));
+        }
+        Url::parse(&value)
+            .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
+        Self::new(self.0.clone()).map(|_| ())
+    }
+}
+
 /// Adapter attestation for the exact Controlled Identifiers verification-method
 /// retrieval boundary.
 ///
@@ -189,9 +217,10 @@ pub struct VerificationMethodResolution {
     pub schema_version: u16,
     pub verification_method: ClaimVerificationMethod,
     pub controller_document_ref: String,
-    pub controller_document_id: ClaimControllerIdentity,
+    pub controller_document_id: ClaimControllerDocumentIdentity,
     pub resolved_verification_method_controller: ClaimControllerIdentity,
     pub verification_relationship: ClaimVerificationRelationship,
+    pub relationship_methods: Vec<ClaimVerificationMethod>,
     pub relationship_methods_digest: String,
     pub controller_document_digest: String,
 }
@@ -202,7 +231,7 @@ impl VerificationMethodResolution {
     pub fn from_controller_document(
         request: &VerificationRequest,
         controller_document_ref: impl Into<String>,
-        controller_document_id: ClaimControllerIdentity,
+        controller_document_id: ClaimControllerDocumentIdentity,
         resolved_verification_method: ClaimVerificationMethod,
         resolved_verification_method_controller: ClaimControllerIdentity,
         relationship_methods: &[ClaimVerificationMethod],
@@ -214,6 +243,9 @@ impl VerificationMethodResolution {
 
         let method_url = Url::parse(request.verification_method.as_str())
             .map_err(|_| VerificationFailure::InvalidVerificationMethodUrl)?;
+        if method_url.fragment().is_none() {
+            return Err(VerificationFailure::InvalidVerificationMethodUrl);
+        }
         let mut expected_document_url = method_url.clone();
         expected_document_url.set_fragment(None);
         let expected_document_url = expected_document_url.to_string();
@@ -304,6 +336,7 @@ impl VerificationMethodResolution {
             controller_document_id,
             resolved_verification_method_controller,
             verification_relationship: request.expected_verification_relationship.clone(),
+            relationship_methods: methods,
             relationship_methods_digest,
             controller_document_digest,
         })
@@ -350,6 +383,43 @@ impl VerificationMethodResolution {
         }
 
         self.verification_relationship.validate_structure()?;
+        let mut canonical_methods = self.relationship_methods.clone();
+        for method in &canonical_methods {
+            method
+                .validate_structure()
+                .map_err(|_| VerificationFailure::InvalidVerificationMethodUrl)?;
+            Url::parse(method.as_str())
+                .map_err(|_| VerificationFailure::InvalidVerificationMethodUrl)?;
+        }
+        canonical_methods.sort();
+        canonical_methods.dedup();
+        if canonical_methods != self.relationship_methods {
+            return Err(VerificationFailure::Structural(
+                "relationship method set must be sorted and unique".into(),
+            ));
+        }
+        if !self
+            .relationship_methods
+            .iter()
+            .any(|method| method == &self.verification_method)
+        {
+            return Err(VerificationFailure::VerificationMethodNotInRelationship);
+        }
+        let encoded_members = (
+            "symthaea:verification-relationship-members:v1",
+            self.verification_relationship.as_str(),
+            self.relationship_methods
+                .iter()
+                .map(ClaimVerificationMethod::as_str)
+                .collect::<Vec<_>>(),
+        );
+        let bytes = serde_json::to_vec(&encoded_members)
+            .expect("verification relationship member set is serializable");
+        if crate::sha256_hex(&bytes) != self.relationship_methods_digest {
+            return Err(VerificationFailure::Structural(
+                "relationship methods digest does not match member set".into(),
+            ));
+        }
         if !is_hex_digest(&self.relationship_methods_digest) {
             return Err(VerificationFailure::Structural(
                 "relationship methods digest must be a 64-character hexadecimal digest".into(),
@@ -475,18 +545,27 @@ impl VerificationRequest {
         })
     }
 
+    pub fn controller_document_ref(&self) -> Result<String, VerificationFailure> {
+        let method_url = Url::parse(self.verification_method.as_str())
+            .map_err(|_| VerificationFailure::InvalidVerificationMethodUrl)?;
+        if method_url.fragment().is_none() {
+            return Err(VerificationFailure::InvalidVerificationMethodUrl);
+        }
+        let mut document_url = method_url;
+        document_url.set_fragment(None);
+        Ok(document_url.to_string())
+    }
+
     /// Typed external dependencies required for the adapter-side resolution step.
     ///
     /// The core deliberately does not turn these into fetches; an adapter may resolve
     /// them through a DID/controller-document system, Holochain, a local cache, or any
     /// other substrate.
-    pub fn dependencies(&self) -> Vec<FederationDependency> {
-        vec![
+    pub fn dependencies(&self) -> Result<Vec<FederationDependency>, VerificationFailure> {
+        Ok(vec![
             FederationDependency::VerificationMethod(self.verification_method.as_str().to_owned()),
-            FederationDependency::ControllerDocument(
-                self.expected_controller.as_str().to_owned(),
-            ),
-        ]
+            FederationDependency::ControllerDocument(self.controller_document_ref()?),
+        ])
     }
 
     pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
@@ -796,6 +875,7 @@ pub enum VerificationFailure {
         expected: ClaimVerificationRelationship,
         actual: ClaimVerificationRelationship,
     },
+    VerificationMethodNotInRelationship,
     InvalidTimestamp {
         field: &'static str,
         value: String,
@@ -909,7 +989,7 @@ mod tests {
         VerificationMethodResolution::from_controller_document(
             request,
             "https://example.test/controller",
-            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
             request.verification_method.clone(),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             &[request.verification_method.clone()],
@@ -1028,7 +1108,7 @@ mod tests {
             request.verification_method.as_str(),
             "https://example.test/controller#key-1"
         );
-        assert_eq!(request.dependencies().len(), 2);
+        assert_eq!(request.dependencies().unwrap().len(), 2);
         assert_eq!(
             request.expected_verification_relationship.as_str(),
             "assertionMethod"
