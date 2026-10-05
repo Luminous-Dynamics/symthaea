@@ -506,7 +506,7 @@ impl StoredIgnoranceRecord {
         let frame_revisions = self
             .frame_revisions_serialized
             .iter()
-            .map(deserialize_frame_revision)
+            .map(|encoded| deserialize_frame_revision(encoded))
             .collect::<Result<Vec<_>, _>>()?;
 
         let mut expected_frame = detection.frame.identity();
