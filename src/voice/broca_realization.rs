@@ -11,7 +11,7 @@
 #![cfg(all(feature = "ssm_language", feature = "vocal-tract"))]
 
 use symthaea_broca::{IntonationIntent, PhonemeSlot, ProsodicIntent, SpeechPlan, SpeechSensoryTarget};
-use symthaea_vocal_tract::pipeline::{Intonation, PitchAccent, ProsodyContext, SourceType};
+use symthaea_vocal_tract::pipeline::{Intonation, PitchAccent, ProsodyContext, SourceType, predict_duration};
 
 /// Timing/articulation state supplied by the phonological/realization layer.
 #[derive(Debug, Clone, Copy)]
@@ -134,6 +134,27 @@ impl BrocaProsodyAdapter {
     /// Relative rate target for the caller's duration/timing subsystem.
     pub fn rate_target(&self) -> f32 {
         self.plan.prosody.rate
+    }
+
+    /// Compute scheduler-owned duration frames using the exact Broca rate target.
+    ///
+    /// This is a typed timing projection, not proof that every live voice path currently
+    /// consumes it. Word/utterance-final and stress effects remain explicit inputs to the
+    /// realization primitive rather than being folded into the Broca rate field.
+    pub fn duration_frames(
+        &self,
+        phoneme: &str,
+        stress: u8,
+        is_word_final: bool,
+        is_utterance_final: bool,
+    ) -> usize {
+        predict_duration(
+            phoneme,
+            stress.min(2),
+            is_word_final,
+            is_utterance_final,
+            self.rate_target(),
+        )
     }
 }
 
@@ -280,6 +301,25 @@ mod tests {
         assert_eq!(position.stress, 1);
         assert!(position.is_focus);
         assert!(position.is_syllable_onset);
+    }
+
+    #[test]
+    fn rate_target_maps_monotonically_to_scheduler_duration() {
+        let mut slow_plan = plan_for(4, 0.0);
+        slow_plan.prosody.rate = 0.70;
+        let slow = BrocaProsodyAdapter::new(slow_plan);
+
+        let mut fast_plan = plan_for(4, 0.0);
+        fast_plan.prosody.rate = 1.30;
+        let fast = BrocaProsodyAdapter::new(fast_plan);
+
+        let slow_frames = slow.duration_frames("AH", 1, false, false);
+        let fast_frames = fast.duration_frames("AH", 1, false, false);
+
+        assert!(
+            slow_frames > fast_frames,
+            "lower speaking rate must produce longer scheduler duration: slow={slow_frames}, fast={fast_frames}"
+        );
     }
 
     #[test]
