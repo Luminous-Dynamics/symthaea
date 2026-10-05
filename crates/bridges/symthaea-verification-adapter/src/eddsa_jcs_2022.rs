@@ -21,6 +21,7 @@ use crate::{ResolvedVerificationMethod, ResolvedVerificationMethodMaterial, Snap
 
 pub const EDDSA_JCS_2022: &str = "eddsa-jcs-2022";
 const DATA_INTEGRITY_PROOF: &str = "DataIntegrityProof";
+const MAX_SECURED_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
 
 /// Verify a wire-format JSON document using a strict I-JSON parser before
 /// entering the JCS/Data Integrity pipeline.
@@ -35,6 +36,13 @@ pub fn verify_eddsa_jcs_2022_json(
     resolved_method: &ResolvedVerificationMethod,
     secured_document_json: &[u8],
 ) -> Result<CryptographicVerificationReceipt, SnapshotError> {
+    if secured_document_json.len() > MAX_SECURED_DOCUMENT_BYTES {
+        return Err(SnapshotError::Verification(
+            VerificationFailure::Structural(
+                "secured JSON document exceeds the verifier safety limit".into(),
+            ),
+        ));
+    }
     let secured_document = parse_strict_json(secured_document_json)?;
     verify_eddsa_jcs_2022(
         request,
@@ -715,6 +723,25 @@ mod tests {
             request.claim_representation_digest
         );
         assert!(evidence.validate_structure().is_ok());
+    }
+
+    #[test]
+    fn rejects_oversized_wire_document() {
+        let request = vector_request();
+        let (resolution, resolved_method) = resolved_vector(&request);
+        let oversized = vec![b' '; MAX_SECURED_DOCUMENT_BYTES + 1];
+
+        assert!(matches!(
+            verify_eddsa_jcs_2022_json(
+                &request,
+                &resolution,
+                &resolved_method,
+                &oversized,
+            ),
+            Err(SnapshotError::Verification(
+                VerificationFailure::Structural(message)
+            )) if message.contains("safety limit")
+        ));
     }
 
     #[test]
