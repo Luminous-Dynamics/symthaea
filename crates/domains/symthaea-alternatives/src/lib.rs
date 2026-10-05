@@ -26,7 +26,7 @@ pub mod corpus;
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 3;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-v4";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-v5";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -785,6 +785,8 @@ pub enum FrontierBlocker {
         /// Candidate comparison scope.
         actual_scope: String,
     },
+    /// A burden has explicit evidence references, but none are valid at assessment time.
+    EvidenceUnavailable(Dimension),
     /// Functional performance uses a different unit or scope from the requirement.
     PerformanceIncompatibleScale {
         /// Functional requirement metric.
@@ -1151,30 +1153,24 @@ impl AlternativesEngine {
                             actual_scope: estimate.scope.clone(),
                         });
                     }
+                    (Some(estimate), Some(_))
+                        if !estimate.evidence_ids.is_empty()
+                            && candidate
+                                .linked_evidence_at(
+                                    &estimate.evidence_ids,
+                                    assessed_at_epoch_seconds,
+                                )
+                                .next()
+                                .is_none() =>
+                    {
+                        candidate_blockers.push(FrontierBlocker::EvidenceUnavailable(dimension));
+                    }
                     _ => {}
                 }
             }
 
             let frontier_blocked = !candidate_blockers.is_empty();
-            if frontier_blocked {
-                blockers.insert(candidate.id.clone(), candidate_blockers);
-            }
-
-            let observed_evidence_count = Dimension::ALL
-                .into_iter()
-                .map(|dimension| {
-                    let count = candidate
-                        .burdens
-                        .get(&dimension)
-                        .map(|estimate| {
-                            candidate
-                                .linked_evidence_at(&estimate.evidence_ids, assessed_at_epoch_seconds)
-                                .filter(|e| {
-                                    matches!(
-                                        e.kind,
-                                        EvidenceKind::Observed
-                                            | EvidenceKind::FieldObserved
-                                            | EvidenceKind::ContinuouslyMonitored
+d::ContinuouslyMonitored
                                     )
                                 })
                                 .count()
@@ -1575,6 +1571,51 @@ mod tests {
             .assess(&fixture_requirement(), &[c], None)
             .unwrap();
         assert!(timeless.frontier_blockers.contains_key("expired"));
+    }
+
+    #[test]
+    fn stale_burden_evidence_blocks_burden_comparison() {
+        let mut c = candidate(
+            "stale-burden",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![
+                evidence(
+                    "current",
+                    "source-current",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Supports,
+                    0.9,
+                ),
+                evidence(
+                    "stale",
+                    "source-stale",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Supports,
+                    0.9,
+                ),
+            ],
+        );
+        c.evidence
+            .iter_mut()
+            .find(|e| e.id == "stale")
+            .unwrap()
+            .valid_until_epoch_seconds = Some(100);
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["stale".into()];
+        }
+        for estimate in c.performance.values_mut() {
+            estimate.evidence_ids = vec!["current".into()];
+        }
+
+        let result = AlternativesEngine
+            .assess_at(&fixture_requirement(), &[c], None, Some(200))
+            .unwrap();
+
+        assert!(result.frontier_blockers["stale-burden"]
+            .iter()
+            .any(|blocker| matches!(blocker, FrontierBlocker::EvidenceUnavailable(_))));
     }
 
     #[test]
