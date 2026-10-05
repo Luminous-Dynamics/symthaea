@@ -122,7 +122,9 @@ impl HdcOntologyManifest {
                     || binding.relation_id.len() > HDC_ONTOLOGY_MAX_ID_BYTES
             })
             && unique_concept_node_ids(&self.concepts)
+            && unique_stable_concept_ids(&self.concepts)
             && unique_graph_local_relations(&self.relations)
+            && unique_stable_relation_ids(&self.relations)
             && concept_kinds_consistent(&self.concepts)
     }
 
@@ -590,9 +592,7 @@ impl HdcOntologyConformalEvidenceArtifact {
             && self.calibration_split_manifest_hash != self.evaluation_split_manifest_hash
             && !self.exchangeability_assumptions.trim().is_empty()
             && self.exchangeability_assumptions.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
-            && !self.execution_revision.trim().is_empty()
-            && self.execution_revision != "local"
-            && self.execution_revision.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
+            && is_exact_git_revision(&self.execution_revision)
             && !self.evidence_bundle_id.trim().is_empty()
             && self.evidence_bundle_id.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
     }
@@ -1530,6 +1530,14 @@ fn identity_normalized_graph(
     Ok(GroundedConceptGraph { nodes, edges })
 }
 
+fn is_exact_git_revision(revision: &str) -> bool {
+    if revision.len() != 40 && revision.len() != 64 {
+        return false;
+    }
+    revision.bytes().all(|byte| byte.is_ascii_hexdigit())
+        && !revision.bytes().all(|byte| byte == b'0')
+}
+
 fn validate_manifest(manifest: &HdcOntologyManifest) -> Result<(), String> {
     if !manifest.validates() {
         return Err("invalid ontology identity manifest".into());
@@ -1561,11 +1569,25 @@ fn unique_concept_node_ids(concepts: &[HdcConceptIdentityBinding]) -> bool {
         .all(|binding| ids.insert(binding.node_id.clone()))
 }
 
+fn unique_stable_concept_ids(concepts: &[HdcConceptIdentityBinding]) -> bool {
+    let mut ids = BTreeSet::new();
+    concepts
+        .iter()
+        .all(|binding| ids.insert(binding.concept_id.clone()))
+}
+
 fn unique_graph_local_relations(relations: &[HdcRelationIdentityBinding]) -> bool {
     let mut ids = BTreeSet::new();
     relations
         .iter()
         .all(|binding| ids.insert(binding.local_relation.clone()))
+}
+
+fn unique_stable_relation_ids(relations: &[HdcRelationIdentityBinding]) -> bool {
+    let mut ids = BTreeSet::new();
+    relations
+        .iter()
+        .all(|binding| ids.insert(binding.relation_id.clone()))
 }
 
 fn concept_kinds_consistent(concepts: &[HdcConceptIdentityBinding]) -> bool {
@@ -2092,7 +2114,7 @@ mod tests {
             evaluation_split_manifest_hash: "evaluation-split".into(),
             coverage_target: HdcOntologyCoverageTarget::Marginal,
             exchangeability_assumptions: "pre-registered exchangeability within the declared evaluation population".into(),
-            execution_revision: "revision-1".into(),
+            execution_revision: "0123456789abcdef0123456789abcdef01234567".into(),
             evidence_bundle_id: "bundle-1".into(),
         };
 
@@ -2113,6 +2135,20 @@ mod tests {
         let mut local_execution = artifact.clone();
         local_execution.execution_revision = "local".into();
         assert!(!local_execution.validates());
+
+        let mut short_revision = artifact.clone();
+        short_revision.execution_revision = "0123456789abcdef0123456789abcdef0123456".into();
+        assert!(!short_revision.validates());
+
+        let mut malformed_revision = artifact.clone();
+        malformed_revision.execution_revision =
+            "0123456789abcdef0123456789abcdef0123456g".into();
+        assert!(!malformed_revision.validates());
+
+        let mut sha256_revision = artifact.clone();
+        sha256_revision.execution_revision =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".into();
+        assert!(sha256_revision.validates());
 
         let mut forged_threshold = artifact.clone();
         forged_threshold.calibration.threshold = 0.10;
@@ -2327,7 +2363,7 @@ mod tests {
     }
 
     #[test]
-    fn identity_normalization_rejects_duplicate_stable_concepts() {
+    fn identity_manifest_rejects_duplicate_stable_ids() {
         let duplicate_graph = graph(
             &[
                 ("node-a", ConceptKind::Agent, "ground-a"),
@@ -2335,7 +2371,7 @@ mod tests {
             ],
             &[("node-a", "links", "node-b")],
         );
-        let duplicate_manifest = manifest(
+        let duplicate_concept_manifest = manifest(
             &duplicate_graph,
             &[
                 ("node-a", "concept:agent/shared"),
@@ -2344,8 +2380,22 @@ mod tests {
             &[("links", "relation:links")],
             "scheme:example-v1",
         );
-        assert!(duplicate_manifest.validates());
-        assert!(identity_normalized_graph(&duplicate_graph, &duplicate_manifest).is_err());
+        assert!(!duplicate_concept_manifest.validates());
+        assert!(identity_normalized_graph(&duplicate_graph, &duplicate_concept_manifest).is_err());
+
+        let duplicate_relation_manifest = manifest(
+            &duplicate_graph,
+            &[
+                ("node-a", "concept:agent/a"),
+                ("node-b", "concept:agent/b"),
+            ],
+            &[
+                ("links", "relation:shared"),
+                ("other-links", "relation:shared"),
+            ],
+            "scheme:example-v1",
+        );
+        assert!(!duplicate_relation_manifest.validates());
     }
 
     #[test]
