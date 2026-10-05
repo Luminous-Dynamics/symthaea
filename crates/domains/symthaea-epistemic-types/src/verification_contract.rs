@@ -1545,6 +1545,7 @@ pub enum VerificationFailure {
         expected: ClaimVerificationMethod,
         actual: ClaimVerificationMethod,
     },
+    VerificationMethodNotFound,
     InvalidVerificationMethodUrl,
     InvalidControllerDocumentId,
     ControllerDocumentMismatch {
