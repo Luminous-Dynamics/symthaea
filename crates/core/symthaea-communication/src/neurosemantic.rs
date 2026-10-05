@@ -1061,7 +1061,10 @@ mod tests {
         let mut policy = NeurosemanticHandlingPolicy {
             schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
             policy_provenance_ref: "x".repeat(MAX_NEUROSEMANTIC_ID_BYTES + 1),
-            policy_provenance_hash: content_hash(b"synthetic-policy-record-1"),
+            policy_provenance_hash: compute_policy_provenance_hash(
+                "synthetic-policy-record-1",
+                b"synthetic-policy-record-1",
+            ),
             origin_jurisdiction: "ZA".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
             permitted_secondary_uses: BTreeSet::new(),
@@ -1084,7 +1087,10 @@ mod tests {
             retention: NeurosemanticRetentionPolicy::Ephemeral,
         };
         assert!(!policy.validates());
-        policy.policy_provenance_hash = content_hash(b"synthetic-policy-record-1");
+        policy.policy_provenance_hash = compute_policy_provenance_hash(
+            "synthetic-policy-record-1",
+            b"synthetic-policy-record-1",
+        );
         assert!(policy.validates());
         policy.policy_provenance_hash = "not-a-blake3-digest".into();
         assert!(!policy.validates());
@@ -1131,7 +1137,10 @@ mod tests {
         let policy = NeurosemanticHandlingPolicy {
             schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
             policy_provenance_ref: "synthetic-policy-record-1".into(),
-            policy_provenance_hash: content_hash(b"synthetic-policy-record-1"),
+            policy_provenance_hash: compute_policy_provenance_hash(
+                "synthetic-policy-record-1",
+                b"synthetic-policy-record-1",
+            ),
             origin_jurisdiction: "ZA".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into(), "GB".into()]),
             permitted_secondary_uses: BTreeSet::from([NeurosemanticSecondaryUse::Research]),
@@ -1157,7 +1166,10 @@ mod tests {
         let mut policy = NeurosemanticHandlingPolicy {
             schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
             policy_provenance_ref: "synthetic-policy-record-1".into(),
-            policy_provenance_hash: content_hash(b"synthetic-policy-record-1"),
+            policy_provenance_hash: compute_policy_provenance_hash(
+                "synthetic-policy-record-1",
+                b"synthetic-policy-record-1",
+            ),
             origin_jurisdiction: "za".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["za".into()]),
             permitted_secondary_uses: BTreeSet::new(),
@@ -1617,8 +1629,10 @@ mod tests {
         )
         .unwrap();
         assert!(packet.validate_integrity().is_ok());
-        packet.data_policy.handling.policy_provenance_hash =
-            content_hash(b"synthetic-policy-record-2");
+        packet.data_policy.handling.policy_provenance_hash = compute_policy_provenance_hash(
+            "synthetic-policy-record-1",
+            b"synthetic-policy-record-2",
+        );
         assert!(packet.validate_integrity().is_err());
     }
 
