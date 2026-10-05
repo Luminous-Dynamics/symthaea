@@ -319,6 +319,20 @@ impl ScientificInquirySelectionReceipt {
         blake3::hash(&self.canonical_bytes()).to_hex().to_string()
     }
 
+    pub fn validate_against_prediction_frame(
+        &self,
+        prediction_frame: &PhysicalType,
+    ) -> Result<(), String> {
+        self.validate()?;
+        prediction_frame
+            .validate()
+            .map_err(|error| format!("invalid prediction frame: {}", error.reason))?;
+        if self.prediction_frame_digest != prediction_frame.digest_hex() {
+            return Err("inquiry selection is bound to a different prediction frame".into());
+        }
+        Ok(())
+    }
+
     pub fn validate_against(
         &self,
         hypothesis_handoff: &ScientificHypothesisHandoff,
@@ -555,10 +569,33 @@ mod tests {
         .unwrap();
 
         assert!(receipt.validate().is_ok());
-        assert_eq!(
-            receipt.prediction_frame_digest,
-            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        let matching_frame = PhysicalType::with_kind(
+            QuantityKind::Length,
+            PhysicalDimension::LENGTH,
         );
+        let mismatching_frame = PhysicalType::with_kind(
+            QuantityKind::Time,
+            PhysicalDimension::TIME,
+        );
+        let matching_receipt = ScientificInquirySelectionReceipt::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "selector-v3",
+            9,
+            matching_frame.digest_hex(),
+            2.5,
+            2,
+            2,
+        )
+        .unwrap();
+        assert!(matching_receipt
+            .validate_against_prediction_frame(&matching_frame)
+            .is_ok());
+        assert!(matching_receipt
+            .validate_against_prediction_frame(&mismatching_frame)
+            .is_err());
     }
 
     #[test]
