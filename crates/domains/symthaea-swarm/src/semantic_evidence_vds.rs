@@ -5066,7 +5066,6 @@ mod tests {
             Err(Rfc9942VdpError::ResourceLimitExceeded)
         );
 
-        let _ = nested;
     }
 
     #[test]
