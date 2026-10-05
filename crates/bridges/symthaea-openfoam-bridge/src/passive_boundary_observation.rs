@@ -546,6 +546,54 @@ fn observe_openfoam_patch_geometry_with_neighbour(
     let points = parse_points_list(points_source_bytes)?;
     let face_count = faces.len() as u64;
     let internal_face_count = parse_neighbour_list_count(neighbour_source_bytes)?;
+
+    let radius_mm = interface.radius_mm() as f64;
+    let normal = interface.interface_plane.normal_unit;
+    let origin = interface.interface_plane.origin_mm;
+    let tolerance = tolerance_mm.max(0.001);
+    for face in &faces[start..end] {
+        for &point_index in face {
+            let point = points
+                .get(usize::try_from(point_index).map_err(|_| {
+                    OpenFoamBoundaryObservationError::PointIndexOutOfBounds {
+                        face_index: record.start_face,
+                        point_index,
+                    }
+                })?)
+                .ok_or(OpenFoamBoundaryObservationError::PointIndexOutOfBounds {
+                    face_index: record.start_face,
+                    point_index,
+                })?;
+            let point_mm = [
+                point[0] * point_scale_mm_per_unit,
+                point[1] * point_scale_mm_per_unit,
+                point[2] * point_scale_mm_per_unit,
+            ];
+            let delta = [
+                point_mm[0] - origin[0] as f64,
+                point_mm[1] - origin[1] as f64,
+                point_mm[2] - origin[2] as f64,
+            ];
+            let signed_distance =
+                delta[0] * normal[0] as f64
+                    + delta[1] * normal[1] as f64
+                    + delta[2] * normal[2] as f64;
+            if !signed_distance.is_finite() || signed_distance.abs() > tolerance {
+                return Err(OpenFoamBoundaryObservationError::PatchGeometryMismatch);
+            }
+
+            let radial = [
+                delta[0] - signed_distance * normal[0] as f64,
+                delta[1] - signed_distance * normal[1] as f64,
+                delta[2] - signed_distance * normal[2] as f64,
+            ];
+            let radial_distance =
+                (radial[0] * radial[0] + radial[1] * radial[1] + radial[2] * radial[2]).sqrt();
+            if !radial_distance.is_finite() || radial_distance > radius_mm + tolerance {
+                return Err(OpenFoamBoundaryObservationError::PatchGeometryMismatch);
+            }
+        }
+    }
     if internal_face_count > face_count {
         return Err(
             OpenFoamBoundaryObservationError::BoundaryPatchRangeExceedsFaces {
@@ -1761,6 +1809,83 @@ mod tests {
                 expected_start: 1,
                 actual_start: 2,
             }) if patch == "outlet"
+        ));
+    }
+
+    #[test]
+    fn patch_vertex_must_stay_on_interface_plane_and_inside_aperture() {
+        let boundary = br#"1
+(
+    inlet { type patch; nFaces 1; startFace 0; }
+)
+"#;
+        let faces = br#"1
+(
+    4(0 1 2 3)
+)
+"#;
+        let good_points = br#"4
+(
+    (2 0 0)
+    (0 2 0)
+    (-2 0 0)
+    (0 -2 0)
+)
+"#;
+        let bad_points = br#"4
+(
+    (2 0 0)
+    (0 2 0)
+    (-2 0 0)
+    (0 -2 0.2)
+)
+"#;
+        let interface = {
+            use symthaea_passive_void_compiler::{
+                BoundaryConditionDomain, InterfacePlane, PortAperture, PortInterface,
+                SolverBoundaryIdentity,
+            };
+            use symthaea_passive_void_graph::PortId;
+            PortInterface::new(
+                PortId(10),
+                [0.0, 0.0, 0.0],
+                PortAperture::Circular { radius_mm: 2.0 },
+                [0.0, 0.0, 1.0],
+                InterfacePlane::new([0.0, 0.0, 0.0], [0.0, 0.0, 1.0]).unwrap(),
+                SolverBoundaryIdentity {
+                    domain: BoundaryConditionDomain::Fluidic,
+                    id: 7,
+                },
+            )
+            .unwrap()
+        };
+        let candidate = symthaea_fabrication_kernel::mesh::TriangleMesh {
+            vertices: vec![
+                [0.0, 0.0, 0.0],
+                [2.0, 0.0, 0.0],
+                [0.0, 2.0, 0.0],
+                [-2.0, 0.0, 0.0],
+                [0.0, -2.0, 0.0],
+            ],
+            normals: vec![[0.0, 0.0, 1.0]; 5],
+            indices: vec![[0,1,2],[0,2,3],[0,3,4],[0,4,1]],
+        };
+
+        let neighbour = br#"0
+(
+)
+"#;
+        observe_openfoam_patch_geometry_with_neighbour(
+            boundary, faces, good_points, neighbour, "inlet",
+            &interface, &candidate, 0.05, 1.0,
+        ).unwrap();
+
+        assert!(matches!(
+            observe_openfoam_patch_geometry_with_neighbour(
+                boundary, faces, bad_points, neighbour, "inlet",
+                &interface, &candidate, 0.05, 1.0,
+            ),
+            Err(OpenFoamBoundaryObservationError::PatchGeometryMismatch)
         ));
     }
 
