@@ -106,6 +106,101 @@ pub fn observe_openfoam_boundary_patch(
 
 type OpenFoamBoundaryEntityObservation = SolverBoundaryEntityObservation;
 
+fn observe_openfoam_boundary_patch_and_faces(
+    boundary_source_bytes: &[u8],
+    faces_source_bytes: &[u8],
+    patch_name: &str,
+) -> Result<
+    (OpenFoamBoundaryPatchRecord, OpenFoamBoundaryEntityObservation),
+    OpenFoamBoundaryObservationError,
+> {
+    let (record, _) =
+        observe_openfoam_boundary_patch(boundary_source_bytes, patch_name)?;
+    let face_count = parse_face_list_count(faces_source_bytes)?;
+
+    let end_face = record
+        .start_face
+        .checked_add(record.n_faces)
+        .ok_or(OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
+    if end_face > face_count {
+        return Err(
+            OpenFoamBoundaryObservationError::BoundaryFaceRangeOutOfBounds {
+                start_face: record.start_face,
+                n_faces: record.n_faces,
+                face_count,
+            },
+        );
+    }
+
+    let mut source_hasher = Hasher::new();
+    source_hasher.update(b"openfoam-polyMesh-boundary-and-faces-source:v1");
+    source_hasher.update(&(boundary_source_bytes.len() as u64).to_le_bytes());
+    source_hasher.update(boundary_source_bytes);
+    source_hasher.update(&(faces_source_bytes.len() as u64).to_le_bytes());
+    source_hasher.update(faces_source_bytes);
+    let source_digest = *source_hasher.finalize().as_bytes();
+
+    let mut identity = Vec::new();
+    identity.extend_from_slice(b"openfoam-polyMesh-boundary-patch-and-face-list:v1");
+    let boundary_identity = record.canonical_identity_bytes();
+    identity.extend_from_slice(&(boundary_identity.len() as u64).to_le_bytes());
+    identity.extend_from_slice(&boundary_identity);
+    identity.extend_from_slice(&face_count.to_le_bytes());
+
+    let observation = SolverBoundaryEntityObservation::new(
+        "openfoam-polyMesh-boundary-patch-and-face-list:v1",
+        identity,
+        source_digest,
+    )
+    .map_err(Into::into)?;
+
+    Ok((record, observation))
+}
+
+fn parse_face_list_count(
+    source_bytes: &[u8],
+) -> Result<u64, OpenFoamBoundaryObservationError> {
+    let text = std::str::from_utf8(source_bytes)
+        .map_err(|_| OpenFoamBoundaryObservationError::InvalidUtf8)?;
+    let stripped = strip_comments(text)?;
+    let tokens = tokenize(&stripped)?;
+
+    let mut brace_depth = 0usize;
+    let mut list_count = None;
+    for index in 0..tokens.len().saturating_sub(1) {
+        match tokens[index] {
+            Token::LBrace => {
+                brace_depth = brace_depth
+                    .checked_add(1)
+                    .ok_or(OpenFoamBoundaryObservationError::ArithmeticOverflow)?;
+            }
+            Token::RBrace => {
+                brace_depth = brace_depth
+                    .checked_sub(1)
+                    .ok_or(OpenFoamBoundaryObservationError::InvalidFaceListEntry)?;
+            }
+            Token::Number(_) | Token::Ident(_) | Token::LParen | Token::RParen | Token::Semi => {}
+        }
+
+        if brace_depth == 0
+            && matches!(&tokens[index], Token::Number(_))
+            && matches!(tokens[index + 1], Token::LParen)
+        {
+            if list_count.is_some() {
+                return Err(OpenFoamBoundaryObservationError::DuplicateFaceList);
+            }
+            let Token::Number(count) = &tokens[index] else {
+                unreachable!();
+            };
+            list_count = Some(count.parse::<u64>().map_err(|_| {
+                OpenFoamBoundaryObservationError::InvalidFaceListEntry
+            })?);
+        }
+    }
+
+    list_count.ok_or(OpenFoamBoundaryObservationError::MissingFaceList)
+}
+
 fn parse_boundary_patch_list(
     tokens: &[Token],
 ) -> Result<Vec<OpenFoamBoundaryPatchRecord>, OpenFoamBoundaryObservationError> {
@@ -374,6 +469,7 @@ fn skip_value(tokens: &[Token], index: &mut usize) -> Result<(), OpenFoamBoundar
 /// candidate mesh.
 pub struct OpenFoamPassiveBoundaryAdapter {
     source_bytes: Vec<u8>,
+    faces_source_bytes: Option<Vec<u8>>,
     patch_name: String,
     tolerance_mm: f64,
 }
@@ -393,9 +489,21 @@ impl OpenFoamPassiveBoundaryAdapter {
         }
         Ok(Self {
             source_bytes: source_bytes.into(),
+            faces_source_bytes: None,
             patch_name,
             tolerance_mm,
         })
+    }
+
+    pub fn new_with_faces(
+        source_bytes: impl Into<Vec<u8>>,
+        faces_source_bytes: impl Into<Vec<u8>>,
+        patch_name: impl Into<String>,
+        tolerance_mm: f64,
+    ) -> Result<Self, OpenFoamBoundaryObservationError> {
+        let mut adapter = Self::new(source_bytes, patch_name, tolerance_mm)?;
+        adapter.faces_source_bytes = Some(faces_source_bytes.into());
+        Ok(adapter)
     }
 }
 
@@ -440,10 +548,17 @@ impl symthaea_passive_solver_binding::SolverBoundaryInputEntityObserver
         symthaea_passive_solver_binding::SolverBoundaryEntityAttestation,
         symthaea_passive_solver_binding::SolverBindingError,
     > {
-        let (_, observation) = observe_openfoam_boundary_patch(
-            &self.source_bytes,
-            &self.patch_name,
-        )
+        let (_, observation) = match &self.faces_source_bytes {
+            Some(faces_source_bytes) => observe_openfoam_boundary_patch_and_faces(
+                &self.source_bytes,
+                faces_source_bytes,
+                &self.patch_name,
+            ),
+            None => observe_openfoam_boundary_patch(
+                &self.source_bytes,
+                &self.patch_name,
+            ),
+        }
         .map_err(|error| {
             symthaea_passive_solver_binding::SolverBindingError::ExternalObservation(
                 format!("{error:?}"),
@@ -632,6 +747,68 @@ mod tests {
         assert_eq!(record.patch_type, "patch");
         assert_eq!(record.n_faces, 1);
         assert_eq!(record.start_face, 0);
+    }
+
+    #[test]
+    fn boundary_range_must_fit_within_faces_list() {
+        let faces = br#"3
+(
+    3(0 1 2)
+    3(2 3 4)
+    3(4 5 6)
+)
+"#;
+        let boundary = br#"1
+(
+    inlet { type patch; nFaces 2; startFace 1; }
+)
+"#;
+        let (_, observation) =
+            observe_openfoam_boundary_patch_and_faces(boundary, faces, "inlet")
+                .unwrap();
+        assert_eq!(
+            observation.entity_kind,
+            "openfoam-polyMesh-boundary-patch-and-face-list:v1"
+        );
+
+        let out_of_bounds = br#"1
+(
+    inlet { type patch; nFaces 2; startFace 2; }
+)
+"#;
+        assert!(matches!(
+            observe_openfoam_boundary_patch_and_faces(&out_of_bounds, faces, "inlet"),
+            Err(OpenFoamBoundaryObservationError::BoundaryFaceRangeOutOfBounds {
+                start_face: 2,
+                n_faces: 2,
+                face_count: 3
+            })
+        ));
+    }
+
+    #[test]
+    fn face_source_changes_change_combined_observation_lineage() {
+        let boundary = br#"1
+(
+    inlet { type patch; nFaces 1; startFace 0; }
+)
+"#;
+        let faces = br#"1
+(
+    3(0 1 2)
+)
+"#;
+        let changed_faces = br#"1
+(
+    3(0 2 1)
+)
+"#;
+        let (_, first) =
+            observe_openfoam_boundary_patch_and_faces(boundary, faces, "inlet").unwrap();
+        let (_, second) =
+            observe_openfoam_boundary_patch_and_faces(boundary, changed_faces, "inlet").unwrap();
+        assert_ne!(first.source_digest, second.source_digest);
+        assert_ne!(first.digest(), second.digest());
     }
 
     #[test]
