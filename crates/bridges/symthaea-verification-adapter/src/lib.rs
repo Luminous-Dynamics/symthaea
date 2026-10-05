@@ -299,10 +299,10 @@ impl JsonControllerDocumentSnapshotAdapter {
         let document_bytes = snapshot.document.as_bytes();
         let actual_document_digest = sha256_hex(document_bytes);
 
-        let document = serde_json::from_slice::<Value>(document_bytes).map_err(|error| {
-            SnapshotError::Malformed(format!(
-                "controller document is not valid JSON: {error}"
-            ))
+        let document = eddsa_jcs_2022::parse_strict_json(document_bytes).map_err(|_| {
+            SnapshotError::Malformed(
+                "controller document is not valid strict I-JSON".into(),
+            )
         })?;
 
         let object = document.as_object().ok_or_else(|| {
@@ -1048,6 +1048,23 @@ mod tests {
         let dereference = resolution.controller_document_dereference.as_ref().unwrap();
         assert_eq!(dereference.source, ControllerDocumentResolutionSource::ApplicationSnapshot);
         assert!(dereference.digest_multibase.is_some());
+    }
+
+    #[test]
+    fn controller_document_rejects_duplicate_member_names_before_resolution() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = r#"{"id":"https://example.test/controller","id":"https://example.test/other"}"#.into();
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference)
+                .unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("strict I-JSON")
+        ));
     }
 
     #[test]
