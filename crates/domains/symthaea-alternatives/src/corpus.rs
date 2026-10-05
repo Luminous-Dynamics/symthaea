@@ -8,7 +8,7 @@ use blake3::Hasher;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-const BENCHMARK_MANIFEST_SCHEMA_VERSION: u16 = 2;
+const BENCHMARK_MANIFEST_SCHEMA_VERSION: u16 = 3;
 
 /// One frozen benchmark scenario.
 #[derive(Debug, Clone)]
@@ -47,6 +47,7 @@ fn evidence(
         scope: "benchmark:functional-unit-v1|global".into(),
         unit: Some("burden-unit".into()),
         as_of: Some("benchmark-v1".into()),
+        observed_at_epoch_seconds: Some(1_000),
         valid_from_epoch_seconds: None,
         valid_until_epoch_seconds: None,
         derivation: matches!(kind, EvidenceKind::Simulated | EvidenceKind::Derived).then(
@@ -57,6 +58,18 @@ fn evidence(
                 configuration_hash: Some("benchmark-config-v1".into()),
             },
         ),
+    }
+}
+
+fn freshness_policy(max_age_seconds: u64) -> EvidenceFreshnessPolicy {
+    EvidenceFreshnessPolicy {
+        policy_id: "benchmark-freshness".into(),
+        policy_revision: "v1".into(),
+        policy_digest: "benchmark-freshness-digest-v1".into(),
+        max_age_seconds_by_kind: EvidenceKind::ALL
+            .into_iter()
+            .map(|kind| (kind, max_age_seconds))
+            .collect(),
     }
 }
 
@@ -489,6 +502,79 @@ mod tests {
             .confidence = 0.91;
 
         assert_ne!(original_hash, changed.manifest_hash());
+    }
+
+    #[test]
+    fn freshness_policy_requires_assessment_timestamp() {
+        let case = five_pathway_adversarial_case();
+        let policy = freshness_policy(100);
+
+        let error = AlternativesEngine.assess_at_with_freshness(
+            &case.requirement,
+            &case.candidates,
+            Some(case.incumbent_id),
+            None,
+            Some(&policy),
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            AssessmentError::FreshnessPolicyRequiresAssessmentTimestamp
+        );
+    }
+
+    #[test]
+    fn freshness_policy_distinguishes_validity_from_recency() {
+        let case = five_pathway_adversarial_case();
+        let policy = freshness_policy(100);
+
+        let fresh = AlternativesEngine
+            .assess_at_with_freshness(
+                &case.requirement,
+                &case.candidates,
+                Some(case.incumbent_id),
+                Some(1_050),
+                Some(&policy),
+            )
+            .unwrap();
+
+        let direct_fresh = fresh
+            .candidates
+            .iter()
+            .find(|candidate| candidate.candidate_id == "direct-substitute")
+            .unwrap();
+        assert!(!direct_fresh.frontier_blocked);
+        assert_eq!(fresh.freshness_policy, Some(policy.clone()));
+
+        let mut stale_case = case.clone();
+        for candidate in &mut stale_case.candidates {
+            for evidence in &mut candidate.evidence {
+                evidence.observed_at_epoch_seconds = Some(800);
+            }
+        }
+
+        let stale = AlternativesEngine
+            .assess_at_with_freshness(
+                &stale_case.requirement,
+                &stale_case.candidates,
+                Some(stale_case.incumbent_id),
+                Some(1_050),
+                Some(&policy),
+            )
+            .unwrap();
+
+        let direct_stale = stale
+            .candidates
+            .iter()
+            .find(|candidate| candidate.candidate_id == "direct-substitute")
+            .unwrap();
+        assert!(direct_stale.frontier_blocked);
+        assert_eq!(direct_stale.qualification, QualificationState::Hypothesis);
+        assert!(stale.frontier_blockers["direct-substitute"]
+            .iter()
+            .any(|blocker| matches!(blocker, FrontierBlocker::EvidenceUnavailable(_))));
+        assert_ne!(fresh.receipt.payload_hash, stale.receipt.payload_hash);
     }
 
     #[test]
