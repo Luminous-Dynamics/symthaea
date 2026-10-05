@@ -737,7 +737,8 @@ impl Rfc9942ReceiptEnvelope {
         let mut ph=CborReader::new(&protected);
         let protected_entries=if protected.is_empty(){Vec::new()}else{
             let entries=ph.read_map_entries_bounded(32).map_err(|error|match error{
-                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+                Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidStructure,
                 _=>Rfc9942VdpError::InvalidEncoding,
             })?;
             ph.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
@@ -792,7 +793,8 @@ impl Rfc9942ReceiptEnvelope {
 
         let unprotected_start = reader.offset;
         let unprotected_entries=reader.read_map_entries_bounded_with_limits_and_bytes(32, MAX_RFC9942_RECEIPT_BYTES, 64, MAX_RFC9942_RECEIPT_ENCODED_BYTES).map_err(|error|match error{
-            Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+            Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidStructure,
             _=>Rfc9942VdpError::InvalidEncoding,
         })?;
         let payload_start = reader.offset;
@@ -964,7 +966,8 @@ impl Rfc9942SignatureWithReceipts {
             Vec::new()
         } else {
             reader.read_map_entries_bounded(32).map_err(|error|match error {
-                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+                Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidStructure,
                 _=>Rfc9942VdpError::InvalidEncoding,
             })?
         };
@@ -1194,7 +1197,8 @@ impl Rfc9942SignatureWithReceipts {
         } else {
             let entries=protected_reader.read_map_entries_bounded(32)
                 .map_err(|error|match error {
-                    Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+                    Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidStructure,
                     _=>Rfc9942VdpError::InvalidEncoding,
                 })?;
             protected_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
@@ -1259,7 +1263,8 @@ impl Rfc9942SignatureWithReceipts {
         let unprotected_start=reader.offset;
         let unprotected_entries=reader.read_map_entries_bounded_with_limits_and_bytes(32, MAX_RFC9942_RECEIPT_BYTES, 64, MAX_RFC9942_RECEIPTS_ENCODED_BYTES_TOTAL)
             .map_err(|error|match error {
-                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+                Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidStructure,
                 _=>Rfc9942VdpError::InvalidEncoding,
             })?;
         let mut unprotected_extensions=Vec::new();
@@ -1408,7 +1413,8 @@ impl Rfc9942ReceiptCollection {
             MAX_RFC9942_RECEIPT_BYTES,
             MAX_RFC9942_RECEIPTS_BYTES_TOTAL,
         ).map_err(|error|match error {
-            Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded,
+            Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded,
+            Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidStructure,
             _=>Rfc9942VdpError::InvalidEncoding,
         })?;
         if items.is_empty() {
@@ -1793,9 +1799,10 @@ impl Rfc9942Vdp {
     }
 
     fn from_reader(reader: &mut CborReader<'_>) -> Result<Self, Rfc9942VdpError> {
-        let entries=reader.read_map_entries_bounded_with_limits_and_bytes(1, MAX_RFC9942_PROOF_BYTES, MAX_RFC9942_PROOFS, MAX_RFC9942_VDP_ENCODED_BYTES)
+        let entries=reader.read_map_entries_bounded_with_limits_and_bytes(32, MAX_RFC9942_PROOF_BYTES, MAX_RFC9942_PROOFS, MAX_RFC9942_VDP_ENCODED_BYTES)
             .map_err(|error|match error {
-                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+                Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidStructure,
                 _=>Rfc9942VdpError::InvalidEncoding,
             })?;
         if entries.len()!=1{return Err(Rfc9942VdpError::InvalidStructure);}
@@ -1812,7 +1819,8 @@ impl Rfc9942Vdp {
             MAX_RFC9942_PROOF_BYTES,
             MAX_RFC9942_PROOFS*MAX_RFC9942_PROOF_BYTES,
         ).map_err(|error|match error {
-            Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+            Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidStructure,
             _=>Rfc9942VdpError::InvalidEncoding,
         })?;
         value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
@@ -1951,6 +1959,8 @@ pub enum Rfc9162ProofDecodeError {
     InvalidEncoding,
     #[error("invalid proof structure")]
     InvalidStructure,
+    #[error("CBOR decoder defensive resource limit exceeded")]
+    ResourceLimitExceeded,
     #[error("invalid hash length")]
     InvalidHashLength,
     #[error("trailing bytes after proof")]
@@ -2128,7 +2138,7 @@ impl<'a> CborReader<'a> {
         };
 
         if count.is_some_and(|count| count > max_entries) {
-            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+            return Err(Rfc9162ProofDecodeError::ResourceLimitExceeded);
         }
 
         let mut entries=Vec::with_capacity(count.unwrap_or(max_entries.min(8)));
@@ -2151,7 +2161,7 @@ impl<'a> CborReader<'a> {
             }
 
             if entries.len()>=max_entries {
-                return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                return Err(Rfc9162ProofDecodeError::ResourceLimitExceeded);
             }
 
             let key_start=self.offset;
@@ -2693,7 +2703,7 @@ impl<'a> CborReader<'a> {
                     return Ok(());
                 }
                 if chunks >= MAX_CBOR_BSTR_CHUNKS {
-                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    return Err(Rfc9162ProofDecodeError::ResourceLimitExceeded);
                 }
                 let chunk_initial = *self
                     .bytes
@@ -2796,7 +2806,7 @@ impl<'a> CborReader<'a> {
                     return Ok(());
                 }
                 if chunks >= MAX_CBOR_TSTR_CHUNKS {
-                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    return Err(Rfc9162ProofDecodeError::ResourceLimitExceeded);
                 }
                 let chunk_initial = *self
                     .bytes
@@ -2962,7 +2972,7 @@ impl<'a> CborReader<'a> {
                     return Ok(items);
                 }
                 if items.len()>=max_items {
-                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    return Err(Rfc9162ProofDecodeError::ResourceLimitExceeded);
                 }
                 let start=self.offset;
                 self.skip_value(0)?;
@@ -2970,7 +2980,7 @@ impl<'a> CborReader<'a> {
             }
         }
         let count=match ai{0..=23=>ai as usize,24=>usize::try_from(self.read_uint(1,24)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?,25=>usize::try_from(self.read_uint(2,256)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?,26=>usize::try_from(self.read_uint(4,65_536)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?,27=>usize::try_from(self.read_uint(8,4_294_967_296)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)};
-        if count>max_items{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
+        if count>max_items{return Err(Rfc9162ProofDecodeError::ResourceLimitExceeded)}
         items.reserve(count);
         for _ in 0..count {
             let start=self.offset;
@@ -3010,7 +3020,7 @@ impl<'a> CborReader<'a> {
             Some(usize::try_from(count).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?)
         };
         if count.is_some_and(|count| count>max_items) {
-            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+            return Err(Rfc9162ProofDecodeError::ResourceLimitExceeded);
         }
 
         let mut items=Vec::new();
@@ -3039,7 +3049,7 @@ impl<'a> CborReader<'a> {
                 return Ok(items);
             }
             if items.len()>=max_items {
-                return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                return Err(Rfc9162ProofDecodeError::ResourceLimitExceeded);
             }
             let remaining_total = max_total_len
                 .checked_sub(total_len)
