@@ -620,6 +620,21 @@ async function runMode(mode) {
         blank_hash: blankMovieHash,
         pixel_statistics: await canvasPixelStatistics(page, '#webgpu-movie-canvas'),
       };
+      diagnostics.surface_configuration = await page.evaluate(() => {
+        const read = selector => {
+          const canvas = document.querySelector(selector);
+          return {
+            format: canvas?.getAttribute('data-qualification-surface-format') || null,
+            formats: canvas?.getAttribute('data-qualification-surface-formats') || null,
+            alpha_mode: canvas?.getAttribute('data-qualification-alpha-mode') || null,
+            present_mode: canvas?.getAttribute('data-qualification-present-mode') || null,
+          };
+        };
+        return {
+          cognitive: read('#webgpu-cognitive-canvas'),
+          movie: read('#webgpu-movie-canvas'),
+        };
+      });
 
       await page.screenshot({
         path: path.join(SCREENSHOT_DIR, \`${mode}-preassert.png\`),
