@@ -1514,6 +1514,71 @@ fn exhaustive_noisy_candidate_ledger_separates_codeword_and_factor_ambiguity() {
 }
 
 #[test]
+fn noisy_candidate_boundary_is_translation_invariant_across_codewords() {
+    // A linear code is translation-invariant under XOR: every codeword sees
+    // the same local Hamming geometry. Re-run the radius-2 oracle around
+    // every clean codeword so the 9/28/12 boundary is not tied to one target.
+    let code = RandomLinearCode::from_basis(vec![
+        BinaryCodeword::from_words(8, vec![0b1111_0000]),
+        BinaryCodeword::from_words(8, vec![0b0000_1111]),
+    ])
+    .expect("fixed rank-2 code");
+    let codewords = code.enumerate();
+    let hamming_distance = |left: &BinaryCodeword, right: &BinaryCodeword| {
+        left.words()
+            .iter()
+            .zip(right.words())
+            .map(|(a, b)| (a ^ b).count_ones() as usize)
+            .sum::<usize>()
+    };
+
+    for clean in &codewords {
+        let mut subhalf_observations = 0usize;
+        let mut boundary_observations = 0usize;
+        let mut boundary_ambiguous_observations = 0usize;
+
+        for mask in 0..(1usize << 8) {
+            let error_weight = mask.count_ones() as usize;
+            if error_weight > 2 {
+                continue;
+            }
+
+            let mut error = BinaryCodeword::zero(8);
+            for index in 0..8 {
+                if (mask >> index) & 1 == 1 {
+                    error.set_bit(index, true);
+                }
+            }
+            let observation = clean.bound(&error);
+            let distances: Vec<_> = codewords
+                .iter()
+                .map(|candidate| hamming_distance(&observation, candidate))
+                .collect();
+            let nearest_distance = *distances.iter().min().expect("codebook is non-empty");
+            let nearest_count = distances
+                .iter()
+                .filter(|&&distance| distance == nearest_distance)
+                .count();
+            assert_eq!(nearest_distance, error_weight);
+
+            if error_weight <= 1 {
+                subhalf_observations += 1;
+                assert_eq!(nearest_count, 1);
+            } else {
+                boundary_observations += 1;
+                if nearest_count > 1 {
+                    boundary_ambiguous_observations += 1;
+                }
+            }
+        }
+
+        assert_eq!(subhalf_observations, 9);
+        assert_eq!(boundary_observations, 28);
+        assert_eq!(boundary_ambiguous_observations, 12);
+    }
+}
+
+#[test]
 fn minimum_distance_boundary_can_map_one_valid_codeword_to_another() {
     // At d_min, a corruption can itself be a non-zero codeword. The observed
     // vector is then another valid codeword, so an exact span solver has no
