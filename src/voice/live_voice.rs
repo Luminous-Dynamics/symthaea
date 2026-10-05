@@ -278,13 +278,6 @@ impl LiveVoice {
     }
 
     #[cfg(feature = "ssm_language")]
-    fn arousal_for_plan(base_arousal: f32, pitch_range: f32) -> f32 {
-        let normalized = base_arousal.clamp(0.0, 1.0);
-        let range = pitch_range.clamp(0.65, 1.45);
-        (0.5 + (normalized - 0.5) * range).clamp(0.0, 1.0)
-    }
-
-    #[cfg(feature = "ssm_language")]
     fn pitch_accent_for_plan(segment_is_focus: bool, prominence: f32) -> PitchAccent {
         if segment_is_focus && prominence >= 0.82 {
             PitchAccent::RiseHigh
@@ -412,14 +405,11 @@ impl LiveVoice {
                     utterance_progress: utterance_progress.clamp(0.0, 1.0),
                     phoneme_progress: progress,
                     stress: segment.stress.ordinal(),
-                    // Broca's pitch_range widens/narrows F0 excursion via the existing
-                    // arousal channel rather than overwriting the speaker's authoritative
-                    // base pitch from the vocal-tract controller.
+                    // Keep planned pitch range and speaker-state arousal as separate
+                    // prosody controls. The pitch range never overwrites authoritative base F0.
                     base_f0: self.streaming.base_f0(),
-                    arousal: Self::arousal_for_plan(
-                        state.emotional_arousal,
-                        plan.pitch_range,
-                    ),
+                    arousal: state.emotional_arousal.clamp(0.0, 1.0),
+                    pitch_range: plan.pitch_range,
                     intonation,
                     phrase_index,
                     phrase_progress: phrase_progress.clamp(0.0, 1.0),
@@ -755,21 +745,6 @@ mod tests {
 
     #[cfg(feature = "ssm_language")]
     #[test]
-    fn test_plan_pitch_range_adapter_is_bounded_and_monotonic() {
-        let narrow = LiveVoice::arousal_for_plan(0.8, 0.65);
-        let neutral = LiveVoice::arousal_for_plan(0.8, 1.0);
-        let wide = LiveVoice::arousal_for_plan(0.8, 1.45);
-
-        assert!(narrow.is_finite() && wide.is_finite());
-        assert!(narrow < neutral && neutral < wide);
-        assert_eq!(LiveVoice::arousal_for_plan(-2.0, 1.0), 0.0);
-        assert_eq!(LiveVoice::arousal_for_plan(2.0, 1.0), 1.0);
-        assert_eq!(LiveVoice::arousal_for_plan(0.8, -3.0), narrow);
-        assert_eq!(LiveVoice::arousal_for_plan(0.8, 3.0), wide);
-    }
-
-    #[cfg(feature = "ssm_language")]
-    #[test]
     fn test_plan_prominence_selects_typed_pitch_accent() {
         assert_eq!(
             LiveVoice::pitch_accent_for_plan(true, 0.90),
@@ -892,11 +867,6 @@ mod tests {
 
         let genesis = GenesisSeed::from_phrase("plan-native-pitch-test");
         let mut voice = LiveVoice::new_headless(&genesis);
-        voice.set_cognitive_state(VoiceCognitiveState {
-            emotional_arousal: 0.75,
-            ..Default::default()
-        });
-
         let narrow = make_plan(0.65);
         let wide = make_plan(1.45);
 
