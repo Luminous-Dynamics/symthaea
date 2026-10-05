@@ -280,6 +280,9 @@ impl FunctionalRequirement {
         if self.id.is_empty() || self.description.is_empty() {
             return Err(AssessmentError::EmptyRequirementIdentity);
         }
+        if self.constraints.is_empty() {
+            return Err(AssessmentError::EmptyFunctionalConstraints);
+        }
         for bound in self.constraints.values() {
             match bound {
                 RequirementBound::AtLeast(v) | RequirementBound::AtMost(v) => {
@@ -392,6 +395,15 @@ impl CandidatePathway {
             .iter()
             .map(|e| e.id.as_str())
             .collect::<BTreeSet<_>>();
+        for performance in self.performance.values() {
+            for evidence_id in &performance.evidence_ids {
+                if !evidence_ids.contains(evidence_id.as_str()) {
+                    return Err(AssessmentError::MissingEvidenceReference(
+                        evidence_id.clone(),
+                    ));
+                }
+            }
+        }
         for estimate in self.burdens.values() {
             Interval::new(estimate.interval.lower, estimate.interval.upper)?;
             if estimate.unit.is_empty() || estimate.scope.is_empty() {
@@ -707,6 +719,20 @@ pub enum FrontierBlocker {
     },
 }
 
+/// Functional performance uses a different unit or scope from the requirement.
+    PerformanceIncompatibleScale {
+        /// Functional requirement metric.
+        metric: String,
+        /// Expected comparison unit.
+        expected_unit: String,
+        /// Candidate unit.
+        actual_unit: String,
+        /// Expected comparison scope.
+        expected_scope: String,
+        /// Candidate scope.
+        actual_scope: String,
+    }
+
 /// Candidate-versus-incumbent burden transfer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BurdenTransfer {
@@ -797,6 +823,8 @@ pub enum AssessmentError {
     NoBurdenData,
     /// A burden estimate lacks a comparable unit or scope.
     EmptyBurdenScale,
+    /// A functional requirement contains no performance constraints.
+    EmptyFunctionalConstraints,
     /// A performance estimate lacks a comparable unit or scope.
     EmptyPerformanceScale,
     /// The requirement does not declare a comparison scale for a dimension.
