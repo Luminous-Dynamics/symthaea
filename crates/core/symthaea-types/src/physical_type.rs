@@ -633,6 +633,7 @@ mod tests {
                 RationalScale::ONE,
                 RationalScale { numerator: 27315, denominator: 100 },
             ),
+            semantic_id: None,
         };
         assert_eq!(celsius.transform_to_si.offset.numerator, 27315);
     }
