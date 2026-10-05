@@ -971,9 +971,24 @@ impl CandidatePathway {
             };
             capability.unit == required.unit
                 && capability.scope == required.scope
+                && capability.basis == required.basis
                 && capability.interval.lower <= required.interval.lower
                 && capability.interval.upper >= required.interval.upper
                 && self.operating_evidence_is_supported_at(condition, as_of, freshness_policy)
+        })
+    }
+
+    fn burden_scales_match_requirement(&self, requirement: &FunctionalRequirement) -> bool {
+        Dimension::ALL.iter().all(|dimension| {
+            let Some(estimate) = self.burdens.get(dimension) else {
+                return false;
+            };
+            let Some(scale) = requirement.comparison_scales.get(dimension) else {
+                return false;
+            };
+            estimate.unit == scale.unit
+                && estimate.scope == scale.scope
+                && estimate.basis == scale.basis
         })
     }
 
@@ -992,6 +1007,7 @@ impl CandidatePathway {
             };
             estimate.unit == scale.unit
                 && estimate.scope == scale.scope
+                && estimate.basis == scale.basis
                 && self.performance_evidence_is_supported_at(metric, as_of, freshness_policy)
         })
     }
@@ -1056,6 +1072,7 @@ impl CandidatePathway {
     ) -> QualificationState {
         if !self.performance_is_supported(requirement, as_of, freshness_policy)
             || !self.operating_envelope_is_supported(requirement, as_of, freshness_policy)
+            || !self.burden_scales_match_requirement(requirement)
             || self.burdens.is_empty()
             || self.burdens.values().all(|estimate| {
                 let linked = self
@@ -1971,7 +1988,12 @@ impl AlternativesEngine {
                         (Some(estimate), Some(scale))
                             if estimate.unit == scale.unit
                                 && estimate.scope == scale.scope
-                                && candidate.performance_evidence_is_supported_at(metric, assessed_at_epoch_seconds, freshness_policy) =>
+                                && estimate.basis == scale.basis
+                                && candidate.performance_evidence_is_supported_at(
+                                    metric,
+                                    assessed_at_epoch_seconds,
+                                    freshness_policy,
+                                ) =>
                         {
                             bound.check(Some(estimate.interval))
                         }
