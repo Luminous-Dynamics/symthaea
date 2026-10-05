@@ -66,6 +66,66 @@ pub struct PhonologicalPlanRealizationReceipt {
     pub audio_blake3: String,
 }
 
+#[cfg(feature = "ssm_language")]
+impl PhonologicalPlanRealizationReceipt {
+    /// Independently verify the receipt's plan-bound fields and internal sample accounting.
+    pub fn verify_against_plan(&self, plan: &PhonologicalPlan) -> Result<()> {
+        plan.validate()
+            .map_err(|error| anyhow::anyhow!("invalid phonological plan: {error}"))?;
+
+        if self.schema_version != 1 {
+            anyhow::bail!("unsupported realization receipt schema: {}", self.schema_version);
+        }
+        if self.plan_version != plan.version {
+            anyhow::bail!("realization receipt plan version does not match plan");
+        }
+
+        let expected_grounding =
+            blake3::hash(plan.grounding_surface().as_bytes()).to_hex().to_string();
+        if self.plan_grounding_blake3 != expected_grounding {
+            anyhow::bail!("realization receipt plan grounding does not match plan");
+        }
+
+        if self.segment_count != plan.segments.len()
+            || self.rate != plan.rate
+            || self.pitch_range != plan.pitch_range
+            || self.prominence != plan.prominence
+            || self.pause_weight != plan.pause_weight
+        {
+            anyhow::bail!("realization receipt plan fields do not match plan");
+        }
+
+        let samples_per_frame = (self.sample_rate / FRAME_RATE) as usize;
+        let expected_samples = self.scheduler_frames.saturating_mul(samples_per_frame);
+        if self.sample_count != expected_samples || self.sample_count == 0 {
+            anyhow::bail!("realization receipt sample accounting is inconsistent");
+        }
+
+        if !is_hex_digest(&self.audio_blake3) || !is_hex_digest(&self.plan_grounding_blake3) {
+            anyhow::bail!("realization receipt hashes are malformed");
+        }
+
+        Ok(())
+    }
+
+    /// Verify the audio digest independently from the plan receipt.
+    pub fn verify_samples(&self, samples: &[f32]) -> bool {
+        if samples.len() != self.sample_count {
+            return false;
+        }
+        let mut hasher = blake3::Hasher::new();
+        for sample in samples {
+            hasher.update(&sample.to_le_bytes());
+        }
+        hasher.finalize().to_hex().to_string() == self.audio_blake3
+    }
+}
+
+#[cfg(feature = "ssm_language")]
+fn is_hex_digest(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 /// Handle to a background `speak_async()` call.
 ///
 /// Dropping the handle does NOT stop playback — call [`SpeakHandle::stop()`] explicitly,
@@ -923,6 +983,47 @@ mod tests {
         assert_eq!(receipt.prominence, plan.prominence);
         assert_eq!(receipt.pause_weight, plan.pause_weight);
         assert_eq!(receipt.audio_blake3.len(), 64);
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_phonological_plan_receipt_rejects_tampering() {
+        use symthaea_broca::{
+            ContentBindingStatus, LinguisticFrame, PhonemeSlot, SpeechPlan, StructuredDecoder,
+            SyllableStress, ThoughtChannels,
+        };
+
+        let genesis = GenesisSeed::from_phrase("plan-native-receipt-verify-test");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(2);
+        let readout = decoder.decode(&channels);
+        let speech_plan = SpeechPlan::from_readout(&channels, &readout);
+        let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+        let mut plan = PhonologicalPlan::from_linguistic_frame(&frame);
+        plan.bind_segments(
+            vec![PhonemeSlot::new(
+                "AH",
+                0,
+                SyllableStress::Primary,
+                true,
+                false,
+                true,
+            )],
+            ContentBindingStatus::PhonologicallyBound,
+        )
+        .expect("explicit receipt fixture");
+
+        let mut voice = LiveVoice::new_headless(&genesis);
+        let (samples, receipt) = voice
+            .synthesize_phonological_plan(&plan)
+            .expect("plan-native receipt should be emitted");
+        assert!(receipt.verify_against_plan(&plan).is_ok());
+        assert!(receipt.verify_samples(&samples));
+
+        let mut tampered = plan.clone();
+        tampered.rate = if tampered.rate < 1.0 { 1.2 } else { 0.8 };
+        assert!(receipt.verify_against_plan(&tampered).is_err());
+        assert!(receipt.verify_samples(&samples[..samples.len().saturating_sub(1)]).not());
     }
 
     #[cfg(feature = "ssm_language")]
