@@ -179,10 +179,9 @@ impl NixOSCommand {
     pub fn rollback_command(&self) -> Option<NixOSCommand> {
         match self {
             Self::RebuildSwitch { .. } | Self::RebuildTest { .. } | Self::RebuildBoot { .. } => {
-                Some(NixOSCommand::Custom {
-                    command: "nixos-rebuild".to_string(),
-                    args: vec!["switch".to_string(), "--rollback".to_string()],
-                    safety_level: SafetyLevel::SystemCritical,
+                Some(NixOSCommand::RebuildSwitch {
+                    flake: None,
+                    extra_args: vec!["--rollback".to_string()],
                 })
             }
             Self::EnvInstall { .. } | Self::EnvRemove { .. } => {
@@ -754,6 +753,19 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn test_rebuild_rollback_is_typed() {
+        let rebuild = NixOSCommand::RebuildSwitch {
+            flake: None,
+            extra_args: vec![],
+        };
+        let rollback = rebuild.rollback_command().expect("rollback");
+        assert!(matches!(rollback, NixOSCommand::RebuildSwitch { .. }));
+        let (bin, args) = rollback.to_command();
+        assert_eq!(bin, "nixos-rebuild");
+        assert_eq!(args, vec!["switch", "--rollback"]);
+    }
+
     fn test_rollback_commands() {
         let rebuild = NixOSCommand::RebuildSwitch {
             flake: None,
