@@ -25,6 +25,14 @@ pub struct BenchmarkCase {
     pub incumbent_id: &'static str,
 }
 
+fn benchmark_basis() -> ComparisonBasisRef {
+    ComparisonBasisRef {
+        basis_id: "benchmark-comparison-basis".into(),
+        basis_revision: "v1".into(),
+        basis_digest: "benchmark-comparison-basis-digest-v1".into(),
+    }
+}
+
 fn evidence(
     id: &str,
     source: &str,
@@ -92,6 +100,7 @@ fn burdens(
                     interval,
                     unit: "burden-unit".into(),
                     scope: "benchmark:functional-unit-v1|global".into(),
+                    basis: benchmark_basis(),
                     evidence_ids: evidence_ids.iter().map(|id| (*id).into()).collect(),
                 },
             )
@@ -118,6 +127,7 @@ fn candidate(
                     interval: Interval::point(12.0).unwrap(),
                     unit: "burden-unit".into(),
                     scope: "benchmark:functional-unit-v1|global".into(),
+                    basis: benchmark_basis(),
                     evidence_ids: evidence_ids.iter().map(|id| (*id).into()).collect(),
                 },
             ),
@@ -127,6 +137,7 @@ fn candidate(
                     interval: Interval::point(120.0).unwrap(),
                     unit: "burden-unit".into(),
                     scope: "benchmark:functional-unit-v1|global".into(),
+                    basis: benchmark_basis(),
                     evidence_ids: evidence_ids.iter().map(|id| (*id).into()).collect(),
                 },
             ),
@@ -138,6 +149,7 @@ fn candidate(
                     interval: Interval::new(-40.0, 120.0).unwrap(),
                     unit: "burden-unit".into(),
                     scope: "benchmark:functional-unit-v1|global".into(),
+                    basis: benchmark_basis(),
                     evidence_ids: evidence_ids.iter().map(|id| (*id).into()).collect(),
                 },
             ),
@@ -147,6 +159,7 @@ fn candidate(
                     interval: Interval::new(0.1, 20.0).unwrap(),
                     unit: "burden-unit".into(),
                     scope: "benchmark:functional-unit-v1|global".into(),
+                    basis: benchmark_basis(),
                     evidence_ids: evidence_ids.iter().map(|id| (*id).into()).collect(),
                 },
             ),
@@ -188,6 +201,7 @@ pub fn five_pathway_adversarial_case() -> BenchmarkCase {
                         ComparisonScale {
                             unit: "burden-unit".into(),
                             scope: "benchmark:functional-unit-v1|global".into(),
+                            basis: benchmark_basis(),
                         },
                     )
                 })
@@ -215,6 +229,7 @@ pub fn five_pathway_adversarial_case() -> BenchmarkCase {
                         interval: Interval::new(-20.0, 80.0).unwrap(),
                         unit: "burden-unit".into(),
                         scope: "benchmark:functional-unit-v1|global".into(),
+                        basis: benchmark_basis(),
                     },
                 ),
                 (
@@ -223,6 +238,7 @@ pub fn five_pathway_adversarial_case() -> BenchmarkCase {
                         interval: Interval::new(0.5, 10.0).unwrap(),
                         unit: "burden-unit".into(),
                         scope: "benchmark:functional-unit-v1|global".into(),
+                        basis: benchmark_basis(),
                     },
                 ),
             ]),
