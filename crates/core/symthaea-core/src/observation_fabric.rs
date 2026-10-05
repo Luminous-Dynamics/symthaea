@@ -2532,6 +2532,85 @@ mod tests {
     }
 
     #[test]
+    fn receipt_attestation_envelope_binds_v3_receipt_without_cross_version_aliasing() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let assessment = graph
+            .assess_independence_detailed_v3("obs-001", "obs-002")
+            .expect("v3 assessment");
+        let receipt = IndependenceVerificationReceiptV3::from_assessment(&assessment);
+
+        assert!(receipt.verify_integrity());
+        let envelope = ReceiptAttestationEnvelope::from_receipt_v3(
+            &receipt,
+            "attester-1",
+            "https://example.org/purpose/observation-independence",
+            1_700_000_000_000_000_000,
+        );
+
+        assert!(envelope.verify_against_receipt_v3(&receipt));
+        assert!(envelope.verify_against_integral_receipt_v3(&receipt));
+        assert!(!envelope.verify_against_receipt(&IndependenceVerificationReceipt {
+            source_observation_id: receipt.source_observation_id.clone(),
+            target_observation_id: receipt.target_observation_id.clone(),
+            classification: receipt.classification.clone(),
+            basis: receipt.basis.clone(),
+            examined_observation_ids: receipt.examined_observation_ids.clone(),
+            verifier_version: "observation-fabric-independence-v2",
+            examined_scope_fingerprint: receipt.examined_scope_fingerprint.clone(),
+            assessment_fingerprint: receipt.assessment_fingerprint.clone(),
+        }));
+        assert_eq!(envelope.verifier_version, INDEPENDENCE_VERIFIER_VERSION_V3);
+        assert_eq!(
+            envelope.examined_scope_fingerprint,
+            receipt.examined_scope_fingerprint
+        );
+        assert_eq!(
+            envelope.receipt_fingerprint,
+            receipt.fingerprint()
+        );
+    }
+
+    #[test]
+    fn independence_v3_receipt_canonical_identity_is_version_separated() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let assessment = graph
+            .assess_independence_detailed_v3("obs-001", "obs-002")
+            .expect("v3 assessment");
+        let v3_receipt = IndependenceVerificationReceiptV3::from_assessment(&assessment);
+        let v2_assessment = graph
+            .assess_independence_detailed("obs-001", "obs-002")
+            .expect("v2 assessment");
+        let v2_receipt = IndependenceVerificationReceipt::from_assessment(&v2_assessment);
+
+        assert_ne!(v2_receipt.fingerprint(), v3_receipt.fingerprint());
+        assert_ne!(
+            IndependenceVerificationReceipt::DOMAIN_SEPARATOR,
+            IndependenceVerificationReceiptV3::DOMAIN_SEPARATOR
+        );
+        assert_eq!(
+            IndependenceVerificationReceiptV3::DOMAIN_SEPARATOR,
+            INDEPENDENCE_RECEIPT_V3_DOMAIN_SEPARATOR
+        );
+        assert!(v3_receipt.canonical_bytes().starts_with(
+            INDEPENDENCE_RECEIPT_V3_DOMAIN_SEPARATOR
+        ));
+    }
+
+    #[test]
     fn receipt_attestation_envelope_is_detached_and_validatable() {
         let mut second = fixture();
         second.id = "obs-002".into();
