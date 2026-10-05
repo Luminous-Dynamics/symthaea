@@ -28,11 +28,11 @@
 //! domain. What this module needs is different: not "how much does one
 //! model's own uncertainty shrink," but "how much do *several independent
 //! discrete symbolic hypotheses' predictions disagree* for a given
-//! experiment" -- the classic optimal-experimental-design / query-by-
-//! committee framing, which happens to be the multi-hypothesis analogue of
-//! the same FEP epistemic-value idea. `epistemic_value` below is a new,
-//! small, honestly-scoped implementation of that analogue, not a
-//! reimplementation of `symthaea-fep`'s machinery.
+//! experiment" -- the classic query-by-committee / experimental-design
+//! framing. The score below is explicitly a disagreement heuristic, not a
+//! Shannon-information calculation, because no hypothesis prior/posterior
+//! distribution is supplied. It is not a reimplementation of
+//! `symthaea-fep`'s machinery.
 //!
 //! ## Design
 //!
@@ -73,39 +73,116 @@ pub fn epistemic_value<H, E>(
     hypotheses: &[H],
     predict: impl Fn(&H, &E) -> Option<f64>,
 ) -> f64 {
-    let predictions: Vec<f64> = hypotheses
-        .iter()
-        .filter_map(|h| predict(h, experiment))
-        .collect();
-    variance(&predictions)
+    discriminative_value(experiment, hypotheses, predict)
+        .map(|(score, _)| score)
+        .unwrap_or(0.0)
 }
 
-/// Select, from a pool of candidate experiments, the one with maximum
-/// [`epistemic_value`] against `hypotheses` -- i.e. the single most
-/// discriminating experiment to run next. Returns `None` if `candidates` is
-/// empty. Ties broken by first occurrence (stable, deterministic given a
-/// fixed candidate ordering).
-pub fn select_most_informative_experiment<'a, H, E>(
+/// Return the finite prediction-disagreement score and the number of hypotheses
+/// directly compared for one candidate experiment.
+///
+/// This is deliberately *not* Shannon information gain: the selector has no
+/// prior/posterior hypothesis probabilities, so population variance is only a
+/// disagreement heuristic. A candidate with fewer than two finite predictions
+/// is not discriminative and is therefore rejected from the strict inquiry path.
+pub fn discriminative_value<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    predict: impl Fn(&H, &E) -> Option<f64>,
+) -> Option<(f64, u16)> {
+    let predictions: Vec<f64> = hypotheses
+        .iter()
+        .filter_map(|h| predict(h, experiment).filter(|value| value.is_finite()))
+        .collect();
+
+    if predictions.len() < 2 {
+        return None;
+    }
+
+    let score = variance(&predictions);
+    if !score.is_finite() || score < 0.0 || predictions.len() > u16::MAX as usize {
+        return None;
+    }
+
+    Some((score, predictions.len() as u16))
+}
+
+/// Select the candidate experiment that most strongly discriminates between
+/// the surviving hypotheses. Only candidates with at least two finite
+/// hypothesis predictions are eligible.
+///
+/// Ties are broken by first occurrence, making the result deterministic for a
+/// fixed candidate ordering.
+pub fn select_most_discriminative_experiment<'a, H, E>(
     candidates: &'a [E],
     hypotheses: &[H],
     predict: impl Fn(&H, &E) -> Option<f64> + Copy,
-) -> Option<(&'a E, f64)> {
+) -> Option<(&'a E, f64, u16)> {
     candidates
         .iter()
         .enumerate()
-        .map(|(index, experiment)| {
-            (index, experiment, epistemic_value(experiment, hypotheses, predict))
+        .filter_map(|(index, experiment)| {
+            discriminative_value(experiment, hypotheses, predict)
+                .map(|(score, count)| (index, experiment, score, count))
         })
         .max_by(|a, b| {
             a.2.partial_cmp(&b.2)
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| b.0.cmp(&a.0))
         })
-        .map(|(_, experiment, value)| (experiment, value))
+        .map(|(_, experiment, score, count)| (experiment, score, count))
 }
 
+/// Backward-compatible selection name. The implementation now uses the
+/// strict discriminative path so active-inquiry callers cannot select a
+/// challenge where only one hypothesis can make a finite prediction.
+pub fn select_most_informative_experiment<'a, H, E>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    predict: impl Fn(&H, &E) -> Option<f64> + Copy,
+) -> Option<(&'a E, f64)> {
+    select_most_discriminative_experiment(candidates, hypotheses, predict)
+        .map(|(experiment, score, _)| (experiment, score))
+}
 
-/// Select an experiment and emit an evidence-neutral reproducibility receipt.
+/// Select a discriminative experiment and emit an evidence-neutral
+/// reproducibility receipt. The receipt records predicted disagreement, not
+/// realized information gain or scientific confirmation.
+pub fn select_most_discriminative_experiment_with_receipt<'a, H, E, P, D>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    predict: P,
+    hypothesis_handoff_digest: impl Into<String>,
+    hypothesis_set_digest: impl Into<String>,
+    challenge_space_digest: impl Into<String>,
+    selector_revision: impl Into<String>,
+    selection_seed: u64,
+    challenge_digest: D,
+) -> Result<Option<(&'a E, ScientificInquirySelectionReceipt)>, String>
+where
+    P: Fn(&H, &E) -> Option<f64> + Copy,
+    D: Fn(&E) -> String,
+{
+    let Some((selected, predicted, prediction_count)) =
+        select_most_discriminative_experiment(candidates, hypotheses, predict)
+    else {
+        return Ok(None);
+    };
+
+    let receipt = ScientificInquirySelectionReceipt::new(
+        hypothesis_handoff_digest,
+        hypothesis_set_digest,
+        challenge_space_digest,
+        challenge_digest(selected),
+        selector_revision,
+        selection_seed,
+        predicted,
+        prediction_count,
+    )?;
+    Ok(Some((selected, receipt)))
+}
+
+/// Backward-compatible receipt-selection name.
 pub fn select_most_informative_experiment_with_receipt<'a, H, E, P, D>(
     candidates: &'a [E],
     hypotheses: &[H],
@@ -121,23 +198,19 @@ where
     P: Fn(&H, &E) -> Option<f64> + Copy,
     D: Fn(&E) -> String,
 {
-    let Some((selected, predicted)) =
-        select_most_informative_experiment(candidates, hypotheses, predict)
-    else {
-        return Ok(None);
-    };
-
-    let receipt = ScientificInquirySelectionReceipt::new(
+    select_most_discriminative_experiment_with_receipt(
+        candidates,
+        hypotheses,
+        predict,
         hypothesis_handoff_digest,
         hypothesis_set_digest,
         challenge_space_digest,
-        challenge_digest(selected),
         selector_revision,
         selection_seed,
-        predicted,
-    )?;
-    Ok(Some((selected, receipt)))
+        challenge_digest,
+    )
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -235,7 +308,72 @@ use symthaea_types::ScientificInquirySelectionReceipt;
             receipt.selected_challenge_digest,
             "experiment:3.0"
         );
-        assert!(receipt.predicted_information_gain() > 0.0);
+        assert!(receipt.predicted_disagreement_score() > 0.0);
+    }
+
+    #[test]
+    fn strict_selector_rejects_single_prediction_candidates() {
+        let hypotheses = [0u8, 1u8];
+        let candidates = [0.0f64, 2.0f64];
+        let predict = |h: &u8, x: &f64| {
+            if *h == 0 {
+                Some(*x)
+            } else if *x == 0.0 {
+                None
+            } else {
+                Some(*x * 2.0)
+            }
+        };
+        let (chosen, score, count) =
+            select_most_discriminative_experiment(&candidates, &hypotheses, predict)
+                .expect("at least one candidate has two finite predictions");
+        assert_eq!(*chosen, 2.0);
+        assert!(score > 0.0);
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn strict_selector_rejects_nonfinite_predictions() {
+        let hypotheses = [0u8, 1u8];
+        let candidates = [1.0f64, 2.0f64];
+        let predict = |h: &u8, x: &f64| {
+            Some(match (*h, *x as u8) {
+                (0, 1) => f64::NAN,
+                (1, 1) => 1.0,
+                (0, 2) => 2.0,
+                (1, 2) => 4.0,
+                _ => 0.0,
+            })
+        };
+        let (chosen, score, count) =
+            select_most_discriminative_experiment(&candidates, &hypotheses, predict)
+                .expect("finite candidate should remain eligible");
+        assert_eq!(*chosen, 2.0);
+        assert!(score > 0.0);
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn selection_receipt_records_prediction_coverage() {
+        let hypotheses = [0u8, 1u8];
+        let candidates = [1.0f64, 3.0f64];
+        let predict = |h: &u8, x: &f64| Some(if *h == 0 { *x } else { *x * 2.0 });
+        let (_, receipt) = select_most_discriminative_experiment_with_receipt(
+            &candidates,
+            &hypotheses,
+            predict,
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "selector-v2",
+            17,
+            |x| format!("experiment:{x:.1}"),
+        )
+        .unwrap()
+        .expect("candidate pool is non-empty");
+        assert_eq!(receipt.prediction_count, 2);
+        assert!(receipt.predicted_disagreement_score() > 0.0);
+        assert!(receipt.validate().is_ok());
     }
 
     #[test]
