@@ -323,7 +323,7 @@ impl PhonologicalPlan {
             .join("|");
 
         format!(
-            "{};binding={:?};intent={};focus={};intonation={:?};rate={:.4};pause={:.4};syllables={};lexical_provenance={};segments={}",
+            "{};binding={:?};intent={};focus={};intonation={:?};pitch={:.4};rate={:.4};pause={:.4};syllables={};lexical_provenance={};segments={}",
             self.version,
             self.content_binding,
             self.source_intent,
