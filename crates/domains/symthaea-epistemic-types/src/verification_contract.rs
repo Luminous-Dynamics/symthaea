@@ -1532,7 +1532,7 @@ impl VerificationEvidence {
     /// verification it describes.
     pub fn evidence_digest(&self) -> String {
         let encoded = (
-            "symthaea:verification-evidence:v2",
+            "symthaea:verification-evidence:v3",
             self.schema_version,
             VERIFICATION_EVIDENCE_DIGEST_VERSION,
             &self.claim_representation_digest,
