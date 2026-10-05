@@ -176,9 +176,9 @@ No production integration, timing claim, or superiority claim is made here.
 
 ## Deterministic random-code cross-check
 
-The boundary fixture is not sufficient by itself to establish that the syndrome implementation is faithful to the general binary linear-code semantics. The qualification suite therefore adds a deterministic sweep over independently generated [12,4] random linear codes.
+The boundary fixture is not sufficient by itself to establish that the syndrome implementation is faithful to the general binary linear-code semantics. The qualification suite therefore adds deterministic sweeps over two independently generated Boolean random-linear-code regimes: a moderate-rate [12,4] family and a lower-rate [20,3] family that is closer to the low-rate regime of the paper-scale comparator.
 
-For each seed whose exhaustive code geometry has unique-decoding radius at least one, every codeword and every error pattern inside that guaranteed radius are passed through the syndrome decoder. The independent nearest-codeword oracle is required to report the same unique codeword, distance, and exact error pattern.
+For each usable seed whose exhaustive code geometry has unique-decoding radius between one and four, every codeword and every error pattern inside that guaranteed radius are passed through the syndrome decoder. The independent nearest-codeword oracle is required to report the same unique codeword, distance, and exact error pattern.
 
 This remains a finite implementation cross-check. It is not a probabilistic claim about the entire random-code ensemble.
 
