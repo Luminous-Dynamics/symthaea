@@ -145,9 +145,127 @@ pub fn select_most_informative_experiment<'a, H, E>(
         .map(|(experiment, score, _)| (experiment, score))
 }
 
-/// Select a discriminative experiment and emit an evidence-neutral
-/// reproducibility receipt. The receipt records predicted disagreement, not
-/// realized information gain or scientific confirmation.
+/// Select a discriminative experiment after converting every finite hypothesis
+/// prediction into one explicit physical frame. A candidate is eligible only
+/// when every live hypothesis produces a finite, physically compatible value.
+///
+/// This closes the unit-scale loophole in raw variance: `1000 J` and `1 kJ`
+/// must compare as equal before disagreement is scored.
+pub fn discriminative_value_typed<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    prediction_frame: &symthaea_types::PhysicalType,
+    predict: impl Fn(&H, &E) -> Option<(f64, symthaea_types::PhysicalType)>,
+) -> Result<Option<(f64, u32)>, String> {
+    prediction_frame
+        .validate()
+        .map_err(|error| format!("invalid prediction frame: {}", error.reason))?;
+
+    if hypotheses.len() < 2 {
+        return Ok(None);
+    }
+
+    let mut predictions = Vec::with_capacity(hypotheses.len());
+    for hypothesis in hypotheses {
+        let Some((value, source_type)) = predict(hypothesis, experiment) else {
+            return Ok(None);
+        };
+        let symthaea_types::TypeJudgement::Valid(normalized) =
+            source_type.convert_value_to(value, prediction_frame)
+        else {
+            return Ok(None);
+        };
+        if !normalized.is_finite() {
+            return Ok(None);
+        }
+        predictions.push(normalized);
+    }
+
+    let score = variance(&predictions);
+    if !score.is_finite() || score < 0.0 || predictions.len() > u32::MAX as usize {
+        return Ok(None);
+    }
+
+    Ok(Some((score, predictions.len() as u32)))
+}
+
+pub fn select_most_discriminative_experiment_typed<'a, H, E>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    prediction_frame: &symthaea_types::PhysicalType,
+    predict: impl Fn(&H, &E) -> Option<(f64, symthaea_types::PhysicalType)> + Copy,
+) -> Result<Option<(&'a E, f64, u32)>, String> {
+    let mut best: Option<(&'a E, f64, u32, usize)> = None;
+
+    for (index, candidate) in candidates.iter().enumerate() {
+        let Some((score, count)) = discriminative_value_typed(
+            candidate,
+            hypotheses,
+            prediction_frame,
+            predict,
+        )? else {
+            continue;
+        };
+
+        let replace = match best {
+            None => true,
+            Some((_, best_score, _, best_index)) => {
+                score > best_score || (score == best_score && index < best_index)
+            }
+        };
+        if replace {
+            best = Some((candidate, score, count, index));
+        }
+    }
+
+    Ok(best.map(|(candidate, score, count, _)| (candidate, score, count)))
+}
+
+/// Select a typed discriminative experiment and emit an evidence-neutral
+/// reproducibility receipt. The receipt records the canonical physical frame,
+/// prediction coverage, and disagreement score—not realized evidence.
+pub fn select_most_discriminative_experiment_with_typed_receipt<'a, H, E, P, D>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    prediction_frame: &symthaea_types::PhysicalType,
+    predict: P,
+    hypothesis_handoff_digest: impl Into<String>,
+    hypothesis_set_digest: impl Into<String>,
+    challenge_space_digest: impl Into<String>,
+    selector_revision: impl Into<String>,
+    selection_seed: u64,
+    challenge_digest: D,
+) -> Result<Option<(&'a E, ScientificInquirySelectionReceipt)>, String>
+where
+    P: Fn(&H, &E) -> Option<(f64, symthaea_types::PhysicalType)> + Copy,
+    D: Fn(&E) -> String,
+{
+    let Some((selected, predicted, prediction_count)) =
+        select_most_discriminative_experiment_typed(
+            candidates,
+            hypotheses,
+            prediction_frame,
+            predict,
+        )?
+    else {
+        return Ok(None);
+    };
+
+    let receipt = ScientificInquirySelectionReceipt::new(
+        hypothesis_handoff_digest,
+        hypothesis_set_digest,
+        challenge_space_digest,
+        challenge_digest(selected),
+        selector_revision,
+        selection_seed,
+        prediction_frame.digest_hex(),
+        predicted,
+        prediction_count,
+        hypotheses.len() as u32,
+    )?;
+    Ok(Some((selected, receipt)))
+}
+
 pub fn select_most_discriminative_experiment_with_receipt<'a, H, E, P, D>(
     candidates: &'a [E],
     hypotheses: &[H],
@@ -176,7 +294,9 @@ where
         challenge_digest(selected),
         selector_revision,
         selection_seed,
+        prediction_frame_digest,
         predicted,
+        prediction_count,
         prediction_count,
     )?;
     Ok(Some((selected, receipt)))
