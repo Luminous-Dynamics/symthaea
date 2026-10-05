@@ -1997,6 +1997,14 @@ impl AlternativesEngine {
                         expected_scope: scale.scope.clone(),
                         actual_scope: estimate.scope.clone(),
                     });
+                } else if let Some(estimate) = candidate.performance.get(metric)
+                    && estimate.basis != scale.basis
+                {
+                    candidate_blockers.push(FrontierBlocker::ComparisonBasisMismatch {
+                        context: format!("performance:{metric}"),
+                        expected: scale.basis.clone(),
+                        actual: estimate.basis.clone(),
+                    });
                 }
             }
             for (condition, required) in &requirement.operating_envelope {
@@ -2013,6 +2021,13 @@ impl AlternativesEngine {
                             actual_unit: capability.unit.clone(),
                             expected_scope: required.scope.clone(),
                             actual_scope: capability.scope.clone(),
+                        });
+                    }
+                    Some(capability) if capability.basis != required.basis => {
+                        candidate_blockers.push(FrontierBlocker::ComparisonBasisMismatch {
+                            context: format!("operating:{condition}"),
+                            expected: required.basis.clone(),
+                            actual: capability.basis.clone(),
                         });
                     }
                     Some(capability)
@@ -2058,6 +2073,15 @@ impl AlternativesEngine {
                             actual_unit: estimate.unit.clone(),
                             expected_scope: expected_scope.clone(),
                             actual_scope: estimate.scope.clone(),
+                        });
+                    }
+                    (Some(estimate), Some(scale))
+                        if estimate.basis != scale.basis =>
+                    {
+                        candidate_blockers.push(FrontierBlocker::ComparisonBasisMismatch {
+                            context: format!("burden:{dimension:?}"),
+                            expected: scale.basis.clone(),
+                            actual: estimate.basis.clone(),
                         });
                     }
                     (Some(estimate), Some(_))
@@ -2198,7 +2222,10 @@ impl AlternativesEngine {
         for dimension in Dimension::ALL {
             let a_estimate = &a[&dimension];
             let b_estimate = &b[&dimension];
-            if a_estimate.unit != b_estimate.unit || a_estimate.scope != b_estimate.scope {
+            if a_estimate.unit != b_estimate.unit
+                || a_estimate.scope != b_estimate.scope
+                || a_estimate.basis != b_estimate.basis
+            {
                 return false;
             }
             let ai = a_estimate.interval;
@@ -2232,6 +2259,7 @@ impl AlternativesEngine {
             let incumbent_scale = incumbent.burdens.get(&dimension).unwrap();
             if candidate_scale.unit != incumbent_scale.unit
                 || candidate_scale.scope != incumbent_scale.scope
+                || candidate_scale.basis != incumbent_scale.basis
             {
                 continue;
             }
