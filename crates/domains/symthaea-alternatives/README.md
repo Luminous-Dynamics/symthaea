@@ -15,9 +15,9 @@ The model is:
 7. Keep multi-axis burdens separate.
 8. Evaluate hard constraints fail-closed.
 9. Compute a conservative Pareto frontier without an aggregate sustainability score.
-10. Preserve evidence kind, confidence, canonical authority identity, artifact identity/digest, optional source-admission reference, contradictions, validity windows, and derivation lineage.
+10. Preserve evidence kind, confidence, canonical authority identity, artifact identity/digest, optional source-admission reference, contradictions, validity windows, observation time, and derivation lineage.
 11. Derive an explicit qualification ceiling from evidence actually linked to every burden dimension and every required functional metric.
-12. Emit a deterministic assessment receipt, including the assessment timestamp when supplied.
+12. Emit a deterministic assessment receipt, including the assessment timestamp and exact freshness policy when supplied.
 13. Require reproducible derivation metadata for simulated/derived evidence.
 14. Intersect eligibility across every required function while keeping each requirement assessment separate and auditable.
 15. Carry externally qualified source-admission references without verifying or upgrading them inside Symthaea.
@@ -30,3 +30,8 @@ Authority diversity is authority-scoped: multiple artifacts or rotated issuer ke
 Model output is a hypothesis or assessment artifact, not a manufacturing authorization.
 
 A simulation cannot promote a candidate to field-qualified status. Missing or conflicting evidence remains visible and lowers the qualification ceiling.
+
+
+Freshness is deliberately separate from validity. An evidence record may remain valid for a declared interval while still being too old for a particular decision. A caller can therefore supply an explicit `EvidenceFreshnessPolicy` with a stable policy identity/digest and maximum age per evidence kind. A freshness-bounded assessment requires an explicit assessment timestamp and machine-readable `observed_at_epoch_seconds`; missing observation time, future observations, or observations older than the configured limit are conservatively unusable. There is no universal freshness default because evidence decay is decision-profile dependent. The freshness policy is carried into the assessment result and receipt, but its identity is not itself an authority or authenticity proof.
+
+This temporal model follows a provenance-friendly boundary: W3C PROV treats entity lifetimes, generation, use, and invalidation as time-aware provenance events, so validity and recency should not be collapsed into an opaque source label. The JRC Safe and Sustainable by Design guidance likewise describes alternatives assessment as iterative and tiered as data availability and research knowledge increase. citeturn210773search0turn210773search2
