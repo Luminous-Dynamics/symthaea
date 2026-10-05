@@ -188,6 +188,11 @@ impl EvidenceRecord {
 pub struct BurdenEstimate {
     /// Plausible burden interval.
     pub interval: Interval,
+    /// Unit of measure used for cross-candidate comparison.
+    pub unit: String,
+    /// Scope in which this value is comparable: geography, functional unit,
+    /// lifecycle boundary, process boundary, time basis, etc.
+    pub scope: String,
     /// Evidence IDs that specifically bear on this dimension.
     pub evidence_ids: Vec<String>,
 }
@@ -318,6 +323,9 @@ impl CandidatePathway {
             .collect::<BTreeSet<_>>();
         for estimate in self.burdens.values() {
             Interval::new(estimate.interval.lower, estimate.interval.upper)?;
+            if estimate.unit.is_empty() || estimate.scope.is_empty() {
+                return Err(AssessmentError::EmptyBurdenScale);
+            }
             for evidence_id in &estimate.evidence_ids {
                 if !evidence_ids.contains(evidence_id.as_str()) {
                     return Err(AssessmentError::MissingEvidenceReference(
@@ -501,6 +509,19 @@ pub enum FrontierBlocker {
     ConstraintUnresolved(String),
     /// A burden dimension is missing.
     MissingDimension(Dimension),
+    /// Candidate and comparison cohort use different units or scopes.
+    IncompatibleScale {
+        /// Dimension whose comparison scale differs.
+        dimension: Dimension,
+        /// Expected comparison unit.
+        expected_unit: String,
+        /// Candidate unit.
+        actual_unit: String,
+        /// Expected comparison scope.
+        expected_scope: String,
+        /// Candidate scope.
+        actual_scope: String,
+    },
 }
 
 /// Candidate-versus-incumbent burden transfer.
@@ -586,6 +607,8 @@ pub enum AssessmentError {
     EmptyCandidateIdentity,
     /// Candidate has no burden dimensions.
     NoBurdenData,
+    /// A burden estimate lacks a comparable unit or scope.
+    EmptyBurdenScale,
     /// Requirement range is invalid.
     InvalidRequirementRange { min: f64, max: f64 },
     /// A burden references unknown evidence.
@@ -606,6 +629,7 @@ impl std::fmt::Display for AssessmentError {
             Self::EmptyRequirementIdentity => write!(f, "requirement identity is incomplete"),
             Self::EmptyCandidateIdentity => write!(f, "candidate identity is incomplete"),
             Self::NoBurdenData => write!(f, "candidate has no burden data"),
+            Self::EmptyBurdenScale => write!(f, "burden unit/scope is empty"),
             Self::InvalidRequirementRange { min, max } => {
                 write!(f, "invalid requirement range [{min}, {max}]")
             }
@@ -643,6 +667,20 @@ impl AlternativesEngine {
 
         let mut assessments = Vec::with_capacity(candidates.len());
         let mut blockers = BTreeMap::new();
+        let expected_scales = Dimension::ALL
+            .into_iter()
+            .filter_map(|dimension| {
+                candidates
+                    .iter()
+                    .find_map(|candidate| {
+                        candidate
+                            .burdens
+                            .get(&dimension)
+                            .map(|estimate| (estimate.unit.clone(), estimate.scope.clone()))
+                    })
+                    .map(|scale| (dimension, scale))
+            })
+            .collect::<BTreeMap<_, _>>();
 
         for candidate in candidates {
             let constraints = requirement
@@ -666,8 +704,20 @@ impl AlternativesEngine {
                 }
             }
             for dimension in Dimension::ALL {
-                if !candidate.burdens.contains_key(&dimension) {
-                    candidate_blockers.push(FrontierBlocker::MissingDimension(dimension));
+                match (candidate.burdens.get(&dimension), expected_scales.get(&dimension)) {
+                    (None, _) => candidate_blockers.push(FrontierBlocker::MissingDimension(dimension)),
+                    (Some(estimate), Some((expected_unit, expected_scope)))
+                        if estimate.unit != *expected_unit || estimate.scope != *expected_scope =>
+                    {
+                        candidate_blockers.push(FrontierBlocker::IncompatibleScale {
+                            dimension,
+                            expected_unit: expected_unit.clone(),
+                            actual_unit: estimate.unit.clone(),
+                            expected_scope: expected_scope.clone(),
+                            actual_scope: estimate.scope.clone(),
+                        });
+                    }
+                    _ => {}
                 }
             }
 
@@ -778,8 +828,13 @@ impl AlternativesEngine {
 
         let mut strict = false;
         for dimension in Dimension::ALL {
-            let ai = a[&dimension].interval;
-            let bi = b[&dimension].interval;
+            let a_estimate = &a[&dimension];
+            let b_estimate = &b[&dimension];
+            if a_estimate.unit != b_estimate.unit || a_estimate.scope != b_estimate.scope {
+                return false;
+            }
+            let ai = a_estimate.interval;
+            let bi = b_estimate.interval;
             if !ai.clearly_no_worse_than(bi) {
                 return false;
             }
@@ -805,6 +860,13 @@ impl AlternativesEngine {
             else {
                 continue;
             };
+            let candidate_scale = candidate.burdens.get(&dimension).unwrap();
+            let incumbent_scale = incumbent.burdens.get(&dimension).unwrap();
+            if candidate_scale.unit != incumbent_scale.unit
+                || candidate_scale.scope != incumbent_scale.scope
+            {
+                continue;
+            }
             if candidate_interval.clearly_better_than(incumbent_interval) {
                 clearly_better.push(dimension);
             } else if candidate_interval.clearly_worse_than(incumbent_interval) {
@@ -888,6 +950,8 @@ mod tests {
                     dimension,
                     BurdenEstimate {
                         interval: Interval::point(base).unwrap(),
+                        unit: "unit".into(),
+                        scope: "synthetic-global-v1".into(),
                         evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
                     },
                 )
@@ -941,6 +1005,8 @@ mod tests {
             Dimension::Hazard,
             BurdenEstimate {
                 interval: Interval::point(hazard).unwrap(),
+                unit: "unit".into(),
+                scope: "synthetic-global-v1".into(),
                 evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
             },
         );
@@ -948,6 +1014,8 @@ mod tests {
             Dimension::Water,
             BurdenEstimate {
                 interval: Interval::point(water).unwrap(),
+                unit: "unit".into(),
+                scope: "synthetic-global-v1".into(),
                 evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
             },
         );
@@ -1143,6 +1211,8 @@ mod tests {
             BurdenEstimate {
                 interval: Interval::new(estimate.interval.lower, estimate.interval.upper + 100.0)
                     .unwrap(),
+                unit: estimate.unit,
+                scope: estimate.scope,
                 evidence_ids: estimate.evidence_ids,
             },
         );
