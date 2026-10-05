@@ -13,6 +13,7 @@
 
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
+use std::os::unix::fs::OpenOptionsExt;
 use std::io::Read;
 use std::sync::Arc;
 use std::time::Instant;
@@ -33,6 +34,28 @@ use tokio_rustls::TlsAcceptor;
 
 /// Execute a shell command locally and return stdout/stderr + exit status.
 /// Replaces the previous SSH-to-localhost pattern.
+fn nix_collect_garbage_executable() -> Result<&'static str, std::io::Error> {
+    const CANDIDATES: &[&str] = &[
+        "/run/current-system/sw/bin/nix-collect-garbage",
+        "/nix/var/nix/profiles/system/sw/bin/nix-collect-garbage",
+        "/usr/bin/nix-collect-garbage",
+    ];
+    CANDIDATES
+        .iter()
+        .copied()
+        .find(|path| std::path::Path::new(path).is_file())
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "nix-collect-garbage not found in known system-owned paths",
+            )
+        })
+}
+
+fn gc_collect_args() -> [&'static str; 3] {
+    ["-d", "--delete-older-than", "30d"]
+}
+
 struct CmdResult {
     pub stdout: String,
     pub stderr: String,
@@ -4192,57 +4215,146 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                     .map(|d| d.as_millis() as u64)
                     .unwrap_or(0);
                 let gc_log = format!("/tmp/symthaea-gc-{}.log", gc_session_id);
-                let _ = run_cmd(&format!("touch {} && chmod 600 {}", gc_log, gc_log)).await;
-                let _ = run_cmd(&format!(
-                    "nix-collect-garbage -d --delete-older-than 30d > {} 2>&1 &",
-                    gc_log
-                ))
-                .await;
+
+                let log_file = match std::fs::OpenOptions::new()
+                    .create_new(true)
+                    .write(true)
+                    .mode(0o600)
+                    .open(&gc_log)
+                {
+                    Ok(file) => file,
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("GC log unavailable: {}", e)).to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let stderr_file = match log_file.try_clone() {
+                    Ok(file) => file,
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("GC log setup failed: {}", e)).to_json(),
+                            ))
+                            .await;
+                        let _ = std::fs::remove_file(&gc_log);
+                        continue;
+                    }
+                };
+
+                let executable = match nix_collect_garbage_executable() {
+                    Ok(path) => path,
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Garbage collection unavailable: {}",
+                                    e
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        let _ = std::fs::remove_file(&gc_log);
+                        continue;
+                    }
+                };
+
+                let args = gc_collect_args();
+                let mut child = match tokio::process::Command::new(executable)
+                    .args(args)
+                    .stdout(std::process::Stdio::from(log_file))
+                    .stderr(std::process::Stdio::from(stderr_file))
+                    .spawn()
+                {
+                    Ok(child) => child,
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Garbage collection failed to start: {}",
+                                    e
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        let _ = std::fs::remove_file(&gc_log);
+                        continue;
+                    }
+                };
+
                 let _ = ws_tx
                     .send(Message::Text(
                         RelayMessage::output("Garbage collection started...", "stdout").to_json(),
                     ))
                     .await;
-                let mut last_lines = 0u64;
+
+                let mut file_offset = 0u64;
+                let mut pending = String::new();
+
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                    if let Ok(result) = run_cmd(&format!(
-                        "wc -l < {} 2>/dev/null && tail -n +{} {} 2>/dev/null",
-                        gc_log,
-                        last_lines + 1,
-                        gc_log
-                    ))
-                    .await
-                    {
-                        if result.exit_status == 0 {
-                            let lines: Vec<&str> = result.stdout.lines().collect();
-                            if let Some(first) = lines.first() {
-                                if let Ok(total) = first.trim().parse::<u64>() {
-                                    for line in &lines[1..] {
-                                        if !line.trim().is_empty() {
-                                            let _ = ws_tx
-                                                .send(Message::Text(
-                                                    RelayMessage::output(line, "stdout").to_json(),
-                                                ))
-                                                .await;
-                                        }
+
+                    if let Ok(mut file) = std::fs::File::open(&gc_log) {
+                        use std::io::{Read, Seek, SeekFrom};
+                        if file.seek(SeekFrom::Start(file_offset)).is_ok() {
+                            let mut bytes = Vec::new();
+                            if file.read_to_end(&mut bytes).is_ok() {
+                                file_offset += bytes.len() as u64;
+                                pending.push_str(&String::from_utf8_lossy(&bytes));
+                                while let Some(pos) = pending.find('\n') {
+                                    let line = pending[..pos].trim_end_matches('\r').to_string();
+                                    pending.drain(..=pos);
+                                    if !line.trim().is_empty() {
+                                        let _ = ws_tx
+                                            .send(Message::Text(
+                                                RelayMessage::output(&line, "stdout").to_json(),
+                                            ))
+                                            .await;
                                     }
-                                    last_lines = total;
                                 }
                             }
                         }
                     }
-                    if let Ok(check) = run_cmd("pgrep -f nix-collect-garbage").await {
-                        if check.exit_status != 0 && last_lines > 0 {
+
+                    match child.try_wait() {
+                        Ok(Some(status)) => {
+                            if !pending.trim().is_empty() {
+                                let _ = ws_tx
+                                    .send(Message::Text(
+                                        RelayMessage::output(pending.trim_end(), "stdout").to_json(),
+                                    ))
+                                    .await;
+                            }
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type": "exit",
+                                        "code": status.code().unwrap_or(1)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                            break;
+                        }
+                        Ok(None) => {}
+                        Err(e) => {
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    RelayMessage::error(&format!(
+                                        "Garbage collection status failed: {}",
+                                        e
+                                    ))
+                                    .to_json(),
+                                ))
+                                .await;
                             break;
                         }
                     }
                 }
-                let _ = ws_tx
-                    .send(Message::Text(
-                        serde_json::json!({"type":"exit","code":0}).to_string(),
-                    ))
-                    .await;
+                let _ = std::fs::remove_file(&gc_log);
             }
 
             "diagnose" => {
@@ -5032,6 +5144,29 @@ echo '}'
     // Cleanup
     tracker.lock().await.release(&peer_addr);
     eprintln!("[{}] WebSocket disconnected", peer_addr);
+}
+
+#[cfg(test)]
+mod gc_direct_argv_tests {
+    use super::{gc_collect_args, nix_collect_garbage_executable};
+
+    #[test]
+    fn gc_arguments_are_fixed_and_shell_free() {
+        assert_eq!(gc_collect_args(), ["-d", "--delete-older-than", "30d"]);
+        assert!(gc_collect_args().iter().all(|arg| !arg.contains(';')));
+        assert!(gc_collect_args().iter().all(|arg| !arg.contains('|')));
+    }
+
+    #[test]
+    fn gc_executable_resolution_is_not_path_search() {
+        if let Ok(path) = nix_collect_garbage_executable() {
+            assert!(
+                path.starts_with("/run/current-system/")
+                    || path.starts_with("/nix/var/nix/profiles/system/")
+                    || path.starts_with("/usr/bin/")
+            );
+        }
+    }
 }
 
 fn generate_auth_token() -> String {
