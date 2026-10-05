@@ -2713,6 +2713,51 @@ mod tests {
 
 
     #[test]
+    fn cryptographic_receipt_preserves_exact_transformed_representation_binding() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap()
+        .with_expected_transformed_document_digest("22".repeat(32))
+        .unwrap();
+
+        let resolution = resolved_method(&request);
+        let receipt = test_cryptographic_receipt(&request, &resolution);
+        assert_eq!(
+            receipt.expected_transformed_document_digest.as_deref(),
+            Some("22".repeat(32).as_str())
+        );
+        assert!(receipt.validate_against(&request, &resolution).is_ok());
+
+        let evidence =
+            VerificationEvidence::from_adapter_attestation(&request, resolution, receipt).unwrap();
+        let encoded = serde_json::to_vec(&evidence).unwrap();
+        let decoded: VerificationEvidence = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(
+            decoded
+                .cryptographic_verification
+                .expected_transformed_document_digest
+                .as_deref(),
+            Some("22".repeat(32).as_str())
+        );
+        assert!(decoded.validate_structure().is_ok());
+
+        let mut tampered = decoded;
+        tampered
+            .cryptographic_verification
+            .expected_transformed_document_digest = Some("33".repeat(32));
+        assert!(matches!(
+            tampered.validate_structure(),
+            Err(VerificationFailure::TransformedDocumentDigestMismatch { .. })
+        ));
+    }
+
+    #[test]
     fn freshness_context_rejects_future_expiry_and_mismatched_replay_inputs() {
         let valid = default_freshness();
         assert!(valid.validate().is_ok());
