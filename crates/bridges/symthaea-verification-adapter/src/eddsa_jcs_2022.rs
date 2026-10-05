@@ -854,6 +854,45 @@ mod tests {
     }
 
     #[test]
+    fn fully_rebound_wrong_public_key_reaches_cryptographic_failure() {
+        let request = vector_request();
+        let (mut resolution, mut resolved_method) = resolved_vector(&request);
+        let alternate = "z6Mkf5rGMoatrSj1f4CyvuHBeXJELe9RPdzo2PKGNCKVtZxP";
+
+        if let ResolvedVerificationMethodMaterial::Multikey {
+            public_key_multibase,
+        } = &mut resolved_method.material
+        {
+            *public_key_multibase = alternate.into();
+        }
+
+        let mut material_object = Map::new();
+        material_object.insert(
+            "publicKeyMultibase".into(),
+            Value::String(alternate.into()),
+        );
+        resolved_method.material_digest = crate::verification_method_material_digest(
+            &resolved_method.method,
+            "Multikey",
+            &material_object,
+        )?;
+        resolution.verification_method_material_digest =
+            resolved_method.material_digest.clone();
+
+        assert!(matches!(
+            verify_eddsa_jcs_2022(
+                &request,
+                &resolution,
+                &resolved_method,
+                &secured_document(),
+            ),
+            Err(SnapshotError::Verification(
+                VerificationFailure::CryptographicVerificationFailed
+            ))
+        ));
+    }
+
+    #[test]
     fn rejects_key_material_substitution_before_signature_check() {
         let request = vector_request();
         let (resolution, mut resolved_method) = resolved_vector(&request);
