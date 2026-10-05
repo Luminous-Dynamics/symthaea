@@ -1090,8 +1090,6 @@ pub const VERIFICATION_CONTEXT_V5_VERSION: &str =
 /// Versioned annotation/provenance record for evaluator, trust-root, and authorization identities.
 pub const EVALUATION_CONTEXT_SUPPLEMENT_VERSION: &str =
     "symthaea-observation-evaluation-context-supplement-v2";
-const LEGACY_EVALUATION_CONTEXT_SUPPLEMENT_V1_VERSION: &str =
-    "symthaea-observation-evaluation-context-supplement-v1";
 pub const EVALUATION_CONTEXT_SUPPLEMENT_ATTACHMENT_PHASE: &str = "post-evaluation";
 /// Future evaluation representation that separates execution context from supplemental annotations.
 pub const EVIDENCE_EVALUATION_V9_VERSION: &str =
@@ -6355,10 +6353,8 @@ mod tests {
             EVALUATION_CONTEXT_SUPPLEMENT_VERSION,
             "symthaea-observation-evaluation-context-supplement-v2"
         );
-        assert_eq!(
-            LEGACY_EVALUATION_CONTEXT_SUPPLEMENT_V1_VERSION,
-            "symthaea-observation-evaluation-context-supplement-v1"
-        );
+        let legacy_version = "symthaea-observation-evaluation-context-supplement-v1";
+        assert_ne!(legacy_version, EVALUATION_CONTEXT_SUPPLEMENT_VERSION);
         assert_eq!(
             EvaluationContextSupplement::empty().attachment_phase,
             EVALUATION_CONTEXT_SUPPLEMENT_ATTACHMENT_PHASE
