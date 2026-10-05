@@ -11,14 +11,14 @@ The model is:
 3. Declare an explicit comparison scale (unit + functional/lifecycle scope) for every burden dimension; candidates cannot define their own cohort.
 4. Represent functional-performance values as evidence-linked, scoped measurements rather than bare claims.
 5. Keep multi-axis burdens separate.
-5. Evaluate hard constraints fail-closed.
-6. Compute a conservative Pareto frontier without an aggregate sustainability score.
-7. Preserve evidence kind, confidence, provenance, source identity, and contradictions.
-8. Derive an explicit qualification ceiling from evidence actually linked to each burden dimension.
-9. Emit a deterministic assessment receipt.
-10. Identify a conservative next-measurement target from unresolved uncertainty.
+6. Evaluate hard constraints fail-closed.
+7. Compute a conservative Pareto frontier without an aggregate sustainability score.
+8. Preserve evidence kind, confidence, provenance, source identity, contradictions, and validity windows.
+9. Derive an explicit qualification ceiling from evidence actually linked to every burden dimension and every required functional metric.
+10. Emit a deterministic assessment receipt, including the assessment timestamp when supplied.
+11. Identify a conservative next-measurement target from unresolved uncertainty.
 
-The design is intended to compose later with Mycelix manufacturing/BOM/routing records and a federated evidence graph, while remaining independent of Holochain versioning. The Pareto frontier is a candidate comparison set, not a recommendation or deployment authorization. Time-bounded evidence is ignored by timeless assessments and evaluated only when the caller supplies an explicit assessment timestamp.
+The design is intended to compose later with Mycelix manufacturing/BOM/routing records and a federated evidence graph, while remaining independent of Holochain versioning. The Pareto frontier is a candidate comparison set, not a recommendation or deployment authorization. Functional performance uses conservative intervals rather than midpoint-based pass/fail. Time-bounded evidence is ignored by timeless assessments and evaluated only when the caller supplies an explicit assessment timestamp.
 
 ## Safety boundary
 
