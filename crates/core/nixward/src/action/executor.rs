@@ -132,6 +132,16 @@ impl SafetyLevel {
     }
 }
 
+fn rebuild_has_unguarded_extra_args(command: &NixOSCommand) -> bool {
+    matches!(
+        command,
+        NixOSCommand::RebuildSwitch { extra_args, .. }
+            | NixOSCommand::RebuildTest { extra_args, .. }
+            | NixOSCommand::RebuildBoot { extra_args, .. }
+            if !extra_args.is_empty()
+    )
+}
+
 impl NixOSCommand {
     /// Create a Custom command with auto-classified safety level.
     ///
@@ -523,11 +533,19 @@ impl NixOSExecutor {
     /// re-checking a synthetic score. See
     /// SYMTHAEA_NIXOS_MANAGEMENT_IMPROVEMENT_PLAN_2026-07-26.md Phase 1.
     pub async fn execute(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
-        if matches!(&command, NixOSCommand::Custom { .. }) && !self.dry_run {
-            return ExecutionResult::Blocked {
-                reason: "unguarded Custom command requires a typed Nixward effect".to_string(),
-                safety_level: SafetyLevel::Destructive,
-            };
+        if !self.dry_run {
+            if matches!(&command, NixOSCommand::Custom { .. }) {
+                return ExecutionResult::Blocked {
+                    reason: "unguarded Custom command requires a typed Nixward effect".to_string(),
+                    safety_level: SafetyLevel::Destructive,
+                };
+            }
+            if rebuild_has_unguarded_extra_args(&command) {
+                return ExecutionResult::Blocked {
+                    reason: "nixos-rebuild extra_args require individually typed authority".to_string(),
+                    safety_level: command.safety_level(),
+                };
+            }
         }
 
         let safety = command.safety_level();
@@ -651,11 +669,19 @@ impl NixOSExecutor {
     /// a real gate elsewhere (e.g. an explicit human approval) — this
     /// function performs no safety check of its own.
     pub async fn execute_confirmed(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
-        if matches!(&command, NixOSCommand::Custom { .. }) && !self.dry_run {
-            return ExecutionResult::Blocked {
-                reason: "unguarded Custom command requires a typed Nixward effect".to_string(),
-                safety_level: SafetyLevel::Destructive,
-            };
+        if !self.dry_run {
+            if matches!(&command, NixOSCommand::Custom { .. }) {
+                return ExecutionResult::Blocked {
+                    reason: "unguarded Custom command requires a typed Nixward effect".to_string(),
+                    safety_level: SafetyLevel::Destructive,
+                };
+            }
+            if rebuild_has_unguarded_extra_args(&command) {
+                return ExecutionResult::Blocked {
+                    reason: "nixos-rebuild extra_args require individually typed authority".to_string(),
+                    safety_level: command.safety_level(),
+                };
+            }
         }
 
         let (cmd, args) = command.to_command();
@@ -894,6 +920,40 @@ mod tests {
         match result {
             ExecutionResult::Success { stdout, .. } => assert!(stdout.contains("[DRY-RUN]")),
             other => panic!("expected dry-run preview, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_rebuild_extra_args_cannot_expand_real_authority() {
+        let commands = [
+            NixOSCommand::RebuildSwitch {
+                flake: None,
+                extra_args: vec!["--target-host".into(), "host.example".into()],
+            },
+            NixOSCommand::RebuildTest {
+                flake: None,
+                extra_args: vec!["--use-remote-sudo".into()],
+            },
+            NixOSCommand::RebuildBoot {
+                flake: None,
+                extra_args: vec!["--upgrade".into()],
+            },
+        ];
+        for command in commands {
+            let mut executor = NixOSExecutor::new();
+            let result = executor.execute(command.clone(), 1.0).await;
+            assert!(matches!(
+                result,
+                ExecutionResult::Blocked { reason, .. }
+                    if reason.contains("extra_args require individually typed authority")
+            ));
+
+            let result = executor.execute_confirmed(command, 1.0).await;
+            assert!(matches!(
+                result,
+                ExecutionResult::Blocked { reason, .. }
+                    if reason.contains("extra_args require individually typed authority")
+            ));
         }
     }
 

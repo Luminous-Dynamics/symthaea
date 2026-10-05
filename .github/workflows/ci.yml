@@ -42,6 +42,25 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  nixward-rebuild-args-focused:
+    name: Nixward Rebuild Args Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check rebuild authority formatting
+        run: cargo fmt --check -- crates/core/nixward/src/action/executor.rs
+
+      - name: Run rebuild argument authority regressions
+        run: cargo test -p nixward test_rebuild_extra_args_cannot_expand_real_authority --lib
+
   nixward-typed-effect-migration-focused:
     name: Nixward Typed Effect Migration Focused
     runs-on: ubuntu-latest
