@@ -264,4 +264,6 @@ EUREKA outcome -X-> original Ramanujan campaign
 
 A later model-revision campaign may consume the closed result as a new input, but it receives a new campaign/search identity. The first `ScientificHypothesisRevisionReceipt` implementation enforces this at the value level by requiring distinct prior/new handoff digests and a distinct campaign digest.
 
-The current `ScientificInquirySelectionReceipt` implementation freezes which hypothesis set and challenge space produced an experiment-selection decision. Its disagreement score is a selection heuristic, not realized evidence; the actual experiment must be evaluated separately.
+The handoff exposes a deterministic campaign identity derived from the source observation, search configuration, search seed, and discovery manifest. Revision validation binds the recorded new-campaign digest to the new handoff and rejects revisions that remain within the prior campaign identity.
+
+The current `ScientificInquirySelectionReceipt` implementation freezes which hypothesis set and challenge space produced an experiment-selection decision. Its disagreement score is a selection heuristic, not realized evidence; the actual experiment must be evaluated separately. A concrete-set validator additionally recomputes the ordered hypothesis-set digest and requires the anchored handoff digest to be a member of that exact set, preventing unrelated valid identities from being paired.
