@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: hdc-linear-code-bounded-decoder-\${{ github.ref }}
+  group: hdc-linear-code-bounded-decoder-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -26,24 +26,25 @@ jobs:
       - name: Checkout exact workflow head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: \${{ github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 2
 
       - name: Record exact head and parent
         id: head
         run: |
           ACTUAL_SHA="$(git rev-parse HEAD)"
-          PARENT_SHA="$(git rev-parse HEAD^)"
-          test "$ACTUAL_SHA" = "\${GITHUB_SHA}"
-          test "$PARENT_SHA" = "0f063ea9dd403a5d64ce1b69e9f296286d96268a"
+          PARENT_SHA="0f063ea9dd403a5d64ce1b69e9f296286d96268a"
+          git fetch --no-tags --depth=1 origin "$PARENT_SHA"
+          test "$ACTUAL_SHA" = "${GITHUB_SHA}"
+          git cat-file -e "${PARENT_SHA}^{commit}"
           echo "sha=$ACTUAL_SHA" >> "$GITHUB_OUTPUT"
           echo "parent_sha=$PARENT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Enforce stacked research surface
         id: scope
         env:
-          HEAD_SHA: \${{ steps.head.outputs.sha }}
-          PARENT_SHA: \${{ steps.head.outputs.parent_sha }}
+          HEAD_SHA: ${{ steps.head.outputs.sha }}
+          PARENT_SHA: ${{ steps.head.outputs.parent_sha }}
         run: |
           EXPECTED_PATHS="$RUNNER_TEMP/hdc-linear-code-bounded-decoder-expected-paths"
           CHANGED_PATHS="$RUNNER_TEMP/hdc-linear-code-bounded-decoder-changed-paths"
@@ -123,9 +124,9 @@ jobs:
 
           cat > "$HARNESS/src/lib.rs" <<EOF
           pub mod hdc {
-              #[path = "\${GITHUB_WORKSPACE}/crates/core/symthaea-core/src/hdc/linear_code.rs"]
+              #[path = "${GITHUB_WORKSPACE}/crates/core/symthaea-core/src/hdc/linear_code.rs"]
               pub mod linear_code;
-              #[path = "\${GITHUB_WORKSPACE}/crates/core/symthaea-core/src/hdc/syndrome_decoder.rs"]
+              #[path = "${GITHUB_WORKSPACE}/crates/core/symthaea-core/src/hdc/syndrome_decoder.rs"]
               pub mod syndrome_decoder;
           }
           EOF
@@ -144,28 +145,28 @@ jobs:
         id: unit_tests
         run: |
           cargo +1.96.1 test --locked \
-            --manifest-path "\${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
             --lib linear_code
 
       - name: Existing ambiguity qualification
         id: inherited_tests
         run: |
           cargo +1.96.1 test --locked \
-            --manifest-path "\${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
             --test linear_code_ambiguity
 
       - name: Independent syndrome decoder qualification
         id: decoder_tests
         run: |
           cargo +1.96.1 test --locked \
-            --manifest-path "\${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
             --test linear_code_syndrome_decoder
 
       - name: Capture syndrome decoder ledger
         id: decoder_ledger
         run: |
           OUTPUT="$(cargo +1.96.1 test --locked \
-            --manifest-path "\${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
             --test linear_code_syndrome_decoder \
             decoder_work_ledger_matches_exact_weight_search_space -- --nocapture 2>&1)"
           LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SYNDROME_DECODER_LEDGER=')"
@@ -178,7 +179,7 @@ jobs:
         id: clippy
         run: |
           cargo +1.96.1 clippy --locked \
-            --manifest-path "\${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
             --all-targets \
             -- -D warnings
 
@@ -190,30 +191,30 @@ jobs:
           HDC Linear-Code Bounded Decoder Qualification
           =============================================
           receipt_schema=hdc-linear-code-bounded-decoder-qualification-v1
-          event_name=\${{ github.event_name }}
-          exact_head=\${{ steps.head.outputs.sha }}
-          parent_head=\${{ steps.head.outputs.parent_sha }}
+          event_name=${{ github.event_name }}
+          exact_head=${{ steps.head.outputs.sha }}
+          parent_head=${{ steps.head.outputs.parent_sha }}
           parent_head_required=0f063ea9dd403a5d64ce1b69e9f296286d96268a
-          research_surface_status=\${{ steps.scope.outcome }}
-          research_surface_paths=\${{ steps.scope.outputs.changed_paths }}
+          research_surface_status=${{ steps.scope.outcome }}
+          research_surface_paths=${{ steps.scope.outputs.changed_paths }}
           rust_toolchain=1.96.1
-          rust_toolchain_installation_status=\${{ steps.toolchain_install.outcome }}
-          rust_toolchain_verification_status=\${{ steps.toolchain.outcome }}
-          format_status=\${{ steps.format.outcome }}
-          harness_status=\${{ steps.harness.outcome }}
-          unit_tests_status=\${{ steps.unit_tests.outcome }}
-          inherited_ambiguity_status=\${{ steps.inherited_tests.outcome }}
-          syndrome_decoder_status=\${{ steps.decoder_tests.outcome }}
-          strict_clippy_status=\${{ steps.clippy.outcome }}
-          dependency_lock_sha256=\${{ steps.harness.outputs.lock_sha256 }}
-          syndrome_decoder_ledger_status=\${{ steps.decoder_ledger.outcome }}
-          syndrome_decoder_ledger=\${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
+          rust_toolchain_installation_status=${{ steps.toolchain_install.outcome }}
+          rust_toolchain_verification_status=${{ steps.toolchain.outcome }}
+          format_status=${{ steps.format.outcome }}
+          harness_status=${{ steps.harness.outcome }}
+          unit_tests_status=${{ steps.unit_tests.outcome }}
+          inherited_ambiguity_status=${{ steps.inherited_tests.outcome }}
+          syndrome_decoder_status=${{ steps.decoder_tests.outcome }}
+          strict_clippy_status=${{ steps.clippy.outcome }}
+          dependency_lock_sha256=${{ steps.harness.outputs.lock_sha256 }}
+          syndrome_decoder_ledger_status=${{ steps.decoder_ledger.outcome }}
+          syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
           EOF
 
       - name: Upload qualification receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hdc-linear-code-bounded-decoder-\${{ steps.head.outputs.sha }}
+          name: hdc-linear-code-bounded-decoder-${{ steps.head.outputs.sha }}
           path: hdc-linear-code-evidence
           if-no-files-found: error
