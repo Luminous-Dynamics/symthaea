@@ -115,8 +115,124 @@ impl ScientificHypothesisHandoff {
     }
 }
 
+
+/// Scope of a scientific inquiry-selection receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum InquirySelectionScope {
+    /// Records only a decision about which fresh experiment to run.
+    ExperimentSelectionOnly,
+}
+
+/// Evidence-neutral record of an experiment selected to discriminate hypotheses.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScientificInquirySelectionReceipt {
+    pub schema_revision: String,
+    pub scope: InquirySelectionScope,
+    pub hypothesis_handoff_digest: String,
+    pub hypothesis_set_digest: String,
+    pub challenge_space_digest: String,
+    pub selected_challenge_digest: String,
+    pub selector_revision: String,
+    pub selection_seed: u64,
+    /// Predicted disagreement / information value; this is not realized evidence.
+    pub predicted_information_gain_bits: u64,
+}
+
+impl ScientificInquirySelectionReceipt {
+    pub const SCHEMA_REVISION: &'static str = "SCIENTIFIC_INQUIRY_SELECTION.v1";
+
+    pub fn new(
+        hypothesis_handoff_digest: impl Into<String>,
+        hypothesis_set_digest: impl Into<String>,
+        challenge_space_digest: impl Into<String>,
+        selected_challenge_digest: impl Into<String>,
+        selector_revision: impl Into<String>,
+        selection_seed: u64,
+        predicted_information_gain: f64,
+    ) -> Result<Self, String> {
+        if !predicted_information_gain.is_finite() || predicted_information_gain < 0.0 {
+            return Err("predicted information gain must be finite and non-negative".into());
+        }
+        let receipt = Self {
+            schema_revision: Self::SCHEMA_REVISION.into(),
+            scope: InquirySelectionScope::ExperimentSelectionOnly,
+            hypothesis_handoff_digest: hypothesis_handoff_digest.into(),
+            hypothesis_set_digest: hypothesis_set_digest.into(),
+            challenge_space_digest: challenge_space_digest.into(),
+            selected_challenge_digest: selected_challenge_digest.into(),
+            selector_revision: selector_revision.into(),
+            selection_seed,
+            predicted_information_gain_bits: predicted_information_gain.to_bits(),
+        };
+        receipt.validate()?;
+        Ok(receipt)
+    }
+
+    pub fn predicted_information_gain(&self) -> f64 {
+        f64::from_bits(self.predicted_information_gain_bits)
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        serde_json::to_vec(self).expect("inquiry selection serialization must be infallible")
+    }
+
+    pub fn digest(&self) -> [u8; 32] {
+        *blake3::hash(&self.canonical_bytes()).as_bytes()
+    }
+
+    pub fn digest_hex(&self) -> String {
+        blake3::hash(&self.canonical_bytes()).to_hex().to_string()
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_revision != Self::SCHEMA_REVISION {
+            return Err("unsupported inquiry selection schema revision".into());
+        }
+        if self.scope != InquirySelectionScope::ExperimentSelectionOnly {
+            return Err("unsupported inquiry selection scope".into());
+        }
+        for (label, value) in [
+            ("hypothesis_handoff_digest", self.hypothesis_handoff_digest.as_str()),
+            ("hypothesis_set_digest", self.hypothesis_set_digest.as_str()),
+            ("challenge_space_digest", self.challenge_space_digest.as_str()),
+            ("selected_challenge_digest", self.selected_challenge_digest.as_str()),
+            ("selector_revision", self.selector_revision.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                return Err(format!("{label} cannot be empty"));
+            }
+        }
+        let predicted = self.predicted_information_gain();
+        if !predicted.is_finite() || predicted < 0.0 {
+            return Err("predicted information gain is invalid".into());
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn inquiry_selection_is_explicitly_not_an_outcome() {
+        let receipt = ScientificInquirySelectionReceipt::new(
+            "handoff",
+            "hypotheses",
+            "challenge-space",
+            "experiment-7",
+            "selector-v1",
+            9,
+            2.5,
+        )
+        .unwrap();
+        assert_eq!(
+            receipt.scope,
+            InquirySelectionScope::ExperimentSelectionOnly
+        );
+        assert!((receipt.predicted_information_gain() - 2.5).abs() < f64::EPSILON);
+        assert!(receipt.validate().is_ok());
+    }
+
+
     use super::*;
     use crate::physical_type::{PhysicalDimension, QuantityKind};
 
