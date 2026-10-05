@@ -1325,3 +1325,52 @@ fn rfc9942_vdp_map_resource_limit_remains_typed() {
         Err(Rfc9942VdpError::ResourceLimitExceeded)
     );
 }
+
+
+#[test]
+fn rfc9942_receipt_protected_header_resource_limit_is_typed() {
+    let mut encoded = vec![0xd2, 0x84, 0x59, 0x10, 0x01];
+    encoded.extend(std::iter::repeat_n(0x00, 4097));
+
+    assert_eq!(
+        Rfc9942ReceiptEnvelope::from_cbor(&encoded),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
+
+#[test]
+fn rfc9942_outer_protected_header_resource_limit_is_typed() {
+    let mut encoded = vec![0xd2, 0x84, 0x59, 0x10, 0x01];
+    encoded.extend(std::iter::repeat_n(0x00, 4097));
+
+    assert_eq!(
+        Rfc9942SignatureWithReceipts::from_cbor(&encoded),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
+
+#[test]
+fn rfc9942_receipt_signature_resource_limit_is_typed() {
+    let mut encoded = vec![
+        0xd2, 0x84,
+        0x41, 0xa0, // protected = {}
+        0xa1, 0x19, 0x01, 0x8a, // receipts key
+    ];
+    // Make the value structurally parsable enough to reach the signature field:
+    // one tiny receipt bstr, whose nested parse fails structurally before the
+    // signature. Therefore use an empty receipts map instead to isolate the
+    // outer receipt decoder's signature bound.
+    encoded = vec![
+        0xd2, 0x84,
+        0x41, 0xa0,
+        0xa0,
+        0xf6,
+        0x5a, 0x00, 0x01, 0x00, 0x00,
+    ];
+    encoded.extend(std::iter::repeat_n(0x00, 65537));
+
+    assert_eq!(
+        Rfc9942ReceiptEnvelope::from_cbor(&encoded),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
