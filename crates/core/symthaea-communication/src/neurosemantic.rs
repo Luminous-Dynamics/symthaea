@@ -985,6 +985,21 @@ mod tests {
     }
 
     #[test]
+    fn handling_policy_requires_provenance_reference() {
+        let mut policy = NeurosemanticHandlingPolicy {
+            schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
+            policy_provenance_ref: String::new(),
+            origin_jurisdiction: "ZA".into(),
+            permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
+            permitted_secondary_uses: BTreeSet::new(),
+            retention: NeurosemanticRetentionPolicy::Ephemeral,
+        };
+        assert!(!policy.validates());
+        policy.policy_provenance_ref = "synthetic-policy-record-1".into();
+        assert!(policy.validates());
+    }
+
+    #[test]
     fn handling_policy_requires_explicit_destination_and_retention() {
         let policy = NeurosemanticHandlingPolicy {
             schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
