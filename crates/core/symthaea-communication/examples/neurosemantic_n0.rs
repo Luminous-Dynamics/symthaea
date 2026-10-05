@@ -74,6 +74,7 @@ fn main() -> Result<(), String> {
         expires_at_unix_s: 2_000,
         consent_epoch: 4,
         revoked: false,
+        revoked_at_unix_s: None,
     };
 
     let packet = NeurosemanticPacket::new_with_policy(
