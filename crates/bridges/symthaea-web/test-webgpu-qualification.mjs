@@ -166,7 +166,8 @@ async function canvasPixelStatistics(page, selector) {
     }
     context.drawImage(image, 0, 0);
     const rgba = context.getImageData(0, 0, canvas.width, canvas.height).data;
-    let nonOpaqueBlack = 0;
+    let opaqueBlack = 0;
+    let nonOpaque = 0;
     let nonBlack = 0;
     let minX = canvas.width;
     let minY = canvas.height;
@@ -188,8 +189,11 @@ async function canvasPixelStatistics(page, selector) {
         const g = rgba[offset + 1];
         const b = rgba[offset + 2];
         const a = rgba[offset + 3];
-        if (r !== 0 || g !== 0 || b !== 0 || a !== 255) {
-          nonOpaqueBlack++;
+        if (r === 0 && g === 0 && b === 0 && a === 255) {
+          opaqueBlack++;
+        }
+        if (a !== 255) {
+          nonOpaque++;
         }
         if (r !== 0 || g !== 0 || b !== 0) {
           nonBlack++;
@@ -203,7 +207,8 @@ async function canvasPixelStatistics(page, selector) {
     return {
       width: canvas.width,
       height: canvas.height,
-      non_opaque_black_pixels: nonOpaqueBlack,
+      opaque_black_pixels: opaqueBlack,
+      non_opaque_pixels: nonOpaque,
       non_black_pixels: nonBlack,
       non_black_fraction: (canvas.width * canvas.height) > 0
         ? nonBlack / (canvas.width * canvas.height)
@@ -316,7 +321,8 @@ function assertCanvasStatistics(statistics, width, height, label = 'WebGPU', cla
   if (!statistics
     || statistics.width !== width
     || statistics.height !== height
-    || statistics.non_opaque_black_pixels !== 0
+    || statistics.non_opaque_pixels !== 0
+    || statistics.opaque_black_pixels > expectedPixels * 0.05
     || statistics.non_black_pixels < expectedPixels * 0.95
     || !statistics.non_black_bounds
     || statistics.non_black_bounds.min_x !== 0
