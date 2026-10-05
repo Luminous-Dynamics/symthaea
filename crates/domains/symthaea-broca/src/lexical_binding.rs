@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use crate::linguistic_frame::{FormulationStrategy, LinguisticFrame};
 
 pub const LEXICAL_MORPHOSYNTACTIC_BINDING_VERSION: &str =
-    "broca-lexical-morphosyntactic-binding-v1";
+    "broca-lexical-morphosyntactic-binding-v2";
 
 /// Whether a language-specific morphosyntactic rule has been explicitly supplied.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -150,7 +150,7 @@ impl LexicalMorphosyntacticBinding {
         let binding = Self {
             version: LEXICAL_MORPHOSYNTACTIC_BINDING_VERSION.to_string(),
             source_frame_version: frame.version.clone(),
-            source_frame_grounding: frame.grounding_surface(),
+            source_frame_grounding: frame.canonical_grounding_surface(),
             language,
             constituents,
             dependencies,
@@ -173,7 +173,7 @@ impl LexicalMorphosyntacticBinding {
         self.validate()?;
 
         if self.source_frame_version != frame.version
-            || self.source_frame_grounding != frame.grounding_surface()
+            || self.source_frame_grounding != frame.canonical_grounding_surface()
         {
             return Err(LexicalBindingError::UpstreamMismatch);
         }
@@ -672,6 +672,47 @@ mod tests {
             provenance: Some("fixture:english-rules-v1".into()),
             unbound_reason: None,
         }
+    }
+
+    #[test]
+    fn legacy_binding_schema_fails_closed() {
+        let frame = statement_frame();
+        let mut binding = LexicalMorphosyntacticBinding::new(
+            &frame,
+            english_rule_binding(),
+            base_semantic_bindings(),
+            vec![],
+            vec![],
+        )
+        .expect("base lexical binding");
+        binding.version = "broca-lexical-morphosyntactic-binding-v1".into();
+
+        assert_eq!(
+            binding.validate().expect_err("legacy binding schema must fail closed"),
+            LexicalBindingError::InvalidVersion
+        );
+    }
+
+    #[test]
+    fn upstream_prosody_tampering_breaks_exact_lineage() {
+        let frame = statement_frame();
+        let binding = LexicalMorphosyntacticBinding::new(
+            &frame,
+            english_rule_binding(),
+            base_semantic_bindings(),
+            vec![],
+            vec![],
+        )
+        .expect("base lexical binding");
+        let mut tampered = frame.clone();
+        tampered.prosody.rate = if tampered.prosody.rate < 1.0 { 1.2 } else { 0.8 };
+
+        assert_eq!(
+            binding
+                .validate_against_frame(&tampered)
+                .expect_err("prosody mutation must invalidate lexical lineage"),
+            LexicalBindingError::UpstreamMismatch
+        );
     }
 
     #[test]
