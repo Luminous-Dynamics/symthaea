@@ -59,7 +59,9 @@ jobs:
         run: cargo fmt --check -- crates/core/nixward/src/action/executor.rs crates/core/nixward/src/action/generation_manager.rs crates/core/nixward/src/support/watchdog.rs crates/core/nixward/src/bin/nixward.rs
 
       - name: Run typed generation regressions
-        run: cargo test -p nixward test_switch_to_is_typed_system_generation_operation --lib
+        run: |
+          cargo test -p nixward test_switch_to_is_typed_system_generation_operation --lib
+          cargo test -p nixward test_activate_generation_is_typed_system_activation --lib
 
   nixward-custom-authority-focused:
     name: Nixward Custom Authority Focused
