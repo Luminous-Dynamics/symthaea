@@ -163,11 +163,27 @@ pub fn validate_scientific_hypothesis_set(
     }
 
     let mut identities = std::collections::BTreeSet::new();
+    let reference_type = &handoffs[0].physical_type;
     for handoff in handoffs {
         handoff.validate()?;
         let identity = handoff.digest_hex();
         if !identities.insert(identity) {
             return Err("scientific hypothesis set contains a duplicate hypothesis identity".into());
+        }
+
+        match reference_type.judge_compatibility(&handoff.physical_type) {
+            TypeJudgement::Valid(()) => {}
+            TypeJudgement::Invalid(error) => {
+                return Err(format!(
+                    "scientific hypothesis set contains incompatible physical targets: {}",
+                    error.reason
+                ));
+            }
+            TypeJudgement::Unknown(reason) => {
+                return Err(format!(
+                    "scientific hypothesis set physical target compatibility is unknown: {reason}"
+                ));
+            }
         }
     }
 
@@ -719,6 +735,38 @@ mod tests {
         );
 
         assert!(validate_scientific_hypothesis_set(&[h.clone(), h]).is_err());
+    }
+
+    #[test]
+    fn hypothesis_set_validator_rejects_incompatible_physical_targets() {
+        let energy = ScientificHypothesisHandoff::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &energy(),
+            ModelMaturity::ResearchPrototype,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            1,
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+        let torque_type =
+            PhysicalType::with_kind(QuantityKind::Torque, PhysicalDimension::ENERGY);
+        let torque = ScientificHypothesisHandoff::new(
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            &torque_type,
+            ModelMaturity::ResearchPrototype,
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "1111111111111111111111111111111111111111111111111111111111111111",
+            2,
+            "2222222222222222222222222222222222222222222222222222222222222222",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+
+        assert!(validate_scientific_hypothesis_set(&[energy, torque]).is_err());
     }
 
     #[test]
