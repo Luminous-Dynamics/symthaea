@@ -18092,6 +18092,7 @@ dependencies = [
  "tree-sitter-nix",
  "tree-sitter-python",
  "tree-sitter-rust",
+ "url",
  "urlencoding",
  "uuid",
  "wait-timeout",
