@@ -63,6 +63,19 @@ fn derived_kind_sub(a: QuantityKind, b: QuantityKind) -> QuantityKind {
     }
 }
 
+fn combine_scalar(a: ScalarDomain, b: ScalarDomain, division: bool) -> ScalarDomain {
+    use ScalarDomain::*;
+    match (a, b) {
+        (Unknown, _) | (_, Unknown) => Unknown,
+        (Complex, _) | (_, Complex) => Complex,
+        (ApproximateReal, _) | (_, ApproximateReal) => ApproximateReal,
+        (Real, _) | (_, Real) => Real,
+        (Integer, Integer) if division => Rational,
+        (Integer, Integer) => Integer,
+        (Integer, Rational) | (Rational, Integer) | (Rational, Rational) => Rational,
+    }
+}
+
 fn additive_result(
     left: &PhysicalType,
     right: &PhysicalType,
@@ -81,7 +94,9 @@ fn additive_result(
     }
 
     if left.kind == QuantityKind::Unknown || right.kind == QuantityKind::Unknown {
-        return valid(left.clone());
+        return TypeJudgement::Unknown(
+            "add/sub requires known quantity kinds when physical dimension is shared".into(),
+        );
     }
 
     let result_kind = match operation {
@@ -104,6 +119,11 @@ fn additive_result(
     } else {
         PhysicalType::with_kind(result_kind, left_dimension)
     };
+    if !(result_kind == left.kind && operation == BinOp::Add)
+        && !(result_kind == right.kind && operation == BinOp::Add)
+    {
+        result.scalar = combine_scalar(left.scalar, right.scalar, false);
+    }
 
     // Subtracting two absolute temperatures yields a temperature difference.
     // Do not carry a Celsius/Fahrenheit affine offset into the delta result.
@@ -305,14 +325,18 @@ where
                 );
             };
             match ld.checked_add(rd) {
-                Some(dimension) => valid(PhysicalType::with_kind(
-                    if l.kind == Unknown || r.kind == Unknown {
-                        Unknown
-                    } else {
-                        derived_kind_mul(l.kind, r.kind)
-                    },
-                    dimension,
-                )),
+                Some(dimension) => {
+                    let mut result = PhysicalType::with_kind(
+                        if l.kind == Unknown || r.kind == Unknown {
+                            Unknown
+                        } else {
+                            derived_kind_mul(l.kind, r.kind)
+                        },
+                        dimension,
+                    );
+                    result.scalar = combine_scalar(l.scalar, r.scalar, false);
+                    valid(result)
+                },
                 None => TypeJudgement::Invalid(PhysicalTypeError {
                     operation: "mul".into(),
                     reason: "physical dimension exponent overflow".into(),
@@ -334,10 +358,14 @@ where
             };
             if r.has_refinement(Refinement::NonZero) {
                 match ld.checked_sub(rd) {
-                    Some(dimension) => valid(PhysicalType::with_kind(
-                        derived_kind_div(l.kind, r.kind),
-                        dimension,
-                    )),
+                    Some(dimension) => {
+                        let mut result = PhysicalType::with_kind(
+                            derived_kind_div(l.kind, r.kind),
+                            dimension,
+                        );
+                        result.scalar = combine_scalar(l.scalar, r.scalar, true);
+                        valid(result)
+                    },
                     None => TypeJudgement::Invalid(PhysicalTypeError {
                         operation: "div".into(),
                         reason: "physical dimension exponent overflow".into(),
@@ -591,6 +619,108 @@ mod tests {
         );
         match infer_expr_type_with_variables(&expr, &variables) {
             TypeJudgement::Valid(t) => assert_eq!(t.kind, QuantityKind::Force),
+            other => panic!("unexpected judgment: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unknown_quantity_kind_is_not_promoted_to_valid_addition() {
+        let known =
+            PhysicalType::with_kind(QuantityKind::Energy, PhysicalDimension::ENERGY);
+        let unknown_same_dimension =
+            PhysicalType::with_kind(QuantityKind::Unknown, PhysicalDimension::ENERGY);
+        let expr = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Var("known".into())),
+            Box::new(Expr::Var("unknown".into())),
+        );
+        let variables = HashMap::from([
+            ("known".into(), known),
+            ("unknown".into(), unknown_same_dimension),
+        ]);
+
+        assert!(matches!(
+            infer_expr_type_with_variables(&expr, &variables),
+            TypeJudgement::Unknown(_)
+        ));
+    }
+
+    #[test]
+    fn scalar_domain_is_preserved_through_multiplication() {
+        let mut mass =
+            PhysicalType::with_kind(QuantityKind::Mass, PhysicalDimension::MASS);
+        mass.scalar = ScalarDomain::Complex;
+        let acceleration =
+            PhysicalType::with_kind(QuantityKind::Acceleration, PhysicalDimension::ACCELERATION);
+        let expr = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("m".into())),
+            Box::new(Expr::Var("a".into())),
+        );
+        let variables = HashMap::from([
+            ("m".into(), mass),
+            ("a".into(), acceleration),
+        ]);
+
+        match infer_expr_type_with_variables(&expr, &variables) {
+            TypeJudgement::Valid(result) => {
+                assert_eq!(result.kind, QuantityKind::Force);
+                assert_eq!(result.scalar, ScalarDomain::Complex);
+            }
+            other => panic!("unexpected judgment: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn integer_division_does_not_claim_an_integer_result() {
+        let mut length =
+            PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH);
+        length.scalar = ScalarDomain::Integer;
+        let mut time =
+            PhysicalType::with_kind(QuantityKind::Time, PhysicalDimension::TIME);
+        time.scalar = ScalarDomain::Integer;
+        let expr = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Var("t".into())),
+        );
+        let variables = HashMap::from([
+            ("x".into(), length),
+            ("t".into(), time),
+        ]);
+
+        match infer_expr_type_with_variables(&expr, &variables) {
+            TypeJudgement::Valid(result) => {
+                assert_eq!(result.kind, QuantityKind::Velocity);
+                assert_eq!(result.scalar, ScalarDomain::Rational);
+            }
+            other => panic!("unexpected judgment: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn approximate_scalar_domain_does_not_collapse_to_exact_real() {
+        let mut energy =
+            PhysicalType::with_kind(QuantityKind::Energy, PhysicalDimension::ENERGY);
+        energy.scalar = ScalarDomain::ApproximateReal;
+        let mut time =
+            PhysicalType::with_kind(QuantityKind::Time, PhysicalDimension::TIME);
+        time.scalar = ScalarDomain::Real;
+        let expr = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Var("e".into())),
+            Box::new(Expr::Var("t".into())),
+        );
+        let variables = HashMap::from([
+            ("e".into(), energy),
+            ("t".into(), time),
+        ]);
+
+        match infer_expr_type_with_variables(&expr, &variables) {
+            TypeJudgement::Valid(result) => {
+                assert_eq!(result.kind, QuantityKind::Power);
+                assert_eq!(result.scalar, ScalarDomain::ApproximateReal);
+            }
             other => panic!("unexpected judgment: {other:?}"),
         }
     }
