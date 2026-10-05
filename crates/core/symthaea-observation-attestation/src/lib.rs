@@ -6160,7 +6160,7 @@ mod tests {
         )
         .verify_report(&envelope, &receipt);
 
-        let mut evaluation = report.to_evidence_evaluation_v9();
+        let mut evaluation = report.try_to_evidence_evaluation_v9().expect("v9 evaluation");
         let original_context_fingerprint = evaluation.context_fingerprint;
 
         evaluation.supplement.trust_root_fingerprint =
@@ -6182,10 +6182,27 @@ mod tests {
         )
         .verify_report(&envelope, &receipt);
 
-        let mut evaluation = report.to_evidence_evaluation_v9();
+        let mut evaluation = report.try_to_evidence_evaluation_v9().expect("v9 evaluation");
         evaluation.context.verifier_id = "attacker-verifier";
         evaluation.context_fingerprint = evaluation.context.fingerprint();
         assert!(!evaluation.is_well_formed());
+    }
+
+    #[test]
+    fn evidence_evaluation_v9_checked_constructor_rejects_malformed_report() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let mut report = verifier.verify_report(&envelope, &receipt);
+        report.receipt_fingerprint.clear();
+
+        assert_eq!(
+            report.try_to_evidence_evaluation_v9(),
+            Err(EvidenceEvaluationConstructionError::InvalidReport)
+        );
     }
 
     #[test]
@@ -6218,7 +6235,7 @@ mod tests {
         .verify_report(&envelope, &receipt);
 
         let v8 = report.to_evidence_evaluation();
-        let v9 = report.to_evidence_evaluation_v9();
+        let v9 = report.try_to_evidence_evaluation_v9().expect("v9 evaluation");
 
         assert!(v8.canonical_bytes().starts_with(b"symthaea:evidence-evaluation:v8\n"));
         assert!(v9.canonical_bytes().starts_with(b"symthaea:evidence-evaluation:v9\n"));
