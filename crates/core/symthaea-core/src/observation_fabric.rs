@@ -384,7 +384,10 @@ impl ProcessingActivity {
 }
 
 fn is_canonical_hex_fingerprint(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 fn write_canonical_bytes(hasher: &mut blake3::Hasher, bytes: &[u8]) {
@@ -4205,6 +4208,39 @@ mod tests {
         let mut cross = receipt.clone();
         cross.assessment_fingerprint = v2_receipt.assessment_fingerprint;
         assert!(!cross.verify_integrity());
+    }
+
+    #[test]
+    fn independence_v3_receipt_verifies_detached_scope_witness_without_graph_reexecution() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let assessment = graph
+            .assess_independence_detailed_v3("obs-001", "obs-002")
+            .expect("v3 assessment");
+        let receipt = IndependenceVerificationReceiptV3::from_assessment(&assessment);
+        let scope = graph
+            .independence_verification_reachable_scope_canonical_bytes_v3(
+                "obs-001",
+                "obs-002",
+            )
+            .expect("v3 scope bytes");
+
+        assert!(receipt.verify_against_scope_witness(&scope));
+
+        let mut mutated = scope.clone();
+        mutated.push(0);
+        assert!(!receipt.verify_against_scope_witness(&mutated));
+
+        let wrong_domain = scope
+            .strip_prefix(INDEPENDENCE_SCOPE_V3_DOMAIN_SEPARATOR)
+            .expect("scope domain")
+            .to_vec();
+        assert!(!receipt.verify_against_scope_witness(&wrong_domain));
     }
 
     #[test]
