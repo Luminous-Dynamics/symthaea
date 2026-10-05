@@ -1411,6 +1411,10 @@ impl EvaluationContextSupplement {
         self.supplement_version == EVALUATION_CONTEXT_SUPPLEMENT_VERSION
             && self.attachment_phase == EVALUATION_CONTEXT_SUPPLEMENT_ATTACHMENT_PHASE
             && self
+                .applies_to_context_fingerprint
+                .as_deref()
+                .is_none_or(is_blake3_fingerprint)
+            && self
                 .evaluator_identity_fingerprint
                 .as_deref()
                 .is_none_or(is_blake3_fingerprint)
@@ -6237,6 +6241,15 @@ mod tests {
         evaluation.context.verifier_version = "attacker-verifier-version";
         evaluation.context_fingerprint = evaluation.context.fingerprint();
         assert!(!evaluation.is_well_formed());
+    }
+
+    #[test]
+    fn supplement_self_validation_rejects_malformed_context_binding() {
+        let mut supplement = EvaluationContextSupplement::empty();
+        assert!(supplement.is_well_formed());
+
+        supplement.applies_to_context_fingerprint = Some("not-a-fingerprint".into());
+        assert!(!supplement.is_well_formed());
     }
 
     #[test]
