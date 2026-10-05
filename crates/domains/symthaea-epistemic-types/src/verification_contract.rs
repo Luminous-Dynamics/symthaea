@@ -386,7 +386,7 @@ pub struct ControllerDocumentDereferenceAttestation {
     pub source: ControllerDocumentResolutionSource,
     pub document_digest: String,
     /// Optional Multibase-encoded SHA-256 multihash for the dereferenced bytes.
-    #[serde(default)]
+    #[serde(default, rename = "digestMultibase", alias = "digest_multibase")]
     pub digest_multibase: Option<String>,
 }
 
@@ -1923,6 +1923,43 @@ mod tests {
             Err(VerificationFailure::ControllerDocumentIntegrityMismatch { .. })
                 | Err(VerificationFailure::Structural(_))
         ));
+    }
+
+    #[test]
+    fn digest_multibase_uses_standards_property_name_on_the_wire() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let dereference = ControllerDocumentDereferenceAttestation::from_adapter(
+            &request,
+            "https://example.test/controller",
+            "application/cid",
+            1024,
+            0,
+            request.freshness.verification_time.clone(),
+            ControllerDocumentResolutionSource::Network,
+            &"11".repeat(32),
+            Some("zQmPVGjYFugq4XUyBfoTHG6c3qxfBS26jEdaFM1gdAVuMZ2".into()),
+        )
+        .unwrap();
+
+        let encoded = serde_json::to_value(&dereference).unwrap();
+        assert!(encoded.get("digestMultibase").is_some());
+        assert!(encoded.get("digest_multibase").is_none());
+
+        let mut legacy = encoded.clone();
+        let digest = legacy["digestMultibase"].take();
+        legacy["digest_multibase"] = digest;
+        let decoded: ControllerDocumentDereferenceAttestation =
+            serde_json::from_value(legacy).unwrap();
+        assert_eq!(decoded.digest_multibase, dereference.digest_multibase);
     }
 
     #[test]
