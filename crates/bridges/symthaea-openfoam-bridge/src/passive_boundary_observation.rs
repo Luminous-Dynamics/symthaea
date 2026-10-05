@@ -583,6 +583,8 @@ fn observe_openfoam_patch_geometry_with_neighbour(
             symthaea_passive_solver_binding::BoundaryEdgeKey,
             u32,
         >::new();
+    let mut edge_origins =
+        std::collections::BTreeMap::<symthaea_passive_solver_binding::BoundaryEdgeKey, (u64, u64)>::new();
 
     for (offset, face) in faces[start..end].iter().enumerate() {
         if face.len() < 3 {
