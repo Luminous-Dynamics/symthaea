@@ -936,6 +936,32 @@ mod tests {
     }
 
     #[test]
+    fn resolution_material_handoff_is_exactly_receipt_bound() {
+        let request = request();
+        let snapshot = snapshot();
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+
+        let (resolution, material) = adapter
+            .resolve_snapshot_with_material(&request, snapshot)
+            .unwrap();
+
+        assert_eq!(material.method, resolution.verification_method);
+        assert_eq!(material.controller, resolution.resolved_verification_method_controller);
+        assert_eq!(material.method_type(), resolution.verification_method_type);
+        assert_eq!(
+            material.material_digest,
+            resolution.verification_method_material_digest
+        );
+
+        assert!(matches!(
+            material.material,
+            ResolvedVerificationMethodMaterial::Multikey { .. }
+        ));
+    }
+
+    #[test]
     fn durable_snapshot_emits_historical_application_receipt() {
         let request = request();
         let snapshot = snapshot();
