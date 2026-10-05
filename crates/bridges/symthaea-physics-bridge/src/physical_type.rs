@@ -552,10 +552,12 @@ where
                         other => return other,
                     };
 
-                    if !exponent_ty
-                        .dimension
-                        .is_some_and(PhysicalDimension::is_dimensionless)
-                    {
+                    let Some(exponent_dimension) = exponent_ty.dimension else {
+                        return TypeJudgement::Unknown(
+                            "variable exponent requires a known dimensionless exponent".into(),
+                        );
+                    };
+                    if !exponent_dimension.is_dimensionless() {
                         return TypeJudgement::Invalid(PhysicalTypeError {
                             operation: "pow".into(),
                             reason: "exponent must be dimensionless".into(),
@@ -988,6 +990,26 @@ mod tests {
         assert!(matches!(
             infer_expr_type_with_variables(&expr, &variables),
             TypeJudgement::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn variable_exponent_with_unknown_dimension_stays_unknown() {
+        let base = PhysicalType::dimensionless();
+        let exponent = PhysicalType::unknown();
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("base".into())),
+            Box::new(Expr::Var("exponent".into())),
+        );
+        let variables = HashMap::from([
+            ("base".into(), base),
+            ("exponent".into(), exponent),
+        ]);
+
+        assert!(matches!(
+            infer_expr_type_with_variables(&expr, &variables),
+            TypeJudgement::Unknown(_)
         ));
     }
 
