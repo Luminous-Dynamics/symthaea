@@ -241,7 +241,10 @@ impl Rfc9942Es256CoseKey {
                     });
                 }
                 CborLabelKey::Integer(COSE_KID_LABEL) => {
-                    kid=Some(value_reader.read_bstr_bounded(256).map_err(|_|Rfc9942VdpError::InvalidEncoding)?);
+                    kid=Some(value_reader.read_bstr_bounded(256).map_err(|error|match error {
+                        Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                        _=>Rfc9942VdpError::InvalidEncoding,
+                    })?);
                 }
                 CborLabelKey::Integer(COSE_KEY_ALG_LABEL) => {
                     match value_reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)? {
@@ -314,7 +317,11 @@ impl Rfc9942Es256CoseKey {
                     return Err(Rfc9942VdpError::Es256PrivateKeyMaterial);
                 }
                 _ => {
-                    value_reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                    value_reader.skip_value_with_resource_limits(0,4096,64,usize::MAX)
+                        .map_err(|error|match error {
+                            Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                            _=>Rfc9942VdpError::InvalidEncoding,
+                        })?;
                 }
             }
             value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
@@ -4809,6 +4816,57 @@ mod tests {
             Rfc9942SignatureWithReceipts::from_cbor(&bytes),
             Err(Rfc9942VdpError::InvalidEncoding)
         );
+    }
+
+    #[test]
+    fn rfc9942_es256_key_kid_resource_limit_is_typed() {
+        let mut key = Vec::new();
+        cbor_map_len(&mut key, 1);
+        cbor_int(&mut key, COSE_KID_LABEL);
+        cbor_bytes(&mut key, &vec![0u8; 257]);
+
+        assert_eq!(
+            Rfc9942Es256CoseKey::from_cbor(&key),
+            Err(Rfc9942VdpError::ResourceLimitExceeded)
+        );
+    }
+
+    #[test]
+    fn rfc9942_es256_key_unknown_extension_recursion_limit_is_typed() {
+        let mut nested = vec![0x61, b'x'];
+        for _ in 0..17 {
+            nested = vec![0x81];
+            nested.extend_from_slice(&{
+                let mut v = Vec::new();
+                v.push(0xd8);
+                v.push(0x18);
+                v.extend_from_slice(&{
+                    let mut inner = Vec::new();
+                    inner.push(0x81);
+                    inner.push(0x00);
+                    inner
+                });
+                v
+            });
+        }
+
+        let mut key = Vec::new();
+        cbor_map_len(&mut key, 1);
+        cbor_int(&mut key, 99);
+
+        // 17 nested arrays are enough to reach the CBOR decoder depth ceiling.
+        let mut value = Vec::new();
+        value.push(0x81);
+        value.extend_from_slice(&[0x81; 16]);
+        value.push(0x00);
+        key.extend_from_slice(&value);
+
+        assert_eq!(
+            Rfc9942Es256CoseKey::from_cbor(&key),
+            Err(Rfc9942VdpError::ResourceLimitExceeded)
+        );
+
+        let _ = nested;
     }
 
     #[test]
