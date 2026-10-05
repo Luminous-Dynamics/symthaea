@@ -1343,14 +1343,12 @@ mod tests {
         )
         .unwrap();
 
+        let mut resolution = resolved_method(&request);
+        resolution.resolved_verification_method_controller =
+            ClaimControllerIdentity::new("https://example.test/other").unwrap();
         let result = VerificationEvidence::from_adapter_attestation(
             &request,
-            "https://example.test/controller",
-            &"11".repeat(32),
-            ClaimControllerIdentity::new("https://example.test/other").unwrap(),
-            ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
-            &"55".repeat(32),
-            "assertionMethod",
+            resolution,
             "ed25519",
             &"22".repeat(32),
             &"33".repeat(32),
@@ -1374,13 +1372,25 @@ mod tests {
         )
         .unwrap();
 
+        let mut resolution = resolved_method(&request);
+        resolution.verification_method =
+            ClaimVerificationMethod::new("https://example.test/controller#key-2").unwrap();
+        resolution.relationship_methods =
+            vec![resolution.verification_method.clone()];
+        let encoded_members = (
+            "symthaea:verification-relationship-members:v1",
+            request.expected_verification_relationship.as_str(),
+            resolution
+                .relationship_methods
+                .iter()
+                .map(ClaimVerificationMethod::as_str)
+                .collect::<Vec<_>>(),
+        );
+        resolution.relationship_methods_digest =
+            crate::sha256_hex(&serde_json::to_vec(&encoded_members).unwrap());
         let result = VerificationEvidence::from_adapter_attestation(
             &request,
-            "https://example.test/controller",
-            &"11".repeat(32),
-            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
-            ClaimVerificationMethod::new("https://example.test/controller#key-2").unwrap(),
-            "assertionMethod",
+            resolution,
             "ed25519",
             &"22".repeat(32),
             &"33".repeat(32),
@@ -1392,7 +1402,6 @@ mod tests {
         ));
     }
 
-    #[test]
     #[test]
     fn evidence_cannot_be_replayed_under_a_different_freshness_context() {
         let claim = fixture_claim();
@@ -1453,6 +1462,7 @@ mod tests {
         assert_ne!(controller.evidence_digest(), method.evidence_digest());
     }
 
+    #[test]
     fn evidence_changes_when_controller_snapshot_or_claim_changes() {
         let claim = fixture_claim();
         let request = VerificationRequest::from_claim(
@@ -1493,14 +1503,9 @@ mod tests {
             default_freshness(),
         )
         .unwrap();
-        let c = VerificationEvidence::from_adapter_attestation(
+        let c = make_evidence(
             &changed_request,
-            "https://example.test/controller",
             &"11".repeat(32),
-            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
-            ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
-            &"55".repeat(32),
-            "assertionMethod",
             "ed25519",
             &"22".repeat(32),
             &"33".repeat(32),
