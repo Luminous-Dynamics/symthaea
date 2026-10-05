@@ -640,6 +640,7 @@ fn observe_openfoam_patch_geometry(
     identity.extend_from_slice(&(boundary_identity.len() as u64).to_le_bytes());
     identity.extend_from_slice(&boundary_identity);
     identity.extend_from_slice(&point_scale_mm_per_unit.to_le_bytes());
+    identity.extend_from_slice(&tolerance_mm.to_le_bytes());
     identity.extend_from_slice(&(solver_boundary_edges.len() as u64).to_le_bytes());
     for edge in &solver_boundary_edges {
         identity.extend_from_slice(&edge.a[0].to_le_bytes());
@@ -767,7 +768,7 @@ fn observe_openfoam_patch_geometry_with_neighbour(
     let radius_mm = interface.radius_mm() as f64;
     let normal = interface.interface_plane.normal_unit;
     let origin = interface.interface_plane.origin_mm;
-    let tolerance = tolerance_mm.max(0.001);
+    let tolerance = tolerance_mm;
     for face in &faces[start..end] {
         for &point_index in face {
             let point = points
@@ -947,6 +948,7 @@ fn observe_openfoam_patch_geometry_with_neighbour(
     identity.extend_from_slice(&(boundary_identity.len() as u64).to_le_bytes());
     identity.extend_from_slice(&boundary_identity);
     identity.extend_from_slice(&point_scale_mm_per_unit.to_le_bytes());
+    identity.extend_from_slice(&tolerance_mm.to_le_bytes());
     identity.extend_from_slice(&(solver_boundary_edges.len() as u64).to_le_bytes());
     for edge in &solver_boundary_edges {
         identity.extend_from_slice(&edge.a[0].to_le_bytes());
@@ -2437,6 +2439,67 @@ mod tests {
             ),
             Err(OpenFoamBoundaryObservationError::DegenerateFace { face_index: 0 })
         ));
+    }
+
+    #[test]
+    fn geometry_observation_identity_commits_to_tolerance() {
+        use symthaea_fabrication_kernel::mesh::TriangleMesh;
+        use symthaea_passive_void_compiler::{
+            BoundaryConditionDomain, InterfacePlane, PortAperture, PortInterface,
+            SolverBoundaryIdentity,
+        };
+        use symthaea_passive_void_graph::PortId;
+
+        let interface = PortInterface::new(
+            PortId(10),
+            [0.0, 0.0, 0.0],
+            PortAperture::Circular { radius_mm: 2.0 },
+            [0.0, 0.0, 1.0],
+            InterfacePlane::new([0.0, 0.0, 0.0], [0.0, 0.0, 1.0]).unwrap(),
+            SolverBoundaryIdentity {
+                domain: BoundaryConditionDomain::Fluidic,
+                id: 7,
+            },
+        )
+        .unwrap();
+        let candidate = TriangleMesh {
+            vertices: vec![
+                [0.0, 0.0, 0.0],
+                [2.0, 0.0, 0.0],
+                [0.0, 2.0, 0.0],
+                [-2.0, 0.0, 0.0],
+                [0.0, -2.0, 0.0],
+            ],
+            normals: vec![[0.0, 0.0, 1.0]; 5],
+            indices: vec![[0,1,2],[0,2,3],[0,3,4],[0,4,1]],
+        };
+        let boundary = br#"1
+(
+    inlet { type patch; nFaces 1; startFace 0; }
+)
+"#;
+        let faces = br#"1
+(
+    4(0 1 2 3)
+)
+"#;
+        let points = br#"4
+(
+    (2 0 0)
+    (0 2 0)
+    (-2 0 0)
+    (0 -2 0)
+)
+"#;
+
+        let (_, first) = observe_openfoam_patch_geometry(
+            boundary, faces, points, "inlet", &interface, &candidate, 0.05, 1.0,
+        ).unwrap();
+        let (_, second) = observe_openfoam_patch_geometry(
+            boundary, faces, points, "inlet", &interface, &candidate, 0.10, 1.0,
+        ).unwrap();
+
+        assert_ne!(first.digest(), second.digest());
     }
 
     #[test]
