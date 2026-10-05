@@ -315,6 +315,8 @@ pub struct HdcOntologyConformalCalibration {
     pub threshold: f64,
     pub calibration_case_count: usize,
     pub codebook_hash: String,
+    /// Hash of the exact sorted multiset of calibration nonconformity scores.
+    pub calibration_scores_hash: String,
     /// Canonical hash of the complete candidate universe used for calibration.
     pub candidate_universe_hash: String,
     pub candidate_universe_size: usize,
@@ -331,6 +333,7 @@ impl HdcOntologyConformalCalibration {
     ) -> Result<Self, String> {
         let codebook_hash = codebook_hash.into();
         let candidate_universe_hash = candidate_universe_hash(candidate_universe)?;
+        let calibration_scores_hash = calibration_scores_hash(calibration_scores)?;
         if codebook_hash.trim().is_empty() {
             return Err("conformal calibration requires a codebook hash".into());
         }
@@ -366,6 +369,7 @@ impl HdcOntologyConformalCalibration {
             threshold: sorted[rank - 1],
             calibration_case_count: n,
             codebook_hash,
+            calibration_scores_hash,
             candidate_universe_hash,
             candidate_universe_size: candidate_universe.len(),
             score_revision: HDC_ONTOLOGY_CONFORMAL_SCORE_REVISION.into(),
@@ -386,10 +390,14 @@ impl HdcOntologyConformalCalibration {
     /// and bind the calibration to the same frozen codebook.
     pub fn prediction_set(
         &self,
+        codebook_hash: &str,
         candidates: &[HdcOntologyRetrievalCandidate],
     ) -> Result<Vec<String>, String> {
         if !self.validates() {
             return Err("invalid HDC ontology conformal calibration".into());
+        }
+        if codebook_hash != self.codebook_hash {
+            return Err("conformal prediction codebook hash does not match calibration".into());
         }
         let candidate_ids = candidates
             .iter()
@@ -438,6 +446,7 @@ impl HdcOntologyConformalCalibration {
             && (0.0..=1.0).contains(&self.threshold)
             && self.calibration_case_count > 0
             && !self.codebook_hash.trim().is_empty()
+            && !self.calibration_scores_hash.trim().is_empty()
             && !self.candidate_universe_hash.trim().is_empty()
             && self.candidate_universe_size > 0
             && self.score_revision == HDC_ONTOLOGY_CONFORMAL_SCORE_REVISION
@@ -1429,6 +1438,21 @@ fn selection_stats(
     Ok((min_selected, min_selected - max_unselected))
 }
 
+fn calibration_scores_hash(scores: &[f64]) -> Result<String, String> {
+    if scores.is_empty() {
+        return Err("conformal calibration scores cannot be empty".into());
+    }
+    if scores
+        .iter()
+        .any(|score| !score.is_finite() || !(0.0..=1.0).contains(score))
+    {
+        return Err("conformal calibration scores must be finite and within [0, 1]".into());
+    }
+    let mut canonical = scores.to_vec();
+    canonical.sort_by(f64::total_cmp);
+    hash_json(&canonical)
+}
+
 fn candidate_universe_hash(stable_ids: &[String]) -> Result<String, String> {
     if stable_ids.is_empty() {
         return Err("conformal candidate universe cannot be empty".into());
@@ -1721,28 +1745,29 @@ mod tests {
             HdcOntologyRetrievalCandidate { stable_id: "m".into(), score: 0.6 },
             HdcOntologyRetrievalCandidate { stable_id: "q".into(), score: -1.0 },
         ];
-        assert_eq!(calibration.prediction_set(&candidates).unwrap(), vec!["a", "z"]);
+        assert_eq!(calibration.prediction_set("codebook", &candidates).unwrap(), vec!["a", "z"]);
+        assert!(calibration.prediction_set("different-codebook", &candidates).is_err());
         let reordered = vec![
             HdcOntologyRetrievalCandidate { stable_id: "q".into(), score: -1.0 },
             HdcOntologyRetrievalCandidate { stable_id: "z".into(), score: 0.8 },
             HdcOntologyRetrievalCandidate { stable_id: "a".into(), score: 1.0 },
             HdcOntologyRetrievalCandidate { stable_id: "m".into(), score: 0.6 },
         ];
-        assert_eq!(calibration.prediction_set(&reordered).unwrap(), vec!["a", "z"]);
+        assert_eq!(calibration.prediction_set("codebook", &reordered).unwrap(), vec!["a", "z"]);
         let wrong_universe = vec![
             HdcOntologyRetrievalCandidate { stable_id: "a".into(), score: 1.0 },
             HdcOntologyRetrievalCandidate { stable_id: "m".into(), score: 0.6 },
             HdcOntologyRetrievalCandidate { stable_id: "x".into(), score: 0.8 },
             HdcOntologyRetrievalCandidate { stable_id: "z".into(), score: 0.8 },
         ];
-        assert!(calibration.prediction_set(&wrong_universe).is_err());
+        assert!(calibration.prediction_set("codebook", &wrong_universe).is_err());
         let oversized = (0..=HDC_ONTOLOGY_MAX_CONFORMAL_CANDIDATES)
             .map(|index| HdcOntologyRetrievalCandidate {
                 stable_id: format!("candidate-{index}"),
                 score: 1.0,
             })
             .collect::<Vec<_>>();
-        assert!(calibration.prediction_set(&oversized).is_err());
+        assert!(calibration.prediction_set("codebook", &oversized).is_err());
     }
 
     #[test]
@@ -1758,12 +1783,12 @@ mod tests {
             HdcOntologyRetrievalCandidate { stable_id: "x".into(), score: 1.0 },
             HdcOntologyRetrievalCandidate { stable_id: "x".into(), score: 0.9 },
         ];
-        assert!(calibration.prediction_set(&duplicate).is_err());
+        assert!(calibration.prediction_set("codebook", &duplicate).is_err());
         let invalid = vec![HdcOntologyRetrievalCandidate {
             stable_id: "x".into(),
             score: f64::NAN,
         }];
-        assert!(calibration.prediction_set(&invalid).is_err());
+        assert!(calibration.prediction_set("codebook", &invalid).is_err());
     }
 
     #[test]
