@@ -270,6 +270,8 @@ pub struct FunctionalRequirement {
     pub constraints: BTreeMap<String, RequirementBound>,
     /// Explicit comparison scales for every burden dimension.
     pub comparison_scales: BTreeMap<Dimension, ComparisonScale>,
+    /// Explicit comparison scales for every constrained performance metric.
+    pub performance_scales: BTreeMap<String, ComparisonScale>,
 }
 
 impl FunctionalRequirement {
@@ -301,6 +303,12 @@ impl FunctionalRequirement {
             };
             scale.validate()?;
         }
+        for metric in self.constraints.keys() {
+            let Some(scale) = self.performance_scales.get(metric) else {
+                return Err(AssessmentError::MissingPerformanceScale(metric.clone()));
+            };
+            scale.validate()?;
+        }
         Ok(())
     }
 }
@@ -322,6 +330,32 @@ pub enum PathwayKind {
     ReuseRemanufacture,
 }
 
+/// Evidence-linked functional performance measurement.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PerformanceEstimate {
+    /// Performance value.
+    pub value: f64,
+    /// Unit declared by the functional requirement.
+    pub unit: String,
+    /// Scope in which this performance value applies.
+    pub scope: String,
+    /// Evidence IDs supporting or contradicting the value.
+    pub evidence_ids: Vec<String>,
+}
+
+impl PerformanceEstimate {
+    /// Validate the performance value and scale metadata.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if !self.value.is_finite() {
+            return Err(AssessmentError::NonFinite);
+        }
+        if self.unit.is_empty() || self.scope.is_empty() {
+            return Err(AssessmentError::EmptyPerformanceScale);
+        }
+        Ok(())
+    }
+}
+
 /// One candidate solution pathway.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CandidatePathway {
@@ -331,8 +365,8 @@ pub struct CandidatePathway {
     pub name: String,
     /// Candidate pathway class.
     pub kind: PathwayKind,
-    /// Performance values keyed by requirement metric.
-    pub performance: BTreeMap<String, f64>,
+    /// Evidence-linked performance values keyed by requirement metric.
+    pub performance: BTreeMap<String, PerformanceEstimate>,
     /// Burden estimates by dimension.
     pub burdens: BTreeMap<Dimension, BurdenEstimate>,
     /// Candidate-level evidence bundle.
@@ -340,7 +374,8 @@ pub struct CandidatePathway {
 }
 
 impl CandidatePathway {
-    /// Validate the candidate, burden intervals, evidence references, and
+    /// Validate the candidate, performance values, burden intervals, evidence
+    /// references, and evidence records.
     /// evidence records.
     pub fn validate(&self) -> Result<(), AssessmentError> {
         if self.id.is_empty() || self.name.is_empty() {
@@ -349,10 +384,8 @@ impl CandidatePathway {
         if self.burdens.is_empty() {
             return Err(AssessmentError::NoBurdenData);
         }
-        for value in self.performance.values() {
-            if !value.is_finite() {
-                return Err(AssessmentError::NonFinite);
-            }
+        for performance in self.performance.values() {
+            performance.validate()?;
         }
         let evidence_ids = self
             .evidence
@@ -425,8 +458,36 @@ impl CandidatePathway {
             .any(|estimate| self.dimension_has_conflict(estimate))
     }
 
-    fn qualification_ceiling(&self) -> QualificationState {
-        if self.burdens.is_empty()
+    fn performance_is_supported(&self, requirement: &FunctionalRequirement) -> bool {
+        requirement.constraints.keys().all(|metric| {
+            self.performance
+                .get(metric)
+                .map(|estimate| {
+                    !estimate.evidence_ids.is_empty()
+                        && self
+                            .evidence
+                            .iter()
+                            .filter(|e| estimate.evidence_ids.contains(&e.id))
+                            .any(|e| {
+                                matches!(
+                                    e.kind,
+                                    EvidenceKind::Observed
+                                        | EvidenceKind::Reported
+                                        | EvidenceKind::Derived
+                                        | EvidenceKind::ManufacturingObserved
+                                        | EvidenceKind::FieldObserved
+                                        | EvidenceKind::ContinuouslyMonitored
+                                ) && e.stance == EvidenceStance::Supports
+                                    && e.confidence >= 0.7
+                            })
+                })
+                .unwrap_or(false)
+        })
+    }
+
+    fn qualification_ceiling(&self, requirement: &FunctionalRequirement) -> QualificationState {
+        if !self.performance_is_supported(requirement)
+            || self.burdens.is_empty()
             || self.burdens.values().all(|estimate| {
                 let linked = self.linked_evidence(estimate).collect::<Vec<_>>();
                 linked.is_empty()
@@ -606,6 +667,8 @@ pub struct ConstraintEvaluation {
 pub struct CandidateAssessment {
     /// Candidate identifier.
     pub candidate_id: String,
+    /// Evidence-linked functional performance estimates.
+    pub performance: BTreeMap<String, PerformanceEstimate>,
     /// Per-constraint outcomes.
     pub constraints: Vec<ConstraintEvaluation>,
     /// Burdens with dimension-specific evidence linkage.
@@ -734,8 +797,12 @@ pub enum AssessmentError {
     NoBurdenData,
     /// A burden estimate lacks a comparable unit or scope.
     EmptyBurdenScale,
+    /// A performance estimate lacks a comparable unit or scope.
+    EmptyPerformanceScale,
     /// The requirement does not declare a comparison scale for a dimension.
     MissingComparisonScale(Dimension),
+    /// The requirement does not declare a comparison scale for a performance metric.
+    MissingPerformanceScale(String),
     /// Linked evidence uses a different scope from the burden estimate.
     EvidenceScopeMismatch {
         /// Evidence identifier.
@@ -777,8 +844,12 @@ impl std::fmt::Display for AssessmentError {
             Self::EmptyCandidateIdentity => write!(f, "candidate identity is incomplete"),
             Self::NoBurdenData => write!(f, "candidate has no burden data"),
             Self::EmptyBurdenScale => write!(f, "burden unit/scope is empty"),
+            Self::EmptyPerformanceScale => write!(f, "performance unit/scope is empty"),
             Self::MissingComparisonScale(dimension) => {
                 write!(f, "missing comparison scale for {dimension:?}")
+            }
+            Self::MissingPerformanceScale(metric) => {
+                write!(f, "missing performance scale for {metric}")
             }
             Self::EvidenceScopeMismatch {
                 evidence_id,
