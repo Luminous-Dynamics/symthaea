@@ -1703,6 +1703,26 @@ mod remote_command_capability_tests {
     }
 
     #[test]
+    fn test_remote_command_capability_rejects_env_wrapper() {
+        let err = classify_remote_command_capability(
+            "env",
+            &["systemctl".into(), "restart".into(), "nginx.service".into()],
+        )
+        .expect_err("env must not be treated as a read-only command wrapper");
+        assert!(err.contains("allowlist"));
+    }
+
+    #[test]
+    fn test_remote_command_capability_keeps_direct_systemctl_mutating() {
+        let capability = classify_remote_command_capability(
+            "systemctl",
+            &["restart".into(), "nginx.service".into()],
+        )
+        .expect("direct systemctl restart should be recognized");
+        assert_eq!(capability, RemoteCommandCapability::Mutating);
+    }
+
+    #[test]
     fn test_remote_command_capability_rejects_unknown_program() {
         let err = classify_remote_command_capability("python", &["-c".into(), "print(1)".into()])
             .expect_err("python should not be allowlisted");
