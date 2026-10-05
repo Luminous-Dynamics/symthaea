@@ -3661,9 +3661,7 @@ mod tests {
                 "obs-002"
             )
             .expect("canonical scope bytes");
-        assert!(bytes.starts_with(
-            b"symthaea:observation-independence-scope:v3\\n"
-        ));
+        assert!(bytes.starts_with(INDEPENDENCE_SCOPE_V3_DOMAIN_SEPARATOR));
         assert_eq!(
             blake3::hash(&bytes).to_hex().to_string(),
             graph
