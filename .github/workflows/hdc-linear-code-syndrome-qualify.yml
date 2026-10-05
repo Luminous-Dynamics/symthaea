@@ -3,7 +3,10 @@ name: HDC Linear-Code Bounded Decoder Qualification
 on:
   push:
     branches:
-      - "research/hdc-linear-code-bounded-decoder-v1"
+      - "research/hdc-linear-code-bounded-decoder-v2"
+  pull_request:
+    branches:
+      - "research/hdc-linear-code-recovery-design-v1"
   workflow_dispatch:
 
 concurrency:
