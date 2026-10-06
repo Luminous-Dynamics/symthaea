@@ -1289,6 +1289,13 @@ function clearInstallRequestId() {
   try { sessionStorage.removeItem('nfh_install_request_id'); } catch (e) {}
 }
 
+function durableTransactionOutcome(msg) {
+  var outcome = msg && msg.transaction && msg.transaction.outcome;
+  return (outcome === 'observed_success' || outcome === 'failed' || outcome === 'indeterminate')
+    ? outcome
+    : null;
+}
+
       for (var i = 0; i < relayUrls.length; i++) {
         try {
           sshStatus.textContent = 'Connecting to relay at ' + relayUrls[i] + '...';
@@ -1767,9 +1774,10 @@ function clearInstallRequestId() {
             break;
 
           case 'exit':
-            // A terminal relay result consumes the request key; a later install gets a fresh key.
-            clearInstallRequestId();
-            if (msg.code === 0) {
+            var transactionOutcome = durableTransactionOutcome(msg);
+            if (transactionOutcome === 'observed_success') {
+              // Only a durably recorded terminal transaction consumes the request key.
+              clearInstallRequestId();
               appendTerminal('Installation complete!', 'var(--leaf-green)');
               updateProgress('Complete', 100, 'FirstBreath');
 
@@ -1808,7 +1816,7 @@ function clearInstallRequestId() {
                     window.addNarration('The machine draws its first breath. It is sovereign.', true);
 
                     if (window.speechSynthesis && window.narrateTTS) {
-                      var utt = new SpeechSynthesisUtterance('The machine draws its first breath. It is sovereign.');
+                      var utt = new SpeechSynthesisUtterance('The machine draws its first breath. Not just alive — but aware of its being alive.');
                       utt.rate = 0.78; utt.pitch = 0.85; utt.volume = 0.9;
                       window.speechSynthesis.speak(utt);
                     }
@@ -1853,13 +1861,23 @@ function clearInstallRequestId() {
                   }, 2000);
                 }, 2000);
               }
-            } else {
-              appendTerminal('Installation failed with code ' + msg.code, 'var(--clay)');
-              sshStatus.textContent = 'Installation encountered an error. Check Diagnostics for details.';
+            } else if (transactionOutcome === 'failed') {
+              // A durably recorded failure is terminal and may consume the request key.
+              clearInstallRequestId();
+              var failedCode = (msg.code === null || typeof msg.code === 'undefined') ? 'unknown' : msg.code;
+              appendTerminal('Installation failed (durably recorded; exit code ' + failedCode + ')', 'var(--clay)');
+              sshStatus.textContent = 'Installation failed; the terminal transaction receipt was durably recorded.';
               sshStatus.style.color = 'var(--clay)';
-              // Open diagnostics automatically on error
               var diag = document.getElementById('ssh-diagnostics');
               if (diag) diag.open = true;
+            } else {
+              // Missing/unknown/indeterminate receipts are deliberately not terminal.
+              // Keep the request ID so reconnect/status recovery cannot create a new effect.
+              appendTerminal('Installation outcome is uncertain; request identity retained for recovery.', 'var(--solar-gold)');
+              sshStatus.textContent = 'Installation completion is uncertain. The relay did not authorize a fresh execution.';
+              sshStatus.style.color = 'var(--solar-gold)';
+              var uncertainDiag = document.getElementById('ssh-diagnostics');
+              if (uncertainDiag) uncertainDiag.open = true;
             }
             btn.disabled = false;
             btn.textContent = 'Connect & Deploy';
