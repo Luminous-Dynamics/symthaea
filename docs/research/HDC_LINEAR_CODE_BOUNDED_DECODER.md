@@ -42,6 +42,14 @@ so the decoder need not enumerate codewords. It computes the observed syndrome,
 then searches error patterns in increasing Hamming weight until one or more
 patterns have the same syndrome.
 
+This is a geometric minimum-weight decoder. It should be called a maximum-likelihood
+decoder only when the channel model justifies that equivalence: for a binary
+symmetric channel with independent crossover probability below 1/2 (and the usual
+equal-prior codeword assumption), maximizing likelihood is equivalent to minimizing
+Hamming distance. Under biased, correlated, asymmetric, or otherwise non-BSC noise,
+the minimum-weight rule is not automatically maximum likelihood; a future decoder
+for such a channel must expose its noise model and scoring rule explicitly.
+
 The implementation returns exactly one of:
 
 - **Unique** — one minimum-weight error pattern was found within the explicit
@@ -270,6 +278,8 @@ No production integration, timing claim, or superiority claim is made here.
   https://errorcorrectionzoo.org/c/binary_linear
 - Error Correction Zoo, *Binary code*:
   https://errorcorrectionzoo.org/c/bits_into_bits
+- MIT 6.02, *Linear Block Codes: Encoding and Syndrome Decoding* (maximum-likelihood decoding over the BSC):
+  https://ocw.mit.edu/courses/6-02-introduction-to-eecs-ii-digital-communication-systems-fall-2012/34b7d78e0b90235095ef81542f6aa2dc_MIT6_02F12_chap06.pdf
 - Berlekamp, McEliece and van Tilborg (1978), *On the inherent intractability of certain coding problems*:
   https://doi.org/10.1109/TIT.1978.1055873
 - MathWorld, *Syndrome Decoding Problem*:
