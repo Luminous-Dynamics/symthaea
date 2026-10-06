@@ -8196,11 +8196,23 @@ mod tests {
             .assess(&case.requirement, &case.candidates, Some(case.incumbent_id))
             .unwrap();
         let mut mutated = case.clone();
+        let mutated_candidate_id = mutated
+            .candidates
+            .iter()
+            .find(|candidate| candidate.evidence.iter().any(|e| e.observation.is_some()))
+            .unwrap()
+            .id
+            .clone();
         let observed = mutated
             .candidates
             .iter_mut()
-            .flat_map(|candidate| candidate.evidence.iter_mut())
-            .find(|e| e.observation.is_some())
+            .find(|candidate| candidate.id == mutated_candidate_id)
+            .and_then(|candidate| {
+                candidate
+                    .evidence
+                    .iter_mut()
+                    .find(|evidence| e.observation.is_some())
+            })
             .unwrap();
         observed
             .observation
@@ -8211,11 +8223,22 @@ mod tests {
         let changed = AlternativesEngine
             .assess(&mutated.requirement, &mutated.candidates, Some(mutated.incumbent_id))
             .unwrap();
+        let original_digest = original
+            .candidates
+            .iter()
+            .find(|candidate| candidate.candidate_id == mutated_candidate_id)
+            .unwrap()
+            .evidence_digest
+            .clone();
+        let changed_digest = changed
+            .candidates
+            .iter()
+            .find(|candidate| candidate.candidate_id == mutated_candidate_id)
+            .unwrap()
+            .evidence_digest
+            .clone();
         assert_ne!(original.receipt.payload_hash, changed.receipt.payload_hash);
-        assert_ne!(
-            original.candidates[0].evidence_digest,
-            changed.candidates[0].evidence_digest
-        );
+        assert_ne!(original_digest, changed_digest);
     }
 
     #[test]
