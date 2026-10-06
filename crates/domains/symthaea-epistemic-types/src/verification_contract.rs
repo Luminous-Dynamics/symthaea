@@ -2075,11 +2075,28 @@ mod tests {
         )
         .unwrap();
 
+        let dereference = ControllerDocumentDereferenceAttestation::from_adapter(
+            &request,
+            "https://example.test/controller",
+            "application/cid",
+            1024,
+            0,
+            request.freshness.verification_time.clone(),
+            ControllerDocumentResolutionSource::HistoricalRegistry,
+            &"11".repeat(32),
+            None,
+        )
+        .unwrap();
+        let resolution = resolution
+            .with_controller_document_dereference(dereference, &request)
+            .unwrap();
+
         assert_eq!(
             resolution.resolved_verification_method_controller.as_str(),
             "https://key-controller.example"
         );
-        assert!(resolution.validate_structure().is_err());
+        assert!(resolution.validate_structure().is_ok());
+        assert!(resolution.matches_request(&request));
     }
 
     #[test]
