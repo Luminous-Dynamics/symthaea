@@ -1639,12 +1639,20 @@ impl Rfc9942Vdp {
         for proof in &proofs {
             match kind {
                 Rfc9942ProofKind::Inclusion => {
-                    let decoded = Rfc9162InclusionProof::from_cbor(proof)?;
+                    let decoded = Rfc9162InclusionProof::from_cbor(proof).map_err(|error| match error {
+                        Rfc9162ProofDecodeError::ResourceLimitExceeded => Rfc9942VdpError::ResourceLimitExceeded,
+                        other => Rfc9942VdpError::InvalidProof(other),
+                    })?;
                     if decoded.inclusion_path.is_empty() {
                         return Err(Rfc9942VdpError::InvalidProof(Rfc9162ProofDecodeError::InvalidStructure));
                     }
                 }
-                Rfc9942ProofKind::Consistency => { Rfc9162ConsistencyProof::from_cbor(proof)?; }
+                Rfc9942ProofKind::Consistency => {
+                    Rfc9162ConsistencyProof::from_cbor(proof).map_err(|error| match error {
+                        Rfc9162ProofDecodeError::ResourceLimitExceeded => Rfc9942VdpError::ResourceLimitExceeded,
+                        other => Rfc9942VdpError::InvalidProof(other),
+                    })?;
+                }
             }
         }
         Ok(Self { kind, proofs })
@@ -2443,6 +2451,14 @@ impl<'a> CborReader<'a> {
     }
     fn read_bstr32(&mut self)->Result<[u8;32],Rfc9162ProofDecodeError>{
         let value=self.read_bstr_bounded(32)?;
+        if value.len()!=32{return Err(Rfc9162ProofDecodeError::InvalidHashLength)}
+        let mut out=[0u8;32];
+        out.copy_from_slice(&value);
+        Ok(out)
+    }
+
+    fn read_bstr32_with_resource_chunk_limits(&mut self)->Result<[u8;32],Rfc9162ProofDecodeError>{
+        let value=self.read_bstr_bounded_with_resource_chunk_limits(32)?;
         if value.len()!=32{return Err(Rfc9162ProofDecodeError::InvalidHashLength)}
         let mut out=[0u8;32];
         out.copy_from_slice(&value);
@@ -3543,7 +3559,7 @@ impl Rfc9162ConsistencyProof {
         let mut path=Vec::with_capacity(items.len());
         for item in items{
             let mut item_reader=CborReader::new(&item);
-            path.push(item_reader.read_bstr32()?);
+            path.push(item_reader.read_bstr32_with_resource_chunk_limits()?);
             item_reader.finish()?;
         }
         r.finish_indefinite_array(indefinite_array)?;
