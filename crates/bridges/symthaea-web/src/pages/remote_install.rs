@@ -1928,6 +1928,26 @@ mod tests {
     }
 
     #[test]
+    fn storage_security_rejects_unsupported_encryption_combinations() {
+        assert!(validate_storage_security("single", "btrfs", true).is_ok());
+        assert!(validate_storage_security("single-luks", "btrfs", true).is_ok());
+        assert!(validate_storage_security("single", "zfs", false).is_ok());
+
+        assert!(validate_storage_security("alongside", "btrfs", true).is_err());
+        assert!(validate_storage_security("single", "zfs", true).is_err());
+        assert!(validate_storage_security("single-luks", "zfs", true).is_err());
+        assert!(validate_storage_security("single-luks", "ext4", true).is_err());
+    }
+
+    #[test]
+    fn luks_requirement_is_bound_to_supported_layout_and_filesystem() {
+        assert!(layout_requires_luks("single-luks", "btrfs"));
+        assert!(!layout_requires_luks("single", "btrfs"));
+        assert!(!layout_requires_luks("single-luks", "zfs"));
+        assert!(!layout_requires_luks("alongside", "btrfs"));
+    }
+
+    #[test]
     fn hardware_probe_requires_typed_bounded_evidence() {
         let hardware = parse_hardware_probe(
             r#"{"arch":"x86_64","tpm2_available":true,"detected_os":[{"name":"NixOS"}]}"#,
