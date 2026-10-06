@@ -83,7 +83,29 @@ impl NixSystemdDefinitionContentCommitmentV1 {
             .validate_shape()
             .map_err(NixSystemdDefinitionContentErrorV1::InvalidDefinitionIdentity)?;
         validate_manager_owner(&self.manager_owner)?;
-        if self.files.is_empty() || self.files.len() > MAX_FILES {
+
+        let mut expected_paths = Vec::with_capacity(
+            1 + self.definition_identity.drop_in_paths.len(),
+        );
+        expected_paths.push(self.definition_identity.fragment_path.clone());
+        expected_paths.extend(self.definition_identity.drop_in_paths.iter().cloned());
+        expected_paths.sort();
+        expected_paths.dedup();
+
+        if self.files.is_empty()
+            || self.files.len() > MAX_FILES
+            || self.files.len() != expected_paths.len()
+        {
+            return Err(NixSystemdDefinitionContentErrorV1::InvalidFileCount);
+        }
+        if self
+            .files
+            .iter()
+            .map(|file| file.path.as_str())
+            .ne(expected_paths.iter().map(String::as_str))
+        {
+            return Err(NixSystemdDefinitionContentErrorV1::FileSetMismatch);
+        }
             return Err(NixSystemdDefinitionContentErrorV1::InvalidFileCount);
         }
         for file in &self.files {
@@ -367,6 +389,7 @@ pub enum NixSystemdDefinitionContentErrorV1 {
     #[error("definition contains too many files or no files")] InvalidFileCount,
     #[error("definition file is too large")] FileTooLarge,
     #[error("definition paths are not sorted or contain duplicates")] UnsortedOrDuplicatePaths,
+    #[error("hashed file set does not exactly match systemd definition identity")] FileSetMismatch,
     #[error("overall definition-content digest does not match file records")] OverallDigestMismatch,
     #[error("path open failed: {0}")] Open(#[source] std::io::Error),
     #[error("file read failed: {0}")] Read(#[source] std::io::Error),
@@ -412,6 +435,39 @@ mod tests {
         std::fs::write(path, b"b").unwrap();
         let second = NixVerifiedSystemdDefinitionContentCommitmentV1::from_observer(&identity).unwrap();
         assert_ne!(first.digest(), second.digest());
+    }
+
+    #[test]
+    fn file_set_must_exactly_match_systemd_definition_identity() {
+        let temp = tempfile::tempdir().unwrap();
+        let fragment = temp.path().join("nginx.service");
+        let dropin = temp.path().join("override.conf");
+        std::fs::write(&fragment, b"fragment").unwrap();
+        std::fs::write(&dropin, b"dropin").unwrap();
+        let identity = NixSystemdUnitDefinitionIdentityV1::new(
+            fragment.to_str().unwrap(),
+            vec![dropin.to_str().unwrap().into()],
+        )
+        .unwrap();
+        let verified = NixVerifiedSystemdDefinitionContentCommitmentV1::from_observer(
+            "nginx.service",
+            &identity,
+            ":1.42",
+        )
+        .unwrap();
+        let mut forged = verified.as_ref().clone();
+        forged.files.pop();
+        forged.overall_digest = compute_overall_digest(
+            &forged.unit,
+            &forged.definition_identity,
+            &forged.manager_owner,
+            &forged.files,
+        )
+        .unwrap();
+        assert_eq!(
+            forged.validate_shape().unwrap_err(),
+            NixSystemdDefinitionContentErrorV1::InvalidFileCount
+        );
     }
 
     #[test]
