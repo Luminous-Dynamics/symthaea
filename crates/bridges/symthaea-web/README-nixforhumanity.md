@@ -112,7 +112,7 @@ When a package name changes in nixpkgs, NixForHumanity fixes it automatically:
 | Browser UI | Rust + Leptos 0.8 CSR (WASM) | 1.9 MB |
 | Relay | Rust + Tokio + tokio-tungstenite | 1.4 MB |
 | Config gen | Rust (WASM-compatible) | Part of UI |
-| ISO | NixOS 25.05 minimal + relay | 1.4 GB |
+| ISO | NixOS 26.05 minimal + relay | 1.4 GB |
 | Package DB | 111 curated + 485 aliases + 100 HDC vectors | Embedded |
 
 **163 tests** covering config generation, input validation, package healing, semantic search, and Nix syntax validation via `nix-instantiate`.
