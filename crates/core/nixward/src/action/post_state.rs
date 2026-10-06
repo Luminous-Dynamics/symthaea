@@ -1722,7 +1722,7 @@ mod tests {
                     generation,
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     definition_digest,
-                    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                    definition_content_digest(),
                     pre_invocation_id,
                     required_stability_us,
                 )
