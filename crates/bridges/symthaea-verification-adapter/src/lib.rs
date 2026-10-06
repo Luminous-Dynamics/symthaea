@@ -617,7 +617,8 @@ fn verification_method_material_digest(
         ));
     }
 
-    let material_bytes = match method_type {        "Multikey" => {
+    let material_bytes = match method_type {
+        "Multikey" => {
             let public = object
                 .get("publicKeyMultibase")
                 .and_then(Value::as_str)
@@ -1116,7 +1117,8 @@ mod tests {
             symthaea_epistemic_types::ClaimAuthorship::new(
                 ClaimAuthorIdentity::new("author:verification").unwrap(),
                 ClaimProofPurpose::new("assertionMethod").unwrap(),
-                Some(ClaimVerificationMethod::new(                    "https://example.test/controller#key-1",
+                Some(ClaimVerificationMethod::new(
+                    "https://example.test/controller#key-1",
                 ).unwrap()),
             )
             .unwrap()
@@ -1736,7 +1738,8 @@ mod tests {
                     "id": "#key-1",
                     "type": "Multikey",
                     "controller": "https://example.test/controller",
-                    "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"                },
+                    "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+                },
                 {
                     "id": "https://example.test/controller#key-1",
                     "type": "Multikey",
