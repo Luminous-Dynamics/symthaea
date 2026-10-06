@@ -251,7 +251,7 @@ jobs:
           )
           protected_outer_recursion = (
               b"\xd2\x84"
-              + b"\x58\x16\xa2\x01\x26\x18\x1e"
+              + b"\x58\x17\xa2\x01\x26\x18\x1e"
               + (b"\xc0" * 17)
               + b"\xf6\xa0\xf6\x58\x40"
               + (b"\x00" * 64)
