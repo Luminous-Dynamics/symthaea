@@ -19,7 +19,7 @@ use super::authorization::{
     NixActionDescriptorV1, NixActionIntentV1, NixAuthorizationDecisionV1,
     NixExecutionAuthorizationRecordV1,
 };
-use super::service_domain::NixServiceOperationKindV1;
+use super::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use super::service_state::{
     ServiceActiveStateV1, ServiceUnitFileStateV1,
 };
@@ -155,10 +155,8 @@ pub struct NixServicePostStateExpectationV1 {
 
 impl NixServicePostStateExpectationV1 {
     pub fn validate_shape(&self) -> Result<(), NixPostStateErrorV1> {
-        require_nonempty(&self.unit, "service unit")?;
-        if self.unit.len() > MAX_PATH_BYTES {
-            return Err(NixPostStateErrorV1::PathTooLong);
-        }
+        NixServiceOperationV1::new(self.unit.clone(), self.operation)
+            .map_err(|_| NixPostStateErrorV1::InvalidServiceUnit)?;
         if self.authorized_generation == 0 {
             return Err(NixPostStateErrorV1::InvalidGeneration);
         }
@@ -169,15 +167,14 @@ impl NixServicePostStateExpectationV1 {
 
     pub fn effect_digest(&self) -> Result<String, NixPostStateErrorV1> {
         self.validate_shape()?;
-        let mut h = Hasher::new();
-        h.update(EFFECT_DIGEST_DOMAIN_V1);
-        h.update(&[operation_tag(self.operation)]);
-        put_str(&mut h, &self.unit);
-        put_u64(&mut h, self.authorized_generation);
-        put_str(&mut h, &self.authorized_definition_digest);
-        put_opt_str(&mut h, self.pre_invocation_id.as_deref());
-        put_u64(&mut h, self.required_stability_us);
-        Ok(h.finalize().to_hex().to_string())
+        Ok(service_effect_digest(
+            self.operation,
+            &self.unit,
+            self.authorized_generation,
+            &self.authorized_definition_digest,
+            self.pre_invocation_id.as_deref(),
+            self.required_stability_us,
+        ))
     }
 }
 
@@ -199,10 +196,8 @@ pub struct NixServicePostStateObservationV1 {
 
 impl NixServicePostStateObservationV1 {
     pub fn validate_shape(&self) -> Result<(), NixPostStateErrorV1> {
-        require_nonempty(&self.unit, "observed service unit")?;
-        if self.unit.len() > MAX_PATH_BYTES {
-            return Err(NixPostStateErrorV1::PathTooLong);
-        }
+        NixServiceOperationV1::new(self.unit.clone(), self.operation)
+            .map_err(|_| NixPostStateErrorV1::InvalidServiceUnit)?;
         if self.observed_generation == 0 {
             return Err(NixPostStateErrorV1::InvalidGeneration);
         }
@@ -422,7 +417,19 @@ impl NixPostStateReceiptV1 {
             "authorization record digest",
         )?;
         validate_digest(&self.effect_digest, "effect digest")?;
-        require_nonempty(&self.target_unit, "target unit")?;
+        NixServiceOperationV1::new(self.target_unit.clone(), self.operation)
+            .map_err(|_| NixPostStateErrorV1::InvalidServiceUnit)?;
+        let expected_effect_digest = service_effect_digest(
+            self.operation,
+            &self.target_unit,
+            self.authorized_generation,
+            &self.authorized_definition_digest,
+            self.pre_invocation_id.as_deref(),
+            self.required_stability_us,
+        );
+        if self.effect_digest != expected_effect_digest {
+            return Err(NixPostStateErrorV1::EffectDigestMismatch);
+        }
         if self.authorized_generation == 0 || self.observed_generation == 0 {
             return Err(NixPostStateErrorV1::InvalidGeneration);
         }
@@ -613,6 +620,25 @@ fn evaluate_postcondition(
     Ok(NixPostconditionAssessmentV1::Satisfied)
 }
 
+fn service_effect_digest(
+    operation: NixServiceOperationKindV1,
+    unit: &str,
+    authorized_generation: u64,
+    authorized_definition_digest: &str,
+    pre_invocation_id: Option<&str>,
+    required_stability_us: u64,
+) -> String {
+    let mut h = Hasher::new();
+    h.update(EFFECT_DIGEST_DOMAIN_V1);
+    h.update(&[operation_tag(operation)]);
+    put_str(&mut h, unit);
+    put_u64(&mut h, authorized_generation);
+    put_str(&mut h, authorized_definition_digest);
+    put_opt_str(&mut h, pre_invocation_id);
+    put_u64(&mut h, required_stability_us);
+    h.finalize().to_hex().to_string()
+}
+
 fn operation_tag(operation: NixServiceOperationKindV1) -> u8 {
     match operation {
         NixServiceOperationKindV1::Start => 0,
@@ -774,6 +800,10 @@ pub enum NixPostStateErrorV1 {
     PathTooLong,
     #[error("invalid post-state claim")]
     InvalidClaim,
+    #[error("invalid service unit")]
+    InvalidServiceUnit,
+    #[error("effect digest does not match its bound effect fields")]
+    EffectDigestMismatch,
     #[error("bound action intent is invalid")]
     InvalidBoundIntent,
     #[error("bound authorization record is invalid")]
@@ -1187,6 +1217,26 @@ mod tests {
             }),
         );
         assert_eq!(result.unwrap_err(), NixPostStateErrorV1::InvalidClaim);
+    }
+
+    #[test]
+    fn receipt_rejects_tampered_effect_digest_even_when_shape_remains_valid() {
+        let mut receipt = build_receipt(
+            &expectation(NixServiceOperationKindV1::Start),
+            &observation(
+                NixServiceOperationKindV1::Start,
+                ServiceActiveStateV1::Active,
+                ServiceUnitFileStateV1::Enabled,
+            ),
+            None,
+        )
+        .unwrap();
+        receipt.effect_digest =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_string();
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::EffectDigestMismatch
+        );
     }
 
     #[test]
