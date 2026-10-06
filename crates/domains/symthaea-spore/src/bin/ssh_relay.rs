@@ -338,6 +338,15 @@ fn extract_explicit_nix_system(flake: &str) -> Option<&str> {
     Some(&rest[..end])
 }
 
+fn validate_extra_disks(extra_disks: &[String]) -> Result<(), String> {
+    for extra_disk in extra_disks {
+        validate_disk_path(extra_disk)
+            .map(|_| ())
+            .map_err(|error| format!("Invalid extra disk: {error}"))?;
+    }
+    Ok(())
+}
+
 fn default_port() -> u16 {
     22
 }
@@ -3544,17 +3553,14 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     }
                 }
 
-                // Validate extra disks for RAID/ZFS multi-disk layouts
-                for extra_disk in &client_msg.extra_disks {
-                    if let Err(e) = validate_disk_path(extra_disk) {
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::error(&format!("Invalid extra disk: {}", e))
-                                    .to_json(),
-                            ))
-                            .await;
-                        continue;
-                    }
+                // Validate extra disks for RAID/ZFS multi-disk layouts.
+                // An invalid member rejects the entire request rather than
+                // being skipped by an inner-loop continue.
+                if let Err(error) = validate_extra_disks(&client_msg.extra_disks) {
+                    let _ = ws_tx
+                        .send(Message::Text(RelayMessage::error(&error).to_json()))
+                        .await;
+                    continue;
                 }
 
                 // Authoritative target architecture check. Browser-generated flakes
@@ -8407,6 +8413,18 @@ mod tests {
     #[test]
     fn disk_rejects_urandom() {
         assert!(validate_disk_path("/dev/urandom").is_err());
+    }
+
+    #[test]
+    fn extra_disk_validation_rejects_invalid_member_instead_of_skipping_it() {
+        let extra_disks = vec![
+            "/dev/vdb".to_string(),
+            "/dev/../../etc/passwd".to_string(),
+            "/dev/vdc".to_string(),
+        ];
+        let error = validate_extra_disks(&extra_disks)
+            .expect_err("an invalid extra disk must reject the entire collection");
+        assert!(error.contains("Invalid extra disk"));
     }
 
     #[test]
