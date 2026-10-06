@@ -474,6 +474,25 @@ impl NixLocalExecutionAuthorityV1 {
         Ok(Self { intent, approval })
     }
 
+    /// Promote one consumed Service approval only when the exact observer-sealed
+    /// definition capture is bound into the approved intent.
+    pub fn from_consumed_local_approval_with_definition_capture(
+        intent: NixActionIntentV1,
+        approval: ConsumedLocalApprovalDecisionV1,
+        content: &NixVerifiedServiceDefinitionContentV1,
+    ) -> Result<Self, NixAuthorizationErrorV1> {
+        if approval.decision_kind() != LocalApprovalDecisionKindV1::Approved {
+            return Err(NixAuthorizationErrorV1::NotApproved);
+        }
+        let digest = intent.digest()?;
+        if approval.decision_evidence().action_intent_digest != digest {
+            return Err(NixAuthorizationErrorV1::IntentMismatch);
+        }
+        validate_service_definition_capture(&intent, content)?;
+        service_effect_context_digest_for_intent(&intent)?;
+        Ok(Self { intent, approval })
+    }
+
     /// Validate that the execution command is exactly the action that was approved.
     pub(crate) fn validate_command(
         &self,
