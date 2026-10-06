@@ -782,7 +782,19 @@ impl TransactionLedger {
 }
 
 fn read_fingerprint_key(path: &Path) -> Result<[u8; 32], String> {
-    let metadata = std::fs::symlink_metadata(path).map_err(|error| {
+    // Validate the descriptor that will actually be read; do not rely on a
+    // separate path metadata lookup that can race with file replacement.
+    let mut file = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+        .map_err(|error| {
+            format!(
+                "unable to open transaction fingerprint key {}: {error}",
+                path.display()
+            )
+        })?;
+    let metadata = file.metadata().map_err(|error| {
         format!(
             "unable to inspect transaction fingerprint key {}: {error}",
             path.display()
@@ -794,21 +806,17 @@ fn read_fingerprint_key(path: &Path) -> Result<[u8; 32], String> {
             path.display()
         ));
     }
-    let mode = {
-        use std::os::unix::fs::PermissionsExt;
-        metadata.permissions().mode() & 0o777
-    };
-    if mode != 0o600 {
-        return Err(format!(
-            "transaction fingerprint key {} has unsafe permissions {:04o}; require 0600",
-            path.display(),
-            mode
-        ));
-    }
     {
-        use std::os::unix::fs::MetadataExt;
-        let owner = unsafe { libc::geteuid() };
-        if metadata.uid() != owner {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        let mode = metadata.permissions().mode() & 0o777;
+        if mode != 0o600 {
+            return Err(format!(
+                "transaction fingerprint key {} has unsafe permissions {:04o}; require 0600",
+                path.display(),
+                mode
+            ));
+        }
+        if metadata.uid() != unsafe { libc::geteuid() } {
             return Err(format!(
                 "transaction fingerprint key {} is not owned by relay user",
                 path.display()
@@ -823,16 +831,6 @@ fn read_fingerprint_key(path: &Path) -> Result<[u8; 32], String> {
         ));
     }
 
-    let mut file = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open(path)
-        .map_err(|error| {
-            format!(
-                "unable to open transaction fingerprint key {}: {error}",
-                path.display()
-            )
-        })?;
     let mut key = [0u8; 32];
     file.read_exact(&mut key).map_err(|error| {
         format!(
@@ -842,7 +840,6 @@ fn read_fingerprint_key(path: &Path) -> Result<[u8; 32], String> {
     })?;
     Ok(key)
 }
-
 fn load_or_create_fingerprint_key(path: &Path) -> Result<[u8; 32], String> {
     match std::fs::symlink_metadata(path) {
         Ok(_) => return read_fingerprint_key(path),
