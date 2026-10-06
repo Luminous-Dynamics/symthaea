@@ -140,6 +140,7 @@ pub use lexical_binding::{
     LanguageRuleStatus, LexemeBinding, LexicalBindingError, LexicalMorphosyntacticBinding,
     LexicalSource, MorphologicalFeature, MorphophonologicalCompilationWitness,
     MorphophonologicalCompilationWitnessError, MorphophonologicalDerivationStep,
+    MorphophonologicalSourceSlice,
     MorphophonologicalDerivationWitness, MorphophonologicalDerivationWitnessError,
     MorphophonologicalResourceEvidence, MorphophonologicalResourceEvidenceError,
     MorphophonologicalResourceOrigin, MorphophonologicalRule, MorphophonologicalRuleOperation,
