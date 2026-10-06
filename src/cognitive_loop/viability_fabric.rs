@@ -135,6 +135,9 @@ pub struct ViabilityVariable {
 impl ViabilityVariable {
     pub fn normalized_pressure(&self) -> f64 {
         let value = self.observation.value;
+        if !value.is_finite() || !self.band.validate() {
+            return 1.0;
+        }
         if self.band.contains_preferred(value) {
             return 0.0;
         }
@@ -515,6 +518,7 @@ mod tests {
             prediction: Some(injected_prediction),
             observed_effect: None,
             prediction_error: PredictionErrorLedger::default(),
+            evidence_refs: Vec::new(),
         };
 
         assert_eq!(fabric.observe_action(outcome), Err("missing pre-action prediction"));
