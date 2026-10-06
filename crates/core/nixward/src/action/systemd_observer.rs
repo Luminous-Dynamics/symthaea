@@ -287,15 +287,18 @@ impl NixSystemdReadOnlyObserverV1 {
         let result = tokio::time::timeout(timeout, async {
             while let Some(message) = stream.next().await {
                 let message = message?;
-                let evidence = decode_job_removed(&message)?;
-                if evidence.id == expected.id
-                    && evidence.object_path == expected.object_path.as_str()
-                    && evidence.unit == expected.unit
+                let removed = decode_job_removed(&message)?;
+                if removed.id == expected.id
+                    && removed.object_path.as_str() == expected.object_path.as_str()
+                    && removed.unit == expected.unit
                 {
-                    if evidence.job_type != expected.job_type {
-                        return Err(NixSystemdObserverErrorV1::JobCorrelationMismatch);
-                    }
-                    return Ok(evidence);
+                    return Ok(NixSystemdJobEvidenceV1 {
+                        id: removed.id,
+                        job_type: expected.job_type,
+                        unit: removed.unit,
+                        object_path: removed.object_path.as_str().to_string(),
+                        result: removed.result,
+                    });
                 }
             }
             Err(NixSystemdObserverErrorV1::JobRemovedTimeout)
@@ -349,6 +352,12 @@ impl NixSystemdReadOnlyObserverV1 {
                 requested: expected_unit,
                 observed: observed_id,
             });
+        }
+        let observed_invocation = required_invocation_id(&properties)?
+            .ok_or(NixSystemdObserverErrorV1::InvocationIdUnavailable)?;
+        let expected_invocation = hex::encode(invocation_id);
+        if observed_invocation != expected_invocation {
+            return Err(NixSystemdObserverErrorV1::InvalidInvocationId);
         }
         Ok(path)
     }
@@ -741,9 +750,17 @@ fn build_observation_from_properties(
     })
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct NixSystemdJobRemovedTuple {
+    id: u32,
+    object_path: OwnedObjectPath,
+    unit: String,
+    result: String,
+}
+
 fn decode_job_removed(
     message: &Message,
-) -> Result<NixSystemdJobEvidenceV1, NixSystemdObserverErrorV1> {
+) -> Result<NixSystemdJobRemovedTuple, NixSystemdObserverErrorV1> {
     let (id, path, unit, result): (u32, OwnedObjectPath, String, String) =
         message.body().deserialize().map_err(|_| {
             NixSystemdObserverErrorV1::InvalidJobIdentity(
@@ -758,11 +775,10 @@ fn decode_job_removed(
         ));
     }
 
-    Ok(NixSystemdJobEvidenceV1 {
+    Ok(NixSystemdJobRemovedTuple {
         id,
-        job_type: NixSystemdJobTypeV1::Start,
+        object_path: path,
         unit: canonical_unit(&unit)?,
-        object_path: path.as_str().to_string(),
         result,
     })
 }
