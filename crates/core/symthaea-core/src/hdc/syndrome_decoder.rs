@@ -281,17 +281,14 @@ impl BoundedDistanceSyndromeDecoder {
         let mut running_syndrome = BinaryCodeword::zero(self.parity_check.syndrome_dimension());
         let mut matching_errors = 0usize;
 
-        collect_exact_weight_matches(
-            &self.parity_check.columns,
-            &observed_syndrome,
-            distance,
-            0,
-            &mut selected,
-            &mut running_syndrome,
-            &mut matching_errors,
+        let mut list_search = ExactWeightListSearch {
+            columns: &self.parity_check.columns,
+            observed_syndrome: &observed_syndrome,
+            matching_errors: &mut matching_errors,
             max_list_size,
-            &mut result.minimum_errors,
-        );
+            output: &mut result.minimum_errors,
+        };
+        list_search.visit(distance, 0, &mut selected, &mut running_syndrome);
 
         let expected_matches = match &result.outcome {
             BoundedDistanceDecode::Ambiguous {
@@ -363,17 +360,14 @@ impl BoundedDistanceSyndromeDecoder {
             let mut first_error = None;
             let mut matches = 0usize;
 
-            search_exact_weight(
-                &self.parity_check.columns,
-                &observed_syndrome,
-                weight,
-                0,
-                &mut selected,
-                &mut running_syndrome,
-                &mut work,
-                &mut matches,
-                &mut first_error,
-            );
+            let mut search = ExactWeightSearch {
+                columns: &self.parity_check.columns,
+                observed_syndrome: &observed_syndrome,
+                work: &mut work,
+                matches: &mut matches,
+                first_error: &mut first_error,
+            };
+            search.visit(weight, 0, &mut selected, &mut running_syndrome);
 
             if matches == 0 {
                 continue;
