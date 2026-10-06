@@ -22,6 +22,9 @@ use tokio::sync::Mutex;
 use tokio_tungstenite::accept_hdr_async;
 use tokio_tungstenite::tungstenite::Message;
 
+mod system_transaction;
+use system_transaction::{MutationKind, SystemTransaction};
+
 // Security validators from the library (shared with fuzz targets)
 use symthaea_spore::security::{
     sanitize_heredoc, sanitize_input, token_eq, validate_disk_path,
@@ -2334,12 +2337,18 @@ fn parse_lsblk(json_str: &str) -> Vec<DiskInfo> {
 }
 
 type SharedTracker = Arc<Mutex<SessionTracker>>;
+type SharedMutationLock = Arc<Mutex<()>>;
+
+fn mutation_lock_busy_message() -> &'static str {
+    "Another consequential system mutation is already in progress; refusing concurrent execution."
+}
 
 async fn handle_connection(
     stream: tokio::net::TcpStream,
     peer_addr: String,
     tracker: SharedTracker,
     auth_token: Arc<String>,
+    mutation_lock: SharedMutationLock,
 ) {
     // Upgrade to WebSocket with Origin header validation.
     // Only allow connections from localhost, 127.0.0.1, or our known domains.
@@ -2382,7 +2391,7 @@ async fn handle_connection(
             return;
         }
     };
-    handle_connection_ws(ws_stream, peer_addr, tracker, auth_token).await;
+    handle_connection_ws(ws_stream, peer_addr, tracker, auth_token, mutation_lock).await;
 }
 
 /// Handle an already-upgraded WebSocket connection (works for both plain and TLS streams)
@@ -2391,6 +2400,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
     peer_addr: String,
     tracker: SharedTracker,
     auth_token: Arc<String>,
+    mutation_lock: SharedMutationLock,
 ) {
     let (mut ws_tx, mut ws_rx) = ws_stream.split();
     let mut authed = false;
@@ -2768,6 +2778,48 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                         .await;
                     continue;
                 }
+
+                // Install is a consequential mutation. Refuse concurrent mutations rather than
+                // queueing them invisibly behind a stale browser request.
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+
+                // Bind the authenticated request to a typed transaction identity. Passwords and
+                // LUKS secrets are represented only by the surrounding secure session, never in this digest.
+                let install_payload = serde_json::json!({
+                    "disk": &disk,
+                    "layout": &client_msg.layout,
+                    "hostname": &hostname,
+                    "target_machine_digest": &target_machine_digest,
+                    "configuration_digest": blake3::hash(client_msg.configuration_nix.as_bytes()).to_hex().to_string(),
+                    "flake_digest": blake3::hash(client_msg.flake_nix.as_bytes()).to_hex().to_string(),
+                    "hardware_digest": blake3::hash(client_msg.hardware_nix.as_bytes()).to_hex().to_string(),
+                    "disko_digest": blake3::hash(client_msg.disko_nix.as_bytes()).to_hex().to_string(),
+                });
+                let install_payload_bytes = serde_json::to_vec(&install_payload).unwrap_or_default();
+                let transaction = match SystemTransaction::begin(
+                    MutationKind::Install,
+                    Some(&target_machine_digest),
+                    &install_payload_bytes,
+                ) {
+                    Ok(tx) => tx,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Unable to establish secure system transaction: {}", error)).to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                eprintln!("[{}] {}", peer_addr, transaction.log_line());
 
                 // Generate session-isolated log path (CRITICAL-4: prevents cross-session log tampering)
                 let session_id = match new_session_id() {
@@ -4331,10 +4383,29 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
             }
 
             "rollback" => {
-                eprintln!("[{}] Rolling back...", peer_addr);
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let transaction = match SystemTransaction::begin(MutationKind::Rollback, None, b"nixos-rebuild switch --rollback") {
+                    Ok(tx) => tx,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&format!("Unable to establish secure system transaction: {}", error)).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                eprintln!("[{}] {} Rolling back...", peer_addr, transaction.log_line());
                 match run_cmd("nixos-rebuild switch --rollback 2>&1").await {
                     Ok(r) => {
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>()}).to_string())).await;
+                        let outcome = if r.exit_status == 0 { "committed" } else { "failed" };
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
                         let _ = ws_tx
@@ -4356,14 +4427,33 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                         .await;
                     continue;
                 }
-                eprintln!("[{}] Switching to generation {}...", peer_addr, r#gen);
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let transaction = match SystemTransaction::begin(MutationKind::SwitchGeneration, None, r#gen.as_bytes()) {
+                    Ok(tx) => tx,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&format!("Unable to establish secure system transaction: {}", error)).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                eprintln!("[{}] {} Switching to generation {}...", peer_addr, transaction.log_line(), r#gen);
                 let cmd = format!(
                     "nix-env --switch-generation {} -p /nix/var/nix/profiles/system && /nix/var/nix/profiles/system/bin/switch-to-configuration switch 2>&1",
                     r#gen
                 );
                 match run_cmd(&cmd).await {
                     Ok(r) => {
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>()}).to_string())).await;
+                        let outcome = if r.exit_status == 0 { "committed" } else { "failed" };
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
                         let _ = ws_tx
@@ -4406,11 +4496,31 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                         continue;
                     }
                 };
-                eprintln!("[{}] {} {}...", peer_addr, action, service);
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let transaction_payload = format!("{}:{}", action, service);
+                let transaction = match SystemTransaction::begin(MutationKind::ServiceAction, None, transaction_payload.as_bytes()) {
+                    Ok(tx) => tx,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&format!("Unable to establish secure system transaction: {}", error)).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                eprintln!("[{}] {} {} {}...", peer_addr, transaction.log_line(), action, service);
                 let cmd = format!("systemctl {} {}.service 2>&1", action, service);
                 match run_cmd(&cmd).await {
                     Ok(r) => {
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout}).to_string())).await;
+                        let outcome = if r.exit_status == 0 { "committed" } else { "failed" };
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout,"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
                         let _ = ws_tx
@@ -4473,12 +4583,26 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
             }
 
             "gc_collect" => {
-                eprintln!("[{}] Starting garbage collection...", peer_addr);
-                let gc_session_id: u64 = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_millis() as u64)
-                    .unwrap_or(0);
-                let gc_log = format!("/tmp/symthaea-gc-{}.log", gc_session_id);
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let transaction = match SystemTransaction::begin(MutationKind::GcCollect, None, b"nix-collect-garbage:delete-older-than-30d") {
+                    Ok(tx) => tx,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&format!("Unable to establish secure system transaction: {}", error)).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                eprintln!("[{}] {} Starting garbage collection...", peer_addr, transaction.log_line());
+                let gc_log = format!("/tmp/symthaea-gc-{}.log", transaction.transaction_id);
                 let _ = run_cmd(&format!("touch {} && chmod 600 {}", gc_log, gc_log)).await;
                 let _ = run_cmd(&format!(
                     "nix-collect-garbage -d --delete-older-than 30d > {} 2>&1 &",
@@ -4527,7 +4651,7 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                 }
                 let _ = ws_tx
                     .send(Message::Text(
-                        serde_json::json!({"type":"exit","code":0}).to_string(),
+                        serde_json::json!({"type":"exit","code":0,"transaction":transaction.receipt("committed")}).to_string(),
                     ))
                     .await;
             }
@@ -4613,14 +4737,29 @@ echo '}'
                         .await;
                     continue;
                 }
-                eprintln!("[{}] Writing config + rebuilding...", peer_addr);
-                let wc_session_id: u64 = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_millis() as u64)
-                    .unwrap_or(0);
-                let wc_config_path = format!("/tmp/symthaea-newconfig-{}.nix", wc_session_id);
-                let wc_script_path = format!("/tmp/symthaea-rebuild-{}.sh", wc_session_id);
-                let wc_log_path = format!("/tmp/symthaea-rebuild-{}.log", wc_session_id);
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let config_digest = blake3::hash(client_msg.configuration_nix.as_bytes()).to_hex().to_string();
+                let transaction = match SystemTransaction::begin(MutationKind::WriteConfig, None, config_digest.as_bytes()) {
+                    Ok(tx) => tx,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&format!("Unable to establish secure system transaction: {}", error)).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                eprintln!("[{}] {} Writing config + rebuilding...", peer_addr, transaction.log_line());
+                let wc_config_path = format!("/tmp/symthaea-newconfig-{}.nix", transaction.transaction_id);
+                let wc_script_path = format!("/tmp/symthaea-rebuild-{}.sh", transaction.transaction_id);
+                let wc_log_path = format!("/tmp/symthaea-rebuild-{}.log", transaction.transaction_id);
                 // Stage browser-supplied configuration through the filesystem API.
                 // Never interpolate it into a shell heredoc: a user-controlled
                 // delimiter must not become a command-injection boundary.
@@ -4706,7 +4845,11 @@ echo "REBUILD_COMPLETE"
                 .await;
                 let _ = ws_tx
                     .send(Message::Text(
-                        RelayMessage::output("Rebuilding system...", "stdout").to_json(),
+                        RelayMessage::output(
+                            &format!("Rebuilding system (transaction {})...", transaction.transaction_id),
+                            "stdout",
+                        )
+                        .to_json(),
                     ))
                     .await;
                 let mut last_lines = 0u64;
@@ -4754,7 +4897,7 @@ echo "REBUILD_COMPLETE"
                 let exit_code = if complete { 0 } else { 1 };
                 let _ = ws_tx
                     .send(Message::Text(
-                        serde_json::json!({"type":"exit","code":exit_code}).to_string(),
+                        serde_json::json!({"type":"exit","code":exit_code,"transaction":transaction.receipt(if exit_code == 0 { "committed" } else { "failed" })}).to_string(),
                     ))
                     .await;
             }
@@ -5454,6 +5597,9 @@ async fn main() {
     let auth_token = Arc::new(token);
 
     let tracker: SharedTracker = Arc::new(Mutex::new(SessionTracker::new(1800))); // 30 min timeout
+    // Serialize consequential system mutations across all WebSocket connections owned by this relay.
+    // We refuse rather than queue so a stale request cannot silently execute later.
+    let mutation_lock: SharedMutationLock = Arc::new(Mutex::new(()));
 
     let addr = format!("{}:{}", bind_addr, port);
     let listener = match TcpListener::bind(&addr).await {
@@ -5590,6 +5736,7 @@ async fn main() {
         let peer = addr.ip().to_string();
         let tracker = tracker.clone();
         let auth = auth_token.clone();
+        let mutation_lock = mutation_lock.clone();
 
         if let Some(ref acceptor) = tls_acceptor {
             let acceptor = acceptor.clone();
@@ -5635,7 +5782,7 @@ async fn main() {
                                 return;
                             }
                         };
-                        handle_connection_ws(ws_stream, peer, tracker, auth).await;
+                        handle_connection_ws(ws_stream, peer, tracker, auth, mutation_lock).await;
                     }
                     Err(e) => {
                         eprintln!("[{}] TLS handshake failed: {}", peer, e);
@@ -5643,7 +5790,7 @@ async fn main() {
                 }
             });
         } else {
-            tokio::spawn(handle_connection(stream, peer, tracker, auth));
+            tokio::spawn(handle_connection(stream, peer, tracker, auth, mutation_lock));
         }
     }
 }
@@ -5653,6 +5800,24 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn transaction_ids_are_random_and_not_clock_derived() {
+        let first = SystemTransaction::begin(MutationKind::Rollback, None, b"rollback").unwrap();
+        let second = SystemTransaction::begin(MutationKind::Rollback, None, b"rollback").unwrap();
+        assert_ne!(first.transaction_id, second.transaction_id);
+        assert_eq!(first.request_digest, second.request_digest);
+        assert_eq!(first.transaction_id.len(), 32);
+    }
+
+    #[test]
+    fn mutation_lock_rejects_concurrent_acquisition() {
+        let lock: SharedMutationLock = Arc::new(Mutex::new(()));
+        let first = lock.try_lock().expect("first mutation lock should succeed");
+        assert!(lock.try_lock().is_err(), "second mutation must be rejected, not queued");
+        drop(first);
+        assert!(lock.try_lock().is_ok());
+    }
 
     // ── sanitize_heredoc ──
 
