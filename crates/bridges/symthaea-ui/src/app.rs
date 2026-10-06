@@ -21,6 +21,8 @@ use symthaea_canvas::{GpuScene, RemoteScene, WebGpuMovieRenderer, WebGpuRenderer
 use symthaea_canvas::{Color, SceneNode};
 #[cfg(feature = "browser-qualification")]
 use symthaea_canvas::scene_graph::{Style, Transform};
+#[cfg(feature = "browser-qualification")]
+use web_sys::HtmlCanvasElement;
 use wasm_bindgen::JsCast;
 
 use crate::api::{self};
@@ -159,6 +161,24 @@ fn browser_qualification_portrait() -> String {
         "data:image/svg+xml;base64,{}",
         base64::engine::general_purpose::STANDARD.encode(SVG.as_bytes())
     )
+}
+
+#[cfg(feature = "browser-qualification")]
+fn record_qualification_adapter_snapshot(canvas: &HtmlCanvasElement, init_count: u32) {
+    for key in [
+        "name",
+        "device-type",
+        "backend",
+        "vendor",
+        "device",
+    ] {
+        if let Some(value) = canvas.get_attribute(&format!("data-qualification-adapter-{key}")) {
+            let _ = canvas.set_attribute(
+                &format!("data-qualification-adapter-{key}-init-{init_count}"),
+                &value,
+            );
+        }
+    }
 }
 
 #[cfg(feature = "browser-qualification")]
@@ -409,6 +429,7 @@ pub fn App() -> impl IntoView {
                                     "data-qualification-init-count",
                                     &count.to_string(),
                                 );
+                                record_qualification_adapter_snapshot(&canvas, count);
                             }
                             if count >= 2 {
                                 if let Some(canvas) = webgpu_canvas.get_untracked() {
@@ -487,6 +508,7 @@ pub fn App() -> impl IntoView {
                                     "data-qualification-init-count",
                                     &count.to_string(),
                                 );
+                                record_qualification_adapter_snapshot(&canvas, count);
                             }
                             if count >= 2 {
                                 if let Some(canvas) = movie_webgpu_canvas.get_untracked() {
