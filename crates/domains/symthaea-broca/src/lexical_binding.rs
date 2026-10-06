@@ -117,14 +117,14 @@ pub struct AgreementConstraint {
 
 /// Stable identity for explicit morphophonological derivation traces.
 pub const MORPHOPHONOLOGICAL_DERIVATION_WITNESS_VERSION: &str =
-    "broca-morphophonological-derivation-witness-v1";
+    "broca-morphophonological-derivation-witness-v2";
 
 pub const MORPHOPHONOLOGICAL_RULE_SET_VERSION: &str =
     "broca-morphophonological-rule-set-v1";
 pub const MORPHOPHONOLOGICAL_RULE_SELECTION_POLICY: &str =
     "exact-feature-single-rule-v1";
 pub const MORPHOPHONOLOGICAL_RESOURCE_EVIDENCE_VERSION: &str =
-    "broca-morphophonological-resource-evidence-v1";
+    "broca-morphophonological-resource-evidence-v2";
 
 /// Whether an executable morphology resource is externally sourced or explicitly
 /// authored as a local/fixture resource.
@@ -136,8 +136,10 @@ pub enum MorphophonologicalResourceOrigin {
 
 /// Provenance for the linguistic/resource artifact behind an executable rule set.
 ///
-/// External resources require a source URI, immutable revision identifier, and declared
-/// license. Hand-authored resources intentionally carry no fabricated external attribution.
+/// External resources require a source URI, revision identifier, declared license, and an
+/// exact source-artifact digest. Hand-authored resources intentionally carry no fabricated
+/// external attribution. The artifact digest is the cryptographic byte identity; the revision
+/// field is retained as a human/source-system version reference.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MorphophonologicalResourceEvidence {
     pub version: String,
@@ -189,6 +191,41 @@ impl MorphophonologicalResourceEvidence {
         };
         evidence.validate()?;
         Ok(evidence)
+    }
+
+    /// Construct external evidence directly from the exact source-artifact bytes.
+    ///
+    /// The artifact digest is computed locally from the supplied bytes rather than accepted
+    /// as a caller assertion.
+    pub fn external_from_artifact(
+        source_id: impl Into<String>,
+        source_uri: impl Into<String>,
+        revision: impl Into<String>,
+        license: impl Into<String>,
+        source_artifact: &[u8],
+    ) -> Result<Self, MorphophonologicalResourceEvidenceError> {
+        let digest = blake3::hash(source_artifact).to_hex().to_string();
+        Self::external(source_id, source_uri, revision, license, digest)
+    }
+
+    /// Verify a persisted source-artifact identity against the exact bytes available now.
+    pub fn verify_source_artifact_bytes(
+        &self,
+        source_artifact: &[u8],
+    ) -> Result<(), MorphophonologicalResourceEvidenceError> {
+        let expected = self
+            .source_artifact_blake3
+            .as_deref()
+            .ok_or(
+                MorphophonologicalResourceEvidenceError::ExternalMissingSourceArtifactDigest,
+            )?;
+        let actual = blake3::hash(source_artifact).to_hex().to_string();
+        if expected != actual {
+            return Err(
+                MorphophonologicalResourceEvidenceError::SourceArtifactDigestMismatch,
+            );
+        }
+        Ok(())
     }
 
     pub fn validate(&self) -> Result<(), MorphophonologicalResourceEvidenceError> {
@@ -253,6 +290,7 @@ pub enum MorphophonologicalResourceEvidenceError {
     ExternalMissingLicense,
     ExternalMissingSourceArtifactDigest,
     MalformedSourceArtifactDigest,
+    SourceArtifactDigestMismatch,
     HandAuthoredCarriesExternalMetadata,
 }
 
@@ -266,6 +304,7 @@ impl std::fmt::Display for MorphophonologicalResourceEvidenceError {
             Self::ExternalMissingLicense => write!(f, "external morphophonological resources require a declared license"),
             Self::ExternalMissingSourceArtifactDigest => write!(f, "external morphophonological resources require an exact source artifact BLAKE3 digest"),
             Self::MalformedSourceArtifactDigest => write!(f, "morphophonological source artifact BLAKE3 digest must be exactly 64 lowercase hexadecimal characters"),
+            Self::SourceArtifactDigestMismatch => write!(f, "morphophonological source artifact bytes do not match the declared BLAKE3 digest"),
             Self::HandAuthoredCarriesExternalMetadata => write!(f, "hand-authored morphophonological resources must not carry fabricated external URI or license metadata"),
         }
     }
@@ -721,6 +760,22 @@ impl MorphophonologicalDerivationWitness {
     }
 
     /// Validate the retained trace against the executable rule set as well as the binding.
+    pub fn validate_against_binding_and_rule_set_with_source_artifact(
+        &self,
+        binding: &LexicalMorphosyntacticBinding,
+        rule_set: &MorphophonologicalRuleSet,
+        source_artifact: &[u8],
+    ) -> Result<(), MorphophonologicalDerivationWitnessError> {
+        self.validate_against_binding_and_rule_set(binding, rule_set)?;
+        rule_set
+            .resource_evidence
+            .verify_source_artifact_bytes(source_artifact)
+            .map_err(|_| {
+                MorphophonologicalDerivationWitnessError::SourceArtifactDigestMismatch
+            })?;
+        Ok(())
+    }
+
     pub fn validate_against_binding_and_rule_set(
         &self,
         binding: &LexicalMorphosyntacticBinding,
@@ -915,6 +970,7 @@ pub enum MorphophonologicalDerivationWitnessError {
     RuleExecutionFailed { position: usize },
     DerivedOutputMismatch { position: usize },
     AppliedRuleMismatch { position: usize },
+    SourceArtifactDigestMismatch,
     InvalidDerivedWitness,
 }
 }
@@ -945,6 +1001,7 @@ impl std::fmt::Display for MorphophonologicalDerivationWitnessError {
             Self::RuleExecutionFailed { position } => write!(f, "morphophonological rule execution failed at position {position}"),
             Self::DerivedOutputMismatch { position } => write!(f, "executable morphophonological derivation does not reproduce position {position}'s retained output"),
             Self::AppliedRuleMismatch { position } => write!(f, "retained morphophonological witness selected a different executable rule at position {position}"),
+            Self::SourceArtifactDigestMismatch => write!(f, "morphophonological witness source-artifact bytes do not match the declared resource identity"),
             Self::InvalidDerivedWitness => write!(f, "executable morphophonological derivation produced an invalid witness"),
         }
     }
@@ -2305,6 +2362,32 @@ mod tests {
     }
 
     #[test]
+    fn morphophonological_resource_evidence_verifies_exact_source_artifact_bytes() {
+        let artifact = b"fixture morphology resource v2\nwalk<TAB>walked<TAB>V;PST\n";
+        let evidence = MorphophonologicalResourceEvidence::external_from_artifact(
+            "fixture:external",
+            "https://example.invalid/resource",
+            "fixture-release-1",
+            "CC-BY-SA-4.0",
+            artifact,
+        )
+        .expect("artifact-derived external evidence should validate");
+
+        evidence
+            .verify_source_artifact_bytes(artifact)
+            .expect("exact source bytes should match their persisted identity");
+
+        let mut tampered = artifact.to_vec();
+        tampered.push(b'!');
+        assert_eq!(
+            evidence
+                .verify_source_artifact_bytes(&tampered)
+                .expect_err("source-byte tampering must fail closed"),
+            MorphophonologicalResourceEvidenceError::SourceArtifactDigestMismatch
+        );
+    }
+
+    #[test]
     fn morphophonological_resource_evidence_rejects_missing_external_metadata() {
         let error = MorphophonologicalResourceEvidence {
             version: MORPHOPHONOLOGICAL_RESOURCE_EVIDENCE_VERSION.into(),
@@ -2358,6 +2441,39 @@ mod tests {
         assert_eq!(
             error,
             MorphophonologicalResourceEvidenceError::MalformedSourceArtifactDigest
+        );
+    }
+
+    #[test]
+    fn morphophonological_witness_verifies_persisted_source_artifact_identity() {
+        let binding = morphophonological_fixture_binding();
+        let mut rule_set = morphophonological_fixture_rule_set();
+        let artifact = b"fixture hand-authored resource bytes";
+        rule_set.resource_evidence.source_artifact_blake3 =
+            Some(blake3::hash(artifact).to_hex().to_string());
+        rule_set.validate().unwrap();
+
+        let witness = MorphophonologicalDerivationWitness::from_rule_set(&binding, &rule_set)
+            .expect("artifact-bound rule set should produce a witness");
+
+        witness
+            .validate_against_binding_and_rule_set_with_source_artifact(
+                &binding,
+                &rule_set,
+                artifact,
+            )
+            .expect("matching source artifact bytes should validate");
+
+        let tampered = b"fixture hand-authored resource bytes!";
+        assert_eq!(
+            witness
+                .validate_against_binding_and_rule_set_with_source_artifact(
+                    &binding,
+                    &rule_set,
+                    tampered,
+                )
+                .expect_err("source artifact tampering must fail closed"),
+            MorphophonologicalDerivationWitnessError::SourceArtifactDigestMismatch
         );
     }
 
