@@ -354,6 +354,8 @@ pub enum NeurosemanticRemediationImpactEvidenceKind {
     UtilityImpact,
     FairnessImpact,
     ResidualRisk,
+    RecoveryRisk,
+    RepresentationResidual,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
