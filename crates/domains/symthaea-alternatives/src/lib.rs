@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 23;
+pub const SCHEMA_VERSION: u16 = 24;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-v32";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-v33";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -1902,6 +1902,8 @@ pub struct ExperimentalDesignProvenance {
     pub design_id: String,
     /// Exact functional-requirement identity this campaign is scoped to.
     pub requirement_id: String,
+    /// Canonical BLAKE3 digest of the complete functional requirement payload.
+    pub requirement_digest: String,
     /// Exact hypothesis identity.
     pub hypothesis_id: String,
     /// Human-readable statement of the hypothesis being tested.
@@ -1925,6 +1927,7 @@ impl ExperimentalDesignProvenance {
     pub fn validate(&self) -> Result<(), AssessmentError> {
         if self.design_id.is_empty()
             || self.requirement_id.is_empty()
+            || self.requirement_digest.is_empty()
             || self.hypothesis_id.is_empty()
             || self.hypothesis_statement.is_empty()
             || self.unresolved_uncertainty_refs.is_empty()
@@ -1992,6 +1995,13 @@ impl ExperimentalDesignProvenance {
             return Err(AssessmentError::ExperimentalDesignRequirementMismatch {
                 expected_requirement_id: requirement.id.clone(),
                 actual_requirement_id: self.requirement_id.clone(),
+            });
+        }
+        let expected_requirement_digest = canonical_requirement_hash(requirement)?;
+        if self.requirement_digest != expected_requirement_digest {
+            return Err(AssessmentError::ExperimentalDesignRequirementDigestMismatch {
+                expected_requirement_digest,
+                actual_requirement_digest: self.requirement_digest.clone(),
             });
         }
         let declared = self.candidate_ids.iter().collect::<BTreeSet<_>>();
@@ -2270,6 +2280,13 @@ pub enum AssessmentError {
         /// Requirement identity carried by the design.
         actual_requirement_id: String,
     },
+    /// An experimental design carries a different digest from the complete requirement semantics.
+    ExperimentalDesignRequirementDigestMismatch {
+        /// Canonical requirement digest expected by the assessment.
+        expected_requirement_digest: String,
+        /// Digest carried by the experimental design.
+        actual_requirement_digest: String,
+    },
     /// An experimental discrimination target names a surface absent from the requirement.
     ExperimentalDesignSurfaceUndeclared(String),
     /// Two unresolved experimental uncertainty references share one identity.
@@ -2480,7 +2497,6 @@ impl std::fmt::Display for AssessmentError {
             Self::MissingIncumbent(id) => write!(f, "incumbent {id} not found"),
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate id {id}"),
             Self::DuplicateEvidenceId(id) => write!(f, "duplicate evidence id {id}"),
-            Self::EmptySourceIdentity => write!(f, "evidence source identity is incomplete"),
             Self::InvalidExperimentalDesign => write!(f, "experimental design provenance is incomplete"),
             Self::DuplicateExperimentalUncertaintyReference => {
                 write!(f, "duplicate experimental uncertainty reference")
@@ -2491,6 +2507,13 @@ impl std::fmt::Display for AssessmentError {
             } => write!(
                 f,
                 "experimental design requirement {actual_requirement_id} does not match assessment requirement {expected_requirement_id}"
+            ),
+            Self::ExperimentalDesignRequirementDigestMismatch {
+                expected_requirement_digest,
+                actual_requirement_digest,
+            } => write!(
+                f,
+                "experimental design requirement digest {actual_requirement_digest} does not match canonical requirement digest {expected_requirement_digest}"
             ),
             Self::ExperimentalDesignSurfaceUndeclared(id) => write!(
                 f,
@@ -3375,6 +3398,13 @@ impl AlternativesEngine {
             }
         })
     }
+}
+
+fn canonical_requirement_hash(requirement: &FunctionalRequirement) -> Result<String, AssessmentError> {
+    let bytes = serde_json::to_vec(requirement).map_err(|_| AssessmentError::NonFinite)?;
+    let mut hasher = Hasher::new();
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
 }
 
 fn canonical_candidate_evidence_hash(candidate: &CandidatePathway) -> Result<String, AssessmentError> {
@@ -5210,6 +5240,7 @@ mod tests {
         let design = ExperimentalDesignProvenance {
             design_id: "design:water-v1".into(),
             requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
             hypothesis_id: "hypothesis:water-discrimination-v1".into(),
             hypothesis_statement: "A direct measurement can discriminate the unresolved water-burden intervals of the selected frontier candidates.".into(),
             unresolved_uncertainty_refs: vec!["uncertainty:direct-substitute:Water".into()],
@@ -5265,6 +5296,7 @@ mod tests {
         let design = ExperimentalDesignProvenance {
             design_id: "design:invalid".into(),
             requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
             hypothesis_id: "hypothesis:invalid".into(),
             hypothesis_statement: "Test.".into(),
             unresolved_uncertainty_refs: vec!["u".into()],
@@ -5343,6 +5375,7 @@ mod tests {
         let mut first = ExperimentalDesignProvenance {
             design_id: "design:order".into(),
             requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
             hypothesis_id: "hypothesis:order".into(),
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u2".into(), "u1".into()],
@@ -5397,12 +5430,61 @@ mod tests {
     }
 
     #[test]
+    fn experimental_design_must_match_requirement_digest() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:digest".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:digest".into(),
+            hypothesis_statement: "Test water.".into(),
+            unresolved_uncertainty_refs: vec!["u1".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                target_uncertainty_width: None,
+            },
+            comparison_basis: basis,
+        };
+        let mut changed = case.requirement.clone();
+        changed.description.push_str(" drift");
+        let error = design.validate_against(&changed).unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::ExperimentalDesignRequirementDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
     fn experimental_design_must_match_requirement_identity() {
         let case = crate::corpus::five_pathway_adversarial_case();
         let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
         let design = ExperimentalDesignProvenance {
             design_id: "design:req".into(),
             requirement_id: "different-requirement".into(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
             hypothesis_id: "hypothesis:req".into(),
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
@@ -5452,6 +5534,7 @@ mod tests {
         let design = ExperimentalDesignProvenance {
             design_id: "design:drift".into(),
             requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
             hypothesis_id: "hypothesis:drift".into(),
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
@@ -5543,6 +5626,7 @@ mod tests {
         let design = ExperimentalDesignProvenance {
             design_id: "design:expected".into(),
             requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
             hypothesis_id: "hypothesis:water".into(),
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
@@ -5615,6 +5699,7 @@ mod tests {
         let design = ExperimentalDesignProvenance {
             design_id: "design:positive".into(),
             requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
             hypothesis_id: "hypothesis:water".into(),
             hypothesis_statement: "A measurement distinguishes the selected alternatives.".into(),
             unresolved_uncertainty_refs: vec!["uncertainty:water".into()],
@@ -5686,6 +5771,7 @@ mod tests {
         let design = ExperimentalDesignProvenance {
             design_id: "design:procedure".into(),
             requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
             hypothesis_id: "hypothesis:procedure".into(),
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
