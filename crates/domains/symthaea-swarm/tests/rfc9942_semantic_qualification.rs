@@ -255,6 +255,24 @@ fn rfc9162_inclusion_and_consistency_path_bounds_are_tree_size_derived() {
 
 
 #[test]
+fn rfc9942_unprotected_text_label_resource_limit_is_typed() {
+    let mut wire = Vec::new();
+    wire.extend_from_slice(&[0xd2, 0x84]); // COSE_Sign1
+    wire.extend_from_slice(&[0x41, 0xa1, 0x01, 0x26]); // protected = {alg: ES256}
+    wire.extend_from_slice(&[0xb8, 0x01]); // one-entry unprotected map
+    wire.push(0x79); // tstr, two-byte length
+    wire.extend_from_slice(&257u16.to_be_bytes());
+    wire.extend(std::iter::repeat_n(b'x', 257));
+    wire.push(0x00); // arbitrary well-formed CBOR value
+    wire.extend_from_slice(&[0xf6, 0x40]); // detached payload, empty signature
+
+    assert_eq!(
+        Rfc9942SignatureWithReceipts::from_cbor(&wire),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
+
+#[test]
 fn rfc9942_vdp_resource_limit_is_not_collapsed_into_encoding_error() {
     let mut encoded = vec![0xa1, 0x20];
     encoded.extend(std::iter::repeat_n(0xc0, 17));
