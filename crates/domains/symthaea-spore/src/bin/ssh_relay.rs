@@ -3888,6 +3888,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                                 RelayMessage::error("Password must not contain newlines").to_json(),
                             ))
                             .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
                         continue;
                     }
                     let pw_file = format!("{transaction_dir}/user-password");
@@ -3909,6 +3910,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                                     RelayMessage::error(&format!("Failed to stage password: {}", error)).to_json(),
                                 ))
                                 .await;
+                            remove_transaction_artifact_dir(&transaction_dir);
                             continue;
                         }
                     };
@@ -3920,6 +3922,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                                 RelayMessage::error(&format!("Failed to stage password: {}", error)).to_json(),
                             ))
                             .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
                         continue;
                     }
                     drop(pw_file_handle);
@@ -3950,9 +3953,9 @@ echo "  User password set."
                     }
                 }
 
-                // All staged secrets are cleaned up even if the install fails before
-                // their normal post-install steps. Secret paths are session-scoped and
-                // contain no user-controlled data.
+                // All staged secrets are cleaned up if the install fails before their
+                // normal post-install steps. Paths are transaction-scoped and derived
+                // entirely from the validated transaction identifier.
                 let mut staged_secret_paths = Vec::<String>::new();
                 if !client_msg.user_password.is_empty() {
                     staged_secret_paths.push(format!("{transaction_dir}/user-password"));
@@ -3973,7 +3976,7 @@ echo "  User password set."
                                     RelayMessage::error(&format!("Failed to stage LUKS2 passphrase: {}", error)).to_json(),
                                 ))
                                 .await;
-                            let _ = tokio::fs::remove_file(format!("{transaction_dir}/user-password")).await;
+                            remove_transaction_artifact_dir(&transaction_dir);
                             continue;
                         }
                     };
@@ -3986,6 +3989,7 @@ echo "  User password set."
                                 RelayMessage::error(&format!("Failed to stage LUKS2 passphrase: {}", error)).to_json(),
                             ))
                             .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
                         continue;
                     }
                     if let Err(error) = luks_file.sync_all() {
@@ -3997,6 +4001,7 @@ echo "  User password set."
                                 RelayMessage::error(&format!("Failed to flush LUKS2 passphrase: {}", error)).to_json(),
                             ))
                             .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
                         continue;
                     }
                     drop(luks_file);
@@ -8582,8 +8587,8 @@ mod tests {
 
     fn cleanup_trap_contains_no_nested_shell_quotes() {
         let paths = [
-            "/tmp/sovereign-user-pw-42",
-            "/tmp/sovereign-luks-pw-42",
+            "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef/user-password",
+            "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef/luks-passphrase",
         ];
         let cleanup = paths
             .iter()
@@ -8591,7 +8596,9 @@ mod tests {
             .collect::<Vec<_>>()
             .join("; ");
         let trap = format!("trap '{}' EXIT", cleanup);
-        assert!(trap.contains("rm -f -- /tmp/sovereign-user-pw-42"));
+        assert!(trap.contains(
+            "rm -f -- /tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef/user-password"
+        ));
         assert!(!trap.contains("rm -f '/tmp"));
     }
 
