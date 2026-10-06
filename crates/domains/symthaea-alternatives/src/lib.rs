@@ -8196,9 +8196,10 @@ mod tests {
             .assess(&case.requirement, &case.candidates, Some(case.incumbent_id))
             .unwrap();
         let mut mutated = case.clone();
-        let observed = mutated.candidates[0]
-            .evidence
+        let observed = mutated
+            .candidates
             .iter_mut()
+            .flat_map(|candidate| candidate.evidence.iter_mut())
             .find(|e| e.observation.is_some())
             .unwrap();
         observed
@@ -8228,7 +8229,11 @@ mod tests {
             procedure_digest: "procedure-digest".into(),
             record_digest: "record".into(),
             measurement_system_id: Some("system".into()),
-            calibration_chain_refs: vec!["calibration".into()],
+            calibration_chain_refs: vec![CalibrationTraceabilityRef {
+                calibration_id: "calibration".into(),
+                calibration_revision: "v1".into(),
+                calibration_record_digest: "calibration-digest".into(),
+            }],
             experimental_design_id: Some("design:water-v1".into()),
             experimental_target_id: Some("target:water-v1".into()),
         };
