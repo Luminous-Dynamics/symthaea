@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 26;
+pub const SCHEMA_VERSION: u16 = 27;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-v35";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v36";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -1870,6 +1870,31 @@ impl ExperimentalDiscriminationTarget {
 
 /// Explicit stopping rule for a proposed measurement campaign.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExperimentalUncertaintyStoppingTarget {
+    /// Exact discrimination target whose uncertainty width is being bounded.
+    pub target_id: String,
+    /// Maximum allowed interval width.
+    pub max_interval_width: f64,
+    /// Unit of the target measurand in which the interval width is expressed.
+    pub unit: String,
+}
+
+impl ExperimentalUncertaintyStoppingTarget {
+    /// Validate target identity and quantitative stop bound.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.target_id.is_empty()
+            || !self.max_interval_width.is_finite()
+            || self.max_interval_width <= 0.0
+            || self.unit.is_empty()
+        {
+            return Err(AssessmentError::InvalidExperimentalStoppingCriteria);
+        }
+        Ok(())
+    }
+}
+
+/// Explicit stopping rule for a proposed measurement campaign.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExperimentalStoppingCriteria {
     /// Minimum number of usable observations required before evaluating the stopping rule.
     pub min_valid_observations: u32,
@@ -1877,8 +1902,8 @@ pub struct ExperimentalStoppingCriteria {
     pub max_valid_observations: u32,
     /// Optional hard wall-clock duration in seconds.
     pub max_duration_seconds: Option<u64>,
-    /// Optional target interval width for the declared measurand.
-    pub target_uncertainty_width: Option<f64>,
+    /// Optional target-specific uncertainty stopping bound.
+    pub uncertainty_target: Option<ExperimentalUncertaintyStoppingTarget>,
 }
 
 impl ExperimentalStoppingCriteria {
@@ -1887,7 +1912,6 @@ impl ExperimentalStoppingCriteria {
         if self.min_valid_observations == 0
             || self.max_valid_observations < self.min_valid_observations
             || self.max_duration_seconds == Some(0)
-            || self.target_uncertainty_width.is_some_and(|width| !width.is_finite() || width <= 0.0)
         {
             return Err(AssessmentError::InvalidExperimentalStoppingCriteria);
         }
@@ -1964,6 +1988,9 @@ impl ExperimentalDesignProvenance {
         self.protocol.validate()?;
         self.stopping_criteria.validate()?;
         self.comparison_basis.validate()?;
+        if let Some(target) = &self.stopping_criteria.uncertainty_target {
+            target.validate()?;
+        }
         if self.protocol.basis != self.comparison_basis {
             return Err(AssessmentError::ExperimentalDesignBasisMismatch {
                 expected: self.comparison_basis.clone(),
@@ -2003,6 +2030,29 @@ impl ExperimentalDesignProvenance {
                 expected_requirement_digest,
                 actual_requirement_digest: self.requirement_digest.clone(),
             });
+        }
+        if let Some(stop_target) = &self.stopping_criteria.uncertainty_target {
+            let Some(target) = self
+                .expected_discrimination
+                .iter()
+                .find(|target| target.target_id == stop_target.target_id)
+            else {
+                return Err(AssessmentError::ExperimentalDesignStoppingTargetUndeclared(
+                    stop_target.target_id.clone(),
+                ));
+            };
+            let Some((required_unit, _, _)) = target.requirement_scale(requirement) else {
+                return Err(AssessmentError::ExperimentalDesignSurfaceUndeclared(
+                    target.target_id.clone(),
+                ));
+            };
+            if stop_target.unit != required_unit {
+                return Err(AssessmentError::ExperimentalDesignStoppingUnitMismatch {
+                    target_id: stop_target.target_id.clone(),
+                    expected_unit: required_unit.to_string(),
+                    actual_unit: stop_target.unit.clone(),
+                });
+            }
         }
         let declared = self.candidate_ids.iter().collect::<BTreeSet<_>>();
         for target in &self.expected_discrimination {
@@ -2399,6 +2449,17 @@ pub enum AssessmentError {
     },
     /// Experimental stopping criteria are structurally invalid.
     InvalidExperimentalStoppingCriteria,
+    /// An experimental stopping rule references a target not declared by the design.
+    ExperimentalDesignStoppingTargetUndeclared(String),
+    /// An experimental stopping uncertainty threshold uses a unit different from its target.
+    ExperimentalDesignStoppingUnitMismatch {
+        /// Target identity.
+        target_id: String,
+        /// Unit required by the target surface.
+        expected_unit: String,
+        /// Unit declared by the stopping criterion.
+        actual_unit: String,
+    },
     /// An experimental design references a candidate not present in the assessment.
     ExperimentalDesignCandidateMissing(String),
     /// An experimental design uses a comparison basis not declared by the assessment requirement.
@@ -2663,6 +2724,18 @@ impl std::fmt::Display for AssessmentError {
             Self::InvalidExperimentalStoppingCriteria => {
                 write!(f, "experimental stopping criteria are invalid")
             }
+            Self::ExperimentalDesignStoppingTargetUndeclared(id) => write!(
+                f,
+                "experimental stopping rule references undeclared target {id}"
+            ),
+            Self::ExperimentalDesignStoppingUnitMismatch {
+                target_id,
+                expected_unit,
+                actual_unit,
+            } => write!(
+                f,
+                "experimental stopping target {target_id} unit {actual_unit} does not match target unit {expected_unit}"
+            ),
             Self::EmptyAssessmentSubject => write!(f, "assessment subject identity is incomplete"),
             Self::EmptySourceAdmissionReference => {
                 write!(f, "source admission reference is incomplete")
@@ -5379,7 +5452,11 @@ mod tests {
                 min_valid_observations: 3,
                 max_valid_observations: 12,
                 max_duration_seconds: Some(86_400),
-                target_uncertainty_width: Some(0.5),
+                uncertainty_target: Some(ExperimentalUncertaintyStoppingTarget {
+                    target_id: "water-discrimination".into(),
+                    max_interval_width: 0.5,
+                    unit: "unit".into(),
+                }),
             },
             comparison_basis: basis,
         };
@@ -5435,7 +5512,7 @@ mod tests {
                 min_valid_observations: 1,
                 max_valid_observations: 1,
                 max_duration_seconds: None,
-                target_uncertainty_width: None,
+                uncertainty_target: None,
             },
             comparison_basis: basis,
         };
@@ -5503,7 +5580,7 @@ mod tests {
                 min_valid_observations: 1,
                 max_valid_observations: 2,
                 max_duration_seconds: None,
-                target_uncertainty_width: None,
+                uncertainty_target: None,
             },
             comparison_basis: basis.clone(),
         };
@@ -5575,7 +5652,7 @@ mod tests {
                 min_valid_observations: 1,
                 max_valid_observations: 2,
                 max_duration_seconds: None,
-                target_uncertainty_width: None,
+                uncertainty_target: None,
             },
             comparison_basis: basis,
         };
@@ -5586,6 +5663,55 @@ mod tests {
             error,
             AssessmentError::ExperimentalDesignRequirementDigestMismatch { .. }
         ));
+    }
+
+    #[test]
+    fn experimental_design_stopping_target_must_be_declared() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:stop-target".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:stop-target".into(),
+            hypothesis_statement: "Test water.".into(),
+            unresolved_uncertainty_refs: vec!["u1".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                uncertainty_target: Some(ExperimentalUncertaintyStoppingTarget {
+                    target_id: "missing".into(),
+                    max_interval_width: 0.5,
+                    unit: "unit".into(),
+                }),
+            },
+            comparison_basis: basis,
+        };
+        assert_eq!(
+            design.validate_against(&case.requirement).unwrap_err(),
+            AssessmentError::ExperimentalDesignStoppingTargetUndeclared("missing".into())
+        );
     }
 
     #[test]
@@ -5623,7 +5749,7 @@ mod tests {
                 min_valid_observations: 1,
                 max_valid_observations: 2,
                 max_duration_seconds: None,
-                target_uncertainty_width: None,
+                uncertainty_target: None,
             },
             comparison_basis: basis,
         };
@@ -5673,7 +5799,7 @@ mod tests {
                 min_valid_observations: 1,
                 max_valid_observations: 2,
                 max_duration_seconds: None,
-                target_uncertainty_width: None,
+                uncertainty_target: None,
             },
             comparison_basis: basis,
         };
@@ -5765,7 +5891,7 @@ mod tests {
                 min_valid_observations: 1,
                 max_valid_observations: 2,
                 max_duration_seconds: None,
-                target_uncertainty_width: None,
+                uncertainty_target: None,
             },
             comparison_basis: basis,
         };
@@ -5838,7 +5964,7 @@ mod tests {
                 min_valid_observations: 1,
                 max_valid_observations: 2,
                 max_duration_seconds: None,
-                target_uncertainty_width: None,
+                uncertainty_target: None,
             },
             comparison_basis: basis,
         };
@@ -5906,7 +6032,7 @@ mod tests {
                 min_valid_observations: 1,
                 max_valid_observations: 2,
                 max_duration_seconds: None,
-                target_uncertainty_width: None,
+                uncertainty_target: None,
             },
             comparison_basis: basis,
         };
@@ -5983,7 +6109,7 @@ mod tests {
                 min_valid_observations: 1,
                 max_valid_observations: 2,
                 max_duration_seconds: None,
-                target_uncertainty_width: None,
+                uncertainty_target: None,
             },
             comparison_basis: basis,
         };
