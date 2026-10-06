@@ -598,6 +598,54 @@ pub struct RollingOriginRelationalPredictionSummary {
 }
 
 impl RollingOriginRelationalPredictionSummary {
+    pub fn compute_evidence(
+        samples: &[RelationalPredictionSample],
+        config: RollingOriginRelationalPredictionConfig,
+        provenance: RelationalPredictionProvenance,
+    ) -> Result<RollingOriginRelationalPredictionEvidence, RelationalPredictionError> {
+        let observed = Self::compute(samples, config)?;
+        let segment_total = config
+            .train_samples
+            .checked_add(config.gap_samples)
+            .and_then(|value| value.checked_add(config.test_samples))
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+        let mut origins = Vec::with_capacity(config.origin_count);
+        for origin in 0..config.origin_count {
+            let start = config
+                .step_samples
+                .checked_mul(origin)
+                .and_then(|offset| config.first_origin.checked_add(offset))
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let end = start
+                .checked_add(segment_total)
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let segment = samples
+                .get(start..end)
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+            origins.push(HeldOutRelationalPredictionSummary::compute_evidence(
+                segment,
+                HeldOutRelationalPredictionConfig {
+                    train_samples: config.train_samples,
+                    test_samples: config.test_samples,
+                    gap_samples: config.gap_samples,
+                    ridge_lambda: config.ridge_lambda,
+                },
+                provenance.clone(),
+            )?);
+        }
+
+        let evidence = RollingOriginRelationalPredictionEvidence {
+            provenance,
+            config,
+            observed,
+            origins,
+        };
+        evidence.validate()?;
+        Ok(evidence)
+    }
+
     pub fn compute(
         samples: &[RelationalPredictionSample],
         config: RollingOriginRelationalPredictionConfig,
