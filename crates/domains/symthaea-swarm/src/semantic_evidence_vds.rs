@@ -3571,7 +3571,7 @@ impl Rfc9162InclusionProof {
         let mut path=Vec::with_capacity(items.len());
         for item in items{
             let mut item_reader=CborReader::new(&item);
-            path.push(item_reader.read_bstr32()?);
+            path.push(item_reader.read_bstr32_with_resource_chunk_limits()?);
             item_reader.finish()?;
         }
         r.finish_indefinite_array(indefinite_array)?;
