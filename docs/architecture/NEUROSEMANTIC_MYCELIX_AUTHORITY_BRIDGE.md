@@ -100,6 +100,31 @@ This is intentionally compatible in concept with W3C PROV's entity/activity/agen
 
 2026 iBCI governance work identifies traceable data lineage as an emerging safeguard because successive processing stages can create derivative artifacts under different custodians, complicating access, deletion, and transfer. (Sandbrink & Young, *Communications Medicine* 6, 413, 2026, doi:10.1038/s43856-026-01797-y.)
 
+## Post-generation lifecycle evidence contract
+
+Derivation lineage answers **where an artifact came from**; lifecycle evidence answers **what downstream remediation was requested, applied, and independently checked**. These claims must not collapse into a single boolean such as `verified`.
+
+The machine-readable `NeurosemanticArtifactLifecycleReceipt` is schema v3 and uses the explicit progression:
+
+**Requested → Accepted → Processing → Applied → IndependentlyVerified**
+
+with `Rejected` available as a terminal outcome from the pre-application states.
+
+`Applied` requires content-addressed effect evidence. `IndependentlyVerified` additionally requires:
+
+- an explicit verifier/agent reference;
+- separate content-addressed verification evidence;
+- an exact hash of the effect evidence that the verifier inspected;
+- an explicit verification scope (`ArtifactOnly` or `EnumeratedTargetSet`).
+
+For `EnumeratedTargetSet`, the checked target set is itself content-addressed, so an independent verifier can establish exactly which descendant set its verification evidence covered. This is still an evidence binding, not proof that the verifier is trustworthy, that every replica/cache/model descendant was discovered, or that the claimed external effect actually occurred.
+
+The transition checker is intentionally stricter than a status log: it rejects skipped lifecycle stages, predecessor substitution, sequence gaps, state regression, and observation-time rollback. A passing `IndependentlyVerified` receipt therefore means **the verifier evidence is bound to the exact recorded effect evidence and declared scope**; it does not mean “the system is globally safe after deletion.”
+
+This distinction matters for model-derived descendants. Recent clinical-AI research found that machine unlearning can itself increase performance disparities across sensitive subgroups, so a future remediation campaign should carry a separate, preregistered impact-evaluation artifact for relevant models/descendants rather than treating successful erasure evidence as sufficient fairness evidence. (Clifton et al., *Nature Communications* 17, 6009, 2026, doi:10.1038/s41467-026-72601-7.)
+
+The lifecycle receipt should therefore remain the narrow evidence primitive. Model-remediation evaluation belongs in a separate evidence layer that binds the exact pre-remediation and post-remediation model/derivation identities, evaluation split/protocol, subgroup metrics, and observed behavioral changes.
+
 ## Recommended resolution object
 
 The integration layer should expose a machine-readable resolution result containing at minimum:
