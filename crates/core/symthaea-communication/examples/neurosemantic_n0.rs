@@ -671,12 +671,8 @@ fn main() -> Result<(), String> {
             &serde_json::to_vec(&forged).map_err(|e| e.to_string())?,
         ).is_err()
     };
-    let remediation_bound_claim_is_narrow = matches!(
-        remediation_impact.disposition,
-        NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds
-            | NeurosemanticRemediationImpactDisposition::OutsideDeclaredBounds
-            | NeurosemanticRemediationImpactDisposition::Inconclusive
-    );    let derivation_provenance_present =
+    let remediation_bound_claim_is_narrow =
+        remediation_impact.disposition == NeurosemanticRemediationImpactDisposition::Inconclusive;    let derivation_provenance_present =
         !message.packet.data_policy.handling.derivation_provenance_ref.is_empty();
     let derivation_provenance_hash_valid = message
         .packet
