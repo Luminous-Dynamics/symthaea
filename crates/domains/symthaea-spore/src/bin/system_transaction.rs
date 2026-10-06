@@ -101,6 +101,7 @@ pub(crate) enum MutationKind {
     CreateImage,
     RestoreImage,
     PreserveData,
+    ConnectWifi,
 }
 
 impl MutationKind {
@@ -115,6 +116,7 @@ impl MutationKind {
             Self::CreateImage => "create_image",
             Self::RestoreImage => "restore_image",
             Self::PreserveData => "preserve_data",
+            Self::ConnectWifi => "connect_wifi",
         }
     }
 }
@@ -277,6 +279,7 @@ mod tests {
         assert_eq!(MutationKind::CreateImage.as_str(), "create_image");
         assert_eq!(MutationKind::RestoreImage.as_str(), "restore_image");
         assert_eq!(MutationKind::PreserveData.as_str(), "preserve_data");
+        assert_eq!(MutationKind::ConnectWifi.as_str(), "connect_wifi");
     }
 
     #[test]
