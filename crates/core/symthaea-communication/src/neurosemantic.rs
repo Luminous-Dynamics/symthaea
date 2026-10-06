@@ -391,9 +391,12 @@ impl NeurosemanticHandlingPolicy {
         })
     }
 
-    /// Convenience predicate for callers that only need a boolean result.
-    pub fn verify_policy_provenance_bytes(&self, record_bytes: &[u8]) -> bool {
-        self.verify_policy_record_binding_bytes(record_bytes)
+    /// Convenience predicate for callers that only need a boolean record-binding result.
+    pub fn verify_policy_record_binding_bytes(&self, record_bytes: &[u8]) -> bool {
+        self.validates()
+            && record_bytes.len() <= MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            && compute_policy_provenance_hash(&self.policy_provenance_ref, record_bytes)
+                == self.policy_provenance_hash
     }
 
     pub fn allows_destination(&self, destination_jurisdiction: &str) -> bool {
@@ -1535,9 +1538,9 @@ mod tests {
     #[test]
     fn handling_policy_provenance_digest_verifies_exact_record_and_reference() {
         let policy = semantic_policy().handling;
-        assert!(policy.verify_policy_provenance_bytes(b"synthetic-policy-record-1"));
-        assert!(!policy.verify_policy_provenance_bytes(b"synthetic-policy-record-2"));
-        assert!(!policy.verify_policy_provenance_bytes(
+        assert!(policy.verify_policy_record_binding_bytes(b"synthetic-policy-record-1"));
+        assert!(!policy.verify_policy_record_binding_bytes(b"synthetic-policy-record-2"));
+        assert!(!policy.verify_policy_record_binding_bytes(
             &vec![b'x'; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1]
         ));
     }
@@ -1552,19 +1555,37 @@ mod tests {
 
     #[test]
     fn handling_policy_provenance_binding_becomes_stale_after_policy_mutation() {
-        let policy = semantic_policy().handling;
-        let binding = policy
-            .bind_policy_provenance_bytes(b"synthetic-policy-record-1")
-            .unwrap();
+        let policy = semantic_policy();
+        let original_binding = {
+            let (attestation, verifying_key) = authority_attestation(&policy);
+            policy
+                .handling
+                .bind_policy_provenance_with_attestation(
+                    b"synthetic-policy-record-1",
+                    &attestation,
+                    &verifying_key,
+                    150,
+                )
+                .unwrap()
+        };
 
-        let mut mutated = policy;
+        let mut mutated = policy.clone();
         mutated
+            .handling
             .permitted_secondary_uses
             .insert(NeurosemanticSecondaryUse::Research);
 
+        let (fresh_attestation, fresh_key) = authority_attestation(&mutated);
         let fresh_binding = mutated
-            .bind_policy_provenance_bytes(b"synthetic-policy-record-1")
+            .handling
+            .bind_policy_provenance_with_attestation(
+                b"synthetic-policy-record-1",
+                &fresh_attestation,
+                &fresh_key,
+                150,
+            )
             .unwrap();
+
         let mut packet = NeurosemanticPacket::new_with_policy(
             18,
             "peer",
