@@ -1674,6 +1674,7 @@ mod tests {
         NixSystemdUnitDefinitionContentEvidenceV1 {
             unit: "nginx.service".into(),
             source_identity_digest: definition().digest("nginx.service").unwrap(),
+            manager_owner: ":1.123".into(),
             files: definition_content_files(),
             captured_at_monotonic_us: 2_000,
         }
@@ -1832,6 +1833,7 @@ mod tests {
             NixSystemdUnitDefinitionContentEvidenceV1 {
                 unit: "nginx.service".into(),
                 source_identity_digest: definition_identity.digest("nginx.service").unwrap(),
+                manager_owner: ":1.123".into(),
                 files: definition_content_files.clone(),
                 captured_at_monotonic_us: 2_000,
             }
