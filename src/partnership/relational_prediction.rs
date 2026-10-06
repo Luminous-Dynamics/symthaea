@@ -434,6 +434,11 @@ impl PredictionEvidenceRecord {
                 return Err(RelationalPredictionError::InvalidSplit);
             }
         }
+        for pair in self.outcome_times.windows(2) {
+            if pair[1] <= pair[0] {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
         for (feature_time, outcome_time) in
             self.feature_times.iter().zip(&self.outcome_times)
         {
@@ -2550,6 +2555,24 @@ mod tests {
         .unwrap();
 
         evidence.config.test_samples += 1;
+
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_trace_rejects_non_monotonic_outcome_times() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            provenance(),
+        )
+        .unwrap();
+
+        evidence.records[0].outcome_times.swap(0, 1);
 
         assert_eq!(
             evidence.validate(),
