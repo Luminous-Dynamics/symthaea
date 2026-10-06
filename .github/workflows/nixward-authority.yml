@@ -18,6 +18,7 @@ on:
       - "crates/core/nixward/src/action/service_manager.rs"
       - "crates/core/nixward/src/action/service_state.rs"
       - "crates/core/nixward/src/action/post_state.rs"
+      - "crates/core/nixward/src/action/systemd_observer.rs"
       - "crates/core/nixward/src/action/systemd_transport.rs"
       - "scripts/check-nixward-observation-boundary.sh"
       - "scripts/qualify_nixward_authority.sh"
