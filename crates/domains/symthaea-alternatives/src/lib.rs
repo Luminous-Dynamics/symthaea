@@ -3811,6 +3811,11 @@ fn canonical_requirement_hash(requirement: &FunctionalRequirement) -> Result<Str
 fn canonical_candidate_evidence_hash(candidate: &CandidatePathway) -> Result<String, AssessmentError> {
     let mut evidence = candidate.evidence.clone();
     evidence.sort_by(|a, b| a.id.cmp(&b.id));
+    for record in &mut evidence {
+        if let Some(uncertainty) = &mut record.uncertainty {
+            uncertainty.component_refs.sort();
+        }
+    }
     let bytes = serde_json::to_vec(&evidence).map_err(|_| AssessmentError::NonFinite)?;
     let mut hasher = Hasher::new();
     hasher.update(&bytes);
@@ -4386,6 +4391,63 @@ mod tests {
         assert_eq!(
             error,
             AssessmentError::DuplicateMeasurementUncertaintyComponentReference
+        );
+    }
+
+    #[test]
+    fn uncertainty_component_reference_order_is_semantically_canonical() {
+        let mut first = candidate(
+            "component-order",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "component-order-evidence",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut second = first.clone();
+
+        let uncertainty = first.evidence[0].uncertainty.as_mut().unwrap();
+        uncertainty.component_refs = vec![
+            "component-a".into(),
+            "component-b".into(),
+            "component-c".into(),
+        ];
+        uncertainty.component_refs_digest =
+            canonical_string_list_hash(&uncertainty.component_refs).unwrap();
+
+        let uncertainty = second.evidence[0].uncertainty.as_mut().unwrap();
+        uncertainty.component_refs = vec![
+            "component-c".into(),
+            "component-a".into(),
+            "component-b".into(),
+        ];
+        uncertainty.component_refs_digest =
+            canonical_string_list_hash(&vec![
+                "component-a".into(),
+                "component-b".into(),
+                "component-c".into(),
+            ])
+            .unwrap();
+
+        let first_result = AlternativesEngine
+            .assess(&fixture_requirement(), &[first], None)
+            .unwrap();
+        let second_result = AlternativesEngine
+            .assess(&fixture_requirement(), &[second], None)
+            .unwrap();
+
+        assert_eq!(
+            first_result.candidates[0].evidence_digest,
+            second_result.candidates[0].evidence_digest
+        );
+        assert_eq!(
+            first_result.receipt.payload_hash,
+            second_result.receipt.payload_hash
         );
     }
 
@@ -5615,6 +5677,39 @@ mod tests {
             .assess_at(&fixture_requirement(), &[c], None, Some(50))
             .unwrap();
         assert!(!valid.frontier_blockers.contains_key("admission-expired"));
+    }
+
+    #[test]
+    fn uncertainty_component_reference_digest_is_order_independent() {
+        let mut uncertainty = MeasurementUncertaintyRef {
+            uncertainty_id: "u-components".into(),
+            observation_id: "observation".into(),
+            observation_record_digest: "record".into(),
+            statement: MeasurementUncertaintyStatement::Expanded {
+                value: 0.1,
+                unit: "unit".into(),
+                coverage_factor: 2.0,
+            },
+            method_id: "method".into(),
+            measurand_id: "measurand".into(),
+            procedure_id: "procedure".into(),
+            procedure_digest: "procedure-digest".into(),
+            component_refs: vec!["b".into(), "a".into()],
+            component_refs_digest:
+                canonical_string_list_hash(&vec!["a".into(), "b".into()]).unwrap(),
+            record_digest: "digest".into(),
+        };
+
+        uncertainty.validate().unwrap();
+        uncertainty.component_refs_digest =
+            canonical_string_list_hash(&vec!["b".into(), "a".into()]).unwrap();
+        uncertainty.validate().unwrap();
+
+        uncertainty.component_refs_digest = "wrong-digest".into();
+        assert!(matches!(
+            uncertainty.validate().unwrap_err(),
+            AssessmentError::MeasurementUncertaintyComponentRefsDigestMismatch { .. }
+        ));
     }
 
     #[test]
