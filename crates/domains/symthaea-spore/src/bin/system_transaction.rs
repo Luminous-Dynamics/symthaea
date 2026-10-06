@@ -30,6 +30,7 @@ const LEDGER_PATH: &str = "/var/lib/nixforhumanity/system-transactions.jsonl";
 const FINGERPRINT_KEY_PATH: &str =
     "/var/lib/nixforhumanity/system-transaction-fingerprint.key";
 const MAX_JOURNAL_EVENT_BYTES: usize = 64 * 1024;
+const MAX_JOURNAL_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Debug)]
 pub(crate) struct MutationLease {
@@ -451,6 +452,13 @@ impl TransactionLedger {
                 self.path.display()
             ));
         }
+        if metadata.len() > MAX_JOURNAL_BYTES {
+            return Err(format!(
+                "transaction ledger {} exceeds {} byte total limit",
+                self.path.display(),
+                MAX_JOURNAL_BYTES
+            ));
+        }
         {
             use std::os::unix::fs::{MetadataExt, PermissionsExt};
             let mode = metadata.permissions().mode() & 0o777;
@@ -688,6 +696,18 @@ impl TransactionLedger {
                 self.path.display()
             ));
         }
+        if metadata.len()
+            .checked_add(serialized.len() as u64)
+            .and_then(|len| len.checked_add(1))
+            .is_none_or(|len| len > MAX_JOURNAL_BYTES)
+        {
+            return Err(format!(
+                "transaction ledger {} would exceed {} byte total limit",
+                self.path.display(),
+                MAX_JOURNAL_BYTES
+            ));
+        }
+
         {
             use std::os::unix::fs::{MetadataExt, PermissionsExt};
             let mode = metadata.permissions().mode() & 0o777;
@@ -1520,7 +1540,36 @@ mod tests {
     }
 
     #[test]
-    fn ledger_rejects_oversized_event_on_load() {
+    fn ledger_rejects_oversized_total_file_on_load() {
+        let name = random_suffix();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-transaction-ledger-total-oversized-{name}.jsonl"));
+        let file = std::fs::File::create(&path).unwrap();
+        file.set_len(MAX_JOURNAL_BYTES + 1).unwrap();
+        drop(file);
+
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let error = ledger.load().expect_err("oversized total journal must fail closed");
+        assert!(error.contains("total limit"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn ledger_rejects_oversized_total_file_on_load() {
+        let name = random_suffix();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-transaction-ledger-total-oversized-{name}.jsonl"));
+        let file = std::fs::File::create(&path).unwrap();
+        file.set_len(MAX_JOURNAL_BYTES + 1).unwrap();
+        drop(file);
+
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let error = ledger.load().expect_err("oversized total journal must fail closed");
+        assert!(error.contains("total limit"));
+        let _ = std::fs::remove_file(path);
+    }
+
+
         use std::os::unix::fs::PermissionsExt;
 
         let name = random_operation_id().unwrap();
