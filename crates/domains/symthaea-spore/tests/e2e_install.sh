@@ -5,13 +5,13 @@
 #   - QEMU installed (qemu-system-x86_64)
 #   - NixOS ISO (auto-downloads if not present)
 #   - ssh-relay binary built: cargo build -p symthaea-spore --bin ssh-relay --features server --release
-#   - websocat installed (for WebSocket testing)
+#   - Python 3 with the websockets package installed
 #
 # What this tests:
 #   1. Boot NixOS ISO in QEMU with serial console
-#   2. Start ssh-relay on host
-#   3. Connect to relay via WebSocket
-#   4. Authenticate
+#   2. Copy ssh-relay into the VM and start it there
+#   3. Connect to the VM-local relay via a QEMU port forward
+#   4. Authenticate and exercise the typed protocol on one persistent WebSocket
 #   5. Send install command (single-disk layout, 8GB virtual disk)
 #   6. Verify installation completes (COMPLETE marker in output)
 #   7. Verify /mnt/etc/nixos/configuration.nix exists on the VM
@@ -22,7 +22,7 @@
 #
 # NixOS version options:
 #   nixforhumanity  - Custom ISO with relay pre-installed (default, recommended)
-#   25.05           - NixOS 25.05 stable minimal
+#   26.05           - NixOS 26.05 stable minimal
 #   unstable        - NixOS unstable minimal
 #   <path>          - Use a specific ISO file
 
@@ -37,6 +37,7 @@ RELAY_PORT=8405  # Dev/test port range
 RELAY_TOKEN=""
 QEMU_PID=""
 RELAY_PID=""
+REMOTE_RELAY=false
 KEEP_VM=false
 PASS=0
 FAIL=0
@@ -58,9 +59,9 @@ if [[ -z "$NIXOS_ISO" ]]; then
             NIXOS_ISO="/tmp/nixos-minimal-26.05pre-git-x86_64-linux.iso"
             ISO_URL="https://github.com/Luminous-Dynamics/nixforhumanity/releases/download/v0.1.0/nixos-minimal-26.05pre-git-x86_64-linux.iso"
             ;;
-        25.05)
-            NIXOS_ISO="/tmp/nixos-25.05-minimal.iso"
-            ISO_URL="https://channels.nixos.org/nixos-25.05/latest-nixos-minimal-x86_64-linux.iso"
+        26.05)
+            NIXOS_ISO="/tmp/nixos-26.05-minimal.iso"
+            ISO_URL="https://channels.nixos.org/nixos-26.05/latest-nixos-minimal-x86_64-linux.iso"
             ;;
         unstable)
             NIXOS_ISO="/tmp/nixos-unstable-minimal.iso"
@@ -88,6 +89,11 @@ echo "Using ISO: $NIXOS_ISO ($NIXOS_VERSION)"
 cleanup() {
     echo "Cleaning up..."
     [[ -n "$RELAY_PID" ]] && kill "$RELAY_PID" 2>/dev/null || true
+    if [[ "$REMOTE_RELAY" == true ]]; then
+        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -p 2222 root@localhost "pkill -f '/tmp/e2e-ssh-relay' || true; rm -f /tmp/e2e-ssh-relay /tmp/e2e-relay.log" \
+            2>/dev/null || true
+    fi
     if [[ "$KEEP_VM" == false && -n "$QEMU_PID" ]]; then
         kill "$QEMU_PID" 2>/dev/null || true
         rm -f "$DISK_IMG"
@@ -139,7 +145,7 @@ qemu-system-x86_64 \
     -enable-kvm \
     -cdrom "$NIXOS_ISO" \
     -drive file="$DISK_IMG",format=qcow2,if=virtio \
-    -net nic -net user,hostfwd=tcp::2222-:22 \
+    -net nic -net user,hostfwd=tcp::2222-:22,hostfwd=tcp::8405-:8405 \
     -nographic \
     -serial mon:stdio \
     &> /tmp/e2e-qemu.log &
@@ -156,60 +162,118 @@ ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
     -p 2222 root@localhost "systemctl start sshd && echo SSH_OK" 2>/dev/null || \
     echo "  (SSH may already be running)"
 
-# ── Step 3: Start relay ──
-echo "Starting ssh-relay..."
-$RELAY_BIN --port $RELAY_PORT --bind 127.0.0.1 &> /tmp/e2e-relay.log &
-RELAY_PID=$!
-sleep 2
+# ── Step 3: Start relay inside the VM ──
+echo "Installing test relay into the VM..."
+scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    "$RELAY_BIN" root@localhost:/tmp/e2e-ssh-relay >/dev/null
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    -p 2222 root@localhost \
+    "chmod 700 /tmp/e2e-ssh-relay && rm -f /tmp/e2e-relay.log && \
+     nohup /tmp/e2e-ssh-relay --port $RELAY_PORT --bind 0.0.0.0 >/tmp/e2e-relay.log 2>&1 &"
+REMOTE_RELAY=true
 
-# Extract token from relay log
-RELAY_TOKEN=$(grep -oP 'Token: \K\S+' /tmp/e2e-relay.log || echo "")
+echo "Waiting for VM-local relay token..."
+for _ in $(seq 1 30); do
+    TOKEN_LINE=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        -p 2222 root@localhost "grep -oE 'Token: [^[:space:]]+' /tmp/e2e-relay.log | tail -1" 2>/dev/null || true)
+    if [[ -n "$TOKEN_LINE" ]]; then
+        RELAY_TOKEN="\${TOKEN_LINE#Token: }"
+        break
+    fi
+    sleep 1
+done
 if [[ -z "$RELAY_TOKEN" ]]; then
-    echo "ERROR: Could not extract relay token from log"
-    cat /tmp/e2e-relay.log
+    echo "ERROR: VM-local relay did not publish an auth token"
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        -p 2222 root@localhost "cat /tmp/e2e-relay.log" 2>/dev/null || true
     exit 1
 fi
-echo "  Relay token: ${RELAY_TOKEN:0:8}..."
+echo "  VM relay token: \${RELAY_TOKEN:0:8}..."
 
-# ── Step 4: Test authentication ──
-echo "Testing relay authentication..."
-AUTH_RESP=$(echo "{\"action\":\"auth\",\"token\":\"$RELAY_TOKEN\",\"ssh_host\":\"127.0.0.1\",\"ssh_port\":2222,\"ssh_user\":\"root\",\"ssh_password\":\"\"}" | \
-    timeout 10 websocat -n1 "ws://127.0.0.1:$RELAY_PORT" 2>/dev/null || echo "TIMEOUT")
-assert "Relay accepts valid token" echo "$AUTH_RESP" | grep -q '"ok"'
+# ── Step 4-7: Persistent authenticated protocol + install ──
+echo "Exercising authenticated install protocol against the VM-local relay..."
+RELAY_TOKEN="$RELAY_TOKEN" RELAY_PORT="$RELAY_PORT" python3 - <<'PYEOF'
+import asyncio
+import json
+import os
 
-# ── Step 5: Test hardware probe ──
-echo "Testing hardware probe..."
-PROBE_RESP=$(echo "{\"action\":\"probe_hardware\"}" | \
-    timeout 15 websocat -n1 "ws://127.0.0.1:$RELAY_PORT" 2>/dev/null || echo "TIMEOUT")
-assert "Hardware probe returns disks" echo "$PROBE_RESP" | grep -q "disk\|vd\|sd"
+import websockets
 
-# ── Step 6: Test install (dry run) ──
-echo "Testing install command (single layout on /dev/vda)..."
-# NOTE: This is a real install on the virtual disk — it will partition and format it.
-# Only safe because it targets the ephemeral QEMU disk.
-INSTALL_CMD="{\"action\":\"install\",\"layout\":\"single\",\"disk\":\"/dev/vda\",\"hostname\":\"e2e-test\",\"timezone\":\"UTC\",\"keyboard\":\"us\",\"desktop\":\"none\",\"gpu_driver\":\"auto\"}"
-# Stream install output for up to 10 minutes
-echo "$INSTALL_CMD" | timeout 600 websocat "ws://127.0.0.1:$RELAY_PORT" 2>/dev/null | tee /tmp/e2e-install.log &
-INSTALL_PID=$!
+TOKEN = os.environ["RELAY_TOKEN"]
+PORT = int(os.environ["RELAY_PORT"])
 
-# Wait for completion
-echo "  Waiting for install to complete (up to 10 min)..."
-COMPLETE=false
-for i in $(seq 1 120); do
-    sleep 5
-    if grep -q "COMPLETE" /tmp/e2e-install.log 2>/dev/null; then
-        COMPLETE=true
-        break
-    fi
-    if ! kill -0 $INSTALL_PID 2>/dev/null; then
-        break
-    fi
-done
-kill $INSTALL_PID 2>/dev/null || true
+async def recv(ws, expected=None, timeout=30):
+    while True:
+        msg = json.loads(await asyncio.wait_for(ws.recv(), timeout), strict=False)
+        message_type = msg.get("type")
+        if message_type in ("output", "progress"):
+            print(f"  [relay] {message_type}: {msg.get('data') or msg.get('stage')}")
+        if expected is None or message_type == expected:
+            return msg
 
-assert "Install completed successfully" [[ "$COMPLETE" == "true" ]]
+async def main():
+    uri = f"ws://127.0.0.1:{PORT}"
+    async with websockets.connect(
+        uri,
+        ping_timeout=60,
+        ping_interval=20,
+        close_timeout=10,
+    ) as ws:
+        await ws.send(json.dumps({"action": "auth", "token": TOKEN}))
+        auth = await recv(ws)
+        if auth.get("type") not in ("authenticated", "authed"):
+            raise AssertionError(f"auth failed: {auth}")
 
-# ── Step 7: Verify config exists ──
+        await ws.send(json.dumps({
+            "action": "connect",
+            "host": "127.0.0.1",
+            "port": 22,
+            "username": "root",
+            "password": "",
+        }))
+        connected = await recv(ws, "connected")
+        if connected.get("type") != "connected":
+            raise AssertionError(f"connect failed: {connected}")
+
+        await ws.send(json.dumps({"action": "probe_hardware"}))
+        probe = await recv(ws, "hardware_probe", timeout=60)
+        hw = json.loads(probe["data"], strict=False)
+        if hw.get("arch") not in ("x86_64", "aarch64", "armv7l"):
+            raise AssertionError(f"unexpected target architecture: {hw!r}")
+        print(f"  [probe] target architecture: {hw.get('arch')}")
+
+        await ws.send(json.dumps({"action": "discover_disks"}))
+        disks_msg = await recv(ws, "disks", timeout=30)
+        disks = json.loads(disks_msg["data"], strict=False)
+        names = {d["name"] for d in disks}
+        if "vda" not in names:
+            raise AssertionError(f"/dev/vda missing from disk inventory: {names}")
+        print("  [disks] ephemeral /dev/vda present")
+
+        await ws.send(json.dumps({
+            "action": "install",
+            "layout": "single",
+            "disk": "/dev/vda",
+            "hostname": "e2e-test",
+            "timezone": "UTC",
+            "keyboard": "us",
+            "desktop": "none",
+            "gpu_driver": "auto",
+        }))
+
+        complete = False
+        while True:
+            msg = await recv(ws, timeout=900)
+            if msg.get("type") == "output" and "COMPLETE" in msg.get("data", ""):
+                complete = True
+            if msg.get("type") == "exit":
+                if msg.get("code") != 0 or not complete:
+                    raise AssertionError(f"install did not complete cleanly: {msg}")
+                break
+
+asyncio.run(main())
+PYEOF
+
 echo "Verifying configuration..."
 CONFIG_CHECK=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
     -p 2222 root@localhost "cat /mnt/etc/nixos/configuration.nix 2>/dev/null | head -3" 2>/dev/null || echo "MISSING")
