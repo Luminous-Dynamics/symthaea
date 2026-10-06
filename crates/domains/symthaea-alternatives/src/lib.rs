@@ -5270,6 +5270,38 @@ mod tests {
     }
 
     #[test]
+    fn measurement_uncertainty_probability_distribution_digest_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-distribution-digest",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "distribution-digest",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .probability_distribution_digest = "different-distribution-digest".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBindingDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
     fn measurement_uncertainty_combination_method_digest_mutation_fails_closed() {
         let c = candidate(
             "uncertainty-combination-digest",
@@ -5310,6 +5342,19 @@ mod tests {
             error,
             AssessmentError::InvalidMeasurementUncertaintyEvaluation
         ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_standard_allows_no_coverage_method_provenance() {
+        let mut uncertainty = test_uncertainty(&["component"]);
+        uncertainty.statement = MeasurementUncertaintyStatement::Standard {
+            value: 0.05,
+            unit: "unit".into(),
+        };
+        uncertainty.evaluation.coverage_method = None;
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
+        assert!(uncertainty.validate().is_ok());
     }
 
     #[test]
