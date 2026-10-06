@@ -98,33 +98,6 @@ fn capture_service_definition_content(
         .map_err(|_| "definition-capture worker panicked".to_string())?
 }
 
-fn parse_service_pre_state_identity(
-    identity: &str,
-    expected_generation: u64,
-    expected_unit: &str,
-) -> Result<String, String> {
-    let prefix = "nixward-service-pre-state-v1|generation=";
-    let rest = identity
-        .strip_prefix(prefix)
-        .ok_or_else(|| "invalid service pre-state identity prefix".to_string())?;
-    let (generation, rest) = rest
-        .split_once("|unit=")
-        .ok_or_else(|| "invalid service pre-state identity generation/unit separator".to_string())?;
-    let generation = generation
-        .parse::<u64>()
-        .map_err(|_| "invalid service pre-state generation".to_string())?;
-    let (unit, state_digest) = rest
-        .split_once("|state=")
-        .ok_or_else(|| "invalid service pre-state identity unit/state separator".to_string())?;
-    if generation != expected_generation || unit != expected_unit {
-        return Err("service pre-state identity does not match generation/unit".to_string());
-    }
-    if state_digest.len() != 64 || !state_digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return Err("service pre-state identity contains invalid state digest".to_string());
-    }
-    Ok(state_digest.to_string())
-}
-
 fn bind_service_definition_content(
     intent: NixActionIntentV1,
     generation: u64,
@@ -135,34 +108,13 @@ fn bind_service_definition_content(
     ),
     String,
 > {
-    let NixActionDescriptorV1::Service { operation, unit } = &intent.action else {
+    let NixActionDescriptorV1::Service { unit, .. } = &intent.action else {
         return Ok((intent, None));
     };
-    let pre_state_identity = intent
-        .pre_state_identity
-        .as_deref()
-        .ok_or_else(|| "Service intent has no exact pre-state identity".to_string())?;
-    let pre_state_digest =
-        parse_service_pre_state_identity(pre_state_identity, generation, unit)?;
     let content = capture_service_definition_content(unit)?;
-    let context = NixServiceEffectContextV1::new(
-        *operation,
-        unit.clone(),
-        generation,
-        pre_state_digest,
-        content
-            .as_ref()
-            .definition_identity
-            .digest(unit)
-            .map_err(|error| error.to_string())?,
-        content.digest().map_err(|error| error.to_string())?,
-        None,
-        0,
-    )
-    .map_err(|error| format!("could not construct service-effect context: {error}"))?;
     let intent = intent
-        .with_service_effect_context(context)
-        .map_err(|error| format!("could not bind service-effect context: {error}"))?;
+        .with_verified_service_definition_content(generation, &content)
+        .map_err(|error| format!("could not bind service definition content: {error}"))?;
     Ok((intent, Some(content)))
 }
 
