@@ -91,8 +91,10 @@ native = ["nix", "rusqlite", "tree-sitter", "tree-sitter-nix", "tokio", "getrand
 cli = ["clap", "clap_complete", "native"]
 tui = ["crossterm", "ratatui", "cli"]
 daemon = ["tokio/full", "native"]
-systemd = ["systemd-observer", "libsystemd"]
+systemd = ["systemd-observer", "systemd-mutation", "libsystemd"]
 # Read-only D-Bus observer capability. No libsystemd C dependency is required.
 systemd-observer = ["zbus", "native"]
+# Typed lifecycle mutation transport. This is transport-only, not authorization.
+systemd-mutation = ["zbus", "native"]
 observability = ["tracing-subscriber", "metrics", "metrics-exporter-prometheus", "hyper", "hyper-util", "http-body-util", "daemon"]
 full = ["cli", "tui", "daemon", "systemd"]
