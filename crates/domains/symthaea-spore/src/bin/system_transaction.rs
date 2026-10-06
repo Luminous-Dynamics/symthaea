@@ -98,6 +98,8 @@ pub(crate) enum MutationKind {
     ServiceAction,
     GcCollect,
     WriteConfig,
+    CreateImage,
+    RestoreImage,
 }
 
 impl MutationKind {
@@ -109,6 +111,8 @@ impl MutationKind {
             Self::ServiceAction => "service_action",
             Self::GcCollect => "gc_collect",
             Self::WriteConfig => "write_config",
+            Self::CreateImage => "create_image",
+            Self::RestoreImage => "restore_image",
         }
     }
 }
@@ -268,6 +272,8 @@ mod tests {
     fn mutation_names_are_stable() {
         assert_eq!(MutationKind::Install.as_str(), "install");
         assert_eq!(MutationKind::WriteConfig.as_str(), "write_config");
+        assert_eq!(MutationKind::CreateImage.as_str(), "create_image");
+        assert_eq!(MutationKind::RestoreImage.as_str(), "restore_image");
     }
 
     #[test]
