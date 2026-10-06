@@ -26,7 +26,7 @@ pub mod corpus;
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 28;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v39";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v40";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -1862,10 +1862,15 @@ impl ExperimentalDiscriminationTarget {
                 .comparison_scales
                 .get(dimension)
                 .map(|scale| (scale.unit.as_str(), scale.scope.as_str(), &scale.basis)),
-            ExperimentalDiscriminationSurface::PerformanceMetric(metric) => requirement
-                .performance_scales
-                .get(metric)
-                .map(|scale| (scale.unit.as_str(), scale.scope.as_str(), &scale.basis)),
+            ExperimentalDiscriminationSurface::PerformanceMetric(metric)
+                if requirement.constraints.contains_key(metric) =>
+            {
+                requirement
+                    .performance_scales
+                    .get(metric)
+                    .map(|scale| (scale.unit.as_str(), scale.scope.as_str(), &scale.basis))
+            }
+            ExperimentalDiscriminationSurface::PerformanceMetric(_) => None,
             ExperimentalDiscriminationSurface::OperatingCondition(condition) => requirement
                 .operating_envelope
                 .get(condition)
