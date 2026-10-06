@@ -197,7 +197,9 @@ The implementation deliberately avoids one aggregate unlearning score. A passing
 
 The evaluation population is itself first-class evidence. `NeurosemanticRemediationEvaluationSetManifest` separately identifies a `Forget` set and `Retain` set, each with a source-dataset manifest hash and unique bounded member artifact identities. The verifier rejects role substitution and any overlap between the forget and retain sets. Membership fingerprints are canonicalized so harmless member reordering does not create a different population identity.
 
-Evaluation methodology is also content-addressed. `NeurosemanticRemediationEvaluationMethod` identifies the recovery-attack method and representation-residual probe method, binds each to the exact study protocol hash, and requires the method implementation revision to match the impact artifact execution revision.
+`NeurosemanticRemediationEvaluationManifest` then acts as the canonical study identity. It binds the source dataset manifest, forget-set identity, retain-set identity, study protocol, evaluation split, recovery-attack method, and representation-residual probe method into one content-addressed object. The impact artifact binds this manifest fingerprint, preventing an evaluator from mixing a valid result from one evaluation design with population or methodology identities from another.
+
+Evaluation methodology is also content-addressed. `NeurosemanticRemediationEvaluationMethod` identifies the recovery-attack method and representation-residual probe method, binds each to the exact study protocol hash, and requires the method implementation revision to match the impact artifact execution revision. Concrete method-byte verification is therefore distinct from merely recording a method name.
 
 The impact artifact keeps `RecoveryRisk` and `RepresentationResidual` as separate evidence kinds. This is intentional: recovery robustness and residual internal representation leakage answer related but distinct questions. A future N1 bundle should report them separately rather than allowing a single residual-risk score to conceal which failure modes were actually tested.
 
