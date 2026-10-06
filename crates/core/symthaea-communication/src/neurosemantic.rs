@@ -280,10 +280,9 @@ impl NeurosemanticPolicyAuthorityAttestation {
             .map_err(|_| "neurosemantic authority signature verification failed".to_string())
     }
 
+    /// Fingerprint the exact serialized authority proof artifact, including its signature.
     pub fn fingerprint_for_attestation(&self) -> Result<String, String> {
-        let mut canonical = self.clone();
-        canonical.signature.clear();
-        let bytes = serde_json::to_vec(&canonical)
+        let bytes = serde_json::to_vec(self)
             .map_err(|error| format!("authority attestation serialization: {error}"))?;
         Ok(content_hash(&bytes))
     }
@@ -386,7 +385,7 @@ impl NeurosemanticHandlingPolicy {
             handling_policy_fingerprint: policy_fingerprint,
             authority_ref: attestation.authority_ref.clone(),
             key_ref: attestation.key_ref.clone(),
-            attestation_fingerprint: attestation.fingerprint()?,
+            attestation_fingerprint: attestation.fingerprint_for_attestation()?,
             attestation_expires_at_unix_s: attestation.expires_at_unix_s,
         })
     }
@@ -1362,6 +1361,27 @@ mod tests {
 
         let oversized = vec![b' '; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1];
         assert!(NeurosemanticPolicyAuthorityAttestation::from_json_bytes(&oversized).is_err());
+    }
+
+    #[test]
+    fn authority_attestation_fingerprint_binds_exact_signature() {
+        let policy = semantic_policy();
+        let (attestation, verifying_key) = authority_attestation(&policy);
+        let fingerprint = attestation.fingerprint_for_attestation().unwrap();
+        let mut tampered = attestation.clone();
+        tampered.signature[0] ^= 0x01;
+        assert_ne!(
+            tampered.fingerprint_for_attestation().unwrap(),
+            fingerprint
+        );
+        assert!(tampered
+            .verify(
+                &policy.handling.fingerprint_for_attestation().unwrap(),
+                &policy.handling.policy_provenance_hash,
+                &verifying_key,
+                150
+            )
+            .is_err());
     }
 
     #[test]
