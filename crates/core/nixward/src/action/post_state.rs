@@ -874,6 +874,7 @@ impl NixPostStateReceiptV1 {
             &self.target_unit,
             self.authorized_generation,
             &self.authorized_definition_digest,
+            &self.authorized_definition_content_digest,
             self.pre_invocation_id.as_deref(),
             self.required_stability_us,
         );
@@ -896,6 +897,17 @@ impl NixPostStateReceiptV1 {
             || self.authorized_definition_digest != self.observed_definition_digest
         {
             return Err(NixPostStateErrorV1::DefinitionMismatch);
+        }
+        validate_digest(
+            &self.authorized_definition_content_digest,
+            "authorized definition content digest",
+        )?;
+        validate_digest(
+            &self.observed_definition_content_digest,
+            "observed definition content digest",
+        )?;
+        if self.authorized_definition_content_digest != self.observed_definition_content_digest {
+            return Err(NixPostStateErrorV1::DefinitionContentMismatch);
         }
         if self.authorized_generation != self.observed_generation {
             return Err(NixPostStateErrorV1::GenerationMismatch);
@@ -1035,7 +1047,9 @@ impl NixPostStateReceiptV1 {
         put_u64(&mut h, self.authorized_generation);
         put_u64(&mut h, self.observed_generation);
         put_str(&mut h, &self.authorized_definition_digest);
+        put_str(&mut h, &self.authorized_definition_content_digest);
         put_str(&mut h, &self.observed_definition_digest);
+        put_str(&mut h, &self.observed_definition_content_digest);
         put_str(&mut h, &self.observed_definition_identity.fragment_path);
         put_str_vec(&mut h, &self.observed_definition_identity.drop_in_paths);
         put_u8(&mut h, operation_tag(self.operation));
@@ -1229,6 +1243,7 @@ fn service_effect_digest(
     unit: &str,
     authorized_generation: u64,
     authorized_definition_digest: &str,
+    authorized_definition_content_digest: &str,
     pre_invocation_id: Option<&str>,
     required_stability_us: u64,
 ) -> String {
@@ -1238,6 +1253,7 @@ fn service_effect_digest(
     put_str(&mut h, unit);
     put_u64(&mut h, authorized_generation);
     put_str(&mut h, authorized_definition_digest);
+    put_str(&mut h, authorized_definition_content_digest);
     put_opt_str(&mut h, pre_invocation_id);
     put_u64(&mut h, required_stability_us);
     h.finalize().to_hex().to_string()
@@ -1527,6 +1543,8 @@ pub enum NixPostStateErrorV1 {
     GenerationMismatch,
     #[error("observed systemd unit-definition identity does not match authorization")]
     DefinitionMismatch,
+    #[error("observed definition content does not match the authorization-bound commitment")]
+    DefinitionContentMismatch,
     #[error("systemd manager incarnation is missing")]
     MissingManagerOwner,
     #[error("systemd manager incarnation does not match the observation/job binding")]
