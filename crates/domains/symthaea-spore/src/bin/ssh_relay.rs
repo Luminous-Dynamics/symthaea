@@ -5648,13 +5648,21 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                 let previous_generation = match current_system_generation().await {
                     Ok(generation) => generation,
                     Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!(
-                                    "Unable to establish rollback pre-state: {}",
-                                    error
-                                ))
-                                .to_json(),
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Rollback pre-state unavailable: {}", error),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
                             ))
                             .await;
                         continue;
@@ -5700,9 +5708,21 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                         let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":protocol_exit_code(r.exit_status, outcome),"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!("Rollback failed: {}", e)).to_json(),
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Rollback execution could not be observed: {}", e),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
                             ))
                             .await;
                     }
@@ -5795,9 +5815,21 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                         let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":protocol_exit_code(r.exit_status, outcome),"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!("Switch failed: {}", e)).to_json(),
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Generation switch execution could not be observed: {}", e),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
                             ))
                             .await;
                     }
@@ -5927,9 +5959,21 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                         }).to_string())).await;
                     }
                     Err(e) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!("Failed: {}", e)).to_json(),
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Service action execution could not be observed: {}", e),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
                             ))
                             .await;
                     }
