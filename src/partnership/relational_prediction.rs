@@ -687,7 +687,7 @@ fn validate_rolling_config(
 pub enum PredictionNullFamily {
     /// Shift the relational bundle together inside train and test partitions.
     CircularShift,
-    /// Shift each relational channel by a distinct offset inside each partition.
+    /// Shift relational channels by channel-specific non-zero offsets inside each partition.
     FeatureDecoupling,
     /// Keep synchrony and all non-relational context fixed while shifting only
     /// the incremental directionality/turn-taking channels.
