@@ -95,12 +95,14 @@ impl NixEpisodicMemory {
         true
     }
 
-    /// Record from components (convenience method).
-    #[cfg(feature = "native")]
-    pub fn record_transition(
+    /// Record an episode using a non-executable action label.
+    ///
+    /// This is intentionally separate from `record_transition`: bookkeeping
+    /// labels must never be represented as executable NixOS commands.
+    pub fn record_action_label(
         &mut self,
         state_before: ContinuousHV,
-        action: &NixOSCommand,
+        action_label: &str,
         state_after: ContinuousHV,
         outcome: EpisodeOutcome,
         phi: f64,
@@ -115,7 +117,7 @@ impl NixEpisodicMemory {
 
         let episode = SystemEpisode {
             state_before,
-            action: format!("{action:?}"),
+            action: action_label.to_string(),
             state_after,
             outcome,
             phi_at_encoding: phi,
@@ -125,6 +127,27 @@ impl NixEpisodicMemory {
         };
 
         self.record(episode)
+    }
+
+    /// Record from components (convenience method).
+    #[cfg(feature = "native")]
+    pub fn record_transition(
+        &mut self,
+        state_before: ContinuousHV,
+        action: &NixOSCommand,
+        state_after: ContinuousHV,
+        outcome: EpisodeOutcome,
+        phi: f64,
+        prediction_error: f64,
+    ) -> bool {
+        self.record_action_label(
+            state_before,
+            &format!("{action:?}"),
+            state_after,
+            outcome,
+            phi,
+            prediction_error,
+        )
     }
 
     /// Retrieve episodes similar to a query state.
@@ -324,6 +347,23 @@ mod tests {
         let high_phi = make_episode(2, EpisodeOutcome::Success, 0.8);
         assert!(mem.record(high_phi));
         assert_eq!(mem.len(), 1);
+    }
+
+    #[test]
+    fn test_record_action_label_stores_non_executable_category() {
+        let mut mem = NixEpisodicMemory::new();
+        let stored = mem.record_action_label(
+            make_hv(11),
+            "ConfigureUnknown",
+            make_hv(12),
+            EpisodeOutcome::Success,
+            0.8,
+            0.2,
+        );
+        assert!(stored);
+        assert_eq!(mem.len(), 1);
+        assert_eq!(mem.retrieve_by_action("ConfigureUnknown").len(), 1);
+        assert_eq!(mem.retrieve_by_action("NixOSCommand::Custom").len(), 0);
     }
 
     #[test]
