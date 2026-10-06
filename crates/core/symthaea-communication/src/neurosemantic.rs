@@ -638,6 +638,9 @@ impl NeurosemanticHandlingPolicy {
             resolution_verifying_key,
             now_unix_s,
         )?;
+        if resolution.checked_at_unix_s < attestation.issued_at_unix_s {
+            return Err("neurosemantic authority resolution predates its authority attestation".into());
+        }
         if resolution.expires_at_unix_s > attestation.expires_at_unix_s {
             return Err("neurosemantic authority resolution outlives its authority attestation".into());
         }
@@ -1958,6 +1961,35 @@ mod tests {
             authority_resolution(&policy, &attestation, &context, 100, 2_000);
         resolution.resolver_ref.clear();
         assert!(resolution.message_bytes().is_err());
+    }
+
+    #[test]
+    fn authority_resolution_cannot_predate_authority_attestation() {
+        let policy = semantic_policy();
+        let (attestation, authority_key) = authority_attestation(&policy);
+        let context = binding_context();
+        let (mut resolution, resolver_key) =
+            authority_resolution(&policy, &attestation, &context, 50, 1_900);
+        let resolver_signing_key = ed25519_dalek::SigningKey::from_bytes(&[9u8; 32]);
+        resolution.signature = ed25519_dalek::Signer::sign(
+            &resolver_signing_key,
+            &resolution.message_bytes().unwrap(),
+        )
+        .to_bytes()
+        .to_vec();
+
+        assert!(policy
+            .handling
+            .bind_policy_provenance_with_attestation_and_resolution(
+                b"synthetic-policy-record-1",
+                &attestation,
+                &authority_key,
+                &resolution,
+                &resolver_key,
+                &context,
+                150,
+            )
+            .is_err());
     }
 
     #[test]
