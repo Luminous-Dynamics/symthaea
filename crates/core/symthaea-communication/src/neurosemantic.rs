@@ -1636,7 +1636,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_data_policy_schema_is_rejected_by_v3_validator() {
+    fn legacy_data_policy_schema_is_rejected_by_v6_validator() {
         let policy = semantic_policy();
         let mut value = serde_json::to_value(&policy).unwrap();
         value
@@ -2169,6 +2169,18 @@ mod tests {
     }
 
     #[test]
+    fn handling_policy_freshness_bound_is_machine_enforced() {
+        let mut policy = semantic_policy().handling;
+        assert!(policy.validates());
+        policy.max_authority_resolution_age_s = 0;
+        assert!(!policy.validates());
+        policy.max_authority_resolution_age_s = MAX_NEUROSEMANTIC_AUTHORITY_RESOLUTION_TTL_S + 1;
+        assert!(!policy.validates());
+        policy.max_authority_resolution_age_s = 1;
+        assert!(policy.validates());
+    }
+
+    #[test]
     fn handling_policy_defaults_to_deny() {
         let policy = NeurosemanticHandlingPolicy::default();
         assert!(!policy.validates());
@@ -2193,6 +2205,7 @@ mod tests {
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
             permitted_secondary_uses: BTreeSet::new(),
             retention: NeurosemanticRetentionPolicy::Ephemeral,
+            max_authority_resolution_age_s: 300,
         };
         assert!(!policy.validates());
         policy.policy_provenance_ref = "synthetic-policy-record-1".into();
@@ -2209,6 +2222,7 @@ mod tests {
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
             permitted_secondary_uses: BTreeSet::new(),
             retention: NeurosemanticRetentionPolicy::Ephemeral,
+            max_authority_resolution_age_s: 300,
         };
         assert!(!policy.validates());
         policy.policy_provenance_hash = compute_policy_provenance_hash(
@@ -2327,6 +2341,7 @@ mod tests {
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
             permitted_secondary_uses: BTreeSet::new(),
             retention: NeurosemanticRetentionPolicy::Ephemeral,
+            max_authority_resolution_age_s: 300,
         };
         assert!(!policy.validates());
         policy.policy_provenance_ref = "synthetic-policy-record-1".into();
@@ -2346,6 +2361,7 @@ mod tests {
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into(), "GB".into()]),
             permitted_secondary_uses: BTreeSet::from([NeurosemanticSecondaryUse::Research]),
             retention: NeurosemanticRetentionPolicy::UntilUnixS(200),
+            max_authority_resolution_age_s: 300,
         };
         assert!(policy.validates());
         assert!(policy.allows_destination("GB"));
@@ -2375,6 +2391,7 @@ mod tests {
             permitted_destination_jurisdictions: BTreeSet::from(["za".into()]),
             permitted_secondary_uses: BTreeSet::new(),
             retention: NeurosemanticRetentionPolicy::Ephemeral,
+            max_authority_resolution_age_s: 300,
         };
         assert!(!policy.validates());
         policy.origin_jurisdiction = "ZA".into();
