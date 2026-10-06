@@ -5301,6 +5301,7 @@ fn validate_native_authority_pin_set(
             let mut connection = self.connection()?;
             let tx = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
             let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
+            self.validate_persisted_native_replay_history(&tx, record)?;
             if matches!(persisted_state.as_str(), "succeeded" | "failed") {
                 if let Some(receipt) =
                     load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")?
