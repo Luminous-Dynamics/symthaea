@@ -32,6 +32,7 @@ AUTHORITY_FILES=(
   crates/core/nixward/src/action/local_approval_submission.rs
   crates/core/nixward/src/action/service_domain.rs
   crates/core/nixward/src/action/service_state.rs
+  crates/core/nixward/src/action/service_effect.rs
   crates/core/nixward/src/action/systemd_observer.rs
   crates/core/nixward/src/action/systemd_transport.rs
   crates/core/nixward/src/action/temporal.rs
@@ -57,6 +58,7 @@ SYSTEMD_OBSERVER_MUTATION_CALL_PATTERN='(?:\.call|\.call_method|\.call_noreply)\
 SYSTEMD_OBSERVER_PROXY_MUTATION_PATTERN='\.set_property\(|\.set\(|\.into_inner\(\)|\.inner(?:_mut)?\(\)'
 SYSTEMD_OBSERVER_AUTHORITY_IMPORT_PATTERN='\bsuper::(?:executor|authorization|systemd_mutation)\b'
 VERIFIED_STABILITY_FACTORY_PATTERN='\bNixVerifiedPostStateStabilityEvidenceV1::from_observer[[:space:]]*\('
+VERIFIED_DEFINITION_CONTENT_FACTORY_PATTERN='\bNixVerifiedServiceDefinitionContentV1::from_observer[[:space:]]*\('
 SYSTEMD_TRANSPORT_PUBLIC_API_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(observe_service_properties|observe_service_state_properties)[[:space:]]*\('
 
 scan_diagnostic_boundary() {
@@ -102,6 +104,11 @@ scan_systemd_observer_proxy_mutation() {
 scan_verified_stability_factory() {
   local file="$1"
   rg -n --pcre2 "${VERIFIED_STABILITY_FACTORY_PATTERN}" "$file"
+}
+
+scan_verified_definition_content_factory() {
+  local file="$1"
+  rg -n --pcre2 "${VERIFIED_DEFINITION_CONTENT_FACTORY_PATTERN}" "$file"
 }
 
 scan_public_systemd_transport_api() {
@@ -251,6 +258,17 @@ run_boundary_check() {
     [[ "${file}" == "crates/core/nixward/src/action/systemd_observer.rs" ]] && continue
     if matches="$(scan_verified_stability_factory "${ROOT}/${file}")"; then
       echo "ERROR: stability sealing factory crossed its observer-only boundary: ${file}" >&2
+      echo "${matches}" >&2
+      failed=1
+    fi
+  done
+
+  # CROSS-068: only the read-only observer may mint the observer-sealed
+  # definition-content token. Other authority modules must not manufacture provenance.
+  for file in "${AUTHORITY_FILES[@]}"; do
+    [[ "${file}" == "crates/core/nixward/src/action/systemd_observer.rs" ]] && continue
+    if matches="$(scan_verified_definition_content_factory "${ROOT}/${file}")"; then
+      echo "ERROR: definition-content sealing factory crossed its observer-only boundary: ${file}" >&2
       echo "${matches}" >&2
       failed=1
     fi
