@@ -343,6 +343,29 @@ impl PredictionEvidenceRecord {
             return Err(RelationalPredictionError::InvalidSplit);
         }
 
+        if let Some(coefficients) = &self.fit_coefficients {
+            if coefficients.len() != self.feature_means.len() + 1
+                || coefficients.len() != self.feature_scales.len() + 1
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        } else if !self.feature_means.is_empty() || !self.feature_scales.is_empty() {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        for pair in self.feature_times.windows(2) {
+            if pair[1] <= pair[0] {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+        for (feature_time, outcome_time) in
+            self.feature_times.iter().zip(&self.outcome_times)
+        {
+            if *outcome_time <= *feature_time {
+                return Err(RelationalPredictionError::OutcomeNotAfterFeatures);
+            }
+        }
+
         let mut absolute_error = 0.0;
         let mut squared_error = 0.0;
         for (prediction, outcome) in self.predictions.iter().zip(&self.observed_outcomes) {
@@ -453,6 +476,88 @@ pub struct HeldOutRelationalPredictionSummary {
     pub relational_augmented: PredictionScore,
     pub relational_profile: PredictionScore,
     pub status: EvidenceStatus,
+}
+
+impl HeldOutRelationalPredictionEvidence {
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        Self::validate_provenance(&self.provenance)?;
+        if self.records.len() != PredictionFeatureSet::all().len() {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        for record in &self.records {
+            record.validate_trace()?;
+            if record.score() != self.summary.score(record.feature_set) {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+
+        let scores = PredictionFeatureSet::all()
+            .into_iter()
+            .map(|feature_set| {
+                let score = self.summary.score(feature_set);
+                serde_json::json!({
+                    "feature_set": feature_set_name(feature_set),
+                    "parameter_count": score.parameter_count,
+                    "train_samples": score.train_samples,
+                    "test_samples": score.test_samples,
+                    "mean_absolute_error": score.mean_absolute_error,
+                    "mean_squared_error": score.mean_squared_error
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let records = self.records
+            .iter()
+            .map(prediction_evidence_record_json)
+            .collect::<Vec<_>>();
+
+        Ok(serde_json::json!({
+            "schema": "relational-prediction-evidence/v1",
+            "provenance": {
+                "protocol_id": self.provenance.protocol_id,
+                "source_data_sha256": self.provenance.source_data_sha256,
+                "software_commit_sha": self.provenance.software_commit_sha
+            },
+            "split": {
+                "train_samples": self.summary.train_samples,
+                "test_samples": self.summary.test_samples,
+                "gap_samples": self.summary.gap_samples,
+                "minimum_outcome_horizon": self.summary.minimum_outcome_horizon,
+                "maximum_outcome_horizon": self.summary.maximum_outcome_horizon
+            },
+            "scores": scores,
+            "records": records
+        }).to_string())
+    }
+
+    fn validate_provenance(
+        provenance: &RelationalPredictionProvenance,
+    ) -> Result<(), RelationalPredictionError> {
+        if provenance.protocol_id.trim().is_empty() {
+            return Err(RelationalPredictionError::InvalidEvidenceProvenance(
+                "protocol_id",
+            ));
+        }
+        if !is_hex_digest(&provenance.source_data_sha256, 64) {
+            return Err(RelationalPredictionError::InvalidEvidenceProvenance(
+                "source_data_sha256",
+            ));
+        }
+        if !is_hex_digest(&provenance.software_commit_sha, 40) {
+            return Err(RelationalPredictionError::InvalidEvidenceProvenance(
+                "software_commit_sha",
+            ));
+        }
+
+        Ok(())
+    }
 }
 
 impl HeldOutRelationalPredictionSummary {
@@ -615,6 +720,64 @@ pub struct RollingOriginRelationalPredictionSummary {
     pub mean_relational_profile_mse: f64,
     pub segments: Vec<HeldOutRelationalPredictionSummary>,
     pub status: EvidenceStatus,
+}
+
+impl RollingOriginRelationalPredictionEvidence {
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        if self.origins.len() != self.config.origin_count {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        for origin in &self.origins {
+            origin.validate()?;
+        }
+        if self.origins.iter().any(|origin| origin.summary.status != EvidenceStatus::Measured) {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+
+        let origins = self.origins
+            .iter()
+            .map(|origin| {
+                serde_json::from_str::<serde_json::Value>(
+                    &origin.to_json().expect("validated evidence must serialize"),
+                )
+                .map_err(|_| RelationalPredictionError::ModelFitFailed)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(serde_json::json!({
+            "schema": "relational-prediction-rolling-evidence/v1",
+            "provenance": {
+                "protocol_id": self.provenance.protocol_id,
+                "source_data_sha256": self.provenance.source_data_sha256,
+                "software_commit_sha": self.provenance.software_commit_sha
+            },
+            "rolling_config": {
+                "first_origin": self.config.first_origin,
+                "train_samples": self.config.train_samples,
+                "test_samples": self.config.test_samples,
+                "gap_samples": self.config.gap_samples,
+                "origin_count": self.config.origin_count,
+                "step_samples": self.config.step_samples,
+                "forecast_horizon": self.config.forecast_horizon,
+                "ridge_lambda": self.config.ridge_lambda
+            },
+            "observed": {
+                "mean_persistence_mse": self.observed.mean_persistence_mse,
+                "mean_isolated_agents_mse": self.observed.mean_isolated_agents_mse,
+                "mean_common_driver_mse": self.observed.mean_common_driver_mse,
+                "mean_synchrony_only_mse": self.observed.mean_synchrony_only_mse,
+                "mean_non_relational_context_mse": self.observed.mean_non_relational_context_mse,
+                "mean_relational_augmented_mse": self.observed.mean_relational_augmented_mse,
+                "mean_relational_profile_mse": self.observed.mean_relational_profile_mse
+            },
+            "origins": origins
+        }).to_string())
+    }
 }
 
 impl RollingOriginRelationalPredictionSummary {
@@ -1084,6 +1247,37 @@ impl HeldOutRelationalPredictionQualification {
             feature_decoupling_null,
         })
     }
+}
+
+fn feature_set_name(feature_set: PredictionFeatureSet) -> &'static str {
+    match feature_set {
+        PredictionFeatureSet::PersistenceBaseline => "PersistenceBaseline",
+        PredictionFeatureSet::IsolatedAgents => "IsolatedAgents",
+        PredictionFeatureSet::CommonDriver => "CommonDriver",
+        PredictionFeatureSet::SynchronyOnly => "SynchronyOnly",
+        PredictionFeatureSet::NonRelationalContext => "NonRelationalContext",
+        PredictionFeatureSet::RelationalAugmented => "RelationalAugmented",
+        PredictionFeatureSet::RelationalProfile => "RelationalProfile",
+    }
+}
+
+fn prediction_evidence_record_json(
+    record: &PredictionEvidenceRecord,
+) -> serde_json::Value {
+    serde_json::json!({
+        "feature_set": feature_set_name(record.feature_set),
+        "train_samples": record.train_samples,
+        "test_samples": record.test_samples,
+        "feature_times": record.feature_times,
+        "outcome_times": record.outcome_times,
+        "observed_outcomes": record.observed_outcomes,
+        "predictions": record.predictions,
+        "fit_coefficients": record.fit_coefficients,
+        "feature_means": record.feature_means,
+        "feature_scales": record.feature_scales,
+        "mean_absolute_error": record.mean_absolute_error,
+        "mean_squared_error": record.mean_squared_error
+    })
 }
 
 fn is_hex_digest(value: &str, length: usize) -> bool {
@@ -1685,6 +1879,30 @@ mod tests {
             assert_eq!(record.score(), evidence.summary.score(record.feature_set));
             record.validate_trace().unwrap();
         }
+    }
+
+    #[test]
+    fn evidence_packet_validates_and_serializes() {
+        let samples = build_samples(0.5);
+        let provenance = RelationalPredictionProvenance::new(
+            "RH-006-v1",
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "0123456789abcdef0123456789abcdef01234567",
+        )
+        .unwrap();
+
+        let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            provenance,
+        )
+        .unwrap();
+
+        evidence.validate().unwrap();
+        let json = evidence.to_json().unwrap();
+        assert!(json.contains("relational-prediction-evidence/v1"));
+        assert!(json.contains("RelationalAugmented"));
+        assert!(json.contains("predictions"));
     }
 
     #[test]
