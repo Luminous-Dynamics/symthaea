@@ -178,6 +178,111 @@ pub enum NeurosemanticArtifactLifecycleVerificationScope {
 
 pub const NEUROSEMANTIC_ARTIFACT_LIFECYCLE_RECEIPT_SCHEMA_VERSION: u16 = 3;
 pub const NEUROSEMANTIC_ARTIFACT_LIFECYCLE_VERIFICATION_SCOPE_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_REMEDIATION_IMPACT_ARTIFACT_SCHEMA_VERSION: u16 = 1;
+const MAX_NEUROSEMANTIC_IMPACT_DIMENSION_REFS: usize = 32;
+
+/// Content-addressed evidence that a remediation was evaluated for its declared impact dimensions.
+/// This is an evidence binding, not a theorem that the model forgot information or is safe.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationImpactArtifact {
+    pub schema_version: u16,
+    pub impact_ref: String,
+    pub pre_remediation_model_hash: String,
+    pub post_remediation_model_hash: String,
+    pub pre_remediation_lineage_ref: String,
+    pub pre_remediation_lineage_hash: String,
+    pub post_remediation_lineage_ref: String,
+    pub post_remediation_lineage_hash: String,
+    pub remediation_action: NeurosemanticArtifactLifecycleAction,
+    pub study_protocol_hash: String,
+    pub evaluation_split_manifest_hash: String,
+    /// Evidence over the intended forget/removal target.
+    pub forget_evidence_hash: String,
+    /// Evidence over retained-task utility/behavior.
+    pub utility_impact_evidence_hash: String,
+    /// Optional subgroup/fairness impact evidence; absence means it was not evaluated.
+    pub fairness_impact_evidence_hash: Option<String>,
+    /// Evidence over recovery or residual-influence checks.
+    pub residual_risk_evidence_hash: String,
+    /// Exact execution revision producing the impact artifact.
+    pub execution_revision: String,
+    pub observed_at_unix_s: u64,
+    /// Declared interpretation of the evaluation result.
+    pub disposition: NeurosemanticRemediationImpactDisposition,
+    /// Explicit names of impact dimensions covered by the artifact.
+    pub dimensions: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum NeurosemanticRemediationImpactDisposition {
+    WithinDeclaredBounds,
+    OutsideDeclaredBounds,
+    Inconclusive,
+}
+
+impl NeurosemanticRemediationImpactArtifact {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != NEUROSEMANTIC_REMEDIATION_IMPACT_ARTIFACT_SCHEMA_VERSION
+            || !valid_identifier(&self.impact_ref)
+            || !valid_blake3_digest(&self.pre_remediation_model_hash)
+            || !valid_blake3_digest(&self.post_remediation_model_hash)
+            || self.pre_remediation_model_hash == self.post_remediation_model_hash
+            || !valid_identifier(&self.pre_remediation_lineage_ref)
+            || !valid_blake3_digest(&self.pre_remediation_lineage_hash)
+            || !valid_identifier(&self.post_remediation_lineage_ref)
+            || !valid_blake3_digest(&self.post_remediation_lineage_hash)
+            || self.pre_remediation_lineage_ref == self.post_remediation_lineage_ref
+            || self.pre_remediation_lineage_hash == self.post_remediation_lineage_hash
+            || !valid_blake3_digest(&self.study_protocol_hash)
+            || !valid_blake3_digest(&self.evaluation_split_manifest_hash)
+            || !valid_blake3_digest(&self.forget_evidence_hash)
+            || !valid_blake3_digest(&self.utility_impact_evidence_hash)
+            || self.fairness_impact_evidence_hash.as_ref().is_some_and(|hash| !valid_blake3_digest(hash))
+            || !valid_blake3_digest(&self.residual_risk_evidence_hash)
+            || !valid_execution_revision(&self.execution_revision)
+            || self.dimensions.is_empty()
+            || self.dimensions.len() > MAX_NEUROSEMANTIC_IMPACT_DIMENSION_REFS
+            || self.dimensions.iter().any(|dimension| !valid_identifier(dimension))
+        {
+            return Err("neurosemantic remediation impact artifact fields are invalid".into());
+        }
+        let unique_dimensions: BTreeSet<&str> = self.dimensions.iter().map(String::as_str).collect();
+        if unique_dimensions.len() != self.dimensions.len() {
+            return Err("neurosemantic remediation impact artifact contains duplicate dimensions".into());
+        }
+        match self.remediation_action {
+            NeurosemanticArtifactLifecycleAction::Rectification | NeurosemanticArtifactLifecycleAction::Supersession | NeurosemanticArtifactLifecycleAction::Erasure | NeurosemanticArtifactLifecycleAction::AccessRevocation | NeurosemanticArtifactLifecycleAction::Retention => {}
+        }
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic remediation impact artifact JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let artifact: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("neurosemantic remediation impact artifact JSON: {error}"))?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn verify_evidence_bytes(&self, evidence_bytes: &[u8], expected_hash: &str) -> bool {
+        self.validate().is_ok()
+            && evidence_bytes.len() <= MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            && valid_blake3_digest(expected_hash)
+            && content_hash(evidence_bytes) == expected_hash
+    }
+
+    pub fn fingerprint(&self) -> Result<String, String> {
+        self.validate()?;
+        let bytes = serde_json::to_vec(self)
+            .map_err(|error| format!("neurosemantic remediation impact artifact serialization: {error}"))?;
+        Ok(content_hash(&bytes))
+    }
+}
 
 /// Machine-readable enumeration of the exact artifact identities independently inspected.
 /// The record is content-addressed separately from the lifecycle receipt so coverage scope
