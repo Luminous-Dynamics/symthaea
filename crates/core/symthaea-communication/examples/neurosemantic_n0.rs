@@ -80,6 +80,10 @@ fn main() -> Result<(), String> {
         schema_version: symthaea_communication::NEUROSEMANTIC_DERIVATION_LINEAGE_SCHEMA_VERSION,
         lineage_ref: "synthetic-derivation-record-1".into(),
         input_artifact_refs: vec!["synthetic-input-1".into(), "synthetic-input-2".into()],
+        input_artifact_hashes: vec![
+            symthaea_communication::content_hash(b"synthetic-input-artifact-1"),
+            symthaea_communication::content_hash(b"synthetic-input-artifact-2"),
+        ],
         activity_ref: "synthetic-semantic-graph-transform".into(),
         activity_revision: "transform-v1".into(),
         output_artifact_hash: derivation_output_artifact_hash.clone(),
