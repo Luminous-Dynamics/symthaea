@@ -1822,6 +1822,50 @@ mod tests {
     }
 
     #[test]
+    fn forged_observed_content_commitment_is_rejected() {
+        let mut receipt = build_receipt(
+            &expectation(NixServiceOperationKindV1::Start),
+            &observation(
+                NixServiceOperationKindV1::Start,
+                ServiceActiveStateV1::Active,
+                ServiceUnitFileStateV1::Enabled,
+            ),
+            None,
+        )
+        .unwrap();
+
+        receipt.observed_definition_content_digest =
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_string();
+
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::DefinitionContentMismatch
+        );
+    }
+
+    #[test]
+    fn forged_stability_content_commitment_is_rejected_even_with_recomputed_sequence_digest() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let stable = stability(&obs, 1_000, 1_000, 2_000, &[1_200, 1_900]);
+        let mut receipt = build_receipt(&exp, &obs, Some(stable)).unwrap();
+
+        receipt.stability.as_mut().unwrap().samples[1].definition_content_digest =
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_string();
+        receipt.stability.as_mut().unwrap().sequence_digest =
+            stability_sequence_digest(&receipt.stability.as_ref().unwrap().samples).unwrap();
+
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::StabilityIdentityOrStateChanged
+        );
+    }
+
+    #[test]
     fn start_success_is_observed_without_stability_claim() {
         let receipt = build_receipt(
             &expectation(NixServiceOperationKindV1::Start),
