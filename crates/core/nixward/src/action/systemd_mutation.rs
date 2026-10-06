@@ -18,6 +18,9 @@ use zbus::zvariant::OwnedObjectPath;
 use zbus::{Connection, Proxy};
 
 const SYSTEMD_DESTINATION: &str = "org.freedesktop.systemd1";
+const DBUS_DESTINATION: &str = "org.freedesktop.DBus";
+const DBUS_PATH: &str = "/org/freedesktop/DBus";
+const DBUS_INTERFACE: &str = "org.freedesktop.DBus";
 const SYSTEMD_MANAGER_PATH: &str = "/org/freedesktop/systemd1";
 const SYSTEMD_MANAGER_INTERFACE: &str = "org.freedesktop.systemd1.Manager";
 const JOB_PATH_PREFIX: &str = "/org/freedesktop/systemd1/job/";
@@ -33,6 +36,8 @@ pub enum NixSystemdMutationTransportErrorV1 {
     UnsupportedOperation(&'static str),
     #[error("invalid systemd manager unique D-Bus owner")]
     InvalidManagerOwner,
+    #[error("systemd manager incarnation changed before lifecycle dispatch")]
+    ManagerOwnerChanged,
     #[error("systemd returned an invalid Job object path")]
     InvalidJobObjectPath,
 }
@@ -58,39 +63,6 @@ impl NixSystemdLifecycleMutationTransportV1 {
         Self { connection }
     }
 
-    /// Dispatch one validated lifecycle operation to the captured systemd
-    /// manager incarnation and return systemd's exact Job object path.
-    ///
-    /// This function deliberately does not accept or validate an authorization
-    /// record. It is a transport primitive only and must remain downstream of
-    /// the live execution-authority check.
-    async fn dispatch_lifecycle(
-        &self,
-        operation: &NixServiceOperationV1,
-    ) -> Result<OwnedObjectPath, NixSystemdMutationTransportErrorV1> {
-        operation
-            .validate_shape()
-            .map_err(|error| {
-                NixSystemdMutationTransportErrorV1::InvalidServiceOperation(error.to_string())
-            })?;
-
-        let (method, _job_type) = method_and_job_type(operation.operation())?;
-        let manager = Proxy::new(
-            &self.connection,
-            SYSTEMD_DESTINATION,
-            SYSTEMD_MANAGER_PATH,
-            SYSTEMD_MANAGER_INTERFACE,
-        )
-        .await?;
-
-        let job_path: OwnedObjectPath = manager
-            .call(method, &(operation.unit(), JOB_MODE_REPLACE))
-            .await?;
-
-        validate_job_object_path(&job_path)?;
-        Ok(job_path)
-    }
-
     /// Dispatch only to the exact systemd manager connection captured by the
     /// read-only observer.
     ///
@@ -109,6 +81,19 @@ impl NixSystemdLifecycleMutationTransportV1 {
                 NixSystemdMutationTransportErrorV1::InvalidServiceOperation(error.to_string())
             })?;
         validate_manager_owner(manager_owner)?;
+        let bus = Proxy::new(
+            &self.connection,
+            DBUS_DESTINATION,
+            DBUS_PATH,
+            DBUS_INTERFACE,
+        )
+        .await?;
+        let current_owner: String = bus
+            .call("GetNameOwner", &(SYSTEMD_DESTINATION,))
+            .await?;
+        if current_owner != manager_owner {
+            return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
+        }
 
         let (method, _job_type) = method_and_job_type(operation.operation())?;
         let manager = Proxy::new(
@@ -207,6 +192,13 @@ mod tests {
     #[test]
     fn bound_dispatch_api_requires_an_explicit_manager_owner() {
         let _method = NixSystemdLifecycleMutationTransportV1::dispatch_lifecycle_for_manager_owner;
+        assert!(validate_manager_owner(":1.42").is_ok());
+    }
+
+    #[test]
+    fn lifecycle_dispatch_api_is_owner_bound_not_well_known_name_bound() {
+        let _method =
+            NixSystemdLifecycleMutationTransportV1::dispatch_lifecycle_for_manager_owner;
         assert!(validate_manager_owner(":1.42").is_ok());
     }
 
