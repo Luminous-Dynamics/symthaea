@@ -449,6 +449,8 @@ A delayed association is not by itself causal evidence, and a high zero-lag corr
 
 The existing estimator is a histogram estimator with a coarse history representation and should therefore be independently stress-tested for sample size, bin count, bias, and deterministic null behavior before any threshold is introduced.
 
+The module now also exposes a deterministic circular-shift surrogate calibration for the TE wrapper. It reports observed A→B and B→A values, the maximum surrogate value in each direction, and empirical exceedance fractions. These are calibration diagnostics only; they are not formal significance levels.
+
 ## 14. Literature boundary
 
 Relevant literature supports studying interpersonal coordination as a dynamical, multimodal, and context-sensitive phenomenon, but does not establish the stronger ontological claims above.
