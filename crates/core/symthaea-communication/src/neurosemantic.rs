@@ -2484,7 +2484,8 @@ mod tests {
                 .handling
                 .bind_policy_provenance_with_attestation_and_resolution(
                     b"synthetic-policy-record-1",
-                b"synthetic-derivation-record-1",
+                    b"synthetic-derivation-record-1",
+                    b"synthetic-status-record-1",
                     &fresh_attestation,
                     &fresh_key,
                     &resolution,
