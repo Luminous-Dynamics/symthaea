@@ -2776,6 +2776,18 @@ mod tests {
     }
 
     #[test]
+    fn timestamp_parser_only_collapses_xsd_whitespace() {
+        let padded = "\t2026-10-05T00:00:00Z\r\n";
+        assert!(parse_timestamp("timestamp", padded).is_ok());
+
+        let nbsp = "\u{00a0}2026-10-05T00:00:00Z";
+        assert!(matches!(
+            parse_timestamp("timestamp", nbsp),
+            Err(VerificationFailure::InvalidTimestamp { .. })
+        ));
+    }
+
+    #[test]
     fn timestamp_parser_applies_xsd_whitespace_collapse() {
         let padded = " \t2026-10-05T00:00:00Z\r\n";
         let parsed = parse_timestamp("timestamp", padded).unwrap();
