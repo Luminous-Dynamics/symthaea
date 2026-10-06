@@ -30,8 +30,8 @@ use symthaea_core::genesis::GenesisSeed;
 #[cfg(feature = "ssm_language")]
 use symthaea_broca::{
     ContentBindingStatus, LexicalMorphosyntacticBinding, LexicalPhonologicalWitness,
-    LinguisticFrame, MorphophonologicalDerivationWitness, MorphophonologicalRuleSet,
-    PhonologicalPlan,
+    LinguisticFrame, MorphophonologicalCompilationWitness,
+    MorphophonologicalDerivationWitness, MorphophonologicalRuleSet, PhonologicalPlan,
 };
 use symthaea_vocal_tract::pipeline::{
     Intonation, MannerClass, PitchAccent, ProsodyContext, phoneme_manner_class, predict_duration,
@@ -224,11 +224,14 @@ pub struct MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt {
     pub morphophonological_witness_version: String,
     pub morphophonological_witness_blake3: String,
     pub morphophonological_rule_set_blake3: String,
+    /// Optional source-to-rule compilation provenance. Present only for the stronger
+    /// compilation-backed admission path.
+    pub compilation_witness: Option<MorphophonologicalCompilationWitness>,
 }
 
 #[cfg(feature = "ssm_language")]
 impl MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt {
-    pub const SCHEMA_VERSION: u32 = 1;
+    pub const SCHEMA_VERSION: u32 = 2;
 
     pub fn verify_against_plan_and_rule_set(
         &self,
@@ -274,6 +277,19 @@ impl MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt {
             );
         }
 
+        if let Some(compilation_witness) = &self.compilation_witness {
+            if compilation_witness.output_rule_set_blake3 != rule_set.resource_blake3() {
+                anyhow::bail!(
+                    "receipt compilation witness does not match executable rule-set identity"
+                );
+            }
+            compilation_witness
+                .validate_shape()
+                .map_err(|error| {
+                    anyhow::anyhow!("invalid optional morphophonological compilation witness: {error}")
+                })?;
+        }
+
         Ok(())
     }
 
@@ -305,6 +321,40 @@ impl MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt {
         )
     }
 
+    pub fn verify_against_plan_and_rule_set_with_compilation_witness(
+        &self,
+        plan: &PhonologicalPlan,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        lexical_witness: &LexicalPhonologicalWitness,
+        morphophonological_witness: &MorphophonologicalDerivationWitness,
+        rule_set: &MorphophonologicalRuleSet,
+        compilation_witness: &MorphophonologicalCompilationWitness,
+    ) -> Result<()> {
+        self.verify_against_plan_and_rule_set(
+            plan,
+            frame,
+            binding,
+            lexical_witness,
+            morphophonological_witness,
+            rule_set,
+        )?;
+        if self.compilation_witness.as_ref() != Some(compilation_witness) {
+            anyhow::bail!(
+                "morphophonological realization receipt compilation witness does not match supplied witness"
+            );
+        }
+        compilation_witness
+            .validate_shape()
+            .map_err(|error| anyhow::anyhow!("invalid morphophonological compilation witness: {error}"))?;
+        if compilation_witness.output_rule_set_blake3 != rule_set.resource_blake3() {
+            anyhow::bail!(
+                "morphophonological compilation witness output does not match executable rule set"
+            );
+        }
+        Ok(())
+    }
+
     pub fn verify_against_plan_and_rule_set_with_source_artifact(
         &self,
         plan: &PhonologicalPlan,
@@ -323,6 +373,16 @@ impl MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt {
             morphophonological_witness,
             rule_set,
         )?;
+        let compilation_witness = self.compilation_witness.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "source-artifact verification requires a persisted compilation witness"
+            )
+        })?;
+        if compilation_witness.output_rule_set_blake3 != rule_set.resource_blake3() {
+            anyhow::bail!(
+                "source-artifact compilation witness output does not match executable rule set"
+            );
+        }
         morphophonological_witness
             .validate_against_binding_and_rule_set_with_source_artifact(
                 binding,
@@ -850,6 +910,96 @@ impl LiveVoice {
         Ok(receipt.sample_count)
     }
 
+    /// Stronger admission path: also requires an explicit source-to-rule compilation witness.
+    #[cfg(feature = "ssm_language")]
+    pub fn speak_morphophonology_compilation_verified_lexical_phonological_plan_with_receipt(
+        &mut self,
+        plan: &PhonologicalPlan,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        lexical_witness: &LexicalPhonologicalWitness,
+        morphophonological_witness: &MorphophonologicalDerivationWitness,
+        rule_set: &MorphophonologicalRuleSet,
+        compilation_witness: &MorphophonologicalCompilationWitness,
+    ) -> Result<MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt> {
+        compilation_witness
+            .validate_against_source_artifact_and_rule_set(
+                &[],
+                rule_set,
+            )
+            .err()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "source-to-rule compilation witness requires exact source artifact bytes"
+                )
+            })?;
+
+        let receipt = self.speak_morphophonology_verified_lexical_phonological_plan_with_receipt(
+            plan,
+            frame,
+            binding,
+            lexical_witness,
+            morphophonological_witness,
+            rule_set,
+        )?;
+        let mut receipt = receipt;
+        receipt.compilation_witness = Some(compilation_witness.clone());
+        receipt
+            .verify_against_plan_and_rule_set_with_compilation_witness(
+                plan,
+                frame,
+                binding,
+                lexical_witness,
+                morphophonological_witness,
+                rule_set,
+                compilation_witness,
+            )?;
+        Ok(receipt)
+    }
+
+    /// Source-artifact-backed compilation admission. Exact source bytes are checked before
+    /// the underlying morphophonological realization is allowed to synthesize/enqueue audio.
+    #[cfg(feature = "ssm_language")]
+    pub fn speak_morphophonology_compilation_verified_lexical_phonological_plan_with_source_artifact_receipt(
+        &mut self,
+        plan: &PhonologicalPlan,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        lexical_witness: &LexicalPhonologicalWitness,
+        morphophonological_witness: &MorphophonologicalDerivationWitness,
+        rule_set: &MorphophonologicalRuleSet,
+        compilation_witness: &MorphophonologicalCompilationWitness,
+        source_artifact: &[u8],
+    ) -> Result<MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt> {
+        compilation_witness
+            .validate_against_source_artifact_and_rule_set(source_artifact, rule_set)
+            .map_err(|error| {
+                anyhow::anyhow!("invalid morphophonological compilation admission: {error}")
+            })?;
+
+        let mut receipt =
+            self.speak_morphophonology_verified_lexical_phonological_plan_with_receipt(
+                plan,
+                frame,
+                binding,
+                lexical_witness,
+                morphophonological_witness,
+                rule_set,
+            )?;
+        receipt.compilation_witness = Some(compilation_witness.clone());
+        receipt
+            .verify_against_plan_and_rule_set_with_compilation_witness(
+                plan,
+                frame,
+                binding,
+                lexical_witness,
+                morphophonological_witness,
+                rule_set,
+                compilation_witness,
+            )?;
+        Ok(receipt)
+    }
+
     /// Stronger admission path: requires a morphophonological witness backed by an
     /// executable rule set before synthesis/audio enqueue occurs.
     #[cfg(feature = "ssm_language")]
@@ -882,6 +1032,7 @@ impl LiveVoice {
             morphophonological_witness_version: morphophonological_witness.version.clone(),
             morphophonological_witness_blake3: morphophonological_witness.provenance_token(),
             morphophonological_rule_set_blake3: rule_set.resource_blake3(),
+            compilation_witness: None,
         };
 
         receipt.verify_against_plan_and_rule_set(
