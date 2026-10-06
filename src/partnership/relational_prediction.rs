@@ -1235,6 +1235,7 @@ mod tests {
                 gap_samples: 2,
                 origin_count: 4,
                 step_samples: 8,
+                forecast_horizon: 0.5,
                 ridge_lambda: 1e-8,
                 ..Default::default()
             },
@@ -1257,6 +1258,7 @@ mod tests {
             gap_samples: 2,
             origin_count: 4,
             step_samples: 8,
+            forecast_horizon: 0.5,
             ridge_lambda: 1e-8,
             ..Default::default()
         };
