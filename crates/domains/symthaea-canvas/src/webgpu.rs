@@ -768,7 +768,6 @@ impl WebGpuRenderer {
             #[cfg(feature = "browser-qualification")]
             let device_loss_reason = Arc::clone(&device_loss_reason);
             device.set_device_lost_callback(move |reason, message| {
-                device_lost.store(true, Ordering::Release);
                 #[cfg(feature = "browser-qualification")]
                 device_loss_reason.store(
                     match reason {
@@ -777,6 +776,7 @@ impl WebGpuRenderer {
                     },
                     Ordering::Release,
                 );
+                device_lost.store(true, Ordering::Release);
                 web_sys::console::warn_2(
                     &format!("Symthaea WebGPU cognitive device lost ({reason:?})").into(),
                     &message.into(),
@@ -1122,7 +1122,6 @@ impl WebGpuMovieRenderer {
             #[cfg(feature = "browser-qualification")]
             let device_loss_reason = Arc::clone(&device_loss_reason);
             device.set_device_lost_callback(move |reason, message| {
-                device_lost.store(true, Ordering::Release);
                 #[cfg(feature = "browser-qualification")]
                 device_loss_reason.store(
                     match reason {
@@ -1131,6 +1130,7 @@ impl WebGpuMovieRenderer {
                     },
                     Ordering::Release,
                 );
+                device_lost.store(true, Ordering::Release);
                 web_sys::console::warn_2(
                     &format!("Symthaea WebGPU movie device lost ({reason:?})").into(),
                     &message.into(),
