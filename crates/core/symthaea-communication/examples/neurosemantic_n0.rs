@@ -419,6 +419,11 @@ fn main() -> Result<(), String> {
         forged.verification_agent_ref = forged.effect_agent_ref.clone();
         forged.validate().is_err()
     };
+    let lifecycle_effect_binding_mutation_blocked = {
+        let mut forged = lifecycle_receipt.clone();
+        forged.effect_evidence_hash = Some(symthaea_communication::content_hash(b"other-effect"));
+        forged.verify_transition(&lifecycle_applied).is_err()
+    };
     let lifecycle_verification_scope_mismatch_blocked = {
         let mut forged = lifecycle_receipt.clone();
         forged.verification_scope_hash = Some(symthaea_communication::content_hash(b"wrong-scope"));
@@ -905,6 +910,7 @@ fn main() -> Result<(), String> {
         "lifecycle_verifier_target_mismatch_blocked": lifecycle_verifier_target_mismatch_blocked,
         "lifecycle_verifier_identity_required": lifecycle_verifier_identity_required,
         "lifecycle_verifier_independence_required": lifecycle_verifier_independence_required,
+        "lifecycle_effect_binding_mutation_blocked": lifecycle_effect_binding_mutation_blocked,
         "lifecycle_verification_scope_mismatch_blocked": lifecycle_verification_scope_mismatch_blocked,
         "lifecycle_verification_scope_root_mismatch_blocked": lifecycle_verification_scope_root_mismatch_blocked,
         "lifecycle_verification_scope_duplicate_blocked": lifecycle_verification_scope_duplicate_blocked,
