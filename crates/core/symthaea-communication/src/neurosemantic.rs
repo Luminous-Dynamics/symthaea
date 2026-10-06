@@ -369,6 +369,14 @@ pub struct NeurosemanticRemediationImpactArtifact {
     pub lifecycle_receipt_hash: String,
     /// Canonical identity of the full frozen evaluation design.
     pub evaluation_manifest_hash: String,
+    /// Identity of the agent that conducted the remediation impact evaluation.
+    pub evaluation_agent_ref: String,
+    /// Identity of the independent agent that verified the evaluation result.
+    pub evaluation_verifier_ref: String,
+    /// Exact evidence bytes supporting independent evaluation verification.
+    pub evaluation_verification_evidence_hash: String,
+    /// Content-addressed evaluation runtime/environment descriptor.
+    pub evaluation_environment_hash: String,
     pub remediation_action: NeurosemanticArtifactLifecycleAction,
     pub study_protocol_hash: String,
     pub evaluation_split_manifest_hash: String,
@@ -436,6 +444,11 @@ impl NeurosemanticRemediationImpactArtifact {
             || !valid_blake3_digest(&self.post_remediation_lineage_hash)
             || !valid_blake3_digest(&self.lifecycle_receipt_hash)
             || !valid_blake3_digest(&self.evaluation_manifest_hash)
+            || !valid_identifier(&self.evaluation_agent_ref)
+            || !valid_identifier(&self.evaluation_verifier_ref)
+            || self.evaluation_agent_ref == self.evaluation_verifier_ref
+            || !valid_blake3_digest(&self.evaluation_verification_evidence_hash)
+            || !valid_blake3_digest(&self.evaluation_environment_hash)
             || self.pre_remediation_lineage_ref == self.post_remediation_lineage_ref
             || self.pre_remediation_lineage_hash == self.post_remediation_lineage_hash
             || !valid_blake3_digest(&self.study_protocol_hash)
@@ -531,12 +544,52 @@ impl NeurosemanticRemediationImpactArtifact {
         if lifecycle_receipt.action != self.remediation_action {
             return Err("neurosemantic remediation impact action does not match the lifecycle receipt action".into());
         }
+        if Some(self.evaluation_agent_ref.as_str()) == lifecycle_receipt.effect_agent_ref.as_deref()
+            || Some(self.evaluation_verifier_ref.as_str()) == lifecycle_receipt.effect_agent_ref.as_deref()
+        {
+            return Err("neurosemantic remediation evaluation agents must be independent from the remediation effect agent".into());
+        }
         if lifecycle_receipt.execution_revision != self.execution_revision {
             return Err("neurosemantic remediation impact execution revision does not match the lifecycle receipt".into());
         }
         let fingerprint = lifecycle_receipt.fingerprint()?;
         if fingerprint != self.lifecycle_receipt_hash {
             return Err("neurosemantic remediation impact artifact is bound to a different lifecycle receipt".into());
+        }
+        Ok(())
+    }
+
+    pub fn verify_evaluation_verification_evidence_bytes(
+        &self,
+        verifier_agent_ref: &str,
+        evidence_bytes: &[u8],
+    ) -> Result<(), String> {
+        self.validate()?;
+        if verifier_agent_ref != self.evaluation_verifier_ref {
+            return Err("neurosemantic remediation evaluation verifier identity mismatch".into());
+        }
+        if verifier_agent_ref == self.evaluation_agent_ref {
+            return Err("neurosemantic remediation evaluation verifier must differ from evaluator".into());
+        }
+        if evidence_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err("neurosemantic remediation evaluation verification evidence exceeds the serialized artifact limit".into());
+        }
+        if content_hash(evidence_bytes) != self.evaluation_verification_evidence_hash {
+            return Err("neurosemantic remediation evaluation verification evidence hash mismatch".into());
+        }
+        Ok(())
+    }
+
+    pub fn verify_evaluation_environment_bytes(
+        &self,
+        environment_bytes: &[u8],
+    ) -> Result<(), String> {
+        self.validate()?;
+        if environment_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err("neurosemantic remediation evaluation environment descriptor exceeds the serialized artifact limit".into());
+        }
+        if content_hash(environment_bytes) != self.evaluation_environment_hash {
+            return Err("neurosemantic remediation evaluation environment hash mismatch".into());
         }
         Ok(())
     }
