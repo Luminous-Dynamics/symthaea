@@ -2789,6 +2789,19 @@ async fn verify_active_configuration(expected: &[u8]) -> Result<bool, String> {
         .map_err(|error| format!("active configuration postcondition probe failed: {error}"))?;
     Ok(configuration_bytes_match(&actual, expected))
 }
+async fn verify_installed_configuration(expected: Option<&[u8]>) -> Result<bool, String> {
+    let actual = tokio::fs::read("/mnt/etc/nixos/configuration.nix")
+        .await
+        .map_err(|error| format!("installed configuration postcondition probe failed: {error}"))?;
+    if actual.is_empty() {
+        return Ok(false);
+    }
+    match expected {
+        Some(expected) => Ok(configuration_bytes_match(&actual, expected)),
+        None => Ok(true),
+    }
+}
+
 
 fn parse_generation_link(value: &str) -> Option<u64> {
     let value = value.trim().rsplit('/').next()?;
@@ -3920,7 +3933,28 @@ echo "  User password set."
                     _ => None,
                 };
                 let (exit_code, observed_outcome) = match install_exit_code {
-                    Some(0) => (0, TransactionOutcome::ObservedSuccess),
+                    Some(0) => match verify_installed_configuration(
+                        (!client_msg.configuration_nix.is_empty())
+                            .then_some(client_msg.configuration_nix.as_bytes()),
+                    )
+                    .await
+                    {
+                        Ok(true) => (0, TransactionOutcome::ObservedSuccess),
+                        Ok(false) => {
+                            eprintln!(
+                                "[{}] {} install returned 0 but the installed configuration post-state did not match",
+                                peer_addr, transaction.log_line()
+                            );
+                            (1, TransactionOutcome::Indeterminate)
+                        }
+                        Err(error) => {
+                            eprintln!(
+                                "[{}] {} installed configuration postcondition probe failed: {}",
+                                peer_addr, transaction.log_line(), error
+                            );
+                            (1, TransactionOutcome::Indeterminate)
+                        }
+                    },
                     Some(code) => (code, TransactionOutcome::Failed),
                     None => (1, TransactionOutcome::Indeterminate),
                 };
@@ -7605,6 +7639,13 @@ mod tests {
         assert_eq!(parse_generation_link("system--link"), None);
         assert_eq!(parse_generation_link("system-7"), None);
         assert_eq!(parse_generation_link("system-7-link-attacker"), None);
+    }
+
+    #[test]
+    fn configuration_postcondition_digest_is_exact() {
+        let expected = b"{ config = true; }\n";
+        assert!(configuration_bytes_match(expected, expected));
+        assert!(!configuration_bytes_match(expected, b"{ config = false; }\n"));
     }
 
     #[test]
