@@ -89,6 +89,17 @@ impl ControllerDocumentSnapshotFile {
             }
         }
 
+        let controller_document_url = url::Url::parse(&self.controller_document_ref).map_err(|_| {
+            SnapshotError::Malformed(
+                "controller-document snapshot reference must be a valid absolute URL".into(),
+            )
+        })?;
+        if controller_document_url.fragment().is_some() {
+            return Err(SnapshotError::Malformed(
+                "controller-document snapshot reference must not contain a URL fragment".into(),
+            ));
+        }
+
         if self.document.is_empty() {
             return Err(SnapshotError::Malformed(
                 "controller-document snapshot document must be non-empty".into(),
@@ -174,9 +185,19 @@ impl JsonControllerDocumentSnapshotAdapter {
         path: impl Into<PathBuf>,
         expected_snapshot_reference: impl Into<String>,
     ) -> Result<Self, SnapshotError> {
+        let expected_snapshot_reference = expected_snapshot_reference.into();
+        if !expected_snapshot_reference
+            .strip_prefix("sha256:")
+            .is_some_and(|hex| is_hex_digest(hex))
+        {
+            return Err(SnapshotError::Malformed(
+                "expected snapshot reference must be sha256:<64 hex characters>".into(),
+            ));
+        }
+
         let adapter = Self {
             path: path.into(),
-            expected_snapshot_reference: expected_snapshot_reference.into(),
+            expected_snapshot_reference,
         };
         validate_snapshot_reference(&adapter.expected_snapshot_reference)?;
         Ok(adapter)
@@ -1350,6 +1371,38 @@ mod tests {
         let dereference = resolution.controller_document_dereference.as_ref().unwrap();
         assert_eq!(dereference.source, ControllerDocumentResolutionSource::ApplicationSnapshot);
         assert!(dereference.digest_multibase.is_some());
+    }
+
+    #[test]
+    fn snapshot_structure_rejects_non_url_and_fragmented_document_references() {
+        let mut snapshot = snapshot();
+        snapshot.controller_document_ref = "not-a-url".into();
+        assert!(matches!(
+            snapshot.validate_structure(),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("valid absolute URL")
+        ));
+
+        let mut snapshot = snapshot();
+        snapshot.controller_document_ref =
+            "https://example.test/controller#fragment".into();
+        assert!(matches!(
+            snapshot.validate_structure(),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("must not contain a URL fragment")
+        ));
+    }
+
+    #[test]
+    fn adapter_rejects_malformed_expected_snapshot_reference() {
+        assert!(matches!(
+            JsonControllerDocumentSnapshotAdapter::new(
+                "/tmp/does-not-matter",
+                "sha256:not-a-digest",
+            ),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("sha256:<64 hex characters>")
+        ));
     }
 
     #[test]
