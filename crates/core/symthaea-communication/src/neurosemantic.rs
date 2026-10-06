@@ -3367,6 +3367,17 @@ mod tests {
             representation_probe_method_hash: representation_method.fingerprint().unwrap(),
         };
         let evaluation_manifest_bytes = serde_json::to_vec(&evaluation_manifest).unwrap();
+        let evaluation_environment = NeurosemanticRemediationEvaluationEnvironment {
+            schema_version: NEUROSEMANTIC_REMEDIATION_EVALUATION_ENVIRONMENT_SCHEMA_VERSION,
+            environment_ref: "environment-1".into(),
+            platform_ref: "linux-x86_64".into(),
+            runtime_ref: "rust-runtime".into(),
+            toolchain_ref: "rust-1.96".into(),
+            dependency_lock_hash: content_hash(b"deps"),
+            configuration_hash: content_hash(b"config"),
+            execution_revision: "2".repeat(40),
+        };
+        let evaluation_environment_bytes = serde_json::to_vec(&evaluation_environment).unwrap();
         let measurement = NeurosemanticRemediationMeasurementArtifact {
             schema_version: NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION,
             measurement_ref: "measurement-1".into(),
@@ -3420,7 +3431,7 @@ mod tests {
             evaluation_agent_ref: "evaluation-agent-1".into(),
             evaluation_verifier_ref: "evaluation-verifier-1".into(),
             evaluation_verification_evidence_hash: content_hash(b"evaluation-verification"),
-            evaluation_environment_hash: content_hash(b"evaluation-environment"),
+            evaluation_environment_hash: evaluation_environment.fingerprint().unwrap(),
             remediation_action: NeurosemanticArtifactLifecycleAction::Erasure,
             study_protocol_hash: content_hash(protocol_bytes),
             evaluation_split_manifest_hash: content_hash(b"split-1"),
@@ -3475,7 +3486,7 @@ mod tests {
             )
             .is_ok());
         assert!(impact
-            .verify_evaluation_environment_bytes(b"evaluation-environment")
+            .verify_evaluation_environment_bytes(&evaluation_environment_bytes)
             .is_ok());
         let mut role_collision = impact.clone();
         role_collision.evaluation_verifier_ref = lifecycle.verification_agent_ref.clone().unwrap();
@@ -3497,6 +3508,13 @@ mod tests {
             .is_err());
         assert!(impact
             .verify_evaluation_environment_bytes(b"other-environment")
+            .is_err());
+        let mut environment_revision = evaluation_environment.clone();
+        environment_revision.execution_revision = "4".repeat(40);
+        assert!(impact
+            .verify_evaluation_environment_bytes(
+                &serde_json::to_vec(&environment_revision).unwrap()
+            )
             .is_err());
         let mut measurement_status_forged = measurement.clone();
         measurement_status_forged.measurements[0].status =
