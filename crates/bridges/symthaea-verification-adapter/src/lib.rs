@@ -204,7 +204,7 @@ impl JsonControllerDocumentSnapshotAdapter {
         let expected_snapshot_reference = expected_snapshot_reference.into();
         if !expected_snapshot_reference
             .strip_prefix("sha256:")
-            .is_some_and(|hex| is_hex_digest(hex))
+            .is_some_and(is_lower_hex_digest)
         {
             return Err(SnapshotError::Malformed(
                 "expected snapshot reference must be sha256:<64 hex characters>".into(),
@@ -821,13 +821,17 @@ fn validate_multikey_encoding(value: &str) -> Result<(), SnapshotError> {
     Ok(())
 }
 
+fn is_lower_hex_digest(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
 fn validate_snapshot_reference(value: &str) -> Result<(), SnapshotError> {
     let digest = value.strip_prefix("sha256:").ok_or_else(|| {
         SnapshotError::Malformed(
             "snapshot reference must use the sha256:<hex-digest> format".into(),
         )
     })?;
-    if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+    if !is_lower_hex_digest(digest) {
         return Err(SnapshotError::Malformed(
             "snapshot reference must contain a 64-character hexadecimal SHA-256 digest".into(),
         ));
@@ -1497,6 +1501,18 @@ mod tests {
             snapshot.validate_structure(),
             Err(SnapshotError::Malformed(message))
                 if message.contains("must not contain a URL fragment")
+        ));
+    }
+
+    #[test]
+    fn adapter_rejects_noncanonical_uppercase_snapshot_reference() {
+        assert!(matches!(
+            JsonControllerDocumentSnapshotAdapter::new(
+                "/tmp/does-not-matter",
+                &format!("sha256:{}", "AB".repeat(32)),
+            ),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("sha256:<64 hex characters>")
         ));
     }
 
