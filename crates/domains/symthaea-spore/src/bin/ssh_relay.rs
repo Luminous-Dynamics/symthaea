@@ -19,7 +19,8 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
-use tokio_tungstenite::accept_hdr_async;
+use tokio_tungstenite::accept_hdr_async_with_config;
+use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::tungstenite::Message;
 
 mod system_transaction;
@@ -300,6 +301,15 @@ fn default_port() -> u16 {
 fn auth_token_fingerprint(token: &str) -> String {
     let hex = blake3::hash(token.as_bytes()).to_hex().to_string();
     hex[..16].to_string()
+}
+
+const MAX_WS_MESSAGE_SIZE: usize = 8 * 1024 * 1024;
+const MAX_WS_FRAME_SIZE: usize = 2 * 1024 * 1024;
+
+fn relay_websocket_config() -> WebSocketConfig {
+    WebSocketConfig::default()
+        .max_message_size(Some(MAX_WS_MESSAGE_SIZE))
+        .max_frame_size(Some(MAX_WS_FRAME_SIZE))
 }
 
 fn origin_is_allowed(origin: &str) -> bool {
@@ -2450,7 +2460,12 @@ async fn handle_connection(
         Ok(resp)
     };
 
-    let ws_stream = match accept_hdr_async(stream, origin_check).await {
+    let ws_stream = match accept_hdr_async_with_config(
+        stream,
+        origin_check,
+        Some(relay_websocket_config()),
+    )
+    .await {
         Ok(ws) => ws,
         Err(e) => {
             eprintln!("[{}] WebSocket upgrade failed: {}", peer_addr, e);
@@ -6463,7 +6478,12 @@ async fn main() {
                             }
                             Ok(resp)
                         };
-                        let ws_stream = match accept_hdr_async(tls_stream, origin_check).await {
+                        let ws_stream = match accept_hdr_async_with_config(
+                            tls_stream,
+                            origin_check,
+                            Some(relay_websocket_config()),
+                        )
+                        .await {
                             Ok(ws) => ws,
                             Err(e) => {
                                 eprintln!("[{}] TLS WebSocket upgrade failed: {}", peer, e);
@@ -6497,6 +6517,13 @@ mod tests {
         assert!(validate_image_path("/tmp/nixforhumanity-image-0123").is_err());
         assert!(validate_image_path("/tmp/nixforhumanity-image-0123456789abcdef0123456789abcdeg").is_err());
         assert!(validate_image_path("/tmp/nixforhumanity-image-0123456789abcdef/../etc").is_err());
+    }
+
+    #[test]
+    fn websocket_limits_are_bounded() {
+        let config = relay_websocket_config();
+        assert_eq!(config.max_message_size, Some(MAX_WS_MESSAGE_SIZE));
+        assert_eq!(config.max_frame_size, Some(MAX_WS_FRAME_SIZE));
     }
 
     #[test]
