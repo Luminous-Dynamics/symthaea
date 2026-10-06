@@ -390,7 +390,10 @@ async function rawWebGpuExecutionCanary(page) {
     let deviceLost = null;
 
     try {
-      const adapter = await navigator.gpu.requestAdapter();
+      const adapter = await navigator.gpu.requestAdapter({
+        powerPreference: 'high-performance',
+        forceFallbackAdapter: false,
+      });
       if (!adapter) {
         return { supported: false, reason: 'raw execution canary requestAdapter returned null' };
       }
@@ -659,7 +662,10 @@ async function rawWebGpuCompositorCanary(page) {
     const uncapturedErrors = [];
     let deviceLost = null;
     try {
-      const adapter = await navigator.gpu.requestAdapter();
+      const adapter = await navigator.gpu.requestAdapter({
+        powerPreference: 'high-performance',
+        forceFallbackAdapter: false,
+      });
       if (!adapter) {
         return { supported: false, reason: 'compositor canary requestAdapter returned null' };
       }
@@ -787,7 +793,10 @@ async function rawWebGpuCanvasCanary(page) {
     let device = null;
     const uncapturedErrors = [];
     try {
-      const adapter = await navigator.gpu.requestAdapter();
+      const adapter = await navigator.gpu.requestAdapter({
+        powerPreference: 'high-performance',
+        forceFallbackAdapter: false,
+      });
       if (!adapter) {
         return { supported: false, reason: 'raw canary requestAdapter returned null' };
       }
@@ -925,7 +934,10 @@ async function capabilityPreflight(page) {
       return { navigator_gpu: false, adapter: false, device: false, reason: 'navigator.gpu unavailable' };
     }
     try {
-      const adapter = await navigator.gpu.requestAdapter();
+      const adapter = await navigator.gpu.requestAdapter({
+        powerPreference: 'high-performance',
+        forceFallbackAdapter: false,
+      });
       if (!adapter) {
         return { navigator_gpu: true, adapter: false, device: false, reason: 'requestAdapter returned null' };
       }
@@ -1643,7 +1655,7 @@ try {
   }
 
   const artifact = {
-    schema: 'symthaea-ui-webgpu-qualification-v3',
+    schema: 'symthaea-ui-webgpu-qualification-v4',
     harness_self_tests_passed: true,
     url: URL,
     chromium: CHROMIUM,
@@ -1658,6 +1670,10 @@ try {
       ozone_platform: 'x11',
       headed_under_xvfb: HEADLESS === false,
       viewport: { width: 1280, height: 900, device_scale_factor: 1 },
+      adapter_request: {
+        power_preference: 'high-performance',
+        force_fallback_adapter: false,
+      },
     },
     run_id: process.env.GITHUB_RUN_ID || null,
     workflow_ref: process.env.GITHUB_WORKFLOW_REF || null,
@@ -1847,7 +1863,10 @@ async function capabilityPreflight(page) {
       return { navigator_gpu: false, adapter: false, device: false, reason: 'navigator.gpu unavailable' };
     }
     try {
-      const adapter = await navigator.gpu.requestAdapter();
+      const adapter = await navigator.gpu.requestAdapter({
+        powerPreference: 'high-performance',
+        forceFallbackAdapter: false,
+      });
       if (!adapter) {
         return { navigator_gpu: true, adapter: false, device: false, reason: 'requestAdapter returned null' };
       }
