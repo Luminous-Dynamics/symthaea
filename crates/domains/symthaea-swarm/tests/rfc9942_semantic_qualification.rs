@@ -1404,6 +1404,30 @@ fn rfc9942_protected_header_map_entry_resource_limit_is_typed() {
 }
 
 #[test]
+fn rfc9942_receipt_payload_chunk_resource_limit_is_typed() {
+    let proof = {
+        let mut value = vec![0x83, 0x02, 0x00, 0x81, 0x58, 0x20];
+        value.extend_from_slice(&[0u8; 32]);
+        value
+    };
+    let mut vdp = vec![0xa1, 0x20, 0x81, 0x58, proof.len() as u8];
+    vdp.extend_from_slice(&proof);
+
+    let mut encoded = vec![0xd2, 0x84, 0x47, 0xa2, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01];
+    encoded.extend_from_slice(&[0xa1, 0x19, 0x01, 0x8c]);
+    encoded.extend_from_slice(&vdp);
+    encoded.push(0x5f);
+    encoded.extend(std::iter::repeat_n(0x40, 4097));
+    encoded.extend_from_slice(&[0xff, 0x58, 0x40]);
+    encoded.extend_from_slice(&[0u8; 64]);
+
+    assert_eq!(
+        Rfc9942ReceiptEnvelope::from_cbor(&encoded),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
+
+#[test]
 fn rfc9942_receipt_protected_header_resource_limit_is_typed() {
     let mut encoded = vec![0xd2, 0x84, 0x59, 0x10, 0x01];
     encoded.extend(std::iter::repeat_n(0x00, 4097));
