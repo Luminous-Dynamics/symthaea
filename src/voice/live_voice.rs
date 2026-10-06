@@ -392,6 +392,11 @@ impl MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt {
             .map_err(|error| {
                 anyhow::anyhow!("invalid morphophonological source artifact: {error}")
             })?;
+        compilation_witness
+            .replay_unimorph_tsv_compilation(source_artifact, rule_set)
+            .map_err(|error| {
+                anyhow::anyhow!("invalid morphophonological compiler replay: {error}")
+            })?;
         Ok(())
     }
 }
