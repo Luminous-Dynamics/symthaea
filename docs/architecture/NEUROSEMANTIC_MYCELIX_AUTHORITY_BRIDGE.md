@@ -56,29 +56,31 @@ A local cache hit is evidence of previously observed state, not proof of current
 A successful cryptographic signature check is evidence of signer control of a key, not proof that the key is authorized by the Mycelix governance layer.
 
 ## Concrete signed resolution contract
-The communication crate now materializes the recommended resolution as`NeurosemanticAuthorityResolutionAttestation`.
 
-The resolution is signed by the configured external resolver and binds, in one immutablesnapshot:
+The communication crate now materializes the recommended resolution as `NeurosemanticAuthorityResolutionAttestation`.
+
+The resolution is signed by the configured external resolver and binds, in one immutable snapshot:
 
 - the external resolver and resolver key reference;
 - the authority and authority-key references;
 - the exact Symthaea handling-policy fingerprint;
 - the exact external policy-provenance reference and digest;
 - the exact subject, peer, lease identifier, and consent epoch;
+- the content hash of the complete consent lease;
 - the communication purpose, channel, and direction;
 - an explicit authority status;
 - the status source reference;
 - the status checked-at time and a bounded freshness expiry.
 
-Only `Active` status can produce a `NeurosemanticPolicyProvenanceBinding`. `Suspended`,`Revoked`, `Unknown`, and `Unavailable` are explicit fail-closed states.
+Only `Active` status can produce a `NeurosemanticPolicyProvenanceBinding`. `Suspended`, `Revoked`, `Unknown`, and `Unavailable` are explicit fail-closed states.
 
-The resolution lifetime is bounded to 24 hours by the Symthaea protocol as a defensive upperbound. Deployments handling higher-risk neurosemantic data should use a materially shorterfreshness window.
+The resolution lifetime is bounded to 24 hours by the Symthaea protocol as a defensive upper bound. Deployments handling higher-risk neurosemantic data should use a materially shorter freshness window.
 
-The resolver signature authenticates the exact snapshot to the configured resolver key. Theintegration must still establish that the resolver key is trusted and authorized; signatureverification is not itself a governance decision.
+The resolver signature authenticates the exact snapshot to the configured resolver key. The integration must still establish that the resolver key is trusted and authorized; signature verification is not itself a governance decision.
 
-A resolution cannot outlive the authority attestation that it resolves. This prevents afreshness snapshot from extending an older issuer proof beyond its cryptographic validitywindow.
+A resolution cannot outlive the authority attestation that it resolves. This prevents a freshness snapshot from extending an older issuer proof beyond its cryptographic validity window.
 
-The capability also retains the exact resolution fingerprint and its context. Subsequenthandling therefore fails closed when the resolution is expired, non-active, or bound to adifferent subject, peer, lease, consent epoch, purpose, channel, or direction.
+The resulting capability retains the exact resolution fingerprint and its context. Because the resolution also commits to the complete consent-lease fingerprint, changing scopes, sensitivity ceilings, data/inference permissions, validity, revocation state, or other lease fields invalidates an older capability even when an implementation accidentally reuses the same lease ID and epoch. Subsequent handling therefore fails closed when the resolution is expired, non-active, or bound to a different subject, peer, lease, consent state, purpose, channel, or direction.
 
 ## Recommended resolution object
 
