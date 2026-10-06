@@ -4493,6 +4493,37 @@ mod tests {
     }
 
     #[test]
+    fn cbor_generic_map_entry_cap_remains_structural() {
+        let wire = vec![0xa2, 0x01, 0x00, 0x02, 0x00];
+        let mut reader = CborReader::new(&wire);
+        assert_eq!(
+            reader.read_map_entries_bounded(1),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+    }
+
+    #[test]
+    fn cbor_generic_indefinite_string_chunk_caps_remain_structural() {
+        let mut bstr = vec![0x5f];
+        bstr.extend(std::iter::repeat_n(0x40, MAX_CBOR_BSTR_CHUNKS + 1));
+        bstr.push(0xff);
+        let mut reader = CborReader::new(&bstr);
+        assert_eq!(
+            reader.skip_value_with_limits(0, usize::MAX, 64, usize::MAX),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+
+        let mut tstr = vec![0x7f];
+        tstr.extend(std::iter::repeat_n(0x60, MAX_CBOR_TSTR_CHUNKS + 1));
+        tstr.push(0xff);
+        let mut reader = CborReader::new(&tstr);
+        assert_eq!(
+            reader.skip_value_with_limits(0, usize::MAX, 64, usize::MAX),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+    }
+
+    #[test]
     fn cbor_skip_value_enforces_exact_recursion_depth_cap() {
         fn tagged_integer(tag_count: usize) -> Vec<u8> {
             let mut value = Vec::with_capacity(tag_count + 1);
@@ -4518,6 +4549,26 @@ mod tests {
         let mut reader = CborReader::new(&rejected);
         assert_eq!(
             reader.read_map_entries_bounded(1),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+    }
+
+    #[test]
+    fn cbor_resource_aware_skip_value_enforces_recursion_depth_cap() {
+        fn tagged_integer(tag_count: usize) -> Vec<u8> {
+            let mut value = Vec::with_capacity(tag_count + 1);
+            for _ in 0..tag_count { value.push(0xc0); }
+            value.push(0x01);
+            value
+        }
+
+        let mut rejected = vec![0xa1, 0x01];
+        rejected.extend_from_slice(&tagged_integer(17));
+        let mut reader = CborReader::new(&rejected);
+        assert_eq!(
+            reader.read_map_entries_bounded_with_resource_limits_and_bytes(
+                1, 4096, 64, usize::MAX
+            ),
             Err(Rfc9162ProofDecodeError::ResourceLimitExceeded)
         );
     }
