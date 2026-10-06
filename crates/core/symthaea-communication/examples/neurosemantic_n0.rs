@@ -1030,6 +1030,7 @@ fn main() -> Result<(), String> {
                 &measurement_bytes,
                 &forged_refs,
                 &observation_set_byte_refs,
+                &population_manifest_byte_refs,
             )
             .is_err()
     };
@@ -1045,6 +1046,7 @@ fn main() -> Result<(), String> {
                 &measurement_bytes,
                 &computation_byte_refs,
                 &supplied_refs,
+                &population_manifest_byte_refs,
             )
             .is_err()
     };
@@ -1060,6 +1062,7 @@ fn main() -> Result<(), String> {
                 &measurement_bytes,
                 &computation_byte_refs,
                 &supplied_refs,
+                &population_manifest_byte_refs,
             )
             .is_err()
     };
@@ -1075,6 +1078,7 @@ fn main() -> Result<(), String> {
                 &measurement_bytes,
                 &computation_byte_refs,
                 &supplied_refs,
+                &population_manifest_byte_refs,
             )
             .is_err()
     };
@@ -1090,6 +1094,7 @@ fn main() -> Result<(), String> {
                 &measurement_bytes,
                 &computation_byte_refs,
                 &supplied_refs,
+                &population_manifest_byte_refs,
             )
             .is_err()
     };
@@ -1135,6 +1140,7 @@ fn main() -> Result<(), String> {
                 &measurement_bytes,
                 &forged_refs,
                 &observation_set_byte_refs,
+                &population_manifest_byte_refs,
             )
             .is_err()
     };
