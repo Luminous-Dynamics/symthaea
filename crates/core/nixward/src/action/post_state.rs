@@ -290,6 +290,7 @@ impl NixServicePostStateObservationV1 {
             unit: self.unit.clone(),
             source_identity_digest: self.definition_identity.digest(&self.unit)?,
             manager_owner: manager_owner.to_string(),
+            bus_id: self.systemd_bus_id.clone(),
             files: self.definition_content_files.clone(),
             captured_at_monotonic_us: self.observed_at_monotonic_us,
         };
@@ -1861,6 +1862,7 @@ mod tests {
             definition_content_digest,
             definition_content_files,
             load_state: ServiceLoadStateV1::Loaded,
+            systemd_bus_id: ":1.123".into(),
             active_state,
             sub_state: "running".to_string(),
             unit_file_state,
