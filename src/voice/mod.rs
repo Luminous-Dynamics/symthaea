@@ -106,7 +106,9 @@ pub use audio_out::AudioOutput;
 #[cfg(feature = "live-voice")]
 pub mod live_voice;
 #[cfg(feature = "live-voice")]
-pub use live_voice::LiveVoice;
+pub use live_voice::{
+    LiveVoice, MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt,
+};
 
 // REPL voice output (consciousness-modulated speech for interactive use)
 pub mod repl_voice;
