@@ -550,6 +550,14 @@ fn main() -> Result<(), String> {
     let study_protocol_hash = symthaea_communication::content_hash(study_protocol_bytes);
     let evaluation_split_manifest_hash = symthaea_communication::content_hash(evaluation_split_manifest_bytes);
     let lifecycle_receipt_hash = lifecycle_receipt.fingerprint()?;
+    let evaluation_environment_bytes =
+        b"synthetic-remediation-evaluation-environment-v1:rust:test-runtime";
+    let evaluation_environment_hash =
+        symthaea_communication::content_hash(evaluation_environment_bytes);
+    let evaluation_verification_evidence =
+        b"synthetic-independent-evaluation-verification-v1";
+    let evaluation_verification_evidence_hash =
+        symthaea_communication::content_hash(evaluation_verification_evidence);
 
     let source_dataset_manifest_hash = symthaea_communication::content_hash(b"synthetic-source-dataset-manifest-v1");
     let forget_set_manifest = NeurosemanticRemediationEvaluationSetManifest {
@@ -622,6 +630,10 @@ fn main() -> Result<(), String> {
         ),
         lifecycle_receipt_hash,
         evaluation_manifest_hash: evaluation_manifest.fingerprint()?,
+        evaluation_agent_ref: "synthetic-evaluation-agent-1".into(),
+        evaluation_verifier_ref: "synthetic-evaluation-verifier-1".into(),
+        evaluation_verification_evidence_hash,
+        evaluation_environment_hash,
         remediation_action: NeurosemanticArtifactLifecycleAction::Erasure,
         study_protocol_hash,
         evaluation_split_manifest_hash,
@@ -652,6 +664,17 @@ fn main() -> Result<(), String> {
     let remediation_impact_bytes = serde_json::to_vec(&remediation_impact).map_err(|e| e.to_string())?;
     let remediation_impact_structured = NeurosemanticRemediationImpactArtifact::from_json_bytes(&remediation_impact_bytes).is_ok();
     let remediation_lifecycle_binding_verified = remediation_impact.verify_lifecycle_binding(&lifecycle_receipt).is_ok();
+    let remediation_evaluation_verification_evidence_verified =
+        remediation_impact
+            .verify_evaluation_verification_evidence_bytes(
+                "synthetic-evaluation-verifier-1",
+                evaluation_verification_evidence,
+            )
+            .is_ok();
+    let remediation_evaluation_environment_verified =
+        remediation_impact
+            .verify_evaluation_environment_bytes(evaluation_environment_bytes)
+            .is_ok();
     let remediation_evaluation_manifest_verified =
         remediation_impact.verify_evaluation_manifest_bytes(&evaluation_manifest_bytes).is_ok();
     let remediation_pre_lineage_verified = remediation_impact
@@ -688,6 +711,27 @@ fn main() -> Result<(), String> {
         .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::RecoveryRisk, recovery_evidence).is_ok();
     let remediation_representation_residual_evidence_verified = remediation_impact
         .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::RepresentationResidual, representation_residual_evidence).is_ok();
+    let remediation_evaluation_verifier_substitution_blocked = remediation_impact
+        .verify_evaluation_verification_evidence_bytes(
+            "synthetic-other-verifier",
+            evaluation_verification_evidence,
+        )
+        .is_err();
+    let remediation_evaluation_self_verification_blocked = remediation_impact
+        .verify_evaluation_verification_evidence_bytes(
+            "synthetic-evaluation-agent-1",
+            evaluation_verification_evidence,
+        )
+        .is_err();
+    let remediation_evaluation_verification_evidence_substitution_blocked = remediation_impact
+        .verify_evaluation_verification_evidence_bytes(
+            "synthetic-evaluation-verifier-1",
+            b"tampered-evaluation-verification",
+        )
+        .is_err();
+    let remediation_evaluation_environment_substitution_blocked = remediation_impact
+        .verify_evaluation_environment_bytes(b"other-evaluation-environment")
+        .is_err();
     let remediation_evaluation_manifest_substitution_blocked = {
         let mut forged = evaluation_manifest.clone();
         forged.forget_set_manifest_hash = symthaea_communication::content_hash(b"other-forget-set");
@@ -1204,6 +1248,10 @@ fn main() -> Result<(), String> {
         "remediation_impact_structured": remediation_impact_structured,
         "remediation_evaluation_bundle_verified": remediation_evaluation_bundle_verified,
         "remediation_evaluation_source_dataset_mismatch_blocked": remediation_evaluation_source_dataset_mismatch_blocked,
+        "remediation_evaluation_verifier_substitution_blocked": remediation_evaluation_verifier_substitution_blocked,
+        "remediation_evaluation_self_verification_blocked": remediation_evaluation_self_verification_blocked,
+        "remediation_evaluation_verification_evidence_substitution_blocked": remediation_evaluation_verification_evidence_substitution_blocked,
+        "remediation_evaluation_environment_substitution_blocked": remediation_evaluation_environment_substitution_blocked,
         "remediation_evaluation_manifest_substitution_blocked": remediation_evaluation_manifest_substitution_blocked,
         "remediation_set_pair_verified": remediation_set_pair_verified,
         "remediation_recovery_method_verified": remediation_recovery_method_verified,
@@ -1221,6 +1269,8 @@ fn main() -> Result<(), String> {
         "remediation_recovery_evidence_substitution_blocked": remediation_recovery_evidence_substitution_blocked,
         "remediation_representation_evidence_substitution_blocked": remediation_representation_evidence_substitution_blocked,
         "remediation_lifecycle_binding_verified": remediation_lifecycle_binding_verified,
+        "remediation_evaluation_verification_evidence_verified": remediation_evaluation_verification_evidence_verified,
+        "remediation_evaluation_environment_verified": remediation_evaluation_environment_verified,
         "remediation_evaluation_manifest_verified": remediation_evaluation_manifest_verified,
         "remediation_pre_lineage_verified": remediation_pre_lineage_verified,
         "remediation_post_lineage_verified": remediation_post_lineage_verified,
