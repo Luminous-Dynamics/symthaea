@@ -1479,6 +1479,34 @@ fn rfc9942_outer_crit_array_resource_limit_is_typed() {
 }
 
 #[test]
+fn rfc9942_indefinite_crit_array_resource_limit_is_typed() {
+    let mut protected = vec![0xa2, 0x01, 0x26, 0x02, 0x9f];
+    for label in 0..17u8 {
+        protected.push(label);
+    }
+    protected.push(0xff);
+
+    for context in ["receipt", "outer"] {
+        let mut encoded = vec![0xd2, 0x84, 0x58, protected.len() as u8];
+        encoded.extend_from_slice(&protected);
+        encoded.push(0xa0);
+        encoded.push(0xf6);
+        encoded.push(0x40);
+
+        let result = if context == "receipt" {
+            Rfc9942ReceiptEnvelope::from_cbor(&encoded)
+        } else {
+            Rfc9942SignatureWithReceipts::from_cbor(&encoded)
+        };
+        assert_eq!(
+            result,
+            Err(Rfc9942VdpError::ResourceLimitExceeded),
+            "{context} indefinite crit array must preserve the resource boundary"
+        );
+    }
+}
+
+#[test]
 fn rfc9942_receipt_extension_recursion_resource_limit_is_typed() {
     let mut encoded = vec![0xd2, 0x84, 0x47, 0xa2, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01, 0xa1, 0x18, 0x1e];
     for _ in 0..17 { encoded.push(0xc0); }
