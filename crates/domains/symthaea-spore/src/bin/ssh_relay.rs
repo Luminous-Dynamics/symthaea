@@ -2435,6 +2435,7 @@ async fn handle_connection(
     tracker: SharedTracker,
     auth_token: Arc<String>,
     mutation_lock: SharedMutationLock,
+    transaction_ledger: TransactionLedger,
 ) {
     // Upgrade to WebSocket with Origin header validation.
     // Only allow connections from localhost, 127.0.0.1, or our known domains.
@@ -2475,16 +2476,110 @@ async fn handle_connection(
             return;
         }
     };
-    handle_connection_ws(ws_stream, peer_addr, tracker, auth_token, mutation_lock).await;
+    handle_connection_ws(ws_stream, peer_addr, tracker, auth_token, mutation_lock, transaction_ledger).await;
 }
 
 /// Handle an already-upgraded WebSocket connection (works for both plain and TLS streams)
+async fn admit_mutation_transaction<S>(
+    ws_tx: &mut futures_util::stream::SplitSink<tokio_tungstenite::WebSocketStream<S>, Message>,
+    ledger: &TransactionLedger,
+    mutation: MutationKind,
+    request_id: &str,
+    target_machine_digest: Option<&str>,
+    payload: &[u8],
+) -> Option<SystemTransaction>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    let transaction = match SystemTransaction::begin(
+        mutation,
+        request_id,
+        target_machine_digest,
+        payload,
+    ) {
+        Ok(transaction) => transaction,
+        Err(error) => {
+            let _ = ws_tx
+                .send(Message::Text(
+                    RelayMessage::error(&format!(
+                        "Unable to establish secure system transaction: {}",
+                        error
+                    ))
+                    .to_json(),
+                ))
+                .await;
+            return None;
+        }
+    };
+
+    match ledger.admit(transaction) {
+        Ok(TransactionAdmission::New(transaction)) => Some(transaction),
+        Ok(TransactionAdmission::Replayed(receipt)) => {
+            let _ = ws_tx
+                .send(Message::Text(
+                    serde_json::json!({
+                        "type": "transaction_replay",
+                        "message": "Request was already completed; effect was not re-executed.",
+                        "transaction": receipt
+                    })
+                    .to_string(),
+                ))
+                .await;
+            None
+        }
+        Ok(TransactionAdmission::Indeterminate(receipt)) => {
+            let _ = ws_tx
+                .send(Message::Text(
+                    serde_json::json!({
+                        "type": "transaction_indeterminate",
+                        "message": "Request was previously admitted but its terminal effect is uncertain; refusing re-execution.",
+                        "transaction": receipt
+                    })
+                    .to_string(),
+                ))
+                .await;
+            None
+        }
+        Err(error) => {
+            let _ = ws_tx
+                .send(Message::Text(
+                    RelayMessage::error(&format!(
+                        "Transaction request identity conflict: {}",
+                        error
+                    ))
+                    .to_json(),
+                ))
+                .await;
+            None
+        }
+    }
+}
+
+fn finalize_transaction(
+    ledger: &TransactionLedger,
+    transaction: &SystemTransaction,
+    observed_outcome: TransactionOutcome,
+    peer_addr: &str,
+) -> TransactionOutcome {
+    match ledger.mark_completed(transaction, observed_outcome) {
+        Ok(()) => observed_outcome,
+        Err(error) => {
+            eprintln!(
+                "[{}] Transaction {} completion journal failed: {}",
+                peer_addr, transaction.transaction_id, error
+            );
+            TransactionOutcome::Indeterminate
+        }
+    }
+}
+
 async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin>(
     ws_stream: tokio_tungstenite::WebSocketStream<S>,
     peer_addr: String,
     tracker: SharedTracker,
     auth_token: Arc<String>,
     mutation_lock: SharedMutationLock,
+    transaction_ledger: TransactionLedger,
 ) {
     let (mut ws_tx, mut ws_rx) = ws_stream.split();
     let mut authed = false;
@@ -2913,21 +3008,15 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                         continue;
                     }
                 };
-                let transaction = match SystemTransaction::begin(
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
                     MutationKind::Install,
                     &client_msg.request_id,
                     Some(&target_machine_digest),
                     &install_payload_bytes,
-                ) {
-                    Ok(tx) => tx,
-                    Err(error) => {
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::error(&format!("Unable to establish secure system transaction: {}", error)).to_json(),
-                            ))
-                            .await;
-                        continue;
-                    }
+                ).await else {
+                    continue;
                 };
                 eprintln!("[{}] {}", peer_addr, transaction.log_line());
 
@@ -3442,11 +3531,17 @@ echo "  User password set."
                     }
                     _ => None,
                 };
-                let (exit_code, outcome) = match install_exit_code {
+                let (exit_code, observed_outcome) = match install_exit_code {
                     Some(0) => (0, TransactionOutcome::ObservedSuccess),
                     Some(code) => (code, TransactionOutcome::Failed),
                     None => (1, TransactionOutcome::Indeterminate),
                 };
+                let outcome = finalize_transaction(
+                    &transaction_ledger,
+                    &transaction,
+                    observed_outcome,
+                    &peer_addr,
+                );
                 let _ = ws_tx
                     .send(Message::Text(
                         serde_json::json!({
@@ -4455,25 +4550,15 @@ echo '}'
                         continue;
                     }
                 };
-                let transaction = match SystemTransaction::begin(
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
                     MutationKind::PreserveData,
                     &client_msg.request_id,
                     None,
                     b"preserve-data-before-wipe",
-                ) {
-                    Ok(tx) => tx,
-                    Err(error) => {
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::error(&format!(
-                                    "Unable to establish secure system transaction: {}",
-                                    error
-                                ))
-                                .to_json(),
-                            ))
-                            .await;
-                        continue;
-                    }
+                ).await else {
+                    continue;
                 };
                 eprintln!(
                     "[{}] {} Preserving data before wipe...",
@@ -4584,13 +4669,16 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                                 serde_json::json!({
                                     "type": "data_preserved",
                                     "data": result.stdout,
-                                    "transaction": transaction.receipt(
+                                    "transaction": transaction.receipt(finalize_transaction(
+                                        &transaction_ledger,
+                                        &transaction,
                                         if result.exit_status == 0 {
                                             TransactionOutcome::ObservedSuccess
                                         } else {
                                             TransactionOutcome::Failed
-                                        }
-                                    )
+                                        },
+                                        &peer_addr,
+                                    ))
                                 })
                                 .to_string(),
                             ))
@@ -4602,9 +4690,12 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                                 serde_json::json!({
                                     "type": "error",
                                     "message": format!("Data preservation failed: {}", e),
-                                    "transaction": transaction.receipt(
-                                        TransactionOutcome::Indeterminate
-                                    )
+                                    "transaction": transaction.receipt(finalize_transaction(
+                                        &transaction_ledger,
+                                        &transaction,
+                                        TransactionOutcome::Indeterminate,
+                                        &peer_addr,
+                                    ))
                                 })
                                 .to_string(),
                             ))
@@ -4653,23 +4744,30 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                         continue;
                     }
                 };
-                let transaction = match SystemTransaction::begin(MutationKind::Rollback, &client_msg.request_id, None, b"nixos-rebuild switch --rollback") {
-                    Ok(tx) => tx,
-                    Err(error) => {
-                        let _ = ws_tx
-                            .send(Message::Text(RelayMessage::error(&format!("Unable to establish secure system transaction: {}", error)).to_json()))
-                            .await;
-                        continue;
-                    }
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
+                    MutationKind::Rollback,
+                    &client_msg.request_id,
+                    None,
+                    b"nixos-rebuild switch --rollback",
+                ).await else {
+                    continue;
                 };
                 eprintln!("[{}] {} Rolling back...", peer_addr, transaction.log_line());
                 match run_cmd("nixos-rebuild switch --rollback 2>&1").await {
                     Ok(r) => {
-                        let outcome = if r.exit_status == 0 {
+                        let observed_outcome = if r.exit_status == 0 {
                             TransactionOutcome::ObservedSuccess
                         } else {
                             TransactionOutcome::Failed
                         };
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            observed_outcome,
+                            &peer_addr,
+                        );
                         let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
@@ -4716,14 +4814,15 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                         continue;
                     }
                 };
-                let transaction = match SystemTransaction::begin(MutationKind::SwitchGeneration, &client_msg.request_id, None, r#gen.as_bytes()) {
-                    Ok(tx) => tx,
-                    Err(error) => {
-                        let _ = ws_tx
-                            .send(Message::Text(RelayMessage::error(&format!("Unable to establish secure system transaction: {}", error)).to_json()))
-                            .await;
-                        continue;
-                    }
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
+                    MutationKind::SwitchGeneration,
+                    &client_msg.request_id,
+                    None,
+                    r#gen.as_bytes(),
+                ).await else {
+                    continue;
                 };
                 eprintln!("[{}] {} Switching to generation {}...", peer_addr, transaction.log_line(), r#gen);
                 let cmd = format!(
@@ -4732,11 +4831,17 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                 );
                 match run_cmd(&cmd).await {
                     Ok(r) => {
-                        let outcome = if r.exit_status == 0 {
+                        let observed_outcome = if r.exit_status == 0 {
                             TransactionOutcome::ObservedSuccess
                         } else {
                             TransactionOutcome::Failed
                         };
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            observed_outcome,
+                            &peer_addr,
+                        );
                         let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
@@ -4805,24 +4910,31 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                     }
                 };
                 let transaction_payload = format!("{}:{}", action, service);
-                let transaction = match SystemTransaction::begin(MutationKind::ServiceAction, &client_msg.request_id, None, transaction_payload.as_bytes()) {
-                    Ok(tx) => tx,
-                    Err(error) => {
-                        let _ = ws_tx
-                            .send(Message::Text(RelayMessage::error(&format!("Unable to establish secure system transaction: {}", error)).to_json()))
-                            .await;
-                        continue;
-                    }
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
+                    MutationKind::ServiceAction,
+                    &client_msg.request_id,
+                    None,
+                    transaction_payload.as_bytes(),
+                ).await else {
+                    continue;
                 };
                 eprintln!("[{}] {} {} {}...", peer_addr, transaction.log_line(), action, service);
                 let cmd = format!("systemctl {} {}.service 2>&1", action, service);
                 match run_cmd(&cmd).await {
                     Ok(r) => {
-                        let outcome = if r.exit_status == 0 {
+                        let observed_outcome = if r.exit_status == 0 {
                             TransactionOutcome::ObservedSuccess
                         } else {
                             TransactionOutcome::Failed
                         };
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            observed_outcome,
+                            &peer_addr,
+                        );
                         let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout,"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
@@ -4910,14 +5022,15 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                         continue;
                     }
                 };
-                let transaction = match SystemTransaction::begin(MutationKind::GcCollect, &client_msg.request_id, None, b"nix-collect-garbage:delete-older-than-30d") {
-                    Ok(tx) => tx,
-                    Err(error) => {
-                        let _ = ws_tx
-                            .send(Message::Text(RelayMessage::error(&format!("Unable to establish secure system transaction: {}", error)).to_json()))
-                            .await;
-                        continue;
-                    }
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
+                    MutationKind::GcCollect,
+                    &client_msg.request_id,
+                    None,
+                    b"nix-collect-garbage:delete-older-than-30d",
+                ).await else {
+                    continue;
                 };
                 eprintln!("[{}] {} Starting garbage collection...", peer_addr, transaction.log_line());
                 let gc_log = format!("/tmp/symthaea-gc-{}.log", transaction.transaction_id);
@@ -4984,13 +5097,19 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                     Ok(result) if result.exit_status == 0 => result.stdout.trim().parse::<u32>().unwrap_or(1),
                     _ => 1,
                 };
-                let outcome = if gc_exit_code == 0 {
+                let observed_outcome = if gc_exit_code == 0 {
                     TransactionOutcome::ObservedSuccess
                 } else if gc_exit_code == 1 {
                     TransactionOutcome::Failed
                 } else {
                     TransactionOutcome::Indeterminate
                 };
+                let outcome = finalize_transaction(
+                    &transaction_ledger,
+                    &transaction,
+                    observed_outcome,
+                    &peer_addr,
+                );
                 let _ = ws_tx
                     .send(Message::Text(
                         serde_json::json!({
@@ -5112,19 +5231,15 @@ echo '}'
                         continue;
                     }
                 };
-                let transaction = match SystemTransaction::begin(
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
                     MutationKind::WriteConfig,
                     &client_msg.request_id,
                     None,
                     client_msg.configuration_nix.as_bytes(),
-                ) {
-                    Ok(tx) => tx,
-                    Err(error) => {
-                        let _ = ws_tx
-                            .send(Message::Text(RelayMessage::error(&format!("Unable to establish secure system transaction: {}", error)).to_json()))
-                            .await;
-                        continue;
-                    }
+                ).await else {
+                    continue;
                 };
                 eprintln!("[{}] {} Writing config + rebuilding...", peer_addr, transaction.log_line());
                 let wc_config_path = format!("/tmp/symthaea-newconfig-{}.nix", transaction.transaction_id);
@@ -5384,11 +5499,17 @@ echo "REBUILD_COMPLETE"
                     }
                     _ => None,
                 };
-                let (exit_code, outcome) = match rebuild_exit_code {
+                let (exit_code, observed_outcome) = match rebuild_exit_code {
                     Some(0) => (0, TransactionOutcome::ObservedSuccess),
                     Some(code) => (code, TransactionOutcome::Failed),
                     None => (1, TransactionOutcome::Indeterminate),
                 };
+                let outcome = finalize_transaction(
+                    &transaction_ledger,
+                    &transaction,
+                    observed_outcome,
+                    &peer_addr,
+                );
                 let _ = ws_tx
                     .send(Message::Text(
                         serde_json::json!({
@@ -5495,25 +5616,15 @@ echo "REBUILD_COMPLETE"
                         continue;
                     }
                 };
-                let transaction = match SystemTransaction::begin(
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
                     MutationKind::CreateImage,
                     &client_msg.request_id,
                     Some(&target_machine_digest),
                     b"create-system-image",
-                ) {
-                    Ok(tx) => tx,
-                    Err(error) => {
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::error(&format!(
-                                    "Unable to establish secure system transaction: {}",
-                                    error
-                                ))
-                                .to_json(),
-                            ))
-                            .await;
-                        continue;
-                    }
+                ).await else {
+                    continue;
                 };
                 let image_dest = format!("/tmp/nixforhumanity-image-{}", transaction.transaction_id);
                 eprintln!(
@@ -5673,11 +5784,17 @@ echo "COMPLETE"
                     }
                     _ => None,
                 };
-                let (response_code, outcome) = match image_exit_code {
+                let (response_code, observed_outcome) = match image_exit_code {
                     Some(0) => (0, TransactionOutcome::ObservedSuccess),
                     Some(code) => (code, TransactionOutcome::Failed),
                     None => (1, TransactionOutcome::Indeterminate),
                 };
+                let outcome = finalize_transaction(
+                    &transaction_ledger,
+                    &transaction,
+                    observed_outcome,
+                    &peer_addr,
+                );
 
                 let _ = ws_tx
                     .send(Message::Text(
@@ -5731,25 +5848,15 @@ echo "COMPLETE"
                         continue;
                     }
                 };
-                let transaction = match SystemTransaction::begin(
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
                     MutationKind::RestoreImage,
                     &client_msg.request_id,
                     None,
                     image_path.as_bytes(),
-                ) {
-                    Ok(tx) => tx,
-                    Err(error) => {
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::error(&format!(
-                                    "Unable to establish secure system transaction: {}",
-                                    error
-                                ))
-                                .to_json(),
-                            ))
-                            .await;
-                        continue;
-                    }
+                ).await else {
+                    continue;
                 };
 
                 eprintln!(
@@ -5782,11 +5889,17 @@ echo "COMPLETE"
 
                 match run_cmd(&script).await {
                     Ok(r) => {
-                        let outcome = if r.exit_status == 0 {
+                        let observed_outcome = if r.exit_status == 0 {
                             TransactionOutcome::ObservedSuccess
                         } else {
                             TransactionOutcome::Failed
                         };
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            observed_outcome,
+                            &peer_addr,
+                        );
                         let _ = ws_tx
                             .send(Message::Text(
                                 serde_json::json!({
@@ -5805,7 +5918,7 @@ echo "COMPLETE"
                                 serde_json::json!({
                                     "type": "error",
                                     "message": format!("Restore failed: {}", e),
-                                    "transaction": transaction.receipt(TransactionOutcome::Indeterminate)
+                                    "transaction": transaction.receipt(finalize_transaction(&transaction_ledger, &transaction, TransactionOutcome::Indeterminate, &peer_addr))
                                 })
                                 .to_string(),
                             ))
@@ -6001,25 +6114,16 @@ echo '}'
                         continue;
                     }
                 };
-                let transaction = match SystemTransaction::begin(
+                let transaction_payload = format!("connect-wifi:{ssid}");
+                 let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
                     MutationKind::ConnectWifi,
                     &client_msg.request_id,
                     Some(&target_machine_digest),
-                    format!("connect-wifi:{ssid}").as_bytes(),
-                ) {
-                    Ok(tx) => tx,
-                    Err(error) => {
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::error(&format!(
-                                    "Unable to establish secure system transaction: {}",
-                                    error
-                                ))
-                                .to_json(),
-                            ))
-                            .await;
-                        continue;
-                    }
+                    transaction_payload.as_bytes(),
+                ).await else {
+                    continue;
                 };
 
                 let secret_path =
@@ -6089,7 +6193,7 @@ echo '}'
                                 "type": "wifi_result",
                                 "code": 1,
                                 "data": format!("Wi-Fi profile creation failed: {}", error),
-                                "transaction": transaction.receipt(TransactionOutcome::Indeterminate)
+                                "transaction": transaction.receipt(finalize_transaction(&transaction_ledger, &transaction, TransactionOutcome::Indeterminate, &peer_addr))
                             })
                             .to_string(),
                         ))
@@ -6106,11 +6210,17 @@ echo '}'
 
                 let response = match result {
                     Ok(r) => {
-                        let outcome = if r.exit_status == 0 {
+                        let observed_outcome = if r.exit_status == 0 {
                             TransactionOutcome::ObservedSuccess
                         } else {
                             TransactionOutcome::Failed
                         };
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            observed_outcome,
+                            &peer_addr,
+                        );
                         serde_json::json!({
                             "type": "wifi_result",
                             "code": r.exit_status,
@@ -6126,7 +6236,7 @@ echo '}'
                         "type": "wifi_result",
                         "code": 1,
                         "data": format!("Wi-Fi connection failed: {}", error),
-                        "transaction": transaction.receipt(TransactionOutcome::Indeterminate)
+                        "transaction": transaction.receipt(finalize_transaction(&transaction_ledger, &transaction, TransactionOutcome::Indeterminate, &peer_addr))
                     }),
                 };
 
@@ -6484,6 +6594,13 @@ async fn main() {
     // Serialize consequential system mutations across all WebSocket connections owned by this relay.
     // We refuse rather than queue so a stale request cannot silently execute later.
     let mutation_lock: SharedMutationLock = Arc::new(Mutex::new(()));
+    let transaction_ledger = match TransactionLedger::open_default() {
+        Ok(ledger) => ledger,
+        Err(error) => {
+            eprintln!("ERROR: Cannot initialize transaction ledger: {}", error);
+            std::process::exit(1);
+        }
+    };
 
     let addr = format!("{}:{}", bind_addr, port);
     let listener = match TcpListener::bind(&addr).await {
@@ -6667,7 +6784,7 @@ async fn main() {
                                 return;
                             }
                         };
-                        handle_connection_ws(ws_stream, peer, tracker, auth, mutation_lock).await;
+                        handle_connection_ws(ws_stream, peer, tracker, auth, mutation_lock, transaction_ledger.clone()).await;
                     }
                     Err(e) => {
                         eprintln!("[{}] TLS handshake failed: {}", peer, e);
@@ -6675,7 +6792,7 @@ async fn main() {
                 }
             });
         } else {
-            tokio::spawn(handle_connection(stream, peer, tracker, auth, mutation_lock));
+            tokio::spawn(handle_connection(stream, peer, tracker, auth, mutation_lock, transaction_ledger.clone()));
         }
     }
 }
@@ -6963,6 +7080,7 @@ mod tests {
     fn single_luks_script_uses_session_scoped_keyfile_not_secret_text() {
         let message = ClientMessage {
             action: "install".into(),
+            request_id: String::new(),
             token: String::new(),
             host: String::new(),
             port: 22,
@@ -7016,6 +7134,7 @@ mod tests {
         for layout in layouts {
             let message = ClientMessage {
                 action: "install".into(),
+                request_id: String::new(),
                 token: String::new(),
                 host: String::new(),
                 port: 22,
