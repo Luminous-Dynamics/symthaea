@@ -25,6 +25,8 @@ use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
+#[cfg(target_os = "linux")]
+use std::os::fd::FromRawFd;
 use std::time::Duration;
 use thiserror::Error;
 use zbus::export::futures_util::StreamExt;
@@ -137,6 +139,9 @@ pub enum NixSystemdObserverErrorV1 {
 
     #[error("definition content exceeds capture size limit")]
     DefinitionContentTooLarge,
+
+    #[error("kernel does not support the required openat2 path-resolution policy")]
+    DefinitionContentStrongResolutionUnavailable,
 
     #[error("systemd reports that this unit needs daemon reload")]
     DefinitionNeedsDaemonReload,
@@ -1075,6 +1080,29 @@ fn definition_file_identity(file: &std::fs::File) -> Result<DefinitionFileObject
 }
 
 #[cfg(unix)]
+fn definition_path_identity(
+    path: &Path,
+) -> Result<DefinitionFileObjectIdentity, NixSystemdObserverErrorV1> {
+    use std::os::unix::fs::MetadataExt;
+    let metadata = std::fs::metadata(path).map_err(|error| {
+        NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string())
+    })?;
+    if !metadata.is_file() {
+        return Err(NixSystemdObserverErrorV1::DefinitionContentNotRegular);
+    }
+    Ok(DefinitionFileObjectIdentity {
+        dev: metadata.dev(),
+        ino: metadata.ino(),
+        mode: metadata.mode(),
+        size: metadata.size(),
+        mtime_sec: metadata.mtime(),
+        mtime_nsec: metadata.mtime_nsec(),
+        ctime_sec: metadata.ctime(),
+        ctime_nsec: metadata.ctime_nsec(),
+    })
+}
+
+#[cfg(unix)]
 fn hash_open_definition_file(
     file: &mut std::fs::File,
 ) -> Result<(u64, String), NixSystemdObserverErrorV1> {
@@ -1125,28 +1153,85 @@ fn resolve_definition_content_open_path(
     Ok((source.to_path_buf(), None))
 }
 
+#[cfg(target_os = "linux")]
+#[repr(C)]
+struct OpenHow {
+    flags: u64,
+    mode: u64,
+    resolve: u64,
+}
+
+#[cfg(target_os = "linux")]
+const RESOLVE_NO_MAGICLINKS: u64 = 0x02;
+#[cfg(target_os = "linux")]
+const RESOLVE_NO_SYMLINKS: u64 = 0x04;
+
+#[cfg(target_os = "linux")]
+fn open_definition_capture_path(
+    path: &Path,
+) -> Result<std::fs::File, NixSystemdObserverErrorV1> {
+    let path_str = path.to_str().ok_or_else(|| {
+        NixSystemdObserverErrorV1::DefinitionContentIo(
+            "definition path is not valid UTF-8".into(),
+        )
+    })?;
+    let c_path = std::ffi::CString::new(path_str.as_bytes()).map_err(|_| {
+        NixSystemdObserverErrorV1::DefinitionContentIo(
+            "definition path contains an embedded NUL".into(),
+        )
+    })?;
+    let how = OpenHow {
+        flags: (libc::O_RDONLY | libc::O_CLOEXEC | libc::O_NOFOLLOW) as u64,
+        mode: 0,
+        resolve: RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS,
+    };
+    let fd = unsafe {
+        libc::syscall(
+            libc::SYS_openat2,
+            libc::AT_FDCWD,
+            c_path.as_ptr(),
+            &how,
+            std::mem::size_of::<OpenHow>(),
+        )
+    };
+    if fd < 0 {
+        let error = std::io::Error::last_os_error();
+        match error.raw_os_error() {
+            Some(libc::ENOSYS) => Err(
+                NixSystemdObserverErrorV1::DefinitionContentStrongResolutionUnavailable,
+            ),
+            Some(libc::ELOOP) => Err(NixSystemdObserverErrorV1::DefinitionContentSymlink),
+            _ => Err(NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string())),
+        }
+    } else {
+        Ok(unsafe { std::fs::File::from_raw_fd(fd as std::os::fd::RawFd) })
+    }
+}
+
+#[cfg(all(unix, not(target_os = "linux")))]
+fn open_definition_capture_path(
+    path: &Path,
+) -> Result<std::fs::File, NixSystemdObserverErrorV1> {
+    use std::os::unix::fs::OpenOptionsExt;
+    OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
+        .open(path)
+        .map_err(|error| NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string()))
+}
+
 #[cfg(unix)]
 fn read_definition_content_file(
     path: &str,
 ) -> Result<NixSystemdUnitDefinitionContentFileV1, NixSystemdObserverErrorV1> {
-    use std::os::unix::fs::OpenOptionsExt;
-
     let (open_path, resolved_path) = resolve_definition_content_open_path(path)?;
-
-    let mut options = OpenOptions::new();
-    options.read(true);
-    let mut file = options
-        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
-        .open(&open_path)
-        .map_err(|error| {
-            if error.raw_os_error() == Some(libc::ELOOP) {
-                NixSystemdObserverErrorV1::DefinitionContentSymlink
-            } else {
-                NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string())
-            }
-        })?;
+    let expected_identity = definition_path_identity(&open_path)?;
+    let mut file = open_definition_capture_path(&open_path)?;
 
     let before = definition_file_identity(&file)?;
+    if before != expected_identity {
+        return Err(NixSystemdObserverErrorV1::DefinitionContentMutationDetected);
+    }
     let (first_len, first_digest) = hash_open_definition_file(&mut file)?;
     let middle = definition_file_identity(&file)?;
     let (second_len, second_digest) = hash_open_definition_file(&mut file)?;
@@ -1422,6 +1507,23 @@ fn monotonic_now_us() -> Result<u64, NixSystemdObserverErrorV1> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn openat2_rejects_intermediate_symlink_without_weaker_fallback() {
+        let directory = tempfile::tempdir().unwrap();
+        let target = directory.path().join("target");
+        let link = directory.path().join("link");
+        std::fs::create_dir(&target).unwrap();
+        std::fs::write(target.join("unit.service"), b"[Service]\n").unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        let result = open_definition_capture_path(&link.join("unit.service"));
+        assert_eq!(
+            result.unwrap_err(),
+            NixSystemdObserverErrorV1::DefinitionContentSymlink
+        );
+    }
 
     #[cfg(unix)]
     #[test]
