@@ -177,6 +177,7 @@ jobs:
           assert report["remediation_evaluation_self_verification_blocked"] is True
           assert report["remediation_evaluation_verification_evidence_substitution_blocked"] is True
           assert report["remediation_evaluation_environment_substitution_blocked"] is True
+          assert report["remediation_evaluation_environment_revision_mismatch_blocked"] is True
           assert report["remediation_evaluation_manifest_substitution_blocked"] is True
           assert report["remediation_evaluation_source_dataset_mismatch_blocked"] is True
           assert report["remediation_set_role_substitution_blocked"] is True
