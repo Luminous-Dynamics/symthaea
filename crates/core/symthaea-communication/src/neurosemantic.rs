@@ -237,8 +237,10 @@ impl NeurosemanticRemediationEvaluationSetManifest {
 
     pub fn fingerprint(&self) -> Result<String, String> {
         self.validate()?;
+        let mut canonical = self.clone();
+        canonical.member_artifact_hashes.sort();
         Ok(content_hash(
-            &serde_json::to_vec(self)
+            &serde_json::to_vec(&canonical)
                 .map_err(|error| format!("neurosemantic remediation evaluation set serialization: {error}"))?,
         ))
     }
@@ -264,7 +266,7 @@ pub const NEUROSEMANTIC_REMEDIATION_EVALUATION_METHOD_SCHEMA_VERSION: u16 = 1;
 impl NeurosemanticRemediationEvaluationMethod {
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_version != NEUROSEMANTIC_REMEDIATION_EVALUATION_METHOD_SCHEMA_VERSION
-            || self.method_ref.is_empty()
+            || !valid_identifier(&self.method_ref)
             || self.method_ref.len() > MAX_NEUROSEMANTIC_REMEDIATION_METHOD_REF_BYTES
             || !valid_blake3_digest(&self.protocol_hash)
             || !valid_execution_revision(&self.implementation_revision)
@@ -2920,6 +2922,22 @@ mod tests {
 
         let oversized = vec![b' '; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1];
         assert!(NeurosemanticArtifactLifecycleVerificationTargetSet::from_json_bytes(&oversized).is_err());
+    }
+
+    #[test]
+    fn remediation_evaluation_set_fingerprint_is_order_insensitive() {
+        let mut manifest = NeurosemanticRemediationEvaluationSetManifest {
+            schema_version: NEUROSEMANTIC_REMEDIATION_EVALUATION_SET_SCHEMA_VERSION,
+            set_ref: "set-order-test".into(),
+            set_kind: NeurosemanticRemediationEvaluationSetKind::Forget,
+            source_dataset_manifest_hash: content_hash(b"dataset"),
+            member_artifact_hashes: vec![content_hash(b"b"), content_hash(b"a")],
+        };
+        let first = manifest.fingerprint().unwrap();
+        manifest.member_artifact_hashes.reverse();
+        let second = manifest.fingerprint().unwrap();
+        assert_eq!(first, second);
+        assert!(manifest.validate().is_ok());
     }
 
     #[test]
