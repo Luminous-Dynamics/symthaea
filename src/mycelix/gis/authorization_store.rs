@@ -11127,6 +11127,373 @@ mod tests {
     }
 
     #[test]
+    fn each_attempt_bearing_legacy_ledger_independently_blocks_attempt_reuse() {
+        let tables = [
+            "authorization_leases",
+            "authorization_receipts",
+            "authorization_status_checks",
+            "authorization_recovery_markers",
+            "authorization_terminal_evidence",
+            "authorization_dispatches",
+        ];
+
+        for (index, table) in tables.iter().enumerate() {
+            let path = std::env::temp_dir().join(format!(
+                "symthaea-gis-auth-legacy-attempt-matrix-{index}-{}.db",
+                std::process::id()
+            ));
+            let store = SqliteAuthorizationStore::open_with_relying_party(
+                &path,
+                &format!("rp-legacy-attempt-matrix-{index}"),
+            )
+            .unwrap();
+
+            let candidate_auth = format!("legacy-attempt-candidate-{index}");
+            let candidate_operation = format!("operation:legacy-attempt-candidate-{index}");
+            let attempt_id = format!("attempt:legacy-attempt-matrix-{index}");
+            let action = EpistemicAction::new(
+                format!("legacy-attempt-matrix-action-{index}"),
+                "effect",
+                super::super::ActionRisk::Critical,
+            );
+            let action_digest = action.canonical_action_digest();
+            let witness = ActionAuthorizationWitness {
+                operation_id: Some(candidate_operation.clone()),
+                authorization_instance: candidate_auth.clone(),
+                action_id: action.id.clone(),
+                action_digest: action_digest.clone(),
+                frame: "frame@1".into(),
+                support_digest: "sha256:candidate-support".into(),
+                policy: "policy-v1".into(),
+                decision: "execute".into(),
+                issued_at: "2026-10-03T10:00:00Z".into(),
+                expires_at: Some("2026-10-04T10:00:00Z".into()),
+                authority_epoch: 1,
+            };
+
+            store
+                .register_lease(&AuthorizationLease::new_with_instance(
+                    candidate_auth.clone(),
+                    action.id.clone(),
+                    action_digest.clone(),
+                    witness.support_digest.clone(),
+                    witness.policy.clone(),
+                    1,
+                    1,
+                ))
+                .unwrap();
+
+            let legacy_auth = format!("legacy-attempt-owner-{index}");
+            let legacy_operation = format!("operation:legacy-attempt-owner-{index}");
+            let legacy_action = "legacy-action";
+            let legacy_digest = "sha256:legacy-action";
+            let legacy_boundary = format!("legacy-boundary-{index}");
+            let connection = store.connection().unwrap();
+
+            match *table {
+                "authorization_leases" => {
+                    connection
+                        .execute(
+                            "INSERT INTO authorization_leases(
+                                authorization_instance,action_id,action_digest,support_digest,policy,
+                                authority_epoch,remaining_executions,state,attempt_id,operation_id)
+                             VALUES(?1,?2,?3,'legacy-support','legacy-policy',1,1,'ready',?4,?5)",
+                            params![
+                                legacy_auth.as_str(),
+                                legacy_action,
+                                legacy_digest,
+                                attempt_id.as_str(),
+                                legacy_operation.as_str()
+                            ],
+                        )
+                        .unwrap();
+                }
+                "authorization_receipts" => {
+                    connection
+                        .execute(
+                            "INSERT INTO authorization_receipts(
+                                authorization_instance,action_id,attempt_id,phase,outcome,
+                                action_digest,authority_epoch,operation_id)
+                             VALUES(?1,?2,?3,'final','failed',?4,1,?5)",
+                            params![
+                                legacy_auth.as_str(),
+                                legacy_action,
+                                attempt_id.as_str(),
+                                legacy_digest,
+                                legacy_operation.as_str()
+                            ],
+                        )
+                        .unwrap();
+                }
+                "authorization_status_checks" => {
+                    connection
+                        .execute(
+                            "INSERT INTO authorization_status_checks(
+                                authorization_instance,attempt_id,phase,operation_id,status_identifier,
+                                status_source_digest,status_observed_at,status_valid_until,status_evidence_digest)
+                             VALUES(?1,?2,'pre_entry',?3,'status:legacy-attempt',
+                                    'sha256:legacy-source','2026-10-03T10:00:00Z',
+                                    '2026-10-03T10:30:00Z','sha256:legacy-status')",
+                            params![
+                                legacy_auth.as_str(),
+                                attempt_id.as_str(),
+                                legacy_operation.as_str()
+                            ],
+                        )
+                        .unwrap();
+                }
+                "authorization_recovery_markers" => {
+                    connection
+                        .execute(
+                            "INSERT INTO authorization_recovery_markers(
+                                authorization_instance,attempt_id,operation_id,boundary_id,
+                                action_digest,authority_epoch,marker)
+                             VALUES(?1,?2,?3,?4,?5,1,'not_entered')",
+                            params![
+                                legacy_auth.as_str(),
+                                attempt_id.as_str(),
+                                legacy_operation.as_str(),
+                                legacy_boundary.as_str(),
+                                legacy_digest,
+                            ],
+                        )
+                        .unwrap();
+                }
+                "authorization_terminal_evidence" => {
+                    connection
+                        .execute(
+                            "INSERT INTO authorization_terminal_evidence(
+                                authorization_instance,attempt_id,operation_id,native_replay_identity,
+                                boundary_id,action_digest,provider_idempotency_key,target_identity,
+                                audience,outcome,evidence_id,evidence_digest,attempt_binding_digest,
+                                verifier_id,verifier_config_digest,trust_anchor_digest,
+                                evidence_profile_digest,verification_digest)
+                             VALUES(
+                                ?1,?2,?3,'legacy-native',?4,?5,'legacy-provider-key','legacy-target',
+                                'legacy-audience','failed','legacy-evidence','sha256:legacy-evidence',
+                                'sha256:legacy-attempt-binding','legacy-verifier',
+                                'sha256:legacy-verifier-config','sha256:legacy-trust',
+                                'sha256:legacy-profile','sha256:legacy-verification')",
+                            params![
+                                legacy_auth.as_str(),
+                                attempt_id.as_str(),
+                                legacy_operation.as_str(),
+                                legacy_boundary.as_str(),
+                                legacy_digest,
+                            ],
+                        )
+                        .unwrap();
+                }
+                "authorization_dispatches" => {
+                    connection
+                        .execute(
+                            "INSERT INTO authorization_dispatches(
+                                authorization_instance,attempt_id,operation_id,native_replay_identity,
+                                action_id,action_digest,provider_idempotency_key,target_identity,
+                                audience,adapter,adapter_revision,adapter_implementation_digest,
+                                boundary_id,attempt_binding_digest,state)
+                             VALUES(
+                                ?1,?2,?3,'legacy-native',?4,?5,'legacy-provider-key','legacy-target',
+                                'legacy-audience','legacy-adapter','legacy-adapter-v1',
+                                'sha256:legacy-adapter','legacy-boundary',
+                                'sha256:legacy-attempt-binding','failed')",
+                            params![
+                                legacy_auth.as_str(),
+                                attempt_id.as_str(),
+                                legacy_operation.as_str(),
+                                legacy_action,
+                                legacy_digest,
+                            ],
+                        )
+                        .unwrap();
+                }
+                _ => unreachable!(),
+            }
+
+            assert!(matches!(
+                store.prepare_for_execution_bound_with_operation(
+                    &witness,
+                    &action,
+                    "frame@1",
+                    &attempt_id,
+                    &format!("candidate-boundary-{index}"),
+                    &candidate_operation,
+                ),
+                Err(AuthorizationStoreError::Consumption(
+                    AuthorizationConsumptionError::InvalidBinding
+                ))
+            ));
+
+            let _ = std::fs::remove_file(path);
+        }
+    }
+
+    #[test]
+    fn failed_fence_release_requires_fresh_native_replay_and_operation() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-failed-release-fresh-native-{}.db",
+            std::process::id()
+        ));
+        let store = SqliteAuthorizationStore::open(&path).unwrap();
+        let effect = ActionEffectBinding::new("target-failed-release", "prod", "adapter-failed-release");
+        let action = EpistemicAction::new(
+            "failed-release-fresh-native",
+            "intervention",
+            super::super::ActionRisk::Critical,
+        )
+        .with_effect_binding(effect.clone());
+        let action_digest = action.canonical_action_digest();
+
+        let witness = ActionAuthorizationWitness {
+            operation_id: Some("operation:first".into()),
+            authorization_instance: "failed-release-authorization".into(),
+            action_id: action.id.clone(),
+            action_digest: action_digest.clone(),
+            frame: "frame@1".into(),
+            support_digest: "sha256:support".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:00:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+        store
+            .register_lease(&AuthorizationLease::new_with_instance(
+                witness.authorization_instance.clone(),
+                action.id.clone(),
+                action_digest,
+                witness.support_digest.clone(),
+                witness.policy.clone(),
+                1,
+                2,
+            ))
+            .unwrap();
+
+        store
+            .prepare_for_execution_bound_with_operation(
+                &witness,
+                &action,
+                "frame@1",
+                "attempt:first",
+                "boundary-failed-release",
+                "operation:first",
+            )
+            .unwrap();
+        let first = mark_dispatch_pending_bound_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt:first",
+            &action,
+            &effect,
+            "boundary-failed-release",
+            "operation:first",
+            "native:first",
+        )
+        .unwrap();
+        store
+            .mark_invoked_bound(&first, &TestProviderStatusVerifier)
+            .unwrap();
+        store
+            .commit_bound_verified(
+                &first,
+                &verified_evidence(&first, ExecutionOutcome::Failed),
+                &TestProviderVerifier,
+            )
+            .unwrap();
+
+        let lease_state: String = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT state FROM authorization_leases WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(lease_state, "ready");
+
+        let remaining: i64 = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT remaining_executions FROM authorization_leases
+                 WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(remaining, 1);
+
+        let old_attempt = store.prepare_for_execution_bound_with_operation(
+            &witness,
+            &action,
+            "frame@1",
+            "attempt:first",
+            "boundary-failed-release",
+            "operation:second",
+        );
+        assert!(matches!(
+            old_attempt,
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+
+        let mut fresh_witness = witness.clone();
+        fresh_witness.operation_id = Some("operation:second".into());
+        store
+            .prepare_for_execution_bound_with_operation(
+                &fresh_witness,
+                &action,
+                "frame@1",
+                "attempt:second",
+                "boundary-failed-release",
+                "operation:second",
+            )
+            .unwrap();
+
+        let second = mark_dispatch_pending_bound_for_test(
+            &store,
+            &fresh_witness.authorization_instance,
+            "attempt:second",
+            &action,
+            &effect,
+            "boundary-failed-release",
+            "operation:second",
+            "native:second",
+        )
+        .unwrap();
+        assert_ne!(first.native_replay_identity, second.native_replay_identity);
+        assert_ne!(first.provider_idempotency_key, second.provider_idempotency_key);
+
+        store
+            .mark_invoked_bound(&second, &TestProviderStatusVerifier)
+            .unwrap();
+        let second_receipt = store
+            .commit_bound_verified(
+                &second,
+                &verified_evidence(&second, ExecutionOutcome::Succeeded),
+                &TestProviderVerifier,
+            )
+            .unwrap();
+        assert_eq!(second_receipt.outcome, ExecutionOutcome::Succeeded);
+
+        let dispatch_count: i64 = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM authorization_dispatches
+                 WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(dispatch_count, 2);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn prepared_operation_id_cannot_be_reused_across_authorizations() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-auth-operation-reuse-{}.db",std::process::id()
