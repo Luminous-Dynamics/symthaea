@@ -3367,6 +3367,44 @@ mod tests {
             representation_probe_method_hash: representation_method.fingerprint().unwrap(),
         };
         let evaluation_manifest_bytes = serde_json::to_vec(&evaluation_manifest).unwrap();
+        let measurement = NeurosemanticRemediationMeasurementArtifact {
+            schema_version: NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION,
+            measurement_ref: "measurement-1".into(),
+            measurements: vec![
+                NeurosemanticRemediationMeasurement {
+                    kind: NeurosemanticRemediationMeasurementKind::Forgetfulness,
+                    status: NeurosemanticRemediationImpactDisposition::Inconclusive,
+                    sample_count: 2,
+                    failure_count: 0,
+                },
+                NeurosemanticRemediationMeasurement {
+                    kind: NeurosemanticRemediationMeasurementKind::UtilityImpact,
+                    status: NeurosemanticRemediationImpactDisposition::Inconclusive,
+                    sample_count: 2,
+                    failure_count: 0,
+                },
+                NeurosemanticRemediationMeasurement {
+                    kind: NeurosemanticRemediationMeasurementKind::RecoveryRisk,
+                    status: NeurosemanticRemediationImpactDisposition::Inconclusive,
+                    sample_count: 2,
+                    failure_count: 0,
+                },
+                NeurosemanticRemediationMeasurement {
+                    kind: NeurosemanticRemediationMeasurementKind::RepresentationResidual,
+                    status: NeurosemanticRemediationImpactDisposition::Inconclusive,
+                    sample_count: 2,
+                    failure_count: 0,
+                },
+                NeurosemanticRemediationMeasurement {
+                    kind: NeurosemanticRemediationMeasurementKind::FairnessImpact,
+                    status: NeurosemanticRemediationImpactDisposition::Inconclusive,
+                    sample_count: 2,
+                    failure_count: 0,
+                },
+            ],
+            worst_case_disposition: NeurosemanticRemediationImpactDisposition::Inconclusive,
+        };
+        let measurement_bytes = serde_json::to_vec(&measurement).unwrap();
         let impact = NeurosemanticRemediationImpactArtifact {
             schema_version: NEUROSEMANTIC_REMEDIATION_IMPACT_ARTIFACT_SCHEMA_VERSION,
             impact_ref: "impact-1".into(),
@@ -3378,6 +3416,7 @@ mod tests {
             post_remediation_lineage_hash: compute_derivation_provenance_hash(&post_lineage.lineage_ref, &post_bytes),
             lifecycle_receipt_hash: lifecycle.fingerprint().unwrap(),
             evaluation_manifest_hash: evaluation_manifest.fingerprint().unwrap(),
+            measurement_artifact_hash: measurement.fingerprint().unwrap(),
             evaluation_agent_ref: "evaluation-agent-1".into(),
             evaluation_verifier_ref: "evaluation-verifier-1".into(),
             evaluation_verification_evidence_hash: content_hash(b"evaluation-verification"),
@@ -3412,6 +3451,23 @@ mod tests {
         assert!(impact.validate().is_ok());
         assert!(impact.verify_lifecycle_binding(&lifecycle).is_ok());
         assert!(impact.verify_evaluation_manifest_bytes(&evaluation_manifest_bytes).is_ok());
+        assert_eq!(
+            impact.verify_measurement_artifact_bytes(&measurement_bytes).unwrap(),
+            measurement
+        );
+        let mut measurement_subset = measurement.clone();
+        measurement_subset.measurements.retain(|item| {
+            item.kind != NeurosemanticRemediationMeasurementKind::RepresentationResidual
+        });
+        measurement_subset.worst_case_disposition =
+            measurement_subset.recomputed_worst_case_disposition().unwrap();
+        assert!(
+            impact
+                .verify_measurement_artifact_bytes(
+                    &serde_json::to_vec(&measurement_subset).unwrap()
+                )
+                .is_err()
+        );
         assert!(impact
             .verify_evaluation_verification_evidence_bytes(
                 "evaluation-verifier-1",
@@ -3442,6 +3498,13 @@ mod tests {
         assert!(impact
             .verify_evaluation_environment_bytes(b"other-environment")
             .is_err());
+        let mut measurement_status_forged = measurement.clone();
+        measurement_status_forged.measurements[0].status =
+            NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds;
+        assert!(measurement_status_forged.validate().is_err());
+        let mut measurement_count_forged = measurement.clone();
+        measurement_count_forged.measurements[0].failure_count = 3;
+        assert!(measurement_count_forged.validate().is_err());
         assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PreRemediation, &pre_bytes).is_ok());
         assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PostRemediation, &post_bytes).is_ok());
         assert!(impact.verify_evaluation_set_pair_bytes(&forget_bytes, &retain_bytes).is_ok());
