@@ -52,6 +52,8 @@ OBSERVATION_CRATE_WIDE_FACTORY_PATTERN='\bpub\(crate\)[[:space:]]+(?:async[[:spa
 ENABLEMENT_EVIDENCE_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceEnablementEvidenceV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceEnablementEvidenceV1\b'
 ENABLEMENT_EVIDENCE_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceEnablementEvidenceV1[[:space:]]*\{.*?pub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+new[[:space:]]*\('
 OBSERVATION_PUBLIC_FACTORY_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(parse_systemd_properties|parse_systemd_observation|from_observed_state)[[:space:]]*\('
+SYSTEMD_OBSERVER_MUTATION_CALL_PATTERN='\\.call\\(\\s*"(StartUnit|StopUnit|RestartUnit|ReloadUnit|EnableUnitFiles|DisableUnitFiles|SetUnitProperties|Start|Stop|Restart|Reload)"'
+SYSTEMD_OBSERVER_AUTHORITY_IMPORT_PATTERN='\\bsuper::(?:executor|authorization)\\b'
 SYSTEMD_TRANSPORT_PUBLIC_API_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(observe_service_properties|observe_service_state_properties)[[:space:]]*\('
 
 scan_diagnostic_boundary() {
@@ -77,6 +79,16 @@ scan_legacy_service_constructor() {
 scan_public_observation_factory() {
   local file="$1"
   rg -n --pcre2 "${OBSERVATION_PUBLIC_FACTORY_PATTERN}" "$file"
+}
+
+scan_systemd_observer_mutation_call() {
+  local file="$1"
+  rg -n --pcre2 "${SYSTEMD_OBSERVER_MUTATION_CALL_PATTERN}" "$file"
+}
+
+scan_systemd_observer_authority_import() {
+  local file="$1"
+  rg -n --pcre2 "${SYSTEMD_OBSERVER_AUTHORITY_IMPORT_PATTERN}" "$file"
 }
 
 scan_public_systemd_transport_api() {
@@ -203,6 +215,17 @@ run_boundary_check() {
     echo "${matches}" >&2
     failed=1
   fi
+  if matches="$(scan_systemd_observer_mutation_call "${ROOT}/crates/core/nixward/src/action/systemd_observer.rs")"; then
+    echo "ERROR: read-only systemd observer contains a systemd mutation call" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
+  if matches="$(scan_systemd_observer_authority_import "${ROOT}/crates/core/nixward/src/action/systemd_observer.rs")"; then
+    echo "ERROR: read-only systemd observer imports execution/authorization authority" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
+
   if matches="$(scan_public_systemd_transport_api "${ROOT}/crates/core/nixward/src/action/systemd_transport.rs")"; then
     echo "ERROR: raw systemd transport entry point must remain crate-private" >&2
     echo "${matches}" >&2
@@ -422,6 +445,18 @@ run_self_test() {
   printf '%s\n' 'pub async fn observe_service_properties(...) {}' > "${tmp}/systemd-transport-public-async.rs"
   if scan_public_systemd_transport_api "${tmp}/systemd-transport-public-async.rs"; then :; else
     echo "ERROR: CROSS-024 self-test failed to detect public async systemd transport entry point" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'proxy.call("StartUnit", &args);' > "${tmp}/systemd-observer-mutation.rs"
+  if scan_systemd_observer_mutation_call "${tmp}/systemd-observer-mutation.rs"; then :; else
+    echo "ERROR: CROSS-059 self-test failed to detect observer mutation call" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'use super::executor::NixOSExecutor;' > "${tmp}/systemd-observer-authority-import.rs"
+  if scan_systemd_observer_authority_import "${tmp}/systemd-observer-authority-import.rs"; then :; else
+    echo "ERROR: CROSS-059 self-test failed to detect observer authority import" >&2
     return 1
   fi
 
