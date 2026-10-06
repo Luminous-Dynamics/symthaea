@@ -1346,6 +1346,38 @@ fn rfc9942_vdp_map_resource_limit_remains_typed() {
 
 
 #[test]
+fn rfc9942_protected_header_map_entry_resource_limit_is_typed() {
+    let mut protected = Vec::new();
+    cbor_map_len(&mut protected, 33);
+    for label in 100..133 {
+        cbor_int(&mut protected, label);
+        cbor_uint(&mut protected, 0);
+    }
+
+    let mut receipt = vec![0xd2, 0x84];
+    cbor_bytes(&mut receipt, &protected);
+    cbor_map_len(&mut receipt, 0);
+    receipt.push(0xf6);
+    cbor_bytes(&mut receipt, &[0u8; 64]);
+
+    assert_eq!(
+        Rfc9942ReceiptEnvelope::from_cbor(&receipt),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+
+    let mut outer = vec![0xd2, 0x84];
+    cbor_bytes(&mut outer, &protected);
+    cbor_map_len(&mut outer, 0);
+    outer.push(0xf6);
+    cbor_bytes(&mut outer, &[0u8; 64]);
+
+    assert_eq!(
+        Rfc9942SignatureWithReceipts::from_cbor(&outer),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
+
+#[test]
 fn rfc9942_receipt_protected_header_resource_limit_is_typed() {
     let mut encoded = vec![0xd2, 0x84, 0x59, 0x10, 0x01];
     encoded.extend(std::iter::repeat_n(0x00, 4097));
