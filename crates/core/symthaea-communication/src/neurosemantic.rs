@@ -42,6 +42,7 @@ const MAX_NEUROSEMANTIC_AUTHORITY_SIGNATURE_BYTES: usize = 64;
 const MAX_NEUROSEMANTIC_RESOLVER_REF_BYTES: usize = 4096;
 const MAX_NEUROSEMANTIC_STATUS_SOURCE_REF_BYTES: usize = 4096;
 const MAX_NEUROSEMANTIC_DERIVATION_INPUT_ARTIFACTS: usize = 32;
+const MAX_NEUROSEMANTIC_LIFECYCLE_VERIFICATION_TARGETS: usize = 4096;
 const MAX_NEUROSEMANTIC_AUTHORITY_RESOLUTION_TTL_S: u64 = 86_400;
 const NEUROSEMANTIC_AUTHORITY_RESOLUTION_DOMAIN: &[u8] =
     b"symthaea-neurosemantic-authority-resolution-v1\0";
@@ -176,6 +177,52 @@ pub enum NeurosemanticArtifactLifecycleVerificationScope {
 }
 
 pub const NEUROSEMANTIC_ARTIFACT_LIFECYCLE_RECEIPT_SCHEMA_VERSION: u16 = 3;
+pub const NEUROSEMANTIC_ARTIFACT_LIFECYCLE_VERIFICATION_SCOPE_SCHEMA_VERSION: u16 = 1;
+
+/// Machine-readable enumeration of the exact artifact identities independently inspected.
+/// The record is content-addressed separately from the lifecycle receipt so coverage scope
+/// cannot be reduced to an opaque prose assertion.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticArtifactLifecycleVerificationTargetSet {
+    pub schema_version: u16,
+    pub scope_ref: String,
+    pub root_artifact_hash: String,
+    pub target_artifact_hashes: Vec<String>,
+}
+
+impl NeurosemanticArtifactLifecycleVerificationTargetSet {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != NEUROSEMANTIC_ARTIFACT_LIFECYCLE_VERIFICATION_SCOPE_SCHEMA_VERSION
+            || !valid_identifier(&self.scope_ref)
+            || !valid_blake3_digest(&self.root_artifact_hash)
+            || self.target_artifact_hashes.is_empty()
+            || self.target_artifact_hashes.len() > MAX_NEUROSEMANTIC_LIFECYCLE_VERIFICATION_TARGETS
+            || self.target_artifact_hashes.iter().any(|hash| !valid_blake3_digest(hash))
+            || !self.target_artifact_hashes.iter().any(|hash| hash == &self.root_artifact_hash)
+        {
+            return Err("neurosemantic lifecycle verification target set is invalid".into());
+        }
+        let unique_targets: BTreeSet<&str> =
+            self.target_artifact_hashes.iter().map(String::as_str).collect();
+        if unique_targets.len() != self.target_artifact_hashes.len() {
+            return Err("neurosemantic lifecycle verification target set contains duplicates".into());
+        }
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic lifecycle verification target set JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let target_set: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("neurosemantic lifecycle verification target set JSON: {error}"))?;
+        target_set.validate()?;
+        Ok(target_set)
+    }
+}
 
 /// Content-addressed evidence that a downstream lifecycle effect was observed.
 /// Validation establishes exact binding of the receipt to the artifact, lineage,
@@ -197,6 +244,9 @@ pub struct NeurosemanticArtifactLifecycleReceipt {
     /// Content-addressed evidence of the applied downstream effect. Absent before Applied.
     pub effect_evidence_ref: Option<String>,
     pub effect_evidence_hash: Option<String>,
+    /// Identity of the actor/process that emitted the applied effect evidence.
+    /// This is not an authority assertion; it exists so independence is mechanically checkable.
+    pub effect_agent_ref: Option<String>,
     /// Identity of the independently verifying actor/process. This is not a trust assertion.
     pub verification_agent_ref: Option<String>,
     /// Content-addressed evidence produced by the independent verifier.
