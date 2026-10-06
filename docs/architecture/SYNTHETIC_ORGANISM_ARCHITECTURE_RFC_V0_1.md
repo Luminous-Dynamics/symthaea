@@ -440,6 +440,56 @@ changing Symthaea's cognitive architecture.
 This also means that Symthaea can exploit 2026-era compact foundation models without
 becoming architecture-dependent on one vendor or one model family.
 
+## 10. Structured decision organs
+
+Not every cognitive decision should be routed through a generative language model.
+
+Liquid AI's October 2026 d1 release is a useful architectural signal: a specialized
+decision model can consume state/questions and return calibrated probabilities without
+generating output tokens. This pattern is well suited to routing, scoring, filtering,
+and other low-latency decisions.
+
+For Symthaea, add a generic decision-organ adapter alongside generative language organs:
+
+~~~text
+state + typed question
+        |
+        v
+decision organ
+        |
+        +--> probability distribution
+        +--> confidence/calibration
+        +--> model identity
+        +--> provenance
+        |
+        v
+Viability Fabric / policy selection
+~~~
+
+Candidate uses include:
+
+- action ranking;
+- attention routing;
+- anomaly triage;
+- tool selection;
+- memory retention;
+- sensor confidence;
+- safety escalation recommendation.
+
+A decision organ must recommend rather than silently acquire authority. Authority remains
+owned by the existing safety/actuator gates.
+
+This gives Symthaea a practical decomposition:
+
+**generative organs produce possibilities; decision organs score possibilities; the
+Viability Fabric records the prediction and outcome; the action layer executes only with
+authority.**
+
+Reference:
+- Liquid AI, "Introducing d1: The most capable decision model, now with vision",
+  2026-10-05:
+  https://www.liquid.ai/blog/d1-decision-model
+
 ## 10. Global workspace changes
 
 The attention competition arena should not be treated as a literal "consciousness
