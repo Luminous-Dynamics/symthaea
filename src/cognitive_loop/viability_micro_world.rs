@@ -239,6 +239,173 @@ impl MicroWorldPredictor for PersistencePredictor {
     }
 }
 
+/// Minimal homeostatic policy used to qualify whether a predictor can support
+/// survival-aware action selection.
+///
+/// This policy is intentionally simple and inspectable. The research variable is the
+/// predictor: replace it with Symthaea's world-model path and measure what changes.
+#[derive(Debug, Default)]
+pub struct HomeostaticPolicy;
+
+impl HomeostaticPolicy {
+    fn score(predicted: MicroWorldObservation, current: MicroWorldObservation, action: MicroAction) -> f64 {
+        let viability_pressure = (0.30 - predicted.energy).max(0.0)
+            + (0.30 - predicted.integrity).max(0.0)
+            + (predicted.threat - 0.60).max(0.0);
+
+        let mut score = predicted.progress * 1.50
+            + predicted.knowledge * 0.35
+            + predicted.energy * 0.50
+            + predicted.integrity * 0.70
+            - predicted.threat * 1.20
+            - viability_pressure * 2.0;
+
+        // Hysteretic-looking policy biases make the survival objective explicit without
+        // allowing the action to bypass the predictor.
+        if current.energy < 0.25 {
+            if action == MicroAction::Rest {
+                score += 0.80;
+            }
+            if action == MicroAction::Harvest {
+                score += 0.50;
+            }
+        }
+        if current.integrity < 0.35 && action == MicroAction::Repair {
+            score += 1.10;
+        }
+        if current.threat > 0.65 {
+            if action == MicroAction::Retreat {
+                score += 1.10;
+            }
+            if action == MicroAction::Observe {
+                score += 0.20;
+            }
+        }
+
+        score
+    }
+
+    pub fn choose<P: MicroWorldPredictor>(
+        &self,
+        predictor: &mut P,
+        current: MicroWorldObservation,
+    ) -> (MicroAction, MicroWorldObservation) {
+        let mut best_action = MicroAction::Observe;
+        let mut best_prediction = current;
+        let mut best_score = f64::NEG_INFINITY;
+
+        for action in MicroAction::ALL {
+            let predicted = predictor.predict(current, action);
+            let score = Self::score(predicted, current, action);
+            if score > best_score {
+                best_score = score;
+                best_action = action;
+                best_prediction = predicted;
+            }
+        }
+
+        (best_action, best_prediction)
+    }
+}
+
+/// Report from a policy-driven closed-loop run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HomeostaticRunReport {
+    pub steps: u64,
+    pub survived: bool,
+    pub final_energy: f64,
+    pub final_integrity: f64,
+    pub final_knowledge: f64,
+    pub final_threat: f64,
+    pub final_progress: f64,
+    pub cumulative_prediction_error: f64,
+    pub actions: Vec<MicroAction>,
+}
+
+/// Execute perception -> prediction -> selection -> action -> observation for a
+/// deterministic environment.
+///
+/// Every selected action is recorded in ViabilityFabric only after a prediction for
+/// that action was already inserted, preserving the no-post-hoc-prediction invariant.
+pub fn run_homeostatic_agent<P: MicroWorldPredictor>(
+    predictor: &mut P,
+    max_cycles: u64,
+) -> HomeostaticRunReport {
+    let mut world = MicroWorld::default();
+    let policy = HomeostaticPolicy;
+    let mut fabric = ViabilityFabric::new(max_cycles as usize + 1);
+    let mut cumulative_error = 0.0;
+    let mut actions = Vec::with_capacity(max_cycles as usize);
+    let mut steps = 0u64;
+
+    while !world.done() && steps < max_cycles {
+        let before = world.observe();
+        let (action, predicted) = policy.choose(predictor, before);
+        let action_id = steps + 1;
+
+        fabric.begin_cycle(before.cycle);
+        fabric
+            .predict_action(ActionPrediction {
+                action_id,
+                action_label: action.label().to_string(),
+                cycle: before.cycle,
+                predicted_world_delta: Some(signed_delta(before, predicted)),
+                predicted_self_delta: None,
+                predicted_goal_delta: None,
+                authority_granted: true,
+            })
+            .expect("policy action id must be unique");
+
+        let after = world.step(action);
+        let error = predicted.mean_absolute_delta(after);
+        cumulative_error += error;
+        steps += 1;
+        actions.push(action);
+
+        fabric
+            .observe_action(ActionOutcome {
+                action_id,
+                action_label: action.label().to_string(),
+                cycle: after.cycle,
+                pre_state_digest: before.digest(),
+                post_state_digest: after.digest(),
+                authority_granted: true,
+                safety_gate_passed: true,
+                prediction: None,
+                observed_effect: Some(
+                    super::viability_fabric::ViabilitySignal::new(
+                        (signed_delta(before, after).value + 1.0) * 0.5,
+                        1.0,
+                        after.cycle,
+                        "viability-micro-world",
+                    ),
+                ),
+                prediction_error: PredictionErrorLedger {
+                    world: error.clamp(0.0, 1.0),
+                    ..Default::default()
+                },
+                evidence_refs: vec![format!(
+                    "sim://viability-micro-world/policy-step/{}",
+                    after.digest()
+                )],
+            })
+            .expect("closed-loop action must have a pre-action prediction");
+    }
+
+    let final_state = world.observe();
+    HomeostaticRunReport {
+        steps,
+        survived: final_state.is_viable(),
+        final_energy: final_state.energy,
+        final_integrity: final_state.integrity,
+        final_knowledge: final_state.knowledge,
+        final_threat: final_state.threat,
+        final_progress: final_state.progress,
+        cumulative_prediction_error: cumulative_error,
+        actions,
+    }
+}
+
 /// Report from a deterministic benchmark episode.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MicroWorldReport {
@@ -412,6 +579,29 @@ mod tests {
         let report = evaluate_predictor(&mut predictor, 12);
         assert!(report.predictor_mae.abs() < 1e-12);
         assert!(report.improvement_over_baseline() > 0.99);
+    }
+
+    #[test]
+    fn oracle_policy_survives_and_makes_progress() {
+        struct Oracle;
+        impl MicroWorldPredictor for Oracle {
+            fn predict(&mut self, state: MicroWorldObservation, action: MicroAction) -> MicroWorldObservation {
+                transition(state, action)
+            }
+        }
+
+        let mut predictor = Oracle;
+        let report = run_homeostatic_agent(&mut predictor, 64);
+        assert!(report.survived);
+        assert!(report.final_progress > 0.2);
+        assert_eq!(report.actions.len(), report.steps as usize);
+    }
+
+    #[test]
+    fn homeostatic_run_is_replay_stable() {
+        let mut a = PersistencePredictor;
+        let mut b = PersistencePredictor;
+        assert_eq!(run_homeostatic_agent(&mut a, 32), run_homeostatic_agent(&mut b, 32));
     }
 
     #[test]
