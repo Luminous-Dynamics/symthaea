@@ -1028,6 +1028,9 @@ fn gaussian_elimination(
 
             for j in column..=dimension {
                 matrix[row][j] -= factor * matrix[column][j];
+                if !matrix[row][j].is_finite() {
+                    return Err(RelationalPredictionError::ModelFitFailed);
+                }
             }
         }
     }
@@ -1037,6 +1040,9 @@ fn gaussian_elimination(
         let mut rhs = matrix[row][dimension];
         for j in (row + 1)..dimension {
             rhs -= matrix[row][j] * solution[j];
+            if !rhs.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
         }
 
         let divisor = matrix[row][row];
