@@ -1229,6 +1229,17 @@ impl RollingOriginRelationalPredictionQualification {
             return Err(RelationalPredictionError::InvalidSplit);
         }
 
+        for segment in &self.observed.segments {
+            validate_prediction_summary_shape(
+                segment,
+                self.config.train_samples,
+                self.config.test_samples,
+                self.config.gap_samples,
+            )?;
+            validate_forecast_horizon_from_summary(segment, self.config.forecast_horizon)?;
+        }
+        validate_rolling_summary_aggregates(&self.observed)?;
+
         let held_out_config = HeldOutRelationalPredictionConfig {
             train_samples: self.config.train_samples,
             test_samples: self.config.test_samples,
@@ -1838,6 +1849,13 @@ impl HeldOutRelationalPredictionQualification {
             }
         }
 
+        validate_prediction_summary_shape(
+            &self.observed,
+            self.config.train_samples,
+            self.config.test_samples,
+            self.config.gap_samples,
+        )?;
+
         let expected_mse = self.observed.relational_augmented.mean_squared_error;
         let nulls = [
             (
@@ -1925,6 +1943,142 @@ impl HeldOutRelationalPredictionQualification {
         qualification.validate()?;
         Ok(qualification)
     }
+}
+
+fn validate_prediction_summary_shape(
+    summary: &HeldOutRelationalPredictionSummary,
+    train_samples: usize,
+    test_samples: usize,
+    gap_samples: usize,
+) -> Result<(), RelationalPredictionError> {
+    if summary.status != EvidenceStatus::Measured
+        || summary.train_samples != train_samples
+        || summary.test_samples != test_samples
+        || summary.gap_samples != gap_samples
+        || !summary.minimum_outcome_horizon.is_finite()
+        || !summary.maximum_outcome_horizon.is_finite()
+        || summary.minimum_outcome_horizon <= 0.0
+        || summary.maximum_outcome_horizon < summary.minimum_outcome_horizon
+    {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    let scores = [
+        (
+            summary.persistence_baseline,
+            PredictionFeatureSet::PersistenceBaseline,
+        ),
+        (summary.isolated_agents, PredictionFeatureSet::IsolatedAgents),
+        (summary.common_driver, PredictionFeatureSet::CommonDriver),
+        (summary.synchrony_only, PredictionFeatureSet::SynchronyOnly),
+        (
+            summary.non_relational_context,
+            PredictionFeatureSet::NonRelationalContext,
+        ),
+        (
+            summary.relational_augmented,
+            PredictionFeatureSet::RelationalAugmented,
+        ),
+        (summary.relational_profile, PredictionFeatureSet::RelationalProfile),
+    ];
+
+    for (score, expected_feature_set) in scores {
+        let expected_parameter_count = if expected_feature_set
+            == PredictionFeatureSet::PersistenceBaseline
+        {
+            0
+        } else {
+            feature_count(expected_feature_set) + 1
+        };
+
+        if score.feature_set != expected_feature_set
+            || score.parameter_count != expected_parameter_count
+            || score.train_samples != train_samples
+            || score.test_samples != test_samples
+            || !score.mean_absolute_error.is_finite()
+            || score.mean_absolute_error < 0.0
+            || !score.mean_squared_error.is_finite()
+            || score.mean_squared_error < 0.0
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_forecast_horizon_from_summary(
+    summary: &HeldOutRelationalPredictionSummary,
+    expected_horizon: f64,
+) -> Result<(), RelationalPredictionError> {
+    if !expected_horizon.is_finite() || expected_horizon <= 0.0 {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    let tolerance = 1e-9 * expected_horizon.abs().max(1.0);
+    if (summary.minimum_outcome_horizon - expected_horizon).abs() > tolerance
+        || (summary.maximum_outcome_horizon - expected_horizon).abs() > tolerance
+    {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    Ok(())
+}
+
+fn validate_rolling_summary_aggregates(
+    summary: &RollingOriginRelationalPredictionSummary,
+) -> Result<(), RelationalPredictionError> {
+    let mean_mse = |select: fn(&HeldOutRelationalPredictionSummary) -> f64| {
+        let mut total = 0.0;
+        for segment in &summary.segments {
+            total += select(segment);
+            if !total.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+        }
+        let mean = total / summary.segments.len() as f64;
+        if !mean.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+        Ok(mean)
+    };
+
+    let expected = [
+        (
+            mean_mse(|segment| segment.persistence_baseline.mean_squared_error)?,
+            summary.mean_persistence_mse,
+        ),
+        (
+            mean_mse(|segment| segment.isolated_agents.mean_squared_error)?,
+            summary.mean_isolated_agents_mse,
+        ),
+        (
+            mean_mse(|segment| segment.common_driver.mean_squared_error)?,
+            summary.mean_common_driver_mse,
+        ),
+        (
+            mean_mse(|segment| segment.synchrony_only.mean_squared_error)?,
+            summary.mean_synchrony_only_mse,
+        ),
+        (
+            mean_mse(|segment| segment.non_relational_context.mean_squared_error)?,
+            summary.mean_non_relational_context_mse,
+        ),
+        (
+            mean_mse(|segment| segment.relational_augmented.mean_squared_error)?,
+            summary.mean_relational_augmented_mse,
+        ),
+        (
+            mean_mse(|segment| segment.relational_profile.mean_squared_error)?,
+            summary.mean_relational_profile_mse,
+        ),
+    ];
+
+    if expected.iter().any(|(computed, recorded)| computed != recorded) {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    Ok(())
 }
 
 fn feature_set_name(feature_set: PredictionFeatureSet) -> &'static str {
