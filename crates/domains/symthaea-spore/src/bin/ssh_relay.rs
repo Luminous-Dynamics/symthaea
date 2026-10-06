@@ -2810,7 +2810,6 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                             .await;
                         continue;
                     }
-                    // Escape single quotes in password for safe shell embedding
                     let pw_file = format!("/tmp/sovereign-user-pw-{}", session_id);
                     // Write the secret through the filesystem API instead of
                     // embedding it in a shell command. This keeps the password
@@ -2844,11 +2843,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                         continue;
                     }
                     drop(pw_file_handle);
-                    let username = if client_msg.username.is_empty() {
-                        "user"
-                    } else {
-                        &client_msg.username
-                    };
+                    let username = username.as_str();
                     let pw_script = format!(
                         r#"
 # ── Set User Password ──
@@ -2962,6 +2957,9 @@ echo "  User password set."
                         let _ = run_cmd(&format!("chmod +x {}", script_path)).await;
                     }
                     Err(e) => {
+                        for secret_path in &staged_secret_paths {
+                            let _ = tokio::fs::remove_file(secret_path).await;
+                        }
                         let _ = ws_tx
                             .send(Message::Text(
                                 RelayMessage::error(&format!("Failed to write script: {}", e))
@@ -2983,6 +2981,9 @@ echo "  User password set."
                             .await;
                     }
                     Ok(r) => {
+                        for secret_path in &staged_secret_paths {
+                            let _ = tokio::fs::remove_file(secret_path).await;
+                        }
                         let _ = ws_tx
                             .send(Message::Text(
                                 RelayMessage::error(&format!(
@@ -2995,6 +2996,9 @@ echo "  User password set."
                         continue;
                     }
                     Err(e) => {
+                        for secret_path in &staged_secret_paths {
+                            let _ = tokio::fs::remove_file(secret_path).await;
+                        }
                         let _ = ws_tx
                             .send(Message::Text(
                                 RelayMessage::error(&format!("Upload failed: {}", e)).to_json(),
@@ -5634,6 +5638,43 @@ mod tests {
     // ── Generated config secret hygiene ──
 
     #[test]
+    fn single_luks_script_uses_session_scoped_keyfile_not_secret_text() {
+        let message = ClientMessage {
+            action: "install".into(),
+            token: String::new(),
+            host: String::new(),
+            port: 22,
+            username: "testuser".into(),
+            password: String::new(),
+            command: "legacy-command-field-must-not-be-used".into(),
+            disk: "/dev/vda".into(),
+            layout: "single-luks".into(),
+            fast_disk: String::new(),
+            standard_disk: String::new(),
+            hostname: "test-nixos".into(),
+            configuration_nix: String::new(),
+            flake_nix: String::new(),
+            disko_nix: String::new(),
+            hardware_nix: String::new(),
+            secure_boot: false,
+            tpm2_unlock: false,
+            fido2_unlock: false,
+            desktop: "none".into(),
+            gpu_driver: "none".into(),
+            timezone: "UTC".into(),
+            keyboard: "us".into(),
+            user_password: String::new(),
+            luks_passphrase: "not-embedded-secret".into(),
+            extra_disks: Vec::new(),
+        };
+        let script = generate_install_script(&message, 1234);
+        assert!(script.contains("/tmp/sovereign-luks-pw-1234"));
+        assert!(!script.contains("not-embedded-secret"));
+        assert!(!script.contains("legacy-command-field-must-not-be-used"));
+        assert!(script.contains("if [ ! -s \"$LUKS_KEYFILE\" ]"));
+    }
+
+    #[test]
     fn fallback_install_configs_do_not_embed_placeholder_passwords() {
         let layouts = [
             "alongside",
@@ -5699,7 +5740,7 @@ mod tests {
         assert!(source.contains("client_msg.luks_passphrase.is_empty()"));
         assert!(source.contains(secret_field));
         assert!(!source.contains("let passphrase = if msg.command.is_empty()"));
-        assert!(!source.contains('printf %s')) || true;
+        assert!(!source.contains("let passphrase = if msg.command.is_empty()"));
     }
 
     #[test]
