@@ -230,9 +230,9 @@ pub struct NixServicePostStateObservationV1 {
     pub unit_file_state: ServiceUnitFileStateV1,
     pub systemd_job: Option<NixSystemdJobEvidenceV1>,
     pub invocation_id: Option<String>,
-    /// systemd StateChangeTimestamp represented as UNIX microseconds.
-    pub state_change_at_unix_us: u64,
-    pub observed_at_unix_us: u64,
+    /// systemd StateChangeTimestampMonotonic represented as monotonic microseconds.
+    pub state_change_at_monotonic_us: u64,
+    pub observed_at_monotonic_us: u64,
 }
 
 impl NixServicePostStateObservationV1 {
@@ -248,7 +248,7 @@ impl NixServicePostStateObservationV1 {
             job.validate_shape()?;
         }
         validate_optional_invocation_id(self.invocation_id.as_deref(), "post-invocation id")?;
-        if self.observed_at_unix_us < self.state_change_at_unix_us {
+        if self.observed_at_monotonic_us < self.state_change_at_monotonic_us {
             return Err(NixPostStateErrorV1::ObservationBeforeStateChange);
         }
         Ok(())
@@ -261,10 +261,11 @@ impl NixServicePostStateObservationV1 {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixPostStateStabilityEvidenceV1 {
+    /// Measured on the same monotonic clock as the systemd state-change timestamp.
     pub required_window_us: u64,
-    pub window_start_unix_us: u64,
-    pub window_end_unix_us: u64,
-    pub last_state_change_at_unix_us: u64,
+    pub window_start_monotonic_us: u64,
+    pub window_end_monotonic_us: u64,
+    pub last_state_change_at_monotonic_us: u64,
     pub sample_count: u32,
 }
 
@@ -273,12 +274,12 @@ impl NixPostStateStabilityEvidenceV1 {
         if self.required_window_us == 0 {
             return Err(NixPostStateErrorV1::InvalidStabilityWindow);
         }
-        if self.window_end_unix_us < self.window_start_unix_us {
+        if self.window_end_monotonic_us < self.window_start_monotonic_us {
             return Err(NixPostStateErrorV1::InvalidStabilityWindow);
         }
         if self
-            .window_end_unix_us
-            .saturating_sub(self.window_start_unix_us)
+            .window_end_monotonic_us
+            .saturating_sub(self.window_start_monotonic_us)
             < self.required_window_us
         {
             return Err(NixPostStateErrorV1::StabilityWindowTooShort);
@@ -289,7 +290,7 @@ impl NixPostStateStabilityEvidenceV1 {
         // If systemd's StateChangeTimestamp is at or before the beginning of
         // the stability window, the observed state has not changed since that
         // timestamp according to the unit's own state-change clock.
-        if self.last_state_change_at_unix_us > self.window_start_unix_us {
+        if self.last_state_change_at_monotonic_us > self.window_start_monotonic_us {
             return Err(NixPostStateErrorV1::StateChangedDuringStabilityWindow);
         }
         Ok(())
@@ -338,7 +339,7 @@ pub struct NixPostStateReceiptV1 {
     /// Retaining it in the receipt makes a serialized receipt self-checking:
     /// a forged `Proven` claim cannot silently downgrade the required window.
     pub required_stability_us: u64,
-    pub observed_at_unix_us: u64,
+    pub observed_at_monotonic_us: u64,
     pub stability: Option<NixPostStateStabilityEvidenceV1>,
     pub observer_identity: String,
     pub observer_version: String,
@@ -394,7 +395,7 @@ impl NixPostStateReceiptV1 {
 
         if let Some(stability) = &stability {
             stability.validate_shape()?;
-            if stability.window_end_unix_us > observation.observed_at_unix_us {
+            if stability.window_end_monotonic_us > observation.observed_at_monotonic_us {
                 return Err(NixPostStateErrorV1::StabilityAfterObservation);
             }
         }
@@ -442,7 +443,7 @@ impl NixPostStateReceiptV1 {
             postcondition: assessment,
             claim,
             required_stability_us: expectation.required_stability_us,
-            observed_at_unix_us: observation.observed_at_unix_us,
+            observed_at_monotonic_us: observation.observed_at_monotonic_us,
             stability,
             observer_identity,
             observer_version,
@@ -502,7 +503,7 @@ impl NixPostStateReceiptV1 {
 
         if let Some(stability) = &self.stability {
             stability.validate_shape()?;
-            if stability.window_end_unix_us > self.observed_at_unix_us {
+            if stability.window_end_monotonic_us > self.observed_at_monotonic_us {
                 return Err(NixPostStateErrorV1::StabilityAfterObservation);
             }
         }
@@ -572,15 +573,15 @@ impl NixPostStateReceiptV1 {
         put_u8(&mut h, assessment_tag(self.postcondition));
         put_u8(&mut h, claim_tag(self.claim));
         put_u64(&mut h, self.required_stability_us);
-        put_u64(&mut h, self.observed_at_unix_us);
+        put_u64(&mut h, self.observed_at_monotonic_us);
 
         match &self.stability {
             Some(stability) => {
                 put_u8(&mut h, 1);
                 put_u64(&mut h, stability.required_window_us);
-                put_u64(&mut h, stability.window_start_unix_us);
-                put_u64(&mut h, stability.window_end_unix_us);
-                put_u64(&mut h, stability.last_state_change_at_unix_us);
+                put_u64(&mut h, stability.window_start_monotonic_us);
+                put_u64(&mut h, stability.window_end_monotonic_us);
+                put_u64(&mut h, stability.last_state_change_at_monotonic_us);
                 put_u32(&mut h, stability.sample_count);
             }
             None => put_u8(&mut h, 0),
@@ -945,8 +946,8 @@ mod tests {
                 }
             }),
             invocation_id: Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string()),
-            state_change_at_unix_us: 900,
-            observed_at_unix_us: 2_000,
+            state_change_at_monotonic_us: 900,
+            observed_at_monotonic_us: 2_000,
         }
     }
 
@@ -1056,9 +1057,9 @@ mod tests {
             &obs,
             Some(NixPostStateStabilityEvidenceV1 {
                 required_window_us: 1_000,
-                window_start_unix_us: 1_000,
-                window_end_unix_us: 2_000,
-                last_state_change_at_unix_us: 900,
+                window_start_monotonic_us: 1_000,
+                window_end_monotonic_us: 2_000,
+                last_state_change_at_monotonic_us: 900,
                 sample_count: 2,
             }),
         )
@@ -1081,9 +1082,9 @@ mod tests {
             ),
             Some(NixPostStateStabilityEvidenceV1 {
                 required_window_us: 1_000,
-                window_start_unix_us: 1_500,
-                window_end_unix_us: 2_000,
-                last_state_change_at_unix_us: 900,
+                window_start_monotonic_us: 1_500,
+                window_end_monotonic_us: 2_000,
+                last_state_change_at_monotonic_us: 900,
                 sample_count: 2,
             }),
         );
@@ -1214,9 +1215,9 @@ mod tests {
             &obs,
             Some(NixPostStateStabilityEvidenceV1 {
                 required_window_us: 1_000,
-                window_start_unix_us: 1_000,
-                window_end_unix_us: 2_000,
-                last_state_change_at_unix_us: 900,
+                window_start_monotonic_us: 1_000,
+                window_end_monotonic_us: 2_000,
+                last_state_change_at_monotonic_us: 900,
                 sample_count: 2,
             }),
         )
@@ -1250,9 +1251,9 @@ mod tests {
             &obs,
             Some(NixPostStateStabilityEvidenceV1 {
                 required_window_us: 1,
-                window_start_unix_us: 1_000,
-                window_end_unix_us: 2_000,
-                last_state_change_at_unix_us: 900,
+                window_start_monotonic_us: 1_000,
+                window_end_monotonic_us: 2_000,
+                last_state_change_at_monotonic_us: 900,
                 sample_count: 2,
             }),
         );
