@@ -618,7 +618,7 @@ impl TransactionLedger {
             ));
         }
 
-        let mut file = OpenOptions::new()
+        let file = OpenOptions::new()
             .create(true)
             .append(true)
             .read(true)
@@ -631,16 +631,40 @@ impl TransactionLedger {
                     self.path.display()
                 )
             })?;
-        std::fs::set_permissions(
-            &self.path,
-            std::os::unix::fs::PermissionsExt::from_mode(0o600),
-        )
-        .map_err(|error| {
+
+        // Validate the descriptor actually opened. Do not use path-based chmod:
+        // a pathname replacement after open could otherwise apply permissions to
+        // a different inode than the journal we are about to append.
+        let metadata = file.metadata().map_err(|error| {
             format!(
-                "unable to restrict transaction ledger {}: {error}",
+                "unable to inspect transaction ledger {}: {error}",
                 self.path.display()
             )
         })?;
+        if !metadata.file_type().is_file() {
+            return Err(format!(
+                "transaction ledger {} is not a regular file",
+                self.path.display()
+            ));
+        }
+        {
+            use std::os::unix::fs::{MetadataExt, PermissionsExt};
+            let mode = metadata.permissions().mode() & 0o777;
+            if mode != 0o600 {
+                return Err(format!(
+                    "transaction ledger {} has unsafe permissions {:04o}; require 0600",
+                    self.path.display(),
+                    mode
+                ));
+            }
+            if metadata.uid() != unsafe { libc::geteuid() } {
+                return Err(format!(
+                    "transaction ledger {} is not owned by relay user",
+                    self.path.display()
+                ));
+            }
+        }
+
         file.write_all(serialized.as_bytes())
             .and_then(|_| file.write_all(b"\n"))
             .and_then(|_| file.sync_all())
@@ -1041,6 +1065,40 @@ mod tests {
         assert!(error.contains("not a regular file"));
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(&target);
+    }
+
+    #[test]
+    fn ledger_append_rejects_unsafe_existing_file_permissions() {
+        let name = random_operation_id().unwrap();
+        let path =
+            std::env::temp_dir().join(format!("symthaea-transaction-ledger-append-permissions-{name}.jsonl"));
+        std::fs::write(&path, b"").unwrap();
+        std::fs::set_permissions(
+            &path,
+            std::os::unix::fs::PermissionsExt::from_mode(0o640),
+        )
+        .unwrap();
+
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let event = JournalEvent {
+            schema_version: SCHEMA_VERSION,
+            event: "started".into(),
+            request_id: "append-permissions-0001".into(),
+            transaction_id: "0123456789abcdef0123456789abcdef".into(),
+            mutation: MutationKind::Install,
+            target_machine_digest: None,
+            request_digest: "a".repeat(64),
+            outcome: None,
+        };
+        let error = ledger
+            .append(&event)
+            .expect_err("append must reject an unsafe existing journal descriptor");
+        assert!(error.contains("unsafe permissions"));
+        assert!(
+            std::fs::read(&path).unwrap().is_empty(),
+            "unsafe journal must remain untouched"
+        );
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
