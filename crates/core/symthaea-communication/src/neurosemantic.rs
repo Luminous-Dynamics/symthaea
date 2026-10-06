@@ -263,6 +263,59 @@ pub struct NeurosemanticRemediationEvaluationMethod {
 
 pub const NEUROSEMANTIC_REMEDIATION_EVALUATION_METHOD_SCHEMA_VERSION: u16 = 1;
 pub const NEUROSEMANTIC_REMEDIATION_EVALUATION_MANIFEST_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_REMEDIATION_EVALUATION_ENVIRONMENT_SCHEMA_VERSION: u16 = 1;
+
+/// Machine-readable descriptor for the runtime environment in which remediation impact was evaluated.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationEvaluationEnvironment {
+    pub schema_version: u16,
+    pub environment_ref: String,
+    pub platform_ref: String,
+    pub runtime_ref: String,
+    pub toolchain_ref: String,
+    pub dependency_lock_hash: String,
+    pub configuration_hash: String,
+    pub execution_revision: String,
+}
+
+impl NeurosemanticRemediationEvaluationEnvironment {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != NEUROSEMANTIC_REMEDIATION_EVALUATION_ENVIRONMENT_SCHEMA_VERSION
+            || !valid_identifier(&self.environment_ref)
+            || !valid_identifier(&self.platform_ref)
+            || !valid_identifier(&self.runtime_ref)
+            || !valid_identifier(&self.toolchain_ref)
+            || !valid_blake3_digest(&self.dependency_lock_hash)
+            || !valid_blake3_digest(&self.configuration_hash)
+            || !valid_execution_revision(&self.execution_revision)
+        {
+            return Err("neurosemantic remediation evaluation environment fields are invalid".into());
+        }
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic remediation evaluation environment JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let environment: Self = serde_json::from_slice(bytes).map_err(|error| {
+            format!("neurosemantic remediation evaluation environment JSON: {error}")
+        })?;
+        environment.validate()?;
+        Ok(environment)
+    }
+
+    pub fn fingerprint(&self) -> Result<String, String> {
+        self.validate()?;
+        Ok(content_hash(&serde_json::to_vec(self).map_err(|error| {
+            format!("neurosemantic remediation evaluation environment serialization: {error}")
+        })?))
+    }
+}
+
 
 /// Canonical identity for the frozen remediation evaluation design.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -592,10 +645,15 @@ impl NeurosemanticRemediationImpactArtifact {
         environment_bytes: &[u8],
     ) -> Result<(), String> {
         self.validate()?;
-        if environment_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
-            return Err("neurosemantic remediation evaluation environment descriptor exceeds the serialized artifact limit".into());
+        let environment =
+            NeurosemanticRemediationEvaluationEnvironment::from_json_bytes(environment_bytes)?;
+        if environment.execution_revision != self.execution_revision {
+            return Err(
+                "neurosemantic remediation evaluation environment execution revision does not match the impact artifact"
+                    .into(),
+            );
         }
-        if content_hash(environment_bytes) != self.evaluation_environment_hash {
+        if environment.fingerprint()? != self.evaluation_environment_hash {
             return Err("neurosemantic remediation evaluation environment hash mismatch".into());
         }
         Ok(())
