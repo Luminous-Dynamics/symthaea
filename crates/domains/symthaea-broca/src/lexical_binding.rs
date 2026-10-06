@@ -315,6 +315,260 @@ impl std::fmt::Display for MorphophonologicalResourceEvidenceError {
 
 impl std::error::Error for MorphophonologicalResourceEvidenceError {}
 
+pub const UNIMORPH_TSV_SOURCE_FORMAT_VERSION: &str =
+    "unimorph-tsv-lemma-form-features-v1";
+pub const UNIMORPH_TSV_COMPILER_ID: &str = "symthaea-unimorph-tsv-compiler";
+pub const UNIMORPH_TSV_COMPILER_VERSION: &str = "broca-unimorph-tsv-compiler-v1";
+pub const UNIMORPH_TSV_NORMALIZATION_POLICY: &str =
+    "trim-one-line-ending-sort-feature-tokens-sort-output-rules-v1";
+pub const UNIMORPH_TSV_FEATURE_BUNDLE_CATEGORY: &str = "unimorph-bundle";
+
+/// A parsed UniMorph-style source record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MorphophonologicalSourceRecord {
+    pub record_id: String,
+    pub lemma: String,
+    pub form: String,
+    pub feature_bundle: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MorphophonologicalUnimorphCompilerError {
+    InvalidSourceFormat,
+    EmptyRecord,
+    InvalidColumnCount,
+    EmptyLemma,
+    EmptyForm,
+    EmptyFeatureBundle,
+    EmptyFeatureToken,
+    UnsupportedDerivation,
+    AmbiguousSimpleDerivation,
+    DuplicateLemmaAndFeatureBundle,
+    ResourceEvidence,
+    RuleSet(MorphophonologicalRuleSetError),
+    CompilationWitness(MorphophonologicalCompilationWitnessError),
+}
+
+impl std::fmt::Display for MorphophonologicalUnimorphCompilerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidSourceFormat => write!(f, "unsupported UniMorph TSV source format"),
+            Self::EmptyRecord => write!(f, "selected UniMorph source record is empty"),
+            Self::InvalidColumnCount => write!(f, "UniMorph source record must contain exactly three tab-separated columns"),
+            Self::EmptyLemma => write!(f, "UniMorph source record lemma must be non-empty"),
+            Self::EmptyForm => write!(f, "UniMorph source record surface form must be non-empty"),
+            Self::EmptyFeatureBundle => write!(f, "UniMorph source record feature bundle must be non-empty"),
+            Self::EmptyFeatureToken => write!(f, "UniMorph source feature bundle contains an empty token"),
+            Self::UnsupportedDerivation => write!(f, "UniMorph source record cannot be represented by the supported deterministic rule operations"),
+            Self::AmbiguousSimpleDerivation => write!(f, "UniMorph source record admits multiple supported simple derivations"),
+            Self::DuplicateLemmaAndFeatureBundle => write!(f, "UniMorph source compilation contains duplicate lemma and feature-bundle identities"),
+            Self::ResourceEvidence => write!(f, "UniMorph source resource evidence could not be constructed"),
+            Self::RuleSet(error) => write!(f, "compiled morphophonological rule set is invalid: {error}"),
+            Self::CompilationWitness(error) => write!(f, "compiled morphophonological provenance is invalid: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for MorphophonologicalUnimorphCompilerError {}
+
+pub fn normalize_unimorph_feature_bundle(
+    feature_bundle: &str,
+) -> Result<MorphologicalFeature, MorphophonologicalUnimorphCompilerError> {
+    let mut tokens = feature_bundle
+        .split(';')
+        .map(str::trim)
+        .collect::<Vec<_>>();
+    if tokens.is_empty() || tokens.iter().any(|token| token.is_empty()) {
+        return Err(MorphophonologicalUnimorphCompilerError::EmptyFeatureToken);
+    }
+    tokens.sort_unstable();
+    Ok(MorphologicalFeature {
+        category: UNIMORPH_TSV_FEATURE_BUNDLE_CATEGORY.to_string(),
+        value: tokens.join(";"),
+    })
+}
+
+fn parse_unimorph_source_record(
+    record_id: &str,
+    bytes: &[u8],
+) -> Result<MorphophonologicalSourceRecord, MorphophonologicalUnimorphCompilerError> {
+    let text = std::str::from_utf8(bytes)
+        .map_err(|_| MorphophonologicalUnimorphCompilerError::InvalidSourceFormat)?;
+    let text = text
+        .strip_suffix("\r\n")
+        .or_else(|| text.strip_suffix('\n'))
+        .unwrap_or(text);
+    if text.trim().is_empty() {
+        return Err(MorphophonologicalUnimorphCompilerError::EmptyRecord);
+    }
+    let columns = text.split('\t').collect::<Vec<_>>();
+    if columns.len() != 3 {
+        return Err(MorphophonologicalUnimorphCompilerError::InvalidColumnCount);
+    }
+    let lemma = columns[0].trim();
+    let form = columns[1].trim();
+    let feature_bundle = columns[2].trim();
+    if lemma.is_empty() {
+        return Err(MorphophonologicalUnimorphCompilerError::EmptyLemma);
+    }
+    if form.is_empty() {
+        return Err(MorphophonologicalUnimorphCompilerError::EmptyForm);
+    }
+    if feature_bundle.is_empty() {
+        return Err(MorphophonologicalUnimorphCompilerError::EmptyFeatureBundle);
+    }
+    let normalized = normalize_unimorph_feature_bundle(feature_bundle)?;
+    Ok(MorphophonologicalSourceRecord {
+        record_id: record_id.to_string(),
+        lemma: lemma.to_string(),
+        form: form.to_string(),
+        feature_bundle: normalized.value,
+    })
+}
+
+fn infer_simple_unimorph_operation(
+    lemma: &str,
+    form: &str,
+) -> Result<MorphophonologicalRuleOperation, MorphophonologicalUnimorphCompilerError> {
+    if lemma == form {
+        return Ok(MorphophonologicalRuleOperation::Identity);
+    }
+
+    let mut candidates = Vec::with_capacity(2);
+    if let Some(suffix) = form.strip_prefix(lemma) {
+        if !suffix.is_empty() {
+            candidates.push(MorphophonologicalRuleOperation::AppendSuffix {
+                suffix: suffix.to_string(),
+            });
+        }
+    }
+    if let Some(prefix) = form.strip_suffix(lemma) {
+        if !prefix.is_empty() {
+            candidates.push(MorphophonologicalRuleOperation::PrependPrefix {
+                prefix: prefix.to_string(),
+            });
+        }
+    }
+
+    if candidates.len() == 1 {
+        Ok(candidates.remove(0))
+    } else if candidates.len() > 1 {
+        Err(MorphophonologicalUnimorphCompilerError::AmbiguousSimpleDerivation)
+    } else {
+        Err(MorphophonologicalUnimorphCompilerError::UnsupportedDerivation)
+    }
+}
+
+impl MorphophonologicalRuleSet {
+    /// Compile selected UniMorph-style TSV records into this module's intentionally narrow
+    /// executable vocabulary. No replacement or alternation rule is guessed from a lemma/form
+    /// pair: unsupported transformations fail closed.
+    pub fn compile_unimorph_tsv_source(
+        language_tag: impl Into<String>,
+        source_id: impl Into<String>,
+        dialect_scope: impl Into<String>,
+        source_uri: impl Into<String>,
+        revision: impl Into<String>,
+        license: impl Into<String>,
+        rule_id: impl Into<String>,
+        provenance: impl Into<String>,
+        source_artifact: &[u8],
+        source_slices: Vec<MorphophonologicalSourceSlice>,
+    ) -> Result<(Self, MorphophonologicalCompilationWitness),
+        MorphophonologicalUnimorphCompilerError> {
+        let source_id = source_id.into();
+        let rule_set_id = rule_id.into();
+        let evidence = MorphophonologicalResourceEvidence::external_from_artifact(
+            source_id.clone(),
+            source_uri,
+            revision,
+            license,
+            source_artifact,
+        )
+        .map_err(|_| MorphophonologicalUnimorphCompilerError::ResourceEvidence)?;
+
+        if source_slices.is_empty() {
+            return Err(MorphophonologicalUnimorphCompilerError::EmptyRecord);
+        }
+
+        let mut rules = Vec::with_capacity(source_slices.len());
+        let mut identities = HashSet::new();
+        for slice in &source_slices {
+            let end = slice
+                .byte_offset
+                .checked_add(slice.byte_length)
+                .ok_or(MorphophonologicalUnimorphCompilerError::CompilationWitness(
+                    MorphophonologicalCompilationWitnessError::SourceRangeOverflow,
+                ))?;
+            let bytes = source_artifact
+                .get(slice.byte_offset..end)
+                .ok_or(MorphophonologicalUnimorphCompilerError::CompilationWitness(
+                    MorphophonologicalCompilationWitnessError::SourceSliceOutOfBounds,
+                ))?;
+            let record = parse_unimorph_source_record(&slice.record_id, bytes)?;
+            let identity = (record.lemma.clone(), record.feature_bundle.clone());
+            if !identities.insert(identity) {
+                return Err(
+                    MorphophonologicalUnimorphCompilerError::DuplicateLemmaAndFeatureBundle,
+                );
+            }
+            let operation = infer_simple_unimorph_operation(&record.lemma, &record.form)?;
+            rules.push(MorphophonologicalRule {
+                rule_id: format!("{rule_set_id}:source:{}", record.record_id),
+                lemma: Some(record.lemma),
+                morphology: vec![MorphologicalFeature {
+                    category: UNIMORPH_TSV_FEATURE_BUNDLE_CATEGORY.to_string(),
+                    value: record.feature_bundle,
+                }],
+                operation,
+            });
+        }
+
+        rules.sort_by(|left, right| {
+            (
+                left.lemma.as_deref().unwrap_or_default(),
+                left.morphology
+                    .first()
+                    .map(|feature| feature.value.as_str())
+                    .unwrap_or_default(),
+                left.rule_id.as_str(),
+            )
+                .cmp(&(
+                    right.lemma.as_deref().unwrap_or_default(),
+                    right
+                        .morphology
+                        .first()
+                        .map(|feature| feature.value.as_str())
+                        .unwrap_or_default(),
+                    right.rule_id.as_str(),
+                ))
+        });
+
+        let rule_set = Self::new(
+            language_tag,
+            source_id,
+            dialect_scope,
+            evidence,
+            rule_set_id,
+            provenance,
+            rules,
+        )
+        .map_err(MorphophonologicalUnimorphCompilerError::RuleSet)?;
+
+        let witness = MorphophonologicalCompilationWitness::new(
+            UNIMORPH_TSV_COMPILER_ID,
+            UNIMORPH_TSV_COMPILER_VERSION,
+            UNIMORPH_TSV_NORMALIZATION_POLICY,
+            source_artifact,
+            source_slices,
+            &rule_set,
+        )
+        .map_err(MorphophonologicalUnimorphCompilerError::CompilationWitness)?;
+
+        Ok((rule_set, witness))
+    }
+}
+
 /// One exact byte range selected from a frozen source artifact for compilation.
 ///
 /// The verifier uses the offset/length to recompute the record digest from the actual source
