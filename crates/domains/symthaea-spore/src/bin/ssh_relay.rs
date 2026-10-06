@@ -4416,42 +4416,87 @@ echo '}'
                 let wc_config_path = format!("/tmp/symthaea-newconfig-{}.nix", wc_session_id);
                 let wc_script_path = format!("/tmp/symthaea-rebuild-{}.sh", wc_session_id);
                 let wc_log_path = format!("/tmp/symthaea-rebuild-{}.log", wc_session_id);
-                // Upload config as a script that does atomic backup → write → validate → rebuild
-                let upload = format!(
-                    "cat > {} << 'NIXCONF'\n{}\nNIXCONF",
-                    wc_config_path, client_msg.configuration_nix
-                );
-                if let Err(e) = run_cmd(&upload).await {
+                // Stage browser-supplied configuration through the filesystem API.
+                // Never interpolate it into a shell heredoc: a user-controlled
+                // delimiter must not become a command-injection boundary.
+                if let Err(e) = tokio::fs::write(&wc_config_path, client_msg.configuration_nix.as_bytes()).await {
                     let _ = ws_tx
                         .send(Message::Text(
-                            RelayMessage::error(&format!("Upload failed: {}", e)).to_json(),
+                            RelayMessage::error(&format!("Config staging failed: {}", e)).to_json(),
                         ))
                         .await;
                     continue;
                 }
+                if let Err(e) = tokio::fs::set_permissions(
+                    &wc_config_path,
+                    std::os::unix::fs::PermissionsExt::from_mode(0o600),
+                )
+                .await
+                {
+                    let _ = tokio::fs::remove_file(&wc_config_path).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!("Config permission setup failed: {}", e))
+                                .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
                 let rebuild_script = format!(
-                    r#"set -eo pipefail
-cp /etc/nixos/configuration.nix /etc/nixos/configuration.nix.bak
-cp {config} /etc/nixos/configuration.nix
-if ! nix-instantiate --parse /etc/nixos/configuration.nix > /dev/null 2>&1; then
-    echo "ERROR: Invalid Nix syntax. Restoring backup."
-    cp /etc/nixos/configuration.nix.bak /etc/nixos/configuration.nix
+                    r#"set -o pipefail
+cp -- /etc/nixos/configuration.nix /etc/nixos/configuration.nix.bak
+if ! nix-instantiate --parse {config} > /dev/null 2>&1; then
+    echo "ERROR: Invalid Nix syntax. Keeping the active configuration unchanged."
+    rm -f -- {config}
     exit 1
 fi
+cp -- {config} /etc/nixos/configuration.nix
+rm -f -- {config}
 echo "Config validated. Rebuilding..."
+set +e
 nixos-rebuild switch 2>&1
+REBUILD_EXIT=$?
+set -e
+if [ $REBUILD_EXIT -ne 0 ]; then
+    echo "ERROR: Rebuild failed. Restoring the previous configuration."
+    cp -- /etc/nixos/configuration.nix.bak /etc/nixos/configuration.nix
+    exit $REBUILD_EXIT
+fi
 echo "REBUILD_COMPLETE"
 "#,
                     config = wc_config_path
                 );
+                if let Err(e) = tokio::fs::write(&wc_script_path, rebuild_script.as_bytes()).await {
+                    let _ = tokio::fs::remove_file(&wc_config_path).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!("Rebuild staging failed: {}", e))
+                                .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+                if let Err(e) = tokio::fs::set_permissions(
+                    &wc_script_path,
+                    std::os::unix::fs::PermissionsExt::from_mode(0o700),
+                )
+                .await
+                {
+                    let _ = tokio::fs::remove_file(&wc_config_path).await;
+                    let _ = tokio::fs::remove_file(&wc_script_path).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!("Rebuild permission setup failed: {}", e))
+                                .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+                let _ = tokio::fs::remove_file(&wc_config_path).await;
                 let _ = run_cmd(&format!(
-                    "touch {} && chmod 600 {}",
-                    wc_log_path, wc_log_path
-                ))
-                .await;
-                let _ = run_cmd(&format!(
-                    "cat > {} << 'SCRIPTEOF'\n{}\nSCRIPTEOF\nchmod +x {}\nbash {} > {} 2>&1 &",
-                    wc_script_path, rebuild_script, wc_script_path, wc_script_path, wc_log_path
+                    "touch {} && chmod 600 {} && bash {} > {} 2>&1 &",
+                    wc_log_path, wc_log_path, wc_script_path, wc_log_path
                 ))
                 .await;
                 let _ = ws_tx
