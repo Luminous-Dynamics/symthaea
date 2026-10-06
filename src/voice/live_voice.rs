@@ -289,6 +289,27 @@ impl VerifiedLexicalPhonologicalRealizationReceipt {
     pub fn verify_samples(&self, samples: &[f32]) -> bool {
         self.realization.verify_samples(samples)
     }
+
+    /// Verify this receipt against the pronunciation resources currently embedded in a
+    /// verifier process.
+    ///
+    /// The ordinary receipt verifier is intentionally detached: it preserves historical
+    /// evidence inspectability even after the embedded resource changes. This method adds
+    /// the stronger current-resource identity check.
+    pub fn verify_against_plan_and_current_resources(
+        &self,
+        plan: &PhonologicalPlan,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        witness: &LexicalPhonologicalWitness,
+        g2p: &SimpleG2P,
+    ) -> Result<()> {
+        self.verify_against_plan(plan, frame, binding, witness)?;
+        for evidence in &self.pronunciation_lexicon_evidence {
+            g2p.verify_pronunciation_lexicon_evidence(evidence)?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(feature = "ssm_language")]
@@ -628,6 +649,9 @@ impl LiveVoice {
         receipt.pronunciation_lexicon_evidence = pronunciation_lexicon_evidence;
         receipt.pronunciation_lexicon_evidence_blake3 =
             hash_pronunciation_lexicon_evidence(&receipt.pronunciation_lexicon_evidence);
+        receipt.verify_against_plan_and_current_resources(
+            plan, frame, binding, &witness, &self.g2p
+        )?;
         Ok(receipt)
     }
 
@@ -1947,6 +1971,38 @@ mod tests {
             super::hash_pronunciation_lexicon_evidence(
                 &receipt.pronunciation_lexicon_evidence
             )
+        );
+        receipt
+            .verify_against_plan_and_current_resources(
+                &plan,
+                &frame,
+                &binding,
+                &witness,
+                &voice.g2p,
+            )
+            .expect("strict receipt must match the current embedded pronunciation resource");
+
+        let mut detached_resource_substitution = receipt.clone();
+        detached_resource_substitution.pronunciation_lexicon_evidence[0].resource_blake3 =
+            "f".repeat(64);
+        detached_resource_substitution.pronunciation_lexicon_evidence_blake3 =
+            super::hash_pronunciation_lexicon_evidence(
+                &detached_resource_substitution.pronunciation_lexicon_evidence,
+            );
+        detached_resource_substitution
+            .verify_against_plan(&plan, &frame, &binding, &witness)
+            .expect("detached verification should preserve historical evidence inspectability");
+        assert!(
+            detached_resource_substitution
+                .verify_against_plan_and_current_resources(
+                    &plan,
+                    &frame,
+                    &binding,
+                    &witness,
+                    &voice.g2p,
+                )
+                .is_err(),
+            "current-resource verification must reject a substituted historical resource identity"
         );
 
         let unlisted = make_binding("zzzxxyq");
