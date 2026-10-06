@@ -6629,6 +6629,88 @@ echo "COMPLETE"
                     continue;
                 };
 
+                let image_transaction_id = image_path
+                    .strip_prefix("/tmp/nixforhumanity-image-")
+                    .ok_or_else(|| "validated image path is outside the relay image namespace".to_string())
+                    .and_then(|value| {
+                        if value.len() == 32
+                            && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+                        {
+                            Ok(value)
+                        } else {
+                            Err("validated image path has an invalid transaction identity".into())
+                        }
+                    });
+
+                let image_transaction_id = match image_transaction_id {
+                    Ok(value) => value.to_owned(),
+                    Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "error",
+                                    "message": error,
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                match transaction_ledger.has_successful_transaction(
+                    &image_transaction_id,
+                    MutationKind::CreateImage,
+                    transaction.target_machine_digest.as_deref(),
+                ) {
+                    Ok(true) => {}
+                    Ok(false) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "error",
+                                    "message": "Image restore refused: image is not bound to a successfully completed create_image transaction on this target.",
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                    Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "error",
+                                    "message": format!("Unable to establish image creator provenance: {}", error),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                }
+
                 eprintln!(
                     "[{}] {} Restoring system image from {}...",
                     peer_addr,
