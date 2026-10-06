@@ -38,6 +38,9 @@ Unsupported transformations fail closed.
 
 ## Provenance
 
+The current compilation witness schema is `broca-morphophonological-compilation-witness-v2`.
+Adding implementation-identity fields is a schema change and therefore invalidates older witness encodings rather than silently interpreting them as complete.
+
 A source-backed compilation witness binds:
 
 - the exact source artifact digest
