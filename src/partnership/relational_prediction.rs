@@ -1712,6 +1712,21 @@ fn validate_samples(
         return Err(RelationalPredictionError::InsufficientSamples(samples.len()));
     }
 
+    for sample in samples {
+        RelationalPredictionSample::new(
+            sample.feature_time,
+            sample.outcome_time,
+            sample.agent_a,
+            sample.agent_b,
+            sample.alignment,
+            sample.a_to_b,
+            sample.b_to_a,
+            sample.turn_taking,
+            sample.common_driver,
+            sample.future_outcome,
+        )?;
+    }
+
     for pair in samples.windows(2) {
         if pair[1].feature_time <= pair[0].feature_time
             || pair[1].outcome_time <= pair[0].outcome_time
@@ -2419,6 +2434,17 @@ mod tests {
 
         assert!(evidence.records.iter().all(|record| record.ridge_lambda == ridge_lambda));
         assert!(evidence.to_json().unwrap().contains("0.125"));
+    }
+
+    #[test]
+    fn evaluator_rejects_directly_constructed_invalid_samples() {
+        let mut samples = build_samples(0.5);
+        samples[10].a_to_b = f64::NAN;
+
+        assert_eq!(
+            HeldOutRelationalPredictionSummary::compute(&samples, config()),
+            Err(RelationalPredictionError::NonFiniteValue("a_to_b"))
+        );
     }
 
     #[test]
