@@ -471,6 +471,15 @@ impl MeasurementUncertaintyStatement {
     }
 }
 
+/// How an uncertainty component was evaluated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MeasurementUncertaintyComponentEvaluationType {
+    /// Statistical evaluation from repeated observations or equivalent statistical analysis.
+    TypeA,
+    /// Evaluation by means other than statistical analysis of repeated observations.
+    TypeB,
+}
+
 /// Exact provenance for one uncertainty-budget component.
 ///
 /// The component remains an external reference: Symthaea verifies only that
@@ -480,6 +489,8 @@ impl MeasurementUncertaintyStatement {
 pub struct MeasurementUncertaintyComponentRef {
     /// Stable identity of the uncertainty-budget component.
     pub component_id: String,
+    /// Classification of how this component's standard uncertainty was evaluated.
+    pub evaluation_type: MeasurementUncertaintyComponentEvaluationType,
     /// Digest of the exact component record or canonical component payload.
     pub component_record_digest: String,
     /// Stable identity of the exact uncertainty-budget record.
@@ -525,6 +536,30 @@ impl MeasurementUncertaintyComponentRef {
 pub struct MeasurementUncertaintyEvaluationRef {
     /// Stable identity of the exact uncertainty evaluation record.
     pub evaluation_id: String,
+    /// Exact uncertainty identity evaluated by this record.
+    pub uncertainty_id: String,
+    /// Exact uncertainty-budget identity evaluated by this record.
+    pub uncertainty_budget_id: String,
+    /// Revision of the exact uncertainty-budget record.
+    pub uncertainty_budget_revision: String,
+    /// Digest of the exact uncertainty-budget record.
+    pub uncertainty_budget_digest: String,
+    /// Canonical component-frontier digest evaluated by this record.
+    pub component_set_digest: String,
+    /// Number of uncertainty components evaluated by this record.
+    pub component_count: usize,
+    /// Exact measurement-model identity evaluated by this record.
+    pub measurement_model_id: String,
+    /// Revision of the exact measurement model.
+    pub measurement_model_revision: String,
+    /// Digest of the exact measurement model.
+    pub measurement_model_digest: String,
+    /// Exact measurand identity evaluated by this record.
+    pub measurand_id: String,
+    /// Exact measurement-procedure identity evaluated by this record.
+    pub procedure_id: String,
+    /// Digest of the exact measurement procedure evaluated by this record.
+    pub procedure_digest: String,
     /// Revision of the exact uncertainty evaluation record.
     pub evaluation_revision: String,
     /// Digest of the exact uncertainty evaluation record.
@@ -567,6 +602,18 @@ impl MeasurementUncertaintyEvaluationRef {
     /// Validate exact evaluation-method lineage without evaluating the science.
     pub fn validate(&self, expanded: bool) -> Result<(), AssessmentError> {
         if self.evaluation_id.is_empty()
+            || self.uncertainty_id.is_empty()
+            || self.uncertainty_budget_id.is_empty()
+            || self.uncertainty_budget_revision.is_empty()
+            || self.uncertainty_budget_digest.is_empty()
+            || self.component_set_digest.is_empty()
+            || self.component_count == 0
+            || self.measurement_model_id.is_empty()
+            || self.measurement_model_revision.is_empty()
+            || self.measurement_model_digest.is_empty()
+            || self.measurand_id.is_empty()
+            || self.procedure_id.is_empty()
+            || self.procedure_digest.is_empty()
             || self.evaluation_revision.is_empty()
             || self.evaluation_digest.is_empty()
             || self.method_id.is_empty()
@@ -696,6 +743,38 @@ impl MeasurementUncertaintyRef {
             &self.statement,
             MeasurementUncertaintyStatement::Expanded { .. }
         ))?;
+        let evaluation_scope = &self.evaluation;
+        let scope_pairs = [
+            ("uncertainty_id", evaluation_scope.uncertainty_id.as_str(), self.uncertainty_id.as_str()),
+            ("uncertainty_budget_id", evaluation_scope.uncertainty_budget_id.as_str(), self.uncertainty_budget_id.as_str()),
+            ("uncertainty_budget_revision", evaluation_scope.uncertainty_budget_revision.as_str(), self.uncertainty_budget_revision.as_str()),
+            ("uncertainty_budget_digest", evaluation_scope.uncertainty_budget_digest.as_str(), self.uncertainty_budget_digest.as_str()),
+            ("component_set_digest", evaluation_scope.component_set_digest.as_str(), self.component_refs_digest.as_str()),
+            ("measurement_model_id", evaluation_scope.measurement_model_id.as_str(), self.measurement_model_id.as_str()),
+            ("measurement_model_revision", evaluation_scope.measurement_model_revision.as_str(), self.measurement_model_revision.as_str()),
+            ("measurement_model_digest", evaluation_scope.measurement_model_digest.as_str(), self.measurement_model_digest.as_str()),
+            ("measurand_id", evaluation_scope.measurand_id.as_str(), self.measurand_id.as_str()),
+            ("procedure_id", evaluation_scope.procedure_id.as_str(), self.procedure_id.as_str()),
+            ("procedure_digest", evaluation_scope.procedure_digest.as_str(), self.procedure_digest.as_str()),
+        ];
+        for (field, expected, actual) in scope_pairs {
+            if expected != actual {
+                return Err(AssessmentError::MeasurementUncertaintyEvaluationScopeMismatch {
+                    uncertainty_id: self.uncertainty_id.clone(),
+                    field: field.to_string(),
+                    expected: expected.to_string(),
+                    actual: actual.to_string(),
+                });
+            }
+        }
+        if evaluation_scope.component_count != self.component_refs.len() {
+            return Err(AssessmentError::MeasurementUncertaintyEvaluationScopeMismatch {
+                uncertainty_id: self.uncertainty_id.clone(),
+                field: "component_count".into(),
+                expected: self.component_refs.len().to_string(),
+                actual: evaluation_scope.component_count.to_string(),
+            });
+        }
 
         let mut canonical_component_refs = self.component_refs.clone();
         for component in &canonical_component_refs {
@@ -2685,6 +2764,17 @@ pub enum AssessmentError {
     MissingObservationUnit(EvidenceKind),
     /// Measurement-uncertainty reference is structurally incomplete.
     InvalidMeasurementUncertainty,
+    /// Evaluation provenance names a different uncertainty scope than its parent.
+    MeasurementUncertaintyEvaluationScopeMismatch {
+        /// Parent uncertainty identity.
+        uncertainty_id: String,
+        /// Scope field that disagrees.
+        field: String,
+        /// Value expected from the parent uncertainty.
+        expected: String,
+        /// Value declared by the evaluation provenance.
+        actual: String,
+    },
     /// Measurement-uncertainty evaluation provenance is structurally incomplete.
     InvalidMeasurementUncertaintyEvaluation,
     /// Stated measurement uncertainty uses a different unit from the evidence.
@@ -4396,6 +4486,18 @@ mod tests {
                     },
                     evaluation: MeasurementUncertaintyEvaluationRef {
                         evaluation_id: "fixture-uncertainty-evaluation-v1".into(),
+                        uncertainty_id: format!("uncertainty:{id}"),
+                        uncertainty_budget_id: "fixture-uncertainty-budget-v1".into(),
+                        uncertainty_budget_revision: "v1".into(),
+                        uncertainty_budget_digest: "fixture-uncertainty-budget-digest-v1".into(),
+                        component_set_digest: String::new(),
+                        component_count: 1,
+                        measurement_model_id: "fixture-measurement-model-v1".into(),
+                        measurement_model_revision: "v1".into(),
+                        measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
+                        measurand_id: format!("fixture-measurand:{id}"),
+                        procedure_id: "fixture-measurement-procedure-v1".into(),
+                        procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
                         evaluation_revision: "v1".into(),
                         evaluation_digest: "fixture-uncertainty-evaluation-digest-v1".into(),
                         method_id: "fixture-uncertainty-method-v1".into(),
@@ -4459,6 +4561,7 @@ mod tests {
     fn test_component(component_id: &str) -> MeasurementUncertaintyComponentRef {
         MeasurementUncertaintyComponentRef {
             component_id: component_id.into(),
+            evaluation_type: MeasurementUncertaintyComponentEvaluationType::TypeA,
             component_record_digest: format!("component-record:{component_id}"),
             uncertainty_budget_id: "budget-v1".into(),
             uncertainty_budget_revision: "r1".into(),
@@ -4495,6 +4598,18 @@ mod tests {
             },
             evaluation: MeasurementUncertaintyEvaluationRef {
                 evaluation_id: "evaluation".into(),
+                uncertainty_id: "u".into(),
+                uncertainty_budget_id: "budget-v1".into(),
+                uncertainty_budget_revision: "r1".into(),
+                uncertainty_budget_digest: "budget-digest-v1".into(),
+                component_set_digest: String::new(),
+                component_count: 1,
+                measurement_model_id: "model-v1".into(),
+                measurement_model_revision: "r1".into(),
+                measurement_model_digest: "model-digest-v1".into(),
+                measurand_id: "measurand".into(),
+                procedure_id: "procedure".into(),
+                procedure_digest: "procedure-digest".into(),
                 evaluation_revision: "r1".into(),
                 evaluation_digest: "evaluation-digest".into(),
                 method_id: "method".into(),
@@ -5169,6 +5284,38 @@ mod tests {
         assert!(matches!(
             error,
             AssessmentError::MeasurementUncertaintyComponentModelDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_evaluation_scope_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-evaluation-scope",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "evaluation-scope",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .measurand_id = "different-measurand".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyEvaluationScopeMismatch { .. }
         ));
     }
 
