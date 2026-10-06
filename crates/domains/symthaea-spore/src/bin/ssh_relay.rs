@@ -2737,7 +2737,7 @@ async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
     }
 
     for artifact in ["system.btrfs.zst", "system.tar.gz"] {
-        let path = std::path::Path::new(image_dir).join(artifact);
+        let path = std::path::Path::new(&image_dir).join(artifact);
         let Ok(metadata) = tokio::fs::metadata(&path).await else {
             continue;
         };
