@@ -1503,7 +1503,9 @@ impl PredictionNullSummary {
             || self.surrogate_shifts.len() != self.surrogate_count
             || self.surrogate_mse.len() != self.surrogate_count
             || !self.observed_relational_mse.is_finite()
+            || self.observed_relational_mse < 0.0
             || !self.minimum_surrogate_mse.is_finite()
+            || self.minimum_surrogate_mse < 0.0
             || !self.exceedance_fraction.is_finite()
         {
             return Err(RelationalPredictionError::InvalidSurrogateCount);
@@ -1528,7 +1530,11 @@ impl PredictionNullSummary {
             return Err(RelationalPredictionError::InvalidSurrogateCount);
         }
 
-        if self.surrogate_mse.iter().any(|mse| !mse.is_finite()) {
+        if self
+            .surrogate_mse
+            .iter()
+            .any(|mse| !mse.is_finite() || *mse < 0.0)
+        {
             return Err(RelationalPredictionError::ModelFitFailed);
         }
 
@@ -2923,6 +2929,38 @@ mod tests {
         assert_eq!(
             summary.verify_against_samples(&samples, altered),
             Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn null_trace_rejects_negative_mse() {
+        let samples = build_samples(0.5);
+        let mut observed = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config(),
+            PredictionNullFamily::CircularShift,
+            PredictionFeatureSet::RelationalAugmented,
+            12,
+        )
+        .unwrap();
+        observed.observed_relational_mse = -1.0;
+        assert_eq!(
+            observed.validate_trace(),
+            Err(RelationalPredictionError::InvalidSurrogateCount)
+        );
+
+        let mut surrogate = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config(),
+            PredictionNullFamily::CircularShift,
+            PredictionFeatureSet::RelationalAugmented,
+            12,
+        )
+        .unwrap();
+        surrogate.surrogate_mse[0] = -1.0;
+        assert_eq!(
+            surrogate.validate_trace(),
+            Err(RelationalPredictionError::ModelFitFailed)
         );
     }
 
