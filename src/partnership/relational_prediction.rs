@@ -459,7 +459,10 @@ impl HeldOutRelationalPredictionEvidence {
 
         for record in &self.records {
             record.validate_trace()?;
-            if record.score() != self.summary.score(record.feature_set) {
+            if record.train_samples != self.summary.train_samples
+                || record.test_samples != self.summary.test_samples
+                || record.score() != self.summary.score(record.feature_set)
+            {
                 return Err(RelationalPredictionError::InvalidSplit);
             }
         }
@@ -473,6 +476,7 @@ impl HeldOutRelationalPredictionEvidence {
             if record.feature_times != reference.feature_times
                 || record.outcome_times != reference.outcome_times
                 || record.observed_outcomes != reference.observed_outcomes
+                || record.ridge_lambda != reference.ridge_lambda
             {
                 return Err(RelationalPredictionError::InvalidSplit);
             }
@@ -718,7 +722,13 @@ pub struct RollingOriginRelationalPredictionSummary {
 impl RollingOriginRelationalPredictionEvidence {
     pub fn validate(&self) -> Result<(), RelationalPredictionError> {
         validate_evidence_provenance(&self.provenance)?;
-        if self.origins.len() != self.config.origin_count
+        if self.config.origin_count == 0
+            || self.config.step_samples < self.config.test_samples
+            || !self.config.forecast_horizon.is_finite()
+            || self.config.forecast_horizon <= 0.0
+            || !self.config.ridge_lambda.is_finite()
+            || self.config.ridge_lambda < 0.0
+            || self.origins.len() != self.config.origin_count
             || self.observed.segments.len() != self.config.origin_count
         {
             return Err(RelationalPredictionError::InvalidSplit);
@@ -731,6 +741,11 @@ impl RollingOriginRelationalPredictionEvidence {
                 || origin.summary.train_samples != self.config.train_samples
                 || origin.summary.test_samples != self.config.test_samples
                 || origin.summary.gap_samples != self.config.gap_samples
+                || origin
+                    .records
+                    .first()
+                    .map(|record| record.ridge_lambda)
+                    != Some(self.config.ridge_lambda)
             {
                 return Err(RelationalPredictionError::InvalidSplit);
             }
@@ -1985,6 +2000,28 @@ mod tests {
         assert!(json.contains("relational-prediction-rolling-evidence/v1"));
         assert!(json.contains("per_origin_improvement"));
         assert_eq!(evidence.origins.len(), 2);
+    }
+
+    #[test]
+    fn evidence_trace_rejects_tampered_ridge_metadata() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        evidence.records[1].ridge_lambda = 0.25;
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
     }
 
     #[test]
