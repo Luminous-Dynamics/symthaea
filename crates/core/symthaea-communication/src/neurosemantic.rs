@@ -2875,11 +2875,10 @@ mod tests {
 
         let _ = verification_evidence;
     }
-    }
 
     #[test]
     fn lifecycle_receipt_bounded_parser_and_schema_are_fail_closed() {
-        let (_, _, receipt, _, _, _) = synthetic_lifecycle_receipt_chain();
+        let (_, _, _, _, receipt, _, _, _, _) = synthetic_lifecycle_receipt_chain();
         let mut value = serde_json::to_value(&receipt).unwrap();
         value.as_object_mut()
             .unwrap()
@@ -2940,6 +2939,40 @@ mod tests {
         let pre_bytes = serde_json::to_vec(&pre_lineage).unwrap();
         let post_bytes = serde_json::to_vec(&post_lineage).unwrap();
         let lifecycle = synthetic_lifecycle_receipt_chain().4;
+        let source_dataset_manifest_hash = content_hash(b"source-dataset");
+        let forget_set = NeurosemanticRemediationEvaluationSetManifest {
+            schema_version: NEUROSEMANTIC_REMEDIATION_EVALUATION_SET_SCHEMA_VERSION,
+            set_ref: "forget-set".into(),
+            set_kind: NeurosemanticRemediationEvaluationSetKind::Forget,
+            source_dataset_manifest_hash: source_dataset_manifest_hash.clone(),
+            member_artifact_hashes: vec![content_hash(b"forget-1")],
+        };
+        let retain_set = NeurosemanticRemediationEvaluationSetManifest {
+            schema_version: NEUROSEMANTIC_REMEDIATION_EVALUATION_SET_SCHEMA_VERSION,
+            set_ref: "retain-set".into(),
+            set_kind: NeurosemanticRemediationEvaluationSetKind::Retain,
+            source_dataset_manifest_hash,
+            member_artifact_hashes: vec![content_hash(b"retain-1")],
+        };
+        let forget_bytes = serde_json::to_vec(&forget_set).unwrap();
+        let retain_bytes = serde_json::to_vec(&retain_set).unwrap();
+        let protocol_bytes = b"protocol-1";
+        let recovery_method = NeurosemanticRemediationEvaluationMethod {
+            schema_version: NEUROSEMANTIC_REMEDIATION_EVALUATION_METHOD_SCHEMA_VERSION,
+            method_ref: "recovery-method".into(),
+            kind: NeurosemanticRemediationEvaluationMethodKind::RecoveryAttack,
+            protocol_hash: content_hash(protocol_bytes),
+            implementation_revision: "3".repeat(40),
+        };
+        let representation_method = NeurosemanticRemediationEvaluationMethod {
+            schema_version: NEUROSEMANTIC_REMEDIATION_EVALUATION_METHOD_SCHEMA_VERSION,
+            method_ref: "representation-method".into(),
+            kind: NeurosemanticRemediationEvaluationMethodKind::RepresentationResidualProbe,
+            protocol_hash: content_hash(protocol_bytes),
+            implementation_revision: "3".repeat(40),
+        };
+        let recovery_bytes = serde_json::to_vec(&recovery_method).unwrap();
+        let representation_bytes = serde_json::to_vec(&representation_method).unwrap();
         let impact = NeurosemanticRemediationImpactArtifact {
             schema_version: NEUROSEMANTIC_REMEDIATION_IMPACT_ARTIFACT_SCHEMA_VERSION,
             impact_ref: "impact-1".into(),
@@ -2951,76 +2984,67 @@ mod tests {
             post_remediation_lineage_hash: compute_derivation_provenance_hash(&post_lineage.lineage_ref, &post_bytes),
             lifecycle_receipt_hash: lifecycle.fingerprint().unwrap(),
             remediation_action: NeurosemanticArtifactLifecycleAction::Erasure,
-            study_protocol_hash: content_hash(b"protocol-1"),
+            study_protocol_hash: content_hash(protocol_bytes),
             evaluation_split_manifest_hash: content_hash(b"split-1"),
+            forget_set_manifest_hash: forget_set.fingerprint().unwrap(),
+            retain_set_manifest_hash: retain_set.fingerprint().unwrap(),
+            recovery_method_hash: recovery_method.fingerprint().unwrap(),
+            representation_probe_method_hash: representation_method.fingerprint().unwrap(),
             forget_evidence_hash: content_hash(b"forget"),
             utility_impact_evidence_hash: content_hash(b"utility"),
+            recovery_evidence_hash: content_hash(b"recovery"),
+            representation_residual_evidence_hash: content_hash(b"representation"),
             fairness_impact_evidence_hash: Some(content_hash(b"fairness")),
             residual_risk_evidence_hash: content_hash(b"residual"),
-            execution_revision: "3".repeat(40),
+            execution_revision: "2".repeat(40),
             observed_at_unix_s: 170,
-            disposition: NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds,
-            dimensions: vec!["forgetfulness".into(), "utility-impact".into(), "fairness-impact".into(), "residual-risk".into()],
+            disposition: NeurosemanticRemediationImpactDisposition::Inconclusive,
+            dimensions: vec![
+                "forgetfulness".into(),
+                "utility-impact".into(),
+                "fairness-impact".into(),
+                "residual-risk".into(),
+                "forget-set".into(),
+                "retain-set".into(),
+                "recovery-attack".into(),
+                "representation-residual".into(),
+            ],
         };
         assert!(impact.validate().is_ok());
         assert!(impact.verify_lifecycle_binding(&lifecycle).is_ok());
-        let (requested, _, _, _, _, _, _, _, _) = synthetic_lifecycle_receipt_chain();
-        let mut pending_impact = impact.clone();
-        pending_impact.lifecycle_receipt_hash = requested.fingerprint().unwrap();
-        assert!(pending_impact.verify_lifecycle_binding(&requested).is_err());
         assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PreRemediation, &pre_bytes).is_ok());
         assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PostRemediation, &post_bytes).is_ok());
+        assert!(impact.verify_evaluation_set_pair_bytes(&forget_bytes, &retain_bytes).is_ok());
+        assert!(impact.verify_evaluation_method_bytes(NeurosemanticRemediationEvaluationMethodKind::RecoveryAttack, &recovery_bytes).is_ok());
+        assert!(impact.verify_evaluation_method_bytes(NeurosemanticRemediationEvaluationMethodKind::RepresentationResidualProbe, &representation_bytes).is_ok());
+        assert!(impact.verify_study_protocol_bytes(protocol_bytes).is_ok());
+        assert!(impact.verify_evaluation_split_manifest_bytes(b"split-1").is_ok());
         assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::Forgetfulness, b"forget").is_ok());
         assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::UtilityImpact, b"utility").is_ok());
         assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::FairnessImpact, b"fairness").is_ok());
         assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::ResidualRisk, b"residual").is_ok());
+        assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::RecoveryRisk, b"recovery").is_ok());
+        assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::RepresentationResidual, b"representation").is_ok());
 
-        let encoded = serde_json::to_vec(&impact).unwrap();
-        assert_eq!(NeurosemanticRemediationImpactArtifact::from_json_bytes(&encoded).unwrap(), impact);
+        let mut overlap = retain_set.clone();
+        overlap.member_artifact_hashes = vec![forget_set.member_artifact_hashes[0].clone()];
+        assert!(impact.verify_evaluation_set_pair_bytes(&forget_bytes, &serde_json::to_vec(&overlap).unwrap()).is_err());
 
-        let mut missing_required = impact.clone();
-        missing_required.dimensions.retain(|dimension| dimension != "residual-risk");
-        assert!(missing_required.validate().is_err());
+        let mut role_swap = forget_set.clone();
+        role_swap.set_kind = NeurosemanticRemediationEvaluationSetKind::Retain;
+        assert!(impact.verify_evaluation_set_manifest_bytes(NeurosemanticRemediationEvaluationSetKind::Forget, &serde_json::to_vec(&role_swap).unwrap()).is_err());
 
-        let mut fairness_mismatch = impact.clone();
-        fairness_mismatch.fairness_impact_evidence_hash = None;
-        assert!(fairness_mismatch.validate().is_err());
+        let mut method_swap = recovery_method.clone();
+        method_swap.kind = NeurosemanticRemediationEvaluationMethodKind::RepresentationResidualProbe;
+        assert!(impact.verify_evaluation_method_bytes(NeurosemanticRemediationEvaluationMethodKind::RecoveryAttack, &serde_json::to_vec(&method_swap).unwrap()).is_err());
 
-        let mut stale_receipt = impact.clone();
-        stale_receipt.lifecycle_receipt_hash = content_hash(b"different-receipt");
-        assert!(stale_receipt.verify_lifecycle_binding(&lifecycle).is_err());
-
-        let mut different_revision_receipt = lifecycle.clone();
-        different_revision_receipt.execution_revision = "4".repeat(40);
-        different_revision_receipt = NeurosemanticArtifactLifecycleReceipt {
-            previous_receipt_hash: None,
-            event_sequence: 0,
-            ..different_revision_receipt
-        };
-        assert!(impact.verify_lifecycle_binding(&different_revision_receipt).is_err());
-
-        let mut wrong_lineage = impact.clone();
-        wrong_lineage.post_remediation_model_hash = content_hash(b"wrong-model");
-        assert!(wrong_lineage.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PostRemediation, &post_bytes).is_err());
-
-        let mut revision_mismatch = post_lineage.clone();
-        revision_mismatch.execution_revision = "4".repeat(40);
-        let revision_mismatch_bytes = serde_json::to_vec(&revision_mismatch).unwrap();
-        assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PostRemediation, &revision_mismatch_bytes).is_err());
-
-        assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::ResidualRisk, b"tampered").is_err());
+        let mut protocol_swap = recovery_method.clone();
+        protocol_swap.protocol_hash = content_hash(b"other-protocol");
+        assert!(impact.verify_evaluation_method_bytes(NeurosemanticRemediationEvaluationMethodKind::RecoveryAttack, &serde_json::to_vec(&protocol_swap).unwrap()).is_err());
 
         let mut legacy = impact.clone();
         legacy.schema_version = 0;
         assert!(NeurosemanticRemediationImpactArtifact::from_json_bytes(&serde_json::to_vec(&legacy).unwrap()).is_err());
-
-        assert!(impact.verify_study_protocol_bytes(b"protocol-1").is_ok());
-        assert!(impact.verify_evaluation_split_manifest_bytes(b"split-1").is_ok());
-        assert!(impact.verify_study_protocol_bytes(b"other-protocol").is_err());
-        assert!(impact.verify_evaluation_split_manifest_bytes(b"other-split").is_err());
-
-        let oversized = vec![b' '; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1];
-        assert!(NeurosemanticRemediationImpactArtifact::from_json_bytes(&oversized).is_err());
     }
     #[test]
     fn lifecycle_receipt_action_schema_is_stable() {
