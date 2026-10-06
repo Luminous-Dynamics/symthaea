@@ -691,7 +691,7 @@ impl PartnerShuffleSurrogateSummary {
         }
 
         if surrogate_count == 0 {
-            return Err(RelationalHarmonicError::InsufficientSamples(0));
+            return Err(RelationalHarmonicError::InvalidSurrogateCount);
         }
 
         let observed = LagCorrelationSummary::compute(samples, max_lag)?;
