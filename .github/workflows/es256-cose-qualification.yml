@@ -226,7 +226,7 @@ jobs:
           receipt_payload_33 = (
               b"\xd2\x84"
               + b"\x58\x06\xa2\x01\x26\x19\x01\x8b"
-              + b"\xa1\x18\x8c\xa1\x20\x81\x58\x26" + proof
+              + b"\xa1\x19\x01\x8c\xa1\x20\x81\x58\x26" + proof
               + b"\x58\x21" + (b"\x00" * 33)
               + b"\x58\x40" + (b"\x00" * 64)
           )
