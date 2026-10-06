@@ -606,7 +606,26 @@ fn PartitionBar(
 
 // ═══════════════════════════════════════════════════════
 fn layout_requires_luks(layout: &str, filesystem: &str) -> bool {
-    layout == "single-luks" || (filesystem == "zfs" && layout == "single-luks")
+    layout == "single-luks" && filesystem == "btrfs"
+}
+
+fn validate_storage_security(
+    layout: &str,
+    filesystem: &str,
+    encrypt: bool,
+) -> Result<(), &'static str> {
+    if layout == "alongside" && encrypt {
+        return Err("Full-disk encryption is not supported for alongside installs yet.");
+    }
+    if filesystem == "zfs" && encrypt {
+        return Err(
+            "Encrypted ZFS installation is not supported by this installer yet; choose btrfs or disable encryption.",
+        );
+    }
+    if layout == "single-luks" && filesystem != "btrfs" {
+        return Err("The LUKS installer currently supports btrfs only.");
+    }
+    Ok(())
 }
 
 // Relay connection component
@@ -1280,6 +1299,18 @@ pub fn RemoteInstallPanel(
             || disk_confirmation.get().trim() != disk
             || !disks.get().iter().any(|candidate| candidate.name == disk)
         {
+            return;
+        }
+
+        let requested_layout = disk_layout.get();
+        let requested_filesystem = filesystem.get();
+        if let Err(error) = validate_storage_security(
+            &requested_layout,
+            &requested_filesystem,
+            encrypt.get(),
+        ) {
+            relay_state.set(RelayState::Failed(error.to_string()));
+            set_install_log.update(|l| l.push(format!("Install blocked: {}", error)));
             return;
         }
 
