@@ -1614,6 +1614,49 @@ mod tests {
     }
 
     #[test]
+    fn public_jwk_rejects_noncanonical_base64url_spellings() {
+        let request = request();
+
+        let cases = [
+            ("AA==", "unpadded base64url"),
+            ("AB", "non-canonical base64url padding bits"),
+            ("A", "invalid base64url length"),
+        ];
+
+        for (x, expected_message) in cases {
+            let mut snapshot = snapshot();
+            snapshot.document = format!(
+                r##"{{
+                    "id": "https://example.test/controller",
+                    "verificationMethod": [{{
+                        "id": "https://example.test/controller#jwk-1",
+                        "type": "JsonWebKey",
+                        "controller": "https://example.test/controller",
+                        "publicKeyJwk": {{
+                            "kty": "OKP",
+                            "crv": "Ed25519",
+                            "x": "{x}"
+                        }}
+                    }}],
+                    "assertionMethod": ["https://example.test/controller#jwk-1"]
+                }}"##
+            );
+            let reference = snapshot.snapshot_reference().unwrap();
+            let adapter = JsonControllerDocumentSnapshotAdapter::new(
+                "/tmp/does-not-matter",
+                reference,
+            )
+            .unwrap();
+
+            assert!(matches!(
+                adapter.resolve_snapshot(&request, snapshot),
+                Err(SnapshotError::Malformed(message))
+                    if message.contains(expected_message)
+            ));
+        }
+    }
+
+    #[test]
     fn public_jwk_enforces_standard_coordinate_and_key_lengths() {
         let request = request();
         let mut snapshot = snapshot();
