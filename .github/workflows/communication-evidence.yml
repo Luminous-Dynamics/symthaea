@@ -124,6 +124,12 @@ jobs:
           assert report["derivation_input_artifact_verified"] is True
           assert report["derivation_input_artifact_mismatch_blocked"] is True
           assert report["derivation_input_artifact_bounds_blocked"] is True
+          assert report["lifecycle_receipt_binding_verified"] is True
+          assert report["lifecycle_effect_evidence_mismatch_blocked"] is True
+          assert report["lifecycle_artifact_mismatch_blocked"] is True
+          assert report["lifecycle_lineage_mismatch_blocked"] is True
+          assert report["lifecycle_future_timestamp_blocked"] is True
+          assert report["lifecycle_rectification_requires_replacement_artifact"] is True
           assert report["stale_policy_provenance_binding_blocked"] is True
           assert report["inference_escalation_blocked"] is True
           assert report["first_packet_accepted"] is True
