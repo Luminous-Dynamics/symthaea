@@ -477,6 +477,69 @@ impl RollingOriginRelationalPredictionSummary {
                 / self.mean_non_relational_context_mse,
         )
     }
+
+    /// Relative MSE improvement for every rolling origin, retaining the full
+    /// vector so heterogeneity cannot be hidden by the mean.
+    pub fn augmented_mse_improvement_per_origin(&self) -> Vec<Option<f64>> {
+        self.segments
+            .iter()
+            .map(|segment| segment.augmented_mse_improvement_over_non_relational())
+            .collect()
+    }
+
+    /// Median per-origin relative MSE improvement over the nested baseline.
+    pub fn median_augmented_mse_improvement(&self) -> Option<f64> {
+        let mut values = self
+            .augmented_mse_improvement_per_origin()
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+
+        if values.is_empty() {
+            return None;
+        }
+
+        values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let middle = values.len() / 2;
+
+        if values.len() % 2 == 1 {
+            Some(values[middle])
+        } else {
+            Some((values[middle - 1] + values[middle]) / 2.0)
+        }
+    }
+
+    /// Worst per-origin relative MSE improvement over the nested baseline.
+    pub fn minimum_augmented_mse_improvement(&self) -> Option<f64> {
+        self.augmented_mse_improvement_per_origin()
+            .into_iter()
+            .flatten()
+            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+    }
+
+    /// Number of origins where the relational augmentation strictly improves
+    /// held-out MSE over the nested non-relational context model.
+    pub fn origins_beating_non_relational(&self) -> usize {
+        self.segments
+            .iter()
+            .filter(|segment| {
+                segment.relational_augmented.mean_squared_error
+                    < segment.non_relational_context.mean_squared_error
+            })
+            .count()
+    }
+
+    /// Number of origins where the relational augmentation strictly improves
+    /// held-out MSE over the persistence baseline.
+    pub fn origins_beating_persistence(&self) -> usize {
+        self.segments
+            .iter()
+            .filter(|segment| {
+                segment.relational_augmented.mean_squared_error
+                    < segment.persistence_baseline.mean_squared_error
+            })
+            .count()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -697,8 +760,12 @@ impl PredictionNullSummary {
         let mut exceedance_count = 0usize;
 
         for index in 0..count {
-            let shift = 1 + (index * capacity / count);
-            let surrogate = make_surrogate(samples, &config, family, shift);
+            let shift = index
+                .checked_mul(capacity)
+                .and_then(|value| value.checked_div(count))
+                .and_then(|value| value.checked_add(1))
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let surrogate = make_surrogate(samples, &config, family, shift)?;
             let score = fit_and_score(&surrogate, &config, feature_set)?;
 
             minimum_surrogate_mse = minimum_surrogate_mse.min(score.mean_squared_error);
@@ -819,6 +886,9 @@ fn fit_and_score(
         let error = prediction - sample.future_outcome;
         absolute_error += error.abs();
         squared_error += error * error;
+        if !absolute_error.is_finite() || !squared_error.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
     }
 
     let n = config.test_samples as f64;
@@ -850,6 +920,9 @@ fn score_persistence_baseline(
         let error = prediction - sample.future_outcome;
         absolute_error += error.abs();
         squared_error += error * error;
+        if !absolute_error.is_finite() || !squared_error.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
     }
 
     let n = config.test_samples as f64;
@@ -993,7 +1066,7 @@ fn make_surrogate(
     config: &HeldOutRelationalPredictionConfig,
     family: PredictionNullFamily,
     shift: usize,
-) -> Vec<RelationalPredictionSample> {
+) -> Result<Vec<RelationalPredictionSample>, RelationalPredictionError> {
     let test_start = config.test_start();
 
     samples
@@ -1013,33 +1086,42 @@ fn make_surrogate(
                 config.test_samples
             };
             let local_index = index - segment_start;
-            let source = |channel_offset: usize| {
+            let source = |channel_offset: usize| -> Result<usize, RelationalPredictionError> {
                 let extra = match family {
                     PredictionNullFamily::CircularShift => 0,
                     PredictionNullFamily::FeatureDecoupling => channel_offset,
                     PredictionNullFamily::IncrementalRelationalShift => channel_offset,
                 };
-                segment_start + (local_index + shift * (extra + 1)) % segment_len
+                let offset = shift
+                    .checked_mul(extra + 1)
+                    .ok_or(RelationalPredictionError::InvalidSplit)?;
+                let source_index = local_index
+                    .checked_add(offset)
+                    .ok_or(RelationalPredictionError::InvalidSplit)?
+                    % segment_len;
+                segment_start
+                    .checked_add(source_index)
+                    .ok_or(RelationalPredictionError::InvalidSplit)
             };
 
             let shifted_alignment =
                 !matches!(family, PredictionNullFamily::IncrementalRelationalShift);
             let alignment_sample = if shifted_alignment {
-                samples[source(0)]
+                samples[source(0)?]
             } else {
                 *sample
             };
-            let a_to_b_sample = samples[source(1)];
-            let b_to_a_sample = samples[source(2)];
-            let turn_taking_sample = samples[source(3)];
+            let a_to_b_sample = samples[source(1)?];
+            let b_to_a_sample = samples[source(2)?];
+            let turn_taking_sample = samples[source(3)?];
 
-            RelationalPredictionSample {
+            Ok(RelationalPredictionSample {
                 alignment: alignment_sample.alignment,
                 a_to_b: a_to_b_sample.a_to_b,
                 b_to_a: b_to_a_sample.b_to_a,
                 turn_taking: turn_taking_sample.turn_taking,
                 ..*sample
-            }
+            })
         })
         .collect()
 }
@@ -1225,24 +1307,9 @@ mod tests {
     }
 
     #[test]
-    fn rolling_origin_rejects_overlapping_test_windows_or_wrong_horizon() {
+    fn rolling_origin_exposes_per_origin_stability_without_a_pass_threshold() {
         let samples = build_samples(0.5);
-
-        let overlapping = RollingOriginRelationalPredictionSummary::compute(
-            &samples,
-            RollingOriginRelationalPredictionConfig {
-                train_samples: 32,
-                test_samples: 8,
-                gap_samples: 2,
-                origin_count: 4,
-                step_samples: 4,
-                forecast_horizon: 0.5,
-                ..Default::default()
-            },
-        );
-        assert_eq!(overlapping, Err(RelationalPredictionError::InvalidSplit));
-
-        let wrong_horizon = RollingOriginRelationalPredictionSummary::compute(
+        let summary = RollingOriginRelationalPredictionSummary::compute(
             &samples,
             RollingOriginRelationalPredictionConfig {
                 train_samples: 32,
@@ -1250,11 +1317,20 @@ mod tests {
                 gap_samples: 2,
                 origin_count: 4,
                 step_samples: 8,
-                forecast_horizon: 1.0,
+                forecast_horizon: 0.5,
+                ridge_lambda: 1e-8,
                 ..Default::default()
             },
-        );
-        assert_eq!(wrong_horizon, Err(RelationalPredictionError::InvalidSplit));
+        )
+        .unwrap();
+
+        let improvements = summary.augmented_mse_improvement_per_origin();
+        assert_eq!(improvements.len(), 4);
+        assert!(improvements.iter().all(Option::is_some));
+        assert!(summary.median_augmented_mse_improvement().is_some());
+        assert!(summary.minimum_augmented_mse_improvement().is_some());
+        assert!(summary.origins_beating_non_relational() <= 4);
+        assert!(summary.origins_beating_persistence() <= 4);
     }
 
     #[test]
@@ -1339,7 +1415,7 @@ mod tests {
         assert_eq!(summary.status, EvidenceStatus::Proxy);
     }
 
-#[test]
+    #[test]
     fn rolling_origin_is_deterministic() {
         let samples = build_samples(0.5);
         let config = RollingOriginRelationalPredictionConfig {
@@ -1389,7 +1465,7 @@ mod tests {
         assert_eq!(result, Err(RelationalPredictionError::InvalidSplit));
     }
 
-#[test]
+    #[test]
     fn rolling_origin_rejects_zero_step_or_zero_origins() {
         let samples = build_samples(0.5);
 
