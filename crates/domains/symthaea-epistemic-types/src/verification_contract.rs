@@ -750,11 +750,35 @@ pub fn validate_xsd11_date_time_stamp(value: &str) -> Result<(), VerificationFai
     parse_xsd11_date_time_stamp(value).map(|_| ())
 }
 
+fn collapse_xsd_whitespace(value: &str) -> String {
+    let mut normalized = String::with_capacity(value.len());
+    let mut pending_space = false;
+
+    for byte in value.bytes() {
+        match byte {
+            b' ' | b'\t' | b'\n' | b'\r' => pending_space = true,
+            _ => {
+                if pending_space && !normalized.is_empty() {
+                    normalized.push(' ');
+                }
+                normalized.push(byte as char);
+                pending_space = false;
+            }
+        }
+    }
+
+    normalized
+}
+
 fn parse_timestamp(
     field: &'static str,
     value: &str,
 ) -> Result<DateTime<FixedOffset>, VerificationFailure> {
-    let end_of_day = validate_xsd11_date_time_stamp_lexical(value).map_err(|_| {
+    // XSD 1.1 fixes the dateTimeStamp whitespace facet to collapse.
+    // Normalize only the four XML whitespace code points covered by that facet;
+    // retain the original caller spelling everywhere outside this parse path.
+    let normalized_value = collapse_xsd_whitespace(value);
+    let end_of_day = validate_xsd11_date_time_stamp_lexical(&normalized_value).map_err(|_| {
         VerificationFailure::InvalidTimestamp {
             field,
             value: value.to_owned(),
@@ -770,7 +794,7 @@ fn parse_timestamp(
     // four digits. Validate the XSD lexical form first, then adapt a positive
     // expanded year to Chrono's signed-expanded-year syntax without changing
     // the represented instant.
-    let mut parse_value = value.to_owned();
+    let mut parse_value = normalized_value;
 
     if end_of_day {
         let t = parse_value.find('T').ok_or_else(|| VerificationFailure::InvalidTimestamp {
@@ -2749,6 +2773,17 @@ mod tests {
         let resolution = resolved_method(&weaker_request);
         assert!(resolution.matches_request(&weaker_request));
         assert!(!resolution.matches_request(&request));
+    }
+
+    #[test]
+    fn timestamp_parser_applies_xsd_whitespace_collapse() {
+        let padded = " \t2026-10-05T00:00:00Z\r\n";
+        let parsed = parse_timestamp("timestamp", padded).unwrap();
+        let canonical = parse_timestamp("timestamp", "2026-10-05T00:00:00Z").unwrap();
+        assert_eq!(parsed, canonical);
+
+        assert!(parse_timestamp("timestamp", "2026-10-05 T00:00:00Z").is_err());
+        assert!(parse_timestamp("timestamp", "2026-10-05T 00:00:00Z").is_err());
     }
 
     #[test]
