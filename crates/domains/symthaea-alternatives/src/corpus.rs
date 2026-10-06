@@ -84,6 +84,7 @@ fn evidence(
         .then(|| MeasurementUncertaintyRef {
             uncertainty_id: format!("benchmark-uncertainty:{id}"),
             observation_id: format!("benchmark-observation:{id}"),
+            observation_record_digest: format!("benchmark-record-digest:{id}"),
             statement: MeasurementUncertaintyStatement::Expanded {
                 value: 0.1,
                 unit: "burden-unit".into(),
@@ -94,6 +95,10 @@ fn evidence(
             procedure_id: "benchmark-measurement-procedure-v1".into(),
             procedure_digest: "benchmark-measurement-procedure-v1-digest".into(),
             component_refs: vec!["benchmark-uncertainty-component-v1".into()],
+            component_refs_digest: super::canonical_string_list_hash(&vec![
+                "benchmark-uncertainty-component-v1".into()
+            ])
+            .unwrap(),
             record_digest: format!("benchmark-uncertainty-digest:{id}"),
         }),
         scope: "benchmark:functional-unit-v1|global".into(),
