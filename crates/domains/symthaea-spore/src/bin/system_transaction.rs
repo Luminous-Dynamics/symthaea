@@ -100,6 +100,7 @@ pub(crate) enum MutationKind {
     WriteConfig,
     CreateImage,
     RestoreImage,
+    PreserveData,
 }
 
 impl MutationKind {
@@ -113,6 +114,7 @@ impl MutationKind {
             Self::WriteConfig => "write_config",
             Self::CreateImage => "create_image",
             Self::RestoreImage => "restore_image",
+            Self::PreserveData => "preserve_data",
         }
     }
 }
@@ -274,6 +276,7 @@ mod tests {
         assert_eq!(MutationKind::WriteConfig.as_str(), "write_config");
         assert_eq!(MutationKind::CreateImage.as_str(), "create_image");
         assert_eq!(MutationKind::RestoreImage.as_str(), "restore_image");
+        assert_eq!(MutationKind::PreserveData.as_str(), "preserve_data");
     }
 
     #[test]
