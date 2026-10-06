@@ -180,6 +180,33 @@ The rolling-origin qualification path applies three prediction null families at 
 IncrementalRelationalShift is the targeted nested null for the critical RelationalAugmented vs NonRelationalContext comparison: synchrony and non-relational context remain fixed while only the added relational channels are shifted.
 
 
+## 9. Evidence packet and provenance
+
+The evaluator can emit a validated JSON evidence packet rather than only a summary score.
+
+The packet carries:
+
+- a caller-attested protocol identifier;
+- the exact source-data SHA-256 digest;
+- the exact 40-character software commit SHA;
+- split configuration and observed horizon bounds;
+- the score for every feature family;
+- per-family held-out feature timestamps and outcome timestamps;
+- independently retained held-out outcomes and predictions;
+- fitted linear-model coefficients;
+- training-window feature means and scales.
+
+The packet verifier recomputes MAE/MSE from the retained prediction and outcome vectors and rejects mismatched metrics, non-finite values, missing feature families, inconsistent timestamps, mismatched provenance, and rolling-origin child packets that disagree with the parent configuration.
+
+The provenance fields are intentionally caller-supplied. The evaluator must not invent a dataset hash or software identity. A packet with absent or malformed provenance is therefore invalid for empirical qualification.
+
+JSON schemas are versioned in the emitted document:
+
+- `relational-prediction-evidence/v1` for one held-out segment;
+- `relational-prediction-rolling-evidence/v1` for the repeated-origin bundle.
+
+Serialization is an evidence transport mechanism, not an inference procedure. A valid packet proves that the recorded computation is internally self-consistent; it does not prove that the source data are scientifically appropriate, that the target is truly independent, or that the measured predictive difference is causal.
+
 ## 9. Repeated rolling-origin evaluation
 
 A single blocked holdout is an implementation qualification, not a scientific result.
