@@ -288,11 +288,7 @@ fn rfc9942_inclusion_path_semantic_bound_is_distinct_from_resource_cap() {
         Err(Rfc9942VdpError::InvalidProof(_))
     ));
 
-    let mut resource_oversize = vec![0x83, 0x02, 0x00, 0xd8];
-    resource_oversize.truncate(4);
-    resource_oversize.push(0x18);
-    resource_oversize.push(0x41);
-    resource_oversize.push(0x5f);
+    let mut resource_oversize = vec![0x83, 0x02, 0x00, 0x81, 0x5f];
     resource_oversize.extend(std::iter::repeat_n(0x40, 4097));
     resource_oversize.push(0xff);
 
