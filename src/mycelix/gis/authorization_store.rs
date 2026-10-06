@@ -12304,26 +12304,75 @@ fn historical_identity_fence_indexes_are_present() {
     ));
     let store = SqliteAuthorizationStore::open(&path).unwrap();
     let connection = store.connection().unwrap();
-    for index in [
-        "authorization_lease_attempt_history_idx",
-        "authorization_receipt_attempt_history_idx",
-        "authorization_receipt_operation_history_idx",
-        "authorization_status_attempt_history_idx",
-        "authorization_status_operation_history_idx",
-        "authorization_recovery_attempt_history_idx",
-        "authorization_recovery_operation_history_idx",
-        "authorization_terminal_attempt_history_idx",
-        "authorization_terminal_operation_history_idx",
-    ] {
-        let present: Option<String> = connection
-            .query_row(
-                "SELECT name FROM sqlite_master WHERE type='index' AND name=?1",
-                params![index],
-                |row| row.get(0),
-            )
-            .optional()
-            .unwrap();
-        assert_eq!(present.as_deref(), Some(index), "missing expected index: {index}");
+    let expected_plans = [
+        (
+            "authorization_leases",
+            "attempt_id",
+            "attempt_id=?1 AND attempt_id IS NOT NULL AND attempt_id <> ''",
+            "authorization_lease_attempt_history_idx",
+        ),
+        (
+            "authorization_receipts",
+            "attempt_id",
+            "attempt_id=?1",
+            "authorization_receipt_attempt_history_idx",
+        ),
+        (
+            "authorization_receipts",
+            "operation_id",
+            "operation_id=?1 AND operation_id IS NOT NULL AND operation_id <> ''",
+            "authorization_receipt_operation_history_idx",
+        ),
+        (
+            "authorization_status_checks",
+            "attempt_id",
+            "attempt_id=?1",
+            "authorization_status_attempt_history_idx",
+        ),
+        (
+            "authorization_status_checks",
+            "operation_id",
+            "operation_id=?1 AND operation_id IS NOT NULL AND operation_id <> ''",
+            "authorization_status_operation_history_idx",
+        ),
+        (
+            "authorization_recovery_markers",
+            "attempt_id",
+            "attempt_id=?1",
+            "authorization_recovery_attempt_history_idx",
+        ),
+        (
+            "authorization_recovery_markers",
+            "operation_id",
+            "operation_id=?1 AND operation_id IS NOT NULL AND operation_id <> ''",
+            "authorization_recovery_operation_history_idx",
+        ),
+        (
+            "authorization_terminal_evidence",
+            "attempt_id",
+            "attempt_id=?1",
+            "authorization_terminal_attempt_history_idx",
+        ),
+        (
+            "authorization_terminal_evidence",
+            "operation_id",
+            "operation_id=?1 AND operation_id IS NOT NULL AND operation_id <> ''",
+            "authorization_terminal_operation_history_idx",
+        ),
+    ];
+
+    for (table, column, predicate, index) in expected_plans {
+        let plan_sql = format!("EXPLAIN QUERY PLAN SELECT {column} FROM {table} WHERE {predicate}");
+        let mut stmt = connection.prepare(&plan_sql).unwrap();
+        let details: Vec<String> = stmt
+            .query_map(params!["probe"], |row| row.get::<_, String>(3))
+            .unwrap()
+            .map(|row| row.unwrap())
+            .collect();
+        assert!(
+            details.iter().any(|detail| detail.contains(index)),
+            "query plan for {table}.{column} did not use {index}: {details:?}"
+        );
     }
     let _ = std::fs::remove_file(path);
 }
