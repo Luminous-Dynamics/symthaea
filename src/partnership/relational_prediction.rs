@@ -469,6 +469,10 @@ pub struct HeldOutRelationalPredictionEvidence {
 pub struct RollingOriginRelationalPredictionEvidence {
     pub provenance: RelationalPredictionProvenance,
     pub config: RollingOriginRelationalPredictionConfig,
+    /// Exact source-slice start for each retained origin, in source sample
+    /// indices. This binds the realized rolling schedule to the declared
+    /// first_origin and step_samples.
+    pub origin_starts: Vec<usize>,
     pub observed: RollingOriginRelationalPredictionSummary,
     pub origins: Vec<HeldOutRelationalPredictionEvidence>,
 }
@@ -782,11 +786,22 @@ impl RollingOriginRelationalPredictionEvidence {
             || self.config.ridge_lambda < 0.0
             || self.origins.len() != self.config.origin_count
             || self.observed.segments.len() != self.config.origin_count
+            || self.origin_starts.len() != self.config.origin_count
         {
             return Err(RelationalPredictionError::InvalidSplit);
         }
 
         for (index, origin) in self.origins.iter().enumerate() {
+            let expected_start = self
+                .config
+                .step_samples
+                .checked_mul(index)
+                .and_then(|offset| self.config.first_origin.checked_add(offset))
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            if self.origin_starts[index] != expected_start {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+
             origin.validate()?;
             if origin.provenance != self.provenance
                 || origin.summary != self.observed.segments[index]
@@ -850,6 +865,7 @@ impl RollingOriginRelationalPredictionEvidence {
                 "forecast_horizon": self.config.forecast_horizon,
                 "ridge_lambda": self.config.ridge_lambda
             },
+            "origin_starts": &self.origin_starts,
             "observed": {
                 "mean_persistence_mse": self.observed.mean_persistence_mse,
                 "mean_isolated_agents_mse": self.observed.mean_isolated_agents_mse,
@@ -883,6 +899,7 @@ impl RollingOriginRelationalPredictionSummary {
             .ok_or(RelationalPredictionError::InvalidSplit)?;
 
         let mut origins = Vec::with_capacity(config.origin_count);
+        let mut origin_starts = Vec::with_capacity(config.origin_count);
         for origin in 0..config.origin_count {
             let start = config
                 .step_samples
@@ -896,6 +913,7 @@ impl RollingOriginRelationalPredictionSummary {
                 .get(start..end)
                 .ok_or(RelationalPredictionError::InvalidSplit)?;
 
+            origin_starts.push(start);
             origins.push(HeldOutRelationalPredictionSummary::compute_evidence(
                 segment,
                 HeldOutRelationalPredictionConfig {
@@ -911,6 +929,7 @@ impl RollingOriginRelationalPredictionSummary {
         let evidence = RollingOriginRelationalPredictionEvidence {
             provenance,
             config,
+            origin_starts,
             observed,
             origins,
         };
@@ -2046,6 +2065,38 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn rolling_evidence_rejects_tampered_origin_schedule() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 2,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let mut evidence = RollingOriginRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config,
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        evidence.origin_starts[1] += 1;
+
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
     fn rolling_evidence_validates_and_serializes() {
         let samples = build_samples(0.5);
         let config = RollingOriginRelationalPredictionConfig {
