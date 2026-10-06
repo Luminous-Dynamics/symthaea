@@ -1059,6 +1059,36 @@ mod tests {
     }
 
     #[test]
+    fn fingerprint_key_rejects_symlink_and_unsafe_permissions() {
+        let name = random_operation_id().unwrap();
+        let target =
+            std::env::temp_dir().join(format!("symthaea-fingerprint-key-target-{name}"));
+        let path =
+            std::env::temp_dir().join(format!("symthaea-fingerprint-key-link-{name}"));
+        std::fs::write(&target, [0u8; 32]).unwrap();
+        std::os::unix::fs::symlink(&target, &path).unwrap();
+
+        let error = read_fingerprint_key(&path)
+            .expect_err("symlinked fingerprint key must fail closed");
+        assert!(error.contains("unable to open transaction fingerprint key"));
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(&target);
+
+        let unsafe_path =
+            std::env::temp_dir().join(format!("symthaea-fingerprint-key-permissions-{name}"));
+        std::fs::write(&unsafe_path, [0u8; 32]).unwrap();
+        std::fs::set_permissions(
+            &unsafe_path,
+            std::os::unix::fs::PermissionsExt::from_mode(0o640),
+        )
+        .unwrap();
+        let error = read_fingerprint_key(&unsafe_path)
+            .expect_err("group-readable fingerprint key must fail closed");
+        assert!(error.contains("unsafe permissions"));
+        let _ = std::fs::remove_file(unsafe_path);
+    }
+
+    #[test]
     fn secret_commitments_are_stable_domain_separated_and_not_raw_secrets() {
         let name = random_operation_id().unwrap();
         let path = std::env::temp_dir()
