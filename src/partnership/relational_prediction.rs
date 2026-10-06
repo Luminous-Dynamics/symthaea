@@ -122,6 +122,7 @@ pub enum RelationalPredictionError {
     TemporalLeakage,
     InvalidRidgeLambda,
     InvalidSurrogateCount,
+    InvalidEvidenceProvenance(&'static str),
     ModelFitFailed,
 }
 
@@ -141,6 +142,9 @@ impl std::fmt::Display for RelationalPredictionError {
             }
             Self::InvalidRidgeLambda => write!(f, "ridge_lambda must be finite and non-negative"),
             Self::InvalidSurrogateCount => write!(f, "surrogate_count must be greater than zero"),
+            Self::InvalidEvidenceProvenance(name) => {
+                write!(f, "evidence provenance field {name} is invalid")
+            }
             Self::ModelFitFailed => write!(f, "deterministic linear model fit failed"),
         }
     }
@@ -236,10 +240,204 @@ struct FittedLinearModel {
     scales: Vec<f64>,
 }
 
+impl PredictionFeatureSet {
+    fn all() -> [Self; 7] {
+        [
+            Self::PersistenceBaseline,
+            Self::IsolatedAgents,
+            Self::CommonDriver,
+            Self::SynchronyOnly,
+            Self::NonRelationalContext,
+            Self::RelationalAugmented,
+            Self::RelationalProfile,
+        ]
+    }
+}
+
 impl PredictionScore {
     pub fn is_finite(&self) -> bool {
         self.mean_absolute_error.is_finite() && self.mean_squared_error.is_finite()
     }
+}
+
+/// Caller-attested provenance for an empirical qualification run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RelationalPredictionProvenance {
+    pub protocol_id: String,
+    pub source_data_sha256: String,
+    pub software_commit_sha: String,
+}
+
+impl RelationalPredictionProvenance {
+    pub fn new(
+        protocol_id: impl Into<String>,
+        source_data_sha256: impl Into<String>,
+        software_commit_sha: impl Into<String>,
+    ) -> Result<Self, RelationalPredictionError> {
+        let provenance = Self {
+            protocol_id: protocol_id.into(),
+            source_data_sha256: source_data_sha256.into(),
+            software_commit_sha: software_commit_sha.into(),
+        };
+
+        if provenance.protocol_id.trim().is_empty() {
+            return Err(RelationalPredictionError::InvalidEvidenceProvenance(
+                "protocol_id",
+            ));
+        }
+        if !is_hex_digest(&provenance.source_data_sha256, 64) {
+            return Err(RelationalPredictionError::InvalidEvidenceProvenance(
+                "source_data_sha256",
+            ));
+        }
+        if !is_hex_digest(&provenance.software_commit_sha, 40) {
+            return Err(RelationalPredictionError::InvalidEvidenceProvenance(
+                "software_commit_sha",
+            ));
+        }
+
+        Ok(provenance)
+    }
+}
+
+/// Exact held-out prediction trace for one feature family.
+///
+/// This retains fitted preprocessing/model parameters and every held-out
+/// prediction so MAE/MSE can be recomputed from frozen inputs.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PredictionEvidenceRecord {
+    pub feature_set: PredictionFeatureSet,
+    pub train_samples: usize,
+    pub test_samples: usize,
+    pub feature_times: Vec<f64>,
+    pub outcome_times: Vec<f64>,
+    pub observed_outcomes: Vec<f64>,
+    pub predictions: Vec<f64>,
+    pub fit_coefficients: Option<Vec<f64>>,
+    pub feature_means: Vec<f64>,
+    pub feature_scales: Vec<f64>,
+    pub mean_absolute_error: f64,
+    pub mean_squared_error: f64,
+}
+
+impl PredictionEvidenceRecord {
+    pub fn score(&self) -> PredictionScore {
+        PredictionScore {
+            feature_set: self.feature_set,
+            parameter_count: self.fit_coefficients.as_ref().map_or(0, Vec::len),
+            train_samples: self.train_samples,
+            test_samples: self.test_samples,
+            mean_absolute_error: self.mean_absolute_error,
+            mean_squared_error: self.mean_squared_error,
+        }
+    }
+}
+
+/// One complete held-out evidence packet.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeldOutRelationalPredictionEvidence {
+    pub provenance: RelationalPredictionProvenance,
+    pub summary: HeldOutRelationalPredictionSummary,
+    pub records: Vec<PredictionEvidenceRecord>,
+}
+
+/// Rolling-origin packet retaining a complete trace at each origin.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RollingOriginRelationalPredictionEvidence {
+    pub provenance: RelationalPredictionProvenance,
+    pub config: RollingOriginRelationalPredictionConfig,
+    pub observed: RollingOriginRelationalPredictionSummary,
+    pub origins: Vec<HeldOutRelationalPredictionEvidence>,
+}
+
+/// Caller-attested provenance for an empirical qualification run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RelationalPredictionProvenance {
+    pub protocol_id: String,
+    pub source_data_sha256: String,
+    pub software_commit_sha: String,
+}
+
+impl RelationalPredictionProvenance {
+    pub fn new(
+        protocol_id: impl Into<String>,
+        source_data_sha256: impl Into<String>,
+        software_commit_sha: impl Into<String>,
+    ) -> Result<Self, RelationalPredictionError> {
+        let provenance = Self {
+            protocol_id: protocol_id.into(),
+            source_data_sha256: source_data_sha256.into(),
+            software_commit_sha: software_commit_sha.into(),
+        };
+
+        if provenance.protocol_id.trim().is_empty() {
+            return Err(RelationalPredictionError::InvalidEvidenceProvenance(
+                "protocol_id",
+            ));
+        }
+        if !is_hex_digest(&provenance.source_data_sha256, 64) {
+            return Err(RelationalPredictionError::InvalidEvidenceProvenance(
+                "source_data_sha256",
+            ));
+        }
+        if !is_hex_digest(&provenance.software_commit_sha, 40) {
+            return Err(RelationalPredictionError::InvalidEvidenceProvenance(
+                "software_commit_sha",
+            ));
+        }
+
+        Ok(provenance)
+    }
+}
+
+/// Exact held-out prediction trace for one feature family.
+///
+/// This retains fitted preprocessing/model parameters and every held-out
+/// prediction so MAE/MSE can be recomputed from frozen inputs.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PredictionEvidenceRecord {
+    pub feature_set: PredictionFeatureSet,
+    pub train_samples: usize,
+    pub test_samples: usize,
+    pub feature_times: Vec<f64>,
+    pub outcome_times: Vec<f64>,
+    pub observed_outcomes: Vec<f64>,
+    pub predictions: Vec<f64>,
+    pub fit_coefficients: Option<Vec<f64>>,
+    pub feature_means: Vec<f64>,
+    pub feature_scales: Vec<f64>,
+    pub mean_absolute_error: f64,
+    pub mean_squared_error: f64,
+}
+
+impl PredictionEvidenceRecord {
+    pub fn score(&self) -> PredictionScore {
+        PredictionScore {
+            feature_set: self.feature_set,
+            parameter_count: self.fit_coefficients.as_ref().map_or(0, Vec::len),
+            train_samples: self.train_samples,
+            test_samples: self.test_samples,
+            mean_absolute_error: self.mean_absolute_error,
+            mean_squared_error: self.mean_squared_error,
+        }
+    }
+}
+
+/// One complete held-out evidence packet.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeldOutRelationalPredictionEvidence {
+    pub provenance: RelationalPredictionProvenance,
+    pub summary: HeldOutRelationalPredictionSummary,
+    pub records: Vec<PredictionEvidenceRecord>,
+}
+
+/// Rolling-origin packet retaining a complete trace at each origin.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RollingOriginRelationalPredictionEvidence {
+    pub provenance: RelationalPredictionProvenance,
+    pub config: RollingOriginRelationalPredictionConfig,
+    pub observed: RollingOriginRelationalPredictionSummary,
+    pub origins: Vec<HeldOutRelationalPredictionEvidence>,
 }
 
 /// Held-out comparison across the required baselines and the relational model.
@@ -265,6 +463,24 @@ pub struct HeldOutRelationalPredictionSummary {
 }
 
 impl HeldOutRelationalPredictionSummary {
+    pub fn compute_evidence(
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+        provenance: RelationalPredictionProvenance,
+    ) -> Result<HeldOutRelationalPredictionEvidence, RelationalPredictionError> {
+        let summary = Self::compute(samples, config)?;
+        let records = PredictionFeatureSet::all()
+            .into_iter()
+            .map(|feature_set| fit_prediction_record(samples, &config, feature_set))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(HeldOutRelationalPredictionEvidence {
+            provenance,
+            summary,
+            records,
+        })
+    }
+
     pub fn compute(
         samples: &[RelationalPredictionSample],
         config: HeldOutRelationalPredictionConfig,
@@ -409,6 +625,52 @@ pub struct RollingOriginRelationalPredictionSummary {
 }
 
 impl RollingOriginRelationalPredictionSummary {
+    pub fn compute_evidence(
+        samples: &[RelationalPredictionSample],
+        config: RollingOriginRelationalPredictionConfig,
+        provenance: RelationalPredictionProvenance,
+    ) -> Result<RollingOriginRelationalPredictionEvidence, RelationalPredictionError> {
+        let observed = Self::compute(samples, config)?;
+        let segment_total = config
+            .train_samples
+            .checked_add(config.gap_samples)
+            .and_then(|value| value.checked_add(config.test_samples))
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+        let mut origins = Vec::with_capacity(config.origin_count);
+        for origin in 0..config.origin_count {
+            let start = config
+                .step_samples
+                .checked_mul(origin)
+                .and_then(|offset| config.first_origin.checked_add(offset))
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let end = start
+                .checked_add(segment_total)
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let segment = samples
+                .get(start..end)
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+            origins.push(HeldOutRelationalPredictionSummary::compute_evidence(
+                segment,
+                HeldOutRelationalPredictionConfig {
+                    train_samples: config.train_samples,
+                    test_samples: config.test_samples,
+                    gap_samples: config.gap_samples,
+                    ridge_lambda: config.ridge_lambda,
+                },
+                provenance.clone(),
+            )?);
+        }
+
+        Ok(RollingOriginRelationalPredictionEvidence {
+            provenance,
+            config,
+            observed,
+            origins,
+        })
+    }
+
     pub fn compute(
         samples: &[RelationalPredictionSample],
         config: RollingOriginRelationalPredictionConfig,
@@ -831,6 +1093,10 @@ impl HeldOutRelationalPredictionQualification {
     }
 }
 
+fn is_hex_digest(value: &str, length: usize) -> bool {
+    value.len() == length && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 fn validate_samples(
     samples: &[RelationalPredictionSample],
 ) -> Result<(), RelationalPredictionError> {
@@ -861,6 +1127,99 @@ fn validate_temporal_boundary(
     }
 
     Ok(())
+}
+
+fn fit_prediction_record(
+    samples: &[RelationalPredictionSample],
+    config: &HeldOutRelationalPredictionConfig,
+    feature_set: PredictionFeatureSet,
+) -> Result<PredictionEvidenceRecord, RelationalPredictionError> {
+    validate_samples(samples)?;
+    config.validate(samples.len())?;
+    validate_temporal_boundary(samples, config)?;
+
+    let test_start = config.test_start();
+    let test_end = test_start
+        .checked_add(config.test_samples)
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+    let (fit_coefficients, feature_means, feature_scales, prediction_fn): (
+        Option<Vec<f64>>,
+        Vec<f64>,
+        Vec<f64>,
+        Box<dyn Fn(&RelationalPredictionSample) -> Result<f64, RelationalPredictionError>>,
+    ) = if feature_set == PredictionFeatureSet::PersistenceBaseline {
+        let baseline = samples[config.train_samples - 1].future_outcome;
+        (
+            None,
+            Vec::new(),
+            Vec::new(),
+            Box::new(move |_| Ok(baseline)),
+        )
+    } else {
+        let model = fit_linear_model(
+            &samples[..config.train_samples],
+            feature_set,
+            config.ridge_lambda,
+        )?;
+        let coefficients = model.coefficients.clone();
+        let means = model.means.clone();
+        let scales = model.scales.clone();
+        Box::new(move |sample| {
+            let features = feature_vector(sample, feature_set);
+            let prediction = predict(
+                &FittedLinearModel {
+                    coefficients: coefficients.clone(),
+                    means: means.clone(),
+                    scales: scales.clone(),
+                },
+                &features,
+            );
+            if prediction.is_finite() {
+                Ok(prediction)
+            } else {
+                Err(RelationalPredictionError::ModelFitFailed)
+            }
+        })
+        .pipe(|_| unreachable!())
+    };
+
+    let mut feature_times = Vec::with_capacity(config.test_samples);
+    let mut outcome_times = Vec::with_capacity(config.test_samples);
+    let mut observed_outcomes = Vec::with_capacity(config.test_samples);
+    let mut predictions = Vec::with_capacity(config.test_samples);
+    let mut absolute_error = 0.0;
+    let mut squared_error = 0.0;
+
+    for sample in &samples[test_start..test_end] {
+        let prediction = prediction_fn(sample)?;
+        let error = prediction - sample.future_outcome;
+        absolute_error += error.abs();
+        squared_error += error * error;
+        if !absolute_error.is_finite() || !squared_error.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+        feature_times.push(sample.feature_time);
+        outcome_times.push(sample.outcome_time);
+        observed_outcomes.push(sample.future_outcome);
+        predictions.push(prediction);
+    }
+
+    let n = config.test_samples as f64;
+    Ok(PredictionEvidenceRecord {
+        feature_set,
+        train_samples: config.train_samples,
+        test_samples: config.test_samples,
+        feature_times,
+        outcome_times,
+        observed_outcomes,
+        predictions,
+        fit_coefficients,
+        feature_means,
+        feature_scales,
+        mean_absolute_error: absolute_error / n,
+        mean_squared_error: squared_error / n,
+    })
 }
 
 fn fit_and_score(
