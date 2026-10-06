@@ -327,8 +327,8 @@ pub use viability_fabric::{
 };
 pub mod viability_micro_world;
 pub use viability_micro_world::{
-    evaluate_predictor, MicroAction, MicroWorldObservation, MicroWorldPredictor,
-    MicroWorldReport, PersistencePredictor,
+    evaluate_predictor, run_homeostatic_agent, HomeostaticPolicy, HomeostaticRunReport,
+    MicroAction, MicroWorldObservation, MicroWorldPredictor, MicroWorldReport, PersistencePredictor,
 };
 
 // ── Imports (only what the struct definitions below require) ─────────────────
