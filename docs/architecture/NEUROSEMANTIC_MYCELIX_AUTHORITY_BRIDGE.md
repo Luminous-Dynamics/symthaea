@@ -57,7 +57,7 @@ A successful cryptographic signature check is evidence of signer control of a ke
 
 ## Concrete signed resolution contract
 
-The communication crate now materializes the recommended resolution as `NeurosemanticAuthorityResolutionAttestation`. The handling-policy schema is version 8: v5 introduced policy provenance, v6 introduced policy-specific authority-resolution freshness, v7 introduced derivation/data-lineage identity, and v8 binds the lineage output artifact to the packet payload identity. The resolution schema is version 2 because its status evidence is now content-addressed rather than represented only by an opaque source reference.
+The communication crate now materializes the recommended resolution as `NeurosemanticAuthorityResolutionAttestation`. The handling-policy schema is version 8: v5 introduced policy provenance, v6 introduced policy-specific authority-resolution freshness, v7 introduced derivation/data-lineage identity, and v8 binds the lineage input/output artifact identities to the packet payload identity. The structured lineage record is schema v2, and the resolution schema is version 2 because its status evidence is now content-addressed rather than represented only by an opaque source reference.
 
 The resolution is signed by the configured external resolver and binds, in one immutable snapshot:
 
@@ -88,13 +88,13 @@ The resulting capability retains the exact resolution fingerprint, status-source
 
 The external lineage record should be machine-readable and independently verifiable. Symthaea's compact `NeurosemanticDerivationLineageRecord` models a minimum useful subset of provenance concepts:
 
-- bounded input artifact references;
+- bounded input artifact references with corresponding content hashes;
 - transformation/activity reference and revision;
 - exact output artifact BLAKE3 hash;
 - exact execution Git revision;
 - generation timestamp.
 
-The policy binds the exact serialized lineage record and its output-artifact hash. Packet construction then requires that declared output hash to equal the actual packet payload hash. This prevents a valid lineage record for one cognitive artifact from being attached to another merely by reusing its policy/provenance identity.
+The policy binds the exact serialized lineage record, its input artifact identities, and its output-artifact hash. Packet construction then requires that declared output hash to equal the actual packet payload hash. This makes both the produced artifact and the claimed source entities content-addressable within the lineage evidence. This prevents a valid lineage record for one cognitive artifact from being attached to another merely by reusing its policy/provenance identity.
 
 This is intentionally compatible in concept with W3C PROV's entity/activity/agent model without importing a large ontology into the transport crate. W3C PROV describes provenance in terms of entities, activities, agents, and derivations between entities. (W3C PROV Model Primer, https://www.w3.org/TR/prov-primer/.)
 
