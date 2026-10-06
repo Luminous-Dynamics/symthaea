@@ -16,12 +16,11 @@ use super::post_state::{
     NixVerifiedPostStateStabilityEvidenceV1,
 };
 use super::systemd_definition::NixVerifiedSystemdDefinitionContentCommitmentV1;
-use super::systemd_definition::{
-    NixSystemdDefinitionContentCommitmentV1, NixSystemdDefinitionContentErrorV1,
-    NixVerifiedSystemdDefinitionContentCommitmentV1,
-};
 use super::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
-use super::service_state::{ServiceActiveStateV1, ServiceLoadStateV1, ServiceUnitFileStateV1};
+use super::service_state::{
+    NixServiceObservedStateV1, NixVerifiedServicePreStateV1,
+    ServiceActiveStateV1, ServiceLoadStateV1, ServiceUnitFileStateV1,
+};
 use std::collections::HashMap;
 use std::time::Duration;
 use thiserror::Error;
@@ -363,6 +362,35 @@ impl NixSystemdReadOnlyObserverV1 {
             .map_err(|error| NixSystemdObserverErrorV1::InvalidDefinitionContent(error.to_string()))?;
 
         Ok(commitment)
+    }
+
+    /// Observe the exact service pre-state used by the authority model and
+    /// seal its generation-bound identity.
+    pub(crate) async fn observe_service_pre_state(
+        &self,
+        unit: &str,
+        generation: u64,
+    ) -> Result<NixVerifiedServicePreStateV1, NixSystemdObserverErrorV1> {
+        if generation == 0 {
+            return Err(NixSystemdObserverErrorV1::InvalidPostState(
+                "pre-state generation must be non-zero".to_string(),
+            ));
+        }
+
+        let expected_unit = canonical_unit(unit)?;
+        let manager_owner = self.systemd_manager_owner().await?;
+        let object_path = self.resolve_service_unit(&expected_unit).await?;
+        let properties = self
+            .get_all_properties(&object_path, SYSTEMD_UNIT_INTERFACE)
+            .await?;
+        let post_manager_owner = self.systemd_manager_owner().await?;
+        if post_manager_owner != manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+
+        let state = observed_state_from_properties(&expected_unit, &properties)?;
+        NixVerifiedServicePreStateV1::from_observer(&state, generation)
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))
     }
 
     /// Hash the exact FragmentPath/DropInPaths reported by systemd.
@@ -1024,6 +1052,61 @@ fn stability_sample_from_observation(
         state_change_at_monotonic_us: observation.state_change_at_monotonic_us,
         captured_at_monotonic_us: observation.observed_at_monotonic_us,
     })
+}
+
+fn observed_state_from_properties(
+    expected_unit: &str,
+    properties: &HashMap<String, OwnedValue>,
+) -> Result<NixServiceObservedStateV1, NixSystemdObserverErrorV1> {
+    let required = [
+        "Id",
+        "Names",
+        "LoadState",
+        "ActiveState",
+        "SubState",
+        "UnitFileState",
+    ];
+    for property in required {
+        if !properties.contains_key(property) {
+            return Err(NixSystemdObserverErrorV1::MissingProperty {
+                interface: SYSTEMD_UNIT_INTERFACE,
+                property,
+            });
+        }
+    }
+
+    let resolved_id = required_string(properties, SYSTEMD_UNIT_INTERFACE, "Id")?;
+    let names = required_strings(properties, SYSTEMD_UNIT_INTERFACE, "Names")?;
+    let load_state = ServiceLoadStateV1::parse(&required_string(
+        properties,
+        SYSTEMD_UNIT_INTERFACE,
+        "LoadState",
+    )?)
+    .map_err(|_| NixSystemdObserverErrorV1::UnknownStateVocabulary("LoadState".to_string()))?;
+    let active_state = ServiceActiveStateV1::parse(&required_string(
+        properties,
+        SYSTEMD_UNIT_INTERFACE,
+        "ActiveState",
+    )?)
+    .map_err(|_| NixSystemdObserverErrorV1::UnknownStateVocabulary("ActiveState".to_string()))?;
+    let sub_state = required_string(properties, SYSTEMD_UNIT_INTERFACE, "SubState")?;
+    let unit_file_state = ServiceUnitFileStateV1::parse(&required_string(
+        properties,
+        SYSTEMD_UNIT_INTERFACE,
+        "UnitFileState",
+    )?)
+    .map_err(|_| NixSystemdObserverErrorV1::UnknownStateVocabulary("UnitFileState".to_string()))?;
+
+    NixServiceObservedStateV1::from_observer_snapshot(
+        expected_unit,
+        resolved_id,
+        names,
+        load_state,
+        active_state,
+        unit_file_state,
+        sub_state,
+    )
+    .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))
 }
 
 fn definition_identity_from_properties(
