@@ -1098,9 +1098,16 @@ fn make_surrogate(
                     PredictionNullFamily::FeatureDecoupling => channel_offset,
                     PredictionNullFamily::IncrementalRelationalShift => channel_offset,
                 };
-                let offset = shift
+                let raw_offset = shift
                     .checked_mul(extra + 1)
                     .ok_or(RelationalPredictionError::InvalidSplit)?;
+                if segment_len < 2 {
+                    return Err(RelationalPredictionError::InsufficientSamples(segment_len));
+                }
+                // Normalize every shifted channel to a genuinely non-zero
+                // circular offset; raw multiples of segment_len must not
+                // accidentally produce an identity surrogate.
+                let offset = 1 + (raw_offset - 1) % (segment_len - 1);
                 let source_index = local_index
                     .checked_add(offset)
                     .ok_or(RelationalPredictionError::InvalidSplit)?
@@ -1397,6 +1404,29 @@ mod tests {
             assert_eq!(null.surrogate_count, 8);
             assert!((0.0..=1.0).contains(&null.exceedance_fraction));
         }
+    }
+
+    #[test]
+    fn feature_decoupling_never_leaves_a_shifted_channel_identity_aligned() {
+        let samples = build_samples(0.5);
+        let config = HeldOutRelationalPredictionConfig {
+            train_samples: 8,
+            test_samples: 4,
+            gap_samples: 2,
+            ridge_lambda: 1e-8,
+        };
+
+        let surrogate = make_surrogate(
+            &samples,
+            &config,
+            PredictionNullFamily::FeatureDecoupling,
+            2,
+        )
+        .unwrap();
+
+        assert_ne!(surrogate[0].a_to_b, samples[0].a_to_b);
+        assert_ne!(surrogate[0].b_to_a, samples[0].b_to_a);
+        assert_ne!(surrogate[0].turn_taking, samples[0].turn_taking);
     }
 
     #[test]
