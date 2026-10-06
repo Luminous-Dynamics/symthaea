@@ -12162,6 +12162,20 @@ mod tests {
             .unwrap();
         assert_eq!(remaining, 1);
 
+        // FAILED releases the same-action fence but never releases the
+        // already-consumed native replay identity.
+        let ledger_after_failed: i64 = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM authorization_native_replay_history
+                 WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(ledger_after_failed, 1);
+
         let mut fresh_witness = witness.clone();
         fresh_witness.operation_id = Some("operation:second".into());
 
@@ -12246,6 +12260,18 @@ mod tests {
             )
             .unwrap();
         assert_eq!(dispatch_count, 2);
+
+        let ledger_count: i64 = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM authorization_native_replay_history
+                 WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(ledger_count, 2);
 
         let _ = std::fs::remove_file(path);
     }
