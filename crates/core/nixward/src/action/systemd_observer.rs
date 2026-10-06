@@ -51,6 +51,7 @@ const REQUIRED_UNIT_PROPERTIES: &[&str] = &[
     "SubState",
     "FragmentPath",
     "DropInPaths",
+    "NeedDaemonReload",
     "UnitFileState",
     "StateChangeTimestampMonotonic",
     "InvocationID",
@@ -320,6 +321,16 @@ impl NixSystemdReadOnlyObserverV1 {
             .get_all_properties(&object_path, SYSTEMD_UNIT_INTERFACE)
             .await?;
         let before_identity = definition_identity_from_properties(&before_properties)?;
+        let before_need_daemon_reload = required_bool(
+            &before_properties,
+            SYSTEMD_UNIT_INTERFACE,
+            "NeedDaemonReload",
+        )?;
+        if before_need_daemon_reload {
+            return Err(NixSystemdObserverErrorV1::InvalidDefinitionContent(
+                "systemd reports NeedDaemonReload=true before content observation".to_string(),
+            ));
+        }
 
         let commitment = NixVerifiedSystemdDefinitionContentCommitmentV1::from_observer(
             &expected_unit,
@@ -332,6 +343,11 @@ impl NixSystemdReadOnlyObserverV1 {
             .get_all_properties(&object_path, SYSTEMD_UNIT_INTERFACE)
             .await?;
         let after_identity = definition_identity_from_properties(&after_properties)?;
+        let after_need_daemon_reload = required_bool(
+            &after_properties,
+            SYSTEMD_UNIT_INTERFACE,
+            "NeedDaemonReload",
+        )?;
         let post_manager_owner = self.systemd_manager_owner().await?;
 
         if post_manager_owner != manager_owner {
@@ -387,6 +403,11 @@ impl NixSystemdReadOnlyObserverV1 {
         if after_identity != before_identity {
             return Err(NixSystemdObserverErrorV1::InvalidDefinitionContent(
                 "systemd source identity changed during content observation".to_string(),
+            ));
+        }
+        if after_need_daemon_reload {
+            return Err(NixSystemdObserverErrorV1::InvalidDefinitionContent(
+                "systemd reports NeedDaemonReload=true after content observation".to_string(),
             ));
         }
 
@@ -852,6 +873,20 @@ fn required_string(
     interface: &'static str,
     property: &'static str,
 ) -> Result<String, NixSystemdObserverErrorV1> {
+    required_value(properties, interface, property)?
+        .clone()
+        .try_into()
+        .map_err(|_| NixSystemdObserverErrorV1::InvalidPropertyType {
+            interface,
+            property,
+        })
+}
+
+fn required_bool(
+    properties: &HashMap<String, OwnedValue>,
+    interface: &'static str,
+    property: &'static str,
+) -> Result<bool, NixSystemdObserverErrorV1> {
     required_value(properties, interface, property)?
         .clone()
         .try_into()
