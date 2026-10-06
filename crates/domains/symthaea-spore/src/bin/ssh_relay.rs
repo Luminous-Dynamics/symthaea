@@ -2794,6 +2794,26 @@ async fn verify_active_configuration(expected: &[u8]) -> Result<bool, String> {
     Ok(configuration_bytes_match(&actual, expected))
 }
 
+fn parse_generation_link(value: &str) -> Option<u64> {
+    let value = value.trim().rsplit('/').next()?;
+    let suffix = value.strip_prefix("system-")?.strip_suffix("-link")?;
+    suffix.parse::<u64>().ok()
+}
+
+async fn current_system_generation() -> Result<u64, String> {
+    let result = run_cmd("readlink /nix/var/nix/profiles/system").await
+        .map_err(|error| format!("active generation probe failed: {error}"))?;
+    if result.exit_status != 0 {
+        return Err(format!(
+            "active generation probe exited with {}: {}",
+            result.exit_status,
+            result.stderr.chars().take(200).collect::<String>()
+        ));
+    }
+    parse_generation_link(&result.stdout)
+        .ok_or_else(|| "active system profile has an invalid generation link".into())
+}
+
 fn finalize_transaction(
     ledger: &TransactionLedger,
     transaction: &SystemTransaction,
@@ -5131,11 +5151,49 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                 ).await else {
                     continue;
                 };
-                eprintln!("[{}] {} Rolling back...", peer_addr, transaction.log_line());
+                let previous_generation = match current_system_generation().await {
+                    Ok(generation) => generation,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to establish rollback pre-state: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                eprintln!(
+                    "[{}] {} Rolling back from generation {}...",
+                    peer_addr,
+                    transaction.log_line(),
+                    previous_generation
+                );
                 match run_cmd("nixos-rebuild switch --rollback 2>&1").await {
                     Ok(r) => {
                         let observed_outcome = if r.exit_status == 0 {
-                            TransactionOutcome::ObservedSuccess
+                            match current_system_generation().await {
+                                Ok(generation) if generation < previous_generation => {
+                                    TransactionOutcome::ObservedSuccess
+                                }
+                                Ok(generation) => {
+                                    eprintln!(
+                                        "[{}] {} rollback returned 0 but active generation is {} (pre-state {})",
+                                        peer_addr, transaction.log_line(), generation, previous_generation
+                                    );
+                                    TransactionOutcome::Indeterminate
+                                }
+                                Err(error) => {
+                                    eprintln!(
+                                        "[{}] {} rollback post-state probe failed: {}",
+                                        peer_addr, transaction.log_line(), error
+                                    );
+                                    TransactionOutcome::Indeterminate
+                                }
+                            }
                         } else {
                             TransactionOutcome::Failed
                         };
@@ -5209,7 +5267,25 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                 match run_cmd(&cmd).await {
                     Ok(r) => {
                         let observed_outcome = if r.exit_status == 0 {
-                            TransactionOutcome::ObservedSuccess
+                            match current_system_generation().await {
+                                Ok(generation) if generation == r#gen.parse::<u64>().unwrap_or(0) => {
+                                    TransactionOutcome::ObservedSuccess
+                                }
+                                Ok(generation) => {
+                                    eprintln!(
+                                        "[{}] {} switch returned 0 but generation {} is current, requested {}",
+                                        peer_addr, transaction.log_line(), generation, r#gen
+                                    );
+                                    TransactionOutcome::Indeterminate
+                                }
+                                Err(error) => {
+                                    eprintln!(
+                                        "[{}] {} generation post-state probe failed: {}",
+                                        peer_addr, transaction.log_line(), error
+                                    );
+                                    TransactionOutcome::Indeterminate
+                                }
+                            }
                         } else {
                             TransactionOutcome::Failed
                         };
@@ -7511,6 +7587,15 @@ mod tests {
         let banner = auth_token_banner("super-secret-token", true);
         assert!(banner.contains("super-secret-token"));
         assert!(banner.starts_with("  Auth token: "));
+    }
+
+    #[test]
+    fn generation_link_parser_rejects_ambiguous_or_invalid_links() {
+        assert_eq!(parse_generation_link("system-42-link\n"), Some(42));
+        assert_eq!(parse_generation_link("/nix/var/nix/profiles/system-7-link"), Some(7));
+        assert_eq!(parse_generation_link("system--link"), None);
+        assert_eq!(parse_generation_link("system-7"), None);
+        assert_eq!(parse_generation_link("system-7-link-attacker"), None);
     }
 
     #[test]
