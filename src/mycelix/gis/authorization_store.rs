@@ -663,6 +663,30 @@ fn backfill_bound_attempt_boundaries_from_dispatch(
     Ok(())
 }
 
+fn validate_terminal_native_replay_history(
+    connection: &Connection,
+) -> Result<(), AuthorizationStoreError> {
+    let duplicate: Option<String> = connection
+        .query_row(
+            "SELECT native_replay_identity
+             FROM authorization_terminal_evidence
+             WHERE native_replay_identity IS NOT NULL
+               AND native_replay_identity <> ''
+             GROUP BY native_replay_identity
+             HAVING COUNT(*) > 1
+             LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if duplicate.is_some() {
+        return Err(AuthorizationStoreError::InvalidState(
+            "duplicate native replay identity in terminal evidence history".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn validate_attempt_operation_consistency(
     connection: &Connection,
 ) -> Result<(), AuthorizationStoreError> {
@@ -1448,6 +1472,7 @@ impl SqliteAuthorizationStore {
         backfill_attempt_scope_digests(&mut connection)?;
         validate_attempt_boundary_consistency(&connection)?;
         validate_attempt_operation_consistency(&connection)?;
+        validate_terminal_native_replay_history(&connection)?;
         connection.execute_batch(
             "CREATE UNIQUE INDEX IF NOT EXISTS authorization_lease_attempt_id_uq
                ON authorization_leases(attempt_id)
@@ -11341,6 +11366,61 @@ mod tests {
 
             let _ = std::fs::remove_file(path);
         }
+    }
+
+    #[test]
+    fn duplicate_terminal_native_replay_history_fails_store_reopen() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-duplicate-terminal-replay-history-{}.db",
+            std::process::id()
+        ));
+        {
+            let store = SqliteAuthorizationStore::open_with_relying_party(
+                &path,
+                "rp-duplicate-terminal-replay-history",
+            )
+            .unwrap();
+            let connection = store.connection().unwrap();
+            for index in 0..2 {
+                connection
+                    .execute(
+                        "INSERT INTO authorization_terminal_evidence(
+                            authorization_instance,attempt_id,operation_id,native_replay_identity,
+                            boundary_id,action_digest,provider_idempotency_key,target_identity,
+                            audience,adapter,adapter_revision,adapter_implementation_digest,
+                            action_id,outcome,evidence_id,evidence_digest,attempt_binding_digest,
+                            verifier_id,verifier_config_digest,trust_anchor_digest,
+                            evidence_profile_digest,verification_digest)
+                         VALUES(
+                            ?1,?2,?3,'sha256:duplicate-native-replay',?4,'sha256:action',
+                            ?5,'target','audience','adapter','adapter-v1','sha256:adapter',
+                            'action-id','failed',?6,'sha256:evidence',?7,'verifier',
+                            'sha256:verifier-config','sha256:trust','sha256:profile',
+                            'sha256:verification')",
+                        params![
+                            format!("auth-{index}"),
+                            format!("attempt-{index}"),
+                            format!("operation-{index}"),
+                            format!("boundary-{index}"),
+                            format!("provider-key-{index}"),
+                            format!("evidence-{index}"),
+                            format!("sha256:binding-{index}"),
+                        ],
+                    )
+                    .unwrap();
+            }
+        }
+
+        assert!(matches!(
+            SqliteAuthorizationStore::open_with_relying_party(
+                &path,
+                "rp-duplicate-terminal-replay-history",
+            ),
+            Err(AuthorizationStoreError::InvalidState(message))
+                if message.contains("duplicate native replay identity")
+        ));
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
