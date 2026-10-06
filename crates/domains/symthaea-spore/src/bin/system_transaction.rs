@@ -43,7 +43,7 @@ impl MutationLease {
             .open(path)
             .map_err(|error| {
                 format!(
-                    "unable to open cross-process mutation lock {}: {error}",
+                    "unable to open OS mutation lock {}: {error}",
                     path.display()
                 )
             })?;
@@ -204,7 +204,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cross_process_lock_rejects_second_owner() {
+    fn mutation_lock_rejects_second_file_description() {
         let name = random_operation_id().unwrap();
         let path = std::env::temp_dir().join(format!("symthaea-mutation-lock-test-{name}.lock"));
         let first = MutationLease::acquire_at(&path).unwrap();
