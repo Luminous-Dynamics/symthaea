@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 
 use symthaea_core::hdc::ContinuousHV;
 
+use crate::action::executor::{ExecutionResult, NixOSExecutor};
 use crate::action::generation_manager::GenerationManager;
 use crate::encoding::{NixCodebook, SystemStateEncoder, SystemStateSnapshot};
 use crate::observe::SystemObserver;
@@ -204,27 +205,37 @@ impl Watchdog {
                         }
                         AutonomyLevel::FullAutonomous => {
                             let cmd = GenerationManager::switch_to(pre_gen as u32);
-                            let (bin, args) = cmd.to_command();
-                            let result = std::process::Command::new(&bin).args(&args).status();
-                            match result {
-                                Ok(status) if status.success() => {
-                                    return WatchdogVerdict::Reverted { reason, pre_gen };
-                                }
-                                Ok(status) => {
+                            let runtime = match tokio::runtime::Builder::new_current_thread()
+                                .enable_all()
+                                .build()
+                            {
+                                Ok(runtime) => runtime,
+                                Err(e) => {
                                     return WatchdogVerdict::Degraded {
-                                        reason: format!(
-                                            "{}; rollback failed (exit {})",
-                                            reason,
-                                            status.code().unwrap_or(-1)
-                                        ),
+                                        reason: format!("{}; governed rollback runtime unavailable: {}", reason, e),
                                         surprise: last_surprise,
                                         health: last_health,
                                         checks_performed,
                                     };
                                 }
-                                Err(e) => {
+                            };
+                            let mut executor = NixOSExecutor::new();
+                            let result = runtime.block_on(executor.execute_confirmed(cmd, 1.0));
+                            match result {
+                                ExecutionResult::Success { .. } => {
+                                    return WatchdogVerdict::Reverted { reason, pre_gen };
+                                }
+                                ExecutionResult::Blocked { reason: block_reason, .. } => {
                                     return WatchdogVerdict::Degraded {
-                                        reason: format!("{}; rollback exec error: {}", reason, e),
+                                        reason: format!("{}; governed rollback blocked: {}", reason, block_reason),
+                                        surprise: last_surprise,
+                                        health: last_health,
+                                        checks_performed,
+                                    };
+                                }
+                                other => {
+                                    return WatchdogVerdict::Degraded {
+                                        reason: format!("{}; governed rollback did not complete: {:?}", reason, other),
                                         surprise: last_surprise,
                                         health: last_health,
                                         checks_performed,
