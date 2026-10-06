@@ -155,6 +155,13 @@ jobs:
           assert report["remediation_evaluation_environment_verified"] is True
           assert report["remediation_evaluation_manifest_verified"] is True
           assert report["remediation_measurement_verified"] is True
+          assert report["remediation_measurement_computation_verified"] is True
+          assert report["remediation_metric_estimate_forgery_blocked"] is True
+          assert report["remediation_observation_substitution_blocked"] is True
+          assert report["remediation_observation_omission_blocked"] is True
+          assert report["remediation_observation_duplicate_blocked"] is True
+          assert report["remediation_observation_scope_substitution_blocked"] is True
+          assert report["remediation_computation_substitution_blocked"] is True
           assert report["remediation_measurement_worst_case_binding_blocked"] is True
           assert report["remediation_measurement_missingness_fail_closed"] is True
           assert report["remediation_metric_definition_substitution_blocked"] is True
