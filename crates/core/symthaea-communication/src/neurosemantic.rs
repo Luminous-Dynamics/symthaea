@@ -205,15 +205,6 @@ pub struct NeurosemanticConsentBindingContext {
 }
 
 impl NeurosemanticConsentBindingContext {
-    /// Fingerprint the exact serialized consent lease, including scopes, sensitivity
-    /// ceilings, data/inference permissions, validity, revocation state, and epoch.
-    /// Any consent mutation therefore produces a new capability identity.
-    pub fn fingerprint_for_authorization(&self) -> Result<String, String> {
-        let bytes = serde_json::to_vec(self)
-            .map_err(|error| format!("consent lease serialization: {error}"))?;
-        Ok(content_hash(&bytes))
-    }
-
     pub fn validate(&self) -> Result<(), String> {
         if !valid_identifier(&self.subject_ref)
             || !valid_identifier(&self.peer_ref)
@@ -870,6 +861,15 @@ impl CognitiveConsentLease {
             .map_err(|error| format!("neurosemantic consent lease JSON: {error}"))?;
         lease.validate()?;
         Ok(lease)
+    }
+
+    /// Fingerprint the exact serialized consent lease, including scopes, sensitivity
+    /// ceilings, data/inference permissions, validity, revocation state, and epoch.
+    /// Any consent mutation therefore produces a new capability identity.
+    pub fn fingerprint_for_authorization(&self) -> Result<String, String> {
+        let bytes = serde_json::to_vec(self)
+            .map_err(|error| format!("consent lease serialization: {error}"))?;
+        Ok(content_hash(&bytes))
     }
 
     pub fn validate(&self) -> Result<(), String> {
