@@ -56,6 +56,11 @@ async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
     // Preserve other ambient variables as needed, but never inherit PATH:
     // a privileged relay must resolve tools only from trusted system locations.
     let mut command = tokio::process::Command::new(shell);
+    // Bash privileged mode disables startup-file hooks and imported shell
+    // functions, adding a process-local guard against ambient code injection.
+    if shell.ends_with("/bash") {
+        command.arg("-p");
+    }
     command.arg("-c").arg(cmd);
     const TRUSTED_PATH: &str =
         "/run/current-system/sw/bin:/run/wrappers/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin:/sbin";
