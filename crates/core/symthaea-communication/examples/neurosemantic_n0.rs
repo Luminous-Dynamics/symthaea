@@ -156,6 +156,7 @@ fn main() -> Result<(), String> {
         resolver_key_ref: "resolver-key-1".into(),
         authority_ref: authority_attestation.authority_ref.clone(),
         authority_key_ref: authority_attestation.key_ref.clone(),
+        authority_attestation_fingerprint: authority_attestation.fingerprint_for_attestation()?,
         handling_policy_fingerprint: policy_fingerprint.clone(),
         policy_provenance_ref: message.packet.data_policy.handling.policy_provenance_ref.clone(),
         policy_provenance_hash: message.packet.data_policy.handling.policy_provenance_hash.clone(),
@@ -358,6 +359,44 @@ fn main() -> Result<(), String> {
         .filter(|revision| revision.bytes().any(|byte| byte != b'0'))
         .ok_or_else(|| "unable to resolve exact execution revision".to_string())?;
 
+    let substituted_authority_attestation = {
+        let changed_message = NeurosemanticPolicyAuthorityAttestation::message_bytes(
+            &authority_attestation.authority_ref,
+            &authority_attestation.key_ref,
+            &authority_attestation.handling_policy_fingerprint,
+            &authority_attestation.policy_provenance_hash,
+            1_100,
+            1_900,
+        )?;
+        NeurosemanticPolicyAuthorityAttestation {
+            issued_at_unix_s: 1_100,
+            expires_at_unix_s: 1_900,
+            signature: signing_key.sign(&changed_message).to_bytes().to_vec(),
+            ..authority_attestation.clone()
+        }
+    };
+    let authority_proof_substitution_blocked =
+        substituted_authority_attestation.verify(
+            &policy_fingerprint,
+            &message.packet.data_policy.handling.policy_provenance_hash,
+            &signing_key.verifying_key(),
+            1_500,
+        ).is_ok()
+        && message
+            .packet
+            .data_policy
+            .handling
+            .bind_policy_provenance_with_attestation_and_resolution(
+                b"synthetic-policy-record-1",
+                &substituted_authority_attestation,
+                &signing_key.verifying_key(),
+                &authority_resolution,
+                &resolver_signing_key.verifying_key(),
+                &resolution_context,
+                1_500,
+            )
+            .is_err();
+
     let mut forged_resolution = authority_resolution.clone();
     forged_resolution.status = NeurosemanticAuthorityStatus::Revoked;
     forged_resolution.signature =
@@ -472,7 +511,8 @@ fn main() -> Result<(), String> {
         "wrong_authority_resolution_context_blocked": wrong_resolution_context_blocked,
         "authority_resolution_signature_blocked": resolution_signature_blocked,
         "authority_resolution_expiry_blocked": authority_resolution_expiry_blocked,
-        "mutated_consent_lease_blocked": mutated_lease_blocked
+        "mutated_consent_lease_blocked": mutated_lease_blocked,
+        "authority_proof_substitution_blocked": authority_proof_substitution_blocked
     });
 
     println!("{}", serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?);
