@@ -118,9 +118,6 @@ pub enum NixSystemdObserverErrorV1 {
 
     #[error("invalid systemd definition-content observation: {0}")]
     InvalidDefinitionContent(String),
-
-    #[error("invalid systemd definition-content observation: {0}")]
-    InvalidDefinitionContent(String),
 }
 
 /// A one-shot, pre-armed watcher for the systemd Manager.JobRemoved signal.
