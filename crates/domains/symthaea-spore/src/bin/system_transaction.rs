@@ -1285,6 +1285,27 @@ mod tests {
     }
 
     #[test]
+    fn ledger_rejects_unterminated_oversized_event_without_unbounded_read() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-transaction-ledger-unterminated-oversized-{name}.jsonl"));
+        let oversized = "x".repeat(MAX_JOURNAL_EVENT_BYTES + 1);
+        std::fs::write(&path, oversized).unwrap();
+        std::fs::set_permissions(
+            &path,
+            std::os::unix::fs::PermissionsExt::from_mode(0o600),
+        )
+        .unwrap();
+
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let error = ledger
+            .load()
+            .expect_err("unterminated oversized event must fail closed");
+        assert!(error.contains("exceeds"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn ledger_rejects_invalid_request_id_on_load() {
         let name = random_operation_id().unwrap();
         let path = std::env::temp_dir()
