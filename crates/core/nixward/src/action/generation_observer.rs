@@ -52,6 +52,7 @@ impl NixVerifiedNixOSGenerationV1 {
 }
 
 fn parse_generation_link(target: &Path) -> Result<u64, NixOSGenerationObserverErrorV1> {
+    validate_profile_link_target(target)?;
     let name = target
         .file_name()
         .and_then(|value| value.to_str())
@@ -70,6 +71,28 @@ fn parse_generation_link(target: &Path) -> Result<u64, NixOSGenerationObserverEr
         return Err(NixOSGenerationObserverErrorV1::InvalidGeneration);
     }
     Ok(generation)
+}
+
+fn validate_profile_link_target(
+    target: &Path,
+) -> Result<(), NixOSGenerationObserverErrorV1> {
+    let profile_parent = Path::new(SYSTEM_PROFILE)
+        .parent()
+        .ok_or(NixOSGenerationObserverErrorV1::InvalidProfileTarget)?;
+
+    if target.is_absolute() {
+        if target.parent() != Some(profile_parent) {
+            return Err(NixOSGenerationObserverErrorV1::InvalidProfileTarget);
+        }
+    } else {
+        let mut components = target.components();
+        match (components.next(), components.next()) {
+            (Some(std::path::Component::Normal(_)), None) => {}
+            _ => return Err(NixOSGenerationObserverErrorV1::InvalidProfileTarget),
+        }
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Error)]
@@ -99,6 +122,15 @@ mod tests {
         assert!(parse_generation_link(Path::new("system-0-link")).is_err());
         assert!(parse_generation_link(Path::new("system-42")).is_err());
         assert!(parse_generation_link(Path::new("other-42-link")).is_err());
+    }
+
+    #[test]
+    fn generation_link_target_must_resolve_within_fixed_profile_directory() {
+        assert!(parse_generation_link(Path::new("/nix/var/nix/profiles/system-42-link")).is_ok());
+        assert!(parse_generation_link(Path::new("system-42-link")).is_ok());
+        assert!(parse_generation_link(Path::new("/tmp/system-42-link")).is_err());
+        assert!(parse_generation_link(Path::new("../profiles/system-42-link")).is_err());
+        assert!(parse_generation_link(Path::new("nested/system-42-link")).is_err());
     }
 
     #[test]
