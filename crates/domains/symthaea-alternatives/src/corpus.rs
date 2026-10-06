@@ -8,7 +8,7 @@ use blake3::Hasher;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-const BENCHMARK_MANIFEST_SCHEMA_VERSION: u16 = 18;
+const BENCHMARK_MANIFEST_SCHEMA_VERSION: u16 = 19;
 
 /// One frozen benchmark scenario.
 #[derive(Debug, Clone)]
@@ -102,6 +102,8 @@ fn evidence(
                 evaluation: MeasurementUncertaintyEvaluationRef {
                     evaluation_id: "benchmark-uncertainty-evaluation-v1".into(),
                     uncertainty_id: format!("benchmark-uncertainty:{id}"),
+                    observation_id: format!("benchmark-observation:{id}"),
+                    observation_record_digest: format!("benchmark-record-digest:{id}"),
                     uncertainty_budget_id: "benchmark-uncertainty-budget-v1".into(),
                     uncertainty_budget_revision: "v1".into(),
                     uncertainty_budget_digest: "benchmark-uncertainty-budget-digest-v1".into(),
