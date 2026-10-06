@@ -1038,7 +1038,7 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
                 histogram[0], 0,
                 "zero multiplicity must never be recorded as a decoded list"
             );
-            assert!(max_multiplicity <= (1usize << independent_rank));
+            assert!(max_multiplicity <= (1usize << rank));
             ledgers.push((
                 dimension,
                 rank,
