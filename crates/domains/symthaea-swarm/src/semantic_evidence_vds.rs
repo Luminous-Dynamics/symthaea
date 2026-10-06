@@ -22,6 +22,11 @@ pub const RFC9942_VDS_HEADER_LABEL: i64 = 395;
 /// implementation resource limits, not changes to the RFC wire format.
 pub const MAX_RFC9942_PROOFS: usize = 256;
 pub const MAX_RFC9942_PROOF_BYTES: usize = 8 * 1024;
+/// Defensive aggregate encoded-size ceiling for attacker-controlled COSE_Key
+/// maps. Public-key structures are normally tiny; the bound prevents a caller
+/// from forcing repeated raw key/value copies across a map full of opaque
+/// extensions while every individual value remains below its local limit.
+pub const MAX_RFC9942_COSE_KEY_ENCODED_BYTES: usize = 16 * 1024;
 /// Inclusion proofs for a u64-sized tree need at most 64 authentication-path
 /// hashes. Consistency proofs have RFC 9162's ceil(log2(n)) + 1 upper bound and
 /// can therefore reach 65 nodes for the largest representable tree size.
@@ -202,7 +207,7 @@ pub struct Rfc9942Es256CoseKey {
 impl Rfc9942Es256CoseKey {
     pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9942VdpError> {
         let mut reader=CborReader::new(bytes);
-        let entries=reader.read_map_entries_bounded_with_resource_limits_and_bytes(32, 4096, 64, usize::MAX).map_err(|error|match error {
+        let entries=reader.read_map_entries_bounded_with_resource_limits_and_bytes(32, 4096, 64, MAX_RFC9942_COSE_KEY_ENCODED_BYTES).map_err(|error|match error {
             Rfc9162ProofDecodeError::ResourceLimitExceeded => Rfc9942VdpError::ResourceLimitExceeded,
             Rfc9162ProofDecodeError::InvalidStructure => Rfc9942VdpError::InvalidEs256CoseKey,
             _ => Rfc9942VdpError::InvalidEncoding,
