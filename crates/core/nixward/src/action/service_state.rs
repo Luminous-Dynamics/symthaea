@@ -7,6 +7,7 @@
 //! This module observes and commits to state; it does not execute commands,
 //! query the host, authorize an effect, or mint execution authority.
 
+use super::generation_observer::NixVerifiedNixOSGenerationV1;
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -478,14 +479,15 @@ impl std::fmt::Debug for NixVerifiedServicePreStateV1 {
 impl NixVerifiedServicePreStateV1 {
     pub(crate) fn from_observer(
         state: &NixServiceObservedStateV1,
-        generation: u64,
+        generation: &NixVerifiedNixOSGenerationV1,
     ) -> Result<Self, NixServiceStateErrorV1> {
-        if generation == 0 {
+        state.validate_shape()?;
+        let generation_number = generation.generation();
+        if generation_number == 0 {
             return Err(NixServiceStateErrorV1::InvalidGeneration);
         }
-        state.validate_shape()?;
         let state_digest = state.digest()?;
-        let identity = state.execution_pre_state_identity(generation)?;
+        let identity = state.execution_pre_state_identity(generation_number)?;
         Ok(Self {
             unit: state.unit.clone(),
             generation,
@@ -738,7 +740,8 @@ mod tests {
     #[test]
     fn sealed_pre_state_binds_exact_generation_and_state_digest() {
         let state = state("active", "enabled", "running");
-        let sealed = NixVerifiedServicePreStateV1::from_observer(&state, 42).unwrap();
+        let generation = super::NixVerifiedNixOSGenerationV1::for_test(42);
+        let sealed = NixVerifiedServicePreStateV1::from_observer(&state, &generation).unwrap();
         assert_eq!(sealed.unit(), "nginx.service");
         assert_eq!(sealed.generation(), 42);
         assert_eq!(sealed.state_digest(), state.digest().unwrap());
@@ -748,8 +751,9 @@ mod tests {
     #[test]
     fn sealed_pre_state_rejects_zero_generation() {
         let state = state("active", "enabled", "running");
+        let generation = super::NixVerifiedNixOSGenerationV1::for_test(0);
         assert_eq!(
-            NixVerifiedServicePreStateV1::from_observer(&state, 0).unwrap_err(),
+            NixVerifiedServicePreStateV1::from_observer(&state, &generation).unwrap_err(),
             NixServiceStateErrorV1::InvalidGeneration
         );
     }
@@ -757,8 +761,9 @@ mod tests {
     #[test]
     fn sealed_pre_state_identity_is_deterministic() {
         let state = state("active", "enabled", "running");
-        let first = NixVerifiedServicePreStateV1::from_observer(&state, 42).unwrap();
-        let second = NixVerifiedServicePreStateV1::from_observer(&state, 42).unwrap();
+        let generation = super::NixVerifiedNixOSGenerationV1::for_test(42);
+        let first = NixVerifiedServicePreStateV1::from_observer(&state, &generation).unwrap();
+        let second = NixVerifiedServicePreStateV1::from_observer(&state, &generation).unwrap();
         assert_eq!(first.identity(), second.identity());
     }
 

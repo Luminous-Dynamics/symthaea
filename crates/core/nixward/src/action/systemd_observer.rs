@@ -366,13 +366,12 @@ impl NixSystemdReadOnlyObserverV1 {
     pub(crate) async fn observe_service_pre_state(
         &self,
         unit: &str,
-        generation: u64,
     ) -> Result<NixVerifiedServicePreStateV1, NixSystemdObserverErrorV1> {
-        if generation == 0 {
-            return Err(NixSystemdObserverErrorV1::InvalidPostState(
-                "pre-state generation must be non-zero".to_string(),
-            ));
-        }
+        let generation_before =
+            super::generation_observer::NixVerifiedNixOSGenerationV1::from_observer()
+                .map_err(|error| {
+                    NixSystemdObserverErrorV1::InvalidPostState(error.to_string())
+                })?;
 
         let expected_unit = canonical_unit(unit)?;
         let manager_owner = self.systemd_manager_owner().await?;
@@ -380,13 +379,24 @@ impl NixSystemdReadOnlyObserverV1 {
         let properties = self
             .get_all_properties(&object_path, SYSTEMD_UNIT_INTERFACE)
             .await?;
+
+        let generation_after =
+            super::generation_observer::NixVerifiedNixOSGenerationV1::from_observer()
+                .map_err(|error| {
+                    NixSystemdObserverErrorV1::InvalidPostState(error.to_string())
+                })?;
         let post_manager_owner = self.systemd_manager_owner().await?;
         if post_manager_owner != manager_owner {
             return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
         }
+        if generation_after.generation() != generation_before.generation() {
+            return Err(NixSystemdObserverErrorV1::InvalidPostState(
+                "NixOS system generation changed during service pre-state observation".to_string(),
+            ));
+        }
 
         let state = observed_state_from_properties(&expected_unit, &properties)?;
-        NixVerifiedServicePreStateV1::from_observer(&state, generation)
+        NixVerifiedServicePreStateV1::from_observer(&state, &generation_before)
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))
     }
 

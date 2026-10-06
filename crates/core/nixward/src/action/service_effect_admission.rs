@@ -153,7 +153,7 @@ mod tests {
         )
         .unwrap();
         let pre_state =
-            NixVerifiedServicePreStateV1::from_observer(&state, 42).unwrap();
+            NixVerifiedServicePreStateV1::from_observer(&state, &super::super::generation_observer::NixVerifiedNixOSGenerationV1::for_test(42)).unwrap();
 
         let admission = NixServiceEffectAdmissionV1::from_observed_definition_content(
             "host:test",
@@ -211,7 +211,7 @@ mod tests {
         )
         .unwrap();
         let pre_state =
-            NixVerifiedServicePreStateV1::from_observer(&state, 42).unwrap();
+            NixVerifiedServicePreStateV1::from_observer(&state, &super::super::generation_observer::NixVerifiedNixOSGenerationV1::for_test(42)).unwrap();
 
         let other_state =
             super::super::service_state::NixServiceObservedStateV1::from_observer_snapshot(
@@ -225,7 +225,7 @@ mod tests {
             )
             .unwrap();
         let other_pre_state =
-            NixVerifiedServicePreStateV1::from_observer(&other_state, 42).unwrap();
+            NixVerifiedServicePreStateV1::from_observer(&other_state, &super::super::generation_observer::NixVerifiedNixOSGenerationV1::for_test(42)).unwrap();
 
         let result = NixServiceEffectAdmissionV1::from_observed_definition_content(
             "host:test",

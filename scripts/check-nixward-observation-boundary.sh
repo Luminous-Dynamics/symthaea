@@ -33,7 +33,7 @@ AUTHORITY_FILES=(
   crates/core/nixward/src/action/service_domain.rs
   crates/core/nixward/src/action/service_effect.rs
   crates/core/nixward/src/action/service_effect_admission.rs
-  crates/core/nixward/src/action/systemd_lifecycle.rs
+  crates/core/nixward/src/action/generation_observer.rs
   crates/core/nixward/src/action/service_state.rs
   crates/core/nixward/src/action/systemd_definition.rs
   crates/core/nixward/src/action/systemd_lifecycle.rs

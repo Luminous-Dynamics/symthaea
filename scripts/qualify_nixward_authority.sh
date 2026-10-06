@@ -25,6 +25,8 @@ rustfmt --edition 2024 --check \
   crates/core/nixward/src/action/executor.rs \
   crates/core/nixward/src/action/config_writer.rs \
   crates/core/nixward/src/action/post_state.rs \
+  crates/core/nixward/src/action/generation_observer.rs \
+  crates/core/nixward/src/action/generation_observer.rs \
   crates/core/nixward/src/action/service_effect_admission.rs \
   crates/core/nixward/src/action/systemd_definition.rs \
   crates/core/nixward/src/action/systemd_lifecycle.rs \
@@ -62,6 +64,8 @@ echo "-- read-only systemd D-Bus observer tests --"
 cargo test -p nixward --features systemd-observer --lib action::systemd_observer::tests
 echo "-- sealed service pre-state tests --"
 cargo test -p nixward --features systemd-observer --lib action::service_state::tests
+echo "-- NixOS generation observer tests --"
+cargo test -p nixward --lib action::generation_observer::tests
 echo "-- service-effect admission tests --"
 cargo test -p nixward --features systemd-observer --lib action::service_effect_admission::tests
 cargo test -p nixward --features systemd-observer --features systemd-mutation --lib action::systemd_lifecycle::tests
