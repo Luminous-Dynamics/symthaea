@@ -262,6 +262,61 @@ pub struct NeurosemanticRemediationEvaluationMethod {
 }
 
 pub const NEUROSEMANTIC_REMEDIATION_EVALUATION_METHOD_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_REMEDIATION_EVALUATION_MANIFEST_SCHEMA_VERSION: u16 = 1;
+
+/// Canonical identity for the frozen remediation evaluation design.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationEvaluationManifest {
+    pub schema_version: u16,
+    pub evaluation_ref: String,
+    pub source_dataset_manifest_hash: String,
+    pub forget_set_manifest_hash: String,
+    pub retain_set_manifest_hash: String,
+    pub study_protocol_hash: String,
+    pub evaluation_split_manifest_hash: String,
+    pub recovery_method_hash: String,
+    pub representation_probe_method_hash: String,
+}
+
+impl NeurosemanticRemediationEvaluationManifest {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != NEUROSEMANTIC_REMEDIATION_EVALUATION_MANIFEST_SCHEMA_VERSION
+            || !valid_identifier(&self.evaluation_ref)
+            || !valid_blake3_digest(&self.source_dataset_manifest_hash)
+            || !valid_blake3_digest(&self.forget_set_manifest_hash)
+            || !valid_blake3_digest(&self.retain_set_manifest_hash)
+            || !valid_blake3_digest(&self.study_protocol_hash)
+            || !valid_blake3_digest(&self.evaluation_split_manifest_hash)
+            || !valid_blake3_digest(&self.recovery_method_hash)
+            || !valid_blake3_digest(&self.representation_probe_method_hash)
+            || self.forget_set_manifest_hash == self.retain_set_manifest_hash
+            || self.recovery_method_hash == self.representation_probe_method_hash
+        {
+            return Err("neurosemantic remediation evaluation manifest fields are invalid".into());
+        }
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic remediation evaluation manifest JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let manifest: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("neurosemantic remediation evaluation manifest JSON: {error}"))?;
+        manifest.validate()?;
+        Ok(manifest)
+    }
+
+    pub fn fingerprint(&self) -> Result<String, String> {
+        self.validate()?;
+        Ok(content_hash(&serde_json::to_vec(self).map_err(|error| {
+            format!("neurosemantic remediation evaluation manifest serialization: {error}")
+        })?))
+    }
+}
 
 impl NeurosemanticRemediationEvaluationMethod {
     pub fn validate(&self) -> Result<(), String> {
@@ -312,6 +367,8 @@ pub struct NeurosemanticRemediationImpactArtifact {
     pub post_remediation_lineage_hash: String,
     /// Exact fingerprint of the lifecycle receipt whose remediation effect is being evaluated.
     pub lifecycle_receipt_hash: String,
+    /// Canonical identity of the full frozen evaluation design.
+    pub evaluation_manifest_hash: String,
     pub remediation_action: NeurosemanticArtifactLifecycleAction,
     pub study_protocol_hash: String,
     pub evaluation_split_manifest_hash: String,
@@ -378,6 +435,7 @@ impl NeurosemanticRemediationImpactArtifact {
             || !valid_identifier(&self.post_remediation_lineage_ref)
             || !valid_blake3_digest(&self.post_remediation_lineage_hash)
             || !valid_blake3_digest(&self.lifecycle_receipt_hash)
+            || !valid_blake3_digest(&self.evaluation_manifest_hash)
             || self.pre_remediation_lineage_ref == self.post_remediation_lineage_ref
             || self.pre_remediation_lineage_hash == self.post_remediation_lineage_hash
             || !valid_blake3_digest(&self.study_protocol_hash)
@@ -479,6 +537,22 @@ impl NeurosemanticRemediationImpactArtifact {
         let fingerprint = lifecycle_receipt.fingerprint()?;
         if fingerprint != self.lifecycle_receipt_hash {
             return Err("neurosemantic remediation impact artifact is bound to a different lifecycle receipt".into());
+        }
+        Ok(())
+    }
+
+    pub fn verify_evaluation_manifest_bytes(&self, manifest_bytes: &[u8]) -> Result<(), String> {
+        self.validate()?;
+        let manifest = NeurosemanticRemediationEvaluationManifest::from_json_bytes(manifest_bytes)?;
+        if manifest.forget_set_manifest_hash != self.forget_set_manifest_hash
+            || manifest.retain_set_manifest_hash != self.retain_set_manifest_hash
+            || manifest.study_protocol_hash != self.study_protocol_hash
+            || manifest.evaluation_split_manifest_hash != self.evaluation_split_manifest_hash
+            || manifest.recovery_method_hash != self.recovery_method_hash
+            || manifest.representation_probe_method_hash != self.representation_probe_method_hash
+            || manifest.fingerprint()? != self.evaluation_manifest_hash
+        {
+            return Err("neurosemantic remediation evaluation manifest binding mismatch".into());
         }
         Ok(())
     }
