@@ -630,6 +630,20 @@ impl TransactionLedger {
             });
         }
 
+        // A fresh transaction ID is generated before admission, so check it
+        // against the durable namespace before appending a new start event.
+        // A collision must fail closed here rather than corrupting the journal
+        // and only being discovered on the next reload.
+        if records
+            .values()
+            .any(|record| record.transaction_id == transaction.transaction_id)
+        {
+            return Err(format!(
+                "transaction_id {} collides with an existing transaction",
+                transaction.transaction_id
+            ));
+        }
+
         self.append(&JournalEvent {
             schema_version: SCHEMA_VERSION,
             event: "started".into(),
@@ -979,6 +993,49 @@ mod tests {
         assert_eq!(first.len(), 64);
         assert!(!first.contains("correct"));
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn ledger_rejects_fresh_transaction_id_collision_before_append() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-transaction-ledger-collision-admit-{name}.jsonl"));
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+
+        let first = SystemTransaction::begin(
+            MutationKind::Rollback,
+            "collision-request-one-0001",
+            None,
+            b"rollback",
+        )
+        .unwrap();
+        let first_id = first.transaction_id.clone();
+        assert!(matches!(
+            ledger.admit(first).unwrap(),
+            TransactionAdmission::New(_)
+        ));
+
+        let mut second = SystemTransaction::begin(
+            MutationKind::Rollback,
+            "collision-request-two-0001",
+            None,
+            b"rollback",
+        )
+        .unwrap();
+        second.transaction_id = first_id.clone();
+
+        let error = ledger
+            .admit(second)
+            .expect_err("fresh transaction ID collision must fail before append");
+        assert!(error.contains("collides with an existing transaction"));
+
+        let lines = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(
+            lines.lines().count(),
+            1,
+            "collision rejection must not append a second start event"
+        );
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
