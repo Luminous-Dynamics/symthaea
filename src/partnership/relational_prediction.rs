@@ -1194,6 +1194,8 @@ impl RollingOriginRelationalPredictionSummary {
 #[derive(Debug, Clone, PartialEq)]
 pub struct RollingOriginRelationalPredictionQualification {
     pub config: RollingOriginRelationalPredictionConfig,
+    /// Requested surrogate count used at every rolling origin.
+    pub surrogate_count: usize,
     /// Commitment over the exact source sample sequence and rolling configuration.
     pub evaluation_input_blake3: String,
     /// Exact source-sample start index for each rolling origin.
@@ -1209,6 +1211,7 @@ impl RollingOriginRelationalPredictionQualification {
         validate_rolling_qualification_config_shape(&self.config)?;
 
         if !is_hex_digest(&self.evaluation_input_blake3, 64)
+            || self.surrogate_count == 0
             || self.observed.status != EvidenceStatus::Measured
             || self.observed.first_origin != self.config.first_origin
             || self.observed.train_samples != self.config.train_samples
@@ -1270,6 +1273,7 @@ impl RollingOriginRelationalPredictionQualification {
                     || null_trace.feature_set != PredictionFeatureSet::RelationalAugmented
                     || null_trace.status != EvidenceStatus::Proxy
                     || null_trace.config != held_out_config
+                    || null_trace.requested_surrogate_count != self.surrogate_count
                     || (null_trace.observed_relational_mse - expected_mse).abs() > 1e-12
                 {
                     return Err(RelationalPredictionError::InvalidSplit);
@@ -1305,7 +1309,7 @@ impl RollingOriginRelationalPredictionQualification {
         }
 
         let recomputed =
-            Self::compute(samples, config, surrogate_count)?;
+            Self::compute(samples, config, self.surrogate_count)?;
         if recomputed != *self {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
         }
@@ -1379,6 +1383,7 @@ impl RollingOriginRelationalPredictionQualification {
 
         let qualification = Self {
             config,
+            surrogate_count,
             evaluation_input_blake3: rolling_evaluation_input_digest(samples, config),
             origin_starts: (0..config.origin_count)
                 .map(|origin| {
@@ -1772,6 +1777,8 @@ impl PredictionNullSummary {
 #[derive(Debug, Clone, PartialEq)]
 pub struct HeldOutRelationalPredictionQualification {
     pub config: HeldOutRelationalPredictionConfig,
+    /// Requested surrogate count used for every null family.
+    pub surrogate_count: usize,
     pub observed: HeldOutRelationalPredictionSummary,
     pub circular_shift_null: PredictionNullSummary,
     pub feature_decoupling_null: PredictionNullSummary,
@@ -1781,7 +1788,8 @@ pub struct HeldOutRelationalPredictionQualification {
 impl HeldOutRelationalPredictionQualification {
     pub fn validate(&self) -> Result<(), RelationalPredictionError> {
         validate_held_out_config_shape(&self.config)?;
-        if self.observed.status != EvidenceStatus::Measured
+        if self.surrogate_count == 0
+            || self.observed.status != EvidenceStatus::Measured
             || self.observed.train_samples != self.config.train_samples
             || self.observed.test_samples != self.config.test_samples
             || self.observed.gap_samples != self.config.gap_samples
@@ -1853,6 +1861,7 @@ impl HeldOutRelationalPredictionQualification {
                 || null_trace.feature_set != PredictionFeatureSet::RelationalAugmented
                 || null_trace.status != EvidenceStatus::Proxy
                 || null_trace.config != self.config
+                || null_trace.requested_surrogate_count != self.surrogate_count
                 || (null_trace.observed_relational_mse - expected_mse).abs() > 1e-12
             {
                 return Err(RelationalPredictionError::InvalidSplit);
@@ -1872,7 +1881,7 @@ impl HeldOutRelationalPredictionQualification {
         if config != self.config {
             return Err(RelationalPredictionError::InvalidSplit);
         }
-        let recomputed = Self::compute(samples, config, surrogate_count)?;
+        let recomputed = Self::compute(samples, config, self.surrogate_count)?;
         if recomputed != *self {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
         }
@@ -1909,6 +1918,7 @@ impl HeldOutRelationalPredictionQualification {
 
         let qualification = Self {
             config,
+            surrogate_count,
             observed,
             circular_shift_null,
             feature_decoupling_null,
@@ -3204,6 +3214,22 @@ mod tests {
     }
 
     #[test]
+    fn qualification_binds_surrogate_count() {
+        let samples = build_samples(0.5);
+        let qualification =
+            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
+
+        assert_eq!(qualification.surrogate_count, 12);
+
+        let mut tampered = qualification.clone();
+        tampered.surrogate_count = 8;
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
     fn qualification_replay_binds_whole_bundle_to_exact_input() {
         let samples = build_samples(0.5);
         let qualification =
@@ -3713,6 +3739,33 @@ mod tests {
 
         let mut tampered = qualification.clone();
         tampered.origin_starts[2] += 1;
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn rolling_qualification_binds_surrogate_count() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+
+        let qualification =
+            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8).unwrap();
+
+        assert_eq!(qualification.surrogate_count, 8);
+
+        let mut tampered = qualification.clone();
+        tampered.surrogate_count = 4;
         assert_eq!(
             tampered.validate(),
             Err(RelationalPredictionError::InvalidSplit)
