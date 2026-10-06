@@ -164,7 +164,15 @@ The qualification artifact should retain:
 - software commit SHA;
 - source-data identifiers/hashes.
 
-A later rolling-origin implementation should expand this from one blocked holdout to repeated forward-only evaluation.
+The implementation now includes a rolling-origin evaluator with fixed-width training and test windows and a fixed forward step. The per-origin summaries remain available, while the evaluator also reports mean MSE across origins.
+
+The rolling-origin qualification path applies three prediction null families at every origin:
+
+- CircularShift;
+- FeatureDecoupling;
+- IncrementalRelationalShift.
+
+IncrementalRelationalShift is the most targeted null for the nested comparison: isolated-agent state, common driver, and synchrony remain fixed while only the added directional/turn-taking relational channels are shifted.
 
 ## 9. Repeated rolling-origin evaluation
 
@@ -183,13 +191,17 @@ Each origin creates a new contiguous future-held-out segment. No future origin i
 
 The evaluator reports the per-origin scores as well as mean MSE across origins. This keeps the repeated evaluation auditable rather than hiding heterogeneity inside one aggregate.
 
+The mean is descriptive only. It is not a substitute for an inferential procedure that accounts for dependence between overlapping rolling windows.
+
 The design is deliberately descriptive at this stage. Predictive-error differences across strongly dependent origins should not automatically be converted into a classical IID significance test. Recent work shows that strong dependence can materially distort predictive-accuracy inference, so the first qualification target is repeatability and effect stability rather than a convenient p-value. [Coroneo & Iacone, 2025](https://doi.org/10.1016/j.ijforecast.2024.11.003)
 
 ## 10. What would count as meaningful evidence
 
 A strong result would require more than:
 
-RelationalAugmented MSE < SynchronyOnly MSE
+RelationalAugmented MSE < NonRelationalContext MSE
+
+and more than a single favorable origin.
 
 The stronger pattern is:
 
@@ -197,8 +209,10 @@ The stronger pattern is:
 - RelationalAugmented also beats persistence;
 - the improvement repeats across multiple future-held-out origins;
 - the improvement is not explained by the common-driver baseline;
+- the improvement survives the nested non-relational comparison rather than merely beating synchrony;
 - the improvement degrades under partner circular-shift nulls;
 - the improvement also degrades under feature-decoupling nulls;
+- the incremental relational channels degrade under IncrementalRelationalShift while the non-relational context stays fixed;
 - the direction and approximate magnitude are stable under prespecified horizons and fixed regularization choices;
 - no single favorable origin is responsible for the result.
 
