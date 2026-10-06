@@ -149,6 +149,22 @@ jobs:
           assert report["lifecycle_future_timestamp_blocked"] is True
           assert report["lifecycle_rectification_requires_replacement_artifact"] is True
           assert report["lifecycle_rectification_requires_replacement_lineage"] is True
+          assert report["remediation_impact_structured"] is True
+          assert report["remediation_lifecycle_binding_verified"] is True
+          assert report["remediation_pre_lineage_verified"] is True
+          assert report["remediation_post_lineage_verified"] is True
+          assert report["remediation_forget_evidence_verified"] is True
+          assert report["remediation_utility_evidence_verified"] is True
+          assert report["remediation_fairness_evidence_verified"] is True
+          assert report["remediation_residual_evidence_verified"] is True
+          assert report["remediation_effect_evidence_substitution_blocked"] is True
+          assert report["remediation_model_substitution_blocked"] is True
+          assert report["remediation_lineage_substitution_blocked"] is True
+          assert report["remediation_protocol_substitution_blocked"] is True
+          assert report["remediation_evidence_substitution_blocked"] is True
+          assert report["remediation_dimension_claim_blocked"] is True
+          assert report["remediation_schema_migration_blocked"] is True
+          assert report["remediation_bound_claim_is_narrow"] is True
           assert report["stale_policy_provenance_binding_blocked"] is True
           assert report["inference_escalation_blocked"] is True
           assert report["first_packet_accepted"] is True
