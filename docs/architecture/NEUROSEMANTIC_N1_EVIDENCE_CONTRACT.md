@@ -195,7 +195,7 @@ A lifecycle receipt and a model-remediation evaluation answer different question
 
 The implementation deliberately avoids one aggregate unlearning score. A passing lifecycle receipt or impact artifact does not establish complete erasure, legal compliance, safety, fairness, or absence of residual model influence.
 
-The N0 example uses synthetic evidence and therefore reports `Inconclusive`. Its purpose is to demonstrate identity binding and fail-closed substitution controls, not to qualify a real remediation method.
+The N0 example uses synthetic evidence and therefore reports `Inconclusive`. Its purpose is to demonstrate identity binding and fail-closed substitution controls, not to qualify a real remediation method. Concrete verification entry points cover the lifecycle receipt, pre/post lineage records, study-protocol bytes, evaluation-split bytes, and each declared impact-evidence class.
 
 Research direction: RULER demonstrates that output-level unlearning checks can miss residual information in internal representations, while recent benchmarks show that recovery attacks can reveal knowledge after apparently successful unlearning. Accordingly, a future N1 remediation campaign should retain both output-level and representation/recovery evidence rather than selecting whichever metric is most favorable. (Cosma & Finke, RULER, arXiv:2605.27569; Qian et al., Leak-Resistant Unlearning, arXiv:2608.04519.)
 
