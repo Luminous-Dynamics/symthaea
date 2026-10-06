@@ -24,6 +24,7 @@ use super::service_state::{ServiceActiveStateV1, ServiceLoadStateV1, ServiceUnit
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use thiserror::Error;
 use zbus::export::futures_util::StreamExt;
@@ -1100,17 +1101,43 @@ fn hash_open_definition_file(
     Ok((length, hasher.finalize().to_hex().to_string()))
 }
 
+fn resolve_definition_content_open_path(
+    path: &str,
+) -> Result<(PathBuf, Option<String>), NixSystemdObserverErrorV1> {
+    let source = Path::new(path);
+    let resolved = source.canonicalize().map_err(|error| {
+        NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string())
+    })?;
+
+    if resolved != source {
+        let store_root = Path::new("/nix/store/");
+        if !resolved.starts_with(store_root) {
+            return Err(NixSystemdObserverErrorV1::DefinitionContentSymlink);
+        }
+        let resolved_path = resolved.to_str().ok_or_else(|| {
+            NixSystemdObserverErrorV1::DefinitionContentIo(
+                "resolved definition path is not valid UTF-8".into(),
+            )
+        })?;
+        return Ok((resolved, Some(resolved_path.to_string())));
+    }
+
+    Ok((source.to_path_buf(), None))
+}
+
 #[cfg(unix)]
 fn read_definition_content_file(
     path: &str,
 ) -> Result<NixSystemdUnitDefinitionContentFileV1, NixSystemdObserverErrorV1> {
     use std::os::unix::fs::OpenOptionsExt;
 
+    let (open_path, resolved_path) = resolve_definition_content_open_path(path)?;
+
     let mut options = OpenOptions::new();
     options.read(true);
     let mut file = options
         .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
-        .open(path)
+        .open(&open_path)
         .map_err(|error| {
             if error.raw_os_error() == Some(libc::ELOOP) {
                 NixSystemdObserverErrorV1::DefinitionContentSymlink
@@ -1131,6 +1158,7 @@ fn read_definition_content_file(
 
     Ok(NixSystemdUnitDefinitionContentFileV1 {
         path: path.to_string(),
+        resolved_path,
         byte_len: second_len,
         content_digest: second_digest,
     })
