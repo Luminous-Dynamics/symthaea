@@ -911,6 +911,9 @@ impl LiveVoice {
     }
 
     /// Stronger admission path: also requires an explicit source-to-rule compilation witness.
+    ///
+    /// This path verifies the witness structure and exact output-rule-set identity. It does
+    /// not claim source-byte verification because no source artifact is supplied here.
     #[cfg(feature = "ssm_language")]
     pub fn speak_morphophonology_compilation_verified_lexical_phonological_plan_with_receipt(
         &mut self,
@@ -923,16 +926,15 @@ impl LiveVoice {
         compilation_witness: &MorphophonologicalCompilationWitness,
     ) -> Result<MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt> {
         compilation_witness
-            .validate_against_source_artifact_and_rule_set(
-                &[],
-                rule_set,
-            )
-            .err()
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "source-to-rule compilation witness requires exact source artifact bytes"
-                )
+            .validate_shape()
+            .map_err(|error| {
+                anyhow::anyhow!("invalid morphophonological compilation witness: {error}")
             })?;
+        if compilation_witness.output_rule_set_blake3 != rule_set.resource_blake3() {
+            anyhow::bail!(
+                "morphophonological compilation witness output does not match executable rule set"
+            );
+        }
 
         let receipt = self.speak_morphophonology_verified_lexical_phonological_plan_with_receipt(
             plan,
@@ -2866,6 +2868,41 @@ mod tests {
                 )
                 .is_err(),
             "executable rule-set tampering must invalidate the combined receipt"
+        );
+
+        let artifact = b"row0\n";
+        let compilation_witness = MorphophonologicalCompilationWitness::new(
+            "fixture-compiler",
+            "fixture-compiler-v1",
+            "fixture-normalization-v1",
+            artifact,
+            vec![symthaea_broca::MorphophonologicalSourceSlice {
+                record_id: "row0".into(),
+                byte_offset: 0,
+                byte_length: artifact.len(),
+                record_blake3: blake3::hash(artifact).to_hex().to_string(),
+            }],
+            &rule_set,
+        )
+        .expect("compilation witness");
+
+        let mut receipt = receipt;
+        receipt.compilation_witness = Some(compilation_witness.clone());
+
+        let tampered_artifact = b"rowX\n";
+        assert!(
+            receipt
+                .verify_against_plan_and_rule_set_with_source_artifact(
+                    &plan,
+                    &frame,
+                    &binding,
+                    &lexical_witness,
+                    &morph_witness,
+                    &rule_set,
+                    tampered_artifact,
+                )
+                .is_err(),
+            "source-artifact tampering must invalidate compilation-backed receipt"
         );
     }
 
