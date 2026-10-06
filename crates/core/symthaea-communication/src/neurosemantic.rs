@@ -327,11 +327,15 @@ pub struct NeurosemanticRemediationMeasurement {
     pub estimate_numerator: i64,
     pub estimate_scale: u32,
     pub uncertainty: NeurosemanticRemediationUncertainty,
-    pub sample_count: u64,
+    /// Number of cases eligible for this measurement.
+    pub eligible_sample_count: u64,
+    /// Number of eligible cases actually observed by the measurement procedure.
+    pub observed_sample_count: u64,
+    /// Number of observed cases counted as failures by the declared metric procedure.
     pub failure_count: u64,
 }
 
-pub const NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION: u16 = 2;
 pub const NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION: u16 = 1;
 const MAX_NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITIONS: usize = 32;
 const MAX_NEUROSEMANTIC_REMEDIATION_METRIC_TEXT_BYTES: usize = 256;
@@ -375,9 +379,12 @@ impl NeurosemanticRemediationMeasurementArtifact {
         let mut measurement_refs = BTreeSet::new();
         let mut kinds = BTreeSet::new();
         for measurement in &self.measurements {
-            if measurement.sample_count == 0
-                || measurement.failure_count > measurement.sample_count
+            if measurement.eligible_sample_count == 0
+                || measurement.observed_sample_count > measurement.eligible_sample_count
+                || measurement.failure_count > measurement.observed_sample_count
                 || measurement.estimate_scale > 12
+                || (measurement.observed_sample_count < measurement.eligible_sample_count
+                    && measurement.status != NeurosemanticRemediationImpactDisposition::Inconclusive)
                 || !measurement_refs.insert(measurement.metric_ref.as_str())
                 || !kinds.insert(measurement.kind)
             {
@@ -399,6 +406,9 @@ impl NeurosemanticRemediationMeasurementArtifact {
                 } => {
                     if lower_numerator > upper_numerator
                         || scale > 12
+                        || scale != measurement.estimate_scale
+                        || measurement.estimate_numerator < lower_numerator
+                        || measurement.estimate_numerator > upper_numerator
                         || confidence_level_bps == 0
                         || confidence_level_bps > 10_000
                     {
@@ -3535,7 +3545,8 @@ mod tests {
                     estimate_numerator: 0,
                     estimate_scale: 4,
                     uncertainty: NeurosemanticRemediationUncertainty::NotEstimated,
-                    sample_count: 2,
+                    eligible_sample_count: 2,
+                    observed_sample_count: 2,
                     failure_count: 0,
                 },
                 NeurosemanticRemediationMeasurement {
@@ -3545,7 +3556,8 @@ mod tests {
                     estimate_numerator: 0,
                     estimate_scale: 4,
                     uncertainty: NeurosemanticRemediationUncertainty::NotEstimated,
-                    sample_count: 2,
+                    eligible_sample_count: 2,
+                    observed_sample_count: 2,
                     failure_count: 0,
                 },
                 NeurosemanticRemediationMeasurement {
@@ -3555,7 +3567,8 @@ mod tests {
                     estimate_numerator: 0,
                     estimate_scale: 4,
                     uncertainty: NeurosemanticRemediationUncertainty::NotEstimated,
-                    sample_count: 2,
+                    eligible_sample_count: 2,
+                    observed_sample_count: 2,
                     failure_count: 0,
                 },
                 NeurosemanticRemediationMeasurement {
@@ -3565,7 +3578,8 @@ mod tests {
                     estimate_numerator: 0,
                     estimate_scale: 4,
                     uncertainty: NeurosemanticRemediationUncertainty::NotEstimated,
-                    sample_count: 2,
+                    eligible_sample_count: 2,
+                    observed_sample_count: 2,
                     failure_count: 0,
                 },
                 NeurosemanticRemediationMeasurement {
@@ -3575,7 +3589,8 @@ mod tests {
                     estimate_numerator: 0,
                     estimate_scale: 4,
                     uncertainty: NeurosemanticRemediationUncertainty::NotEstimated,
-                    sample_count: 2,
+                    eligible_sample_count: 2,
+                    observed_sample_count: 2,
                     failure_count: 0,
                 },
             ],
@@ -3855,7 +3870,8 @@ mod tests {
                         scale: 4,
                         confidence_level_bps: 9500,
                     },
-                    sample_count: 10,
+                    eligible_sample_count: 10,
+                    observed_sample_count: 10,
                     failure_count: 0,
                 },
                 NeurosemanticRemediationMeasurement {
@@ -3865,7 +3881,8 @@ mod tests {
                     estimate_numerator: 0,
                     estimate_scale: 4,
                     uncertainty: NeurosemanticRemediationUncertainty::NotEstimated,
-                    sample_count: 10,
+                    eligible_sample_count: 10,
+                    observed_sample_count: 10,
                     failure_count: 0,
                 },
                 NeurosemanticRemediationMeasurement {
@@ -3875,7 +3892,8 @@ mod tests {
                     estimate_numerator: 0,
                     estimate_scale: 4,
                     uncertainty: NeurosemanticRemediationUncertainty::NotEstimated,
-                    sample_count: 10,
+                    eligible_sample_count: 10,
+                    observed_sample_count: 10,
                     failure_count: 0,
                 },
                 NeurosemanticRemediationMeasurement {
@@ -3885,7 +3903,8 @@ mod tests {
                     estimate_numerator: 0,
                     estimate_scale: 4,
                     uncertainty: NeurosemanticRemediationUncertainty::NotEstimated,
-                    sample_count: 10,
+                    eligible_sample_count: 10,
+                    observed_sample_count: 10,
                     failure_count: 0,
                 },
             ],
@@ -3935,6 +3954,17 @@ mod tests {
             *upper_numerator = -2;
         }
         assert!(bad_uncertainty.validate().is_err());
+
+        let mut missing_observation = valid.clone();
+        missing_observation.measurements[0].observed_sample_count = 9;
+        assert!(missing_observation.validate().is_ok());
+        missing_observation.measurements[0].status =
+            NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds;
+        assert!(missing_observation.validate().is_err());
+
+        let mut impossible_failure_count = valid.clone();
+        impossible_failure_count.measurements[0].failure_count = 11;
+        assert!(impossible_failure_count.validate().is_err());
     }
 
     #[test]
@@ -3946,25 +3976,29 @@ mod tests {
                 NeurosemanticRemediationMeasurement {
                     kind: NeurosemanticRemediationMeasurementKind::Forgetfulness,
                     status: NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds,
-                    sample_count: 10,
+                    eligible_sample_count: 10,
+                    observed_sample_count: 10,
                     failure_count: 0,
                 },
                 NeurosemanticRemediationMeasurement {
                     kind: NeurosemanticRemediationMeasurementKind::UtilityImpact,
                     status: NeurosemanticRemediationImpactDisposition::OutsideDeclaredBounds,
-                    sample_count: 10,
+                    eligible_sample_count: 10,
+                    observed_sample_count: 10,
                     failure_count: 1,
                 },
                 NeurosemanticRemediationMeasurement {
                     kind: NeurosemanticRemediationMeasurementKind::RecoveryRisk,
                     status: NeurosemanticRemediationImpactDisposition::Inconclusive,
-                    sample_count: 10,
+                    eligible_sample_count: 10,
+                    observed_sample_count: 10,
                     failure_count: 0,
                 },
                 NeurosemanticRemediationMeasurement {
                     kind: NeurosemanticRemediationMeasurementKind::RepresentationResidual,
                     status: NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds,
-                    sample_count: 10,
+                    eligible_sample_count: 10,
+                    observed_sample_count: 10,
                     failure_count: 0,
                 },
             ],
