@@ -201,6 +201,46 @@ Expected:
 - potentially high phase locking;
 - low evidence of direct interpersonal coupling.
 
+### N1.1 — common-driver control
+
+The common-driver null should be executable, not merely conceptual.
+
+For paired scalar signals A and B with an observed driver Z, compute the raw zero-lag correlation and then:
+
+1. regress A on Z;
+2. regress B on Z;
+3. correlate the residuals.
+
+This is a deliberately narrow linear control. It can show that a supplied shared driver explains much of an observed association, but it cannot remove arbitrary nonlinear or unobserved confounding.
+
+The research module now exposes:
+
+- `CommonDriverSignalSample`;
+- `CommonDriverControlSummary`;
+- raw zero-lag correlation;
+- controlled zero-lag correlation;
+- absolute correlation reduction.
+
+A strong N1 fixture should therefore produce high raw synchrony and substantially reduced controlled association.
+
+This boundary is important because shared stimuli can themselves synchronize multiple observers' neural, physiological, and behavioral signals. Recent work continues to treat the interpretation of interpersonal synchrony as context-dependent rather than self-evidently interpersonal. citeturn614126search3turn614126search1
+
+### N6.1 — pseudo-synchrony surrogate calibration
+
+Partner shuffling should preserve individual signal structure as much as practical while destroying the original pairing.
+
+The research module now includes a deterministic circular-shift surrogate family:
+
+- B is shifted relative to A;
+- marginal B values are preserved;
+- the original point-to-point pairing is broken;
+- lag correlation is recomputed with the same estimator;
+- the observed best absolute correlation is compared with the surrogate distribution.
+
+The result is intentionally `Proxy`, not a formal p-value. It is a calibration diagnostic that can reveal whether an observed relationship survives a partner-reassignment null.
+
+A future statistical lane should replace or augment this deterministic circular family with a prespecified surrogate protocol and confidence/error control appropriate to the sampling design. Surrogate-based significance testing is a standard strategy for directional information measures and pseudo-synchrony, but estimator bias and finite sample size remain material concerns. citeturn614126search10turn614126search0
+
 ### N2 — one-way mirroring
 
 B copies A with a delay.
@@ -363,6 +403,21 @@ Move the current consciousness-derived partnership update behind an explicitly n
 ### RH-003 — HDC role-binding experiment
 
 Compare weighted bundling versus role-keyed binding on held-out relational retrieval, keeping the result as an ablation rather than assuming one representation is superior.
+
+### RH-005 — common-driver and partner-null calibration
+
+The next qualification layer should require both controls before interpreting relational structure as partner-specific:
+
+- N1: a strong common-driver fixture must lose most of its association after the supplied-driver control;
+- N6: genuine paired streams should outperform deterministic partner-shuffle surrogates under a prespecified criterion;
+- the same estimator, lag window, and sampling rules must be used for observed and surrogate data;
+- no threshold should be promoted from these fixtures until it has been evaluated across multiple null families.
+
+The conceptual target is:
+
+relational evidence ≈ observed pair structure − explained common-driver structure − null pairing structure
+
+This is not a single formula to expose in production; it is a qualification principle for determining whether the dyadic variables add information beyond shared context and generic temporal similarity.
 
 ### RH-004 — directional information-flow qualification
 
