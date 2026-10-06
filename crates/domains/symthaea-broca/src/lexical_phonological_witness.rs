@@ -11,12 +11,12 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::lexical_binding::LexicalMorphosyntacticBinding;
+use crate::lexical_binding::{LexemeBinding, LexicalMorphosyntacticBinding};
 use crate::phonological_plan::PhonemeSlot;
 
 /// Stable identity for the explicit lexical-to-phonological witness contract.
 pub const LEXICAL_PHONOLOGICAL_WITNESS_VERSION: &str =
-    "broca-lexical-phonological-witness-v2";
+    "broca-lexical-phonological-witness-v3";
 
 /// One explicit realization claim for one final lexical constituent position.
 ///
@@ -31,6 +31,8 @@ pub struct LexicalPhonologicalMapping {
     pub lexeme_id: String,
     /// Exact morphophonological form retained by the lexical binding.
     pub morphophonological_form: Option<String>,
+    /// BLAKE3 of the complete serialized lexical entry.
+    pub lexeme_binding_blake3: String,
     /// Exact zero-based indices into the phonological segment stream.
     pub segment_indices: Vec<usize>,
     /// Exact phoneme symbols asserted for those segment indices, in the same order.
@@ -44,6 +46,26 @@ pub struct LexicalPhonologicalWitness {
     /// Exact provenance token of the lexical/morphosyntactic binding being realized.
     pub lexical_binding_provenance: String,
     pub mappings: Vec<LexicalPhonologicalMapping>,
+}
+
+impl LexicalPhonologicalMapping {
+    /// Construct a mapping with an exact digest of the complete lexical entry.
+    pub fn from_lexical_binding(
+        binding: &LexicalMorphosyntacticBinding,
+        lexical_position: usize,
+        segment_indices: Vec<usize>,
+        symbols: Vec<String>,
+    ) -> Option<Self> {
+        let constituent = binding.constituents.get(lexical_position)?;
+        Some(Self {
+            lexical_position,
+            lexeme_id: constituent.lexeme_id.clone(),
+            morphophonological_form: constituent.morphophonological_form.clone(),
+            lexeme_binding_blake3: lexeme_binding_blake3(constituent),
+            segment_indices,
+            symbols,
+        })
+    }
 }
 
 impl LexicalPhonologicalWitness {
@@ -94,6 +116,13 @@ impl LexicalPhonologicalWitness {
                         lexical_position: mapping.lexical_position,
                     });
                 }
+            }
+            if !is_blake3_token(&mapping.lexeme_binding_blake3) {
+                return Err(
+                    LexicalPhonologicalWitnessError::InvalidLexicalEntryDigest {
+                        lexical_position: mapping.lexical_position,
+                    },
+                );
             }
             if mapping.segment_indices.is_empty() {
                 return Err(LexicalPhonologicalWitnessError::EmptySegmentMapping {
@@ -175,6 +204,7 @@ impl LexicalPhonologicalWitness {
                 .ok_or(LexicalPhonologicalWitnessError::LexicalCoverageMismatch)?;
             if mapping.lexeme_id != constituent.lexeme_id
                 || mapping.morphophonological_form != constituent.morphophonological_form
+                || mapping.lexeme_binding_blake3 != lexeme_binding_blake3(constituent)
             {
                 return Err(LexicalPhonologicalWitnessError::LexicalIdentityMismatch {
                     lexical_position: position,
@@ -249,6 +279,12 @@ fn is_blake3_token(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
+fn lexeme_binding_blake3(binding: &LexemeBinding) -> String {
+    let canonical = serde_json::to_string(binding)
+        .expect("LexemeBinding serialization should be infallible for serializable fields");
+    blake3::hash(canonical.as_bytes()).to_hex().to_string()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LexicalPhonologicalWitnessError {
     InvalidVersion,
@@ -260,6 +296,7 @@ pub enum LexicalPhonologicalWitnessError {
     EmptySegmentMapping { lexical_position: usize },
     EmptyLexemeId { lexical_position: usize },
     EmptyMorphophonologicalForm { lexical_position: usize },
+    InvalidLexicalEntryDigest { lexical_position: usize },
     LexicalIdentityMismatch { lexical_position: usize },
     SymbolCountMismatch { lexical_position: usize },
     EmptySymbol { lexical_position: usize, symbol_offset: usize },
@@ -285,6 +322,7 @@ impl std::fmt::Display for LexicalPhonologicalWitnessError {
             Self::EmptySegmentMapping { lexical_position } => write!(f, "lexical position {lexical_position} must map to at least one phonological segment"),
             Self::EmptyLexemeId { lexical_position } => write!(f, "lexical position {lexical_position} requires an exact lexeme id"),
             Self::EmptyMorphophonologicalForm { lexical_position } => write!(f, "lexical position {lexical_position} carries an empty morphophonological form"),
+            Self::InvalidLexicalEntryDigest { lexical_position } => write!(f, "lexical position {lexical_position} carries an invalid lexical-entry digest"),
             Self::LexicalIdentityMismatch { lexical_position } => write!(f, "lexical position {lexical_position} does not match the exact lexical binding identity"),
             Self::SymbolCountMismatch { lexical_position } => write!(f, "lexical position {lexical_position} has mismatched segment-index and symbol counts"),
             Self::EmptySymbol { lexical_position, symbol_offset } => write!(f, "lexical position {lexical_position} has an empty phoneme symbol at offset {symbol_offset}"),
@@ -402,13 +440,13 @@ mod tests {
             segments
                 .iter()
                 .enumerate()
-                .map(|(index, segment)| LexicalPhonologicalMapping {
-                    lexical_position: index,
-                    lexeme_id: binding.constituents[index].lexeme_id.clone(),
-                    morphophonological_form: binding.constituents[index].morphophonological_form.clone(),
-                    segment_indices: vec![index],
-                    symbols: vec![segment.symbol.clone()],
-                })
+                .map(|(index, segment)| LexicalPhonologicalMapping::from_lexical_binding(
+                    binding,
+                    index,
+                    vec![index],
+                    vec![segment.symbol.clone()],
+                )
+                .expect("lexical position exists"))
                 .collect(),
         )
         .expect("explicit witness")
@@ -419,7 +457,7 @@ mod tests {
         let binding = binding();
         let witness = witness_for_segments(&binding);
         let mut legacy = witness.clone();
-        legacy.version = "broca-lexical-phonological-witness-v1".into();
+        legacy.version = "broca-lexical-phonological-witness-v2".into();
 
         assert_eq!(
             legacy
@@ -501,21 +539,21 @@ mod tests {
             .collect::<Vec<_>>();
 
         let mut mappings = Vec::new();
-        mappings.push(LexicalPhonologicalMapping {
-            lexical_position: 0,
-            lexeme_id: binding.constituents[0].lexeme_id.clone(),
-            morphophonological_form: binding.constituents[0].morphophonological_form.clone(),
-            segment_indices: vec![0, 1],
-            symbols: vec!["P0".into(), "P1".into()],
-        });
+        mappings.push(LexicalPhonologicalMapping::from_lexical_binding(
+            &binding,
+            0,
+            vec![0, 1],
+            vec!["P0".into(), "P1".into()],
+        )
+        .expect("lexical position exists"));
         for position in 1..binding.constituents.len() {
-            mappings.push(LexicalPhonologicalMapping {
-                lexical_position: position,
-                lexeme_id: binding.constituents[position].lexeme_id.clone(),
-                morphophonological_form: binding.constituents[position].morphophonological_form.clone(),
-                segment_indices: vec![position + 1],
-                symbols: vec![segments[position + 1].symbol.clone()],
-            });
+            mappings.push(LexicalPhonologicalMapping::from_lexical_binding(
+                &binding,
+                position,
+                vec![position + 1],
+                vec![segments[position + 1].symbol.clone()],
+            )
+            .expect("lexical position exists"));
         }
 
         let witness = LexicalPhonologicalWitness::new(&binding, mappings)
@@ -631,6 +669,23 @@ mod tests {
             witness
                 .validate_against_binding(&binding)
                 .expect_err("morphophonological-form tampering must fail"),
+            LexicalPhonologicalWitnessError::LexicalIdentityMismatch {
+                lexical_position: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn complete_lexical_entry_tampering_fails_closed() {
+        let binding = binding();
+        let mut witness = witness_for_segments(&binding);
+        witness.mappings[0].lexeme_binding_blake3 =
+            blake3::hash(b"tampered-entry").to_hex().to_string();
+
+        assert_eq!(
+            witness
+                .validate_against_binding(&binding)
+                .expect_err("complete lexical-entry tampering must fail"),
             LexicalPhonologicalWitnessError::LexicalIdentityMismatch {
                 lexical_position: 0,
             }
