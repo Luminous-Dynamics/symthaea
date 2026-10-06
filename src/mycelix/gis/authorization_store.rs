@@ -3274,11 +3274,9 @@ fn validate_native_authority_pin_set(
             return Err(AuthorizationConsumptionError::ActionAlreadyInFlight.into());
         }
 
-        // Native replay identity is a one-time authority unit. History may
-        // survive after the live dispatch row is compacted or otherwise removed,
-        // so the terminal-evidence ledger is part of the authoritative fence too.
-        // The dispatch UNIQUE index remains authoritative for races between
-        // concurrent live callers.
+        // Native replay identity is a one-time authority unit. The dedicated
+        // replay ledger is the authoritative durable fence; dispatch and terminal
+        // rows are execution/evidence views that may be retained or compacted.
         let replay_owner: Option<(String, String, String)> = tx
             .query_row(
                 "SELECT authorization_instance,attempt_id,operation_id
@@ -3378,8 +3376,8 @@ fn validate_native_authority_pin_set(
         // The native replay ledger is the durable one-time authority fact.
         // It intentionally survives dispatch/terminal retention and is the
         // authoritative transaction-time uniqueness boundary for this grant.
-        let inserted = tx.execute(
-            "INSERT OR IGNORE INTO authorization_native_replay_history(
+        tx.execute(
+            "INSERT INTO authorization_native_replay_history(
                 native_replay_identity,authorization_instance,attempt_id,operation_id,
                 relying_party_id,native_authority_namespace,native_authorization_id,
                 native_replay_derivation_digest,boundary_id,action_digest,target_identity)
@@ -3398,31 +3396,6 @@ fn validate_native_authority_pin_set(
                 record.target_identity,
             ],
         )?;
-        if inserted == 0 {
-            let owner: Option<(String,String,String,String,String,String)> = tx
-                .query_row(
-                    "SELECT authorization_instance,attempt_id,operation_id,
-                            relying_party_id,boundary_id,action_digest
-                     FROM authorization_native_replay_history
-                     WHERE native_replay_identity=?1",
-                    params![record.native_replay_identity.as_str()],
-                    |row| Ok((
-                        row.get(0)?,row.get(1)?,row.get(2)?,
-                        row.get(3)?,row.get(4)?,row.get(5)?,
-                    )),
-                )
-                .optional()?;
-            if !owner.is_some_and(|owner| {
-                owner.0 == record.authorization_instance
-                    && owner.1 == record.attempt_id
-                    && owner.2 == record.operation_id
-                    && owner.3 == self.relying_party_id
-                    && owner.4 == record.boundary_id
-                    && owner.5 == record.action_digest
-            }) {
-                return Err(AuthorizationConsumptionError::InvalidBinding.into());
-            }
-        }
 
         tx.execute(
             "INSERT INTO authorization_dispatches
@@ -13054,6 +13027,221 @@ mod tests {
         assert_ne!(r1.is_ok(),r2.is_ok());
         let _=std::fs::remove_file(path);
     }
+    #[test]
+    fn concurrent_native_replay_has_one_durable_winner() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-concurrent-native-replay-{}.db",
+            std::process::id()
+        ));
+        let fixed_now = "2026-10-03T12:00:00Z".parse::<DateTime<Utc>>().unwrap();
+        let store = SqliteAuthorizationStore::open_with_relying_party_clock_and_policy(
+            &path,
+            "rp-concurrent-native-replay",
+            Arc::new(FixedClock {
+                now: fixed_now,
+                source_id: AuthorizationClockPolicy::CLOCK_SOURCE_ID,
+            }),
+            AuthorizationClockPolicy::default(),
+        )
+        .unwrap();
+        let second = SqliteAuthorizationStore::open_with_relying_party_clock_and_policy(
+            &path,
+            "rp-concurrent-native-replay",
+            Arc::new(FixedClock {
+                now: fixed_now,
+                source_id: AuthorizationClockPolicy::CLOCK_SOURCE_ID,
+            }),
+            AuthorizationClockPolicy::default(),
+        )
+        .unwrap();
+
+        let effect_a = ActionEffectBinding::new(
+            "target-concurrent-native-a",
+            "prod",
+            "adapter-concurrent-native",
+        );
+        let effect_b = ActionEffectBinding::new(
+            "target-concurrent-native-b",
+            "prod",
+            "adapter-concurrent-native",
+        );
+        let action_a = EpistemicAction::new(
+            "concurrent-native-a",
+            "intervention",
+            super::super::ActionRisk::Critical,
+        )
+        .with_effect_binding(effect_a.clone());
+        let action_b = EpistemicAction::new(
+            "concurrent-native-b",
+            "intervention",
+            super::super::ActionRisk::Critical,
+        )
+        .with_effect_binding(effect_b.clone());
+        let digest_a = action_a.canonical_action_digest();
+        let digest_b = action_b.canonical_action_digest();
+        let witness_a = ActionAuthorizationWitness {
+            operation_id: Some("operation:concurrent-native-a".into()),
+            authorization_instance: "concurrent-native-a".into(),
+            action_id: action_a.id.clone(),
+            action_digest: digest_a.clone(),
+            frame: "frame@1".into(),
+            support_digest: "sha256:support-a".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:00:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+        let witness_b = ActionAuthorizationWitness {
+            operation_id: Some("operation:concurrent-native-b".into()),
+            authorization_instance: "concurrent-native-b".into(),
+            action_id: action_b.id.clone(),
+            action_digest: digest_b.clone(),
+            frame: "frame@1".into(),
+            support_digest: "sha256:support-b".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:00:01Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+
+        store
+            .pin_provider_status_source_digest("sha256:test-status-source")
+            .unwrap();
+        store
+            .pin_provider_status_verifier_configuration(
+                &TestProviderStatusVerifier.configuration(),
+            )
+            .unwrap();
+        store
+            .pin_provider_adapter_configuration(&ProviderAdapterConfiguration::new(
+                "adapter-concurrent-native",
+                "test-adapter/v1",
+                "sha256:test-adapter-implementation",
+            ))
+            .unwrap();
+        store
+            .pin_native_authority_namespace(
+                "test-explicit-issuer",
+                "concurrent-native-authority",
+            )
+            .unwrap();
+
+        store
+            .register_lease(&AuthorizationLease::new_with_instance(
+                witness_a.authorization_instance.clone(),
+                action_a.id.clone(),
+                digest_a.clone(),
+                witness_a.support_digest.clone(),
+                witness_a.policy.clone(),
+                1,
+                1,
+            ))
+            .unwrap();
+        store
+            .register_lease(&AuthorizationLease::new_with_instance(
+                witness_b.authorization_instance.clone(),
+                action_b.id.clone(),
+                digest_b.clone(),
+                witness_b.support_digest.clone(),
+                witness_b.policy.clone(),
+                1,
+                1,
+            ))
+            .unwrap();
+        store
+            .prepare_for_execution_bound_with_operation(
+                &witness_a,
+                &action_a,
+                "frame@1",
+                "attempt:concurrent-native-a",
+                "boundary:concurrent-native-a",
+                "operation:concurrent-native-a",
+            )
+            .unwrap();
+        store
+            .prepare_for_execution_bound_with_operation(
+                &witness_b,
+                &action_b,
+                "frame@1",
+                "attempt:concurrent-native-b",
+                "boundary:concurrent-native-b",
+                "operation:concurrent-native-b",
+            )
+            .unwrap();
+
+        let barrier = Arc::new(std::sync::Barrier::new(2));
+        let a2 = action_a.clone();
+        let w2 = witness_a.clone();
+        let b1 = barrier.clone();
+        let s2 = second;
+        let t1 = thread::spawn(move || {
+            b1.wait();
+            store.mark_dispatch_pending_bound_from_pinned_native_authority(
+                &w2.authorization_instance,
+                "attempt:concurrent-native-a",
+                &a2,
+                a2.effect_binding().expect("effect binding"),
+                "boundary:concurrent-native-a",
+                "operation:concurrent-native-a",
+                "test-explicit-issuer",
+                "native-grant:concurrent",
+                "status:native-grant:concurrent",
+                &TestProviderStatusVerifier,
+            )
+        });
+        let b2 = barrier.clone();
+        let t2 = thread::spawn(move || {
+            b2.wait();
+            s2.mark_dispatch_pending_bound_from_pinned_native_authority(
+                &witness_b.authorization_instance,
+                "attempt:concurrent-native-b",
+                &action_b,
+                action_b.effect_binding().expect("effect binding"),
+                "boundary:concurrent-native-b",
+                "operation:concurrent-native-b",
+                "test-explicit-issuer",
+                "native-grant:concurrent",
+                "status:native-grant:concurrent",
+                &TestProviderStatusVerifier,
+            )
+        });
+
+        let r1 = t1.join().unwrap();
+        let r2 = t2.join().unwrap();
+        assert_ne!(r1.is_ok(), r2.is_ok());
+
+        let store = SqliteAuthorizationStore::open_with_relying_party_clock_and_policy(
+            &path,
+            "rp-concurrent-native-replay",
+            Arc::new(FixedClock {
+                now: fixed_now,
+                source_id: AuthorizationClockPolicy::CLOCK_SOURCE_ID,
+            }),
+            AuthorizationClockPolicy::default(),
+        )
+        .unwrap();
+        let counts: (i64, i64) = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT
+                    (SELECT COUNT(*) FROM authorization_native_replay_history
+                     WHERE native_replay_identity IS NOT NULL
+                       AND native_replay_identity <> ''),
+                    (SELECT COUNT(*) FROM authorization_dispatches
+                     WHERE native_replay_identity IS NOT NULL
+                       AND native_replay_identity <> '')",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(counts, (1, 1));
+
+        let _ = std::fs::remove_file(path);
+    }
+
     #[test]
     fn bound_preparation_rejects_contradictory_witness_operation_metadata() {
         let path = std::env::temp_dir().join(format!(
