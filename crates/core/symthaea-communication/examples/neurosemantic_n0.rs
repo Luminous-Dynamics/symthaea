@@ -11,7 +11,7 @@ use symthaea_communication::{
     NeurosemanticAuthorityResolutionAttestation, NeurosemanticAuthorityStatus,
     NeurosemanticConsentBindingContext, NeurosemanticDerivationLineageRecord,
     NeurosemanticArtifactLifecycleReceipt, NeurosemanticArtifactLifecycleAction,
-    NeurosemanticArtifactLifecycleState,
+    NeurosemanticArtifactLifecycleState, NeurosemanticArtifactLifecycleVerificationTargetSet,
 };
 
 fn main() -> Result<(), String> {
@@ -268,13 +268,23 @@ fn main() -> Result<(), String> {
 
     let lifecycle_effect_evidence = b"synthetic-lifecycle-effect-v1";
     let lifecycle_verification_evidence = b"synthetic-independent-verification-v1";
-    let lifecycle_verification_scope = b"synthetic-target-set-v1:derived-artifact-only";
     let lifecycle_verification_scope_ref = "synthetic-verification-scope-1";
+    let lifecycle_verification_target_set = NeurosemanticArtifactLifecycleVerificationTargetSet {
+        schema_version: symthaea_communication::NEUROSEMANTIC_ARTIFACT_LIFECYCLE_VERIFICATION_SCOPE_SCHEMA_VERSION,
+        scope_ref: lifecycle_verification_scope_ref.into(),
+        root_artifact_hash: message.packet.payload_hash.clone(),
+        target_artifact_hashes: vec![
+            message.packet.payload_hash.clone(),
+            symthaea_communication::content_hash(b"synthetic-descendant-artifact-1"),
+        ],
+    };
+    let lifecycle_verification_scope =
+        serde_json::to_vec(&lifecycle_verification_target_set).map_err(|e| e.to_string())?;
     let derivation_ref = policy_provenance_binding.derivation_provenance_ref().to_string();
     let derivation_hash = policy_provenance_binding.derivation_provenance_hash().to_string();
     let lifecycle_scope_hash = symthaea_communication::compute_lifecycle_verification_scope_hash(
         lifecycle_verification_scope_ref,
-        lifecycle_verification_scope,
+        &lifecycle_verification_scope,
     );
     let lifecycle_base = NeurosemanticArtifactLifecycleReceipt {
         schema_version: symthaea_communication::NEUROSEMANTIC_ARTIFACT_LIFECYCLE_RECEIPT_SCHEMA_VERSION,
@@ -322,6 +332,7 @@ fn main() -> Result<(), String> {
         event_sequence: 3,
         previous_receipt_hash: Some(lifecycle_processing.fingerprint()?),
         state: NeurosemanticArtifactLifecycleState::Applied,
+        effect_agent_ref: Some("synthetic-effect-worker-1".into()),
         effect_evidence_ref: Some("synthetic-lifecycle-effect-1".into()),
         effect_evidence_hash: Some(symthaea_communication::content_hash(lifecycle_effect_evidence)),
         observed_at_unix_s: 1_583,
@@ -402,14 +413,25 @@ fn main() -> Result<(), String> {
         forged.verification_agent_ref = None;
         forged.validate().is_err()
     };
+    let lifecycle_verifier_independence_required = {
+        let mut forged = lifecycle_receipt.clone();
+        forged.verification_agent_ref = forged.effect_agent_ref.clone();
+        forged.validate().is_err()
+    };
     let lifecycle_verification_scope_mismatch_blocked = {
         let mut forged = lifecycle_receipt.clone();
         forged.verification_scope_hash = Some(symthaea_communication::content_hash(b"wrong-scope"));
         forged.validate().is_ok()
-            && forged.verify_verification_scope_bytes(lifecycle_verification_scope).is_err()
+            && forged.verify_verification_scope_bytes(&lifecycle_verification_scope).is_err()
+    };
+    let lifecycle_verification_scope_root_mismatch_blocked = {
+        let mut forged_set = lifecycle_verification_target_set.clone();
+        forged_set.root_artifact_hash = symthaea_communication::content_hash(b"wrong-root");
+        let forged_bytes = serde_json::to_vec(&forged_set).map_err(|e| e.to_string())?;
+        lifecycle_receipt.verify_verification_scope_bytes(&forged_bytes).is_err()
     };
     let lifecycle_verification_scope_tamper_blocked = lifecycle_receipt
-        .verify_verification_scope_bytes(b"synthetic-target-set-v1:TAMPERED")
+        .verify_verification_scope_bytes(b"{"schema_version":1,"scope_ref":"synthetic-verification-scope-1","root_artifact_hash":"tampered","target_artifact_hashes":[]}")
         .is_err();
     let lifecycle_artifact_mismatch_blocked = lifecycle_receipt
         .verify_binding(
@@ -874,7 +896,9 @@ fn main() -> Result<(), String> {
         "lifecycle_independent_verification_mismatch_blocked": lifecycle_independent_verification_mismatch_blocked,
         "lifecycle_verifier_target_mismatch_blocked": lifecycle_verifier_target_mismatch_blocked,
         "lifecycle_verifier_identity_required": lifecycle_verifier_identity_required,
+        "lifecycle_verifier_independence_required": lifecycle_verifier_independence_required,
         "lifecycle_verification_scope_mismatch_blocked": lifecycle_verification_scope_mismatch_blocked,
+        "lifecycle_verification_scope_root_mismatch_blocked": lifecycle_verification_scope_root_mismatch_blocked,
         "lifecycle_verification_scope_tamper_blocked": lifecycle_verification_scope_tamper_blocked,
         "lifecycle_artifact_mismatch_blocked": lifecycle_artifact_mismatch_blocked,
         "lifecycle_lineage_mismatch_blocked": lifecycle_lineage_mismatch_blocked,
