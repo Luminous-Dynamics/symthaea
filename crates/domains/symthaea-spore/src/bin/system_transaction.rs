@@ -346,22 +346,60 @@ impl TransactionLedger {
         let parent = path
             .parent()
             .ok_or_else(|| "transaction ledger path has no parent directory".to_string())?;
-        std::fs::create_dir_all(parent).map_err(|error| {
+
+        // This is a privileged local authority directory. Create only the
+        // final component with a restrictive mode, then validate the directory
+        // descriptor actually opened. Existing unsafe ownership/modes fail
+        // closed instead of being repaired through a pathname.
+        match std::fs::create_dir(parent) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(error) => {
+                return Err(format!(
+                    "unable to create transaction ledger directory {}: {error}",
+                    parent.display()
+                ));
+            }
+        }
+
+        let directory = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(parent)
+            .map_err(|error| {
+                format!(
+                    "unable to open transaction ledger directory {}: {error}",
+                    parent.display()
+                )
+            })?;
+        let metadata = directory.metadata().map_err(|error| {
             format!(
-                "unable to create transaction ledger directory {}: {error}",
+                "unable to inspect transaction ledger directory {}: {error}",
                 parent.display()
             )
         })?;
-        std::fs::set_permissions(
-            parent,
-            std::os::unix::fs::PermissionsExt::from_mode(0o700),
-        )
-        .map_err(|error| {
-            format!(
-                "unable to restrict transaction ledger directory {}: {error}",
+        use std::os::unix::fs::MetadataExt;
+        let mode = metadata.permissions().mode() & 0o777;
+        if !metadata.is_dir() {
+            return Err(format!(
+                "transaction ledger path parent {} is not a directory",
                 parent.display()
-            )
-        })?;
+            ));
+        }
+        if mode != 0o700 {
+            return Err(format!(
+                "transaction ledger directory {} has unsafe permissions {:04o}; require 0700",
+                parent.display(),
+                mode
+            ));
+        }
+        if metadata.uid() != unsafe { libc::geteuid() } {
+            return Err(format!(
+                "transaction ledger directory {} is not owned by relay user",
+                parent.display()
+            ));
+        }
+        drop(directory);
 
         let fingerprint_key = load_or_create_fingerprint_key(Path::new(FINGERPRINT_KEY_PATH))?;
         Ok(Self {
