@@ -548,7 +548,7 @@ impl NixSystemdReadOnlyObserverV1 {
 
         let service_result =
             required_string(&service_properties, SYSTEMD_SERVICE_INTERFACE, "Result")?;
-        if service_result.is_empty() {
+        if service_result.trim().is_empty() {
             return Err(NixSystemdObserverErrorV1::InvalidPropertyValue {
                 interface: SYSTEMD_SERVICE_INTERFACE,
                 property: "Result",
@@ -561,6 +561,7 @@ impl NixSystemdReadOnlyObserverV1 {
             generation,
             &object_path,
             &manager_owner,
+            &service_result,
             &unit_properties,
             job,
         )?;
@@ -889,6 +890,7 @@ fn build_observation_from_properties(
     generation: u64,
     unit_object_path: &OwnedObjectPath,
     manager_owner: &str,
+    service_result: &str,
     properties: &HashMap<String, OwnedValue>,
     job: Option<NixSystemdJobEvidenceV1>,
 ) -> Result<NixServicePostStateObservationV1, NixSystemdObserverErrorV1> {
@@ -983,9 +985,11 @@ fn build_observation_from_properties(
         observed_generation: generation,
         unit_object_path: unit_object_path.as_str().to_string(),
         definition_identity,
+        load_state,
         active_state,
         sub_state,
         unit_file_state,
+        service_result,
         systemd_job: job,
         systemd_manager_owner: Some(manager_owner.to_string()),
         invocation_id,
