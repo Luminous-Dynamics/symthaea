@@ -278,8 +278,7 @@ impl BoundedDistanceSyndromeDecoder {
             .expect("validated observation dimension");
 
         let mut selected = Vec::with_capacity(distance);
-        let mut running_syndrome =
-            BinaryCodeword::zero(self.parity_check.syndrome_dimension());
+        let mut running_syndrome = BinaryCodeword::zero(self.parity_check.syndrome_dimension());
         let mut matching_errors = 0usize;
 
         collect_exact_weight_matches(

@@ -3,8 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root.
 
 use symthaea_core::hdc::linear_code::{
-    BinaryCodeword, RandomLinearCode, basis_rank, factorization_affine_fiber,
-    factorization_algebra,
+    BinaryCodeword, RandomLinearCode, basis_rank, factorization_affine_fiber, factorization_algebra,
 };
 use symthaea_core::hdc::syndrome_decoder::{
     BoundedDistanceDecode, BoundedDistanceSyndromeDecoder, ParityCheckMatrix,
@@ -164,7 +163,10 @@ fn small_fixture_kernel_equals_code_and_syndrome_cosets_are_exact() {
     }
 
     // Every syndrome occurs and every fiber has exactly |C| = 2^k elements.
-    assert_eq!(buckets.iter().filter(|bucket| !bucket.is_empty()).count(), 64);
+    assert_eq!(
+        buckets.iter().filter(|bucket| !bucket.is_empty()).count(),
+        64
+    );
     assert!(buckets.iter().all(|bucket| bucket.len() == codewords.len()));
 
     // The zero-syndrome kernel is exactly the code, element-for-element.
@@ -405,9 +407,7 @@ fn minimum_weight_syndrome_multiplicity_matches_nearest_codeword_multiplicity_ex
                 "listed codeword was not nearest for observation={mask:#x}"
             );
         }
-        assert_eq!(
-            listed.outcome,
-            result,
+        assert_eq!(listed.outcome, result,
             "list-valued and scalar decoder outcomes diverged for observation={mask:#x}"
         );
         assert_eq!(
@@ -435,9 +435,9 @@ fn minimum_weight_syndrome_multiplicity_matches_nearest_codeword_multiplicity_ex
                 assert_eq!(matching_error_patterns, nearest.len());
                 ambiguous += 1;
             }
-            other => panic!(
-                "covering-radius bound must decode every ambient observation, got {other:?}"
-            ),
+            other => {
+                panic!("covering-radius bound must decode every ambient observation, got {other:?}")
+            }
         }
 
         total_nearest_codewords += nearest.len();
@@ -688,9 +688,7 @@ fn independent_parity_check_rows(code: &RandomLinearCode) -> Vec<u64> {
     let mut pivot_row = 0usize;
 
     for column in 0..dimension {
-        let found = (pivot_row..reduced.len()).find(|&row| {
-            ((reduced[row] >> column) & 1) == 1
-        });
+        let found = (pivot_row..reduced.len()).find(|&row| ((reduced[row] >> column) & 1) == 1);
         let Some(found) = found else {
             continue;
         };
@@ -790,8 +788,7 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
                     .expect("non-zero codeword");
                 let unique_radius = (min_distance - 1) / 2;
                 let bound = unique_radius + 1;
-                let decoder =
-                    BoundedDistanceSyndromeDecoder::from_code(&code).expect("decoder");
+                let decoder = BoundedDistanceSyndromeDecoder::from_code(&code).expect("decoder");
                 let checks = independent_parity_check_rows(&code);
 
                 assert_eq!(checks.len(), dimension - rank);
@@ -800,10 +797,11 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
                     assert_eq!(independent_syndrome(mask, &checks), 0);
                 }
 
-                for mask in deterministic_probe_masks(seed ^ 0x5A17_0A1E, probes_per_code, dimension) {
+                for mask in
+                    deterministic_probe_masks(seed ^ 0x5A17_0A1E, probes_per_code, dimension)
+                {
                     let observation = error_from_mask(mask as usize, dimension);
-                    let (nearest_distance, nearest) =
-                        nearest_codewords(&observation, &codewords);
+                    let (nearest_distance, nearest) = nearest_codewords(&observation, &codewords);
                     let observed_syndrome = independent_syndrome(mask, &checks);
                     let parity_check_syndrome = decoder
                         .parity_check()
@@ -815,10 +813,8 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
                         "production and independent parity-check oracles diverged: regime={dimension}x{rank} seed=0x{seed:X} mask={mask:#x}"
                     );
 
-                    let listed_a =
-                        decoder.decode_with_minimum_list(&observation, bound, 32);
-                    let listed_b =
-                        decoder.decode_with_minimum_list(&observation, bound, 32);
+                    let listed_a = decoder.decode_with_minimum_list(&observation, bound, 32);
+                    let listed_b = decoder.decode_with_minimum_list(&observation, bound, 32);
                     assert_eq!(
                         listed_a, listed_b,
                         "list surface was not deterministic: regime={dimension}x{rank} seed=0x{seed:X} mask={mask:#x}"
@@ -846,13 +842,9 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
                             .zip(&listed_a.nearest_codewords)
                         {
                             assert_eq!(error.weight(), nearest_distance);
-                            let error_syndrome =
-                                independent_syndrome(error.words()[0], &checks);
+                            let error_syndrome = independent_syndrome(error.words()[0], &checks);
                             assert_eq!(error_syndrome, observed_syndrome);
-                            assert_eq!(
-                                hamming_distance(&observation, codeword),
-                                nearest_distance
-                            );
+                            assert_eq!(hamming_distance(&observation, codeword), nearest_distance);
 
                             let index = nearest
                                 .iter()
@@ -873,10 +865,9 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
                 qualifying_codes += 1;
             }
 
-            assert!(qualifying_codes >= 8);
+            assert_eq!(qualifying_codes as u64, trials);
             assert_eq!(
-                histogram[0],
-                0,
+                histogram[0], 0,
                 "zero multiplicity must never be recorded as a decoded list"
             );
             assert!(max_multiplicity <= (1usize << rank));
