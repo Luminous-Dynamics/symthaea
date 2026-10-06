@@ -1607,6 +1607,7 @@ impl PredictionNullSummary {
 /// Full held-out qualification bundle: observed ablation plus multiple null families.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HeldOutRelationalPredictionQualification {
+    pub config: HeldOutRelationalPredictionConfig,
     pub observed: HeldOutRelationalPredictionSummary,
     pub circular_shift_null: PredictionNullSummary,
     pub feature_decoupling_null: PredictionNullSummary,
@@ -1615,7 +1616,11 @@ pub struct HeldOutRelationalPredictionQualification {
 
 impl HeldOutRelationalPredictionQualification {
     pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        validate_held_out_config_shape(&self.config)?;
         if self.observed.status != EvidenceStatus::Measured
+            || self.observed.train_samples != self.config.train_samples
+            || self.observed.test_samples != self.config.test_samples
+            || self.observed.gap_samples != self.config.gap_samples
             || self.observed.relational_augmented.feature_set
                 != PredictionFeatureSet::RelationalAugmented
         {
@@ -1643,10 +1648,7 @@ impl HeldOutRelationalPredictionQualification {
             if null_trace.family != expected_family
                 || null_trace.feature_set != PredictionFeatureSet::RelationalAugmented
                 || null_trace.status != EvidenceStatus::Proxy
-                || null_trace.config.train_samples != self.observed.train_samples
-                || null_trace.config.test_samples != self.observed.test_samples
-                || null_trace.config.gap_samples != self.observed.gap_samples
-                || null_trace.config.ridge_lambda < 0.0
+                || null_trace.config != self.config
                 || (null_trace.observed_relational_mse - expected_mse).abs() > 1e-12
             {
                 return Err(RelationalPredictionError::InvalidSplit);
@@ -1685,6 +1687,7 @@ impl HeldOutRelationalPredictionQualification {
         )?;
 
         Ok(Self {
+            config,
             observed,
             circular_shift_null,
             feature_decoupling_null,
@@ -2921,6 +2924,13 @@ mod tests {
             HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
 
         qualification.validate().unwrap();
+
+        let mut config_tampered = qualification.clone();
+        config_tampered.config.ridge_lambda = 0.25;
+        assert_eq!(
+            config_tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
 
         let mut tampered = qualification.clone();
         tampered.circular_shift_null.observed_relational_mse += 0.01;
