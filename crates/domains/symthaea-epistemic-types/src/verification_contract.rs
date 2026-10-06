@@ -1078,7 +1078,7 @@ impl VerificationMethodResolution {
 
     pub fn resolution_digest(&self) -> String {
         let encoded = (
-            "symthaea:verification-method-resolution:v1",
+            "symthaea:verification-method-resolution:v2",
             self.schema_version,
             self.verification_method.as_str(),
             self.verification_method_type.as_str(),
