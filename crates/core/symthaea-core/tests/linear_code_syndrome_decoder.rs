@@ -829,7 +829,7 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
                 let checks = independent_parity_check_rows(&code);
 
                 assert_eq!(checks.len(), dimension - rank);
-                for &codeword in &codewords {
+                for codeword in &codewords {
                     let mask = codeword.words()[0];
                     assert_eq!(independent_syndrome(mask, &checks), 0);
                 }
@@ -1000,7 +1000,7 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
         "deterministic random-code list-size distribution changed between identical probes"
     );
 
-    for (dimension, rank, observations, no_match, max_multiplicity, histogram) in &first {
+    for &(dimension, rank, observations, no_match, max_multiplicity, histogram) in &first {
         let total_decoded = histogram.iter().skip(1).sum::<usize>();
         assert_eq!(total_decoded + no_match, *observations);
         assert!(max_multiplicity <= 16);
