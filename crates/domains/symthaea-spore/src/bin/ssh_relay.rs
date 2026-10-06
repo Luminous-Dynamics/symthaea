@@ -6165,7 +6165,7 @@ echo "COMPLETE"
                             .send(Message::Text(
                                 serde_json::json!({
                                     "type":"exit",
-                                    "code":r.exit_status,
+                                    "code":protocol_exit_code(r.exit_status, outcome),
                                     "data":r.stdout,
                                     "transaction":transaction.receipt(outcome)
                                 })
