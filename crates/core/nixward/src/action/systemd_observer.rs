@@ -151,6 +151,7 @@ pub enum NixSystemdObserverErrorV1 {
 #[must_use]
 pub struct NixSystemdJobRemovedWatcherV1 {
     manager_owner: String,
+    bus_id: String,
     stream: zbus::SignalStream<'static>,
 }
 
@@ -159,6 +160,7 @@ impl std::fmt::Debug for NixSystemdJobRemovedWatcherV1 {
         formatter
             .debug_struct("NixSystemdJobRemovedWatcherV1")
             .field("manager_owner", &self.manager_owner)
+            .field("bus_id", &self.bus_id)
             .finish_non_exhaustive()
     }
 }
@@ -166,6 +168,10 @@ impl std::fmt::Debug for NixSystemdJobRemovedWatcherV1 {
 impl NixSystemdJobRemovedWatcherV1 {
     pub fn manager_owner(&self) -> &str {
         &self.manager_owner
+    }
+
+    pub fn bus_id(&self) -> &str {
+        &self.bus_id
     }
 
     /// Consume this one-shot watcher and accept only the exact JobRemoved
@@ -178,6 +184,9 @@ impl NixSystemdJobRemovedWatcherV1 {
         expected.validate()?;
         if expected.manager_owner != self.manager_owner {
             return Err(NixSystemdObserverErrorV1::WatcherManagerOwnerMismatch);
+        }
+        if expected.bus_id != self.bus_id {
+            return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
         }
 
         let result = tokio::time::timeout(timeout, async {
@@ -457,6 +466,7 @@ impl NixSystemdReadOnlyObserverV1 {
         &self,
     ) -> Result<NixSystemdJobRemovedWatcherV1, NixSystemdObserverErrorV1> {
         let manager_owner = self.systemd_manager_owner().await?;
+        let bus_id = self.dbus_bus_id().await?;
         let manager = Proxy::new(
             &self.connection,
             SYSTEMD_DESTINATION,
@@ -467,12 +477,14 @@ impl NixSystemdReadOnlyObserverV1 {
         let stream: zbus::SignalStream<'static> = manager.receive_signal("JobRemoved").await?;
 
         let post_arm_owner = self.systemd_manager_owner().await?;
-        if post_arm_owner != manager_owner {
+        let post_arm_bus_id = self.dbus_bus_id().await?;
+        if post_arm_owner != manager_owner || post_arm_bus_id != bus_id {
             return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
         }
 
         Ok(NixSystemdJobRemovedWatcherV1 {
             manager_owner,
+            bus_id,
             stream,
         })
     }
