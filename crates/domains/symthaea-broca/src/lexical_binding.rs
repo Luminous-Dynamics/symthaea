@@ -323,6 +323,8 @@ pub const UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION: &str =
     env!("SYMTHAEA_UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION");
 pub const UNIMORPH_TSV_SOURCE_PARSER_REVISION: &str =
     env!("SYMTHAEA_UNIMORPH_TSV_SOURCE_PARSER_REVISION");
+pub const UNIMORPH_TSV_COMPILER_BUILD_CONTEXT_REVISION: &str =
+    env!("SYMTHAEA_UNIMORPH_TSV_COMPILER_BUILD_CONTEXT_REVISION");
 pub const UNIMORPH_TSV_NORMALIZATION_POLICY: &str =
     "trim-one-line-ending-sort-feature-tokens-sort-output-rules-v1";
 pub const UNIMORPH_TSV_FEATURE_BUNDLE_CATEGORY: &str = "unimorph-bundle";
@@ -612,6 +614,9 @@ pub struct MorphophonologicalCompilationWitness {
     /// Exact content identity of the accepted source-format parser surface and its build-time
     /// identity mechanism.
     pub source_parser_revision: Option<String>,
+    /// Exact content identity of the checked-in crate/workspace manifests, Cargo lockfile, and
+    /// pinned Rust toolchain used to build this compiler.
+    pub compiler_build_context_revision: Option<String>,
     pub normalization_policy: String,
     pub source_artifact_blake3: String,
     pub source_selection_blake3: String,
@@ -646,6 +651,8 @@ impl MorphophonologicalCompilationWitness {
                 .then(|| UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION.to_string()),
             source_parser_revision: known_unimorph_compiler
                 .then(|| UNIMORPH_TSV_SOURCE_PARSER_REVISION.to_string()),
+            compiler_build_context_revision: known_unimorph_compiler
+                .then(|| UNIMORPH_TSV_COMPILER_BUILD_CONTEXT_REVISION.to_string()),
             normalization_policy: normalization_policy.into(),
             source_artifact_blake3: blake3::hash(source_artifact).to_hex().to_string(),
             source_selection_blake3: String::new(),
@@ -679,6 +686,7 @@ impl MorphophonologicalCompilationWitness {
             if self.compiler_version != UNIMORPH_TSV_COMPILER_VERSION
                 || self.compiler_implementation_revision.is_none()
                 || self.source_parser_revision.is_none()
+                || self.compiler_build_context_revision.is_none()
             {
                 return Err(
                     MorphophonologicalCompilationWitnessError::MissingCompilerIdentity,
@@ -688,6 +696,7 @@ impl MorphophonologicalCompilationWitness {
         for value in [
             self.compiler_implementation_revision.as_deref(),
             self.source_parser_revision.as_deref(),
+            self.compiler_build_context_revision.as_deref(),
         ]
         .into_iter()
         .flatten()
@@ -754,6 +763,7 @@ impl MorphophonologicalCompilationWitness {
             &self.compiler_version,
             &self.compiler_implementation_revision,
             &self.source_parser_revision,
+            &self.compiler_build_context_revision,
             &self.normalization_policy,
             &self.source_selection_blake3,
             &self.output_rule_set_blake3,
@@ -785,6 +795,13 @@ impl MorphophonologicalCompilationWitness {
         }
         if self.source_parser_revision.as_deref() != Some(UNIMORPH_TSV_SOURCE_PARSER_REVISION) {
             return Err(MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch);
+        }
+        if self.compiler_build_context_revision.as_deref()
+            != Some(UNIMORPH_TSV_COMPILER_BUILD_CONTEXT_REVISION)
+        {
+            return Err(
+                MorphophonologicalCompilationWitnessError::CompilerBuildContextRevisionMismatch,
+            );
         }
         Ok(())
     }
@@ -923,6 +940,7 @@ pub enum MorphophonologicalCompilationWitnessError {
     MissingCompilerIdentity,
     CompilerImplementationRevisionMismatch,
     SourceParserRevisionMismatch,
+    CompilerBuildContextRevisionMismatch,
     CompilerReplayFailed,
     CompilerReplayMismatch,
     WitnessReplayMismatch,
@@ -953,6 +971,7 @@ impl std::fmt::Display for MorphophonologicalCompilationWitnessError {
             Self::MissingCompilerIdentity => write!(f, "morphophonological compilation witness is missing the implementation identity required for its declared UniMorph compiler"),
             Self::CompilerImplementationRevisionMismatch => write!(f, "morphophonological compilation witness compiler implementation revision does not match the current compiler"),
             Self::SourceParserRevisionMismatch => write!(f, "morphophonological compilation witness source parser revision does not match the current parser"),
+            Self::CompilerBuildContextRevisionMismatch => write!(f, "morphophonological compilation witness compiler build-context revision does not match the current build context"),
             Self::CompilerReplayFailed => write!(f, "morphophonological compilation witness compiler replay failed"),
             Self::CompilerReplayMismatch => write!(f, "morphophonological compilation witness compiler replay did not reproduce the exact output rule set"),
             Self::WitnessReplayMismatch => write!(f, "morphophonological compilation witness compiler replay did not reproduce the exact witness"),
@@ -3195,6 +3214,7 @@ mod tests {
 
         assert!(witness.compiler_implementation_revision.is_none());
         assert!(witness.source_parser_revision.is_none());
+        assert!(witness.compiler_build_context_revision.is_none());
 
         let mut tampered = artifact.to_vec();
         tampered[0] = b'X';
@@ -3355,6 +3375,28 @@ mod tests {
                 .replay_unimorph_tsv_compilation(artifact, &rule_set)
                 .expect_err("source parser revision tampering must fail closed"),
             MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch
+        );
+
+        let mut build_context_tampered = witness.clone();
+        build_context_tampered.compiler_build_context_revision =
+            Some("tampered-build-context-revision".into());
+        assert_eq!(
+            build_context_tampered
+                .replay_unimorph_tsv_compilation(artifact, &rule_set)
+                .expect_err("build-context revision tampering must fail closed"),
+            MorphophonologicalCompilationWitnessError::CompilerBuildContextRevisionMismatch
+        );
+
+        let mut build_context_recomputed = witness.clone();
+        build_context_recomputed.compiler_build_context_revision =
+            Some("tampered-build-context-revision".into());
+        build_context_recomputed.transformation_blake3 =
+            build_context_recomputed.compute_transformation_blake3();
+        assert_eq!(
+            build_context_recomputed
+                .replay_unimorph_tsv_compilation(artifact, &rule_set)
+                .expect_err("recomputing the commitment must not self-certify a build context revision"),
+            MorphophonologicalCompilationWitnessError::CompilerBuildContextRevisionMismatch
         );
 
         let mut compiler_revision_recomputed = witness.clone();
@@ -3760,8 +3802,6 @@ mod tests {
     }
 
 
-}
-
 
 #[test]
 fn compilation_witness_rejects_empty_source_slice() {
@@ -3815,3 +3855,6 @@ fn compilation_witness_rejects_empty_source_slice() {
         Err(MorphophonologicalCompilationWitnessError::EmptySourceSlice)
     );
 }
+
+}
+
