@@ -2516,6 +2516,62 @@ async fn handle_connection(
 }
 
 /// Handle an already-upgraded WebSocket connection (works for both plain and TLS streams)
+const REQUEST_FINGERPRINT_VERSION: u16 = 2;
+
+fn build_install_transaction_payload(
+    message: &ClientMessage,
+    disk: &str,
+    hostname: &str,
+    username: &str,
+    target_machine_digest: &str,
+    user_password_commitment: Option<&str>,
+    luks_passphrase_commitment: Option<&str>,
+) -> Result<Vec<u8>, String> {
+    let payload = serde_json::json!({
+        "fingerprint_version": REQUEST_FINGERPRINT_VERSION,
+        "disk": disk,
+        "layout": &message.layout,
+        "fast_disk": &message.fast_disk,
+        "standard_disk": &message.standard_disk,
+        "extra_disks": &message.extra_disks,
+        "hostname": hostname,
+        "username": username,
+        "secure_boot": message.secure_boot,
+        "tpm2_unlock": message.tpm2_unlock,
+        "fido2_unlock": message.fido2_unlock,
+        "desktop": &message.desktop,
+        "gpu_driver": &message.gpu_driver,
+        "timezone": &message.timezone,
+        "keyboard": &message.keyboard,
+        "target_machine_digest": target_machine_digest,
+        "configuration_digest": blake3::hash(message.configuration_nix.as_bytes()).to_hex().to_string(),
+        "flake_digest": blake3::hash(message.flake_nix.as_bytes()).to_hex().to_string(),
+        "hardware_digest": blake3::hash(message.hardware_nix.as_bytes()).to_hex().to_string(),
+        "disko_digest": blake3::hash(message.disko_nix.as_bytes()).to_hex().to_string(),
+        "user_password_commitment": user_password_commitment,
+        "luks_passphrase_commitment": luks_passphrase_commitment,
+    });
+    serde_json::to_vec(&payload)
+        .map_err(|error| format!("Unable to serialize install transaction fingerprint: {error}"))
+}
+
+fn build_wifi_transaction_payload(
+    ledger: &TransactionLedger,
+    ssid: &str,
+    wifi_password: &str,
+    target_machine_digest: &str,
+) -> Result<Vec<u8>, String> {
+    let payload = serde_json::json!({
+        "fingerprint_version": REQUEST_FINGERPRINT_VERSION,
+        "security_mode": "wpa-psk",
+        "ssid": ssid,
+        "target_machine_digest": target_machine_digest,
+        "psk_commitment": ledger.secret_commitment("connect-wifi-psk", wifi_password),
+    });
+    serde_json::to_vec(&payload)
+        .map_err(|error| format!("Unable to serialize Wi-Fi transaction fingerprint: {error}"))
+}
+
 async fn admit_mutation_transaction<S>(
     ws_tx: &mut futures_util::stream::SplitSink<tokio_tungstenite::WebSocketStream<S>, Message>,
     ledger: &TransactionLedger,
@@ -3167,22 +3223,32 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
 
                 // Bind the authenticated request to a typed transaction identity. Passwords and
                 // LUKS secrets are represented only by the surrounding secure session, never in this digest.
-                let install_payload = serde_json::json!({
-                    "disk": &disk,
-                    "layout": &client_msg.layout,
-                    "hostname": &hostname,
-                    "target_machine_digest": &target_machine_digest,
-                    "configuration_digest": blake3::hash(client_msg.configuration_nix.as_bytes()).to_hex().to_string(),
-                    "flake_digest": blake3::hash(client_msg.flake_nix.as_bytes()).to_hex().to_string(),
-                    "hardware_digest": blake3::hash(client_msg.hardware_nix.as_bytes()).to_hex().to_string(),
-                    "disko_digest": blake3::hash(client_msg.disko_nix.as_bytes()).to_hex().to_string(),
+                let user_password_commitment = (!client_msg.user_password.is_empty()).then(|| {
+                    transaction_ledger.secret_commitment(
+                        "install-user-password",
+                        &client_msg.user_password,
+                    )
                 });
-                let install_payload_bytes = match serde_json::to_vec(&install_payload) {
+                let luks_passphrase_commitment = (!client_msg.luks_passphrase.is_empty()).then(|| {
+                    transaction_ledger.secret_commitment(
+                        "install-luks-passphrase",
+                        &client_msg.luks_passphrase,
+                    )
+                });
+                let install_payload_bytes = match build_install_transaction_payload(
+                    &client_msg,
+                    &disk,
+                    &hostname,
+                    &username,
+                    &target_machine_digest,
+                    user_password_commitment.as_deref(),
+                    luks_passphrase_commitment.as_deref(),
+                ) {
                     Ok(bytes) => bytes,
                     Err(error) => {
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!("Unable to serialize system transaction: {}", error)).to_json(),
+                                RelayMessage::error(&error).to_json(),
                             ))
                             .await;
                         continue;
@@ -3216,10 +3282,13 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                         continue;
                     }
                 };
-                let log_path = format!("/tmp/symthaea-install-{}.log", session_id);
-                let script_path = format!("/tmp/symthaea-install-{}.sh", session_id);
-                let status_path = format!("/tmp/symthaea-install-{}.status", session_id);
-                let pid_path = format!("/tmp/symthaea-install-{}.pid", session_id);
+                // The transaction ID is the durable recovery identity. The
+                // session ID remains reserved for ephemeral secret/staging paths.
+                let process_id = transaction.transaction_id.as_str();
+                let log_path = format!("/tmp/symthaea-install-{}.log", process_id);
+                let script_path = format!("/tmp/symthaea-install-{}.sh", process_id);
+                let status_path = format!("/tmp/symthaea-install-{}.status", process_id);
+                let pid_path = format!("/tmp/symthaea-install-{}.pid", process_id);
 
                 // Create log file with restrictive permissions
                 let _ = run_cmd(&format!("touch {} && chmod 600 {}", log_path, log_path)).await;
@@ -6294,14 +6363,27 @@ echo '}'
                         continue;
                     }
                 };
-                let transaction_payload = format!("connect-wifi:{ssid}");
-                 let Some(transaction) = admit_mutation_transaction(
+                let transaction_payload = match build_wifi_transaction_payload(
+                    &transaction_ledger,
+                    &ssid,
+                    &wifi_pw,
+                    &target_machine_digest,
+                ) {
+                    Ok(payload) => payload,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&error).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let Some(transaction) = admit_mutation_transaction(
                     &mut ws_tx,
                     &transaction_ledger,
                     MutationKind::ConnectWifi,
                     &client_msg.request_id,
                     Some(&target_machine_digest),
-                    transaction_payload.as_bytes(),
+                    &transaction_payload,
                 ).await else {
                     continue;
                 };
@@ -6998,6 +7080,148 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn sample_install_message() -> ClientMessage {
+        ClientMessage {
+            action: "install".into(),
+            request_id: "request-test-000001".into(),
+            token: String::new(),
+            host: String::new(),
+            port: 22,
+            username: "operator".into(),
+            password: String::new(),
+            command: String::new(),
+            disk: "/dev/vda".into(),
+            layout: "single".into(),
+            fast_disk: "/dev/vdb".into(),
+            standard_disk: "/dev/vdc".into(),
+            hostname: "test-nixos".into(),
+            configuration_nix: "{ config, pkgs, ... }: { }".into(),
+            flake_nix: "inputs = { };".into(),
+            disko_nix: "disk-config".into(),
+            hardware_nix: "hardware-config".into(),
+            secure_boot: true,
+            tpm2_unlock: true,
+            fido2_unlock: false,
+            desktop: "gnome".into(),
+            gpu_driver: "amdgpu".into(),
+            timezone: "UTC".into(),
+            keyboard: "us".into(),
+            user_password: "user-secret".into(),
+            luks_passphrase: "luks-secret".into(),
+            extra_disks: vec!["/dev/vdd".into()],
+        }
+    }
+
+    #[test]
+    fn install_fingerprint_changes_when_effect_input_changes() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-install-fingerprint-test-{name}.jsonl"));
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let target = "a".repeat(64);
+        let user_commitment =
+            ledger.secret_commitment("install-user-password", "user-secret");
+        let luks_commitment =
+            ledger.secret_commitment("install-luks-passphrase", "luks-secret");
+
+        let message = sample_install_message();
+        let p1 = build_install_transaction_payload(
+            &message,
+            &message.disk,
+            &message.hostname,
+            &message.username,
+            &target,
+            Some(&user_commitment),
+            Some(&luks_commitment),
+        )
+        .unwrap();
+
+        let mut changed = message;
+        changed.desktop = "plasma".into();
+        let p2 = build_install_transaction_payload(
+            &changed,
+            &changed.disk,
+            &changed.hostname,
+            &changed.username,
+            &target,
+            Some(&user_commitment),
+            Some(&luks_commitment),
+        )
+        .unwrap();
+
+        assert_ne!(p1, p2);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn install_fingerprint_binds_secret_commitments_without_raw_secrets() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-install-secret-fingerprint-{name}.jsonl"));
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let message = sample_install_message();
+        let target = "b".repeat(64);
+
+        let first_user =
+            ledger.secret_commitment("install-user-password", "user-secret");
+        let second_user =
+            ledger.secret_commitment("install-user-password", "different-secret");
+        let first = build_install_transaction_payload(
+            &message,
+            &message.disk,
+            &message.hostname,
+            &message.username,
+            &target,
+            Some(&first_user),
+            Some(ledger.secret_commitment("install-luks-passphrase", "luks-secret").as_str()),
+        )
+        .unwrap();
+        let second = build_install_transaction_payload(
+            &message,
+            &message.disk,
+            &message.hostname,
+            &message.username,
+            &target,
+            Some(&second_user),
+            Some(ledger.secret_commitment("install-luks-passphrase", "luks-secret").as_str()),
+        )
+        .unwrap();
+
+        assert_ne!(first, second);
+        let rendered = String::from_utf8_lossy(&first);
+        assert!(!rendered.contains("user-secret"));
+        assert!(!rendered.contains("luks-secret"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn wifi_fingerprint_binds_psk_without_storing_it() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-wifi-fingerprint-test-{name}.jsonl"));
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let target = "c".repeat(64);
+        let p1 =
+            build_wifi_transaction_payload(&ledger, "MyNet", "secret-one", &target).unwrap();
+        let p2 =
+            build_wifi_transaction_payload(&ledger, "MyNet", "secret-two", &target).unwrap();
+        assert_ne!(p1, p2);
+        assert!(!String::from_utf8_lossy(&p1).contains("secret-one"));
+        assert!(!String::from_utf8_lossy(&p1).contains("secret-two"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn install_recovery_identity_matches_transaction_artifact_shape() {
+        let transaction_id = "0123456789abcdef0123456789abcdef";
+        let cmdline = format!("/bin/bash\0/tmp/symthaea-install-{transaction_id}.sh\0");
+        assert!(install_process_command_matches(transaction_id, cmdline.as_bytes()));
+        assert!(!install_process_command_matches(
+            transaction_id,
+            b"/bin/bash\0/tmp/symthaea-install-1234.sh\0",
+        ));
+    }
 
     #[test]
     fn image_paths_are_strictly_transaction_scoped() {

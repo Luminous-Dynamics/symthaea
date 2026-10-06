@@ -19,14 +19,17 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 
 const SCHEMA_VERSION: u16 = 1;
+const FINGERPRINT_VERSION: u16 = 2;
 const CROSS_PROCESS_LOCK_PATH: &str = "/run/nixforhumanity-system-mutation.lock";
 const LEDGER_PATH: &str = "/var/lib/nixforhumanity/system-transactions.jsonl";
+const FINGERPRINT_KEY_PATH: &str =
+    "/var/lib/nixforhumanity/system-transaction-fingerprint.key";
 
 #[derive(Debug)]
 pub(crate) struct MutationLease {
@@ -264,6 +267,7 @@ pub(crate) enum TransactionAdmission {
 #[derive(Debug, Clone)]
 pub(crate) struct TransactionLedger {
     path: std::path::PathBuf,
+    fingerprint_key: [u8; 32],
 }
 
 impl TransactionLedger {
@@ -288,20 +292,19 @@ impl TransactionLedger {
                 parent.display()
             )
         })?;
-        Self::open_at(path)
+
+        let fingerprint_key = load_or_create_fingerprint_key(Path::new(FINGERPRINT_KEY_PATH))?;
+        Ok(Self {
+            path: path.to_path_buf(),
+            fingerprint_key,
+        })
     }
 
     #[cfg(test)]
     fn open_at(path: &std::path::Path) -> Result<Self, String> {
         Ok(Self {
             path: path.to_path_buf(),
-        })
-    }
-
-    #[cfg(not(test))]
-    fn open_at(path: &std::path::Path) -> Result<Self, String> {
-        Ok(Self {
-            path: path.to_path_buf(),
+            fingerprint_key: [0u8; 32],
         })
     }
 
@@ -546,6 +549,18 @@ impl TransactionLedger {
         }))
     }
 
+    /// Create a server-keyed commitment for a credential that must participate
+    /// in request identity without placing the raw secret (or a fast hash of
+    /// it) in the durable transaction journal.
+    pub(crate) fn secret_commitment(&self, domain: &str, secret: &str) -> String {
+        let mut hasher = blake3::Hasher::new_keyed(&self.fingerprint_key);
+        hasher.update(b"nixforhumanity-secret-commitment-v1\0");
+        hasher.update(domain.as_bytes());
+        hasher.update(b"\0");
+        hasher.update(secret.as_bytes());
+        hasher.finalize().to_hex().to_string()
+    }
+
     pub(crate) fn mark_completed(
         &self,
         transaction: &SystemTransaction,
@@ -589,6 +604,124 @@ impl TransactionLedger {
             outcome: Some(outcome),
         })
     }
+}
+
+fn read_fingerprint_key(path: &Path) -> Result<[u8; 32], String> {
+    let metadata = std::fs::symlink_metadata(path).map_err(|error| {
+        format!(
+            "unable to inspect transaction fingerprint key {}: {error}",
+            path.display()
+        )
+    })?;
+    if !metadata.file_type().is_file() {
+        return Err(format!(
+            "transaction fingerprint key {} is not a regular file",
+            path.display()
+        ));
+    }
+    let mode = {
+        use std::os::unix::fs::PermissionsExt;
+        metadata.permissions().mode() & 0o777
+    };
+    if mode != 0o600 {
+        return Err(format!(
+            "transaction fingerprint key {} has unsafe permissions {:04o}; require 0600",
+            path.display(),
+            mode
+        ));
+    }
+    {
+        use std::os::unix::fs::MetadataExt;
+        let owner = unsafe { libc::geteuid() };
+        if metadata.uid() != owner {
+            return Err(format!(
+                "transaction fingerprint key {} is not owned by relay user",
+                path.display()
+            ));
+        }
+    }
+    if metadata.len() != 32 {
+        return Err(format!(
+            "transaction fingerprint key {} has invalid length {}; require 32 bytes",
+            path.display(),
+            metadata.len()
+        ));
+    }
+
+    let mut file = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+        .map_err(|error| {
+            format!(
+                "unable to open transaction fingerprint key {}: {error}",
+                path.display()
+            )
+        })?;
+    let mut key = [0u8; 32];
+    file.read_exact(&mut key).map_err(|error| {
+        format!(
+            "unable to read transaction fingerprint key {}: {error}",
+            path.display()
+        )
+    })?;
+    Ok(key)
+}
+
+fn load_or_create_fingerprint_key(path: &Path) -> Result<[u8; 32], String> {
+    match std::fs::symlink_metadata(path) {
+        Ok(_) => return read_fingerprint_key(path),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(format!(
+                "unable to inspect transaction fingerprint key {}: {error}",
+                path.display()
+            ));
+        }
+    }
+
+    let mut key = [0u8; 32];
+    getrandom02::getrandom(&mut key)
+        .map_err(|error| format!("unable to generate transaction fingerprint key: {error}"))?;
+
+    let mut file = match OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+    {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            return read_fingerprint_key(path);
+        }
+        Err(error) => {
+            return Err(format!(
+                "unable to create transaction fingerprint key {}: {error}",
+                path.display()
+            ));
+        }
+    };
+
+    file.write_all(&key)
+        .and_then(|_| file.sync_all())
+        .map_err(|error| {
+            format!(
+                "unable to persist transaction fingerprint key {}: {error}",
+                path.display()
+            )
+        })?;
+    std::fs::set_permissions(
+        path,
+        std::os::unix::fs::PermissionsExt::from_mode(0o600),
+    )
+    .map_err(|error| {
+        format!(
+            "unable to restrict transaction fingerprint key {}: {error}",
+            path.display()
+        )
+    })?;
+    Ok(key)
 }
 
 /// Generate a fresh opaque operation identifier from the OS CSPRNG.
@@ -719,6 +852,26 @@ mod tests {
         let ledger = TransactionLedger::open_at(&path).unwrap();
         let error = ledger.load().expect_err("group-readable ledger must fail closed");
         assert!(error.contains("unsafe permissions"));
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn secret_commitments_are_stable_domain_separated_and_not_raw_secrets() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-transaction-ledger-secret-{name}.jsonl"));
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+
+        let first = ledger.secret_commitment("install-user-password", "correct horse battery staple");
+        let same = ledger.secret_commitment("install-user-password", "correct horse battery staple");
+        let other_secret = ledger.secret_commitment("install-user-password", "different secret");
+        let other_domain = ledger.secret_commitment("wifi-psk", "correct horse battery staple");
+
+        assert_eq!(first, same);
+        assert_ne!(first, other_secret);
+        assert_ne!(first, other_domain);
+        assert_eq!(first.len(), 64);
+        assert!(!first.contains("correct"));
         let _ = std::fs::remove_file(&path);
     }
 
