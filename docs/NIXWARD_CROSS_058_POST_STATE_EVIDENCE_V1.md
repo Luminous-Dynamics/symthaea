@@ -67,10 +67,11 @@ A stability record must:
 - contain a non-zero required window;
 - cover at least the required duration;
 - contain at least two samples;
+- use the same monotonic clock domain as systemd's state-change timestamp;
 - report no state-change timestamp later than the beginning of the stability window;
 - end no later than the observation timestamp.
 
-This is deliberately a conservative protocol. A future observer may strengthen it with actual repeated state snapshots, event subscriptions, or stronger monotonic-clock evidence.
+This is deliberately a conservative protocol. A future observer may strengthen it with actual repeated state snapshots, event subscriptions, or stronger event-correlation evidence. Monotonic timestamps avoid wall-clock jumps changing the claimed duration.
 
 ## Definition identity
 
@@ -86,7 +87,7 @@ A later hardening tranche should add a read-only definition-content evidence lay
 
 CROSS-058 is transport-neutral. Existing Nixward service observation currently uses a strict systemctl show transport. A future CROSS-059 should add a narrowly scoped read-only D-Bus observer using the existing optional zbus dependency and feed its structured observations into this protocol.
 
-Current systemd source exposes unit-level definition metadata such as FragmentPath, DropInPaths, and state-change timestamps, while the job path exposes job identity/type and emits JobRemoved results. See:
+Current systemd source exposes unit-level definition metadata such as FragmentPath, DropInPaths, and state-change timestamps, including monotonic timestamp companions, while the job path exposes job identity/type and emits JobRemoved results. See:
 
 - https://github.com/systemd/systemd/blob/main/src/core/dbus-unit.c
 - https://github.com/systemd/systemd/blob/main/src/core/dbus-job.c
