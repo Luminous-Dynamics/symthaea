@@ -20,8 +20,7 @@ use super::local_approval_store::ConsumedLocalApprovalDecisionV1;
 use super::service_domain::{NixServiceOperationKindV1, validate_canonical_service_operation_v1};
 use super::service_effect::{
     NixServiceEffectContextErrorV1, NixServiceEffectContextV1,
-    NixSystemdUnitDefinitionContentEvidenceV1,
-    NixSystemdUnitDefinitionContentFileV1, NixVerifiedServiceDefinitionContentV1,
+    NixVerifiedServiceDefinitionContentV1,
 };
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
@@ -450,9 +449,6 @@ impl NixExecutionAuthorizationRecordV1 {
 pub struct NixLocalExecutionAuthorityV1 {
     intent: NixActionIntentV1,
     approval: ConsumedLocalApprovalDecisionV1,
-    /// Exact observer-sealed definition commitment used when this Service authority was promoted.
-    /// `None` for non-Service authorities.
-    service_definition_content_digest: Option<String>,
 }
 
 impl NixLocalExecutionAuthorityV1 {
@@ -478,7 +474,6 @@ impl NixLocalExecutionAuthorityV1 {
         Ok(Self {
             intent,
             approval,
-            service_definition_content_digest: None,
         })
     }
 
@@ -488,7 +483,7 @@ impl NixLocalExecutionAuthorityV1 {
     /// read-only observer boundary. When an intent already carries a service-effect
     /// context, this constructor additionally requires the sealed capture to match
     /// both its source-identity and content commitments.
-    pub fn from_consumed_local_approval_with_definition_capture(
+    pub(crate) fn from_consumed_local_approval_with_definition_capture(
         intent: NixActionIntentV1,
         approval: ConsumedLocalApprovalDecisionV1,
         content: &NixVerifiedServiceDefinitionContentV1,
@@ -503,10 +498,10 @@ impl NixLocalExecutionAuthorityV1 {
 
         let content_digest = validate_service_definition_capture_binding(&intent, content)?;
         service_effect_context_digest_for_intent(&intent)?;
+        let _content_digest = content_digest;
         Ok(Self {
             intent,
             approval,
-            service_definition_content_digest: Some(content_digest),
         })
     }
 
@@ -542,13 +537,6 @@ impl NixLocalExecutionAuthorityV1 {
         self.approval.projection_digest()
     }
 
-    /// Exact content commitment captured before Service authority promotion.
-    ///
-    /// This is deliberately metadata-only; the raw service definition bytes never
-    /// become part of the live authority object.
-    pub(crate) fn service_definition_content_digest(&self) -> Option<&str> {
-        self.service_definition_content_digest.as_deref()
-    }
 }
 
 pub(crate) struct LiveNixAuthorizationV1 {
@@ -1273,6 +1261,10 @@ fn postcondition_status_tag(value: NixPostconditionStatusV1) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::service_effect::{
+        NixSystemdUnitDefinitionContentEvidenceV1,
+        NixSystemdUnitDefinitionContentFileV1,
+    };
 
     fn rebuild() -> NixOSCommand {
         NixOSCommand::RebuildSwitch {
