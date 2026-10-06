@@ -31,6 +31,7 @@ The evaluator compares four fixed model families:
 | CommonDriver | supplied shared-context signal |
 | SynchronyOnly | current alignment |
 | RelationalProfile | alignment + A->B proxy + B->A proxy + turn-taking |
+| PersistenceBaseline | last training outcome carried forward unchanged |
 
 The richer relational family must earn its additional degrees of freedom by reducing held-out error.
 
@@ -72,6 +73,8 @@ The output reports mean absolute error and mean squared error on the held-out se
 A positive relative MSE improvement means the relational model has lower held-out error than the selected baseline. A negative value means the baseline performs better.
 
 The evaluator does not convert improvement into a significance claim.
+
+The persistence baseline is intentionally non-parametric: it uses only the most recent training target. A relational model that cannot beat this baseline has not demonstrated useful predictive value merely by exploiting temporal persistence.
 
 ## 5. Multiple prediction null families
 
@@ -140,7 +143,7 @@ For each segment:
 
 1. freeze the predictor definitions;
 2. define the outcome horizon before looking at test results;
-3. fit all four models using training observations only;
+3. fit all fixed feature families, including the persistence baseline, using training observations only;
 4. evaluate on the contiguous held-out future segment;
 5. record MAE and MSE for all families;
 6. repeat the same evaluation for each null family;
