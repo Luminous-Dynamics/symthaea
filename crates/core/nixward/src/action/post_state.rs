@@ -294,6 +294,10 @@ pub struct NixPostStateReceiptV1 {
     pub post_invocation_id: Option<String>,
     pub postcondition: NixPostconditionAssessmentV1,
     pub claim: NixPostStateClaimV1,
+    /// The stability contract that was part of the exact effect identity.
+    /// Retaining it in the receipt makes a serialized receipt self-checking:
+    /// a forged `Proven` claim cannot silently downgrade the required window.
+    pub required_stability_us: u64,
     pub observed_at_unix_us: u64,
     pub stability: Option<NixPostStateStabilityEvidenceV1>,
     pub observer_identity: String,
@@ -389,6 +393,7 @@ impl NixPostStateReceiptV1 {
             post_invocation_id: observation.invocation_id.clone(),
             postcondition: assessment,
             claim,
+            required_stability_us: expectation.required_stability_us,
             observed_at_unix_us: observation.observed_at_unix_us,
             stability,
             observer_identity,
@@ -443,11 +448,37 @@ impl NixPostStateReceiptV1 {
         }
 
         match self.claim {
-            NixPostStateClaimV1::Proven if self.postcondition != NixPostconditionAssessmentV1::Satisfied => {
-                return Err(NixPostStateErrorV1::InvalidClaim)
-            }
-            NixPostStateClaimV1::Proven if self.stability.is_none() => {
-                return Err(NixPostStateErrorV1::InvalidClaim)
+            NixPostStateClaimV1::Proven => {
+                if self.postcondition != NixPostconditionAssessmentV1::Satisfied {
+                    return Err(NixPostStateErrorV1::InvalidClaim);
+                }
+                let Some(stability) = &self.stability else {
+                    return Err(NixPostStateErrorV1::InvalidClaim);
+                };
+                if self.required_stability_us == 0
+                    || stability.required_window_us < self.required_stability_us
+                {
+                    return Err(NixPostStateErrorV1::InvalidClaim);
+                }
+                if let Some(job_type) = self.systemd_job_type {
+                    if Some(job_type)
+                        != NixSystemdJobTypeV1::for_operation(self.operation)
+                    {
+                        return Err(NixPostStateErrorV1::InvalidClaim);
+                    }
+                }
+                if matches!(
+                    self.operation,
+                    NixServiceOperationKindV1::Start
+                        | NixServiceOperationKindV1::Stop
+                        | NixServiceOperationKindV1::Restart
+                        | NixServiceOperationKindV1::Reload
+                ) && (self.systemd_job_id.is_none()
+                    || self.systemd_job_type.is_none()
+                    || self.systemd_job_result.as_deref() != Some("done"))
+                {
+                    return Err(NixPostStateErrorV1::InvalidClaim);
+                }
             }
             _ => {}
         }
@@ -480,6 +511,7 @@ impl NixPostStateReceiptV1 {
         put_opt_str(&mut h, self.post_invocation_id.as_deref());
         put_u8(&mut h, assessment_tag(self.postcondition));
         put_u8(&mut h, claim_tag(self.claim));
+        put_u64(&mut h, self.required_stability_us);
         put_u64(&mut h, self.observed_at_unix_us);
 
         match &self.stability {
@@ -1074,6 +1106,74 @@ mod tests {
             obs.validate_shape().unwrap_err(),
             NixPostStateErrorV1::InvalidInvocationId("post-invocation id")
         );
+    }
+
+    #[test]
+    #[test]
+    fn serialized_proven_claim_cannot_reduce_or_remove_required_stability() {
+        let mut exp = expectation(NixServiceOperationKindV1::Start);
+        exp.required_stability_us = 1_000;
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = NixPostStateReceiptV1::build(
+            DIGEST,
+            DIGEST,
+            &exp,
+            &obs,
+            Some(NixPostStateStabilityEvidenceV1 {
+                required_window_us: 1_000,
+                window_start_unix_us: 1_000,
+                window_end_unix_us: 2_000,
+                last_state_change_at_unix_us: 900,
+                sample_count: 2,
+            }),
+            "systemd-observer-v1",
+            "1",
+        )
+        .unwrap();
+        assert_eq!(receipt.claim, NixPostStateClaimV1::Proven);
+        receipt.required_stability_us = 2_000;
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::InvalidClaim
+        );
+        receipt.required_stability_us = 1_000;
+        receipt.stability = None;
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::InvalidClaim
+        );
+    }
+
+    #[test]
+    fn proven_lifecycle_claim_requires_done_job_evidence() {
+        let mut exp = expectation(NixServiceOperationKindV1::Start);
+        exp.required_stability_us = 1;
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.systemd_job.as_mut().unwrap().result = "running".to_string();
+        let result = NixPostStateReceiptV1::build(
+            DIGEST,
+            DIGEST,
+            &exp,
+            &obs,
+            Some(NixPostStateStabilityEvidenceV1 {
+                required_window_us: 1,
+                window_start_unix_us: 1_000,
+                window_end_unix_us: 2_000,
+                last_state_change_at_unix_us: 900,
+                sample_count: 2,
+            }),
+            "systemd-observer-v1",
+            "1",
+        );
+        assert_eq!(result.unwrap_err(), NixPostStateErrorV1::InvalidClaim);
     }
 
     #[test]
