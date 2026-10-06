@@ -260,9 +260,7 @@ struct ClientMessage {
     extra_disks: Vec<String>,
 }
 
-fn machine_binding_digest_hex() -> Result<String, String> {
-    let machine_id = std::fs::read_to_string("/etc/machine-id")
-        .map_err(|error| format!("unable to read target machine identity: {error}"))?;
+fn machine_binding_digest_hex_for(machine_id: &str) -> Result<String, String> {
     let machine_id = machine_id.trim();
     if machine_id.is_empty() || machine_id.len() > 256 || machine_id.chars().any(char::is_control) {
         return Err("target machine identity is missing or invalid".into());
@@ -276,6 +274,12 @@ fn machine_binding_digest_hex() -> Result<String, String> {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect())
+}
+
+fn machine_binding_digest_hex() -> Result<String, String> {
+    let machine_id = std::fs::read_to_string("/etc/machine-id")
+        .map_err(|error| format!("unable to read target machine identity: {error}"))?;
+    machine_binding_digest_hex_for(&machine_id)
 }
 
 fn extract_explicit_nix_system(flake: &str) -> Option<&str> {
@@ -5821,6 +5825,19 @@ mod tests {
     }
 
     // ── Generated config secret hygiene ──
+
+    #[test]
+    fn machine_binding_digest_matches_stable_domain_and_normalization() {
+        let first = machine_binding_digest_hex_for("machine-a\n").unwrap();
+        let second = machine_binding_digest_hex_for("machine-a").unwrap();
+        let other = machine_binding_digest_hex_for("machine-b").unwrap();
+        assert_eq!(first, second);
+        assert_eq!(first.len(), 64);
+        assert!(first.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()));
+        assert_ne!(first, other);
+        assert!(machine_binding_digest_hex_for("").is_err());
+        assert!(machine_binding_digest_hex_for("x\0y").is_err());
+    }
 
     #[test]
     fn session_ids_are_non_deterministic() {
