@@ -129,8 +129,8 @@ impl ParityCheckMatrix {
         }
 
         let mut rows = Vec::with_capacity(dimension - code.rank());
-        for free_column in 0..dimension {
-            if is_pivot[free_column] {
+        for (free_column, &pivot) in is_pivot.iter().enumerate() {
+            if pivot {
                 continue;
             }
 
@@ -151,9 +151,9 @@ impl ParityCheckMatrix {
             .collect::<Vec<_>>();
 
         for (row_index, row) in rows.iter().enumerate() {
-            for column in 0..dimension {
+            for (column, check_column) in columns.iter_mut().enumerate() {
                 if row.bit(column) {
-                    columns[column].set_bit(row_index, true);
+                    check_column.set_bit(row_index, true);
                 }
             }
         }
@@ -411,108 +411,100 @@ impl BoundedDistanceSyndromeDecoder {
     }
 }
 
-fn collect_exact_weight_matches(
-    columns: &[BinaryCodeword],
-    observed_syndrome: &BinaryCodeword,
-    target_weight: usize,
-    start: usize,
-    selected: &mut Vec<usize>,
-    running_syndrome: &mut BinaryCodeword,
-    matching_errors: &mut usize,
+struct ExactWeightListSearch<'a> {
+    columns: &'a [BinaryCodeword],
+    observed_syndrome: &'a BinaryCodeword,
+    matching_errors: &'a mut usize,
     max_list_size: usize,
-    output: &mut Vec<BinaryCodeword>,
-) {
-    if selected.len() == target_weight {
-        if *running_syndrome == *observed_syndrome {
-            *matching_errors += 1;
-            if output.len() < max_list_size {
-                let mut error = BinaryCodeword::zero(columns.len());
-                for &index in selected.iter() {
-                    error.set_bit(index, true);
+    output: &'a mut Vec<BinaryCodeword>,
+}
+
+impl ExactWeightListSearch<'_> {
+    fn visit(
+        &mut self,
+        target_weight: usize,
+        start: usize,
+        selected: &mut Vec<usize>,
+        running_syndrome: &mut BinaryCodeword,
+    ) {
+        if selected.len() == target_weight {
+            if *running_syndrome == *self.observed_syndrome {
+                *self.matching_errors += 1;
+                if self.output.len() < self.max_list_size {
+                    let mut error = BinaryCodeword::zero(self.columns.len());
+                    for &index in selected.iter() {
+                        error.set_bit(index, true);
+                    }
+                    self.output.push(error);
                 }
-                output.push(error);
             }
+            return;
         }
-        return;
-    }
 
-    let remaining = target_weight - selected.len();
-    if remaining == 0 || start >= columns.len() {
-        return;
-    }
+        let remaining = target_weight - selected.len();
+        if remaining == 0 || start >= self.columns.len() {
+            return;
+        }
 
-    let last_start = columns.len() - remaining;
-    for index in start..=last_start {
-        running_syndrome.xor_assign(&columns[index]);
-        selected.push(index);
+        let last_start = self.columns.len() - remaining;
+        for index in start..=last_start {
+            running_syndrome.xor_assign(&self.columns[index]);
+            selected.push(index);
 
-        collect_exact_weight_matches(
-            columns,
-            observed_syndrome,
-            target_weight,
-            index + 1,
-            selected,
-            running_syndrome,
-            matching_errors,
-            max_list_size,
-            output,
-        );
+            self.visit(target_weight, index + 1, selected, running_syndrome);
 
-        selected.pop();
-        running_syndrome.xor_assign(&columns[index]);
+            selected.pop();
+            running_syndrome.xor_assign(&self.columns[index]);
+        }
     }
 }
 
-fn search_exact_weight(
-    columns: &[BinaryCodeword],
-    observed_syndrome: &BinaryCodeword,
-    target_weight: usize,
-    start: usize,
-    selected: &mut Vec<usize>,
-    running_syndrome: &mut BinaryCodeword,
-    work: &mut SyndromeDecoderWork,
-    matches: &mut usize,
-    first_error: &mut Option<BinaryCodeword>,
-) {
-    if selected.len() == target_weight {
-        work.error_patterns_examined += 1;
-        if *running_syndrome == *observed_syndrome {
-            *matches += 1;
-            if first_error.is_none() {
-                let mut error = BinaryCodeword::zero(columns.len());
-                for &index in selected.iter() {
-                    error.set_bit(index, true);
+struct ExactWeightSearch<'a> {
+    columns: &'a [BinaryCodeword],
+    observed_syndrome: &'a BinaryCodeword,
+    work: &'a mut SyndromeDecoderWork,
+    matches: &'a mut usize,
+    first_error: &'a mut Option<BinaryCodeword>,
+}
+
+impl ExactWeightSearch<'_> {
+    fn visit(
+        &mut self,
+        target_weight: usize,
+        start: usize,
+        selected: &mut Vec<usize>,
+        running_syndrome: &mut BinaryCodeword,
+    ) {
+        if selected.len() == target_weight {
+            self.work.error_patterns_examined += 1;
+            if *running_syndrome == *self.observed_syndrome {
+                *self.matches += 1;
+                if self.first_error.is_none() {
+                    let mut error = BinaryCodeword::zero(self.columns.len());
+                    for &index in selected.iter() {
+                        error.set_bit(index, true);
+                    }
+                    *self.first_error = Some(error);
                 }
-                *first_error = Some(error);
             }
+            return;
         }
-        return;
-    }
 
-    let remaining = target_weight - selected.len();
-    if remaining == 0 || start >= columns.len() {
-        return;
-    }
+        let remaining = target_weight - selected.len();
+        if remaining == 0 || start >= self.columns.len() {
+            return;
+        }
 
-    let last_start = columns.len() - remaining;
-    for index in start..=last_start {
-        running_syndrome.xor_assign(&columns[index]);
-        work.syndrome_column_xors += 1;
-        selected.push(index);
+        let last_start = self.columns.len() - remaining;
+        for index in start..=last_start {
+            running_syndrome.xor_assign(&self.columns[index]);
+            self.work.syndrome_column_xors += 1;
+            selected.push(index);
 
-        search_exact_weight(
-            columns,
-            observed_syndrome,
-            target_weight,
-            index + 1,
-            selected,
-            running_syndrome,
-            work,
-            matches,
-            first_error,
-        );
+            self.visit(target_weight, index + 1, selected, running_syndrome);
 
-        selected.pop();
-        running_syndrome.xor_assign(&columns[index]);
+            selected.pop();
+            running_syndrome.xor_assign(&self.columns[index]);
+        }
     }
 }
