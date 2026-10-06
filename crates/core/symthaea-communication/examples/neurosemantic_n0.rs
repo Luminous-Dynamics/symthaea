@@ -461,6 +461,27 @@ fn main() -> Result<(), String> {
         )
         .is_err();
 
+    let mut pre_attestation_resolution = authority_resolution.clone();
+    pre_attestation_resolution.checked_at_unix_s = 900;
+    pre_attestation_resolution.signature =
+        ed25519_dalek::Signer::sign(&resolver_signing_key, &pre_attestation_resolution.message_bytes()?)
+            .to_bytes()
+            .to_vec();
+    let pre_attestation_resolution_blocked = message
+        .packet
+        .data_policy
+        .handling
+        .bind_policy_provenance_with_attestation_and_resolution(
+            b"synthetic-policy-record-1",
+            &authority_attestation,
+            &signing_key.verifying_key(),
+            &pre_attestation_resolution,
+            &resolver_signing_key.verifying_key(),
+            &resolution_context,
+            1_500,
+        )
+        .is_err();
+
     let authority_resolution_fresh_until = authority_resolution.expires_at_unix_s;
     let authority_resolution_expiry_blocked = message
         .validate_for_handling(
@@ -511,6 +532,7 @@ fn main() -> Result<(), String> {
         "wrong_authority_resolution_context_blocked": wrong_resolution_context_blocked,
         "authority_resolution_signature_blocked": resolution_signature_blocked,
         "authority_resolution_expiry_blocked": authority_resolution_expiry_blocked,
+        "authority_resolution_predating_attestation_blocked": pre_attestation_resolution_blocked,
         "mutated_consent_lease_blocked": mutated_lease_blocked,
         "authority_proof_substitution_blocked": authority_proof_substitution_blocked
     });
