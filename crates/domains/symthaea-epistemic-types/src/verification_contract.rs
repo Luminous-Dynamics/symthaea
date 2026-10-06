@@ -735,6 +735,12 @@ impl VerificationFreshnessContext {
     }
 }
 
+/// Validate the XML Schema 1.1 `dateTimeStamp` lexical and temporal boundary
+/// used by Controlled Identifiers lifecycle fields and verification freshness.
+pub fn validate_xsd11_date_time_stamp(value: &str) -> Result<(), VerificationFailure> {
+    parse_timestamp("timestamp", value).map(|_| ())
+}
+
 fn parse_timestamp(
     field: &'static str,
     value: &str,
