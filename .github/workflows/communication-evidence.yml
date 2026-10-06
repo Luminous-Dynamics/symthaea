@@ -156,6 +156,7 @@ jobs:
           assert report["remediation_evaluation_manifest_verified"] is True
           assert report["remediation_measurement_verified"] is True
           assert report["remediation_measurement_worst_case_binding_blocked"] is True
+          assert report["remediation_measurement_missingness_fail_closed"] is True
           assert report["remediation_metric_definition_substitution_blocked"] is True
           assert report["remediation_metric_definition_kind_mismatch_blocked"] is True
           assert report["remediation_metric_uncertainty_substitution_blocked"] is True
