@@ -914,14 +914,12 @@ fn extract_verification_method(
     parse_verification_method_definition(
         request.verification_method.clone(),
         candidates[0],
-        &base,
     )
 }
 
 fn parse_verification_method_definition(
     expected_method: ClaimVerificationMethod,
     object: &serde_json::Map<String, Value>,
-    base: &url::Url,
 ) -> Result<ResolvedVerificationMethod, SnapshotError> {
     let id = required_string(object, "id")?;
     // CID defines the verification-method id as a URL, not a relative
@@ -1032,7 +1030,7 @@ fn extract_relationship_methods(
                     // definition under CID 2.2.4, not merely an ID-bearing reference.
                     // Validate its complete method shape even when it is not the method
                     // requested by this verification operation.
-                    parse_verification_method_definition(method, object, &base)?;
+                    parse_verification_method_definition(method, object)?;
 
                     (
                         id,
