@@ -16,13 +16,19 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use nixward::NixParser;
-use nixward::action::authorization::{NixActionIntentV1, NixAuthorizationErrorV1, NixLocalExecutionAuthorityV1};
+use nixward::action::authorization::{
+    NixActionDescriptorV1, NixActionIntentV1, NixAuthorizationErrorV1,
+    NixLocalExecutionAuthorityV1,
+};
+use nixward::action::service_effect::NixVerifiedServiceDefinitionContentV1;
 use nixward::action::local_approval::LocalApprovalDecisionKindV1;
 use nixward::action::temporal::UnixMillisV1;
 #[cfg(target_os = "linux")]
 use nixward::action::local_approval_runtime::LocalApprovalRuntimeV1;
 #[cfg(target_os = "linux")]
 use nixward::action::local_approval_store::ConsumedLocalApprovalDecisionV1;
+#[cfg(target_os = "linux")]
+use nixward::action::systemd_observer::NixSystemdReadOnlyObserverV1;
 use nixward::action::service_domain::{NixServiceOperationErrorV1, NixServiceOperationKindV1, NixServiceOperationV1};
 use nixward::action::service_manager::ServiceManager;
 use nixward::encoding::{NixCodebook, ServiceState, SystemStateEncoder, SystemStateSnapshot};
@@ -61,6 +67,62 @@ fn render_typed_service_action(
 ) -> Result<nixward::action::executor::NixOSCommand, NixServiceOperationErrorV1> {
     let typed = NixServiceOperationV1::new(unit, operation)?;
     ServiceManager::typed_command(&typed)
+}
+
+#[cfg(target_os = "linux")]
+fn capture_service_definition_content(
+    unit: &str,
+) -> Result<NixVerifiedServiceDefinitionContentV1, String> {
+    let unit = unit.to_string();
+    let join = std::thread::Builder::new()
+        .name("nixward-definition-capture".to_string())
+        .spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|error| format!("could not build definition-capture runtime: {error}"))?;
+            runtime.block_on(async move {
+                let observer = NixSystemdReadOnlyObserverV1::connect_system()
+                    .await
+                    .map_err(|error| format!("could not connect systemd observer: {error}"))?;
+                observer
+                    .capture_service_definition_content(&unit)
+                    .await
+                    .map_err(|error| format!("could not capture service definition content: {error}"))
+            })
+        })
+        .map_err(|error| format!("could not spawn definition-capture worker: {error}"))?;
+
+    join.join()
+        .map_err(|_| "definition-capture worker panicked".to_string())?
+}
+
+fn bind_service_definition_content(
+    intent: NixActionIntentV1,
+    generation: u64,
+) -> Result<
+    (
+        NixActionIntentV1,
+        Option<NixVerifiedServiceDefinitionContentV1>,
+    ),
+    String,
+> {
+    let NixActionDescriptorV1::Service { unit, .. } = &intent.action else {
+        return Ok((intent, None));
+    };
+    let content = capture_service_definition_content(unit)?;
+    let intent = intent
+        .with_verified_service_definition_content(generation, &content)
+        .map_err(|error| format!("could not bind service definition content: {error}"))?;
+    Ok((intent, Some(content)))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn bind_service_definition_content(
+    intent: NixActionIntentV1,
+    _generation: u64,
+) -> Result<(NixActionIntentV1, Option<NixVerifiedServiceDefinitionContentV1>), String> {
+    Ok((intent, None))
 }
 
 fn action_intent_digest_for_command(
@@ -1323,14 +1385,53 @@ impl DaemonState {
                                     );
                                 }
                             };
-                            let intent_digest = match action_intent_digest_for_command(
+                            let base_intent = match NixActionIntentV1::from_command(
+                                "nixward:daemon",
                                 pre_state_identity.clone(),
                                 &cmd,
                             ) {
+                                Ok(intent) => intent,
+                                Err(error) => {
+                                    eprintln!(
+                                        "nixward-daemon: refusing modifying command that cannot construct governed intent: {error}"
+                                    );
+                                    self.watchdog_status = None;
+                                    self.pending_action = None;
+                                    self.pending_action_intent_digest = None;
+                                    return (
+                                        dynamic_threshold,
+                                        Some(best_action.expected_free_energy),
+                                    );
+                                }
+                            };
+
+                            let (intent, definition_content) = match generation {
+                                Some(generation) => match bind_service_definition_content(
+                                    base_intent,
+                                    generation,
+                                ) {
+                                    Ok(bound) => bound,
+                                    Err(error) => {
+                                        eprintln!(
+                                            "nixward-daemon: refusing Service action because definition-content capture failed: {error}"
+                                        );
+                                        self.watchdog_status = None;
+                                        self.pending_action = None;
+                                        self.pending_action_intent_digest = None;
+                                        return (
+                                            dynamic_threshold,
+                                            Some(best_action.expected_free_energy),
+                                        );
+                                    }
+                                },
+                                None => (base_intent, None),
+                            };
+
+                            let intent_digest = match intent.digest() {
                                 Ok(digest) => digest,
                                 Err(error) => {
                                     eprintln!(
-                                        "nixward-daemon: refusing modifying command that cannot enter governed action-intent V1: {error}"
+                                        "nixward-daemon: refusing modifying command whose governed intent cannot be digested: {error}"
                                     );
                                     self.watchdog_status = None;
                                     self.pending_action = None;
@@ -1344,7 +1445,8 @@ impl DaemonState {
 
                             // Every modifying command must have a governed V1 semantic
                             // identity and an approval consumed from the live V2 runtime.
-                            // The legacy watchdog verdict file is not an authority source.
+                            // Service actions include the observer-sealed definition-content
+                            // commitment in the very intent shown for approval.
                             let is_approved = self
                                 .local_approval_consumed
                                 .as_ref()
@@ -1368,25 +1470,6 @@ impl DaemonState {
                                 self.pending_action = Some(cmd_str.clone());
                                 self.pending_action_intent_digest = Some(intent_digest.clone());
 
-                                let intent = match NixActionIntentV1::from_command(
-                                    "nixward:daemon",
-                                    pre_state_identity.clone(),
-                                    &cmd,
-                                ) {
-                                    Ok(intent) => intent,
-                                    Err(error) => {
-                                        eprintln!(
-                                            "nixward-daemon: refusing modifying command that cannot construct governed intent: {error}"
-                                        );
-                                        self.pending_action = None;
-                                        self.pending_action_intent_digest = None;
-                                        self.pending_local_approval = None;
-                                        return (
-                                            dynamic_threshold,
-                                            Some(best_action.expected_free_energy),
-                                        );
-                                    }
-                                };
                                 if let Err(error) =
                                     self.ensure_local_approval_request(&intent, &cmd)
                                 {
@@ -1401,6 +1484,7 @@ impl DaemonState {
                                         Some(best_action.expected_free_energy),
                                     );
                                 }
+
                                 debug_assert_eq!(
                                     intent.digest().ok().as_deref(),
                                     Some(intent_digest.as_str())
@@ -1411,93 +1495,80 @@ impl DaemonState {
                                     format!(" [intent={intent_digest}]")
                                 );
                                 return (dynamic_threshold, Some(best_action.expected_free_energy));
-                            } else {
-                                // TOCTOU guard: the semantic V1 identity and the
-                                // human-readable rendering must still match what was
-                                // presented for approval.
-                                let approved_action_still_matches =
-                                    self.pending_action.as_deref() == Some(cmd_str.as_str())
-                                        && self.pending_action_intent_digest.as_deref()
-                                            == Some(intent_digest.as_str());
-                                if !approved_action_still_matches {
+                            }
+
+                            // The fresh intent was built from the same exact pre-state and,
+                            // for Service actions, the same fresh observer content capture.
+                            // Any drift since approval changes the intent digest and therefore
+                            // cannot reach this branch.
+                            let approved_action_still_matches =
+                                self.pending_action.as_deref() == Some(cmd_str.as_str())
+                                    && self.pending_action_intent_digest.as_deref()
+                                        == Some(intent_digest.as_str());
+                            if !approved_action_still_matches {
+                                eprintln!(
+                                    "nixward-daemon: Plan changed since approval; re-gating (approved command={:?}, approved intent={:?}, now command={}, now intent={:?}).",
+                                    self.pending_action,
+                                    self.pending_action_intent_digest,
+                                    cmd_str,
+                                    intent_digest
+                                );
+                                self.pending_action = Some(cmd_str.clone());
+                                self.pending_action_intent_digest = Some(intent_digest.clone());
+                                self.pending_local_approval = None;
+                                self.local_approval_consumed = None;
+                                self.watchdog_status = None;
+                                return (
+                                    dynamic_threshold,
+                                    Some(best_action.expected_free_energy),
+                                );
+                            }
+
+                            let consumed_approval = match self.local_approval_consumed.take() {
+                                Some(approval) => approval,
+                                None => {
                                     eprintln!(
-                                        "nixward-daemon: Plan changed since approval; re-gating (approved command={:?}, approved intent={:?}, now command={}, now intent={:?}).",
-                                        self.pending_action,
-                                        self.pending_action_intent_digest,
-                                        cmd_str,
-                                        intent_digest
+                                        "nixward-daemon: approved action lost its live approval token; refusing execution"
                                     );
-                                    self.pending_action = Some(cmd_str.clone());
-                                    self.pending_action_intent_digest = Some(intent_digest.clone());
-                                    self.pending_local_approval = None;
-                                    self.local_approval_consumed = None;
+                                    self.pending_action = None;
+                                    self.pending_action_intent_digest = None;
+                                    return (
+                                        dynamic_threshold,
+                                        Some(best_action.expected_free_energy),
+                                    );
+                                }
+                            };
+
+                            let promoted = match definition_content {
+                                Some(content) => {
+                                    NixLocalExecutionAuthorityV1::from_consumed_local_approval_with_definition_capture(
+                                        intent,
+                                        consumed_approval,
+                                        &content,
+                                    )
+                                }
+                                None => NixLocalExecutionAuthorityV1::from_consumed_local_approval(
+                                    intent,
+                                    consumed_approval,
+                                ),
+                            };
+
+                            execution_authority = match promoted {
+                                Ok(authority) => Some(authority),
+                                Err(error) => {
+                                    eprintln!(
+                                        "nixward-daemon: approved action could not be promoted to execution authority: {error}"
+                                    );
+                                    self.pending_action = None;
+                                    self.pending_action_intent_digest = None;
                                     self.watchdog_status = None;
                                     return (
                                         dynamic_threshold,
                                         Some(best_action.expected_free_energy),
                                     );
                                 }
+                            };
 
-                                let intent = match NixActionIntentV1::from_command(
-                                    "nixward:daemon",
-                                    self.prev_snapshot.as_ref().and_then(|snapshot| {
-                                        snapshot
-                                            .generation
-                                            .map(|generation| format!("generation:{generation}"))
-                                    }),
-                                    &cmd,
-                                ) {
-                                    Ok(intent) => intent,
-                                    Err(error) => {
-                                        eprintln!(
-                                            "nixward-daemon: refusing approved action that cannot reconstruct governed intent: {error}"
-                                        );
-                                        self.local_approval_consumed = None;
-                                        self.pending_action = None;
-                                        self.pending_action_intent_digest = None;
-                                        return (
-                                            dynamic_threshold,
-                                            Some(best_action.expected_free_energy),
-                                        );
-                                    }
-                                };
-                                let consumed_approval = match self.local_approval_consumed.take() {
-                                    Some(approval) => approval,
-                                    None => {
-                                        eprintln!(
-                                            "nixward-daemon: approved action lost its live approval token; refusing execution"
-                                        );
-                                        self.pending_action = None;
-                                        self.pending_action_intent_digest = None;
-                                        return (
-                                            dynamic_threshold,
-                                            Some(best_action.expected_free_energy),
-                                        );
-                                    }
-                                };
-                                execution_authority = Some(match NixLocalExecutionAuthorityV1::from_consumed_local_approval(
-                                        intent,
-                                        consumed_approval,
-                                    ) {
-                                        Ok(authority) => authority,
-                                        Err(error) => {
-                                            eprintln!(
-                                                "nixward-daemon: approved action could not be promoted to execution authority: {error}"
-                                            );
-                                            self.pending_action = None;
-                                            self.pending_action_intent_digest = None;
-                                            return (
-                                                dynamic_threshold,
-                                                Some(best_action.expected_free_energy),
-                                            );
-                                        }
-                                    });
-
-                                eprintln!(
-                                    "nixward-daemon: Watchdog APPROVED action: {}{}",
-                                    cmd_str,
-                                    format!(" [intent={intent_digest}]")
-                                );
 
 
                                 // Clear verdict file
@@ -1981,6 +2052,31 @@ fn build_anomaly_prompt(unit: &str, reason: &str, message: &str) -> String {
 mod intent_tests {
     use super::*;
     use nixward::action::executor::{NixOSCommand, SafetyLevel};
+
+    #[test]
+    fn service_pre_state_identity_parser_preserves_exact_state_digest() {
+        let identity =
+            "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        assert_eq!(
+            parse_service_pre_state_identity(identity, 42, "nginx.service").unwrap(),
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        );
+    }
+
+    #[test]
+    fn service_pre_state_identity_parser_rejects_generation_or_unit_drift() {
+        let identity =
+            "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        assert!(parse_service_pre_state_identity(identity, 43, "nginx.service").is_err());
+        assert!(parse_service_pre_state_identity(identity, 42, "sshd.service").is_err());
+    }
+
+    #[test]
+    fn service_pre_state_identity_parser_rejects_malformed_state_digest() {
+        let identity =
+            "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=not-a-digest";
+        assert!(parse_service_pre_state_identity(identity, 42, "nginx.service").is_err());
+    }
 
     #[test]
     fn modifying_custom_command_cannot_enter_governed_intent() {
