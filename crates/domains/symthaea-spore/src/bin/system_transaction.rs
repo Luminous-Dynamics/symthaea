@@ -138,14 +138,14 @@ pub(crate) struct SystemTransaction {
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct TransactionReceipt {
-    schema_version: u16,
-    request_id: String,
-    transaction_id: String,
-    mutation: MutationKind,
-    target_machine_digest: Option<String>,
-    request_digest: String,
-    authorization: &'static str,
-    outcome: TransactionOutcome,
+    pub(crate) schema_version: u16,
+    pub(crate) request_id: String,
+    pub(crate) transaction_id: String,
+    pub(crate) mutation: MutationKind,
+    pub(crate) target_machine_digest: Option<String>,
+    pub(crate) request_digest: String,
+    pub(crate) authorization: &'static str,
+    pub(crate) outcome: TransactionOutcome,
 }
 
 impl SystemTransaction {
@@ -491,6 +491,17 @@ impl TransactionLedger {
         Ok(TransactionAdmission::New(transaction))
     }
 
+    pub(crate) fn lookup(&self, request_id: &str) -> Result<Option<TransactionReceipt>, String> {
+        let request_id = validate_request_id(request_id)?;
+        let records = self.load()?;
+        Ok(records.get(request_id).map(|record| {
+            record.receipt(
+                request_id,
+                record.outcome.unwrap_or(TransactionOutcome::Indeterminate),
+            )
+        }))
+    }
+
     pub(crate) fn mark_completed(
         &self,
         transaction: &SystemTransaction,
@@ -741,6 +752,26 @@ mod tests {
         )
         .unwrap();
         assert!(ledger.admit(second).is_err());
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn ledger_lookup_reports_unfinished_request_as_indeterminate() {
+        let name = random_operation_id().unwrap();
+        let path =
+            std::env::temp_dir().join(format!("symthaea-transaction-ledger-lookup-{name}.jsonl"));
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let tx = SystemTransaction::begin(
+            MutationKind::Install,
+            "lookup-request-0001",
+            Some("a".repeat(64).as_str()),
+            b"install",
+        )
+        .unwrap();
+        assert!(matches!(ledger.admit(tx).unwrap(), TransactionAdmission::New(_)));
+        let receipt = ledger.lookup("lookup-request-0001").unwrap().unwrap();
+        assert_eq!(receipt.mutation, MutationKind::Install);
+        assert_eq!(receipt.outcome, TransactionOutcome::Indeterminate);
         let _ = std::fs::remove_file(&path);
     }
 
