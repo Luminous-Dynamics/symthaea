@@ -2678,6 +2678,15 @@ fn protocol_exit_code(child_exit_code: u32, outcome: TransactionOutcome) -> Opti
     }
 }
 
+fn gc_completion_outcome(exit_code: Option<u32>) -> TransactionOutcome {
+    match exit_code {
+        Some(0) => TransactionOutcome::ObservedSuccess,
+        Some(_) => TransactionOutcome::Failed,
+        None => TransactionOutcome::Indeterminate,
+    }
+}
+
+
 fn service_postcondition_met(
     action: &str,
     active_state: &str,
@@ -5808,16 +5817,10 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                     }
                 }
                 let gc_exit_code = match run_cmd(&format!("cat {} 2>/dev/null", gc_status)).await {
-                    Ok(result) if result.exit_status == 0 => result.stdout.trim().parse::<u32>().unwrap_or(1),
-                    _ => 1,
+                    Ok(result) if result.exit_status == 0 => result.stdout.trim().parse::<u32>().ok(),
+                    _ => None,
                 };
-                let observed_outcome = if gc_exit_code == 0 {
-                    TransactionOutcome::ObservedSuccess
-                } else if gc_exit_code == 1 {
-                    TransactionOutcome::Failed
-                } else {
-                    TransactionOutcome::Indeterminate
-                };
+                let observed_outcome = gc_completion_outcome(gc_exit_code);
                 let outcome = finalize_transaction(
                     &transaction_ledger,
                     &transaction,
@@ -7945,6 +7948,25 @@ mod tests {
             protocol_exit_code(23, TransactionOutcome::Indeterminate),
             None,
             "uncertain completion must not masquerade as an ordinary child failure"
+        );
+    }    
+    #[test]
+    fn gc_completion_outcome_distinguishes_failure_from_missing_evidence() {
+        assert_eq!(
+            gc_completion_outcome(Some(0)),
+            TransactionOutcome::ObservedSuccess
+        );
+        assert_eq!(
+            gc_completion_outcome(Some(1)),
+            TransactionOutcome::Failed
+        );
+        assert_eq!(
+            gc_completion_outcome(Some(42)),
+            TransactionOutcome::Failed
+        );
+        assert_eq!(
+            gc_completion_outcome(None),
+            TransactionOutcome::Indeterminate
         );
     }
 
