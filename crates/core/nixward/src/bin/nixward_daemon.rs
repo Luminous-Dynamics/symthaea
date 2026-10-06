@@ -2054,6 +2054,31 @@ mod intent_tests {
     use nixward::action::executor::{NixOSCommand, SafetyLevel};
 
     #[test]
+    fn service_pre_state_identity_parser_preserves_exact_state_digest() {
+        let identity =
+            "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        assert_eq!(
+            parse_service_pre_state_identity(identity, 42, "nginx.service").unwrap(),
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        );
+    }
+
+    #[test]
+    fn service_pre_state_identity_parser_rejects_generation_or_unit_drift() {
+        let identity =
+            "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        assert!(parse_service_pre_state_identity(identity, 43, "nginx.service").is_err());
+        assert!(parse_service_pre_state_identity(identity, 42, "sshd.service").is_err());
+    }
+
+    #[test]
+    fn service_pre_state_identity_parser_rejects_malformed_state_digest() {
+        let identity =
+            "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=not-a-digest";
+        assert!(parse_service_pre_state_identity(identity, 42, "nginx.service").is_err());
+    }
+
+    #[test]
     fn modifying_custom_command_cannot_enter_governed_intent() {
         let command = NixOSCommand::Custom {
             command: "nixos-rebuild".to_string(),
