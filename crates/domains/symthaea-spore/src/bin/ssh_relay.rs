@@ -302,6 +302,43 @@ fn auth_token_fingerprint(token: &str) -> String {
     hex[..16].to_string()
 }
 
+fn origin_is_allowed(origin: &str) -> bool {
+    let uri = match origin.trim().parse::<tungstenite::http::Uri>() {
+        Ok(uri) => uri,
+        Err(_) => return false,
+    };
+    if uri.path() != "" {
+        return false;
+    }
+    let scheme = match uri.scheme_str() {
+        Some("http") | Some("https") => uri.scheme_str().unwrap(),
+        _ => return false,
+    };
+    let authority = match uri.authority() {
+        Some(authority) => authority,
+        None => return false,
+    };
+    let host = authority.host().to_ascii_lowercase();
+
+    if host == "localhost" || host == "127.0.0.1" {
+        return true;
+    }
+
+    // Remote browser origins must terminate on an explicitly trusted DNS
+    // suffix. Exact-host matching plus a dot boundary rejects lookalikes such
+    // as evil-luminousdynamics.io while still allowing approved subdomains.
+    const TRUSTED_SUFFIXES: [&str; 4] = [
+        "luminousdynamics.io",
+        "nixforhumanity.org",
+        "mycelix.net",
+        "relationalharmonics.org",
+    ];
+    scheme == "https"
+        && TRUSTED_SUFFIXES
+            .iter()
+            .any(|suffix| host == *suffix || host.ends_with(&format!(".{suffix}")))
+}
+
 fn auth_token_banner(token: &str, stderr_is_terminal: bool) -> String {
     if stderr_is_terminal {
         format!("  Auth token: {}", token)
@@ -2396,14 +2433,7 @@ async fn handle_connection(
     > {
         if let Some(origin) = req.headers().get("origin") {
             let origin_str = origin.to_str().unwrap_or("");
-            let allowed = origin_str.starts_with("http://localhost")
-                || origin_str.starts_with("https://localhost")
-                || origin_str.starts_with("http://127.0.0.1")
-                || origin_str.starts_with("https://127.0.0.1")
-                || origin_str.contains("luminousdynamics.io")
-                || origin_str.contains("nixforhumanity.org")
-                || origin_str.contains("mycelix.net")
-                || origin_str.contains("relationalharmonics.org");
+            let allowed = origin_is_allowed(origin_str);
             if !allowed {
                 eprintln!(
                     "[{}] Rejected WebSocket: disallowed Origin '{}'",
@@ -6418,14 +6448,7 @@ async fn main() {
                         > {
                             if let Some(origin) = req.headers().get("origin") {
                                 let o = origin.to_str().unwrap_or("");
-                                let ok = o.starts_with("http://localhost")
-                                    || o.starts_with("https://localhost")
-                                    || o.starts_with("http://127.0.0.1")
-                                    || o.starts_with("https://127.0.0.1")
-                                    || o.contains("luminousdynamics.io")
-                                    || o.contains("nixforhumanity.org")
-                                    || o.contains("mycelix.net")
-                                    || o.contains("relationalharmonics.org");
+                                let ok = origin_is_allowed(o);
                                 if !ok {
                                     eprintln!(
                                         "[{}] Rejected TLS WebSocket: disallowed Origin '{}'",
@@ -6474,6 +6497,22 @@ mod tests {
         assert!(validate_image_path("/tmp/nixforhumanity-image-0123").is_err());
         assert!(validate_image_path("/tmp/nixforhumanity-image-0123456789abcdef0123456789abcdeg").is_err());
         assert!(validate_image_path("/tmp/nixforhumanity-image-0123456789abcdef/../etc").is_err());
+    }
+
+    #[test]
+    fn origin_policy_rejects_lookalike_hosts() {
+        assert!(origin_is_allowed("https://luminousdynamics.io"));
+        assert!(origin_is_allowed("https://app.luminousdynamics.io"));
+        assert!(origin_is_allowed("https://nixforhumanity.org"));
+        assert!(origin_is_allowed("http://localhost:8091"));
+        assert!(origin_is_allowed("https://127.0.0.1:8091"));
+
+        assert!(!origin_is_allowed("https://evil-luminousdynamics.io"));
+        assert!(!origin_is_allowed("https://luminousdynamics.io.attacker.example"));
+        assert!(!origin_is_allowed("https://evilnixforhumanity.org"));
+        assert!(!origin_is_allowed("https://luminousdynamics.io.evil.example"));
+        assert!(!origin_is_allowed("https://luminousdynamics.io/path"));
+        assert!(!origin_is_allowed("file:///tmp/installer.html"));
     }
 
     #[test]
