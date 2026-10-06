@@ -21,7 +21,7 @@ use super::authorization::{
 };
 use super::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use super::service_state::{
-    ServiceActiveStateV1, ServiceUnitFileStateV1,
+    ServiceActiveStateV1, ServiceLoadStateV1, ServiceUnitFileStateV1,
 };
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
@@ -235,9 +235,12 @@ pub struct NixServicePostStateObservationV1 {
     /// Exact systemd Unit object identity used for the observation.
     pub unit_object_path: String,
     pub definition_identity: NixSystemdUnitDefinitionIdentityV1,
+    pub load_state: ServiceLoadStateV1,
     pub active_state: ServiceActiveStateV1,
     pub sub_state: String,
     pub unit_file_state: ServiceUnitFileStateV1,
+    /// systemd Service.Result from the same observation snapshot.
+    pub service_result: String,
     pub systemd_job: Option<NixSystemdJobEvidenceV1>,
     /// Unique D-Bus owner of org.freedesktop.systemd1 for this observation.
     pub systemd_manager_owner: Option<String>,
@@ -256,6 +259,7 @@ impl NixServicePostStateObservationV1 {
         }
         validate_systemd_unit_object_path(&self.unit_object_path)?;
         require_nonempty(&self.sub_state, "observed service sub-state")?;
+        require_nonempty(&self.service_result, "observed service result")?;
         self.definition_identity.validate_shape()?;
         if let Some(owner) = self.systemd_manager_owner.as_deref() {
             validate_unique_manager_owner(owner)?;
@@ -283,9 +287,11 @@ impl NixServicePostStateObservationV1 {
         h.update(STABILITY_SAMPLE_DOMAIN_V1);
         put_u8(&mut h, operation_tag(self.operation));
         put_str(&mut h, &self.unit);
+        put_u8(&mut h, load_state_tag(self.load_state));
         put_u8(&mut h, active_state_tag(self.active_state));
         put_str(&mut h, &self.sub_state);
         put_u8(&mut h, unit_file_state_tag(self.unit_file_state));
+        put_str(&mut h, &self.service_result);
         put_opt_str(&mut h, self.invocation_id.as_deref());
         Ok(h.finalize().to_hex().to_string())
     }
@@ -517,6 +523,13 @@ pub struct NixPostStateReceiptV1 {
     pub systemd_job_unit: Option<String>,
     pub systemd_job_object_path: Option<String>,
     pub systemd_job_result: Option<String>,
+    /// Exact systemd Unit object path corresponding to the persisted semantic state.
+    pub observed_unit_object_path: String,
+    pub observed_load_state: ServiceLoadStateV1,
+    pub observed_active_state: ServiceActiveStateV1,
+    pub observed_sub_state: String,
+    pub observed_unit_file_state: ServiceUnitFileStateV1,
+    pub observed_service_result: String,
     /// Unique D-Bus owner of systemd1 for the observed service-manager epoch.
     pub systemd_manager_owner: String,
     pub pre_invocation_id: Option<String>,
