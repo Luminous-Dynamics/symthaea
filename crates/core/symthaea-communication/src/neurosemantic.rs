@@ -341,6 +341,31 @@ impl NeurosemanticRemediationImpactArtifact {
         Ok(())
     }
 
+    pub fn verify_study_protocol_bytes(&self, protocol_bytes: &[u8]) -> Result<(), String> {
+        self.validate()?;
+        if protocol_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err("neurosemantic remediation study protocol exceeds the serialized artifact limit".into());
+        }
+        if content_hash(protocol_bytes) != self.study_protocol_hash {
+            return Err("neurosemantic remediation study protocol hash mismatch".into());
+        }
+        Ok(())
+    }
+
+    pub fn verify_evaluation_split_manifest_bytes(
+        &self,
+        split_manifest_bytes: &[u8],
+    ) -> Result<(), String> {
+        self.validate()?;
+        if split_manifest_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err("neurosemantic remediation split manifest exceeds the serialized artifact limit".into());
+        }
+        if content_hash(split_manifest_bytes) != self.evaluation_split_manifest_hash {
+            return Err("neurosemantic remediation split manifest hash mismatch".into());
+        }
+        Ok(())
+    }
+
     pub fn verify_lineage_bytes(
         &self,
         side: NeurosemanticRemediationImpactLineageSide,
@@ -2760,6 +2785,11 @@ mod tests {
         let mut legacy = impact.clone();
         legacy.schema_version = 0;
         assert!(NeurosemanticRemediationImpactArtifact::from_json_bytes(&serde_json::to_vec(&legacy).unwrap()).is_err());
+
+        assert!(impact.verify_study_protocol_bytes(b"protocol-1").is_ok());
+        assert!(impact.verify_evaluation_split_manifest_bytes(b"split-1").is_ok());
+        assert!(impact.verify_study_protocol_bytes(b"other-protocol").is_err());
+        assert!(impact.verify_evaluation_split_manifest_bytes(b"other-split").is_err());
 
         let oversized = vec![b' '; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1];
         assert!(NeurosemanticRemediationImpactArtifact::from_json_bytes(&oversized).is_err());
