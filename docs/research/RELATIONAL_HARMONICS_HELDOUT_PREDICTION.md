@@ -195,17 +195,18 @@ The packet carries:
 - independently retained held-out outcomes and predictions;
 - held-out feature rows for every fitted feature family;
 - the persistence baseline forecast for the persistence family;
-- fitted linear-model coefficients;
+- the complete held-out evaluation configuration, including train/test/gap sizes and ridge coefficient;
+  - fitted linear-model coefficients;
 - training-window feature means and scales.
 
-The packet verifier recomputes each fitted-model held-out prediction from the retained feature row, fitted coefficients, and frozen training means/scales, and recomputes MAE/MSE from the resulting predictions and observed outcomes. A replay verifier can additionally rerun the complete evaluation against supplied samples and reject any mismatch in training data, preprocessing, fitted coefficients, predictions, scores, or the computed input commitment. For the persistence family it binds every retained prediction to the recorded constant baseline forecast. It therefore rejects tampered predictions even when the reported loss is also modified. The verifier also rejects non-finite values, wrong feature dimensions, missing feature families, inconsistent timestamps, mismatched provenance, and rolling-origin child packets that disagree with the parent configuration.
+The packet verifier also binds the complete top-level holdout configuration to every record. It rejects mismatched train/test/gap sizes or ridge settings before accepting the packet. It then recomputes each fitted-model held-out prediction from the retained feature row, fitted coefficients, and frozen training means/scales, and recomputes MAE/MSE from the resulting predictions and observed outcomes. A replay verifier can additionally rerun the complete evaluation against supplied samples and reject any mismatch in training data, preprocessing, fitted coefficients, predictions, scores, or the computed input commitment. For the persistence family it binds every retained prediction to the recorded constant baseline forecast. It therefore rejects tampered predictions even when the reported loss is also modified. The verifier also rejects non-finite values, wrong feature dimensions, missing feature families, inconsistent timestamps, mismatched provenance, and rolling-origin child packets that disagree with the parent configuration.
 
 The provenance fields are intentionally caller-supplied. The evaluator must not invent a dataset hash or software identity. A packet with absent or malformed provenance is therefore invalid for empirical qualification.
 
 JSON schemas are versioned in the emitted document:
 
-- `relational-prediction-evidence/v3` for one held-out segment;
-- `relational-prediction-rolling-evidence/v3` for the repeated-origin bundle.
+- `relational-prediction-evidence/v4` for one held-out segment;
+- `relational-prediction-rolling-evidence/v4` for the repeated-origin bundle.
 
 For rolling-origin bundles, the packet also retains `origin_starts`, the exact source-sample start index realized for each child segment. The parent packet also commits to the complete source sequence used to derive those starts, so replay can distinguish a schedule mismatch from a different input sequence. Validation recomputes these from `first_origin` and `step_samples`, so the declared schedule and retained child packets cannot silently diverge.
 
