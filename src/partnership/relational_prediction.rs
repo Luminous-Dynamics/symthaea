@@ -357,8 +357,11 @@ pub struct RollingOriginRelationalPredictionConfig {
     pub gap_samples: usize,
     /// Number of forward origins to evaluate.
     pub origin_count: usize,
-    /// Forward step between origins.
+    /// Forward step between origins. Must be at least test_samples so
+    /// held-out target windows do not overlap.
     pub step_samples: usize,
+    /// Fixed forecast horizon in the same time units as the samples.
+    pub forecast_horizon: f64,
     /// Fixed ridge coefficient shared across every origin.
     pub ridge_lambda: f64,
 }
@@ -372,6 +375,7 @@ impl Default for RollingOriginRelationalPredictionConfig {
             gap_samples: 4,
             origin_count: 4,
             step_samples: 16,
+            forecast_horizon: 1.0,
             ridge_lambda: 1e-8,
         }
     }
@@ -385,6 +389,7 @@ pub struct RollingOriginRelationalPredictionSummary {
     pub gap_samples: usize,
     pub origin_count: usize,
     pub step_samples: usize,
+    pub forecast_horizon: f64,
     pub mean_persistence_mse: f64,
     pub mean_isolated_agents_mse: f64,
     pub mean_common_driver_mse: f64,
@@ -423,6 +428,8 @@ impl RollingOriginRelationalPredictionSummary {
                 .get(start..end)
                 .ok_or(RelationalPredictionError::InvalidSplit)?;
 
+            validate_forecast_horizon(segment, config.forecast_horizon)?;
+
             segments.push(HeldOutRelationalPredictionSummary::compute(
                 segment,
                 HeldOutRelationalPredictionConfig {
@@ -445,6 +452,7 @@ impl RollingOriginRelationalPredictionSummary {
             gap_samples: config.gap_samples,
             origin_count: config.origin_count,
             step_samples: config.step_samples,
+            forecast_horizon: config.forecast_horizon,
             mean_persistence_mse: mean(|s| s.persistence_baseline.mean_squared_error),
             mean_isolated_agents_mse: mean(|s| s.isolated_agents.mean_squared_error),
             mean_common_driver_mse: mean(|s| s.common_driver.mean_squared_error),
@@ -543,6 +551,25 @@ impl RollingOriginRelationalPredictionQualification {
     }
 }
 
+fn validate_forecast_horizon(
+    samples: &[RelationalPredictionSample],
+    expected_horizon: f64,
+) -> Result<(), RelationalPredictionError> {
+    if !expected_horizon.is_finite() || expected_horizon <= 0.0 {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    let tolerance = 1e-9 * expected_horizon.abs().max(1.0);
+    for sample in samples {
+        let horizon = sample.outcome_time - sample.feature_time;
+        if (horizon - expected_horizon).abs() > tolerance {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+    }
+
+    Ok(())
+}
+
 fn validate_rolling_config(
     total_samples: usize,
     config: &RollingOriginRelationalPredictionConfig,
@@ -550,7 +577,9 @@ fn validate_rolling_config(
     if config.train_samples < 8
         || config.test_samples < 4
         || config.origin_count == 0
-        || config.step_samples == 0
+        || config.step_samples < config.test_samples
+        || !config.forecast_horizon.is_finite()
+        || config.forecast_horizon <= 0.0
         || !config.ridge_lambda.is_finite()
         || config.ridge_lambda < 0.0
     {
@@ -1150,6 +1179,39 @@ mod tests {
             ),
             Err(RelationalPredictionError::OutcomeNotAfterFeatures)
         );
+    }
+
+    #[test]
+    fn rolling_origin_rejects_overlapping_test_windows_or_wrong_horizon() {
+        let samples = build_samples(0.5);
+
+        let overlapping = RollingOriginRelationalPredictionSummary::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                train_samples: 32,
+                test_samples: 8,
+                gap_samples: 2,
+                origin_count: 4,
+                step_samples: 4,
+                forecast_horizon: 0.5,
+                ..Default::default()
+            },
+        );
+        assert_eq!(overlapping, Err(RelationalPredictionError::InvalidSplit));
+
+        let wrong_horizon = RollingOriginRelationalPredictionSummary::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                train_samples: 32,
+                test_samples: 8,
+                gap_samples: 2,
+                origin_count: 4,
+                step_samples: 8,
+                forecast_horizon: 1.0,
+                ..Default::default()
+            },
+        );
+        assert_eq!(wrong_horizon, Err(RelationalPredictionError::InvalidSplit));
     }
 
     #[test]
