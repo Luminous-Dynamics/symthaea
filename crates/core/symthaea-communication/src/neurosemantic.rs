@@ -334,6 +334,9 @@ impl NeurosemanticRemediationImpactArtifact {
         if lifecycle_receipt.action != self.remediation_action {
             return Err("neurosemantic remediation impact action does not match the lifecycle receipt action".into());
         }
+        if lifecycle_receipt.execution_revision != self.execution_revision {
+            return Err("neurosemantic remediation impact execution revision does not match the lifecycle receipt".into());
+        }
         let fingerprint = lifecycle_receipt.fingerprint()?;
         if fingerprint != self.lifecycle_receipt_hash {
             return Err("neurosemantic remediation impact artifact is bound to a different lifecycle receipt".into());
@@ -390,6 +393,7 @@ impl NeurosemanticRemediationImpactArtifact {
         };
         if record.lineage_ref != *expected_ref
             || record.output_artifact_hash != *expected_model_hash
+            || record.execution_revision != self.execution_revision
             || compute_derivation_provenance_hash(&record.lineage_ref, lineage_record_bytes)
                 != *expected_hash
         {
@@ -2776,9 +2780,23 @@ mod tests {
         stale_receipt.lifecycle_receipt_hash = content_hash(b"different-receipt");
         assert!(stale_receipt.verify_lifecycle_binding(&lifecycle).is_err());
 
+        let mut different_revision_receipt = lifecycle.clone();
+        different_revision_receipt.execution_revision = "4".repeat(40);
+        different_revision_receipt = NeurosemanticArtifactLifecycleReceipt {
+            previous_receipt_hash: None,
+            event_sequence: 0,
+            ..different_revision_receipt
+        };
+        assert!(impact.verify_lifecycle_binding(&different_revision_receipt).is_err());
+
         let mut wrong_lineage = impact.clone();
         wrong_lineage.post_remediation_model_hash = content_hash(b"wrong-model");
         assert!(wrong_lineage.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PostRemediation, &post_bytes).is_err());
+
+        let mut revision_mismatch = post_lineage.clone();
+        revision_mismatch.execution_revision = "4".repeat(40);
+        let revision_mismatch_bytes = serde_json::to_vec(&revision_mismatch).unwrap();
+        assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PostRemediation, &revision_mismatch_bytes).is_err());
 
         assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::ResidualRisk, b"tampered").is_err());
 
