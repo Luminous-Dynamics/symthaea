@@ -1821,7 +1821,12 @@ impl SqliteAuthorizationStore {
     }
 
     fn connection(&self) -> Result<Connection, AuthorizationStoreError> {
-        Ok(Connection::open(&self.path)?)
+        let connection = Connection::open(&self.path)?;
+        // SQLite's REPLACE conflict strategy deletes the conflicting row before
+        // inserting the replacement. DELETE triggers are only guaranteed to fire
+        // for that implicit delete when recursive triggers are enabled.
+        connection.execute_batch("PRAGMA recursive_triggers=ON;")?;
+        Ok(connection)
     }
 
     pub fn relying_party_id(&self) -> &str {
@@ -12062,6 +12067,43 @@ mod tests {
             )
             .unwrap_err();
         assert!(delete_err.to_string().contains("native replay history is append-only"));
+
+        let replace_err = reopened
+            .connection()
+            .unwrap()
+            .execute(
+                "INSERT OR REPLACE INTO authorization_native_replay_history(
+                    native_replay_identity,authorization_instance,attempt_id,operation_id,
+                    relying_party_id,native_authority_namespace,native_authorization_id,
+                    native_replay_derivation_digest,boundary_id,action_digest,target_identity)
+                 VALUES(
+                    ?1,'auth-replaced','attempt-replaced','operation:replaced','default',
+                    'issuer.replaced','native-grant:replaced','sha256:replaced',
+                    'boundary-replaced','sha256:replaced-action','target-replaced')",
+                params![terminal_native_identity.as_str()],
+            )
+            .unwrap_err();
+        assert!(replace_err.to_string().contains("native replay history is append-only"));
+
+        let ledger_owner_after_replace: (String,String,String) = reopened
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT authorization_instance,attempt_id,operation_id
+                 FROM authorization_native_replay_history
+                 WHERE native_replay_identity=?1",
+                params![terminal_native_identity.as_str()],
+                |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            ledger_owner_after_replace,
+            (
+                "terminal-history-a".into(),
+                "attempt:terminal-history-a".into(),
+                "operation:terminal-history-a".into(),
+            )
+        );
 
         let _ = std::fs::remove_file(path);
     }
