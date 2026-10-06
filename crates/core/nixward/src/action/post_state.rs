@@ -1688,6 +1688,7 @@ mod tests {
             unit: "nginx.service".into(),
             source_identity_digest: definition().digest("nginx.service").unwrap(),
             manager_owner: ":1.123".into(),
+            bus_id: "0123456789abcdef0123456789abcdef".into(),
             files: definition_content_files(),
             captured_at_monotonic_us: 2_000,
         }
@@ -1847,6 +1848,7 @@ mod tests {
                 unit: "nginx.service".into(),
                 source_identity_digest: definition_identity.digest("nginx.service").unwrap(),
                 manager_owner: ":1.123".into(),
+                bus_id: "0123456789abcdef0123456789abcdef".into(),
                 files: definition_content_files.clone(),
                 captured_at_monotonic_us: 2_000,
             }
@@ -1862,7 +1864,7 @@ mod tests {
             definition_content_digest,
             definition_content_files,
             load_state: ServiceLoadStateV1::Loaded,
-            systemd_bus_id: ":1.123".into(),
+            systemd_bus_id: "0123456789abcdef0123456789abcdef".into(),
             active_state,
             sub_state: "running".to_string(),
             unit_file_state,
