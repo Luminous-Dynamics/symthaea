@@ -1482,6 +1482,9 @@ impl SqliteAuthorizationStore {
                ON authorization_terminal_evidence(attempt_id);
              CREATE INDEX IF NOT EXISTS authorization_terminal_operation_history_idx
                ON authorization_terminal_evidence(operation_id);
+             CREATE INDEX IF NOT EXISTS authorization_terminal_native_replay_history_idx
+               ON authorization_terminal_evidence(native_replay_identity)
+               WHERE native_replay_identity IS NOT NULL AND native_replay_identity <> '';
              DROP INDEX IF EXISTS authorization_dispatch_action_fence_idx;
              CREATE INDEX authorization_dispatch_action_fence_idx
                ON authorization_dispatches(relying_party_id, target_identity, action_digest, state);",
@@ -13156,6 +13159,12 @@ fn historical_identity_fence_indexes_are_present() {
             "operation_id",
             "operation_id=?1 AND operation_id IS NOT NULL AND operation_id <> ''",
             "authorization_terminal_operation_history_idx",
+        ),
+        (
+            "authorization_terminal_evidence",
+            "native_replay_identity",
+            "native_replay_identity=?1 AND native_replay_identity IS NOT NULL AND native_replay_identity <> ''",
+            "authorization_terminal_native_replay_history_idx",
         ),
     ];
 
