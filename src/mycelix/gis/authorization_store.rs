@@ -11013,7 +11013,12 @@ mod tests {
         assert!(store.recover_pre_dispatch_attempt(&recovery).unwrap());
         assert!(!store.recover_pre_dispatch_attempt(&recovery).unwrap());
         assert_eq!(store.recover_incomplete_attempts().unwrap(),0);
-        assert_eq!(store.recover_incomplete_attempts_for_boundary("boundary-A").unwrap(),0);
+        assert!(matches!(
+            store.recover_incomplete_attempts_for_boundary("boundary-A"),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
 
         let old_attempt=mark_dispatch_pending_bound_for_test(&store,
             &witness.authorization_instance,"attempt-pre",&action,
