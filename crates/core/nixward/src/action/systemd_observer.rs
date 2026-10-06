@@ -354,6 +354,7 @@ impl NixSystemdReadOnlyObserverV1 {
     ) -> Result<NixVerifiedServiceDefinitionContentV1, NixSystemdObserverErrorV1> {
         let expected_unit = canonical_unit(unit)?;
         let manager_owner = self.systemd_manager_owner().await?;
+        let bus_id = self.dbus_bus_id().await?;
         let object_path = self.resolve_service_unit(&expected_unit).await?;
         let (identity, need_daemon_reload) = self
             .read_definition_identity(&object_path, &expected_unit)
@@ -374,6 +375,7 @@ impl NixSystemdReadOnlyObserverV1 {
         }
 
         let post_owner = self.systemd_manager_owner().await?;
+        let post_bus_id = self.dbus_bus_id().await?;
         let post_object_path = self.resolve_service_unit(&expected_unit).await?;
         let (post_identity, post_need_daemon_reload) = self
             .read_definition_identity(&post_object_path, &expected_unit)
@@ -386,6 +388,9 @@ impl NixSystemdReadOnlyObserverV1 {
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
         let final_owner = self.systemd_manager_owner().await?;
 
+        if post_bus_id != bus_id {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
         if post_owner != manager_owner || final_owner != manager_owner {
             return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
         }
@@ -399,12 +404,30 @@ impl NixSystemdReadOnlyObserverV1 {
             unit: expected_unit,
             source_identity_digest,
             manager_owner,
+            bus_id,
             files,
             captured_at_monotonic_us: monotonic_now_us()?,
         };
 
         NixVerifiedServiceDefinitionContentV1::from_observer(evidence)
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))
+    }
+
+    async fn dbus_bus_id(&self) -> Result<String, NixSystemdObserverErrorV1> {
+        let bus = Proxy::new(
+            &self.connection,
+            DBUS_DESTINATION,
+            DBUS_PATH,
+            DBUS_INTERFACE,
+        )
+        .await?;
+        let id: String = bus.call("GetId", &()).await?;
+        if id.len() != 32 || !id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(NixSystemdObserverErrorV1::InvalidPostState(
+                "D-Bus GetId returned an invalid bus identifier".into(),
+            ));
+        }
+        Ok(id)
     }
 
     async fn read_definition_identity(
