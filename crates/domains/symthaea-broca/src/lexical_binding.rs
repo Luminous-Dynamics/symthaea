@@ -2635,6 +2635,33 @@ mod tests {
             MorphophonologicalCompilationWitnessError::SourceArtifactMismatch
         );
 
+        let mut selection_tampered = witness.clone();
+        selection_tampered.source_selection_blake3 = "0".repeat(64);
+        assert_eq!(
+            selection_tampered
+                .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
+                .expect_err("source selection digest tampering must fail closed"),
+            MorphophonologicalCompilationWitnessError::SourceSelectionMismatch
+        );
+
+        let mut transformation_tampered = witness.clone();
+        transformation_tampered.transformation_blake3 = "1".repeat(64);
+        assert_eq!(
+            transformation_tampered
+                .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
+                .expect_err("transformation digest tampering must fail closed"),
+            MorphophonologicalCompilationWitnessError::TransformationMismatch
+        );
+
+        let mut slice_tampered = witness.clone();
+        slice_tampered.source_slices[0].byte_offset = artifact.len() + 1;
+        assert_eq!(
+            slice_tampered
+                .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
+                .expect_err("out-of-bounds source selection must fail closed"),
+            MorphophonologicalCompilationWitnessError::SourceSliceOutOfBounds
+        );
+
         let mut rule_tampered = rule_set.clone();
         rule_tampered.rules[0].operation =
             MorphophonologicalRuleOperation::AppendSuffix { suffix: "t".into() };
