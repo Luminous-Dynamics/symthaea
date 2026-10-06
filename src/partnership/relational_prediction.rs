@@ -393,53 +393,6 @@ impl RelationalPredictionProvenance {
 /// Exact held-out prediction trace for one feature family.
 ///
 /// This retains fitted preprocessing/model parameters and every held-out
-/// prediction so MAE/MSE can be recomputed from frozen inputs.
-#[derive(Debug, Clone, PartialEq)]
-pub struct PredictionEvidenceRecord {
-    pub feature_set: PredictionFeatureSet,
-    pub train_samples: usize,
-    pub test_samples: usize,
-    pub feature_times: Vec<f64>,
-    pub outcome_times: Vec<f64>,
-    pub observed_outcomes: Vec<f64>,
-    pub predictions: Vec<f64>,
-    pub fit_coefficients: Option<Vec<f64>>,
-    pub feature_means: Vec<f64>,
-    pub feature_scales: Vec<f64>,
-    pub mean_absolute_error: f64,
-    pub mean_squared_error: f64,
-}
-
-impl PredictionEvidenceRecord {
-    pub fn score(&self) -> PredictionScore {
-        PredictionScore {
-            feature_set: self.feature_set,
-            parameter_count: self.fit_coefficients.as_ref().map_or(0, Vec::len),
-            train_samples: self.train_samples,
-            test_samples: self.test_samples,
-            mean_absolute_error: self.mean_absolute_error,
-            mean_squared_error: self.mean_squared_error,
-        }
-    }
-}
-
-/// One complete held-out evidence packet.
-#[derive(Debug, Clone, PartialEq)]
-pub struct HeldOutRelationalPredictionEvidence {
-    pub provenance: RelationalPredictionProvenance,
-    pub summary: HeldOutRelationalPredictionSummary,
-    pub records: Vec<PredictionEvidenceRecord>,
-}
-
-/// Rolling-origin packet retaining a complete trace at each origin.
-#[derive(Debug, Clone, PartialEq)]
-pub struct RollingOriginRelationalPredictionEvidence {
-    pub provenance: RelationalPredictionProvenance,
-    pub config: RollingOriginRelationalPredictionConfig,
-    pub observed: RollingOriginRelationalPredictionSummary,
-    pub origins: Vec<HeldOutRelationalPredictionEvidence>,
-}
-
 /// Held-out comparison across the required baselines and the relational model.
 ///
 /// No score is interpreted as a consciousness, relationship, value, or
@@ -1143,46 +1096,29 @@ fn fit_prediction_record(
         .checked_add(config.test_samples)
         .ok_or(RelationalPredictionError::InvalidSplit)?;
 
-    let (fit_coefficients, feature_means, feature_scales, prediction_fn): (
-        Option<Vec<f64>>,
-        Vec<f64>,
-        Vec<f64>,
-        Box<dyn Fn(&RelationalPredictionSample) -> Result<f64, RelationalPredictionError>>,
-    ) = if feature_set == PredictionFeatureSet::PersistenceBaseline {
-        let baseline = samples[config.train_samples - 1].future_outcome;
+    let (model, baseline) = if feature_set == PredictionFeatureSet::PersistenceBaseline {
         (
             None,
-            Vec::new(),
-            Vec::new(),
-            Box::new(move |_| Ok(baseline)),
+            Some(samples[config.train_samples - 1].future_outcome),
         )
     } else {
-        let model = fit_linear_model(
-            &samples[..config.train_samples],
-            feature_set,
-            config.ridge_lambda,
-        )?;
-        let coefficients = model.coefficients.clone();
-        let means = model.means.clone();
-        let scales = model.scales.clone();
-        Box::new(move |sample| {
-            let features = feature_vector(sample, feature_set);
-            let prediction = predict(
-                &FittedLinearModel {
-                    coefficients: coefficients.clone(),
-                    means: means.clone(),
-                    scales: scales.clone(),
-                },
-                &features,
-            );
-            if prediction.is_finite() {
-                Ok(prediction)
-            } else {
-                Err(RelationalPredictionError::ModelFitFailed)
-            }
-        })
-        .pipe(|_| unreachable!())
+        (
+            Some(fit_linear_model(
+                &samples[..config.train_samples],
+                feature_set,
+                config.ridge_lambda,
+            )?),
+            None,
+        )
     };
+
+    let fit_coefficients = model.as_ref().map(|model| model.coefficients.clone());
+    let feature_means = model
+        .as_ref()
+        .map_or_else(Vec::new, |model| model.means.clone());
+    let feature_scales = model
+        .as_ref()
+        .map_or_else(Vec::new, |model| model.scales.clone());
 
     let mut feature_times = Vec::with_capacity(config.test_samples);
     let mut outcome_times = Vec::with_capacity(config.test_samples);
@@ -1192,13 +1128,23 @@ fn fit_prediction_record(
     let mut squared_error = 0.0;
 
     for sample in &samples[test_start..test_end] {
-        let prediction = prediction_fn(sample)?;
+        let prediction = match (&model, baseline) {
+            (Some(model), None) => predict(model, &feature_vector(sample, feature_set)),
+            (None, Some(value)) => value,
+            _ => return Err(RelationalPredictionError::ModelFitFailed),
+        };
+
+        if !prediction.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
         let error = prediction - sample.future_outcome;
         absolute_error += error.abs();
         squared_error += error * error;
         if !absolute_error.is_finite() || !squared_error.is_finite() {
             return Err(RelationalPredictionError::ModelFitFailed);
         }
+
         feature_times.push(sample.feature_time);
         outcome_times.push(sample.outcome_time);
         observed_outcomes.push(sample.future_outcome);
@@ -1637,6 +1583,66 @@ mod tests {
             test_samples: 28,
             gap_samples: 4,
             ridge_lambda: 1e-8,
+        }
+    }
+
+    #[test]
+    fn evidence_provenance_requires_exact_hashes() {
+        assert_eq!(
+            RelationalPredictionProvenance::new(
+                "",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            ),
+            Err(RelationalPredictionError::InvalidEvidenceProvenance(
+                "protocol_id"
+            ))
+        );
+
+        assert_eq!(
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "not-a-sha",
+                "0123456789abcdef0123456789abcdef01234567",
+            ),
+            Err(RelationalPredictionError::InvalidEvidenceProvenance(
+                "source_data_sha256"
+            ))
+        );
+
+        let valid = RelationalPredictionProvenance::new(
+            "RH-006-v1",
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "0123456789abcdef0123456789abcdef01234567",
+        )
+        .unwrap();
+        assert_eq!(valid.protocol_id, "RH-006-v1");
+    }
+
+    #[test]
+    fn evidence_records_reproduce_compact_scores() {
+        let samples = build_samples(0.5);
+        let provenance = RelationalPredictionProvenance::new(
+            "RH-006-v1",
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "0123456789abcdef0123456789abcdef01234567",
+        )
+        .unwrap();
+
+        let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            provenance,
+        )
+        .unwrap();
+
+        assert_eq!(evidence.records.len(), 7);
+        for record in &evidence.records {
+            assert_eq!(record.predictions.len(), record.test_samples);
+            assert_eq!(record.observed_outcomes.len(), record.test_samples);
+            assert_eq!(record.feature_times.len(), record.test_samples);
+            assert_eq!(record.outcome_times.len(), record.test_samples);
+            assert_eq!(record.score(), evidence.summary.score(record.feature_set));
         }
     }
 
