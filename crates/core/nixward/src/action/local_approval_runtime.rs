@@ -819,6 +819,28 @@ mod tests {
     }
 
     #[test]
+    fn service_approval_request_requires_definition_content_bound_intent() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let result = runtime.create_pending_request(
+            &intent("nginx.service"),
+            &restart_command("nginx.service"),
+            RequiredApprovalProfileV1::SameUidProcessV1,
+            UnixMillisV1::new(now.saturating_sub(1_000)),
+            UnixMillisV1::new(now + 60_000),
+        );
+
+        assert!(matches!(
+            result,
+            Err(LocalApprovalRuntimeErrorV1::Authorization(
+                super::super::authorization::NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture
+            ))
+        ));
+        assert_eq!(runtime.pending_count().unwrap(), 0);
+    }
+
+    #[test]
     fn installed_request_projection_cannot_be_rebound_to_external_display_text() {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
