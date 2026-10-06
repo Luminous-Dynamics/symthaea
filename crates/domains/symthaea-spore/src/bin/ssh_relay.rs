@@ -68,9 +68,24 @@ async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
     );
     command.env_remove("NIX_CONFIG");
     command.env_remove("NIX_USER_CONF_FILES");
-    // Do not allow a caller-controlled environment to redirect privileged Nix
-    // state, store, logs, configuration, daemon socket, or user directories.
+    // Non-interactive Bash and POSIX shells can execute startup files named by
+    // these environment variables. A privileged relay must not inherit them.
+    // Dynamic-library preload/search variables are likewise excluded so an
+    // ambient process environment cannot replace code loaded by a child.
     for variable in [
+        "BASH_ENV",
+        "ENV",
+        "LD_PRELOAD",
+        "LD_LIBRARY_PATH",
+        "PYTHONHOME",
+        "PYTHONPATH",
+        "PERL5OPT",
+        "RUBYOPT",
+        "NODE_OPTIONS",
+        "NODE_PATH",
+        // Do not allow a caller-controlled environment to redirect privileged
+        // Nix state, store, logs, configuration, daemon socket, or user directories.
+
         "NIX_REMOTE",
         "NIX_DAEMON_SOCKET_PATH",
         "NIX_STORE_DIR",
