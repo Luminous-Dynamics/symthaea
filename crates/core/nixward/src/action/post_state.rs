@@ -296,7 +296,7 @@ impl NixServicePostStateObservationV1 {
         {
             return Err(NixPostStateErrorV1::DefinitionMismatch);
         }
-        validate_unique_manager_owner(manager_owner);
+        validate_unique_manager_owner(manager_owner)?;
         if let Some(job) = &self.systemd_job {
             job.validate_shape()?;
             if self.systemd_manager_owner.as_deref() != Some(job.manager_owner.as_str()) {
