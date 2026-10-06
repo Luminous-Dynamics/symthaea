@@ -902,7 +902,8 @@ fn build_flake_nix(choices: &UserChoices) -> String {
     writeln!(out, "  inputs = {{").unwrap();
     writeln!(
         out,
-        "    nixpkgs.url = \"github:NixOS/nixpkgs/nixos-26.05\";"
+        "    nixpkgs.url = \"github:NixOS/nixpkgs/{}\";",
+        NIXOS_2605_NIXPKGS_REV
     )
     .unwrap();
     if choices.secure_boot {
