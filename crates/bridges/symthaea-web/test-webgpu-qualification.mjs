@@ -875,6 +875,7 @@ async function rawWebGpuCompositorCanary(page) {
           reason: info?.reason || null,
           message: info?.message || null,
         };
+        globalThis[statusKey] = deviceLost;
       });
 
       const format = navigator.gpu.getPreferredCanvasFormat();
