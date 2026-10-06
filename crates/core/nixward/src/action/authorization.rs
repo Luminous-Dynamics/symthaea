@@ -467,6 +467,9 @@ impl NixLocalExecutionAuthorityV1 {
         if approval.decision_evidence().action_intent_digest != digest {
             return Err(NixAuthorizationErrorV1::IntentMismatch);
         }
+        if matches!(intent.action, NixActionDescriptorV1::Service { .. }) {
+            return Err(NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture);
+        }
         service_effect_context_digest_for_intent(&intent)?;
         Ok(Self { intent, approval })
     }
