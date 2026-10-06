@@ -256,6 +256,14 @@ struct ClientMessage {
     extra_disks: Vec<String>,
 }
 
+fn extract_explicit_nix_system(flake: &str) -> Option<&str> {
+    let marker = "system = \"";
+    let start = flake.find(marker)? + marker.len();
+    let rest = &flake[start..];
+    let end = rest.find('\"')?;
+    Some(&rest[..end])
+}
+
 fn default_port() -> u16 {
     22
 }
@@ -2626,6 +2634,68 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                             .send(Message::Text(
                                 RelayMessage::error(&format!("Invalid extra disk: {}", e))
                                     .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                }
+
+                // Authoritative target architecture check. Browser-generated flakes
+                // currently default to x86_64-linux; never silently realize one on a
+                // different machine architecture.
+                let target_arch = match run_cmd("uname -m").await {
+                    Ok(result) if result.exit_status == 0 => result.stdout.trim().to_string(),
+                    Ok(result) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to determine target architecture (exit {})",
+                                    result.exit_status
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to determine target architecture: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let target_system = match target_arch.as_str() {
+                    "x86_64" => "x86_64-linux",
+                    "aarch64" => "aarch64-linux",
+                    "armv7l" => "armv7l-linux",
+                    other => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unsupported target architecture: {}",
+                                    other
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                if let Some(system) = extract_explicit_nix_system(&client_msg.flake_nix) {
+                    if system != target_system {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Architecture mismatch: target is {}, but the supplied flake targets {}",
+                                    target_system, system
+                                ))
+                                .to_json(),
                             ))
                             .await;
                         continue;
@@ -5729,6 +5799,19 @@ mod tests {
                 "layout {layout} retained a placeholder secret"
             );
         }
+    }
+
+    // ── Target architecture contract ──
+
+    #[test]
+    fn extracts_explicit_nix_system() {
+        assert_eq!(
+            extract_explicit_nix_system(
+                "outputs = { self, nixpkgs }: { nixosConfigurations.host = nixpkgs.lib.nixosSystem { system = \"aarch64-linux\"; }; };"
+            ),
+            Some("aarch64-linux")
+        );
+        assert_eq!(extract_explicit_nix_system("outputs = { };"), None);
     }
 
     // ── Secret-boundary regressions ──
