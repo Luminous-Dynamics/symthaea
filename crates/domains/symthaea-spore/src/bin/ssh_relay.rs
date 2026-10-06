@@ -472,6 +472,94 @@ fn new_session_id() -> Result<u64, String> {
     Ok(u64::from_le_bytes(bytes))
 }
 
+fn transaction_artifact_dir_path(transaction_id: &str) -> Result<std::path::PathBuf, String> {
+    if transaction_id.len() != 32
+        || !transaction_id.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err("transaction artifact identity must be exactly 32 hexadecimal characters".into());
+    }
+    Ok(std::path::PathBuf::from(format!(
+        "/tmp/nixforhumanity-transaction-{transaction_id}"
+    )))
+}
+
+fn create_transaction_artifact_dir(transaction_id: &str) -> Result<String, String> {
+    let path = transaction_artifact_dir_path(transaction_id)?;
+
+    use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
+    let mut builder = std::fs::DirBuilder::new();
+    builder.mode(0o700);
+    match builder.create(&path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            return Err(format!(
+                "transaction artifact directory {} already exists; refusing reuse",
+                path.display()
+            ));
+        }
+        Err(error) => {
+            return Err(format!(
+                "unable to create transaction artifact directory {}: {error}",
+                path.display()
+            ));
+        }
+    }
+
+    let directory = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(&path)
+        .map_err(|error| {
+            format!(
+                "unable to open transaction artifact directory {}: {error}",
+                path.display()
+            )
+        })?;
+
+    // The directory was created with a restrictive mode, but the exact
+    // descriptor is authoritative. Normalize it through the open descriptor
+    // and then require the expected owner/private mode.
+    directory
+        .set_permissions(std::fs::Permissions::from_mode(0o700))
+        .map_err(|error| {
+            format!(
+                "unable to protect transaction artifact directory {}: {error}",
+                path.display()
+            )
+        })?;
+    let metadata = directory.metadata().map_err(|error| {
+        format!(
+            "unable to inspect transaction artifact directory {}: {error}",
+            path.display()
+        )
+    })?;
+    let mode = metadata.permissions().mode() & 0o777;
+    if !metadata.is_dir() || mode != 0o700 {
+        return Err(format!(
+            "transaction artifact directory {} has invalid type or permissions {:04o}",
+            path.display(),
+            mode
+        ));
+    }
+    if metadata.uid() != unsafe { libc::geteuid() } {
+        return Err(format!(
+            "transaction artifact directory {} is not owned by relay user",
+            path.display()
+        ));
+    }
+
+    Ok(path.to_string_lossy().into_owned())
+}
+
+fn remove_transaction_artifact_dir(path: &str) {
+    if let Err(error) = std::fs::remove_dir(path) {
+        eprintln!(
+            "unable to remove transaction artifact directory {}: {}",
+            path, error
+        );
+    }
+}
+
 /// Generate Secure Boot setup commands (appended to install script when enabled).
 /// Git-initialize the NixOS config (always appended to install scripts).
 fn git_init_config() -> &'static str {
@@ -3045,7 +3133,13 @@ fn install_process_command_matches(transaction_id: &str, cmdline: &[u8]) -> bool
     {
         return false;
     }
-    let expected_script = format!("/tmp/symthaea-install-{}.sh", transaction_id);
+    let expected_script = format!(
+        "{}/install.sh",
+        transaction_artifact_dir_path(transaction_id)
+            .ok()
+            .and_then(|path| path.into_os_string().into_string().ok())
+            .unwrap_or_default()
+    );
     cmdline
         .split(|byte| *byte == 0)
         .any(|arg| arg == expected_script.as_bytes())
@@ -3057,7 +3151,10 @@ async fn install_process_is_alive(transaction_id: &str) -> bool {
     {
         return false;
     }
-    let pid_path = format!("/tmp/symthaea-install-{}.pid", transaction_id);
+    let pid_path = match transaction_artifact_dir_path(transaction_id) {
+        Ok(path) => path.join("install.pid"),
+        Err(_) => return false,
+    };
     let pid_text = match tokio::fs::read_to_string(&pid_path).await {
         Ok(value) => value,
         Err(_) => return false,
@@ -3640,18 +3737,30 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 // The transaction ID is the durable recovery identity. The
                 // session ID remains reserved for ephemeral secret/staging paths.
                 let process_id = transaction.transaction_id.as_str();
-                let log_path = format!("/tmp/symthaea-install-{}.log", process_id);
-                let script_path = format!("/tmp/symthaea-install-{}.sh", process_id);
-                let status_path = format!("/tmp/symthaea-install-{}.status", process_id);
-                let pid_path = format!("/tmp/symthaea-install-{}.pid", process_id);
+                let transaction_dir = match create_transaction_artifact_dir(process_id) {
+                    Ok(path) => path,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to create transaction artifact namespace: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let log_path = format!("{transaction_dir}/install.log");
+                let script_path = format!("{transaction_dir}/install.sh");
+                let status_path = format!("{transaction_dir}/install.status");
+                let pid_path = format!("{transaction_dir}/install.pid");
 
-                // Create log file with restrictive permissions
-                let _ = run_cmd(&format!("touch {} && chmod 600 {}", log_path, log_path)).await;
-
-                // SECURITY: Pre-stage config files to temp dir via direct file write.
-                // The install script copies them after mount — no heredoc injection possible.
-                let config_staging_dir = format!("/tmp/symthaea-config-{}", session_id);
-                let _ = tokio::fs::create_dir_all(&config_staging_dir).await;
+                // The whole asynchronous install evidence namespace is private
+                // to this transaction. Other local users cannot replace status,
+                // PID, log, script, or staged configuration paths from /tmp.
+                let config_staging_dir = transaction_dir.clone();
                 // Stage configuration.nix (browser-supplied or will be generated by fallback in script)
                 if !client_msg.configuration_nix.is_empty() {
                     let config_path = format!("{}/configuration.nix", config_staging_dir);
@@ -3754,7 +3863,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                             .await;
                         continue;
                     }
-                    let pw_file = format!("/tmp/sovereign-user-pw-{}", session_id);
+                    let pw_file = format!("{transaction_dir}/user-password");
                     // Write the secret through the filesystem API instead of
                     // embedding it in a shell command. This keeps the password
                     // out of the relay child-process argument list.
@@ -3819,11 +3928,11 @@ echo "  User password set."
                 // contain no user-controlled data.
                 let mut staged_secret_paths = Vec::<String>::new();
                 if !client_msg.user_password.is_empty() {
-                    staged_secret_paths.push(format!("/tmp/sovereign-user-pw-{}", session_id));
+                    staged_secret_paths.push(pw_file.clone());
                 }
 
                 if requires_luks {
-                    let luks_key_path = format!("/tmp/sovereign-luks-pw-{}", session_id);
+                    let luks_key_path = format!("{transaction_dir}/luks-passphrase");
                     let mut luks_file = match std::fs::OpenOptions::new()
                         .write(true)
                         .create_new(true)
@@ -3837,7 +3946,7 @@ echo "  User password set."
                                     RelayMessage::error(&format!("Failed to stage LUKS2 passphrase: {}", error)).to_json(),
                                 ))
                                 .await;
-                            let _ = tokio::fs::remove_file(format!("/tmp/sovereign-user-pw-{}", session_id)).await;
+                            let _ = tokio::fs::remove_file(&pw_file).await;
                             continue;
                         }
                     };
@@ -4180,13 +4289,14 @@ echo "  User password set."
 
                 // SECURITY: Clean up temporary files containing sensitive data
                 let _ = run_cmd(&format!(
-                    "rm -f -- {} {} {} {} /tmp/sovereign-user-pw-{} /tmp/sovereign-luks-pw-{}",
-                    script_path, log_path, status_path, pid_path, session_id
+                    "rm -f -- {} {} {} {}",
+                    script_path, log_path, status_path, pid_path
                 ))
                 .await;
+                remove_transaction_artifact_dir(&transaction_dir);
                 eprintln!(
-                    "[{}] Session {} temp files cleaned up",
-                    peer_addr, session_id
+                    "[{}] Transaction {} artifact namespace cleaned up",
+                    peer_addr, transaction.transaction_id
                 );
 
                 // LEGACY: The old blocking path (kept for reference)
@@ -5809,9 +5919,24 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                     continue;
                 };
                 eprintln!("[{}] {} Starting garbage collection...", peer_addr, transaction.log_line());
-                let gc_log = format!("/tmp/symthaea-gc-{}.log", transaction.transaction_id);
-                let gc_status = format!("/tmp/symthaea-gc-{}.status", transaction.transaction_id);
-                let gc_pid = format!("/tmp/symthaea-gc-{}.pid", transaction.transaction_id);
+                let transaction_dir = match create_transaction_artifact_dir(&transaction.transaction_id) {
+                    Ok(path) => path,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to create GC transaction artifact namespace: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let gc_log = format!("{transaction_dir}/gc.log");
+                let gc_status = format!("{transaction_dir}/gc.status");
+                let gc_pid = format!("{transaction_dir}/gc.pid");
                 let _ = run_cmd(&format!(
                     "rm -f -- {} {} {} && touch {} {} {} && chmod 600 {} {} {}",
                     gc_log, gc_status, gc_pid,
@@ -5894,6 +6019,7 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                     gc_log, gc_status, gc_pid
                 ))
                 .await;
+                remove_transaction_artifact_dir(&transaction_dir);
             }
 
             "diagnose" => {
@@ -6012,12 +6138,27 @@ echo '}'
                     continue;
                 };
                 eprintln!("[{}] {} Writing config + rebuilding...", peer_addr, transaction.log_line());
-                let wc_config_path = format!("/tmp/symthaea-newconfig-{}.nix", transaction.transaction_id);
-                let wc_preimage_path = format!("/tmp/symthaea-config-preimage-{}.nix", transaction.transaction_id);
-                let wc_script_path = format!("/tmp/symthaea-rebuild-{}.sh", transaction.transaction_id);
-                let wc_log_path = format!("/tmp/symthaea-rebuild-{}.log", transaction.transaction_id);
-                let wc_status_path = format!("/tmp/symthaea-rebuild-{}.status", transaction.transaction_id);
-                let wc_pid_path = format!("/tmp/symthaea-rebuild-{}.pid", transaction.transaction_id);
+                let transaction_dir = match create_transaction_artifact_dir(&transaction.transaction_id) {
+                    Ok(path) => path,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to create rebuild transaction artifact namespace: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let wc_config_path = format!("{transaction_dir}/newconfig.nix");
+                let wc_preimage_path = format!("{transaction_dir}/config-preimage.nix");
+                let wc_script_path = format!("{transaction_dir}/rebuild.sh");
+                let wc_log_path = format!("{transaction_dir}/rebuild.log");
+                let wc_status_path = format!("{transaction_dir}/rebuild.status");
+                let wc_pid_path = format!("{transaction_dir}/rebuild.pid");
                 // Snapshot the exact active configuration before staging.
                 // The apply step refuses stale overwrites if another actor changes it.
                 if let Err(error) = tokio::fs::copy(
@@ -6312,6 +6453,7 @@ echo "REBUILD_COMPLETE"
                 let _ = tokio::fs::remove_file(&wc_log_path).await;
                 let _ = tokio::fs::remove_file(&wc_status_path).await;
                 let _ = tokio::fs::remove_file(&wc_pid_path).await;
+                remove_transaction_artifact_dir(&transaction_dir);
             }
 
             // ── PXE / Network Boot ──
@@ -6453,9 +6595,24 @@ ls -la "$DEST/"
 echo "COMPLETE"
 "#;
                 let script = script_template.replace("__IMAGE_DEST__", &image_dest);
-                let img_log = format!("/tmp/symthaea-image-{}.log", transaction.transaction_id);
-                let img_status = format!("/tmp/symthaea-image-{}.status", transaction.transaction_id);
-                let img_pid = format!("/tmp/symthaea-image-{}.pid", transaction.transaction_id);
+                let transaction_dir = match create_transaction_artifact_dir(&transaction.transaction_id) {
+                    Ok(path) => path,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to create image transaction artifact namespace: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let img_log = format!("{transaction_dir}/image.log");
+                let img_status = format!("{transaction_dir}/image.status");
+                let img_pid = format!("{transaction_dir}/image.pid");
 
                 let setup = run_cmd(&format!(
                     "rm -f -- {} {} {} && touch {} {} {} && chmod 600 {} {} {}",
@@ -6613,6 +6770,7 @@ echo "COMPLETE"
                     img_log, img_status, img_pid
                 ))
                 .await;
+                remove_transaction_artifact_dir(&transaction_dir);
             }
 
             "restore_image" => {
@@ -7892,11 +8050,11 @@ mod tests {
     #[test]
     fn install_recovery_identity_matches_transaction_artifact_shape() {
         let transaction_id = "0123456789abcdef0123456789abcdef";
-        let cmdline = format!("/bin/bash\0/tmp/symthaea-install-{transaction_id}.sh\0");
+        let cmdline = format!("/bin/bash\0/tmp/nixforhumanity-transaction-{transaction_id}/install.sh\0");
         assert!(install_process_command_matches(transaction_id, cmdline.as_bytes()));
         assert!(!install_process_command_matches(
             transaction_id,
-            b"/bin/bash\0/tmp/symthaea-install-1234.sh\0",
+            b"/bin/bash\0/tmp/nixforhumanity-transaction-1234/install.sh\0",
         ));
     }
 
@@ -8137,9 +8295,9 @@ mod tests {
     fn install_process_identity_matches_only_its_transaction_script() {
         let request_id = "0123456789abcdef0123456789abcdef";
         let exact = format!(
-            "bash\0/tmp/symthaea-install-{request_id}.sh\0"
+            "bash\0/tmp/nixforhumanity-transaction-{request_id}/install.sh\0"
         );
-        let other = b"bash\0/tmp/symthaea-install-ffffffffffffffffffffffffffffffff.sh\0";
+        let other = b"bash\0/tmp/nixforhumanity-transaction-ffffffffffffffffffffffffffffffff/install.sh\0";
         let lookalike = format!(
             "bash\0/tmp/symthaea-install-{request_id}-attacker.sh\0"
         );
