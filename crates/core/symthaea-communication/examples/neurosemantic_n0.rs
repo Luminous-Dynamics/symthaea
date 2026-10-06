@@ -251,6 +251,19 @@ fn main() -> Result<(), String> {
         .handling
         .verify_policy_record_binding_bytes(b"synthetic-policy-record-1");
 
+    let derivation_input_artifact_verified = derivation_lineage_record
+        .verify_input_artifact_bytes(0, b"synthetic-input-artifact-1")
+        .is_ok()
+        && derivation_lineage_record
+            .verify_input_artifact_bytes(1, b"synthetic-input-artifact-2")
+            .is_ok();
+    let derivation_input_artifact_mismatch_blocked = derivation_lineage_record
+        .verify_input_artifact_bytes(0, b"synthetic-input-artifact-tampered")
+        .is_err();
+    let derivation_input_artifact_bounds_blocked = derivation_lineage_record
+        .verify_input_artifact_bytes(2, b"synthetic-input-artifact-3")
+        .is_err();
+
     let derivation_provenance_present =
         !message.packet.data_policy.handling.derivation_provenance_ref.is_empty();
     let derivation_provenance_hash_valid = message
@@ -625,6 +638,9 @@ fn main() -> Result<(), String> {
         "derivation_provenance_mismatch_blocked": derivation_provenance_mismatch_blocked,
         "derivation_lineage_structured": derivation_lineage_structured,
         "malformed_derivation_lineage_blocked": malformed_derivation_lineage_blocked,
+        "derivation_input_artifact_verified": derivation_input_artifact_verified,
+        "derivation_input_artifact_mismatch_blocked": derivation_input_artifact_mismatch_blocked,
+        "derivation_input_artifact_bounds_blocked": derivation_input_artifact_bounds_blocked,
         "stale_policy_provenance_binding_blocked": stale_policy_binding_blocked,
         "inference_escalation_blocked": inference_escalation_blocked,
         "first_packet_accepted": accepted == ReplayDecision::Accept,
