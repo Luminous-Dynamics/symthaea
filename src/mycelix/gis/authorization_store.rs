@@ -13172,6 +13172,274 @@ mod tests {
     }
 
     #[test]
+    fn recovered_indeterminate_failed_reconciliation_releases_action_but_not_native_replay() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-recovered-failed-release-{}.db",
+            std::process::id()
+        ));
+        let store = SqliteAuthorizationStore::open_with_relying_party(
+            &path,
+            "rp-recovered-failed-release",
+        )
+        .unwrap();
+        let effect = ActionEffectBinding::new(
+            "target-recovered-failed-release",
+            "prod",
+            "adapter-recovered-failed-release",
+        );
+        let action = EpistemicAction::new(
+            "recovered-failed-release",
+            "intervention",
+            super::super::ActionRisk::Critical,
+        )
+        .with_effect_binding(effect.clone());
+        let digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            operation_id: Some("operation:recovered-first".into()),
+            authorization_instance: "recovered-failed-release".into(),
+            action_id: action.id.clone(),
+            action_digest: digest.clone(),
+            frame: "frame@1".into(),
+            support_digest: "sha256:support-recovered-failed-release".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:00:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+
+        store
+            .pin_native_authority_namespace(
+                "test-explicit-issuer",
+                "recovered-failed-release-authority",
+            )
+            .unwrap();
+        store
+            .pin_provider_status_source_digest("sha256:test-status-source")
+            .unwrap();
+        store
+            .pin_provider_status_verifier_configuration(
+                &TestProviderStatusVerifier.configuration(),
+            )
+            .unwrap();
+        store
+            .pin_provider_adapter_configuration(&ProviderAdapterConfiguration::new(
+                effect.adapter.clone(),
+                "test-adapter/v1",
+                "sha256:test-adapter-implementation",
+            ))
+            .unwrap();
+        store
+            .register_lease(&AuthorizationLease::new_with_instance(
+                witness.authorization_instance.clone(),
+                action.id.clone(),
+                digest,
+                witness.support_digest.clone(),
+                witness.policy.clone(),
+                1,
+                2,
+            ))
+            .unwrap();
+
+        store
+            .prepare_for_execution_bound_with_operation(
+                &witness,
+                &action,
+                "frame@1",
+                "attempt:recovered-first",
+                "boundary:recovered-failed-release",
+                "operation:recovered-first",
+            )
+            .unwrap();
+        let first = mark_dispatch_pending_bound_from_pinned_native_authority_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt:recovered-first",
+            &action,
+            &effect,
+            "boundary:recovered-failed-release",
+            "operation:recovered-first",
+            "native-grant:recovered-first",
+        )
+        .unwrap();
+        assert_eq!(
+            store
+                .connection()
+                .unwrap()
+                .query_row::<String, _, _>(
+                    "SELECT state FROM authorization_dispatches
+                     WHERE authorization_instance=?1 AND attempt_id=?2",
+                    params![
+                        witness.authorization_instance.as_str(),
+                        "attempt:recovered-first"
+                    ],
+                    |row| row.get(0),
+                )
+                .unwrap(),
+            "dispatch_pending"
+        );
+
+        drop(store);
+
+        let reopened = SqliteAuthorizationStore::open_with_relying_party_clock_and_policy(
+            &path,
+            "rp-recovered-failed-release",
+            Arc::new(FixedClock {
+                now: fixed_now,
+                source_id: AuthorizationClockPolicy::CLOCK_SOURCE_ID,
+            }),
+            AuthorizationClockPolicy::default(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            reopened
+                .recover_incomplete_attempt_for_boundary(
+                    "boundary:recovered-failed-release",
+                    "attempt:recovered-first",
+                )
+                .unwrap(),
+            1
+        );
+
+        assert_eq!(
+            reopened
+                .connection()
+                .unwrap()
+                .query_row::<String, _, _>(
+                    "SELECT state FROM authorization_leases
+                     WHERE authorization_instance=?1",
+                    params![witness.authorization_instance.as_str()],
+                    |row| row.get(0),
+                )
+                .unwrap(),
+            "indeterminate"
+        );
+
+        let reconciled = reopened
+            .reconcile_indeterminate_bound_verified(
+                &first,
+                &verified_evidence(&first, ExecutionOutcome::Failed),
+                &TestProviderVerifier,
+            )
+            .unwrap();
+        assert_eq!(reconciled.outcome, ExecutionOutcome::Failed);
+
+        let lease_state: String = reopened
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT state FROM authorization_leases
+                 WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(lease_state, "ready");
+
+        let remaining: i64 = reopened
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT remaining_executions FROM authorization_leases
+                 WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(remaining, 1);
+
+        assert_eq!(
+            reopened
+                .connection()
+                .unwrap()
+                .query_row::<String, _, _>(
+                    "SELECT state FROM authorization_dispatches
+                     WHERE authorization_instance=?1 AND attempt_id=?2",
+                    params![
+                        witness.authorization_instance.as_str(),
+                        "attempt:recovered-first"
+                    ],
+                    |row| row.get(0),
+                )
+                .unwrap(),
+            "failed"
+        );
+
+        let replay_count: i64 = reopened
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM authorization_native_replay_history
+                 WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(replay_count, 1);
+
+        let mut fresh_witness = witness.clone();
+        fresh_witness.operation_id = Some("operation:recovered-second".into());
+
+        reopened
+            .prepare_for_execution_bound_with_operation(
+                &fresh_witness,
+                &action,
+                "frame@1",
+                "attempt:recovered-second",
+                "boundary:recovered-failed-release",
+                "operation:recovered-second",
+            )
+            .unwrap();
+
+        // Authenticated FAILED reconciliation releases only the occupied
+        // same-action fence. It does not release the native replay unit.
+        let reused_native = mark_dispatch_pending_bound_from_pinned_native_authority_for_test(
+            &reopened,
+            &witness.authorization_instance,
+            "attempt:recovered-second",
+            &action,
+            &effect,
+            "boundary:recovered-failed-release",
+            "operation:recovered-second",
+            "native-grant:recovered-first",
+        );
+        assert!(matches!(
+            reused_native,
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+
+        let second = mark_dispatch_pending_bound_from_pinned_native_authority_for_test(
+            &reopened,
+            &witness.authorization_instance,
+            "attempt:recovered-second",
+            &action,
+            &effect,
+            "boundary:recovered-failed-release",
+            "operation:recovered-second",
+            "native-grant:recovered-second",
+        )
+        .unwrap();
+        assert_ne!(first.native_replay_identity, second.native_replay_identity);
+
+        let replay_count_after: i64 = reopened
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM authorization_native_replay_history
+                 WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(replay_count_after, 2);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn recovery_treats_invoked_as_indeterminate() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-invoked-recovery-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
