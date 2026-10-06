@@ -1951,6 +1951,10 @@ mod tests {
                 .enumerate()
                 .map(|(index, segment)| LexicalPhonologicalMapping {
                     lexical_position: index,
+                    lexeme_id: binding.constituents[index].lexeme_id.clone(),
+                    morphophonological_form: binding.constituents[index]
+                        .morphophonological_form
+                        .clone(),
                     segment_indices: vec![index],
                     symbols: vec![segment.symbol.clone()],
                 })
