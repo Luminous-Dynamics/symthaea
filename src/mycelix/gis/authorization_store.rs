@@ -3186,12 +3186,34 @@ fn validate_native_authority_pin_set(
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
+        if operation_id.is_empty() {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        validate_attempt_operation_consistency_for_attempt(
+            &tx,
+            authorization_instance,
+            attempt_id,
+            operation_id,
+        )?;
+        let persisted_operation_id: Option<String> = tx
+            .query_row(
+                "SELECT operation_id
+                 FROM authorization_leases
+                 WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+                params![authorization_instance, attempt_id, boundary_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if persisted_operation_id.as_deref() != Some(operation_id) {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
         let changed = tx.execute(
             "UPDATE authorization_leases
              SET state='ready',attempt_id=NULL,boundary_id=NULL,attempt_scope_digest=NULL
              WHERE authorization_instance=?1 AND state='prepared'
-               AND attempt_id=?2 AND boundary_id=?3",
-            params![authorization_instance, attempt_id, boundary_id],
+               AND attempt_id=?2 AND boundary_id=?3 AND operation_id=?4",
+            params![authorization_instance, attempt_id, boundary_id, operation_id],
         )?;
         if changed != 1 {
             return Err(AuthorizationConsumptionError::PreDispatchRecoveryNotAllowed.into());
@@ -3229,6 +3251,11 @@ fn validate_native_authority_pin_set(
     ) -> Result<(), AuthorizationStoreError> {
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
+        if persisted_state != "dispatch_pending" {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
 
         let changed = tx.execute(
             "UPDATE authorization_dispatches
@@ -12295,6 +12322,181 @@ mod tests {
         let _=std::fs::remove_file(path);
 }
 
+
+#[test]
+fn pre_dispatch_status_release_rejects_forged_operation() {
+    let path = std::env::temp_dir().join(format!(
+        "symthaea-gis-auth-pre-dispatch-release-binding-{}.db",
+        std::process::id()
+    ));
+    let (store, action, witness) = fixture(&path);
+    let attempt_id = "attempt-pre-dispatch-release";
+    let operation_id = "operation:pre-dispatch-release";
+
+    store
+        .prepare_for_execution_bound_with_operation(
+            &witness,
+            &action,
+            "frame@1",
+            attempt_id,
+            "boundary-pre-dispatch-release",
+            operation_id,
+        )
+        .unwrap();
+
+    let err = store
+        .close_pre_dispatch_status_failure(
+            &witness.authorization_instance,
+            attempt_id,
+            "boundary-pre-dispatch-release",
+            "operation:forged",
+        )
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        AuthorizationStoreError::Consumption(
+            AuthorizationConsumptionError::InvalidBinding
+        )
+    ));
+    assert_eq!(
+        store
+            .connection()
+            .unwrap()
+            .query_row::<String, _, _>(
+                "SELECT state FROM authorization_leases
+                 WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap(),
+        "prepared"
+    );
+    assert_eq!(
+        store
+            .connection()
+            .unwrap()
+            .query_row::<Option<String>, _, _>(
+                "SELECT operation_id FROM authorization_leases
+                 WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap()
+            .as_deref(),
+        Some(operation_id)
+    );
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn pre_entry_status_release_rejects_forged_operation() {
+    let path = std::env::temp_dir().join(format!(
+        "symthaea-gis-auth-pre-entry-release-binding-{}.db",
+        std::process::id()
+    ));
+    let (store, action, witness) = fixture(&path);
+    let effect = ActionEffectBinding::new(
+        "target-pre-entry-release",
+        "prod",
+        "adapter-pre-entry-release",
+    );
+    let action = action.with_effect_binding(effect.clone());
+    let digest = action.canonical_action_digest();
+    let witness = ActionAuthorizationWitness {
+        operation_id: None,
+        action_id: action.id.clone(),
+        authorization_instance: "pre-entry-release".into(),
+        action_digest: digest.clone(),
+        frame: witness.frame,
+        support_digest: witness.support_digest,
+        policy: witness.policy,
+        decision: "execute".into(),
+        issued_at: "2026-10-03T08:00:00Z".into(),
+        expires_at: Some("2026-10-04T08:00:00Z".into()),
+        authority_epoch: 1,
+    };
+    store
+        .register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1,
+        ))
+        .unwrap();
+    store
+        .prepare_for_execution_bound_with_operation(
+            &witness,
+            &action,
+            "frame@1",
+            "attempt-pre-entry-release",
+            "boundary-pre-entry-release",
+            "operation:pre-entry-release",
+        )
+        .unwrap();
+    let record = mark_dispatch_pending_bound_for_test(
+        &store,
+        &witness.authorization_instance,
+        "attempt-pre-entry-release",
+        &action,
+        &effect,
+        "boundary-pre-entry-release",
+        "operation:pre-entry-release",
+        "native-pre-entry-release",
+    )
+    .unwrap();
+
+    let forged = DurableDispatchRecord {
+        operation_id: "operation:forged".into(),
+        ..record.clone()
+    };
+    let err = store
+        .mark_invoked_bound(&forged, &AdmissionStatusFailsVerifier)
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        AuthorizationStoreError::Consumption(
+            AuthorizationConsumptionError::InvalidBinding
+        )
+    ));
+    assert_eq!(
+        store
+            .connection()
+            .unwrap()
+            .query_row::<String, _, _>(
+                "SELECT state FROM authorization_dispatches
+                 WHERE authorization_instance=?1 AND attempt_id=?2",
+                params![
+                    record.authorization_instance.as_str(),
+                    record.attempt_id.as_str()
+                ],
+                |row| row.get(0),
+            )
+            .unwrap(),
+        "dispatch_pending"
+    );
+    assert_eq!(
+        store
+            .connection()
+            .unwrap()
+            .query_row::<String, _, _>(
+                "SELECT operation_id FROM authorization_dispatches
+                 WHERE authorization_instance=?1 AND attempt_id=?2",
+                params![
+                    record.authorization_instance.as_str(),
+                    record.attempt_id.as_str()
+                ],
+                |row| row.get(0),
+            )
+            .unwrap(),
+        "operation:pre-entry-release"
+    );
+
+    let _ = std::fs::remove_file(path);
+}
 
 #[test]
 fn historical_identity_fence_indexes_are_present() {
