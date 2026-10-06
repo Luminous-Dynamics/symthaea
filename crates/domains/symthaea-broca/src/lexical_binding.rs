@@ -3310,6 +3310,34 @@ mod tests {
     }
 
     #[test]
+    fn compilation_witness_requires_build_context_identity_for_declared_unimorph_compiler() {
+        let rule_set = morphophonological_fixture_rule_set();
+        let artifact = b"row0\n";
+        let mut witness = MorphophonologicalCompilationWitness::new(
+            UNIMORPH_TSV_COMPILER_ID,
+            UNIMORPH_TSV_COMPILER_VERSION,
+            "fixture-normalization-v1",
+            artifact,
+            vec![MorphophonologicalSourceSlice {
+                record_id: "row0".into(),
+                byte_offset: 0,
+                byte_length: artifact.len(),
+                record_blake3: blake3::hash(artifact).to_hex().to_string(),
+            }],
+            &rule_set,
+        )
+        .expect("known UniMorph compiler witness");
+
+        witness.compiler_build_context_revision = None;
+        assert_eq!(
+            witness
+                .validate_shape()
+                .expect_err("declared UniMorph compiler must carry build-context identity"),
+            MorphophonologicalCompilationWitnessError::MissingCompilerIdentity
+        );
+    }
+
+    #[test]
     fn compilation_witness_rejects_malformed_unimorph_identity_encoding() {
         let rule_set = morphophonological_fixture_rule_set();
         let artifact = b"row0\n";
@@ -3435,7 +3463,7 @@ mod tests {
 
         let mut build_context_recomputed = witness.clone();
         build_context_recomputed.compiler_build_context_revision =
-            Some("tampered-build-context-revision".into());
+            Some("2".repeat(64));
         build_context_recomputed.transformation_blake3 =
             build_context_recomputed.compute_transformation_blake3();
         assert_eq!(
@@ -3447,7 +3475,7 @@ mod tests {
 
         let mut compiler_revision_recomputed = witness.clone();
         compiler_revision_recomputed.compiler_implementation_revision =
-            Some("tampered-compiler-revision".into());
+            Some("0".repeat(64));
         compiler_revision_recomputed.transformation_blake3 =
             compiler_revision_recomputed.compute_transformation_blake3();
         assert_eq!(
@@ -3459,7 +3487,7 @@ mod tests {
 
         let mut parser_revision_recomputed = witness.clone();
         parser_revision_recomputed.source_parser_revision =
-            Some("tampered-parser-revision".into());
+            Some("1".repeat(64));
         parser_revision_recomputed.transformation_blake3 =
             parser_revision_recomputed.compute_transformation_blake3();
         assert_eq!(
