@@ -6963,7 +6963,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[test]
     fn image_paths_are_strictly_transaction_scoped() {
         assert!(validate_image_path("/tmp/nixforhumanity-image-0123456789abcdef0123456789abcdef").is_ok());
         assert!(validate_image_path("/etc").is_err());
