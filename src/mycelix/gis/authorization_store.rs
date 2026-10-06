@@ -3279,6 +3279,13 @@ fn validate_native_authority_pin_set(
         // Native replay identity is a one-time authority unit. The dedicated
         // replay ledger is the authoritative durable fence; dispatch and terminal
         // rows are execution/evidence views that may be retained or compacted.
+        // If that fence is absent while surviving lifecycle evidence names the
+        // same identity, fail closed rather than interpreting corruption as
+        // first use.
+        self.validate_native_replay_history_absence_for_admission(
+            &tx,
+            native_replay_identity,
+        )?;
         let replay_owner: Option<(String, String, String)> = tx
             .query_row(
                 "SELECT authorization_instance,attempt_id,operation_id
@@ -4025,6 +4032,38 @@ fn validate_native_authority_pin_set(
             || replay_owner.9.as_deref() != Some(record.target_identity.as_str())
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        Ok(())
+    }
+
+    /// A missing replay-ledger row is normally the absence of prior consumption.
+    /// Once any durable lifecycle/evidence row references the same native replay
+    /// identity, however, the ledger is known to have been consumed previously
+    /// and its disappearance is corruption, not permission to spend the grant.
+    fn validate_native_replay_history_absence_for_admission(
+        tx: &Transaction<'_>,
+        native_replay_identity: &str,
+    ) -> Result<(), AuthorizationStoreError> {
+        let historical_evidence: bool = tx.query_row(
+            "SELECT EXISTS(
+                 SELECT 1
+                 FROM authorization_dispatches
+                 WHERE native_replay_identity=?1
+                   AND native_replay_identity <> ''
+                 UNION ALL
+                 SELECT 1
+                 FROM authorization_terminal_evidence
+                 WHERE native_replay_identity=?1
+                   AND native_replay_identity <> ''
+             )",
+            params![native_replay_identity],
+            |row| row.get(0),
+        )?;
+
+        if historical_evidence {
+            return Err(AuthorizationStoreError::InvalidState(
+                "native replay history missing for previously recorded replay identity".into(),
+            ));
         }
         Ok(())
     }
@@ -13689,6 +13728,143 @@ mod tests {
         assert_eq!(states,("indeterminate".into(),"dispatch_pending".into()));
 
         let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn admission_rejects_missing_replay_history_after_terminal_evidence() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-admission-missing-native-history-{}.db",
+            std::process::id()
+        ));
+        let store = fixture(&path).0;
+        let action = EpistemicAction::new(
+            "admission-missing-native-history",
+            "intervention",
+            super::super::ActionRisk::Critical,
+        )
+        .with_effect_binding(super::ActionEffectBinding::new(
+            "target-admission-missing-native-history",
+            "prod",
+            "adapter-admission-missing-native-history",
+        ));
+        let digest = action.canonical_action_digest();
+
+        let witness = ActionAuthorizationWitness {
+            operation_id: Some("operation:admission-missing-native-history-1".into()),
+            authorization_instance: "admission-missing-native-history-1".into(),
+            action_id: action.id.clone(),
+            action_digest: digest.clone(),
+            frame: "frame@1".into(),
+            support_digest: "sha256:support-admission-missing-native-history".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:00:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest.clone(),
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1,
+        )).unwrap();
+        store.prepare_for_execution_bound_with_operation(
+            &witness,
+            &action,
+            "frame@1",
+            "attempt:admission-missing-native-history-1",
+            "boundary:admission-missing-native-history-1",
+            "operation:admission-missing-native-history-1",
+        ).unwrap();
+
+        let first = mark_dispatch_pending_bound_from_native_authority_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt:admission-missing-native-history-1",
+            &action,
+            action.effect_binding().unwrap(),
+            "boundary:admission-missing-native-history-1",
+            "operation:admission-missing-native-history-1",
+            "test-explicit-issuer",
+            "native-grant:admission-missing-native-history",
+        ).unwrap();
+        store.mark_invoked_bound(&first, &TestProviderStatusVerifier).unwrap();
+        store.commit_bound_verified(
+            &first,
+            &verified_evidence(&first, ExecutionOutcome::Failed),
+            &TestProviderVerifier,
+        ).unwrap();
+
+        // Preserve ordinary terminal evidence but remove the dedicated replay
+        // fence. A later attempt reusing the exact native authorization must
+        // fail closed instead of being treated as first use.
+        let replay_identity = first.native_replay_identity.clone();
+        store.connection().unwrap().execute(
+            "DELETE FROM authorization_native_replay_history WHERE native_replay_identity=?1",
+            params![replay_identity.as_str()],
+        ).unwrap();
+
+        let witness2 = ActionAuthorizationWitness {
+            operation_id: Some("operation:admission-missing-native-history-2".into()),
+            authorization_instance: "admission-missing-native-history-2".into(),
+            action_id: action.id.clone(),
+            action_digest: digest.clone(),
+            frame: "frame@1".into(),
+            support_digest: "sha256:support-admission-missing-native-history-2".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:01:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness2.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness2.support_digest.clone(),
+            witness2.policy.clone(),
+            1,
+            1,
+        )).unwrap();
+        store.prepare_for_execution_bound_with_operation(
+            &witness2,
+            &action,
+            "frame@1",
+            "attempt:admission-missing-native-history-2",
+            "boundary:admission-missing-native-history-2",
+            "operation:admission-missing-native-history-2",
+        ).unwrap();
+
+        let err = mark_dispatch_pending_bound_from_native_authority_for_test(
+            &store,
+            &witness2.authorization_instance,
+            "attempt:admission-missing-native-history-2",
+            &action,
+            action.effect_binding().unwrap(),
+            "boundary:admission-missing-native-history-2",
+            "operation:admission-missing-native-history-2",
+            "test-explicit-issuer",
+            "native-grant:admission-missing-native-history",
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::InvalidState(message)
+                if message.contains("native replay history missing")
+        ));
+
+        assert_eq!(
+            store.connection().unwrap().query_row::<String,_,_>(
+                "SELECT state FROM authorization_leases WHERE authorization_instance=?1",
+                params![witness2.authorization_instance.as_str()],
+                |row| row.get(0),
+            ).unwrap(),
+            "prepared"
+        );
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
