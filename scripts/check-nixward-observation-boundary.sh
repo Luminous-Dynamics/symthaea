@@ -52,8 +52,8 @@ OBSERVATION_CRATE_WIDE_FACTORY_PATTERN='\bpub\(crate\)[[:space:]]+(?:async[[:spa
 ENABLEMENT_EVIDENCE_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceEnablementEvidenceV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceEnablementEvidenceV1\b'
 ENABLEMENT_EVIDENCE_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceEnablementEvidenceV1[[:space:]]*\{.*?pub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+new[[:space:]]*\('
 OBSERVATION_PUBLIC_FACTORY_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(parse_systemd_properties|parse_systemd_observation|from_observed_state)[[:space:]]*\('
-SYSTEMD_OBSERVER_MUTATION_CALL_PATTERN='\\.call\\(\\s*"(StartUnit|StopUnit|RestartUnit|ReloadUnit|EnableUnitFiles|DisableUnitFiles|SetUnitProperties|Start|Stop|Restart|Reload)"'
-SYSTEMD_OBSERVER_AUTHORITY_IMPORT_PATTERN='\\bsuper::(?:executor|authorization)\\b'
+SYSTEMD_OBSERVER_MUTATION_CALL_PATTERN='\.call\(\s*"(StartUnit|StopUnit|RestartUnit|ReloadUnit|EnableUnitFiles|DisableUnitFiles|SetUnitProperties|Start|Stop|Restart|Reload)"'
+SYSTEMD_OBSERVER_AUTHORITY_IMPORT_PATTERN='\bsuper::(?:executor|authorization)\b'
 SYSTEMD_TRANSPORT_PUBLIC_API_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(observe_service_properties|observe_service_state_properties)[[:space:]]*\('
 
 scan_diagnostic_boundary() {
