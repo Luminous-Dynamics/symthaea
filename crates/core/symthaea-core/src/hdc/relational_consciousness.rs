@@ -330,7 +330,12 @@ pub struct RelationalAssessment {
     /// Turn-taking quality
     pub turn_taking_quality: f64,
 
-    /// Mutual information
+    /// Legacy mutual-information field.
+    ///
+    /// The current implementation is a synchrony/similarity proxy, not an
+    /// information-theoretic mutual-information estimator. New research code
+    /// should prefer the explicit information-flow estimators in the
+    /// relational-harmonics research lane.
     pub mutual_information: f64,
 
     /// Relationship mode
@@ -546,7 +551,11 @@ impl RelationalConsciousness {
         alternations as f64 / (window - 1).max(1) as f64
     }
 
-    /// Compute mutual information (simplified)
+    /// Compute the legacy mutual-information proxy.
+    ///
+    /// IMPORTANT: this currently returns mean interaction synchrony. It is
+    /// intentionally retained for compatibility and must not be interpreted
+    /// as true mutual information.
     fn compute_mutual_information(&self) -> f64 {
         if self.interactions.len() < 2 {
             return 0.0;
