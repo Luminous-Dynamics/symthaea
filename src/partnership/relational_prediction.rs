@@ -1193,6 +1193,11 @@ impl RollingOriginRelationalPredictionSummary {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RollingOriginRelationalPredictionQualification {
+    pub config: RollingOriginRelationalPredictionConfig,
+    /// Commitment over the exact source sample sequence and rolling configuration.
+    pub evaluation_input_blake3: String,
+    /// Exact source-sample start index for each rolling origin.
+    pub origin_starts: Vec<usize>,
     pub observed: RollingOriginRelationalPredictionSummary,
     pub circular_shift_nulls: Vec<PredictionNullSummary>,
     pub feature_decoupling_nulls: Vec<PredictionNullSummary>,
@@ -1200,6 +1205,114 @@ pub struct RollingOriginRelationalPredictionQualification {
 }
 
 impl RollingOriginRelationalPredictionQualification {
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        validate_rolling_qualification_config_shape(&self.config)?;
+
+        if !is_hex_digest(&self.evaluation_input_blake3, 64)
+            || self.observed.status != EvidenceStatus::Measured
+            || self.observed.first_origin != self.config.first_origin
+            || self.observed.train_samples != self.config.train_samples
+            || self.observed.test_samples != self.config.test_samples
+            || self.observed.gap_samples != self.config.gap_samples
+            || self.observed.origin_count != self.config.origin_count
+            || self.observed.step_samples != self.config.step_samples
+            || self.observed.forecast_horizon != self.config.forecast_horizon
+            || self.circular_shift_nulls.len() != self.config.origin_count
+            || self.feature_decoupling_nulls.len() != self.config.origin_count
+            || self.incremental_relational_nulls.len() != self.config.origin_count
+            || self.origin_starts.len() != self.config.origin_count
+            || self.observed.segments.len() != self.config.origin_count
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        let held_out_config = HeldOutRelationalPredictionConfig {
+            train_samples: self.config.train_samples,
+            test_samples: self.config.test_samples,
+            gap_samples: self.config.gap_samples,
+            ridge_lambda: self.config.ridge_lambda,
+        };
+
+        for index in 0..self.config.origin_count {
+            let expected_start = self
+                .config
+                .step_samples
+                .checked_mul(index)
+                .and_then(|offset| self.config.first_origin.checked_add(offset))
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+            if self.origin_starts[index] != expected_start {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+
+            let expected_mse = self.observed.segments[index]
+                .relational_augmented
+                .mean_squared_error;
+
+            let nulls = [
+                (
+                    PredictionNullFamily::CircularShift,
+                    &self.circular_shift_nulls[index],
+                ),
+                (
+                    PredictionNullFamily::FeatureDecoupling,
+                    &self.feature_decoupling_nulls[index],
+                ),
+                (
+                    PredictionNullFamily::IncrementalRelationalShift,
+                    &self.incremental_relational_nulls[index],
+                ),
+            ];
+
+            for (expected_family, null_trace) in nulls {
+                null_trace.validate_trace()?;
+                if null_trace.family != expected_family
+                    || null_trace.feature_set != PredictionFeatureSet::RelationalAugmented
+                    || null_trace.status != EvidenceStatus::Proxy
+                    || null_trace.config != held_out_config
+                    || (null_trace.observed_relational_mse - expected_mse).abs() > 1e-12
+                {
+                    return Err(RelationalPredictionError::InvalidSplit);
+                }
+            }
+
+            let segment = &self.observed.segments[index];
+            let horizon_tolerance = 1e-9 * self.config.forecast_horizon.abs().max(1.0);
+            if (segment.minimum_outcome_horizon - self.config.forecast_horizon).abs()
+                    > horizon_tolerance
+                || (segment.maximum_outcome_horizon - self.config.forecast_horizon).abs()
+                    > horizon_tolerance
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn verify_against_samples(
+        &self,
+        samples: &[RelationalPredictionSample],
+        config: RollingOriginRelationalPredictionConfig,
+        surrogate_count: usize,
+    ) -> Result<(), RelationalPredictionError> {
+        self.validate()?;
+        if config != self.config {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        if rolling_evaluation_input_digest(samples, config) != self.evaluation_input_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        let recomputed =
+            Self::compute(samples, config, surrogate_count)?;
+        if recomputed != *self {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        Ok(())
+    }
+
     pub fn compute(
         samples: &[RelationalPredictionSample],
         config: RollingOriginRelationalPredictionConfig,
@@ -1264,13 +1377,57 @@ impl RollingOriginRelationalPredictionQualification {
             )?);
         }
 
-        Ok(Self {
+        let qualification = Self {
+            config,
+            evaluation_input_blake3: rolling_evaluation_input_digest(samples, config),
+            origin_starts: (0..config.origin_count)
+                .map(|origin| {
+                    config
+                        .step_samples
+                        .checked_mul(origin)
+                        .and_then(|offset| config.first_origin.checked_add(offset))
+                        .ok_or(RelationalPredictionError::InvalidSplit)
+                })
+                .collect::<Result<Vec<_>, _>>()?,
             observed,
             circular_shift_nulls,
             feature_decoupling_nulls,
             incremental_relational_nulls,
-        })
+        };
+        qualification.validate()?;
+        Ok(qualification)
     }
+}
+
+fn validate_rolling_qualification_config_shape(
+    config: &RollingOriginRelationalPredictionConfig,
+) -> Result<(), RelationalPredictionError> {
+    if config.train_samples < 8
+        || config.test_samples < 4
+        || config.origin_count == 0
+        || config.step_samples < config.test_samples
+        || !config.forecast_horizon.is_finite()
+        || config.forecast_horizon <= 0.0
+        || !config.ridge_lambda.is_finite()
+        || config.ridge_lambda < 0.0
+    {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    config
+        .train_samples
+        .checked_add(config.gap_samples)
+        .and_then(|value| value.checked_add(config.test_samples))
+        .and_then(|segment_total| {
+            config
+                .step_samples
+                .checked_mul(config.origin_count - 1)
+                .and_then(|offset| config.first_origin.checked_add(offset))
+                .and_then(|start| start.checked_add(segment_total))
+        })
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+    Ok(())
 }
 
 fn validate_forecast_horizon(
@@ -3521,6 +3678,45 @@ mod tests {
         assert_eq!(summary.segments.len(), 4);
         assert!(summary.mean_relational_profile_mse.is_finite());
         assert!(summary.mean_augmented_mse_improvement().unwrap() >= 0.0);
+    }
+
+    #[test]
+    fn rolling_qualification_replay_binds_schedule_and_source() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+
+        let qualification =
+            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8)
+                .unwrap();
+        qualification.validate().unwrap();
+        assert_eq!(qualification.origin_starts, vec![0, 8, 16, 24]);
+        assert_eq!(
+            qualification.verify_against_samples(&samples, config, 8),
+            Ok(())
+        );
+
+        let mut altered_samples = samples.clone();
+        altered_samples[40].future_outcome += 0.01;
+        assert_eq!(
+            qualification.verify_against_samples(&altered_samples, config, 8),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut tampered = qualification.clone();
+        tampered.origin_starts[2] += 1;
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
     }
 
     #[test]
