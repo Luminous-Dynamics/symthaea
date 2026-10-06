@@ -259,6 +259,8 @@ pub struct NixServicePostStateObservationV1 {
     pub systemd_job: Option<NixSystemdJobEvidenceV1>,
     /// Unique D-Bus owner of org.freedesktop.systemd1 for this observation.
     pub systemd_manager_owner: Option<String>,
+    /// D-Bus daemon incarnation returned by org.freedesktop.DBus.GetId().
+    pub systemd_bus_id: String,
     pub invocation_id: Option<String>,
     /// systemd StateChangeTimestampMonotonic represented as monotonic microseconds.
     pub state_change_at_monotonic_us: u64,
@@ -297,6 +299,7 @@ impl NixServicePostStateObservationV1 {
             return Err(NixPostStateErrorV1::DefinitionMismatch);
         }
         validate_unique_manager_owner(manager_owner)?;
+        validate_bus_id(&self.systemd_bus_id)?;
         if let Some(job) = &self.systemd_job {
             job.validate_shape()?;
             if self.systemd_manager_owner.as_deref() != Some(job.manager_owner.as_str()) {
@@ -339,6 +342,7 @@ pub struct NixPostStateStabilitySampleV1 {
     pub definition_content_digest: String,
     pub state_digest: String,
     pub manager_owner: String,
+    pub systemd_bus_id: String,
     pub invocation_id: Option<String>,
     pub state_change_at_monotonic_us: u64,
     pub captured_at_monotonic_us: u64,
@@ -359,6 +363,7 @@ impl NixPostStateStabilitySampleV1 {
         )?;
         validate_digest(&self.state_digest, "stability state digest")?;
         validate_unique_manager_owner(&self.manager_owner)?;
+        validate_bus_id(&self.systemd_bus_id)?;
         validate_optional_invocation_id(self.invocation_id.as_deref(), "stability invocation id")?;
         if self.captured_at_monotonic_us < self.state_change_at_monotonic_us {
             return Err(NixPostStateErrorV1::ObservationBeforeStateChange);
@@ -378,6 +383,7 @@ impl NixPostStateStabilitySampleV1 {
         put_str(&mut h, &self.definition_content_digest);
         put_str(&mut h, &self.state_digest);
         put_str(&mut h, &self.manager_owner);
+        put_str(&mut h, &self.systemd_bus_id);
         put_opt_str(&mut h, self.invocation_id.as_deref());
         put_u64(&mut h, self.state_change_at_monotonic_us);
         put_u64(&mut h, self.captured_at_monotonic_us);
@@ -445,6 +451,7 @@ impl NixPostStateStabilityEvidenceV1 {
                 || sample.definition_content_digest != first.definition_content_digest
                 || sample.state_digest != first.state_digest
                 || sample.manager_owner != first.manager_owner
+                || sample.systemd_bus_id != first.systemd_bus_id
                 || sample.invocation_id != first.invocation_id
                 || sample.state_change_at_monotonic_us != first.state_change_at_monotonic_us
             {
@@ -580,6 +587,7 @@ pub struct NixPostStateReceiptV1 {
     pub observed_service_result: String,
     /// Unique D-Bus owner of systemd1 for the observed service-manager epoch.
     pub systemd_manager_owner: String,
+    pub systemd_bus_id: String,
     pub pre_invocation_id: Option<String>,
     pub post_invocation_id: Option<String>,
     pub postcondition: NixPostconditionAssessmentV1,
@@ -733,6 +741,7 @@ impl NixPostStateReceiptV1 {
             observed_unit_file_state: observation.unit_file_state,
             observed_service_result: observation.service_result.clone(),
             systemd_manager_owner: manager_owner,
+            systemd_bus_id: observation.systemd_bus_id.clone(),
             pre_invocation_id: expectation.pre_invocation_id.clone(),
             post_invocation_id: observation.invocation_id.clone(),
             postcondition: assessment,
@@ -931,6 +940,7 @@ impl NixPostStateReceiptV1 {
             unit: self.target_unit.clone(),
             source_identity_digest: self.observed_definition_digest.clone(),
             manager_owner: self.systemd_manager_owner.clone(),
+            bus_id: self.systemd_bus_id.clone(),
             files: self.observed_definition_content_files.clone(),
             captured_at_monotonic_us: self.observed_at_monotonic_us,
         };
@@ -986,6 +996,7 @@ impl NixPostStateReceiptV1 {
         require_nonempty(&self.observed_sub_state, "observed service sub-state")?;
         require_nonempty(&self.observed_service_result, "observed service result")?;
         validate_unique_manager_owner(&self.systemd_manager_owner)?;
+        validate_bus_id(&self.systemd_bus_id)?;
         let recomputed_state_digest = semantic_state_digest(
             self.operation,
             &self.target_unit,
@@ -1120,6 +1131,7 @@ impl NixPostStateReceiptV1 {
         put_u8(&mut h, unit_file_state_tag(self.observed_unit_file_state));
         put_str(&mut h, &self.observed_service_result);
         put_str(&mut h, &self.systemd_manager_owner);
+        put_str(&mut h, &self.systemd_bus_id);
         put_opt_str(&mut h, self.pre_invocation_id.as_deref());
         put_opt_str(&mut h, self.post_invocation_id.as_deref());
         put_u8(&mut h, assessment_tag(self.postcondition));
