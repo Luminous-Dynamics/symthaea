@@ -154,6 +154,7 @@ jobs:
           assert report["remediation_evaluation_verification_evidence_verified"] is True
           assert report["remediation_evaluation_environment_verified"] is True
           assert report["remediation_evaluation_manifest_verified"] is True
+          assert report["remediation_measurement_verified"] is True
           assert report["remediation_evaluation_bundle_verified"] is True
           assert report["remediation_pre_lineage_verified"] is True
           assert report["remediation_post_lineage_verified"] is True
@@ -178,6 +179,8 @@ jobs:
           assert report["remediation_evaluation_verification_evidence_substitution_blocked"] is True
           assert report["remediation_evaluation_environment_substitution_blocked"] is True
           assert report["remediation_evaluation_environment_revision_mismatch_blocked"] is True
+          assert report["remediation_measurement_substitution_blocked"] is True
+          assert report["remediation_measurement_dimension_drop_blocked"] is True
           assert report["remediation_evaluation_manifest_substitution_blocked"] is True
           assert report["remediation_evaluation_source_dataset_mismatch_blocked"] is True
           assert report["remediation_set_role_substitution_blocked"] is True
