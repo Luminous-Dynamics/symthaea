@@ -39,6 +39,7 @@ const MAX_NEUROSEMANTIC_AUTHORITY_KEY_REF_BYTES: usize = 4096;
 const MAX_NEUROSEMANTIC_AUTHORITY_SIGNATURE_BYTES: usize = 64;
 const MAX_NEUROSEMANTIC_RESOLVER_REF_BYTES: usize = 4096;
 const MAX_NEUROSEMANTIC_STATUS_SOURCE_REF_BYTES: usize = 4096;
+const MAX_NEUROSEMANTIC_DERIVATION_INPUT_ARTIFACTS: usize = 32;
 const MAX_NEUROSEMANTIC_AUTHORITY_RESOLUTION_TTL_S: u64 = 86_400;
 const NEUROSEMANTIC_AUTHORITY_RESOLUTION_DOMAIN: &[u8] =
     b"symthaea-neurosemantic-authority-resolution-v1\0";
@@ -100,7 +101,7 @@ pub enum NeurosemanticInferenceClass {
     Identity,
 }
 
-pub const NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION: u16 = 7;
+pub const NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION: u16 = 8;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum NeurosemanticSecondaryUse {
@@ -117,6 +118,27 @@ pub enum NeurosemanticSecondaryUse {
 pub enum NeurosemanticRetentionPolicy {
     Ephemeral,
     UntilUnixS(u64),
+}
+
+pub const NEUROSEMANTIC_DERIVATION_LINEAGE_SCHEMA_VERSION: u16 = 1;
+
+/// Structured external lineage evidence for a derived cognitive artifact.
+///
+/// This is intentionally a compact protocol boundary, not a full provenance ontology:
+/// input entities, the transformation activity, its execution revision, and the output
+/// artifact are explicit so an independent verifier can check identity relationships.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticDerivationLineageRecord {
+    pub schema_version: u16,
+    pub lineage_ref: String,
+    #[serde(default)]
+    pub input_artifact_refs: Vec<String>,
+    pub activity_ref: String,
+    pub activity_revision: String,
+    pub output_artifact_hash: String,
+    /// Canonical Git object ID for the execution context that produced the artifact.
+    pub execution_revision: String,
+    pub generated_at_unix_s: u64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -140,6 +162,9 @@ pub struct NeurosemanticHandlingPolicy {
     pub derivation_provenance_ref: String,
     /// BLAKE3-256 binding over the exact derivation reference and exact lineage record bytes.
     pub derivation_provenance_hash: String,
+    /// Exact payload/artifact hash declared by the external lineage record.
+    #[serde(default)]
+    pub derivation_output_artifact_hash: String,
     /// Jurisdiction identifier asserted for the originating data/controller context.
     /// This is an interoperable policy identifier, not a legal determination.
     pub origin_jurisdiction: String,
@@ -164,6 +189,7 @@ impl Default for NeurosemanticHandlingPolicy {
             policy_provenance_hash: String::new(),
             derivation_provenance_ref: String::new(),
             derivation_provenance_hash: String::new(),
+            derivation_output_artifact_hash: String::new(),
             origin_jurisdiction: String::new(),
             permitted_destination_jurisdictions: BTreeSet::new(),
             permitted_secondary_uses: BTreeSet::new(),
@@ -620,6 +646,7 @@ impl NeurosemanticHandlingPolicy {
             && valid_blake3_digest(&self.policy_provenance_hash)
             && valid_identifier(&self.derivation_provenance_ref)
             && valid_blake3_digest(&self.derivation_provenance_hash)
+            && valid_blake3_digest(&self.derivation_output_artifact_hash)
             && valid_jurisdiction_id(&self.origin_jurisdiction)
             && !self.permitted_destination_jurisdictions.is_empty()
             && self.permitted_destination_jurisdictions.len() <= MAX_NEUROSEMANTIC_DESTINATION_JURISDICTIONS
@@ -649,14 +676,33 @@ impl NeurosemanticHandlingPolicy {
     }
 
     /// Verify that the exact external derivation/data-lineage record is bound to the declared
-    /// reference and digest. This does not itself establish that the lineage is honest.
+    /// reference, digest, and declared output artifact identity. This does not itself establish
+    /// that the lineage assertions are truthful; it establishes only exact artifact binding.
+    pub fn verify_derivation_provenance_record_bytes(
+        &self,
+        record_bytes: &[u8],
+    ) -> Result<NeurosemanticDerivationLineageRecord, String> {
+        if !self.validates() {
+            return Err("neurosemantic derivation provenance policy state is invalid".into());
+        }
+        let record = NeurosemanticDerivationLineageRecord::from_json_bytes(record_bytes)?;
+        if record.lineage_ref != self.derivation_provenance_ref {
+            return Err("neurosemantic derivation lineage reference mismatch".into());
+        }
+        if compute_derivation_provenance_hash(&self.derivation_provenance_ref, record_bytes)
+            != self.derivation_provenance_hash
+        {
+            return Err("neurosemantic derivation provenance record hash mismatch".into());
+        }
+        if record.output_artifact_hash != self.derivation_output_artifact_hash {
+            return Err("neurosemantic derivation lineage output artifact mismatch".into());
+        }
+        Ok(record)
+    }
+
+    /// Verify the structured derivation binding as a boolean predicate.
     pub fn verify_derivation_provenance_binding_bytes(&self, record_bytes: &[u8]) -> bool {
-        self.validates()
-            && record_bytes.len() <= MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
-            && compute_derivation_provenance_hash(
-                &self.derivation_provenance_ref,
-                record_bytes,
-            ) == self.derivation_provenance_hash
+        self.verify_derivation_provenance_record_bytes(record_bytes).is_ok()
     }
 
     /// Produce a handling capability only after the external policy record,
@@ -689,13 +735,7 @@ impl NeurosemanticHandlingPolicy {
         {
             return Err("neurosemantic policy provenance reference/record binding mismatch".into());
         }
-        if compute_derivation_provenance_hash(
-            &self.derivation_provenance_ref,
-            derivation_record_bytes,
-        ) != self.derivation_provenance_hash
-        {
-            return Err("neurosemantic derivation provenance reference/record binding mismatch".into());
-        }
+        self.verify_derivation_provenance_record_bytes(derivation_record_bytes)?;
         if !resolution.verify_status_source_binding_bytes(status_record_bytes) {
             return Err("neurosemantic authority status source reference/record binding mismatch".into());
         }
@@ -1143,6 +1183,10 @@ impl NeurosemanticPacket {
         if payload.intrinsic_data_class() != Some(data_policy.data_class) {
             return Err("neurosemantic payload type does not match its declared data class".into());
         }
+        let expected_output_artifact_hash = payload_hash(&payload)?;
+        if data_policy.handling.derivation_output_artifact_hash != expected_output_artifact_hash {
+            return Err("neurosemantic derivation lineage output does not match the payload".into());
+        }
         let mut packet = Self::new(
             sequence,
             sender_id,
@@ -1187,6 +1231,11 @@ impl NeurosemanticPacket {
         if self.payload_hash != expected_payload_hash {
             return Err("payload hash mismatch".into());
         }
+        if self.data_policy.validates()
+            && self.packet_derivation_output_artifact_hash() != expected_payload_hash
+        {
+            return Err("neurosemantic derivation lineage output does not match the payload".into());
+        }
 
         let mut canonical = self.clone();
         canonical.packet_hash.clear();
@@ -1196,6 +1245,10 @@ impl NeurosemanticPacket {
             return Err("packet hash mismatch".into());
         }
         Ok(())
+    }
+
+    fn packet_derivation_output_artifact_hash(&self) -> &str {
+        &self.data_policy.handling.derivation_output_artifact_hash
     }
 
     pub fn refresh_hashes(&mut self) -> Result<(), String> {
@@ -1458,6 +1511,42 @@ pub fn compute_policy_provenance_hash(provenance_ref: &str, record_bytes: &[u8])
     hasher.finalize().to_hex().to_string()
 }
 
+impl NeurosemanticDerivationLineageRecord {
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic derivation lineage JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let record: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("neurosemantic derivation lineage JSON: {error}"))?;
+        record.validate()?;
+        Ok(record)
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != NEUROSEMANTIC_DERIVATION_LINEAGE_SCHEMA_VERSION
+            || !valid_identifier(&self.lineage_ref)
+            || !valid_identifier(&self.activity_ref)
+            || !valid_identifier(&self.activity_revision)
+            || !valid_blake3_digest(&self.output_artifact_hash)
+            || !valid_execution_revision(&self.execution_revision)
+            || self.input_artifact_refs.is_empty()
+            || self.input_artifact_refs.len() > MAX_NEUROSEMANTIC_DERIVATION_INPUT_ARTIFACTS
+            || self.input_artifact_refs.iter().any(|id| !valid_identifier(id))
+        {
+            return Err("neurosemantic derivation lineage fields are invalid".into());
+        }
+        let unique_inputs: BTreeSet<&str> =
+            self.input_artifact_refs.iter().map(String::as_str).collect();
+        if unique_inputs.len() != self.input_artifact_refs.len() {
+            return Err("neurosemantic derivation lineage contains duplicate input artifacts".into());
+        }
+        Ok(())
+    }
+}
+
 pub fn compute_derivation_provenance_hash(provenance_ref: &str, record_bytes: &[u8]) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(NEUROSEMANTIC_DERIVATION_PROVENANCE_DOMAIN);
@@ -1485,6 +1574,12 @@ fn valid_identifier(value: &str) -> bool {
 fn valid_blake3_digest(value: &str) -> bool {
     value.len() == 64
         && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        && value.bytes().any(|byte| byte != b'0')
+}
+
+fn valid_execution_revision(value: &str) -> bool {
+    (value.len() == 40 || value.len() == 64)
+        && value.bytes().all(|byte| byte.is_ascii_hexdigit())
         && value.bytes().any(|byte| byte != b'0')
 }
 
@@ -1527,6 +1622,23 @@ fn payload_hash(payload: &NeurosemanticPayload) -> Result<String, String> {
 mod tests {
     use super::*;
 
+    fn synthetic_output_artifact_hash() -> String {
+        payload_hash(&NeurosemanticPayload::Hypervector(vec![1, -1])).unwrap()
+    }
+
+    fn synthetic_derivation_lineage_record() -> NeurosemanticDerivationLineageRecord {
+        NeurosemanticDerivationLineageRecord {
+            schema_version: NEUROSEMANTIC_DERIVATION_LINEAGE_SCHEMA_VERSION,
+            lineage_ref: "synthetic-derivation-record-1".into(),
+            input_artifact_refs: vec!["input-artifact-1".into(), "input-artifact-2".into()],
+            activity_ref: "synthetic-transform".into(),
+            activity_revision: "transform-v1".into(),
+            output_artifact_hash: synthetic_output_artifact_hash(),
+            execution_revision: "1".repeat(40),
+            generated_at_unix_s: 120,
+        }
+    }
+
     fn semantic_policy() -> NeurosemanticDataPolicy {
         NeurosemanticDataPolicy {
             schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
@@ -1543,7 +1655,7 @@ mod tests {
             derivation_provenance_ref: "synthetic-derivation-record-1".into(),
             derivation_provenance_hash: compute_derivation_provenance_hash(
                 "synthetic-derivation-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
             ),
             origin_jurisdiction: "ZA".into(),
                 permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
@@ -1619,7 +1731,7 @@ mod tests {
             .handling
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
                 b"synthetic-status-record-1",
                 &attestation,
                 &verifying_key,
@@ -1742,7 +1854,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_data_policy_schema_is_rejected_by_v7_validator() {
+    fn legacy_data_policy_schema_is_rejected_by_v8_validator() {
         let policy = semantic_policy();
         let mut value = serde_json::to_value(&policy).unwrap();
         value
@@ -1917,7 +2029,7 @@ mod tests {
             .handling
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
                 b"synthetic-status-record-1",
                 &attestation,
                 &verifying_key,
@@ -2015,7 +2127,7 @@ mod tests {
             .handling
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
                 b"synthetic-status-record-1",
                 &substituted_attestation,
                 &authority_key,
@@ -2038,7 +2150,7 @@ mod tests {
             .handling
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
                 b"synthetic-status-record-1",
                 &attestation,
                 &authority_key,
@@ -2128,7 +2240,7 @@ mod tests {
             .handling
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
                 b"synthetic-status-record-1",
                 &attestation,
                 &authority_key,
@@ -2155,7 +2267,7 @@ mod tests {
             .handling
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
                 b"synthetic-status-record-1",
                 &attestation,
                 &authority_key,
@@ -2219,7 +2331,7 @@ mod tests {
             .handling
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
                 b"synthetic-status-record-1",
                 &attestation,
                 &authority_key,
@@ -2236,7 +2348,7 @@ mod tests {
             .handling
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
                 b"synthetic-status-record-1",
                 &attestation,
                 &authority_key,
@@ -2251,7 +2363,7 @@ mod tests {
             .handling
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
                 b"synthetic-status-record-1",
                 &attestation,
                 &authority_key,
@@ -2326,14 +2438,14 @@ mod tests {
     fn handling_policy_requires_exact_derivation_provenance() {
         let mut policy = semantic_policy().handling;
         assert!(policy.verify_derivation_provenance_binding_bytes(
-            b"synthetic-derivation-record-1"
+            &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap()
         ));
         assert!(!policy.verify_derivation_provenance_binding_bytes(
             b"synthetic-derivation-record-2"
         ));
         policy.derivation_provenance_ref = "synthetic-derivation-record-2".into();
         assert!(!policy.verify_derivation_provenance_binding_bytes(
-            b"synthetic-derivation-record-1"
+            &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap()
         ));
     }
 
@@ -2351,7 +2463,7 @@ mod tests {
             .handling
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
                 b"synthetic-status-record-1",
                 &attestation,
                 &authority_key,
@@ -2365,7 +2477,7 @@ mod tests {
             .handling
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
                 b"synthetic-status-record-2",
                 &attestation,
                 &authority_key,
@@ -2401,7 +2513,7 @@ mod tests {
             derivation_provenance_ref: "synthetic-derivation-record-1".into(),
             derivation_provenance_hash: compute_derivation_provenance_hash(
                 "synthetic-derivation-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
             ),
             origin_jurisdiction: "ZA".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
@@ -2423,7 +2535,7 @@ mod tests {
             derivation_provenance_ref: "synthetic-derivation-record-1".into(),
             derivation_provenance_hash: compute_derivation_provenance_hash(
                 "synthetic-derivation-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
             ),
             origin_jurisdiction: "ZA".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
@@ -2484,7 +2596,7 @@ mod tests {
                 .handling
                 .bind_policy_provenance_with_attestation_and_resolution(
                     b"synthetic-policy-record-1",
-                    b"synthetic-derivation-record-1",
+                    &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
                     b"synthetic-status-record-1",
                     &fresh_attestation,
                     &fresh_key,
@@ -2549,7 +2661,7 @@ mod tests {
             derivation_provenance_ref: "synthetic-derivation-record-1".into(),
             derivation_provenance_hash: compute_derivation_provenance_hash(
                 "synthetic-derivation-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
             ),
             origin_jurisdiction: "ZA".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
@@ -2574,7 +2686,7 @@ mod tests {
             derivation_provenance_ref: "synthetic-derivation-record-1".into(),
             derivation_provenance_hash: compute_derivation_provenance_hash(
                 "synthetic-derivation-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
             ),
             origin_jurisdiction: "ZA".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into(), "GB".into()]),
@@ -2609,7 +2721,7 @@ mod tests {
             derivation_provenance_ref: "synthetic-derivation-record-1".into(),
             derivation_provenance_hash: compute_derivation_provenance_hash(
                 "synthetic-derivation-record-1",
-                b"synthetic-derivation-record-1",
+                &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
             ),
             origin_jurisdiction: "za".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["za".into()]),
