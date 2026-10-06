@@ -504,6 +504,31 @@ function assertCanvasStatistics(statistics, width, height, label = 'WebGPU', cla
   }
 }
 
+function assertCompositorMatchesCanvasBitmap(bitmapSamples, compositorSamples, label = 'WebGPU compositor', classification = 'renderer') {
+  const bitmapByName = new Map(bitmapSamples.map(sample => [sample.name, sample.rgba]));
+  const compositorByName = new Map(compositorSamples.map(sample => [sample.name, sample.rgba]));
+  const mismatches = [];
+  for (const [name, bitmap] of bitmapByName) {
+    const compositor = compositorByName.get(name);
+    if (!compositor || bitmap.length !== compositor.length) {
+      mismatches.push({ name, bitmap, compositor, reason: 'missing-or-invalid-sample' });
+      continue;
+    }
+    const maxChannelDelta = Math.max(
+      ...bitmap.map((value, index) => Math.abs(value - compositor[index])),
+    );
+    if (maxChannelDelta > 12) {
+      mismatches.push({ name, bitmap, compositor, max_channel_delta: maxChannelDelta });
+    }
+  }
+  if (mismatches.length > 0) {
+    throw new QualificationError(
+      `${label} pixels diverge from the canvas bitmap: ${JSON.stringify(mismatches)}`,
+      classification,
+    );
+  }
+}
+
 function assertSemanticMovieSamples(samples, label = 'WebGPU', classification = 'renderer') {
   const byName = new Map(samples.map(sample => [sample.name, sample.rgba]));
   const left = byName.get('left');
@@ -1661,6 +1686,18 @@ async function runMode(mode) {
         'WebGPU compositor scene',
         'renderer',
       );
+      const sceneBitmapSamples = await canvasPixelSamples(page, '#webgpu-cognitive-canvas', [
+        { name: 'background', x: 32, y: 32 },
+        { name: 'polygon', x: 100, y: 100 },
+        { name: 'transformed-line', x: 43, y: 371 },
+        { name: 'circle', x: 360, y: 350 },
+      ]);
+      assertCompositorMatchesCanvasBitmap(
+        sceneBitmapSamples,
+        compositorSceneSamples.screenshot_samples,
+        'WebGPU compositor scene',
+        'renderer',
+      );
 
       const compositorMovieStatistics = await screenshotCanvasPixelStatistics(
         page,
@@ -1684,6 +1721,18 @@ async function runMode(mode) {
         ],
       );
       assertSemanticMovieSamples(
+        compositorMovieSamples.screenshot_samples,
+        'WebGPU compositor movie',
+        'renderer',
+      );
+      const movieBitmapSamples = await canvasPixelSamples(page, '#webgpu-movie-canvas', [
+        { name: 'left', x: 48, y: 96 },
+        { name: 'right', x: 144, y: 96 },
+        { name: 'top', x: 96, y: 48 },
+        { name: 'bottom', x: 96, y: 144 },
+      ]);
+      assertCompositorMatchesCanvasBitmap(
+        movieBitmapSamples,
         compositorMovieSamples.screenshot_samples,
         'WebGPU compositor movie',
         'renderer',
@@ -1750,6 +1799,18 @@ async function runMode(mode) {
           { name: 'circle', x: 360, y: 350 },
         ],
       );
+      const repeatSceneBitmapSamples = await canvasPixelSamples(page, '#webgpu-cognitive-canvas', [
+        { name: 'background', x: 32, y: 32 },
+        { name: 'polygon', x: 100, y: 100 },
+        { name: 'transformed-line', x: 43, y: 371 },
+        { name: 'circle', x: 360, y: 350 },
+      ]);
+      assertCompositorMatchesCanvasBitmap(
+        repeatSceneBitmapSamples,
+        repeatCompositorSceneSamples.screenshot_samples,
+        'WebGPU compositor repeat scene',
+        'renderer',
+      );
       const repeatCompositorMovieSamples = await screenshotCanvasPixelSamples(
         page,
         '#webgpu-movie-canvas',
@@ -1759,6 +1820,18 @@ async function runMode(mode) {
           { name: 'top', x: 96, y: 48 },
           { name: 'bottom', x: 96, y: 144 },
         ],
+      );
+      const repeatMovieBitmapSamples = await canvasPixelSamples(page, '#webgpu-movie-canvas', [
+        { name: 'left', x: 48, y: 96 },
+        { name: 'right', x: 144, y: 96 },
+        { name: 'top', x: 96, y: 48 },
+        { name: 'bottom', x: 96, y: 144 },
+      ]);
+      assertCompositorMatchesCanvasBitmap(
+        repeatMovieBitmapSamples,
+        repeatCompositorMovieSamples.screenshot_samples,
+        'WebGPU compositor repeat movie',
+        'renderer',
       );
       assertSemanticSceneSamples(
         repeatCompositorSceneSamples.screenshot_samples,
@@ -1793,8 +1866,10 @@ async function runMode(mode) {
         semantic_scene_samples: semanticSceneSamples,
         semantic_movie_samples: semanticMovieSamples,
         compositor_scene_statistics: compositorSceneStatistics,
+        compositor_scene_bitmap_samples: sceneBitmapSamples,
         compositor_scene_samples: compositorSceneSamples,
         compositor_movie_statistics: compositorMovieStatistics,
+        compositor_movie_bitmap_samples: movieBitmapSamples,
         compositor_movie_samples: compositorMovieSamples,
         deterministic_repeat: true,
         page_errors: pageErrors,
@@ -1938,7 +2013,7 @@ try {
   }
 
   const artifact = {
-    schema: 'symthaea-ui-webgpu-qualification-v8',
+    schema: 'symthaea-ui-webgpu-qualification-v9',
     harness_self_tests_passed: true,
     url: URL,
     chromium: CHROMIUM,
