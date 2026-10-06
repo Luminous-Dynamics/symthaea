@@ -335,6 +335,9 @@ impl MorphophonologicalRuleSet {
         self.resource_evidence
             .validate()
             .map_err(|_| MorphophonologicalRuleSetError::InvalidResourceEvidence)?;
+        if self.source_id != self.resource_evidence.source_id {
+            return Err(MorphophonologicalRuleSetError::ResourceSourceIdMismatch);
+        }
         if self.rule_id.trim().is_empty() {
             return Err(MorphophonologicalRuleSetError::EmptyRuleSetId);
         }
@@ -518,6 +521,7 @@ pub enum MorphophonologicalRuleSetError {
     EmptyDialectScope,
     UnsupportedSelectionPolicy,
     InvalidResourceEvidence,
+    ResourceSourceIdMismatch,
     EmptyRuleSetId,
     EmptyProvenance,
     EmptyRuleSet,
@@ -541,6 +545,7 @@ impl std::fmt::Display for MorphophonologicalRuleSetError {
             Self::EmptyDialectScope => write!(f, "morphophonological rule-set dialect scope must be non-empty"),
             Self::UnsupportedSelectionPolicy => write!(f, "morphophonological rule-set selection policy is unsupported"),
             Self::InvalidResourceEvidence => write!(f, "morphophonological rule-set resource evidence is invalid"),
+            Self::ResourceSourceIdMismatch => write!(f, "morphophonological rule-set source id must match its resource evidence source id"),
             Self::EmptyRuleSetId => write!(f, "morphophonological rule-set id must be non-empty"),
             Self::EmptyProvenance => write!(f, "morphophonological rule-set provenance must be non-empty"),
             Self::EmptyRuleSet => write!(f, "morphophonological rule set must contain at least one rule"),
@@ -2292,6 +2297,20 @@ mod tests {
         )
         .unwrap();
         assert_ne!(rule_set.resource_blake3(), tampered.resource_blake3());
+    }
+
+
+    #[test]
+    fn morphophonological_rule_set_rejects_dual_source_id_drift() {
+        let mut rule_set = morphophonological_fixture_rule_set();
+        rule_set.source_id = "fixture:other-source-v1".into();
+
+        assert_eq!(
+            rule_set
+                .validate()
+                .expect_err("rule-set and resource evidence identities must remain aligned"),
+            MorphophonologicalRuleSetError::ResourceSourceIdMismatch
+        );
     }
 
 
