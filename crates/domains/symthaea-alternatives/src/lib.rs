@@ -649,7 +649,7 @@ pub struct MeasurementUncertaintyRef {
     pub measurement_model_digest: String,
     /// Quantitative statement reported with the observation.
     pub statement: MeasurementUncertaintyStatement,
-    /// Exact provenance for evaluation, combination, dependence, and coverage methodology.
+    /// Exact provenance for evaluation, combination, dependence, distribution, degrees-of-freedom, and coverage methodology.
     pub evaluation: MeasurementUncertaintyEvaluationRef,
     /// Exact measurand identity to which the uncertainty statement applies.
     pub measurand_id: String,
@@ -4226,8 +4226,8 @@ struct CanonicalMeasurementUncertaintyBinding<'a> {
 ///
 /// The digest binds the reported combined uncertainty to the exact observation,
 /// budget record, measurement model, procedure, component records, component-set
-/// digest, and source-supplied uncertainty record digest. It does not evaluate
-/// the scientific correctness of the budget's calculation.
+/// digest, evaluation lineage, and source-supplied uncertainty record digest. It does not
+/// evaluate the scientific correctness of the budget's calculation.
 fn canonical_measurement_uncertainty_binding_hash(
     uncertainty: &MeasurementUncertaintyRef,
 ) -> Result<String, AssessmentError> {
