@@ -304,6 +304,7 @@ pub enum NeurosemanticRemediationUncertainty {
         upper_numerator: i64,
         scale: u32,
         confidence_level_bps: u16,
+        uncertainty_method_ref: String,
     },
 }
 
@@ -403,6 +404,7 @@ impl NeurosemanticRemediationMeasurementArtifact {
                     upper_numerator,
                     scale,
                     confidence_level_bps,
+                    uncertainty_method_ref,
                 } => {
                     if lower_numerator > upper_numerator
                         || scale > 12
@@ -411,6 +413,7 @@ impl NeurosemanticRemediationMeasurementArtifact {
                         || measurement.estimate_numerator > upper_numerator
                         || confidence_level_bps == 0
                         || confidence_level_bps > 10_000
+                        || !valid_identifier(&uncertainty_method_ref)
                     {
                         return Err("neurosemantic remediation measurement uncertainty is invalid".into());
                     }
@@ -3869,6 +3872,7 @@ mod tests {
                         upper_numerator: 1,
                         scale: 4,
                         confidence_level_bps: 9500,
+                        uncertainty_method_ref: "wilson-interval-v1".into(),
                     },
                     eligible_sample_count: 10,
                     observed_sample_count: 10,
