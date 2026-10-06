@@ -26,6 +26,8 @@ pub struct NixServiceEffectContextV1 {
     pub authorized_generation: u64,
     pub pre_state_digest: String,
     pub authorized_definition_digest: String,
+    /// Digest of the observer-produced exact definition-content commitment.
+    pub authorized_definition_content_digest: String,
     pub pre_invocation_id: Option<String>,
     pub required_stability_us: u64,
 }
@@ -37,6 +39,7 @@ impl NixServiceEffectContextV1 {
         authorized_generation: u64,
         pre_state_digest: impl Into<String>,
         authorized_definition_digest: impl Into<String>,
+        authorized_definition_content_digest: impl Into<String>,
         pre_invocation_id: Option<String>,
         required_stability_us: u64,
     ) -> Result<Self, NixServiceEffectContextErrorV1> {
@@ -46,6 +49,7 @@ impl NixServiceEffectContextV1 {
             authorized_generation,
             pre_state_digest: pre_state_digest.into(),
             authorized_definition_digest: authorized_definition_digest.into(),
+            authorized_definition_content_digest: authorized_definition_content_digest.into(),
             pre_invocation_id,
             required_stability_us,
         };
@@ -68,6 +72,10 @@ impl NixServiceEffectContextV1 {
             &self.authorized_definition_digest,
             "authorized definition digest",
         )?;
+        validate_digest(
+            &self.authorized_definition_content_digest,
+            "authorized definition content digest",
+        )?;
         validate_invocation_id(self.pre_invocation_id.as_deref())?;
         if self.required_stability_us > MAX_STABILITY_WINDOW_US {
             return Err(NixServiceEffectContextErrorV1::StabilityWindowTooLarge);
@@ -84,6 +92,7 @@ impl NixServiceEffectContextV1 {
         put_u64(&mut hasher, self.authorized_generation);
         put_str(&mut hasher, &self.pre_state_digest);
         put_str(&mut hasher, &self.authorized_definition_digest);
+        put_str(&mut hasher, &self.authorized_definition_content_digest);
         put_opt_str(&mut hasher, self.pre_invocation_id.as_deref());
         put_u64(&mut hasher, self.required_stability_us);
         Ok(hasher.finalize().to_hex().to_string())
@@ -174,6 +183,7 @@ mod tests {
             42,
             &"aa".repeat(32),
             &"bb".repeat(32),
+            &"dd".repeat(32),
             Some("cc".repeat(16)),
             1_000,
         )
@@ -209,6 +219,10 @@ mod tests {
             },
             NixServiceEffectContextV1 {
                 authorized_definition_digest: "ee".repeat(32),
+                ..base.clone()
+            },
+            NixServiceEffectContextV1 {
+                authorized_definition_content_digest: "ff".repeat(32),
                 ..base.clone()
             },
             NixServiceEffectContextV1 {
