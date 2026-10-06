@@ -1034,8 +1034,10 @@ impl NixPostStateReceiptV1 {
                 || last.unit_object_path != self.observed_unit_object_path
                 || last.observed_generation != self.observed_generation
                 || last.definition_digest != self.observed_definition_digest
+                || last.definition_content_digest != self.observed_definition_content_digest
                 || last.state_digest != recomputed_state_digest
                 || last.manager_owner != self.systemd_manager_owner
+                || last.systemd_bus_id != self.systemd_bus_id
                 || last.invocation_id != self.post_invocation_id
             {
                 return Err(NixPostStateErrorV1::StabilityIdentityOrStateChanged);
@@ -2066,6 +2068,25 @@ mod tests {
         assert_eq!(
             evidence.validate_shape().unwrap_err(),
             NixPostStateErrorV1::StabilityIdentityOrStateChanged
+        );
+    }
+
+    #[test]
+    fn receipt_bus_incarnation_change_invalidates_stability_binding() {
+        let mut receipt = build_receipt(
+            &expectation(NixServiceOperationKindV1::Start),
+            &observation(
+                NixServiceOperationKindV1::Start,
+                ServiceActiveStateV1::Active,
+                ServiceUnitFileStateV1::Enabled,
+            ),
+            None,
+        )
+        .unwrap();
+        receipt.systemd_bus_id = "fedcba9876543210fedcba9876543210".into();
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::DefinitionMismatch
         );
     }
 
