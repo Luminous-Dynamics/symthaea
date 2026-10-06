@@ -22,7 +22,7 @@ mod strict_json;
 pub use eddsa_jcs_2022::{verify_eddsa_jcs_2022, EDDSA_JCS_2022};
 
 use symthaea_epistemic_types::{
-    url_values_equivalent, validate_xsd11_date_time_stamp,
+    parse_xsd11_date_time_stamp, url_values_equivalent, validate_xsd11_date_time_stamp,
     ClaimControllerDocumentIdentity, ClaimControllerIdentity, ClaimVerificationMethod,
     FederationDependency,
     ControllerDocumentDereferenceAttestation, ControllerDocumentResolutionSource,
@@ -1160,10 +1160,10 @@ fn extract_relationship_methods(
 }
 
 fn timestamps_equal(left: &str, right: &str) -> Result<bool, SnapshotError> {
-    let left = chrono::DateTime::parse_from_rfc3339(left)
-        .map_err(|_| SnapshotError::Malformed("timestamp must be RFC3339".into()))?;
-    let right = chrono::DateTime::parse_from_rfc3339(right)
-        .map_err(|_| SnapshotError::Malformed("timestamp must be RFC3339".into()))?;
+    let left = parse_xsd11_date_time_stamp(left)
+        .map_err(|_| SnapshotError::Malformed("timestamp must be XML Schema 1.1 dateTimeStamp".into()))?;
+    let right = parse_xsd11_date_time_stamp(right)
+        .map_err(|_| SnapshotError::Malformed("timestamp must be XML Schema 1.1 dateTimeStamp".into()))?;
     Ok(left == right)
 }
 
@@ -1398,6 +1398,30 @@ mod tests {
             Err(SnapshotError::Malformed(message))
                 if message.contains("XML Schema 1.1 dateTimeStamp")
         ));
+    }
+
+    #[test]
+    fn relationship_lifecycle_timestamp_comparison_accepts_xsd_equivalence() {
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "verificationMethod": [{
+                "id": "https://example.test/controller#key-1",
+                "type": "Multikey",
+                "controller": "https://example.test/controller",
+                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+                "expires": "2026-10-05T24:00:00Z"
+            }],
+            "assertionMethod": [{
+                "id": "https://example.test/controller#key-1",
+                "expires": "2026-10-06T00:00:00Z"
+            }]
+        }"##.into();
+
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+        assert!(adapter.resolve_snapshot(&request(), snapshot).is_ok());
     }
 
     #[test]
