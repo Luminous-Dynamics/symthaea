@@ -4945,53 +4945,86 @@ fn validate_native_authority_pin_set(
     /// the external sink after its last durable local write. Any non-terminal
     /// prepared/dispatch-pending reservation therefore becomes Indeterminate
     /// before another execution can be admitted.
-    /// Recover one exact attempt owned by one execution boundary.
-    ///
-    /// This is the preferred recovery primitive for an external effect: the
-    /// boundary and attempt are both supplied explicitly, so recovery cannot
-    /// claim a sibling attempt merely because it shares the same boundary.
-    pub fn recover_incomplete_attempt_for_boundary(
+    /// Recover one exact attempt using a recovery authorization bound to that
+    /// attempt. The durable store enforces the authorization instance,
+    /// attempt, boundary, operation, action digest, and authority epoch.
+    pub fn recover_incomplete_attempt_for_boundary_authorized(
         &self,
-        boundary_id: &str,
-        attempt_id: &str,
+        recovery: &RecoveryAuthorizationWitness,
     ) -> Result<usize, AuthorizationStoreError> {
-        if boundary_id.is_empty() || attempt_id.is_empty() {
+        if recovery.authorization_instance.is_empty()
+            || recovery.boundary_id.is_empty()
+            || recovery.attempt_id.is_empty()
+        {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
-        self.recover_incomplete_attempts_scoped(Some(boundary_id), Some(attempt_id))
+        self.validate_recovery_authorization_issued_at(&recovery.issued_at)?;
+        self.recover_incomplete_attempts_scoped(
+            Some(&recovery.boundary_id),
+            Some(&recovery.attempt_id),
+            Some(&recovery.authorization_instance),
+            Some(recovery),
+        )
     }
 
-    /// Recover all incomplete attempts owned by one boundary.
-    ///
-    /// This batch form is intended for executor startup maintenance. Any
-    /// per-attempt recovery authorization should use the exact-attempt API.
+    /// Legacy identifier-only recovery is deliberately fenced. An effectful
+    /// recovery authorization must be bound to exactly one attempt.
+    #[deprecated(note = "use recover_incomplete_attempt_for_boundary_authorized with RecoveryAuthorizationWitness")]
+    pub fn recover_incomplete_attempt_for_boundary(
+        &self,
+        _boundary_id: &str,
+        _attempt_id: &str,
+    ) -> Result<usize, AuthorizationStoreError> {
+        Err(AuthorizationConsumptionError::InvalidBinding.into())
+    }
+
+    /// Boundary-wide effect recovery is deliberately fenced. A boundary can
+    /// own multiple attempts, so it is not itself a sufficient recovery
+    /// authorization under the AEB recovery model.
+    #[deprecated(note = "recover each attempt with RecoveryAuthorizationWitness")]
     pub fn recover_incomplete_attempts_for_boundary(
         &self,
-        boundary_id: &str,
+        _boundary_id: &str,
     ) -> Result<usize, AuthorizationStoreError> {
-        if boundary_id.is_empty() {
-            return Err(AuthorizationConsumptionError::InvalidBinding.into());
-        }
-        self.recover_incomplete_attempts_scoped(Some(boundary_id), None)
+        Err(AuthorizationConsumptionError::InvalidBinding.into())
     }
 
     /// Recover only legacy/unscoped attempts. Bound effectful attempts should use
-    /// one of the boundary-scoped recovery paths.
+    /// an exact-attempt recovery authorization.
     pub fn recover_incomplete_attempts(&self) -> Result<usize, AuthorizationStoreError> {
-        self.recover_incomplete_attempts_scoped(None, None)
+        self.recover_incomplete_attempts_scoped(None, None, None, None)
     }
 
     fn recover_incomplete_attempts_scoped(
         &self,
         boundary_filter: Option<&str>,
         attempt_filter: Option<&str>,
+        authorization_instance_filter: Option<&str>,
+        recovery: Option<&RecoveryAuthorizationWitness>,
     ) -> Result<usize, AuthorizationStoreError> {
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let mut recovered = Vec::new();
         {
-            let (mut stmt, query_params) = match (boundary_filter, attempt_filter) {
-                (Some(_), Some(_)) => (
+            let (mut stmt, query_params) = match (
+                boundary_filter,
+                attempt_filter,
+                authorization_instance_filter,
+            ) {
+                (Some(_), Some(_), Some(_)) => (
+                    tx.prepare(
+                        "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id, state
+                         FROM authorization_leases
+                         WHERE state IN ('dispatch_pending','invoked')
+                           AND authorization_instance=?1 AND boundary_id=?2 AND attempt_id=?3",
+                    )?,
+                    vec![
+                        authorization_instance_filter.unwrap().to_owned(),
+                        boundary_filter.unwrap().to_owned(),
+                        attempt_filter.unwrap().to_owned(),
+                    ],
+                ),
+                (Some(_), Some(_), None) => (
                     tx.prepare(
                         "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id, state
                          FROM authorization_leases
@@ -5003,7 +5036,7 @@ fn validate_native_authority_pin_set(
                         attempt_filter.unwrap().to_owned(),
                     ],
                 ),
-                (Some(_), None) => (
+                (Some(_), None, None) => (
                     tx.prepare(
                         "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id, state
                          FROM authorization_leases
@@ -5012,7 +5045,7 @@ fn validate_native_authority_pin_set(
                     )?,
                     vec![boundary_filter.unwrap().to_owned()],
                 ),
-                (None, Some(_)) => (
+                (None, Some(_), None) => (
                     tx.prepare(
                         "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id, state
                          FROM authorization_leases
@@ -5021,7 +5054,7 @@ fn validate_native_authority_pin_set(
                     )?,
                     vec![attempt_filter.unwrap().to_owned()],
                 ),
-                (None, None) => (
+                (None, None, None) => (
                     tx.prepare(
                         "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id, state
                          FROM authorization_leases
@@ -5048,7 +5081,25 @@ fn validate_native_authority_pin_set(
             drop(stmt);
         }
 
+        if recovery.is_some() && recovered.len() != 1 {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
         for (instance, action_id, attempt_id, action_digest, authority_epoch, lease_boundary, lease_state) in &recovered {
+            if let Some(recovery) = recovery {
+                if recovery.authorization_instance != *instance
+                    || recovery.attempt_id != *attempt_id
+                    || recovery.boundary_id.as_str() != lease_boundary.as_deref().unwrap_or("")
+                {
+                    return Err(AuthorizationConsumptionError::InvalidBinding.into());
+                }
+                let lease = load_lease(&tx, instance)?
+                    .ok_or_else(|| AuthorizationStoreError::NotFound(instance.clone()))?;
+                if !recovery.is_bound_to(&lease) {
+                    return Err(AuthorizationConsumptionError::InvalidBinding.into());
+                }
+            }
+
             let persisted_bound_record = if let Some(boundary_id) = lease_boundary.as_deref() {
                 match dispatch_boundary(&tx, instance, attempt_id)? {
                     Some(dispatch_boundary_id) if dispatch_boundary_id == boundary_id => {}
@@ -8952,7 +9003,17 @@ mod tests {
             "operation:reconcile-key","native-grant:reconcile"
         ).unwrap();
         store.mark_invoked_bound(&record, &TestProviderStatusVerifier).unwrap();
-        store.recover_incomplete_attempt_for_boundary("boundary-A","attempt-reconcile-key").unwrap();
+        let recovery=RecoveryAuthorizationWitness {
+            authorization_instance:witness.authorization_instance.clone(),
+            attempt_id:"attempt-reconcile-key".into(),
+            operation_id:"operation:reconcile-key".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:witness.action_digest.clone(),
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:witness.authority_epoch,
+            issued_at:"2026-10-03T10:00:00Z".into(),
+        };
+        store.recover_incomplete_attempt_for_boundary_authorized(&recovery).unwrap();
         let receipt=store.reconcile_indeterminate_bound_verified(
             &record,&verified_evidence(&record,ExecutionOutcome::Succeeded),&TestProviderVerifier
         ).unwrap();
@@ -11128,13 +11189,25 @@ mod tests {
         ,
             format!("operation:{}", "attempt-boundary"),
             format!("native-replay:{}", &witness.authorization_instance)).unwrap();
+        let recovery=RecoveryAuthorizationWitness {
+            authorization_instance:witness.authorization_instance.clone(),
+            attempt_id:"attempt-boundary".into(),
+            operation_id:"operation:attempt-boundary".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:witness.action_digest.clone(),
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:witness.authority_epoch,
+            issued_at:"2026-10-03T10:05:00Z".into(),
+        };
         drop(store);
 
         let boundary_b=SqliteAuthorizationStore::open(&path).unwrap();
         assert_eq!(boundary_b.recover_incomplete_attempts().unwrap(),0);
+        let mut wrong_recovery=recovery.clone();
+        wrong_recovery.boundary_id="boundary-B".into();
         assert_eq!(
             boundary_b
-                .recover_incomplete_attempt_for_boundary("boundary-B","attempt-boundary")
+                .recover_incomplete_attempt_for_boundary_authorized(&wrong_recovery)
                 .unwrap(),
             0
         );
@@ -11149,7 +11222,7 @@ mod tests {
         let boundary_a=SqliteAuthorizationStore::open(&path).unwrap();
         assert_eq!(
             boundary_a
-                .recover_incomplete_attempt_for_boundary("boundary-A","attempt-boundary")
+                .recover_incomplete_attempt_for_boundary_authorized(&recovery)
                 .unwrap(),
             1
         );
@@ -11201,10 +11274,12 @@ mod tests {
             "boundary-bulk-prepared"
         ).unwrap();
 
-        assert_eq!(
-            store.recover_incomplete_attempts_for_boundary("boundary-bulk-prepared").unwrap(),
-            0
-        );
+        assert!(matches!(
+            store.recover_incomplete_attempts_for_boundary("boundary-bulk-prepared"),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
         assert_eq!(
             store.connection().unwrap().query_row::<String,_,_>(
                 "SELECT state FROM authorization_leases
@@ -11248,15 +11323,6 @@ mod tests {
         ).unwrap();
         drop(store);
 
-        let reopened=SqliteAuthorizationStore::open(&path).unwrap();
-        assert_eq!(reopened.recover_incomplete_attempts().unwrap(),0);
-        assert_eq!(
-            reopened
-                .recover_incomplete_attempt_for_boundary("boundary-A","attempt-prepared")
-                .unwrap(),
-            0
-        );
-
         let recovery=RecoveryAuthorizationWitness {
             authorization_instance:witness.authorization_instance.clone(),
             attempt_id:"attempt-prepared".into(),
@@ -11267,6 +11333,20 @@ mod tests {
             authority_epoch:1,
             issued_at:"2026-10-02T20:12:30Z".into(),
         };
+        let reopened=SqliteAuthorizationStore::open(&path).unwrap();
+        assert_eq!(reopened.recover_incomplete_attempts().unwrap(),0);
+        assert!(matches!(
+            reopened.recover_incomplete_attempts_for_boundary("boundary-A"),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+        assert_eq!(
+            reopened
+                .recover_incomplete_attempt_for_boundary_authorized(&recovery)
+                .unwrap(),
+            0
+        );
         assert!(reopened.recover_pre_dispatch_attempt(&recovery).unwrap());
         assert!(matches!(
             mark_dispatch_pending_bound_for_test(&reopened,
@@ -12978,12 +13058,19 @@ mod tests {
         )
         .unwrap();
 
+        let recovery=RecoveryAuthorizationWitness {
+            authorization_instance:witness.authorization_instance.clone(),
+            attempt_id:"attempt:dispatch-pending-recovery".into(),
+            operation_id:"operation:dispatch-pending-recovery".into(),
+            boundary_id:"boundary:dispatch-pending-recovery".into(),
+            action_digest:witness.action_digest.clone(),
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:witness.authority_epoch,
+            issued_at:"2026-10-03T10:02:00Z".into(),
+        };
         assert_eq!(
             reopened
-                .recover_incomplete_attempt_for_boundary(
-                    "boundary:dispatch-pending-recovery",
-                    "attempt:dispatch-pending-recovery",
-                )
+                .recover_incomplete_attempt_for_boundary_authorized(&recovery)
                 .unwrap(),
             1
         );
@@ -13129,11 +13216,18 @@ mod tests {
             )
             .unwrap();
 
+        let recovery = RecoveryAuthorizationWitness {
+            authorization_instance: witness.authorization_instance.clone(),
+            attempt_id: "attempt:recovery-missing-history".into(),
+            operation_id: "operation:recovery-missing-history".into(),
+            boundary_id: "boundary:recovery-missing-history".into(),
+            action_digest: witness.action_digest.clone(),
+            policy: "recovery-policy-v1".into(),
+            authority_epoch: witness.authority_epoch,
+            issued_at: "2026-10-03T10:03:00Z".into(),
+        };
         let err = store
-            .recover_incomplete_attempt_for_boundary(
-                "boundary:recovery-missing-history",
-                "attempt:recovery-missing-history",
-            )
+            .recover_incomplete_attempt_for_boundary_authorized(&recovery)
             .unwrap_err();
         assert!(matches!(
             err,
@@ -13292,12 +13386,19 @@ mod tests {
         )
         .unwrap();
 
+        let recovery = RecoveryAuthorizationWitness {
+            authorization_instance: witness.authorization_instance.clone(),
+            attempt_id: "attempt:recovered-first".into(),
+            operation_id: "operation:recovered-first".into(),
+            boundary_id: "boundary:recovered-failed-release".into(),
+            action_digest: witness.action_digest.clone(),
+            policy: "recovery-policy-v1".into(),
+            authority_epoch: witness.authority_epoch,
+            issued_at: "2026-10-03T10:04:00Z".into(),
+        };
         assert_eq!(
             reopened
-                .recover_incomplete_attempt_for_boundary(
-                    "boundary:recovered-failed-release",
-                    "attempt:recovered-first",
-                )
+                .recover_incomplete_attempt_for_boundary_authorized(&recovery)
                 .unwrap(),
             1
         );
@@ -13440,6 +13541,128 @@ mod tests {
     }
 
     #[test]
+    fn recovery_authorization_cannot_cross_attempts_in_one_boundary() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-recovery-attempt-scope-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+
+        let effect_a=ActionEffectBinding::new(
+            "target-recovery-attempt-a","prod","adapter-recovery-attempt"
+        );
+        let action_a=EpistemicAction::new(
+            "recovery-attempt-a","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect_a.clone());
+        let digest_a=action_a.canonical_action_digest();
+        let witness_a=ActionAuthorizationWitness {
+            operation_id:Some("operation:recovery-attempt-a".into()),
+            authorization_instance:"recovery-attempt-a".into(),
+            action_id:action_a.id.clone(),
+            action_digest:digest_a.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support-a".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:00:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+
+        let effect_b=ActionEffectBinding::new(
+            "target-recovery-attempt-b","prod","adapter-recovery-attempt"
+        );
+        let action_b=EpistemicAction::new(
+            "recovery-attempt-b","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect_b.clone());
+        let digest_b=action_b.canonical_action_digest();
+        let witness_b=ActionAuthorizationWitness {
+            operation_id:Some("operation:recovery-attempt-b".into()),
+            authorization_instance:"recovery-attempt-b".into(),
+            action_id:action_b.id.clone(),
+            action_digest:digest_b.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support-b".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:00:01Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+
+        for (instance,action,digest,support,witness) in [
+            (&witness_a.authorization_instance,&action_a,&digest_a,&witness_a.support_digest,&witness_a),
+            (&witness_b.authorization_instance,&action_b,&digest_b,&witness_b.support_digest,&witness_b),
+        ] {
+            store.register_lease(&AuthorizationLease::new_with_instance(
+                instance.clone(),action.id.clone(),digest.clone(),
+                support.clone(),witness.policy.clone(),1,1
+            )).unwrap();
+            store.prepare_for_execution_bound_with_operation(
+                witness,
+                action,
+                "frame@1",
+                if instance.ends_with('a') {"attempt-recovery-a"} else {"attempt-recovery-b"},
+                "shared-recovery-boundary",
+                if instance.ends_with('a') {"operation:recovery-attempt-a"} else {"operation:recovery-attempt-b"},
+            ).unwrap();
+        }
+
+        let first=mark_dispatch_pending_bound_for_test(
+            &store,
+            &witness_a.authorization_instance,
+            "attempt-recovery-a",
+            &action_a,
+            &effect_a,
+            "shared-recovery-boundary",
+            "operation:recovery-attempt-a",
+            "native-recovery-attempt-a",
+        ).unwrap();
+        let second=mark_dispatch_pending_bound_for_test(
+            &store,
+            &witness_b.authorization_instance,
+            "attempt-recovery-b",
+            &action_b,
+            &effect_b,
+            "shared-recovery-boundary",
+            "operation:recovery-attempt-b",
+            "native-recovery-attempt-b",
+        ).unwrap();
+
+        let recovery_a=RecoveryAuthorizationWitness {
+            authorization_instance:witness_a.authorization_instance.clone(),
+            attempt_id:"attempt-recovery-a".into(),
+            operation_id:"operation:recovery-attempt-a".into(),
+            boundary_id:"shared-recovery-boundary".into(),
+            action_digest:witness_a.action_digest.clone(),
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-03T10:06:00Z".into(),
+        };
+        assert_eq!(
+            store
+                .recover_incomplete_attempt_for_boundary_authorized(&recovery_a)
+                .unwrap(),
+            1
+        );
+
+        let states:(String,String)=store.connection().unwrap().query_row(
+            "SELECT
+                (SELECT state FROM authorization_dispatches
+                 WHERE authorization_instance=?1 AND attempt_id=?2),
+                (SELECT state FROM authorization_dispatches
+                 WHERE authorization_instance=?3 AND attempt_id=?4)",
+            params![
+                first.authorization_instance.as_str(),"attempt-recovery-a",
+                second.authorization_instance.as_str(),"attempt-recovery-b"
+            ],
+            |row| Ok((row.get(0)?,row.get(1)?))
+        ).unwrap();
+        assert_eq!(states,("indeterminate".into(),"dispatch_pending".into()));
+
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn recovery_treats_invoked_as_indeterminate() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-invoked-recovery-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
@@ -13508,7 +13731,19 @@ mod tests {
             tx.commit().unwrap();
         }
 
-        let err=store.recover_incomplete_attempts_for_boundary("boundary-recovery").unwrap_err();
+        let recovery=RecoveryAuthorizationWitness {
+            authorization_instance:record.authorization_instance.clone(),
+            attempt_id:record.attempt_id.clone(),
+            operation_id:record.operation_id.clone(),
+            boundary_id:record.boundary_id.clone(),
+            action_digest:record.action_digest.clone(),
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-03T10:01:00Z".into(),
+        };
+        let err=store
+            .recover_incomplete_attempt_for_boundary_authorized(&recovery)
+            .unwrap_err();
         assert!(matches!(
             err,
             AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding)
