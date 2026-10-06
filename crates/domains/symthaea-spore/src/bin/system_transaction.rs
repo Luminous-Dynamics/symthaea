@@ -141,7 +141,12 @@ impl SystemTransaction {
         payload: &[u8],
     ) -> Result<Self, String> {
         let transaction_id = random_operation_id()?;
-        let request_digest = blake3::hash(payload).to_hex().to_string();
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"nixforhumanity-system-transaction-v1\0");
+        hasher.update(mutation.as_str().as_bytes());
+        hasher.update(b"\0");
+        hasher.update(payload);
+        let request_digest = hasher.finalize().to_hex().to_string();
 
         Ok(Self {
             schema_version: SCHEMA_VERSION,
@@ -237,6 +242,16 @@ mod tests {
         assert_ne!(a.target_machine_digest, b.target_machine_digest);
         assert_ne!(a.request_digest, c.request_digest);
         assert_ne!(a.log_line(), b.log_line());
+    }
+
+    #[test]
+    fn digest_is_domain_separated_by_mutation_kind() {
+        let install =
+            SystemTransaction::begin(MutationKind::Install, None, b"same-payload").unwrap();
+        let rollback =
+            SystemTransaction::begin(MutationKind::Rollback, None, b"same-payload").unwrap();
+
+        assert_ne!(install.request_digest, rollback.request_digest);
     }
 
     #[test]
