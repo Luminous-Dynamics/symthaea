@@ -5048,6 +5048,7 @@ echo '}'
                 // Never interpolate it into a shell heredoc: a user-controlled
                 // delimiter must not become a command-injection boundary.
                 if let Err(e) = tokio::fs::write(&wc_config_path, client_msg.configuration_nix.as_bytes()).await {
+                    let _ = tokio::fs::remove_file(&wc_preimage_path).await;
                     let _ = ws_tx
                         .send(Message::Text(
                             RelayMessage::error(&format!("Config staging failed: {}", e)).to_json(),
@@ -5111,6 +5112,7 @@ echo "REBUILD_COMPLETE"
 
                 if let Err(e) = tokio::fs::write(&wc_script_path, rebuild_script.as_bytes()).await {
                     let _ = tokio::fs::remove_file(&wc_config_path).await;
+                    let _ = tokio::fs::remove_file(&wc_preimage_path).await;
                     let _ = ws_tx
                         .send(Message::Text(
                             RelayMessage::error(&format!("Rebuild staging failed: {}", e))
@@ -5126,6 +5128,7 @@ echo "REBUILD_COMPLETE"
                 .await
                 {
                     let _ = tokio::fs::remove_file(&wc_config_path).await;
+                    let _ = tokio::fs::remove_file(&wc_preimage_path).await;
                     let _ = tokio::fs::remove_file(&wc_script_path).await;
                     let _ = ws_tx
                         .send(Message::Text(
