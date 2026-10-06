@@ -439,7 +439,7 @@ mod tests {
         changed.files[0].content_digest = "44".repeat(32);
         assert_ne!(baseline, changed.digest().unwrap());
 
-        let mut changed = base;
+        let mut changed = base.clone();
         changed.manager_owner = ":1.43".into();
         assert_ne!(baseline, changed.digest().unwrap());
 
