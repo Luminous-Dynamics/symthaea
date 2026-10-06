@@ -984,6 +984,7 @@ impl NixPostStateReceiptV1 {
                 || last.unit_object_path != self.observed_unit_object_path
                 || last.observed_generation != self.observed_generation
                 || last.definition_digest != self.observed_definition_digest
+                || last.definition_content_digest != self.observed_definition_content_digest
                 || last.state_digest != recomputed_state_digest
                 || last.manager_owner != self.systemd_manager_owner
                 || last.invocation_id != self.post_invocation_id
