@@ -280,9 +280,14 @@ impl NixServicePostStateObservationV1 {
             &self.definition_content_digest,
             "observed definition content digest",
         )?;
+        let manager_owner = self
+            .systemd_manager_owner
+            .as_deref()
+            .ok_or(NixPostStateErrorV1::MissingManagerOwner)?;
         let content_evidence = NixSystemdUnitDefinitionContentEvidenceV1 {
             unit: self.unit.clone(),
             source_identity_digest: self.definition_identity.digest(&self.unit)?,
+            manager_owner: manager_owner.to_string(),
             files: self.definition_content_files.clone(),
             captured_at_monotonic_us: self.observed_at_monotonic_us,
         };
@@ -291,9 +296,7 @@ impl NixServicePostStateObservationV1 {
         {
             return Err(NixPostStateErrorV1::DefinitionMismatch);
         }
-        if let Some(owner) = self.systemd_manager_owner.as_deref() {
-            validate_unique_manager_owner(owner)?;
-        }
+        validate_unique_manager_owner(manager_owner);
         if let Some(job) = &self.systemd_job {
             job.validate_shape()?;
             if self.systemd_manager_owner.as_deref() != Some(job.manager_owner.as_str()) {
@@ -927,6 +930,7 @@ impl NixPostStateReceiptV1 {
         let receipt_content_evidence = NixSystemdUnitDefinitionContentEvidenceV1 {
             unit: self.target_unit.clone(),
             source_identity_digest: self.observed_definition_digest.clone(),
+            manager_owner: self.systemd_manager_owner.clone(),
             files: self.observed_definition_content_files.clone(),
             captured_at_monotonic_us: self.observed_at_monotonic_us,
         };
