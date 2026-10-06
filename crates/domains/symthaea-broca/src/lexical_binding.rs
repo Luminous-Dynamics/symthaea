@@ -127,7 +127,7 @@ pub const MORPHOPHONOLOGICAL_RESOURCE_EVIDENCE_VERSION: &str =
     "broca-morphophonological-resource-evidence-v2";
 
 pub const MORPHOPHONOLOGICAL_COMPILATION_WITNESS_VERSION: &str =
-    "broca-morphophonological-compilation-witness-v1";
+    "broca-morphophonological-compilation-witness-v2";
 
 /// Whether an executable morphology resource is externally sourced or explicitly
 /// authored as a local/fixture resource.
