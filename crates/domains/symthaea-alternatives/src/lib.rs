@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 32;
+pub const SCHEMA_VERSION: u16 = 33;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v45";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v46";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -471,64 +471,160 @@ impl MeasurementUncertaintyStatement {
     }
 }
 
+/// Exact provenance for one uncertainty-budget component.
+///
+/// The component remains an external reference: Symthaea verifies only that
+/// the declared component identity/digest is bound to the exact uncertainty
+/// budget and measurement model named by the parent uncertainty record.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeasurementUncertaintyComponentRef {
+    /// Stable identity of the uncertainty-budget component.
+    pub component_id: String,
+    /// Digest of the exact component record or canonical component payload.
+    pub component_record_digest: String,
+    /// Stable identity of the exact uncertainty-budget record.
+    pub uncertainty_budget_id: String,
+    /// Revision of the exact uncertainty-budget record.
+    pub uncertainty_budget_revision: String,
+    /// Digest of the exact uncertainty-budget record.
+    pub uncertainty_budget_digest: String,
+    /// Stable identity of the exact measurement model used by the budget.
+    pub measurement_model_id: String,
+    /// Revision of the exact measurement model.
+    pub measurement_model_revision: String,
+    /// Digest of the exact measurement model.
+    pub measurement_model_digest: String,
+}
+
+impl MeasurementUncertaintyComponentRef {
+    /// Validate component identity and exact budget/model lineage.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.component_id.is_empty()
+            || self.component_record_digest.is_empty()
+            || self.uncertainty_budget_id.is_empty()
+            || self.uncertainty_budget_revision.is_empty()
+            || self.uncertainty_budget_digest.is_empty()
+            || self.measurement_model_id.is_empty()
+            || self.measurement_model_revision.is_empty()
+            || self.measurement_model_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidMeasurementUncertaintyComponentReference);
+        }
+        Ok(())
+    }
+}
+
 /// Machine-readable reference to the uncertainty analysis accompanying an observation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MeasurementUncertaintyRef {
-    /// Stable identity of the uncertainty statement.
     pub uncertainty_id: String,
-    /// Exact observation identity to which the uncertainty statement applies.
     pub observation_id: String,
-    /// Digest of the exact observation record to which the uncertainty statement applies.
     pub observation_record_digest: String,
-    /// Quantitative statement reported with the observation.
+    pub uncertainty_budget_id: String,
+    pub uncertainty_budget_revision: String,
+    pub uncertainty_budget_digest: String,
+    pub measurement_model_id: String,
+    pub measurement_model_revision: String,
+    pub measurement_model_digest: String,
     pub statement: MeasurementUncertaintyStatement,
-    /// Method used to evaluate the stated uncertainty.
     pub method_id: String,
-    /// Exact measurand identity to which the uncertainty statement applies.
     pub measurand_id: String,
-    /// Exact measurement/test procedure identity to which the uncertainty applies.
     pub procedure_id: String,
-    /// Digest of the exact measurement/test procedure or canonical procedure payload.
     pub procedure_digest: String,
-    /// References to the uncertainty components or source records considered.
-    pub component_refs: Vec<String>,
-    /// BLAKE3 digest of the canonical sorted uncertainty-component reference set.
+    pub component_refs: Vec<MeasurementUncertaintyComponentRef>,
     pub component_refs_digest: String,
-    /// Digest of the canonical uncertainty statement/record.
     pub record_digest: String,
+    /// Integrity commitment only; the authoritative uncertainty calculation remains external.
+    pub binding_digest: String,
 }
 
 impl MeasurementUncertaintyRef {
-    /// Validate the structural and quantitative uncertainty statement.
     pub fn validate(&self) -> Result<(), AssessmentError> {
         if self.uncertainty_id.is_empty()
             || self.observation_id.is_empty()
             || self.observation_record_digest.is_empty()
+            || self.uncertainty_budget_id.is_empty()
+            || self.uncertainty_budget_revision.is_empty()
+            || self.uncertainty_budget_digest.is_empty()
+            || self.measurement_model_id.is_empty()
+            || self.measurement_model_revision.is_empty()
+            || self.measurement_model_digest.is_empty()
             || self.method_id.is_empty()
             || self.measurand_id.is_empty()
             || self.procedure_id.is_empty()
             || self.procedure_digest.is_empty()
             || self.record_digest.is_empty()
+            || self.binding_digest.is_empty()
             || self.component_refs_digest.is_empty()
             || self.component_refs.is_empty()
-            || self.component_refs.iter().any(String::is_empty)
         {
             return Err(AssessmentError::InvalidMeasurementUncertainty);
         }
         self.statement.validate()?;
-        let mut canonical_component_refs = self.component_refs.clone();
-        canonical_component_refs.sort();
-        let mut unique_component_refs = canonical_component_refs.clone();
-        unique_component_refs.dedup();
-        if unique_component_refs.len() != canonical_component_refs.len() {
+        let mut canonical_component_refs=self.component_refs.clone();
+        for component in &canonical_component_refs {
+            component.validate()?;
+            if component.uncertainty_budget_id!=self.uncertainty_budget_id
+                || component.uncertainty_budget_revision!=self.uncertainty_budget_revision
+            {
+                return Err(AssessmentError::MeasurementUncertaintyComponentBudgetMismatch{
+                    uncertainty_id:self.uncertainty_id.clone(),
+                    component_id:component.component_id.clone(),
+                    expected_budget_id:self.uncertainty_budget_id.clone(),
+                    actual_budget_id:component.uncertainty_budget_id.clone(),
+                    expected_budget_revision:self.uncertainty_budget_revision.clone(),
+                    actual_budget_revision:component.uncertainty_budget_revision.clone(),
+                });
+            }
+            if component.uncertainty_budget_digest!=self.uncertainty_budget_digest {
+                return Err(AssessmentError::MeasurementUncertaintyComponentBudgetDigestMismatch{
+                    uncertainty_id:self.uncertainty_id.clone(),
+                    component_id:component.component_id.clone(),
+                    expected_budget_digest:self.uncertainty_budget_digest.clone(),
+                    actual_budget_digest:component.uncertainty_budget_digest.clone(),
+                });
+            }
+            if component.measurement_model_id!=self.measurement_model_id
+                || component.measurement_model_revision!=self.measurement_model_revision
+            {
+                return Err(AssessmentError::MeasurementUncertaintyComponentModelMismatch{
+                    uncertainty_id:self.uncertainty_id.clone(),
+                    component_id:component.component_id.clone(),
+                    expected_model_id:self.measurement_model_id.clone(),
+                    actual_model_id:component.measurement_model_id.clone(),
+                    expected_model_revision:self.measurement_model_revision.clone(),
+                    actual_model_revision:component.measurement_model_revision.clone(),
+                });
+            }
+            if component.measurement_model_digest!=self.measurement_model_digest {
+                return Err(AssessmentError::MeasurementUncertaintyComponentModelDigestMismatch{
+                    uncertainty_id:self.uncertainty_id.clone(),
+                    component_id:component.component_id.clone(),
+                    expected_model_digest:self.measurement_model_digest.clone(),
+                    actual_model_digest:component.measurement_model_digest.clone(),
+                });
+            }
+        }
+        canonical_component_refs.sort_by(|a,b|a.component_id.cmp(&b.component_id));
+        let mut unique_component_ids=canonical_component_refs.iter().map(|c|c.component_id.as_str()).collect::<Vec<_>>();
+        unique_component_ids.dedup();
+        if unique_component_ids.len()!=canonical_component_refs.len(){
             return Err(AssessmentError::DuplicateMeasurementUncertaintyComponentReference);
         }
-        let expected_component_refs_digest = canonical_string_list_hash(&canonical_component_refs)?;
-        if self.component_refs_digest != expected_component_refs_digest {
-            return Err(AssessmentError::MeasurementUncertaintyComponentRefsDigestMismatch {
-                uncertainty_id: self.uncertainty_id.clone(),
+        let expected_component_refs_digest=canonical_measurement_uncertainty_component_refs_hash(&canonical_component_refs)?;
+        if self.component_refs_digest!=expected_component_refs_digest{
+            return Err(AssessmentError::MeasurementUncertaintyComponentRefsDigestMismatch{
+                uncertainty_id:self.uncertainty_id.clone(),
                 expected_component_refs_digest,
-                actual_component_refs_digest: self.component_refs_digest.clone(),
+                actual_component_refs_digest:self.component_refs_digest.clone(),
+            });
+        }
+        let expected_binding_digest=canonical_measurement_uncertainty_binding_hash(self)?;
+        if self.binding_digest!=expected_binding_digest{
+            return Err(AssessmentError::MeasurementUncertaintyBindingDigestMismatch{
+                uncertainty_id:self.uncertainty_id.clone(),
+                expected_binding_digest,
+                actual_binding_digest:self.binding_digest.clone(),
             });
         }
         Ok(())
@@ -2454,6 +2550,46 @@ pub enum AssessmentError {
         /// Digest carried by the uncertainty record.
         actual_component_refs_digest: String,
     },
+    /// A component reference is structurally incomplete.
+    InvalidMeasurementUncertaintyComponentReference,
+    /// A component names a different uncertainty-budget identity/revision.
+    MeasurementUncertaintyComponentBudgetMismatch {
+        uncertainty_id: String,
+        component_id: String,
+        expected_budget_id: String,
+        actual_budget_id: String,
+        expected_budget_revision: String,
+        actual_budget_revision: String,
+    },
+    /// A component carries a different uncertainty-budget digest.
+    MeasurementUncertaintyComponentBudgetDigestMismatch {
+        uncertainty_id: String,
+        component_id: String,
+        expected_budget_digest: String,
+        actual_budget_digest: String,
+    },
+    /// A component names a different measurement-model identity/revision.
+    MeasurementUncertaintyComponentModelMismatch {
+        uncertainty_id: String,
+        component_id: String,
+        expected_model_id: String,
+        actual_model_id: String,
+        expected_model_revision: String,
+        actual_model_revision: String,
+    },
+    /// A component carries a different measurement-model digest.
+    MeasurementUncertaintyComponentModelDigestMismatch {
+        uncertainty_id: String,
+        component_id: String,
+        expected_model_digest: String,
+        actual_model_digest: String,
+    },
+    /// The uncertainty binding digest does not match its canonical payload.
+    MeasurementUncertaintyBindingDigestMismatch {
+        uncertainty_id: String,
+        expected_binding_digest: String,
+        actual_binding_digest: String,
+    },
     /// Stated measurement uncertainty applies to a different measurand than the observation.
     MeasurementUncertaintyMeasurandMismatch {
         /// Evidence identifier.
@@ -2775,6 +2911,57 @@ impl std::fmt::Display for AssessmentError {
             } => write!(
                 f,
                 "uncertainty {uncertainty_id} component-reference digest {actual_component_refs_digest} does not match canonical component-reference digest {expected_component_refs_digest}"
+            ),
+            Self::InvalidMeasurementUncertaintyComponentReference => {
+                write!(f, "measurement uncertainty component reference is incomplete")
+            }
+            Self::MeasurementUncertaintyComponentBudgetMismatch {
+                uncertainty_id,
+                component_id,
+                expected_budget_id,
+                actual_budget_id,
+                expected_budget_revision,
+                actual_budget_revision,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} component {component_id} budget {actual_budget_id}@{actual_budget_revision} does not match {expected_budget_id}@{expected_budget_revision}"
+            ),
+            Self::MeasurementUncertaintyComponentBudgetDigestMismatch {
+                uncertainty_id,
+                component_id,
+                expected_budget_digest,
+                actual_budget_digest,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} component {component_id} budget digest {actual_budget_digest} does not match {expected_budget_digest}"
+            ),
+            Self::MeasurementUncertaintyComponentModelMismatch {
+                uncertainty_id,
+                component_id,
+                expected_model_id,
+                actual_model_id,
+                expected_model_revision,
+                actual_model_revision,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} component {component_id} model {actual_model_id}@{actual_model_revision} does not match {expected_model_id}@{expected_model_revision}"
+            ),
+            Self::MeasurementUncertaintyComponentModelDigestMismatch {
+                uncertainty_id,
+                component_id,
+                expected_model_digest,
+                actual_model_digest,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} component {component_id} model digest {actual_model_digest} does not match {expected_model_digest}"
+            ),
+            Self::MeasurementUncertaintyBindingDigestMismatch {
+                uncertainty_id,
+                expected_binding_digest,
+                actual_binding_digest,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} binding digest {actual_binding_digest} does not match canonical binding digest {expected_binding_digest}"
             ),
             Self::MeasurementUncertaintyMeasurandMismatch {
                 evidence_id,
@@ -3794,6 +3981,68 @@ impl AlternativesEngine {
     }
 }
 
+fn canonical_measurement_uncertainty_component_refs_hash(
+    component_refs: &[MeasurementUncertaintyComponentRef],
+) -> Result<String, AssessmentError> {
+    let mut canonical=component_refs.to_vec();
+    canonical.sort_by(|a,b|a.component_id.cmp(&b.component_id));
+    let bytes=serde_json::to_vec(&canonical).map_err(|_| AssessmentError::NonFinite)?;
+    let mut hasher=Hasher::new();
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
+#[derive(Serialize)]
+struct CanonicalMeasurementUncertaintyBinding<'a> {
+    uncertainty_id: &'a str,
+    observation_id: &'a str,
+    observation_record_digest: &'a str,
+    uncertainty_budget_id: &'a str,
+    uncertainty_budget_revision: &'a str,
+    uncertainty_budget_digest: &'a str,
+    measurement_model_id: &'a str,
+    measurement_model_revision: &'a str,
+    measurement_model_digest: &'a str,
+    statement: &'a MeasurementUncertaintyStatement,
+    method_id: &'a str,
+    measurand_id: &'a str,
+    procedure_id: &'a str,
+    procedure_digest: &'a str,
+    component_refs: &'a [MeasurementUncertaintyComponentRef],
+    component_refs_digest: &'a str,
+    record_digest: &'a str,
+}
+
+fn canonical_measurement_uncertainty_binding_hash(
+    uncertainty: &MeasurementUncertaintyRef,
+) -> Result<String, AssessmentError> {
+    let mut component_refs=uncertainty.component_refs.clone();
+    component_refs.sort_by(|a,b|a.component_id.cmp(&b.component_id));
+    let payload=CanonicalMeasurementUncertaintyBinding {
+        uncertainty_id:&uncertainty.uncertainty_id,
+        observation_id:&uncertainty.observation_id,
+        observation_record_digest:&uncertainty.observation_record_digest,
+        uncertainty_budget_id:&uncertainty.uncertainty_budget_id,
+        uncertainty_budget_revision:&uncertainty.uncertainty_budget_revision,
+        uncertainty_budget_digest:&uncertainty.uncertainty_budget_digest,
+        measurement_model_id:&uncertainty.measurement_model_id,
+        measurement_model_revision:&uncertainty.measurement_model_revision,
+        measurement_model_digest:&uncertainty.measurement_model_digest,
+        statement:&uncertainty.statement,
+        method_id:&uncertainty.method_id,
+        measurand_id:&uncertainty.measurand_id,
+        procedure_id:&uncertainty.procedure_id,
+        procedure_digest:&uncertainty.procedure_digest,
+        component_refs:&component_refs,
+        component_refs_digest:&uncertainty.component_refs_digest,
+        record_digest:&uncertainty.record_digest,
+    };
+    let bytes=serde_json::to_vec(&payload).map_err(|_| AssessmentError::NonFinite)?;
+    let mut hasher=Hasher::new();
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
 fn canonical_string_list_hash(values: &[String]) -> Result<String, AssessmentError> {
     let bytes = serde_json::to_vec(values).map_err(|_| AssessmentError::NonFinite)?;
     let mut hasher = Hasher::new();
@@ -3813,7 +4062,7 @@ fn canonical_candidate_evidence_hash(candidate: &CandidatePathway) -> Result<Str
     evidence.sort_by(|a, b| a.id.cmp(&b.id));
     for record in &mut evidence {
         if let Some(uncertainty) = &mut record.uncertainty {
-            uncertainty.component_refs.sort();
+            uncertainty.component_refs.sort_by(|a,b|a.component_id.cmp(&b.component_id));
         }
     }
     let bytes = serde_json::to_vec(&evidence).map_err(|_| AssessmentError::NonFinite)?;
@@ -3908,25 +4157,30 @@ mod tests {
                     | EvidenceKind::FieldObserved
                     | EvidenceKind::ContinuouslyMonitored
             )
-.then(|| MeasurementUncertaintyRef {
-                uncertainty_id: format!("uncertainty:{id}"),
-                observation_id: format!("observation:{id}"),
-                observation_record_digest: format!("fixture-record-digest:{id}"),
-                statement: MeasurementUncertaintyStatement::Expanded {
-                    value: 0.1,
-                    unit: "unit".into(),
-                    coverage_factor: 2.0,
-                },
-                method_id: "fixture-uncertainty-method-v1".into(),
-                measurand_id: format!("fixture-measurand:{id}"),
-                procedure_id: "fixture-measurement-procedure-v1".into(),
-                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
-                component_refs: vec!["fixture-uncertainty-component-v1".into()],
-                component_refs_digest: canonical_string_list_hash(&vec![
-                    "fixture-uncertainty-component-v1".into()
-                ])
-                .unwrap(),
-                record_digest: format!("fixture-uncertainty-digest:{id}"),
+            .then(|| {
+                let mut uncertainty=MeasurementUncertaintyRef {
+                    uncertainty_id:format!("uncertainty:{id}"),
+                    observation_id:format!("observation:{id}"),
+                    observation_record_digest:format!("fixture-record-digest:{id}"),
+                    uncertainty_budget_id:"fixture-uncertainty-budget-v1".into(),
+                    uncertainty_budget_revision:"v1".into(),
+                    uncertainty_budget_digest:"fixture-uncertainty-budget-digest-v1".into(),
+                    measurement_model_id:"fixture-measurement-model-v1".into(),
+                    measurement_model_revision:"v1".into(),
+                    measurement_model_digest:"fixture-measurement-model-digest-v1".into(),
+                    statement:MeasurementUncertaintyStatement::Expanded{value:0.1,unit:"unit".into(),coverage_factor:2.0},
+                    method_id:"fixture-uncertainty-method-v1".into(),
+                    measurand_id:format!("fixture-measurand:{id}"),
+                    procedure_id:"fixture-measurement-procedure-v1".into(),
+                    procedure_digest:"fixture-measurement-procedure-v1-digest".into(),
+                    component_refs:vec![test_component("fixture-uncertainty-component-v1")],
+                    component_refs_digest:String::new(),
+                    record_digest:format!("fixture-uncertainty-digest:{id}"),
+                    binding_digest:String::new(),
+                };
+                uncertainty.component_refs_digest=canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs).unwrap();
+                uncertainty.binding_digest=canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
+                uncertainty
             }),
             scope: "synthetic functional unit".into(),
             unit: Some("unit".into()),
@@ -3943,6 +4197,47 @@ mod tests {
                 },
             ),
         }
+    }
+
+    fn test_component(component_id: &str) -> MeasurementUncertaintyComponentRef {
+        MeasurementUncertaintyComponentRef {
+            component_id: component_id.into(),
+            component_record_digest: format!("component-record:{component_id}"),
+            uncertainty_budget_id: "budget-v1".into(),
+            uncertainty_budget_revision: "r1".into(),
+            uncertainty_budget_digest: "budget-digest-v1".into(),
+            measurement_model_id: "model-v1".into(),
+            measurement_model_revision: "r1".into(),
+            measurement_model_digest: "model-digest-v1".into(),
+        }
+    }
+
+    fn test_uncertainty(component_ids: &[&str]) -> MeasurementUncertaintyRef {
+        let mut component_refs=component_ids.iter().map(|id|test_component(id)).collect::<Vec<_>>();
+        component_refs.sort_by(|a,b|a.component_id.cmp(&b.component_id));
+        let mut uncertainty=MeasurementUncertaintyRef {
+            uncertainty_id:"u".into(),
+            observation_id:"observation".into(),
+            observation_record_digest:"record".into(),
+            uncertainty_budget_id:"budget-v1".into(),
+            uncertainty_budget_revision:"r1".into(),
+            uncertainty_budget_digest:"budget-digest-v1".into(),
+            measurement_model_id:"model-v1".into(),
+            measurement_model_revision:"r1".into(),
+            measurement_model_digest:"model-digest-v1".into(),
+            statement:MeasurementUncertaintyStatement::Expanded{value:0.1,unit:"unit".into(),coverage_factor:2.0},
+            method_id:"method".into(),
+            measurand_id:"measurand".into(),
+            procedure_id:"procedure".into(),
+            procedure_digest:"procedure-digest".into(),
+            component_refs,
+            component_refs_digest:String::new(),
+            record_digest:"digest".into(),
+            binding_digest:String::new(),
+        };
+        uncertainty.component_refs_digest=canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs).unwrap();
+        uncertainty.binding_digest=canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
+        uncertainty
     }
 
     fn fixture_requirement() -> FunctionalRequirement {
@@ -4357,7 +4652,7 @@ mod tests {
             .uncertainty
             .as_mut()
             .unwrap()
-            .component_refs[0] = "replacement-component".into();
+            .component_refs[0].component_id = "replacement-component".into();
         let error = AlternativesEngine
             .assess(&fixture_requirement(), &[changed], None)
             .unwrap_err();
@@ -4384,7 +4679,7 @@ mod tests {
             .as_mut()
             .unwrap()
             .component_refs
-            .push("fixture-uncertainty-component-v1".into());
+            .push(test_component("fixture-uncertainty-component-v1"));
         let error = AlternativesEngine
             .assess(&fixture_requirement(), &[changed], None)
             .unwrap_err();
@@ -4413,26 +4708,27 @@ mod tests {
 
         let uncertainty = first.evidence[0].uncertainty.as_mut().unwrap();
         uncertainty.component_refs = vec![
-            "component-a".into(),
-            "component-b".into(),
-            "component-c".into(),
+            test_component("component-a"),
+            test_component("component-b"),
+            test_component("component-c"),
         ];
         uncertainty.component_refs_digest =
-            canonical_string_list_hash(&uncertainty.component_refs).unwrap();
+            canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
+                .unwrap();
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
 
         let uncertainty = second.evidence[0].uncertainty.as_mut().unwrap();
         uncertainty.component_refs = vec![
-            "component-c".into(),
-            "component-a".into(),
-            "component-b".into(),
+            test_component("component-c"),
+            test_component("component-a"),
+            test_component("component-b"),
         ];
         uncertainty.component_refs_digest =
-            canonical_string_list_hash(&vec![
-                "component-a".into(),
-                "component-b".into(),
-                "component-c".into(),
-            ])
-            .unwrap();
+            canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
+                .unwrap();
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
 
         let first_result = AlternativesEngine
             .assess(&fixture_requirement(), &[first], None)
@@ -4449,6 +4745,75 @@ mod tests {
             first_result.receipt.payload_hash,
             second_result.receipt.payload_hash
         );
+    }
+
+    #[test]
+    fn measurement_uncertainty_component_record_drift_is_integrity_bound() {
+        let c=candidate("uncertainty-component-record",PathwayKind::ProcessSubstitution,2.0,2.0,
+            vec![evidence("component-record","source",EvidenceKind::Observed,EvidenceStance::Supports,0.9)]);
+        let mut changed=c;
+        changed.evidence[0].uncertainty.as_mut().unwrap().component_refs[0].component_record_digest="different-component-record".into();
+        let error=AlternativesEngine.assess(&fixture_requirement(),&[changed],None).unwrap_err();
+        assert!(matches!(error,AssessmentError::MeasurementUncertaintyComponentRefsDigestMismatch{..}));
+    }
+
+    #[test]
+    fn measurement_uncertainty_component_budget_lineage_fails_closed() {
+        let c=candidate("uncertainty-component-lineage",PathwayKind::ProcessSubstitution,2.0,2.0,
+            vec![evidence("component-lineage","source",EvidenceKind::Observed,EvidenceStance::Supports,0.9)]);
+        let mut changed=c.clone();
+        changed.evidence[0].uncertainty.as_mut().unwrap().component_refs[0].uncertainty_budget_id="different-budget".into();
+        let error=AlternativesEngine.assess(&fixture_requirement(),&[changed],None).unwrap_err();
+        assert!(matches!(error,AssessmentError::MeasurementUncertaintyComponentBudgetMismatch{..}));
+        let mut changed=c;
+        changed.evidence[0].uncertainty.as_mut().unwrap().component_refs[0].uncertainty_budget_digest="different-budget-digest".into();
+        let error=AlternativesEngine.assess(&fixture_requirement(),&[changed],None).unwrap_err();
+        assert!(matches!(error,AssessmentError::MeasurementUncertaintyComponentBudgetDigestMismatch{..}));
+    }
+
+    #[test]
+    fn measurement_uncertainty_component_model_lineage_fails_closed() {
+        let c=candidate("uncertainty-component-model",PathwayKind::ProcessSubstitution,2.0,2.0,
+            vec![evidence("component-model","source",EvidenceKind::Observed,EvidenceStance::Supports,0.9)]);
+        let mut changed=c.clone();
+        changed.evidence[0].uncertainty.as_mut().unwrap().component_refs[0].measurement_model_id="different-model".into();
+        let error=AlternativesEngine.assess(&fixture_requirement(),&[changed],None).unwrap_err();
+        assert!(matches!(error,AssessmentError::MeasurementUncertaintyComponentModelMismatch{..}));
+        let mut changed=c;
+        changed.evidence[0].uncertainty.as_mut().unwrap().component_refs[0].measurement_model_digest="different-model-digest".into();
+        let error=AlternativesEngine.assess(&fixture_requirement(),&[changed],None).unwrap_err();
+        assert!(matches!(error,AssessmentError::MeasurementUncertaintyComponentModelDigestMismatch{..}));
+    }
+
+    #[test]
+    fn measurement_uncertainty_binding_covers_reported_result_and_lineage() {
+        let c=candidate("uncertainty-binding-digest",PathwayKind::ProcessSubstitution,2.0,2.0,
+            vec![evidence("binding","source",EvidenceKind::Observed,EvidenceStance::Supports,0.9)]);
+        let baseline=AlternativesEngine.assess(&fixture_requirement(),&[c.clone()],None).unwrap();
+
+        let mut changed=c.clone();
+        changed.evidence[0].uncertainty.as_mut().unwrap().binding_digest="tampered".into();
+        let error=AlternativesEngine.assess(&fixture_requirement(),&[changed],None).unwrap_err();
+        assert!(matches!(error,AssessmentError::MeasurementUncertaintyBindingDigestMismatch{..}));
+
+        let mut changed=c.clone();
+        changed.evidence[0].uncertainty.as_mut().unwrap().statement=MeasurementUncertaintyStatement::Expanded{
+            value:0.2,unit:"unit".into(),coverage_factor:2.0
+        };
+        let error=AlternativesEngine.assess(&fixture_requirement(),&[changed],None).unwrap_err();
+        assert!(matches!(error,AssessmentError::MeasurementUncertaintyBindingDigestMismatch{..}));
+
+        let mut changed=c;
+        {
+            let uncertainty=changed.evidence[0].uncertainty.as_mut().unwrap();
+            uncertainty.uncertainty_budget_digest="different-budget-digest".into();
+            uncertainty.component_refs[0].uncertainty_budget_digest="different-budget-digest".into();
+            uncertainty.component_refs_digest=canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs).unwrap();
+            uncertainty.binding_digest=canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
+        }
+        let updated=AlternativesEngine.assess(&fixture_requirement(),&[changed],None).unwrap();
+        assert_ne!(baseline.candidates[0].evidence_digest,updated.candidates[0].evidence_digest);
+        assert_ne!(baseline.receipt.payload_hash,updated.receipt.payload_hash);
     }
 
     #[test]
@@ -5680,56 +6045,33 @@ mod tests {
     }
 
     #[test]
-    fn uncertainty_component_reference_digest_is_order_independent() {
-        let mut uncertainty = MeasurementUncertaintyRef {
-            uncertainty_id: "u-components".into(),
-            observation_id: "observation".into(),
-            observation_record_digest: "record".into(),
-            statement: MeasurementUncertaintyStatement::Expanded {
-                value: 0.1,
-                unit: "unit".into(),
-                coverage_factor: 2.0,
-            },
-            method_id: "method".into(),
-            measurand_id: "measurand".into(),
-            procedure_id: "procedure".into(),
-            procedure_digest: "procedure-digest".into(),
-            component_refs: vec!["b".into(), "a".into()],
-            component_refs_digest:
-                canonical_string_list_hash(&vec!["a".into(), "b".into()]).unwrap(),
-            record_digest: "digest".into(),
-        };
-
+    fn uncertainty_component_binding_is_canonical_and_covers_order() {
+        let mut uncertainty = test_uncertainty(&["b", "a"]);
         uncertainty.validate().unwrap();
-        uncertainty.component_refs_digest =
-            canonical_string_list_hash(&vec!["b".into(), "a".into()]).unwrap();
+        uncertainty.component_refs.reverse();
         uncertainty.validate().unwrap();
-
-        uncertainty.component_refs_digest = "wrong-digest".into();
+        assert_eq!(
+            uncertainty.component_refs_digest,
+            canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs).unwrap()
+        );
+        assert_eq!(
+            uncertainty.binding_digest,
+            canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap()
+        );
+        uncertainty.binding_digest = "wrong-digest".into();
         assert!(matches!(
             uncertainty.validate().unwrap_err(),
-            AssessmentError::MeasurementUncertaintyComponentRefsDigestMismatch { .. }
+            AssessmentError::MeasurementUncertaintyBindingDigestMismatch { .. }
         ));
     }
 
     #[test]
     fn expanded_uncertainty_must_be_positive() {
-        let uncertainty = MeasurementUncertaintyRef {
-            uncertainty_id: "u".into(),
-            observation_id: "observation".into(),
-            observation_record_digest: "record".into(),
-            statement: MeasurementUncertaintyStatement::Expanded {
-                value: 0.0,
-                unit: "unit".into(),
-                coverage_factor: 2.0,
-            },
-            method_id: "method".into(),
-            measurand_id: "measurand".into(),
-            procedure_id: "procedure".into(),
-            procedure_digest: "procedure-digest".into(),
-            component_refs: vec!["component".into()],
-            component_refs_digest: canonical_string_list_hash(&vec!["component".into()]).unwrap(),
-            record_digest: "digest".into(),
+        let mut uncertainty = test_uncertainty(&["component"]);
+        uncertainty.statement = MeasurementUncertaintyStatement::Expanded {
+            value: 0.0,
+            unit: "unit".into(),
+            coverage_factor: 2.0,
         };
         assert_eq!(
             uncertainty.validate().unwrap_err(),
