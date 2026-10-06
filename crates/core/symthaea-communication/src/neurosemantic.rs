@@ -378,6 +378,8 @@ pub struct NeurosemanticRemediationObservationSetArtifact {
     pub metric_ref: String,
     pub kind: NeurosemanticRemediationMeasurementKind,
     pub scope_ref: String,
+    /// Content-addressed identity of the canonical eligible population/split used by the metric.
+    pub population_manifest_hash: String,
     pub eligible_subject_artifact_hashes: Vec<String>,
     pub observations: Vec<NeurosemanticRemediationObservationRecord>,
 }
@@ -390,6 +392,7 @@ impl NeurosemanticRemediationObservationSetArtifact {
             || !valid_identifier(&self.metric_ref)
             || self.scope_ref.is_empty()
             || self.scope_ref.len() > MAX_NEUROSEMANTIC_REMEDIATION_METRIC_TEXT_BYTES
+            || !valid_blake3_digest(&self.population_manifest_hash)
             || self.eligible_subject_artifact_hashes.is_empty()
             || self.eligible_subject_artifact_hashes.len() > MAX_NEUROSEMANTIC_REMEDIATION_OBSERVATIONS
             || self.observations.len() > MAX_NEUROSEMANTIC_REMEDIATION_OBSERVATIONS
@@ -1091,6 +1094,7 @@ impl NeurosemanticRemediationImpactArtifact {
         measurement_bytes: &[u8],
         computation_bytes: &[&[u8]],
         observation_set_bytes: &[&[u8]],
+        population_manifest_bytes: &[&[u8]],
     ) -> Result<(), String> {
         self.validate()?;
         let measurement = self.verify_measurement_artifact_bytes(measurement_bytes)?;
@@ -1140,6 +1144,40 @@ impl NeurosemanticRemediationImpactArtifact {
                 || observation_set.scope_ref != definition.scope_ref
             {
                 return Err("neurosemantic remediation observation set binding mismatch".into());
+            }
+
+            let population_bytes = population_manifest_bytes
+                .iter()
+                .copied()
+                .find(|candidate| content_hash(candidate) == observation_set.population_manifest_hash)
+                .ok_or_else(|| "neurosemantic remediation population manifest is missing".to_string())?;
+
+            match computation.kind {
+                NeurosemanticRemediationMeasurementKind::Forgetfulness
+                | NeurosemanticRemediationMeasurementKind::RecoveryRisk
+                | NeurosemanticRemediationMeasurementKind::RepresentationResidual => {
+                    let population =
+                        NeurosemanticRemediationEvaluationSetManifest::from_json_bytes(population_bytes)?;
+                    if population.set_kind != NeurosemanticRemediationEvaluationSetKind::Forget
+                        || population.fingerprint()? != observation_set.population_manifest_hash
+                        || sorted_hashes(&population.member_artifact_hashes)
+                            != sorted_hashes(&observation_set.eligible_subject_artifact_hashes)
+                    {
+                        return Err("neurosemantic remediation observation set is not exactly bound to the forget population".into());
+                    }
+                }
+                NeurosemanticRemediationMeasurementKind::UtilityImpact => {
+                    let population =
+                        NeurosemanticRemediationEvaluationSetManifest::from_json_bytes(population_bytes)?;
+                    if population.set_kind != NeurosemanticRemediationEvaluationSetKind::Retain
+                        || population.fingerprint()? != observation_set.population_manifest_hash
+                        || sorted_hashes(&population.member_artifact_hashes)
+                            != sorted_hashes(&observation_set.eligible_subject_artifact_hashes)
+                    {
+                        return Err("neurosemantic remediation observation set is not exactly bound to the retain population".into());
+                    }
+                }
+                NeurosemanticRemediationMeasurementKind::FairnessImpact => {}
             }
 
             let (eligible_count, observed_count, failure_count, ratio_numerator, ratio_denominator) =
@@ -3329,6 +3367,12 @@ fn validate_payload(payload: &NeurosemanticPayload) -> Result<(), String> {
     }
 }
 
+fn sorted_hashes(values: &[String]) -> Vec<&str> {
+    let mut sorted: Vec<&str> = values.iter().map(String::as_str).collect();
+    sorted.sort_unstable();
+    sorted
+}
+
 fn recompute_metric_ratio(
     observation_set: &NeurosemanticRemediationObservationSetArtifact,
     aggregation_ref: &str,
@@ -4490,6 +4534,7 @@ mod tests {
             metric_ref: "metric-fairness-gap".into(),
             kind: NeurosemanticRemediationMeasurementKind::FairnessImpact,
             scope_ref: "fairness-split-v1".into(),
+            population_manifest_hash: content_hash(b"fairness-population-placeholder"),
             eligible_subject_artifact_hashes: vec![
                 content_hash(b"fair-1"),
                 content_hash(b"fair-2"),
