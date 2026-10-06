@@ -841,6 +841,9 @@ impl NixPostStateReceiptV1 {
             "authorized definition digest",
         )?;
         validate_digest(&self.observed_definition_digest, "observed definition digest")?;
+        if self.authorized_definition_digest != self.observed_definition_digest {
+            return Err(NixPostStateErrorV1::DefinitionMismatch);
+        }
         if self.authorized_generation != self.observed_generation {
             return Err(NixPostStateErrorV1::GenerationMismatch);
         }
@@ -2038,6 +2041,23 @@ mod tests {
             stability_sequence_digest(&evidence_changed.samples).unwrap();
         let receipt_b = build_receipt(&exp, &obs, Some(evidence_changed)).unwrap();
         assert_ne!(receipt_a.digest().unwrap(), receipt_b.digest().unwrap());
+    }
+
+    #[test]
+    fn serialized_receipt_rejects_definition_digest_mismatch() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.observed_definition_digest =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".into();
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::DefinitionMismatch
+        );
     }
 
     #[test]
