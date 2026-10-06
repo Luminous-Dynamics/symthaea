@@ -41,6 +41,7 @@
 
 use anyhow::Result;
 use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 #[cfg(feature = "audio")]
 use tracing::info;
@@ -58,27 +59,63 @@ use crate::voice::{
 /// Raw CMU Pronouncing Dictionary text (~3.5 MB, &'static lifetime).
 static CMUDICT_RAW: &str = include_str!("data/cmudict.dict");
 
-/// Lazily-parsed CMU dictionary: UPPERCASE word → slice of ARPABET phonemes.
-/// Parsed once on first access (~6ms). All slices borrow from CMUDICT_RAW.
+/// Lazily-parsed CMU dictionary: lowercase word → its selected primary ARPABET phonemes.
+/// The unsuffixed entry is authoritative for this deterministic selector. If a malformed or
+/// legacy resource has no primary entry, the first encountered alternate is retained so the
+/// legacy text→phoneme path remains available; strict evidence records the selection policy
+/// explicitly rather than implying that only one pronunciation exists.
 static CMUDICT: LazyLock<HashMap<&'static str, Vec<&'static str>>> = LazyLock::new(|| {
-    let mut map = HashMap::with_capacity(135_000);
+    let mut entries: HashMap<&'static str, (bool, Vec<&'static str>)> =
+        HashMap::with_capacity(135_000);
     for line in CMUDICT_RAW.lines() {
         if line.starts_with(";;;") || line.is_empty() {
             continue;
         }
         // Format: "word PH1 PH2 PH3" (single-space separator, lowercase words)
-        // Variant pronunciations: "word(2) PH1 PH2"
+        // Variant pronunciations: "word(1) PH1 PH2" or "word(2) PH1 PH2"
         if let Some((word_part, phones_part)) = line.split_once(' ') {
-            // Strip variant suffix: "word(2)" → "word"
             let word = word_part.split('(').next().unwrap_or(word_part);
-            // Only keep first pronunciation per word
-            if !map.contains_key(word) {
-                let phones: Vec<&str> = phones_part.split_whitespace().collect();
-                map.insert(word, phones);
+            let is_primary = !word_part.contains('(');
+            let phones: Vec<&str> = phones_part.split_whitespace().collect();
+
+            match entries.get(word) {
+                None => {
+                    entries.insert(word, (is_primary, phones));
+                }
+                Some((existing_primary, _)) if is_primary && !existing_primary => {
+                    entries.insert(word, (true, phones));
+                }
+                _ => {}
             }
         }
     }
-    map
+
+    entries
+        .into_iter()
+        .map(|(word, (_, phones))| (word, phones))
+        .collect()
+});
+
+/// CMUdict root metadata: whether an unsuffixed primary exists and how many entries are
+/// available in the embedded resource. The strict evidence path refuses a root without an
+/// explicit primary instead of relabeling an alternate as primary.
+static CMUDICT_VARIANT_METADATA: LazyLock<
+    HashMap<&'static str, (bool, usize)>,
+> = LazyLock::new(|| {
+    let mut metadata = HashMap::with_capacity(135_000);
+    for line in CMUDICT_RAW.lines() {
+        if line.starts_with(";;;") || line.is_empty() {
+            continue;
+        }
+        if let Some((word_part, _)) = line.split_once(' ') {
+            let word = word_part.split('(').next().unwrap_or(word_part);
+            let is_primary = !word_part.contains('(');
+            let entry = metadata.entry(word).or_insert((false, 0usize));
+            entry.0 |= is_primary;
+            entry.1 += 1;
+        }
+    }
+    metadata
 });
 
 /// Look up a word in the CMU Pronouncing Dictionary.
@@ -87,6 +124,68 @@ fn cmudict_lookup(word: &str) -> Option<Vec<&'static str>> {
     // CMU dict uses lowercase keys
     let lower: String = word.to_lowercase();
     CMUDICT.get(lower.as_str()).cloned()
+}
+
+/// Provenance for one pronunciation resource selection used by a strict realization witness.
+///
+/// The digest identifies the exact embedded resource contents used to derive the pronunciation.
+/// It is resource identity evidence, not a claim that the resource is linguistically infallible.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PronunciationLexiconEvidence {
+    /// Stable identifier for the pronunciation resource.
+    pub source_id: String,
+    /// Actual resource/dialect scope exposed by this selector.
+    pub dialect_scope: String,
+    /// Deterministic policy used when more than one resource entry exists.
+    pub variant_policy: String,
+    /// Stable selected-variant label, e.g. "primary" or "only-entry".
+    pub selected_variant: String,
+    /// Number of resource entries available for this lexical root.
+    pub available_variants: usize,
+    /// BLAKE3 identity of the exact embedded resource used by this selector.
+    pub resource_blake3: String,
+}
+
+impl PronunciationLexiconEvidence {
+    pub fn is_well_formed(&self) -> bool {
+        !self.source_id.is_empty()
+            && !self.dialect_scope.is_empty()
+            && !self.variant_policy.is_empty()
+            && !self.selected_variant.is_empty()
+            && self.available_variants > 0
+            && self.resource_blake3.len() == 64
+            && self.resource_blake3.bytes().all(|byte| byte.is_ascii_hexdigit())
+    }
+}
+
+/// Compute a deterministic identity for the project-maintained hand lexicon.
+///
+/// HashMap iteration order is intentionally eliminated from the identity by sorting keys first.
+/// Length-prefixing makes concatenation unambiguous without relying on display delimiters.
+fn hash_hand_lexicon(dictionary: &HashMap<String, Vec<&'static str>>) -> String {
+    let mut entries = dictionary.iter().collect::<Vec<_>>();
+    entries.sort_by(|left, right| left.0.cmp(right.0));
+
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-hand-lexicon-resource-v1\\0");
+    for (word, phones) in entries {
+        hasher.update(&(word.len() as u64).to_le_bytes());
+        hasher.update(word.as_bytes());
+        hasher.update(&(phones.len() as u64).to_le_bytes());
+        for phone in phones {
+            hasher.update(&(phone.len() as u64).to_le_bytes());
+            hasher.update(phone.as_bytes());
+        }
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
+/// Hash the exact embedded CMUdict resource bytes.
+fn hash_cmudict_resource() -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"cmudict-embedded-resource-v1\\0");
+    hasher.update(CMUDICT_RAW.as_bytes());
+    hasher.finalize().to_hex().to_string()
 }
 
 /// Return the offset phoneme for a diphthong (the vowel it glides toward).
@@ -253,6 +352,8 @@ fn promote_stress(ph: &str) -> &str {
 pub struct SimpleG2P {
     /// Common word pronunciations
     dictionary: HashMap<String, Vec<&'static str>>,
+    /// Canonical identity of the embedded hand-curated pronunciation resource.
+    hand_lexicon_blake3: String,
 }
 
 impl SimpleG2P {
@@ -1191,7 +1292,11 @@ impl SimpleG2P {
         );
         dictionary.insert("so".to_string(), vec!["S", "OW1"]);
 
-        Self { dictionary }
+        let hand_lexicon_blake3 = hash_hand_lexicon(&dictionary);
+        Self {
+            dictionary,
+            hand_lexicon_blake3,
+        }
     }
 
     /// Convert a word to ARPABET phonemes.
@@ -1224,14 +1329,58 @@ impl SimpleG2P {
         &self,
         word: &str,
     ) -> Option<(Vec<&'static str>, &'static str)> {
+        let (phonemes, evidence) = self.word_to_phonemes_from_lexicon_with_evidence(word)?;
+        let source = match evidence.source_id.as_str() {
+            "symthaea-hand-lexicon-v1" => "symthaea-hand-lexicon-v1",
+            "cmudict-embedded-v1" => "cmudict-embedded-v1",
+            _ => unreachable!("strict pronunciation source is constrained by this method"),
+        };
+        Some((phonemes, source))
+    }
+
+    /// Look up a word using only the embedded pronunciation lexicons and retain the complete
+    /// resource identity/scope/variant evidence used by the strict selector.
+    pub fn word_to_phonemes_from_lexicon_with_evidence(
+        &self,
+        word: &str,
+    ) -> Option<(Vec<&'static str>, PronunciationLexiconEvidence)> {
         let lower = word.to_lowercase();
         let clean: String = lower.chars().filter(|c| c.is_alphabetic()).collect();
 
         if let Some(phonemes) = self.dictionary.get(&clean) {
-            return Some((phonemes.clone(), "symthaea-hand-lexicon-v1"));
+            return Some((
+                phonemes.clone(),
+                PronunciationLexiconEvidence {
+                    source_id: "symthaea-hand-lexicon-v1".to_string(),
+                    dialect_scope: "en-unspecified".to_string(),
+                    variant_policy: "single-curated-entry".to_string(),
+                    selected_variant: "only-entry".to_string(),
+                    available_variants: 1,
+                    resource_blake3: self.hand_lexicon_blake3.clone(),
+                },
+            ));
         }
 
-        cmudict_lookup(&clean).map(|phonemes| (phonemes, "cmudict-embedded-v1"))
+        let phonemes = cmudict_lookup(&clean)?;
+        let (has_primary, available_variants) =
+            CMUDICT_VARIANT_METADATA.get(clean.as_str()).copied().unwrap_or((false, 0));
+        if !has_primary || available_variants == 0 {
+            // The compatibility text path may retain a first alternate for malformed/legacy
+            // data, but strict evidence may only identify an explicitly present primary entry.
+            return None;
+        }
+
+        Some((
+            phonemes,
+            PronunciationLexiconEvidence {
+                source_id: "cmudict-embedded-v1".to_string(),
+                dialect_scope: "en-US".to_string(),
+                variant_policy: "primary-un-suffixed-entry".to_string(),
+                selected_variant: "primary".to_string(),
+                available_variants,
+                resource_blake3: hash_cmudict_resource(),
+            },
+        ))
     }
 
     /// Rule-based G2P with longest-match sliding window.
@@ -3058,6 +3207,59 @@ mod tests {
             .word_to_phonemes_from_lexicon("serendipity")
             .expect("serendipity must have a CMU pronunciation");
         assert_eq!(source, "cmudict-embedded-v1");
+    }
+
+    #[test]
+    fn test_pronunciation_evidence_binds_exact_resource_scope_and_variant_policy() {
+        let g2p = SimpleG2P::new();
+        let (hand_phones, hand) = g2p
+            .word_to_phonemes_from_lexicon_with_evidence("hello")
+            .expect("hello must have an embedded pronunciation");
+        assert!(!hand_phones.is_empty());
+        assert_eq!(hand.source_id, "symthaea-hand-lexicon-v1");
+        assert_eq!(hand.dialect_scope, "en-unspecified");
+        assert_eq!(hand.variant_policy, "single-curated-entry");
+        assert_eq!(hand.selected_variant, "only-entry");
+        assert_eq!(hand.available_variants, 1);
+        assert!(hand.is_well_formed());
+
+        let (cmu_phones, cmu) = g2p
+            .word_to_phonemes_from_lexicon_with_evidence("serendipity")
+            .expect("serendipity must have a CMU pronunciation");
+        assert!(!cmu_phones.is_empty());
+        assert_eq!(cmu.source_id, "cmudict-embedded-v1");
+        assert_eq!(cmu.dialect_scope, "en-US");
+        assert_eq!(cmu.variant_policy, "primary-un-suffixed-entry");
+        assert_eq!(cmu.selected_variant, "primary");
+        assert!(cmu.available_variants >= 1);
+        assert!(cmu.is_well_formed());
+    }
+
+    #[test]
+    fn test_cmudict_variant_metadata_exposes_alternates_without_changing_selection() {
+        let mut candidates = CMUDICT_VARIANT_COUNTS
+            .iter()
+            .filter(|(_, count)| **count > 1)
+            .map(|(word, _)| *word)
+            .collect::<Vec<_>>();
+        candidates.sort_unstable();
+        let word = candidates.first().expect("embedded CMUdict should contain alternate entries");
+
+        let selected = cmudict_lookup(word).expect("selected CMU pronunciation must exist");
+        let (has_primary, count) = CMUDICT_VARIANT_METADATA
+            .get(word)
+            .copied()
+            .expect("variant metadata must cover the selected entry");
+        assert!(has_primary);
+        assert!(count > 1);
+
+        let g2p = SimpleG2P::new();
+        let (strict_selected, evidence) = g2p
+            .word_to_phonemes_from_lexicon_with_evidence(word)
+            .expect("strict lookup should expose the same primary selection");
+        assert_eq!(strict_selected, selected);
+        assert_eq!(evidence.selected_variant, "primary");
+        assert_eq!(evidence.available_variants, count);
     }
 
     #[test]
