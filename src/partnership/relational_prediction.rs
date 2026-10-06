@@ -1068,6 +1068,60 @@ impl HeldOutRelationalPredictionQualification {
     }
 }
 
+fn feature_set_name(feature_set: PredictionFeatureSet) -> &'static str {
+    match feature_set {
+        PredictionFeatureSet::PersistenceBaseline => "PersistenceBaseline",
+        PredictionFeatureSet::IsolatedAgents => "IsolatedAgents",
+        PredictionFeatureSet::CommonDriver => "CommonDriver",
+        PredictionFeatureSet::SynchronyOnly => "SynchronyOnly",
+        PredictionFeatureSet::NonRelationalContext => "NonRelationalContext",
+        PredictionFeatureSet::RelationalAugmented => "RelationalAugmented",
+        PredictionFeatureSet::RelationalProfile => "RelationalProfile",
+    }
+}
+
+fn prediction_evidence_record_json(record: &PredictionEvidenceRecord) -> serde_json::Value {
+    serde_json::json!({
+        "feature_set": feature_set_name(record.feature_set),
+        "train_samples": record.train_samples,
+        "test_samples": record.test_samples,
+        "feature_times": &record.feature_times,
+        "outcome_times": &record.outcome_times,
+        "observed_outcomes": &record.observed_outcomes,
+        "predictions": &record.predictions,
+        "fit_coefficients": &record.fit_coefficients,
+        "feature_means": &record.feature_means,
+        "feature_scales": &record.feature_scales,
+        "mean_absolute_error": record.mean_absolute_error,
+        "mean_squared_error": record.mean_squared_error
+    })
+}
+
+fn validate_evidence_provenance(
+    provenance: &RelationalPredictionProvenance,
+) -> Result<(), RelationalPredictionError> {
+    if provenance.protocol_id.trim().is_empty() {
+        return Err(RelationalPredictionError::InvalidEvidenceProvenance(
+            "protocol_id",
+        ));
+    }
+    if !is_hex_digest(&provenance.source_data_sha256, 64) {
+        return Err(RelationalPredictionError::InvalidEvidenceProvenance(
+            "source_data_sha256",
+        ));
+    }
+    if !is_hex_digest(&provenance.software_commit_sha, 40) {
+        return Err(RelationalPredictionError::InvalidEvidenceProvenance(
+            "software_commit_sha",
+        ));
+    }
+    Ok(())
+}
+
+fn is_hex_digest(value: &str, length: usize) -> bool {
+    value.len() == length && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 fn validate_samples(
     samples: &[RelationalPredictionSample],
 ) -> Result<(), RelationalPredictionError> {
@@ -1098,6 +1152,88 @@ fn validate_temporal_boundary(
     }
 
     Ok(())
+}
+
+fn fit_prediction_record(
+    samples: &[RelationalPredictionSample],
+    config: &HeldOutRelationalPredictionConfig,
+    feature_set: PredictionFeatureSet,
+) -> Result<PredictionEvidenceRecord, RelationalPredictionError> {
+    validate_samples(samples)?;
+    config.validate(samples.len())?;
+    validate_temporal_boundary(samples, config)?;
+
+    let test_start = config.test_start();
+    let test_end = test_start
+        .checked_add(config.test_samples)
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+    let (model, baseline) = if feature_set == PredictionFeatureSet::PersistenceBaseline {
+        (None, Some(samples[config.train_samples - 1].future_outcome))
+    } else {
+        (
+            Some(fit_linear_model(
+                &samples[..config.train_samples],
+                feature_set,
+                config.ridge_lambda,
+            )?),
+            None,
+        )
+    };
+
+    let fit_coefficients = model.as_ref().map(|model| model.coefficients.clone());
+    let feature_means = model
+        .as_ref()
+        .map_or_else(Vec::new, |model| model.means.clone());
+    let feature_scales = model
+        .as_ref()
+        .map_or_else(Vec::new, |model| model.scales.clone());
+
+    let mut feature_times = Vec::with_capacity(config.test_samples);
+    let mut outcome_times = Vec::with_capacity(config.test_samples);
+    let mut observed_outcomes = Vec::with_capacity(config.test_samples);
+    let mut predictions = Vec::with_capacity(config.test_samples);
+    let mut absolute_error = 0.0;
+    let mut squared_error = 0.0;
+
+    for sample in &samples[test_start..test_end] {
+        let prediction = match (&model, baseline) {
+            (Some(model), None) => predict(model, &feature_vector(sample, feature_set)),
+            (None, Some(value)) => value,
+            _ => return Err(RelationalPredictionError::ModelFitFailed),
+        };
+        if !prediction.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let error = prediction - sample.future_outcome;
+        absolute_error += error.abs();
+        squared_error += error * error;
+        if !absolute_error.is_finite() || !squared_error.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        feature_times.push(sample.feature_time);
+        outcome_times.push(sample.outcome_time);
+        observed_outcomes.push(sample.future_outcome);
+        predictions.push(prediction);
+    }
+
+    let n = config.test_samples as f64;
+    Ok(PredictionEvidenceRecord {
+        feature_set,
+        train_samples: config.train_samples,
+        test_samples: config.test_samples,
+        feature_times,
+        outcome_times,
+        observed_outcomes,
+        predictions,
+        fit_coefficients,
+        feature_means,
+        feature_scales,
+        mean_absolute_error: absolute_error / n,
+        mean_squared_error: squared_error / n,
+    })
 }
 
 fn fit_and_score(
