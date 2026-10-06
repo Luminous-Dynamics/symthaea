@@ -151,6 +151,8 @@ impl std::error::Error for RelationalPredictionError {}
 /// Predictor families used for the ablation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PredictionFeatureSet {
+    /// Predict the held-out target using the last observed training target.
+    PersistenceBaseline,
     /// Only isolated agent state summaries.
     IsolatedAgents,
     /// Only the supplied common-context signal.
@@ -239,6 +241,7 @@ pub struct HeldOutRelationalPredictionSummary {
     pub gap_samples: usize,
     pub minimum_outcome_horizon: f64,
     pub maximum_outcome_horizon: f64,
+    pub persistence_baseline: PredictionScore,
     pub isolated_agents: PredictionScore,
     pub common_driver: PredictionScore,
     pub synchrony_only: PredictionScore,
@@ -255,6 +258,8 @@ impl HeldOutRelationalPredictionSummary {
         config.validate(samples.len())?;
         validate_temporal_boundary(samples, &config)?;
 
+        let persistence_baseline =
+            fit_and_score(samples, &config, PredictionFeatureSet::PersistenceBaseline)?;
         let scores = [
             fit_and_score(samples, &config, PredictionFeatureSet::IsolatedAgents)?,
             fit_and_score(samples, &config, PredictionFeatureSet::CommonDriver)?,
@@ -279,6 +284,7 @@ impl HeldOutRelationalPredictionSummary {
                 .iter()
                 .copied()
                 .fold(f64::NEG_INFINITY, f64::max),
+            persistence_baseline,
             isolated_agents: scores[0],
             common_driver: scores[1],
             synchrony_only: scores[2],
@@ -289,6 +295,7 @@ impl HeldOutRelationalPredictionSummary {
 
     pub fn score(&self, feature_set: PredictionFeatureSet) -> PredictionScore {
         match feature_set {
+            PredictionFeatureSet::PersistenceBaseline => self.persistence_baseline,
             PredictionFeatureSet::IsolatedAgents => self.isolated_agents,
             PredictionFeatureSet::CommonDriver => self.common_driver,
             PredictionFeatureSet::SynchronyOnly => self.synchrony_only,
@@ -467,6 +474,10 @@ fn fit_and_score(
     config: &HeldOutRelationalPredictionConfig,
     feature_set: PredictionFeatureSet,
 ) -> Result<PredictionScore, RelationalPredictionError> {
+    if feature_set == PredictionFeatureSet::PersistenceBaseline {
+        return score_persistence_baseline(samples, config);
+    }
+
     let coefficients = fit_linear_model(
         &samples[..config.train_samples],
         feature_set,
@@ -494,6 +505,37 @@ fn fit_and_score(
     Ok(PredictionScore {
         feature_set,
         parameter_count: coefficients.len(),
+        train_samples: config.train_samples,
+        test_samples: config.test_samples,
+        mean_absolute_error: absolute_error / n,
+        mean_squared_error: squared_error / n,
+    })
+}
+
+fn score_persistence_baseline(
+    samples: &[RelationalPredictionSample],
+    config: &HeldOutRelationalPredictionConfig,
+) -> Result<PredictionScore, RelationalPredictionError> {
+    let prediction = samples[config.train_samples - 1].future_outcome;
+    if !prediction.is_finite() {
+        return Err(RelationalPredictionError::ModelFitFailed);
+    }
+
+    let test_start = config.test_start();
+    let test_end = test_start + config.test_samples;
+    let mut absolute_error = 0.0;
+    let mut squared_error = 0.0;
+
+    for sample in &samples[test_start..test_end] {
+        let error = prediction - sample.future_outcome;
+        absolute_error += error.abs();
+        squared_error += error * error;
+    }
+
+    let n = config.test_samples as f64;
+    Ok(PredictionScore {
+        feature_set: PredictionFeatureSet::PersistenceBaseline,
+        parameter_count: 0,
         train_samples: config.train_samples,
         test_samples: config.test_samples,
         mean_absolute_error: absolute_error / n,
@@ -727,6 +769,10 @@ mod tests {
         assert!(
             summary.relational_profile.mean_squared_error
                 < summary.synchrony_only.mean_squared_error * 0.05
+        );
+        assert!(
+            summary.relational_profile.mean_squared_error
+                < summary.persistence_baseline.mean_squared_error
         );
         assert!(
             summary
