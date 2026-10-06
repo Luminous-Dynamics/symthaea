@@ -11773,7 +11773,7 @@ mod tests {
     }
 
     #[test]
-    fn terminal_history_fences_native_replay_after_dispatch_row_is_removed() {
+    fn native_replay_history_ledger_survives_compaction_and_restart() {
         let path = std::env::temp_dir().join(format!(
             "symthaea-gis-auth-terminal-replay-history-{}.db",
             std::process::id()
@@ -11863,8 +11863,8 @@ mod tests {
             )
             .unwrap();
 
-        // Simulate history compaction / live-record deletion: terminal evidence
-        // remains the durable historical authority for the spent native grant.
+        // Simulate live-record compaction. The dedicated replay ledger is the
+        // durable historical authority for the spent native grant.
         store
             .connection()
             .unwrap()
