@@ -457,6 +457,15 @@ mod tests {
     }
 
     #[test]
+    fn definition_content_commitment_changes_across_systemd_manager_incarnation() {
+        let mut first = content_evidence();
+        let first_digest = first.digest().unwrap();
+        first.manager_owner = ":1.43".into();
+        let second_digest = first.digest().unwrap();
+        assert_ne!(first_digest, second_digest);
+    }
+
+    #[test]
     fn context_from_verified_definition_content_binds_both_provenance_layers() {
         let evidence = content_evidence();
         let sealed = NixVerifiedServiceDefinitionContentV1::from_observer(evidence.clone()).unwrap();
