@@ -101,6 +101,11 @@ fn main() -> Result<(), String> {
                     "synthetic-policy-record-1",
                     b"synthetic-policy-record-1",
                 ),
+                derivation_provenance_ref: "synthetic-derivation-record-1".into(),
+                derivation_provenance_hash: symthaea_communication::compute_derivation_provenance_hash(
+                    "synthetic-derivation-record-1",
+                    b"synthetic-derivation-record-1",
+                ),
                 origin_jurisdiction: "ZA".into(),
                 permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
                 permitted_secondary_uses: BTreeSet::new(),
@@ -186,6 +191,7 @@ fn main() -> Result<(), String> {
         .handling
         .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
+            b"synthetic-derivation-record-1",
             &authority_attestation,
             &signing_key.verifying_key(),
             &authority_resolution,
@@ -204,6 +210,19 @@ fn main() -> Result<(), String> {
         .data_policy
         .handling
         .verify_policy_record_binding_bytes(b"synthetic-policy-record-1");
+
+    let derivation_provenance_present =
+        !message.packet.data_policy.handling.derivation_provenance_ref.is_empty();
+    let derivation_provenance_hash_valid = message
+        .packet
+        .data_policy
+        .handling
+        .verify_derivation_provenance_binding_bytes(b"synthetic-derivation-record-1");
+    let derivation_provenance_mismatch_blocked = !message
+        .packet
+        .data_policy
+        .handling
+        .verify_derivation_provenance_binding_bytes(b"synthetic-derivation-record-2");
 
     let mut reference_mismatch = message.clone();
     reference_mismatch
@@ -389,6 +408,7 @@ fn main() -> Result<(), String> {
             .handling
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
+                b"synthetic-derivation-record-1",
                 &substituted_authority_attestation,
                 &signing_key.verifying_key(),
                 &authority_resolution,
@@ -410,6 +430,7 @@ fn main() -> Result<(), String> {
         .handling
         .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
+            b"synthetic-derivation-record-1",
             &authority_attestation,
             &signing_key.verifying_key(),
             &forged_resolution,
@@ -436,6 +457,7 @@ fn main() -> Result<(), String> {
         .handling
         .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
+            b"synthetic-derivation-record-1",
             &authority_attestation,
             &signing_key.verifying_key(),
             &wrong_context_resolution,
@@ -453,6 +475,7 @@ fn main() -> Result<(), String> {
         .handling
         .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
+            b"synthetic-derivation-record-1",
             &authority_attestation,
             &signing_key.verifying_key(),
             &tampered_resolution,
@@ -474,6 +497,7 @@ fn main() -> Result<(), String> {
         .handling
         .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
+            b"synthetic-derivation-record-1",
             &authority_attestation,
             &signing_key.verifying_key(),
             &pre_attestation_resolution,
@@ -525,6 +549,9 @@ fn main() -> Result<(), String> {
         "handling_policy_provenance_reference_mismatch_blocked":
             handling_policy_provenance_reference_mismatch_blocked,
         "handling_policy_provenance_mismatch_blocked": handling_policy_provenance_mismatch_blocked,
+        "derivation_provenance_present": derivation_provenance_present,
+        "derivation_provenance_hash_valid": derivation_provenance_hash_valid,
+        "derivation_provenance_mismatch_blocked": derivation_provenance_mismatch_blocked,
         "stale_policy_provenance_binding_blocked": stale_policy_binding_blocked,
         "inference_escalation_blocked": inference_escalation_blocked,
         "first_packet_accepted": accepted == ReplayDecision::Accept,
