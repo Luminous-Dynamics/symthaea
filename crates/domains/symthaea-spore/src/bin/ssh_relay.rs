@@ -2729,19 +2729,32 @@ async fn verify_service_postcondition(action: &str, service: &str) -> Result<boo
 }
 async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
     let image_dir = validate_image_path(image_dir)?;
-    let dir = tokio::fs::metadata(&image_dir)
+    use std::os::unix::fs::MetadataExt;
+
+    let dir = tokio::fs::symlink_metadata(&image_dir)
         .await
         .map_err(|error| format!("image directory postcondition probe failed: {error}"))?;
     if !dir.is_dir() {
         return Err("image destination is not a directory".into());
     }
+    let mode = dir.mode() & 0o777;
+    if mode != 0o700 || dir.uid() != unsafe { libc::geteuid() } {
+        return Err(format!(
+            "image destination has unsafe ownership or mode {:04o}; require relay-owned 0700",
+            mode
+        ));
+    }
 
     for artifact in ["system.btrfs.zst", "system.tar.gz"] {
         let path = std::path::Path::new(&image_dir).join(artifact);
-        let Ok(metadata) = tokio::fs::metadata(&path).await else {
+        let Ok(metadata) = tokio::fs::symlink_metadata(&path).await else {
             continue;
         };
-        if !metadata.is_file() || metadata.len() == 0 {
+        if !metadata.file_type().is_file()
+            || metadata.len() == 0
+            || metadata.uid() != unsafe { libc::geteuid() }
+            || metadata.mode() & 0o077 != 0
+        {
             continue;
         }
 
@@ -6319,7 +6332,7 @@ set -euo pipefail
 umask 077
 echo "STAGE: Creating system image..."
 DEST="__IMAGE_DEST__"
-mkdir -m 700 -p "$DEST"
+mkdir -m 700 "$DEST"
 
 # Snapshot current btrfs root
 if btrfs subvolume snapshot -r / "$DEST/root-snapshot" 2>/dev/null; then
