@@ -726,6 +726,93 @@ impl NixPostStateReceiptV1 {
         Ok(())
     }
 
+    fn evaluate_postcondition_from_receipt(
+        &self,
+    ) -> Result<NixPostconditionAssessmentV1, NixPostStateErrorV1> {
+        let expected_job_type = NixSystemdJobTypeV1::for_operation(self.operation);
+        match self.operation {
+            NixServiceOperationKindV1::Start
+            | NixServiceOperationKindV1::Stop
+            | NixServiceOperationKindV1::Restart
+            | NixServiceOperationKindV1::Reload => {
+                let (
+                    Some(job_id),
+                    Some(job_type),
+                    Some(job_unit),
+                    Some(job_object_path),
+                    Some(job_result),
+                ) = (
+                    self.systemd_job_id,
+                    self.systemd_job_type,
+                    self.systemd_job_unit.as_deref(),
+                    self.systemd_job_object_path.as_deref(),
+                    self.systemd_job_result.as_deref(),
+                )
+                else {
+                    return Ok(NixPostconditionAssessmentV1::Unproven);
+                };
+
+                if job_id == 0
+                    || job_unit != self.target_unit
+                    || job_object_path != format!(
+                        "/org/freedesktop/systemd1/job/{job_id}"
+                    )
+                    || Some(job_type) != expected_job_type
+                {
+                    return Ok(NixPostconditionAssessmentV1::Violated);
+                }
+                if job_result != "done" {
+                    return Ok(NixPostconditionAssessmentV1::Violated);
+                }
+            }
+            NixServiceOperationKindV1::Enable | NixServiceOperationKindV1::Disable => {}
+        }
+
+        match self.operation {
+            NixServiceOperationKindV1::Start => {
+                if self.observed_active_state != ServiceActiveStateV1::Active {
+                    return Ok(NixPostconditionAssessmentV1::Unproven);
+                }
+            }
+            NixServiceOperationKindV1::Stop => {
+                if self.observed_active_state != ServiceActiveStateV1::Inactive {
+                    return Ok(NixPostconditionAssessmentV1::Unproven);
+                }
+            }
+            NixServiceOperationKindV1::Restart => {
+                if self.observed_active_state != ServiceActiveStateV1::Active {
+                    return Ok(NixPostconditionAssessmentV1::Unproven);
+                }
+                let (Some(pre), Some(post)) = (
+                    self.pre_invocation_id.as_deref(),
+                    self.post_invocation_id.as_deref(),
+                ) else {
+                    return Ok(NixPostconditionAssessmentV1::Unproven);
+                };
+                if pre == post {
+                    return Ok(NixPostconditionAssessmentV1::Unproven);
+                }
+            }
+            NixServiceOperationKindV1::Reload => {
+                if self.observed_active_state != ServiceActiveStateV1::Active {
+                    return Ok(NixPostconditionAssessmentV1::Unproven);
+                }
+            }
+            NixServiceOperationKindV1::Enable => {
+                if self.observed_unit_file_state != ServiceUnitFileStateV1::Enabled {
+                    return Ok(NixPostconditionAssessmentV1::Unproven);
+                }
+            }
+            NixServiceOperationKindV1::Disable => {
+                if self.observed_unit_file_state != ServiceUnitFileStateV1::Disabled {
+                    return Ok(NixPostconditionAssessmentV1::Unproven);
+                }
+            }
+        }
+
+        Ok(NixPostconditionAssessmentV1::Satisfied)
+    }
+
     pub fn validate_shape(&self) -> Result<(), NixPostStateErrorV1> {
         validate_digest(&self.action_intent_digest, "action intent digest")?;
         validate_digest(
@@ -799,6 +886,10 @@ impl NixPostStateReceiptV1 {
             &self.observed_service_result,
             self.post_invocation_id.as_deref(),
         );
+        let recomputed_postcondition = self.evaluate_postcondition_from_receipt()?;
+        if self.postcondition != recomputed_postcondition {
+            return Err(NixPostStateErrorV1::PostconditionMismatch);
+        }
         validate_optional_invocation_id(self.pre_invocation_id.as_deref(), "pre-invocation id")?;
         validate_optional_invocation_id(self.post_invocation_id.as_deref(), "post-invocation id")?;
         require_nonempty(&self.observer_identity, "observer identity")?;
@@ -1062,6 +1153,41 @@ fn service_effect_digest(
     put_opt_str(&mut h, pre_invocation_id);
     put_u64(&mut h, required_stability_us);
     h.finalize().to_hex().to_string()
+}
+
+fn semantic_state_digest(
+    operation: NixServiceOperationKindV1,
+    unit: &str,
+    load_state: ServiceLoadStateV1,
+    active_state: ServiceActiveStateV1,
+    sub_state: &str,
+    unit_file_state: ServiceUnitFileStateV1,
+    service_result: &str,
+    invocation_id: Option<&str>,
+) -> String {
+    let mut h = Hasher::new();
+    h.update(STABILITY_SAMPLE_DOMAIN_V1);
+    put_u8(&mut h, operation_tag(operation));
+    put_str(&mut h, unit);
+    put_u8(&mut h, load_state_tag(load_state));
+    put_u8(&mut h, active_state_tag(active_state));
+    put_str(&mut h, sub_state);
+    put_u8(&mut h, unit_file_state_tag(unit_file_state));
+    put_str(&mut h, service_result);
+    put_opt_str(&mut h, invocation_id);
+    h.finalize().to_hex().to_string()
+}
+
+fn load_state_tag(state: ServiceLoadStateV1) -> u8 {
+    match state {
+        ServiceLoadStateV1::Stub => 0,
+        ServiceLoadStateV1::Loaded => 1,
+        ServiceLoadStateV1::NotFound => 2,
+        ServiceLoadStateV1::BadSetting => 3,
+        ServiceLoadStateV1::Error => 4,
+        ServiceLoadStateV1::Merged => 5,
+        ServiceLoadStateV1::Masked => 6,
+    }
 }
 
 fn active_state_tag(state: ServiceActiveStateV1) -> u8 {
