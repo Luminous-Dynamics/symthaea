@@ -256,6 +256,15 @@ jobs:
               b"\x40" for _ in range(257)
           )
 
+          # Exercise the RFC9162 hash-node bstr chunk ceiling directly. The
+          # proof decoder must classify 4097 zero-length chunks as a resource
+          # failure while retaining fixed 32-byte hash length as semantic.
+          proof_hash_chunk_limit = (
+              b"\x83\x02\x00\x81\x5f"
+              + (b"\x40" * 4097)
+              + b"\xff"
+          )
+
           # Exercise the outer receipt-collection count ceiling with small
           # opaque receipt values. The collection limit is 16, while the
           # enclosing COSE map scanner permits the array to reach this boundary.
@@ -300,6 +309,8 @@ jobs:
               "fuzz_rfc9942_signature_with_receipts/seed-label-257.cbor": outer_label_257,
               "fuzz_rfc9942_proofs/seed-65-proof-vdp.cbor": vdp_65,
               "fuzz_rfc9942_proofs/seed-257-proof-vdp.cbor": vdp_257,
+              "fuzz_rfc9942_proofs/seed-proof-hash-4097-chunks.cbor":
+                  proof_hash_chunk_limit,
               "fuzz_rfc9942_signature_with_receipts/seed-tagged-large-opaque.cbor":
                   large_tagged_outer,
               "fuzz_rfc9942_signature_with_receipts/seed-17-receipts.cbor":
