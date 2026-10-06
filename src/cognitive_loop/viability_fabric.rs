@@ -365,6 +365,9 @@ impl ViabilityFabric {
         if outcome.prediction.is_some() {
             return Err("outcome already contains a prediction");
         }
+        if outcome.evidence_refs.is_empty() {
+            return Err("missing evidence reference");
+        }
         if !outcome.prediction_error.world.is_finite()
             || !outcome.prediction_error.self_model.is_finite()
             || !outcome.prediction_error.interoceptive.is_finite()
@@ -390,6 +393,26 @@ impl ViabilityFabric {
         }
         if !outcome.evidence_refs.iter().all(|r| !r.trim().is_empty()) {
             return Err("invalid evidence reference");
+        }
+        if let Some(effect) = &outcome.observed_effect {
+            if !effect.is_valid() {
+                return Err("invalid observed effect");
+            }
+        }
+        if prediction
+            .predicted_world_delta
+            .as_ref()
+            .is_some_and(|delta| !delta.is_valid())
+            || prediction
+                .predicted_self_delta
+                .as_ref()
+                .is_some_and(|delta| !delta.is_valid())
+            || prediction
+                .predicted_goal_delta
+                .as_ref()
+                .is_some_and(|delta| !delta.is_valid())
+        {
+            return Err("invalid action prediction");
         }
 
         let prediction = self
