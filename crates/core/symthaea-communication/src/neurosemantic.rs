@@ -391,14 +391,6 @@ impl NeurosemanticHandlingPolicy {
         })
     }
 
-    /// Convenience predicate for callers that only need a boolean record-binding result.
-    pub fn verify_policy_record_binding_bytes(&self, record_bytes: &[u8]) -> bool {
-        self.validates()
-            && record_bytes.len() <= MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
-            && compute_policy_provenance_hash(&self.policy_provenance_ref, record_bytes)
-                == self.policy_provenance_hash
-    }
-
     pub fn allows_destination(&self, destination_jurisdiction: &str) -> bool {
         self.validates()
             && valid_jurisdiction_id(destination_jurisdiction)
@@ -1622,7 +1614,7 @@ mod tests {
         assert!(message
             .validate_for_handling(
                 &lease(),
-                &binding,
+                &original_binding,
                 "ZA",
                 NeurosemanticHandlingAction::SecondaryUse(NeurosemanticSecondaryUse::Research),
                 150,
