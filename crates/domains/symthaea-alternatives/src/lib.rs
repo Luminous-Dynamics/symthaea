@@ -503,6 +503,7 @@ impl MeasurementUncertaintyComponentRef {
             || self.component_record_digest.is_empty()
             || self.uncertainty_budget_id.is_empty()
             || self.uncertainty_budget_revision.is_empty()
+            || self.uncertainty_budget_digest.is_empty()
             || self.measurement_model_id.is_empty()
             || self.measurement_model_revision.is_empty()
             || self.measurement_model_digest.is_empty()
