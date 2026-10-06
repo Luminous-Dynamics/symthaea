@@ -439,7 +439,9 @@ impl ControllerDocumentDereferenceAttestation {
         request.controller_document_network_policy.validate_structure()?;
         request.controller_document_integrity_policy.validate_structure()?;
         let expected_url = request.controller_document_ref()?;
-        if self.requested_url != expected_url {
+        if !url_values_equivalent(&self.requested_url, &expected_url)
+            .unwrap_or(false)
+        {
             return Err(VerificationFailure::ControllerDocumentMismatch {
                 expected: expected_url,
                 actual: self.requested_url.clone(),
@@ -1255,7 +1257,10 @@ impl VerificationMethodResolution {
         if !self
             .relationship_methods
             .iter()
-            .any(|method| method == &self.verification_method)
+            .any(|method| {
+                url_values_equivalent(method.as_str(), self.verification_method.as_str())
+                    .unwrap_or(false)
+            })
         {
             return Err(VerificationFailure::VerificationMethodNotInRelationship);
         }
@@ -1748,7 +1753,12 @@ impl CryptographicVerificationReceipt {
                 });
             }
         }
-        if self.verification_method != resolution.verification_method {
+        if !url_values_equivalent(
+            self.verification_method.as_str(),
+            resolution.verification_method.as_str(),
+        )
+        .unwrap_or(false)
+        {
             return Err(VerificationFailure::VerificationMethodMismatch {
                 expected: resolution.verification_method.clone(),
                 actual: self.verification_method.clone(),
