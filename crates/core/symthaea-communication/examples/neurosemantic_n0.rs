@@ -663,6 +663,13 @@ fn main() -> Result<(), String> {
     let remediation_set_pair_verified = remediation_impact
         .verify_evaluation_set_pair_bytes(&forget_set_manifest_bytes, &retain_set_manifest_bytes)
         .is_ok();
+    let remediation_evaluation_bundle_verified = remediation_impact
+        .verify_evaluation_bundle_identity(
+            &evaluation_manifest_bytes,
+            &forget_set_manifest_bytes,
+            &retain_set_manifest_bytes,
+        )
+        .is_ok();
     let remediation_recovery_method_verified = remediation_impact
         .verify_evaluation_method_bytes(NeurosemanticRemediationEvaluationMethodKind::RecoveryAttack, &recovery_method_bytes)
         .is_ok();
@@ -686,6 +693,17 @@ fn main() -> Result<(), String> {
         forged.forget_set_manifest_hash = symthaea_communication::content_hash(b"other-forget-set");
         let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
         remediation_impact.verify_evaluation_manifest_bytes(&bytes).is_err()
+    };
+    let remediation_evaluation_source_dataset_mismatch_blocked = {
+        let mut forged_manifest = retain_set_manifest.clone();
+        forged_manifest.source_dataset_manifest_hash = symthaea_communication::content_hash(b"other-dataset");
+        let bytes = serde_json::to_vec(&forged_manifest).map_err(|e| e.to_string())?;
+        remediation_impact.verify_evaluation_bundle_identity(
+            &evaluation_manifest_bytes,
+            &forget_set_manifest_bytes,
+            &bytes,
+        )
+        .is_err()
     };
     let remediation_set_role_substitution_blocked = {
         let mut forged = forget_set_manifest.clone();
@@ -1184,6 +1202,8 @@ fn main() -> Result<(), String> {
         "lifecycle_rectification_requires_replacement_artifact": lifecycle_rectification_requires_replacement_artifact,
         "lifecycle_rectification_requires_replacement_lineage": lifecycle_rectification_requires_replacement_lineage,
         "remediation_impact_structured": remediation_impact_structured,
+        "remediation_evaluation_bundle_verified": remediation_evaluation_bundle_verified,
+        "remediation_evaluation_source_dataset_mismatch_blocked": remediation_evaluation_source_dataset_mismatch_blocked,
         "remediation_evaluation_manifest_substitution_blocked": remediation_evaluation_manifest_substitution_blocked,
         "remediation_set_pair_verified": remediation_set_pair_verified,
         "remediation_recovery_method_verified": remediation_recovery_method_verified,
