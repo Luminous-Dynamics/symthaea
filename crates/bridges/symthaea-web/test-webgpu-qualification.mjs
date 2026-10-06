@@ -633,6 +633,8 @@ async function rawWebGpuCompositorCanary(page) {
 
     const webgpuCanvas = document.createElement('canvas');
     const controlCanvas = document.createElement('canvas');
+    const cleanupKey = '__symthaeaWebGpuCompositorCanaryCleanup';
+    let handoff = false;
     for (const canvas of [webgpuCanvas, controlCanvas]) {
       canvas.width = 64;
       canvas.height = 64;
@@ -653,12 +655,28 @@ async function rawWebGpuCompositorCanary(page) {
     controlCanvas.style.left = '72px';
 
     let device = null;
+    const uncapturedErrors = [];
+    let deviceLost = null;
     try {
       const adapter = await navigator.gpu.requestAdapter();
       if (!adapter) {
         return { supported: false, reason: 'compositor canary requestAdapter returned null' };
       }
       device = await adapter.requestDevice();
+      device.addEventListener('uncapturederror', event => {
+        const error = event.error;
+        uncapturedErrors.push({
+          name: error?.name || 'UnknownGPUError',
+          message: error?.message || String(error),
+        });
+      });
+      void device.lost.then(info => {
+        deviceLost = {
+          reason: info?.reason || null,
+          message: info?.message || null,
+        };
+      });
+
       const format = navigator.gpu.getPreferredCanvasFormat();
       const context = webgpuCanvas.getContext('webgpu');
       const controlContext = controlCanvas.getContext('2d');
@@ -673,6 +691,7 @@ async function rawWebGpuCompositorCanary(page) {
       controlContext.fillStyle = 'rgb(255, 0, 0)';
       controlContext.fillRect(0, 0, 64, 64);
 
+      device.pushErrorScope('validation');
       context.configure({
         device,
         format,
@@ -690,8 +709,20 @@ async function rawWebGpuCompositorCanary(page) {
       pass.end();
       device.queue.submit([encoder.finish()]);
       await device.queue.onSubmittedWorkDone();
+      const validationError = await device.popErrorScope();
       await new Promise(requestAnimationFrame);
       await new Promise(requestAnimationFrame);
+
+      globalThis[cleanupKey] = () => {
+        try {
+          device?.destroy();
+        } finally {
+          webgpuCanvas.remove();
+          controlCanvas.remove();
+          delete globalThis[cleanupKey];
+        }
+      };
+      handoff = true;
 
       return {
         supported: true,
@@ -704,6 +735,13 @@ async function rawWebGpuCompositorCanary(page) {
           const rect = controlCanvas.getBoundingClientRect();
           return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
         })(),
+        validation_error: validationError ? {
+          name: validationError.name || null,
+          message: validationError.message || null,
+        } : null,
+        uncaptured_errors: uncapturedErrors,
+        device_lost: deviceLost,
+        cleanup_key: cleanupKey,
       };
     } catch (error) {
       return {
@@ -711,14 +749,20 @@ async function rawWebGpuCompositorCanary(page) {
         format: null,
         webgpu_rect: null,
         control_rect: null,
+        validation_error: null,
+        uncaptured_errors: uncapturedErrors,
+        device_lost: deviceLost,
         exception: error instanceof Error ? error.message : String(error),
       };
     } finally {
-      device?.destroy();
+      if (!handoff) {
+        device?.destroy();
+        webgpuCanvas.remove();
+        controlCanvas.remove();
+      }
     }
   });
 }
-
 async function rawWebGpuCanvasCanary(page) {
   return page.evaluate(async () => {
     if (!navigator.gpu) {
@@ -1182,33 +1226,39 @@ async function runMode(mode) {
         && diagnostics.raw_webgpu_compositor_canary?.control_rect) {
         const { webgpu_rect: webgpuRect, control_rect: controlRect } =
           diagnostics.raw_webgpu_compositor_canary;
-        const webgpuShot = await page.screenshot({
-          clip: webgpuRect,
-          type: 'png',
-        });
-        const controlShot = await page.screenshot({
-          clip: controlRect,
-          type: 'png',
-        });
-        diagnostics.raw_webgpu_compositor_canary.screenshot_bytes = webgpuShot.length;
-        diagnostics.raw_webgpu_compositor_canary.control_screenshot_bytes = controlShot.length;
-        diagnostics.raw_webgpu_compositor_canary.screenshot_hash =
-          createHash('sha256').update(webgpuShot).digest('hex');
-        diagnostics.raw_webgpu_compositor_canary.control_screenshot_hash =
-          createHash('sha256').update(controlShot).digest('hex');
-        diagnostics.raw_webgpu_compositor_canary.webgpu_screenshot_red =
-          await screenshotRedStatistics(page, webgpuShot);
-        diagnostics.raw_webgpu_compositor_canary.control_screenshot_red =
-          await screenshotRedStatistics(page, controlShot);
-        diagnostics.raw_webgpu_compositor_canary.screenshot_pixel_delta =
-          await screenshotPixelDelta(page, webgpuShot, controlShot);
-        diagnostics.raw_webgpu_compositor_canary.screenshot_matches_2d_control =
-          diagnostics.raw_webgpu_compositor_canary.screenshot_pixel_delta.comparable === true
-          && diagnostics.raw_webgpu_compositor_canary.screenshot_pixel_delta.differing_pixels === 0;
-        await page.evaluate(() => {
-          document.querySelector('#symthaea-webgpu-compositor-canary')?.remove();
-          document.querySelector('#symthaea-webgpu-compositor-control')?.remove();
-        });
+        const cleanupKey = diagnostics.raw_webgpu_compositor_canary.cleanup_key;
+        try {
+          const webgpuShot = await page.screenshot({
+            clip: webgpuRect,
+            type: 'png',
+          });
+          const controlShot = await page.screenshot({
+            clip: controlRect,
+            type: 'png',
+          });
+          diagnostics.raw_webgpu_compositor_canary.screenshot_bytes = webgpuShot.length;
+          diagnostics.raw_webgpu_compositor_canary.control_screenshot_bytes = controlShot.length;
+          diagnostics.raw_webgpu_compositor_canary.screenshot_hash =
+            createHash('sha256').update(webgpuShot).digest('hex');
+          diagnostics.raw_webgpu_compositor_canary.control_screenshot_hash =
+            createHash('sha256').update(controlShot).digest('hex');
+          diagnostics.raw_webgpu_compositor_canary.webgpu_screenshot_red =
+            await screenshotRedStatistics(page, webgpuShot);
+          diagnostics.raw_webgpu_compositor_canary.control_screenshot_red =
+            await screenshotRedStatistics(page, controlShot);
+          diagnostics.raw_webgpu_compositor_canary.screenshot_pixel_delta =
+            await screenshotPixelDelta(page, webgpuShot, controlShot);
+          diagnostics.raw_webgpu_compositor_canary.screenshot_matches_2d_control =
+            diagnostics.raw_webgpu_compositor_canary.screenshot_pixel_delta.comparable === true
+            && diagnostics.raw_webgpu_compositor_canary.screenshot_pixel_delta.differing_pixels === 0;
+        } finally {
+          if (cleanupKey) {
+            await page.evaluate(key => {
+              globalThis[key]?.();
+              delete globalThis[key];
+            }, cleanupKey);
+          }
+        }
       }
       const rawExecutionOk = diagnostics.raw_webgpu_execution_canary?.executed_red === true;
       const rawPresentationOk = diagnostics.raw_webgpu_canary?.painted_red === true;
@@ -1239,14 +1289,18 @@ async function runMode(mode) {
       }
       if (diagnostics.raw_webgpu_execution_canary?.validation_error
         || diagnostics.raw_webgpu_canary?.validation_error
+        || diagnostics.raw_webgpu_compositor_canary?.validation_error
         || diagnostics.raw_webgpu_execution_canary?.uncaptured_errors?.length > 0
-        || diagnostics.raw_webgpu_canary?.uncaptured_errors?.length > 0) {
+        || diagnostics.raw_webgpu_canary?.uncaptured_errors?.length > 0
+        || diagnostics.raw_webgpu_compositor_canary?.uncaptured_errors?.length > 0) {
         throw new QualificationError(
           `Raw WebGPU validation error observed: ${JSON.stringify({
             execution_validation: diagnostics.raw_webgpu_execution_canary?.validation_error || null,
             presentation_validation: diagnostics.raw_webgpu_canary?.validation_error || null,
+            compositor_validation: diagnostics.raw_webgpu_compositor_canary?.validation_error || null,
             execution_uncaptured: diagnostics.raw_webgpu_execution_canary?.uncaptured_errors || [],
             presentation_uncaptured: diagnostics.raw_webgpu_canary?.uncaptured_errors || [],
+            compositor_uncaptured: diagnostics.raw_webgpu_compositor_canary?.uncaptured_errors || [],
           })}`,
           'capability',
         );
@@ -1272,6 +1326,9 @@ async function runMode(mode) {
         || compositor?.control_screenshot_bytes <= 0
         || !webgpuShotRed
         || !controlShotRed
+        || compositor?.device_lost?.reason
+        || compositor?.validation_error
+        || compositor?.uncaptured_errors?.length > 0
         || webgpuShotRed.non_red_pixels !== 0
         || controlShotRed.non_red_pixels !== 0
         || screenshotDelta?.comparable !== true
