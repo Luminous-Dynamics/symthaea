@@ -2552,7 +2552,7 @@ mod tests {
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
                 &record_bytes,
-                &serde_json::to_vec(&serde_json::json!({"status":"active"})).unwrap(),
+                b"synthetic-status-record-1",
                 &attestation,
                 &authority_key,
                 &resolution,
