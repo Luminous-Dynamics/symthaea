@@ -1844,6 +1844,23 @@ mod tests {
         variants.push(changed);
 
         let mut changed = receipt.clone();
+        changed.observed_active_state = ServiceActiveStateV1::Failed;
+        variants.push(changed);
+
+        let mut changed = receipt.clone();
+        changed.observed_load_state = ServiceLoadStateV1::Masked;
+        variants.push(changed);
+
+        let mut changed = receipt.clone();
+        changed.observed_service_result = "exit-code".into();
+        variants.push(changed);
+
+        let mut changed = receipt.clone();
+        changed.observed_unit_object_path =
+            "/org/freedesktop/systemd1/unit/sshd_2eservice".into();
+        variants.push(changed);
+
+        let mut changed = receipt.clone();
         changed.observer_version = "2".into();
         variants.push(changed);
 
@@ -2078,6 +2095,22 @@ mod tests {
         forged.observed_active_state = ServiceActiveStateV1::Inactive;
         assert_eq!(
             forged.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::PostconditionMismatch
+        );
+    }
+
+    #[test]
+    fn serialized_receipt_rejects_inconsistent_postcondition_label() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.postcondition = NixPostconditionAssessmentV1::Violated;
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
             NixPostStateErrorV1::PostconditionMismatch
         );
     }
