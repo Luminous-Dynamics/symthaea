@@ -516,6 +516,9 @@ impl NeurosemanticRemediationImpactArtifact {
         if method.protocol_hash != self.study_protocol_hash {
             return Err("neurosemantic remediation evaluation method is bound to a different study protocol".into());
         }
+        if method.implementation_revision != self.execution_revision {
+            return Err("neurosemantic remediation evaluation method execution revision does not match the impact artifact".into());
+        }
         let expected_hash = match kind {
             NeurosemanticRemediationEvaluationMethodKind::RecoveryAttack =>
                 &self.recovery_method_hash,
@@ -3062,6 +3065,10 @@ mod tests {
         let mut protocol_swap = recovery_method.clone();
         protocol_swap.protocol_hash = content_hash(b"other-protocol");
         assert!(impact.verify_evaluation_method_bytes(NeurosemanticRemediationEvaluationMethodKind::RecoveryAttack, &serde_json::to_vec(&protocol_swap).unwrap()).is_err());
+
+        let mut revision_swap = recovery_method.clone();
+        revision_swap.implementation_revision = "4".repeat(40);
+        assert!(impact.verify_evaluation_method_bytes(NeurosemanticRemediationEvaluationMethodKind::RecoveryAttack, &serde_json::to_vec(&revision_swap).unwrap()).is_err());
 
         let mut legacy = impact.clone();
         legacy.schema_version = 0;
