@@ -198,18 +198,29 @@ pub struct NeurosemanticConsentBindingContext {
     pub peer_ref: String,
     pub lease_id: String,
     pub consent_epoch: u64,
+    pub consent_lease_fingerprint: String,
     pub purpose: CommunicationPurpose,
     pub channel: CognitiveChannel,
     pub direction: ChannelDirection,
 }
 
 impl NeurosemanticConsentBindingContext {
+    /// Fingerprint the exact serialized consent lease, including scopes, sensitivity
+    /// ceilings, data/inference permissions, validity, revocation state, and epoch.
+    /// Any consent mutation therefore produces a new capability identity.
+    pub fn fingerprint_for_authorization(&self) -> Result<String, String> {
+        let bytes = serde_json::to_vec(self)
+            .map_err(|error| format!("consent lease serialization: {error}"))?;
+        Ok(content_hash(&bytes))
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         if !valid_identifier(&self.subject_ref)
             || !valid_identifier(&self.peer_ref)
             || !valid_identifier(&self.lease_id)
+            || !valid_blake3_digest(&self.consent_lease_fingerprint)
         {
-            return Err("neurosemantic consent binding context identifiers are invalid".into());
+            return Err("neurosemantic consent binding context identifiers or lease fingerprint are invalid".into());
         }
         Ok(())
     }
@@ -234,6 +245,7 @@ pub struct NeurosemanticAuthorityResolutionAttestation {
     pub peer_ref: String,
     pub lease_id: String,
     pub consent_epoch: u64,
+    pub consent_lease_fingerprint: String,
     pub purpose: CommunicationPurpose,
     pub channel: CognitiveChannel,
     pub direction: ChannelDirection,
@@ -262,6 +274,7 @@ pub struct NeurosemanticPolicyProvenanceBinding {
     authority_resolution_peer_ref: String,
     authority_resolution_lease_id: String,
     authority_resolution_consent_epoch: u64,
+    authority_resolution_lease_fingerprint: String,
     authority_resolution_purpose: CommunicationPurpose,
     authority_resolution_channel: CognitiveChannel,
     authority_resolution_direction: ChannelDirection,
@@ -303,6 +316,7 @@ impl NeurosemanticAuthorityResolutionAttestation {
             || !valid_identifier(&self.subject_ref)
             || !valid_identifier(&self.peer_ref)
             || !valid_identifier(&self.lease_id)
+            || !valid_blake3_digest(&self.consent_lease_fingerprint)
             || !valid_identifier(&self.status_source_ref)
             || self.status_source_ref.len() > MAX_NEUROSEMANTIC_STATUS_SOURCE_REF_BYTES
             || self.checked_at_unix_s >= self.expires_at_unix_s
@@ -349,6 +363,7 @@ impl NeurosemanticAuthorityResolutionAttestation {
             || self.peer_ref != expected_context.peer_ref
             || self.lease_id != expected_context.lease_id
             || self.consent_epoch != expected_context.consent_epoch
+            || self.consent_lease_fingerprint != expected_context.consent_lease_fingerprint
             || self.purpose != expected_context.purpose
             || self.channel != expected_context.channel
             || self.direction != expected_context.direction
@@ -542,6 +557,10 @@ impl NeurosemanticPolicyProvenanceBinding {
     pub fn authority_resolution_consent_epoch(&self) -> u64 {
         self.authority_resolution_consent_epoch
     }
+
+    pub fn authority_resolution_lease_fingerprint(&self) -> &str {
+        &self.authority_resolution_lease_fingerprint
+    }
 }
 
 impl NeurosemanticHandlingPolicy {
@@ -646,6 +665,7 @@ impl NeurosemanticHandlingPolicy {
             authority_resolution_peer_ref: resolution.peer_ref.clone(),
             authority_resolution_lease_id: resolution.lease_id.clone(),
             authority_resolution_consent_epoch: resolution.consent_epoch,
+            authority_resolution_lease_fingerprint: resolution.consent_lease_fingerprint.clone(),
             authority_resolution_purpose: resolution.purpose,
             authority_resolution_channel: resolution.channel,
             authority_resolution_direction: resolution.direction,
@@ -1201,6 +1221,8 @@ impl AuthorizedNeurosemanticMessage {
             || provenance.authority_resolution_peer_ref != lease.peer_id
             || provenance.authority_resolution_lease_id != lease.lease_id
             || provenance.authority_resolution_consent_epoch != lease.consent_epoch
+            || provenance.authority_resolution_lease_fingerprint
+                != lease.fingerprint_for_authorization()?
             || provenance.authority_resolution_purpose != self.packet.purpose
             || provenance.authority_resolution_channel != self.packet.channel
             || provenance.authority_resolution_direction != self.packet.direction
@@ -1417,6 +1439,7 @@ mod tests {
             peer_ref: "peer".into(),
             lease_id: "lease-1".into(),
             consent_epoch: 7,
+            consent_lease_fingerprint: lease().fingerprint_for_authorization().unwrap(),
             purpose: CommunicationPurpose::HumanCollaboration,
             channel: CognitiveChannel::Semantic,
             direction: ChannelDirection::Write,
@@ -1445,6 +1468,7 @@ mod tests {
             peer_ref: context.peer_ref.clone(),
             lease_id: context.lease_id.clone(),
             consent_epoch: context.consent_epoch,
+            consent_lease_fingerprint: context.consent_lease_fingerprint.clone(),
             purpose: context.purpose,
             channel: context.channel,
             direction: context.direction,
@@ -1872,6 +1896,44 @@ mod tests {
                 &resolver_key.verifying_key(),
                 &context,
                 1_500,
+            )
+            .is_err());
+    }
+
+    #[test]
+    fn authority_resolution_rejects_mutated_lease_without_epoch_change() {
+        let policy = semantic_policy();
+        let binding = policy_provenance_binding();
+
+        let mut mutated_lease = lease();
+        mutated_lease.max_write_sensitivity = CognitiveSensitivity::HighlyPrivate;
+
+        let packet = NeurosemanticPacket::new_with_policy(
+            20,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            policy,
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: mutated_lease.consent_epoch,
+            lease_id: mutated_lease.lease_id.clone(),
+        };
+        assert!(message
+            .validate_for_handling(
+                &mutated_lease,
+                &binding,
+                "ZA",
+                NeurosemanticHandlingAction::Transmit,
+                150,
             )
             .is_err());
     }
