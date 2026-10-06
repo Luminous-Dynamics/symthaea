@@ -294,6 +294,7 @@ pub struct PredictionEvidenceRecord {
     pub feature_set: PredictionFeatureSet,
     pub train_samples: usize,
     pub test_samples: usize,
+    pub ridge_lambda: f64,
     pub feature_times: Vec<f64>,
     pub outcome_times: Vec<f64>,
     pub observed_outcomes: Vec<f64>,
@@ -322,6 +323,8 @@ impl PredictionEvidenceRecord {
             || self.observed_outcomes.len() != self.test_samples
             || self.feature_times.len() != self.test_samples
             || self.outcome_times.len() != self.test_samples
+            || !self.ridge_lambda.is_finite()
+            || self.ridge_lambda < 0.0
         {
             return Err(RelationalPredictionError::InvalidSplit);
         }
@@ -528,7 +531,12 @@ impl HeldOutRelationalPredictionEvidence {
                 "test_samples": self.summary.test_samples,
                 "gap_samples": self.summary.gap_samples,
                 "minimum_outcome_horizon": self.summary.minimum_outcome_horizon,
-                "maximum_outcome_horizon": self.summary.maximum_outcome_horizon
+                "maximum_outcome_horizon": self.summary.maximum_outcome_horizon,
+                "ridge_lambda": self
+                    .records
+                    .first()
+                    .map(|record| record.ridge_lambda)
+                    .unwrap_or(0.0)
             },
             "scores": scores,
             "records": records
@@ -1284,6 +1292,7 @@ fn prediction_evidence_record_json(record: &PredictionEvidenceRecord) -> serde_j
         "feature_set": feature_set_name(record.feature_set),
         "train_samples": record.train_samples,
         "test_samples": record.test_samples,
+        "ridge_lambda": record.ridge_lambda,
         "feature_times": &record.feature_times,
         "outcome_times": &record.outcome_times,
         "observed_outcomes": &record.observed_outcomes,
@@ -1423,6 +1432,7 @@ fn fit_prediction_record(
         feature_set,
         train_samples: config.train_samples,
         test_samples: config.test_samples,
+        ridge_lambda: config.ridge_lambda,
         feature_times,
         outcome_times,
         observed_outcomes,
