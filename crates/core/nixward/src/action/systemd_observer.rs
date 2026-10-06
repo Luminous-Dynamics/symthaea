@@ -1080,6 +1080,29 @@ fn definition_file_identity(file: &std::fs::File) -> Result<DefinitionFileObject
 }
 
 #[cfg(unix)]
+fn definition_path_identity(
+    path: &Path,
+) -> Result<DefinitionFileObjectIdentity, NixSystemdObserverErrorV1> {
+    use std::os::unix::fs::MetadataExt;
+    let metadata = std::fs::metadata(path).map_err(|error| {
+        NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string())
+    })?;
+    if !metadata.is_file() {
+        return Err(NixSystemdObserverErrorV1::DefinitionContentNotRegular);
+    }
+    Ok(DefinitionFileObjectIdentity {
+        dev: metadata.dev(),
+        ino: metadata.ino(),
+        mode: metadata.mode(),
+        size: metadata.size(),
+        mtime_sec: metadata.mtime(),
+        mtime_nsec: metadata.mtime_nsec(),
+        ctime_sec: metadata.ctime(),
+        ctime_nsec: metadata.ctime_nsec(),
+    })
+}
+
+#[cfg(unix)]
 fn hash_open_definition_file(
     file: &mut std::fs::File,
 ) -> Result<(u64, String), NixSystemdObserverErrorV1> {
@@ -1202,9 +1225,13 @@ fn read_definition_content_file(
     path: &str,
 ) -> Result<NixSystemdUnitDefinitionContentFileV1, NixSystemdObserverErrorV1> {
     let (open_path, resolved_path) = resolve_definition_content_open_path(path)?;
+    let expected_identity = definition_path_identity(&open_path)?;
     let mut file = open_definition_capture_path(&open_path)?;
 
     let before = definition_file_identity(&file)?;
+    if before != expected_identity {
+        return Err(NixSystemdObserverErrorV1::DefinitionContentMutationDetected);
+    }
     let (first_len, first_digest) = hash_open_definition_file(&mut file)?;
     let middle = definition_file_identity(&file)?;
     let (second_len, second_digest) = hash_open_definition_file(&mut file)?;
