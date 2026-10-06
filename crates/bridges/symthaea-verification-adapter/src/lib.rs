@@ -1707,6 +1707,39 @@ mod tests {
     }
 
     #[test]
+    fn relationship_lifecycle_binding_accepts_equivalent_timestamp_spellings() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "verificationMethod": [{
+                "id": "https://example.test/controller#key-1",
+                "type": "Multikey",
+                "controller": "https://example.test/controller",
+                "expires": "2026-10-06T00:00:00Z",
+                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+            }],
+            "assertionMethod": [{
+                "id": "https://example.test/controller#key-1",
+                "controller": "https://example.test/controller",
+                "expires": "2026-10-06T02:00:00+02:00"
+            }]
+        }"##.into();
+
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter = JsonControllerDocumentSnapshotAdapter::new(
+            "/tmp/does-not-matter",
+            reference,
+        )
+        .unwrap();
+
+        assert!(adapter.resolve_snapshot(&request, snapshot).is_err());
+        // The request fixture evaluates the method at 2026-10-05T02:00:00Z, so
+        // resolution must still succeed once the equivalent lifecycle values are
+        // recognized as the same instant.
+    }
+
+    #[test]
     fn equivalent_lifecycle_timestamp_spellings_are_semantically_equal() {
         assert!(timestamps_equal(
             "2026-10-06T00:00:00Z",
