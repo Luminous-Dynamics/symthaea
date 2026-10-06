@@ -1153,6 +1153,12 @@ impl Rfc9942SignatureWithReceipts {
         outer_external_aad: &[u8],
         detached_outer_payload: Option<&[u8]>,
     ) -> Result<Rfc9942VerifiedSignatureWithReceipt, Rfc9942VdpError> {
+        // The outer Signature_With_Receipt is the caller-authenticated
+        // composition boundary. Verify it before performing proof and inner
+        // Receipt cryptographic work so an invalid outer signature cannot be
+        // amplified into attacker-controlled inner proof verification.
+        self.verify_es256(outer_public_key, outer_external_aad, detached_outer_payload)?;
+
         let (receipt, placement) = if let Some(receipts) = self.protected_receipts.as_ref() {
             let receipt = receipts
                 .receipts()
@@ -1186,9 +1192,6 @@ impl Rfc9942SignatureWithReceipts {
             receipt_external_aad,
             None,
         )?;
-
-        // The outer signature authenticates those exact candidate bytes.
-        self.verify_es256(outer_public_key, outer_external_aad, detached_outer_payload)?;
 
         Ok(Rfc9942VerifiedSignatureWithReceipt {
             outer_algorithm_id: self.protected_algorithm_id()?,
