@@ -25,11 +25,14 @@ pub mod local_approval_runtime;
 pub mod local_approval_socket;
 pub mod local_approval_store;
 pub mod local_approval_submission;
+pub mod post_state;
 pub mod phi_gate;
 pub mod plan_executor;
 pub mod service_manager;
 pub mod service_domain;
 pub mod service_state;
+#[cfg(feature = "systemd-observer")]
+pub mod systemd_observer;
 pub(crate) mod systemd_transport;
 pub mod temporal;
 
@@ -45,6 +48,13 @@ pub use authorization::{
     NixExecutionAuthorizationRecordV1, NixExecutionReceiptV1, NixLocalExecutionAuthorityV1,
     NixMechanicalResultV1,
     NixPostconditionStatusV1,
+};
+pub use post_state::{
+    NixPostStateClaimV1, NixPostStateErrorV1, NixPostStateReceiptV1,
+    NixPostStateStabilityEvidenceV1, NixPostconditionAssessmentV1,
+    NixServicePostStateExpectationV1, NixServicePostStateObservationV1,
+    NixSystemdJobEvidenceV1, NixSystemdJobTypeV1,
+    NixSystemdUnitDefinitionIdentityV1, NixVerifiedPostStateObservationV1,
 };
 pub use config_writer::{ConfigPatch, ConfigWriter, WriteResult};
 pub use daemon_incarnation::{DaemonApprovalContextErrorV1, LiveDaemonIncarnationV1};
@@ -87,6 +97,10 @@ pub use phi_gate::{classify_command_destructiveness, get_nixos_rollback};
 pub use plan_executor::{PlanExecutionResult, PlanExecutor, PlanStep, StepStatus};
 pub use service_manager::{ServiceManager, ServiceStatus};
 pub use service_domain::{NixServiceOperationErrorV1, NixServiceOperationKindV1, NixServiceOperationV1};
+#[cfg(feature = "systemd-observer")]
+pub use systemd_observer::{
+    NixSystemdJobHandleV1, NixSystemdObserverErrorV1, NixSystemdReadOnlyObserverV1,
+};
 pub use service_state::{
     NixServiceEnablementEvidenceV1,
     NixServiceOperationCapabilitiesV1,

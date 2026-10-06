@@ -59,6 +59,7 @@ DIRECT_GENERIC = {
     "test-hardened-nix",
     "test-all-features",
     "test-feature-matrix",
+    "nixward-observation-boundary",
     "wasm-compat",
     "deny",
     "audit",

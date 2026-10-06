@@ -35,6 +35,7 @@ getrandom = { workspace = true, optional = true }
 
 # WASM-safe
 blake3 = { workspace = true }
+hex = { workspace = true }
 petgraph = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -47,7 +48,7 @@ chrono = { workspace = true }
 lru = { workspace = true }
 dashmap = { workspace = true }
 # `socket` supplies safe SO_PEERCRED; `user` supplies safe geteuid() for socket-path ownership checks.
-nix = { version = "0.27", optional = true, features = ["socket", "user"] }
+nix = { version = "0.27", optional = true, features = ["socket", "user", "time"] }
 libc = { workspace = true }
 rusqlite = { workspace = true, optional = true }
 rnix = "0.11"
@@ -90,6 +91,8 @@ native = ["nix", "rusqlite", "tree-sitter", "tree-sitter-nix", "tokio", "getrand
 cli = ["clap", "clap_complete", "native"]
 tui = ["crossterm", "ratatui", "cli"]
 daemon = ["tokio/full", "native"]
-systemd = ["zbus", "libsystemd", "native"]
+systemd = ["systemd-observer", "libsystemd"]
+# Read-only D-Bus observer capability. No libsystemd C dependency is required.
+systemd-observer = ["zbus", "native"]
 observability = ["tracing-subscriber", "metrics", "metrics-exporter-prometheus", "hyper", "hyper-util", "http-body-util", "daemon"]
 full = ["cli", "tui", "daemon", "systemd"]
