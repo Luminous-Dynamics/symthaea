@@ -91,3 +91,8 @@ Observations linked to an experimental design must also carry that exact design 
 
 
 Experimental observations are now bound to the exact documented procedure prescribed by the experimental protocol. A design-bound observation must match the design's protocol procedure identity exactly; procedure drift fails closed. This keeps the planned protocol distinct from merely having an observation produced by some procedure.
+
+
+### Requirement-semantic binding
+
+ExperimentalDesignProvenance carries both the stable requirement ID and a canonical BLAKE3 digest of the complete FunctionalRequirement payload. The assessment recomputes that digest before accepting the design. This prevents a design from being replayed under the same requirement identifier after the underlying requirement semantics have changed.
