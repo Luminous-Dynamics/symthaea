@@ -30,8 +30,11 @@ use thiserror::Error;
 const EFFECT_DIGEST_DOMAIN_V1: &[u8] = b"nixward-service-effect-v1";
 const UNIT_DEFINITION_DOMAIN_V1: &[u8] = b"nixward-systemd-unit-definition-v1";
 const POST_STATE_RECEIPT_DOMAIN_V1: &[u8] = b"nixward-post-state-receipt-v1";
+const STABILITY_SAMPLE_DOMAIN_V1: &[u8] = b"nixward-post-state-stability-sample-v1";
+const STABILITY_SEQUENCE_DOMAIN_V1: &[u8] = b"nixward-post-state-stability-sequence-v1";
 const INVOCATION_ID_HEX_LEN: usize = 32;
 const MAX_PATH_BYTES: usize = 4096;
+const SYSTEMD_UNIT_PATH_PREFIX: &str = "/org/freedesktop/systemd1/unit/";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NixSystemdJobTypeV1 {
@@ -80,7 +83,7 @@ impl NixVerifiedPostStateObservationV1 {
         Ok(Self { observation })
     }
 
-    fn as_ref(&self) -> &NixServicePostStateObservationV1 {
+    pub(crate) fn as_ref(&self) -> &NixServicePostStateObservationV1 {
         &self.observation
     }
 }
@@ -229,11 +232,15 @@ pub struct NixServicePostStateObservationV1 {
     pub operation: NixServiceOperationKindV1,
     pub unit: String,
     pub observed_generation: u64,
+    /// Exact systemd Unit object identity used for the observation.
+    pub unit_object_path: String,
     pub definition_identity: NixSystemdUnitDefinitionIdentityV1,
     pub active_state: ServiceActiveStateV1,
     pub sub_state: String,
     pub unit_file_state: ServiceUnitFileStateV1,
     pub systemd_job: Option<NixSystemdJobEvidenceV1>,
+    /// Unique D-Bus owner of org.freedesktop.systemd1 for this observation.
+    pub systemd_manager_owner: Option<String>,
     pub invocation_id: Option<String>,
     /// systemd StateChangeTimestampMonotonic represented as monotonic microseconds.
     pub state_change_at_monotonic_us: u64,
@@ -247,10 +254,17 @@ impl NixServicePostStateObservationV1 {
         if self.observed_generation == 0 {
             return Err(NixPostStateErrorV1::InvalidGeneration);
         }
+        validate_systemd_unit_object_path(&self.unit_object_path)?;
         require_nonempty(&self.sub_state, "observed service sub-state")?;
         self.definition_identity.validate_shape()?;
+        if let Some(owner) = self.systemd_manager_owner.as_deref() {
+            validate_unique_manager_owner(owner)?;
+        }
         if let Some(job) = &self.systemd_job {
             job.validate_shape()?;
+            if self.systemd_manager_owner.as_deref() != Some(job.manager_owner.as_str()) {
+                return Err(NixPostStateErrorV1::ManagerOwnerMismatch);
+            }
         }
         validate_optional_invocation_id(self.invocation_id.as_deref(), "post-invocation id")?;
         if self.observed_at_monotonic_us < self.state_change_at_monotonic_us {
@@ -262,16 +276,78 @@ impl NixServicePostStateObservationV1 {
     pub fn definition_digest(&self) -> Result<String, NixPostStateErrorV1> {
         self.definition_identity.digest(&self.unit)
     }
+
+    pub fn state_digest(&self) -> Result<String, NixPostStateErrorV1> {
+        self.validate_shape()?;
+        let mut h = Hasher::new();
+        h.update(STABILITY_SAMPLE_DOMAIN_V1);
+        put_u8(&mut h, operation_tag(self.operation));
+        put_str(&mut h, &self.unit);
+        put_u8(&mut h, active_state_tag(self.active_state));
+        put_str(&mut h, &self.sub_state);
+        put_u8(&mut h, unit_file_state_tag(self.unit_file_state));
+        put_opt_str(&mut h, self.invocation_id.as_deref());
+        Ok(h.finalize().to_hex().to_string())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NixPostStateStabilitySampleV1 {
+    pub operation: NixServiceOperationKindV1,
+    pub unit: String,
+    pub unit_object_path: String,
+    pub observed_generation: u64,
+    pub definition_digest: String,
+    pub state_digest: String,
+    pub manager_owner: String,
+    pub invocation_id: Option<String>,
+    pub state_change_at_monotonic_us: u64,
+    pub captured_at_monotonic_us: u64,
+}
+
+impl NixPostStateStabilitySampleV1 {
+    pub fn validate_shape(&self) -> Result<(), NixPostStateErrorV1> {
+        NixServiceOperationV1::new(self.unit.clone(), self.operation)
+            .map_err(|_| NixPostStateErrorV1::InvalidServiceUnit)?;
+        if self.observed_generation == 0 {
+            return Err(NixPostStateErrorV1::InvalidGeneration);
+        }
+        validate_systemd_unit_object_path(&self.unit_object_path)?;
+        validate_digest(&self.definition_digest, "stability definition digest")?;
+        validate_digest(&self.state_digest, "stability state digest")?;
+        validate_unique_manager_owner(&self.manager_owner)?;
+        validate_optional_invocation_id(self.invocation_id.as_deref(), "stability invocation id")?;
+        if self.captured_at_monotonic_us < self.state_change_at_monotonic_us {
+            return Err(NixPostStateErrorV1::ObservationBeforeStateChange);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn digest(&self) -> Result<String, NixPostStateErrorV1> {
+        self.validate_shape()?;
+        let mut h = Hasher::new();
+        h.update(STABILITY_SAMPLE_DOMAIN_V1);
+        put_u8(&mut h, operation_tag(self.operation));
+        put_str(&mut h, &self.unit);
+        put_str(&mut h, &self.unit_object_path);
+        put_u64(&mut h, self.observed_generation);
+        put_str(&mut h, &self.definition_digest);
+        put_str(&mut h, &self.state_digest);
+        put_str(&mut h, &self.manager_owner);
+        put_opt_str(&mut h, self.invocation_id.as_deref());
+        put_u64(&mut h, self.state_change_at_monotonic_us);
+        put_u64(&mut h, self.captured_at_monotonic_us);
+        Ok(h.finalize().to_hex().to_string())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixPostStateStabilityEvidenceV1 {
-    /// Measured on the same monotonic clock as the systemd state-change timestamp.
     pub required_window_us: u64,
     pub window_start_monotonic_us: u64,
     pub window_end_monotonic_us: u64,
-    pub last_state_change_at_monotonic_us: u64,
-    pub sample_count: u32,
+    pub samples: Vec<NixPostStateStabilitySampleV1>,
+    pub sequence_digest: String,
 }
 
 impl NixPostStateStabilityEvidenceV1 {
@@ -289,17 +365,120 @@ impl NixPostStateStabilityEvidenceV1 {
         {
             return Err(NixPostStateErrorV1::StabilityWindowTooShort);
         }
-        if self.sample_count < 2 {
+        if self.samples.len() < 2 {
             return Err(NixPostStateErrorV1::InsufficientStabilitySamples);
         }
-        // If systemd's StateChangeTimestamp is at or before the beginning of
-        // the stability window, the observed state has not changed since that
-        // timestamp according to the unit's own state-change clock.
-        if self.last_state_change_at_monotonic_us > self.window_start_monotonic_us {
-            return Err(NixPostStateErrorV1::StateChangedDuringStabilityWindow);
+        if self.samples.len() > 64 {
+            return Err(NixPostStateErrorV1::TooManyStabilitySamples);
+        }
+        validate_digest(&self.sequence_digest, "stability sequence digest")?;
+
+        for sample in &self.samples {
+            sample.validate_shape()?;
+            if sample.captured_at_monotonic_us < self.window_start_monotonic_us
+                || sample.captured_at_monotonic_us > self.window_end_monotonic_us
+            {
+                return Err(NixPostStateErrorV1::StabilitySampleOutsideWindow);
+            }
+            if sample.state_change_at_monotonic_us > self.window_start_monotonic_us {
+                return Err(NixPostStateErrorV1::StateChangedDuringStabilityWindow);
+            }
+        }
+
+        for pair in self.samples.windows(2) {
+            if pair[1].captured_at_monotonic_us <= pair[0].captured_at_monotonic_us {
+                return Err(NixPostStateErrorV1::StabilitySamplesNotIncreasing);
+            }
+        }
+
+        let first = &self.samples[0];
+        for sample in &self.samples[1..] {
+            if sample.operation != first.operation
+                || sample.unit != first.unit
+                || sample.unit_object_path != first.unit_object_path
+                || sample.observed_generation != first.observed_generation
+                || sample.definition_digest != first.definition_digest
+                || sample.state_digest != first.state_digest
+                || sample.manager_owner != first.manager_owner
+                || sample.invocation_id != first.invocation_id
+                || sample.state_change_at_monotonic_us != first.state_change_at_monotonic_us
+            {
+                return Err(NixPostStateErrorV1::StabilityIdentityOrStateChanged);
+            }
+        }
+
+        let expected = stability_sequence_digest(&self.samples)?;
+        if self.sequence_digest != expected {
+            return Err(NixPostStateErrorV1::StabilitySequenceDigestMismatch);
         }
         Ok(())
     }
+
+    pub fn digest(&self) -> Result<String, NixPostStateErrorV1> {
+        self.validate_shape()?;
+        Ok(self.sequence_digest.clone())
+    }
+}
+
+/// Observer-sealed stability evidence. Serialized stability data must cross the
+/// observer boundary before it may be used to promote a receipt to Proven.
+pub struct NixVerifiedPostStateStabilityEvidenceV1 {
+    evidence: NixPostStateStabilityEvidenceV1,
+}
+
+impl NixVerifiedPostStateStabilityEvidenceV1 {
+    pub(crate) fn from_observer(
+        evidence: NixPostStateStabilityEvidenceV1,
+    ) -> Result<Self, NixPostStateErrorV1> {
+        evidence.validate_shape()?;
+        Ok(Self { evidence })
+    }
+
+    pub(crate) fn as_ref(&self) -> &NixPostStateStabilityEvidenceV1 {
+        &self.evidence
+    }
+}
+
+pub(crate) fn stability_sequence_digest(
+    samples: &[NixPostStateStabilitySampleV1],
+) -> Result<String, NixPostStateErrorV1> {
+    let mut h = Hasher::new();
+    h.update(STABILITY_SEQUENCE_DOMAIN_V1);
+    put_u32(&mut h, u32::try_from(samples.len()).map_err(|_| {
+        NixPostStateErrorV1::TooManyStabilitySamples
+    })?);
+    for sample in samples {
+        put_str(&mut h, &sample.digest()?);
+    }
+    Ok(h.finalize().to_hex().to_string())
+}
+
+fn validate_stability_against_observation(
+    stability: &NixPostStateStabilityEvidenceV1,
+    observation: &NixServicePostStateObservationV1,
+) -> Result<(), NixPostStateErrorV1> {
+    let last = stability
+        .samples
+        .last()
+        .ok_or(NixPostStateErrorV1::InsufficientStabilitySamples)?;
+
+    if last.operation != observation.operation
+        || last.unit != observation.unit
+        || last.unit_object_path != observation.unit_object_path
+        || last.observed_generation != observation.observed_generation
+        || last.definition_digest != observation.definition_digest()?
+        || last.state_digest != observation.state_digest()?
+        || last.manager_owner != observation
+            .systemd_manager_owner
+            .as_deref()
+            .ok_or(NixPostStateErrorV1::MissingManagerOwner)?
+        || last.invocation_id != observation.invocation_id
+        || last.state_change_at_monotonic_us != observation.state_change_at_monotonic_us
+        || last.captured_at_monotonic_us > observation.observed_at_monotonic_us
+    {
+        return Err(NixPostStateErrorV1::StabilityIdentityOrStateChanged);
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -338,10 +517,8 @@ pub struct NixPostStateReceiptV1 {
     pub systemd_job_unit: Option<String>,
     pub systemd_job_object_path: Option<String>,
     pub systemd_job_result: Option<String>,
-    /// Unique D-Bus owner of systemd1 for the captured job epoch.
-    ///
-    /// Present exactly when Job evidence is present.
-    pub systemd_manager_owner: Option<String>,
+    /// Unique D-Bus owner of systemd1 for the observed service-manager epoch.
+    pub systemd_manager_owner: String,
     pub pre_invocation_id: Option<String>,
     pub post_invocation_id: Option<String>,
     pub postcondition: NixPostconditionAssessmentV1,
@@ -362,7 +539,7 @@ impl NixPostStateReceiptV1 {
         authorization: &NixExecutionAuthorizationRecordV1,
         expectation: &NixServicePostStateExpectationV1,
         observation: &NixVerifiedPostStateObservationV1,
-        stability: Option<NixPostStateStabilityEvidenceV1>,
+        stability: Option<&NixVerifiedPostStateStabilityEvidenceV1>,
         observer_identity: impl Into<String>,
         observer_version: impl Into<String>,
     ) -> Result<Self, NixPostStateErrorV1> {
@@ -405,12 +582,18 @@ impl NixPostStateReceiptV1 {
         if expectation.authorized_definition_digest != observed_definition_digest {
             return Err(NixPostStateErrorV1::DefinitionMismatch);
         }
+        let manager_owner = observation
+            .systemd_manager_owner
+            .clone()
+            .ok_or(NixPostStateErrorV1::MissingManagerOwner)?;
 
-        if let Some(stability) = &stability {
+        if let Some(stability) = stability {
+            let stability = stability.as_ref();
             stability.validate_shape()?;
             if stability.window_end_monotonic_us > observation.observed_at_monotonic_us {
                 return Err(NixPostStateErrorV1::StabilityAfterObservation);
             }
+            validate_stability_against_observation(stability, observation)?;
         }
 
         let assessment = evaluate_postcondition(expectation, observation)?;
@@ -419,7 +602,7 @@ impl NixPostStateReceiptV1 {
                 if expectation.required_stability_us == 0 {
                     NixPostStateClaimV1::Observed
                 } else {
-                    match &stability {
+                    match stability.map(NixVerifiedPostStateStabilityEvidenceV1::as_ref) {
                         Some(stability)
                             if stability.required_window_us >= expectation.required_stability_us =>
                         {
@@ -439,7 +622,6 @@ impl NixPostStateReceiptV1 {
             systemd_job_unit,
             systemd_job_object_path,
             systemd_job_result,
-            systemd_manager_owner,
         ) = match &observation.systemd_job {
             Some(job) => (
                 Some(job.id),
@@ -447,10 +629,11 @@ impl NixPostStateReceiptV1 {
                 Some(job.unit.clone()),
                 Some(job.object_path.clone()),
                 Some(job.result.clone()),
-                Some(job.manager_owner.clone()),
             ),
-            None => (None, None, None, None, None, None),
+            None => (None, None, None, None, None),
         };
+
+        let stability = stability.map(|value| value.as_ref().clone());
 
         let receipt = Self {
             action_intent_digest,
@@ -467,7 +650,7 @@ impl NixPostStateReceiptV1 {
             systemd_job_unit,
             systemd_job_object_path,
             systemd_job_result,
-            systemd_manager_owner,
+            systemd_manager_owner: manager_owner,
             pre_invocation_id: expectation.pre_invocation_id.clone(),
             post_invocation_id: observation.invocation_id.clone(),
             postcondition: assessment,
@@ -564,7 +747,6 @@ impl NixPostStateReceiptV1 {
                 || self.systemd_job_unit.is_none()
                 || self.systemd_job_object_path.is_none()
                 || self.systemd_job_result.is_none()
-                || self.systemd_manager_owner.is_none()
             {
                 return Err(NixPostStateErrorV1::IncompleteJobEvidence);
             }
@@ -572,7 +754,6 @@ impl NixPostStateReceiptV1 {
             || self.systemd_job_unit.is_some()
             || self.systemd_job_object_path.is_some()
             || self.systemd_job_result.is_some()
-            || self.systemd_manager_owner.is_some()
         {
             return Err(NixPostStateErrorV1::IncompleteJobEvidence);
         }
@@ -586,9 +767,7 @@ impl NixPostStateReceiptV1 {
         if let Some(result) = &self.systemd_job_result {
             require_nonempty(result, "systemd job result")?;
         }
-        if let Some(owner) = &self.systemd_manager_owner {
-            validate_unique_manager_owner(owner)?;
-        }
+        validate_unique_manager_owner(&self.systemd_manager_owner)?;
         validate_optional_invocation_id(self.pre_invocation_id.as_deref(), "pre-invocation id")?;
         validate_optional_invocation_id(self.post_invocation_id.as_deref(), "post-invocation id")?;
         require_nonempty(&self.observer_identity, "observer identity")?;
@@ -598,6 +777,19 @@ impl NixPostStateReceiptV1 {
             stability.validate_shape()?;
             if stability.window_end_monotonic_us > self.observed_at_monotonic_us {
                 return Err(NixPostStateErrorV1::StabilityAfterObservation);
+            }
+            let last = stability
+                .samples
+                .last()
+                .ok_or(NixPostStateErrorV1::InsufficientStabilitySamples)?;
+            if last.operation != self.operation
+                || last.unit != self.target_unit
+                || last.observed_generation != self.observed_generation
+                || last.definition_digest != self.observed_definition_digest
+                || last.manager_owner != self.systemd_manager_owner
+                || last.invocation_id != self.post_invocation_id
+            {
+                return Err(NixPostStateErrorV1::StabilityIdentityOrStateChanged);
             }
         }
 
@@ -676,7 +868,7 @@ impl NixPostStateReceiptV1 {
         put_opt_str(&mut h, self.systemd_job_unit.as_deref());
         put_opt_str(&mut h, self.systemd_job_object_path.as_deref());
         put_opt_str(&mut h, self.systemd_job_result.as_deref());
-        put_opt_str(&mut h, self.systemd_manager_owner.as_deref());
+        put_str(&mut h, &self.systemd_manager_owner);
         put_opt_str(&mut h, self.pre_invocation_id.as_deref());
         put_opt_str(&mut h, self.post_invocation_id.as_deref());
         put_u8(&mut h, assessment_tag(self.postcondition));
@@ -690,8 +882,7 @@ impl NixPostStateReceiptV1 {
                 put_u64(&mut h, stability.required_window_us);
                 put_u64(&mut h, stability.window_start_monotonic_us);
                 put_u64(&mut h, stability.window_end_monotonic_us);
-                put_u64(&mut h, stability.last_state_change_at_monotonic_us);
-                put_u32(&mut h, stability.sample_count);
+                put_str(&mut h, &stability.sequence_digest);
             }
             None => put_u8(&mut h, 0),
         }
@@ -840,6 +1031,37 @@ fn service_effect_digest(
     h.finalize().to_hex().to_string()
 }
 
+fn active_state_tag(state: ServiceActiveStateV1) -> u8 {
+    match state {
+        ServiceActiveStateV1::Active => 0,
+        ServiceActiveStateV1::Reloading => 1,
+        ServiceActiveStateV1::Inactive => 2,
+        ServiceActiveStateV1::Failed => 3,
+        ServiceActiveStateV1::Activating => 4,
+        ServiceActiveStateV1::Deactivating => 5,
+        ServiceActiveStateV1::Maintenance => 6,
+        ServiceActiveStateV1::Refreshing => 7,
+    }
+}
+
+fn unit_file_state_tag(state: ServiceUnitFileStateV1) -> u8 {
+    match state {
+        ServiceUnitFileStateV1::Enabled => 0,
+        ServiceUnitFileStateV1::EnabledRuntime => 1,
+        ServiceUnitFileStateV1::Linked => 2,
+        ServiceUnitFileStateV1::LinkedRuntime => 3,
+        ServiceUnitFileStateV1::Alias => 4,
+        ServiceUnitFileStateV1::Masked => 5,
+        ServiceUnitFileStateV1::MaskedRuntime => 6,
+        ServiceUnitFileStateV1::Static => 7,
+        ServiceUnitFileStateV1::Disabled => 8,
+        ServiceUnitFileStateV1::Indirect => 9,
+        ServiceUnitFileStateV1::Generated => 10,
+        ServiceUnitFileStateV1::Transient => 11,
+        ServiceUnitFileStateV1::Bad => 12,
+    }
+}
+
 fn operation_tag(operation: NixServiceOperationKindV1) -> u8 {
     match operation {
         NixServiceOperationKindV1::Start => 0,
@@ -871,8 +1093,6 @@ fn claim_tag(claim: NixPostStateClaimV1) -> u8 {
 fn validate_unique_manager_owner(value: &str) -> Result<(), NixPostStateErrorV1> {
     // D-Bus unique connection names begin with ':' and contain at least two
     // non-empty dot-separated elements. Their maximum name length is 255.
-    // This mirrors the wire-level identity constraint without making the
-    // always-built evidence crate depend on zbus.
     if value.is_empty() || value.len() > 255 || !value.starts_with(':') {
         return Err(NixPostStateErrorV1::InvalidManagerOwner);
     }
@@ -889,6 +1109,28 @@ fn validate_unique_manager_owner(value: &str) -> Result<(), NixPostStateErrorV1>
         {
             return Err(NixPostStateErrorV1::InvalidManagerOwner);
         }
+    }
+    Ok(())
+}
+
+fn validate_systemd_unit_object_path(value: &str) -> Result<(), NixPostStateErrorV1> {
+    if value.is_empty()
+        || value.len() > MAX_PATH_BYTES
+        || !value.starts_with(SYSTEMD_UNIT_PATH_PREFIX)
+        || value.ends_with('/')
+    {
+        return Err(NixPostStateErrorV1::InvalidPath("systemd unit object path"));
+    }
+    let suffix = &value[SYSTEMD_UNIT_PATH_PREFIX.len()..];
+    if suffix.is_empty()
+        || suffix.split('/').any(|element| {
+            element.is_empty()
+                || !element
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        })
+    {
+        return Err(NixPostStateErrorV1::InvalidPath("systemd unit object path"));
     }
     Ok(())
 }
@@ -1004,6 +1246,16 @@ pub enum NixPostStateErrorV1 {
     StabilityWindowTooShort,
     #[error("insufficient stability samples")]
     InsufficientStabilitySamples,
+    #[error("stability sample falls outside the declared window")]
+    StabilitySampleOutsideWindow,
+    #[error("stability samples are not strictly increasing")]
+    StabilitySamplesNotIncreasing,
+    #[error("stability sample identity or semantic state changed")]
+    StabilityIdentityOrStateChanged,
+    #[error("stability sequence digest does not match the samples")]
+    StabilitySequenceDigestMismatch,
+    #[error("too many stability samples")]
+    TooManyStabilitySamples,
     #[error("state changed during stability window")]
     StateChangedDuringStabilityWindow,
     #[error("observation predates the recorded state-change timestamp")]
@@ -1018,6 +1270,10 @@ pub enum NixPostStateErrorV1 {
     GenerationMismatch,
     #[error("observed systemd unit-definition identity does not match authorization")]
     DefinitionMismatch,
+    #[error("systemd manager incarnation is missing")]
+    MissingManagerOwner,
+    #[error("systemd manager incarnation does not match the observation/job binding")]
+    ManagerOwnerMismatch,
     #[error("incomplete systemd job evidence")]
     IncompleteJobEvidence,
     #[error("duplicate drop-in path")]
@@ -1086,6 +1342,9 @@ mod tests {
         stability: Option<NixPostStateStabilityEvidenceV1>,
     ) -> Result<NixPostStateReceiptV1, NixPostStateErrorV1> {
         let verified = NixVerifiedPostStateObservationV1::from_observer(obs.clone())?;
+        let verified_stability = stability.map(|evidence| {
+            NixVerifiedPostStateStabilityEvidenceV1 { evidence }
+        });
 
         use super::super::authorization::{
             NixActionIntentV1, NixAuthorizationProfileV1, NixActionScopeV1,
@@ -1115,7 +1374,7 @@ mod tests {
             &authorization,
             exp,
             &verified,
-            stability,
+            verified_stability.as_ref(),
             "systemd-observer-v1",
             "1",
         )
@@ -1130,6 +1389,7 @@ mod tests {
             operation,
             unit: "nginx.service".to_string(),
             observed_generation: 42,
+            unit_object_path: "/org/freedesktop/systemd1/unit/nginx_2eservice".to_string(),
             definition_identity: definition(),
             active_state,
             sub_state: "running".to_string(),
@@ -1144,9 +1404,42 @@ mod tests {
                     manager_owner: ":1.123".to_string(),
                 }
             }),
+            systemd_manager_owner: Some(":1.123".to_string()),
             invocation_id: Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string()),
             state_change_at_monotonic_us: 900,
             observed_at_monotonic_us: 2_000,
+        }
+    }
+
+    fn stability(
+        obs: &NixServicePostStateObservationV1,
+        required_window_us: u64,
+        window_start_monotonic_us: u64,
+        window_end_monotonic_us: u64,
+        captured_at: &[u64],
+    ) -> NixPostStateStabilityEvidenceV1 {
+        let samples = captured_at
+            .iter()
+            .map(|captured_at_monotonic_us| NixPostStateStabilitySampleV1 {
+                operation: obs.operation,
+                unit: obs.unit.clone(),
+                unit_object_path: obs.unit_object_path.clone(),
+                observed_generation: obs.observed_generation,
+                definition_digest: obs.definition_digest().unwrap(),
+                state_digest: obs.state_digest().unwrap(),
+                manager_owner: obs.systemd_manager_owner.clone().unwrap(),
+                invocation_id: obs.invocation_id.clone(),
+                state_change_at_monotonic_us: obs.state_change_at_monotonic_us,
+                captured_at_monotonic_us: *captured_at_monotonic_us,
+            })
+            .collect::<Vec<_>>();
+        let sequence_digest = stability_sequence_digest(&samples).unwrap();
+        NixPostStateStabilityEvidenceV1 {
+            required_window_us,
+            window_start_monotonic_us: window_start_monotonic_us,
+            window_end_monotonic_us: window_end_monotonic_us,
+            samples,
+            sequence_digest,
         }
     }
 
@@ -1254,13 +1547,13 @@ mod tests {
         let receipt = build_receipt(
             &exp,
             &obs,
-            Some(NixPostStateStabilityEvidenceV1 {
-                required_window_us: 1_000,
-                window_start_monotonic_us: 1_000,
-                window_end_monotonic_us: 2_000,
-                last_state_change_at_monotonic_us: 900,
-                sample_count: 2,
-            }),
+            Some(stability(
+                &obs,
+                1_000,
+                1_000,
+                2_000,
+                &[1_000, 2_000],
+            )),
         )
         .unwrap();
 
@@ -1279,13 +1572,17 @@ mod tests {
                 ServiceActiveStateV1::Active,
                 ServiceUnitFileStateV1::Enabled,
             ),
-            Some(NixPostStateStabilityEvidenceV1 {
-                required_window_us: 1_000,
-                window_start_monotonic_us: 1_500,
-                window_end_monotonic_us: 2_000,
-                last_state_change_at_monotonic_us: 900,
-                sample_count: 2,
-            }),
+            Some(stability(
+                &observation(
+                    NixServiceOperationKindV1::Start,
+                    ServiceActiveStateV1::Active,
+                    ServiceUnitFileStateV1::Enabled,
+                ),
+                1_000,
+                1_500,
+                2_000,
+                &[1_500, 2_000],
+            )),
         );
 
         assert_eq!(
@@ -1371,7 +1668,7 @@ mod tests {
         variants.push(changed);
 
         let mut changed = receipt.clone();
-        changed.systemd_manager_owner = Some(":1.124".into());
+        changed.systemd_manager_owner = ":1.124".into();
         variants.push(changed);
 
         let mut changed = receipt.clone();
@@ -1413,42 +1710,36 @@ mod tests {
     }
 
     #[test]
-    fn receipt_cannot_have_job_evidence_without_manager_incarnation() {
+    fn receipt_requires_observation_manager_incarnation() {
         let mut obs = observation(
             NixServiceOperationKindV1::Start,
             ServiceActiveStateV1::Active,
             ServiceUnitFileStateV1::Enabled,
         );
-        let verified = NixVerifiedPostStateObservationV1::from_observer(obs.clone()).unwrap();
-        let receipt = build_receipt(
-            &expectation(NixServiceOperationKindV1::Start),
-            &obs,
-            None,
-        )
-        .unwrap();
-        let mut tampered = receipt;
-        tampered.systemd_manager_owner = None;
+        obs.systemd_manager_owner = None;
         assert_eq!(
-            tampered.validate_shape().unwrap_err(),
-            NixPostStateErrorV1::IncompleteJobEvidence
+            build_receipt(
+                &expectation(NixServiceOperationKindV1::Start),
+                &obs,
+                None,
+            ).unwrap_err(),
+            NixPostStateErrorV1::MissingManagerOwner
         );
-        let _ = verified;
     }
 
     #[test]
-    fn receipt_without_job_evidence_cannot_carry_manager_incarnation() {
+    fn receipt_manager_incarnation_is_not_optional_for_enablement() {
         let exp = expectation(NixServiceOperationKindV1::Enable);
         let obs = observation(
             NixServiceOperationKindV1::Enable,
             ServiceActiveStateV1::Inactive,
             ServiceUnitFileStateV1::Enabled,
         );
-        let receipt = build_receipt(&exp, &obs, None).unwrap();
-        let mut tampered = receipt;
-        tampered.systemd_manager_owner = Some(":1.124".into());
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.systemd_manager_owner = "org.freedesktop.systemd1".into();
         assert_eq!(
-            tampered.validate_shape().unwrap_err(),
-            NixPostStateErrorV1::IncompleteJobEvidence
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::InvalidManagerOwner
         );
     }
 
@@ -1474,6 +1765,113 @@ mod tests {
     }
 
     #[test]
+    fn stability_sequence_rejects_non_increasing_capture_times() {
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut evidence = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+        evidence.samples[1].captured_at_monotonic_us = 1_000;
+        evidence.sequence_digest = stability_sequence_digest(&evidence.samples).unwrap();
+        assert_eq!(
+            evidence.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::StabilitySamplesNotIncreasing
+        );
+    }
+
+    #[test]
+    fn stability_sequence_detects_state_identity_change_even_when_digest_is_recomputed() {
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut evidence = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+        evidence.samples[1].state_digest =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".into();
+        evidence.sequence_digest = stability_sequence_digest(&evidence.samples).unwrap();
+        assert_eq!(
+            evidence.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::StabilityIdentityOrStateChanged
+        );
+    }
+
+    #[test]
+    fn stability_sequence_rejects_sequence_digest_tampering() {
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut evidence = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+        evidence.sequence_digest =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".into();
+        assert_eq!(
+            evidence.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::StabilitySequenceDigestMismatch
+        );
+    }
+
+    #[test]
+    fn stability_sequence_cannot_be_rebound_to_another_manager_epoch() {
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut evidence = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+        evidence.samples[1].manager_owner = ":1.124".into();
+        evidence.sequence_digest = stability_sequence_digest(&evidence.samples).unwrap();
+        assert_eq!(
+            evidence.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::StabilityIdentityOrStateChanged
+        );
+    }
+
+    #[test]
+    fn receipt_rejects_stability_from_a_different_unit_object() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut evidence = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+        evidence.samples[1].unit_object_path =
+            "/org/freedesktop/systemd1/unit/sshd_2eservice".into();
+        evidence.sequence_digest = stability_sequence_digest(&evidence.samples).unwrap();
+        let result = build_receipt(&exp, &obs, Some(evidence));
+        assert_eq!(
+            result.unwrap_err(),
+            NixPostStateErrorV1::StabilityIdentityOrStateChanged
+        );
+    }
+
+    #[test]
+    fn stable_sequence_is_committed_into_receipt_digest() {
+        let exp = {
+            let mut value = expectation(NixServiceOperationKindV1::Start);
+            value.required_stability_us = 1_000;
+            value
+        };
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let evidence = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+        let receipt_a = build_receipt(&exp, &obs, Some(evidence.clone())).unwrap();
+        let mut evidence_changed = evidence;
+        evidence_changed.samples[1].captured_at_monotonic_us = 2_100;
+        evidence_changed.window_end_monotonic_us = 2_100;
+        evidence_changed.sequence_digest =
+            stability_sequence_digest(&evidence_changed.samples).unwrap();
+        let receipt_b = build_receipt(&exp, &obs, Some(evidence_changed)).unwrap();
+        assert_ne!(receipt_a.digest().unwrap(), receipt_b.digest().unwrap());
+    }
+
+    #[test]
     fn serialized_proven_claim_cannot_reduce_or_remove_required_stability() {
         let mut exp = expectation(NixServiceOperationKindV1::Start);
         exp.required_stability_us = 1_000;
@@ -1485,13 +1883,13 @@ mod tests {
         let mut receipt = build_receipt(
             &exp,
             &obs,
-            Some(NixPostStateStabilityEvidenceV1 {
-                required_window_us: 1_000,
-                window_start_monotonic_us: 1_000,
-                window_end_monotonic_us: 2_000,
-                last_state_change_at_monotonic_us: 900,
-                sample_count: 2,
-            }),
+            Some(stability(
+                &obs,
+                1_000,
+                1_000,
+                2_000,
+                &[1_000, 2_000],
+            )),
         )
         .unwrap();
         assert_eq!(receipt.claim, NixPostStateClaimV1::Proven);
@@ -1521,13 +1919,13 @@ mod tests {
         let result = build_receipt(
             &exp,
             &obs,
-            Some(NixPostStateStabilityEvidenceV1 {
-                required_window_us: 1,
-                window_start_monotonic_us: 1_000,
-                window_end_monotonic_us: 2_000,
-                last_state_change_at_monotonic_us: 900,
-                sample_count: 2,
-            }),
+            Some(stability(
+                &obs,
+                1,
+                1_000,
+                2_000,
+                &[1_000, 2_000],
+            )),
         );
         assert_eq!(result.unwrap_err(), NixPostStateErrorV1::Violated);
     }
