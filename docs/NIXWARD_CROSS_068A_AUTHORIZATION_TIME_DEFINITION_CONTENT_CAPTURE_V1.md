@@ -16,13 +16,17 @@ The observer first captures:
 
 The existing definition-identity digest remains the source-identity commitment.
 
-The new content commitment separately hashes the bytes of each referenced source file together with:
+The new content-evidence commitment separately hashes the bytes of each referenced source file together with:
 - source path;
+- resolved path when explicit NixOS link resolution occurred;
 - byte length;
 - per-file BLAKE3 digest;
 - ordered file-set membership;
 - target unit;
-- source-identity digest.
+- source-identity digest;
+- systemd manager incarnation.
+
+The per-file BLAKE3 remains a pure byte-content digest. The aggregate evidence commitment is intentionally stronger: the same bytes observed under a different systemd manager incarnation produce a different authority-bound commitment, preventing an approval from silently spanning a manager restart.
 
 No raw definition bytes are placed in the portable authorization record.
 
@@ -49,7 +53,7 @@ The content observer captures the systemd manager unique owner before observatio
 
 It also re-resolves the unit and requires the unit object path and FragmentPath/DropInPaths source identity to remain unchanged.
 
-Therefore a manager rollover or observed definition-identity change cannot silently be reinterpreted as the same capture.
+Therefore a manager rollover or observed definition-identity change cannot silently be reinterpreted as the same capture. Because the manager incarnation is part of the aggregate evidence commitment, a fresh capture after a manager restart also produces a different authority-bound content commitment even when the underlying unit bytes are unchanged.
 
 This is observation/commitment evidence, not cryptographic attestation of systemd.
 
