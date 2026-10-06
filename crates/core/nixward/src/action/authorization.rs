@@ -18,7 +18,10 @@ use super::executor::{ChannelOperation, FlakeOperation, NixOSCommand, SafetyLeve
 use super::local_approval::LocalApprovalDecisionKindV1;
 use super::local_approval_store::ConsumedLocalApprovalDecisionV1;
 use super::service_domain::{NixServiceOperationKindV1, validate_canonical_service_operation_v1};
-use super::service_effect::{NixServiceEffectContextErrorV1, NixServiceEffectContextV1};
+use super::service_effect::{
+    NixServiceEffectContextErrorV1, NixServiceEffectContextV1,
+    NixVerifiedServiceDefinitionContentV1,
+};
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
