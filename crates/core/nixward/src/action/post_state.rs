@@ -2027,6 +2027,25 @@ mod tests {
     }
 
     #[test]
+    fn receipt_manager_incarnation_change_invalidates_content_commitment() {
+        let mut receipt = build_receipt(
+            &expectation(NixServiceOperationKindV1::Start),
+            &observation(
+                NixServiceOperationKindV1::Start,
+                ServiceActiveStateV1::Active,
+                ServiceUnitFileStateV1::Enabled,
+            ),
+            None,
+        )
+        .unwrap();
+        receipt.systemd_manager_owner = ":1.124".into();
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::DefinitionMismatch
+        );
+    }
+
+    #[test]
     fn receipt_content_manifest_tampering_fails_independent_recomputation() {
         let mut receipt = build_receipt(
             &expectation(NixServiceOperationKindV1::Start),
