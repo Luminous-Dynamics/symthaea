@@ -998,6 +998,30 @@ mod tests {
     }
 
     #[test]
+    fn job_handle_manager_owner_is_part_of_its_identity() {
+        let object_path =
+            OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42").unwrap();
+        let unit_object_path =
+            OwnedObjectPath::try_from("/org/freedesktop/systemd1/unit/nginx_2eservice").unwrap();
+
+        let valid = NixSystemdJobHandleV1 {
+            id: 42,
+            job_type: NixSystemdJobTypeV1::Start,
+            unit: "nginx.service".to_string(),
+            object_path: object_path.clone(),
+            unit_object_path: unit_object_path.clone(),
+            manager_owner: ":1.42".to_string(),
+        };
+        valid.validate().unwrap();
+
+        let invalid = NixSystemdJobHandleV1 {
+            manager_owner: "org.freedesktop.systemd1".to_string(),
+            ..valid
+        };
+        assert!(invalid.validate().is_err());
+    }
+
+    #[test]
     fn manager_signal_sender_mismatch_is_rejected() {
         let message = Message::signal(
             "/org/freedesktop/systemd1",
