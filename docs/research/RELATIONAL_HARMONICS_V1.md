@@ -374,8 +374,23 @@ The RH wrapper must:
 - require an explicit minimum sample floor;
 - require uniform sampling or an explicitly qualified resampling step;
 - report A→B, B→A, and net directional information flow separately;
+- pair information flow with an explicit lag-structure measurement;
 - label the result as a proxy until significance/surrogate controls are attached;
 - keep transfer entropy distinct from mechanistic causality.
+
+The lag structure is observational:
+
+L(k) = corr(A[t], B[t+k])
+
+for positive k, where B follows A by k samples.
+
+This gives the research layer a direct separation between:
+
+- zero-lag similarity;
+- delayed coordination;
+- directional information flow.
+
+A delayed association is not by itself causal evidence, and a high zero-lag correlation does not imply reciprocity.
 
 The existing estimator is a histogram estimator with a coarse history representation and should therefore be independently stress-tested for sample size, bin count, bias, and deterministic null behavior before any threshold is introduced.
 
