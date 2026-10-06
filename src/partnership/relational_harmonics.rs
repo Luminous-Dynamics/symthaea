@@ -366,6 +366,31 @@ mod tests {
     }
 
     #[test]
+    fn zero_bidirectional_coupling_is_not_reciprocal() {
+        let samples = (0..8)
+            .map(|i| sample(i, 0.5, 0.0, 0.0))
+            .collect::<Vec<_>>();
+
+        let profile = RelationalHarmonicProfile::compute(&samples).unwrap();
+
+        assert_eq!(profile.directional_coupling, 0.0);
+        assert_eq!(profile.reciprocity, 0.0);
+        assert_eq!(profile.directional_asymmetry, 0.0);
+    }
+
+    #[test]
+    fn weak_bidirectional_coupling_remains_low_reciprocity() {
+        let samples = (0..8)
+            .map(|i| sample(i, 0.5, 0.1, 0.1))
+            .collect::<Vec<_>>();
+
+        let profile = RelationalHarmonicProfile::compute(&samples).unwrap();
+
+        assert!((profile.reciprocity - 0.1).abs() < 1e-12);
+        assert!(profile.reciprocity < 0.2);
+    }
+
+    #[test]
     fn constant_signal_has_no_false_harmonic() {
         let samples = (0..16)
             .map(|i| sample(i, 0.5, 0.5, 0.5))
