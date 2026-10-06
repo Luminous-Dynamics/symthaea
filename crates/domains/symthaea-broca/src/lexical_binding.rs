@@ -146,6 +146,11 @@ pub struct MorphophonologicalResourceEvidence {
     pub source_uri: Option<String>,
     pub revision: String,
     pub license: Option<String>,
+    /// Exact BLAKE3 identity of the raw source artifact, when one exists.
+    ///
+    /// This identifies the source artifact bytes; it does not prove that the executable
+    /// rule set is a faithful linguistic derivation of those bytes.
+    pub source_artifact_blake3: Option<String>,
 }
 
 impl MorphophonologicalResourceEvidence {
@@ -160,6 +165,7 @@ impl MorphophonologicalResourceEvidence {
             source_uri: None,
             revision: revision.into(),
             license: None,
+            source_artifact_blake3: None,
         };
         evidence.validate()?;
         Ok(evidence)
@@ -170,6 +176,7 @@ impl MorphophonologicalResourceEvidence {
         source_uri: impl Into<String>,
         revision: impl Into<String>,
         license: impl Into<String>,
+        source_artifact_blake3: impl Into<String>,
     ) -> Result<Self, MorphophonologicalResourceEvidenceError> {
         let evidence = Self {
             version: MORPHOPHONOLOGICAL_RESOURCE_EVIDENCE_VERSION.to_string(),
@@ -178,6 +185,7 @@ impl MorphophonologicalResourceEvidence {
             source_uri: Some(source_uri.into()),
             revision: revision.into(),
             license: Some(license.into()),
+            source_artifact_blake3: Some(source_artifact_blake3.into()),
         };
         evidence.validate()?;
         Ok(evidence)
@@ -192,6 +200,13 @@ impl MorphophonologicalResourceEvidence {
         }
         if self.revision.trim().is_empty() {
             return Err(MorphophonologicalResourceEvidenceError::EmptyRevision);
+        }
+        if let Some(digest) = self.source_artifact_blake3.as_deref() {
+            if !is_canonical_blake3_digest(digest) {
+                return Err(
+                    MorphophonologicalResourceEvidenceError::MalformedSourceArtifactDigest,
+                );
+            }
         }
 
         match self.origin {
@@ -209,6 +224,11 @@ impl MorphophonologicalResourceEvidence {
                 }
                 if license.trim().is_empty() {
                     return Err(MorphophonologicalResourceEvidenceError::ExternalMissingLicense);
+                }
+                if self.source_artifact_blake3.is_none() {
+                    return Err(
+                        MorphophonologicalResourceEvidenceError::ExternalMissingSourceArtifactDigest,
+                    );
                 }
             }
             MorphophonologicalResourceOrigin::HandAuthored => {
@@ -231,6 +251,8 @@ pub enum MorphophonologicalResourceEvidenceError {
     EmptyRevision,
     ExternalMissingUri,
     ExternalMissingLicense,
+    ExternalMissingSourceArtifactDigest,
+    MalformedSourceArtifactDigest,
     HandAuthoredCarriesExternalMetadata,
 }
 
@@ -242,12 +264,21 @@ impl std::fmt::Display for MorphophonologicalResourceEvidenceError {
             Self::EmptyRevision => write!(f, "morphophonological resource revision must be non-empty"),
             Self::ExternalMissingUri => write!(f, "external morphophonological resources require a source URI"),
             Self::ExternalMissingLicense => write!(f, "external morphophonological resources require a declared license"),
+            Self::ExternalMissingSourceArtifactDigest => write!(f, "external morphophonological resources require an exact source artifact BLAKE3 digest"),
+            Self::MalformedSourceArtifactDigest => write!(f, "morphophonological source artifact BLAKE3 digest must be exactly 64 lowercase hexadecimal characters"),
             Self::HandAuthoredCarriesExternalMetadata => write!(f, "hand-authored morphophonological resources must not carry fabricated external URI or license metadata"),
         }
     }
 }
 
 impl std::error::Error for MorphophonologicalResourceEvidenceError {}
+
+fn is_canonical_blake3_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
 
 /// A deliberately small deterministic operation vocabulary for executable
 /// morphophonological derivation evidence.
@@ -2261,11 +2292,16 @@ mod tests {
             "https://example.invalid/resource",
             "commit-or-release-1",
             "CC-BY-SA-4.0",
+            &"0".repeat(64),
         )
         .expect("external evidence should validate");
         assert_eq!(external.origin, MorphophonologicalResourceOrigin::External);
         assert!(external.source_uri.is_some());
         assert!(external.license.is_some());
+        assert_eq!(
+            external.source_artifact_blake3.as_deref(),
+            Some("0".repeat(64).as_str())
+        );
     }
 
     #[test]
@@ -2277,6 +2313,7 @@ mod tests {
             source_uri: None,
             revision: "fixture-rev".into(),
             license: None,
+            source_artifact_blake3: None,
         }
         .validate()
         .expect_err("external resource evidence must identify locator and license");
@@ -2284,6 +2321,43 @@ mod tests {
         assert_eq!(
             error,
             MorphophonologicalResourceEvidenceError::ExternalMissingUri
+        );
+
+        let error = MorphophonologicalResourceEvidence {
+            version: MORPHOPHONOLOGICAL_RESOURCE_EVIDENCE_VERSION.into(),
+            origin: MorphophonologicalResourceOrigin::External,
+            source_id: "fixture:external".into(),
+            source_uri: Some("https://example.invalid/resource".into()),
+            revision: "fixture-rev".into(),
+            license: Some("CC-BY-SA-4.0".into()),
+            source_artifact_blake3: None,
+        }
+        .validate()
+        .expect_err("external resource evidence must identify exact artifact bytes");
+
+        assert_eq!(
+            error,
+            MorphophonologicalResourceEvidenceError::ExternalMissingSourceArtifactDigest
+        );
+    }
+
+    #[test]
+    fn morphophonological_resource_evidence_rejects_malformed_source_artifact_digest() {
+        let error = MorphophonologicalResourceEvidence {
+            version: MORPHOPHONOLOGICAL_RESOURCE_EVIDENCE_VERSION.into(),
+            origin: MorphophonologicalResourceOrigin::External,
+            source_id: "fixture:external".into(),
+            source_uri: Some("https://example.invalid/resource".into()),
+            revision: "fixture-rev".into(),
+            license: Some("CC-BY-SA-4.0".into()),
+            source_artifact_blake3: Some("A".repeat(64)),
+        }
+        .validate()
+        .expect_err("uppercase hexadecimal must not create multiple digest serializations");
+
+        assert_eq!(
+            error,
+            MorphophonologicalResourceEvidenceError::MalformedSourceArtifactDigest
         );
     }
 
@@ -2297,6 +2371,22 @@ mod tests {
         )
         .unwrap();
         assert_ne!(rule_set.resource_blake3(), tampered.resource_blake3());
+
+        let mut external_tampered = morphophonological_fixture_rule_set();
+        external_tampered.resource_evidence = MorphophonologicalResourceEvidence {
+            version: MORPHOPHONOLOGICAL_RESOURCE_EVIDENCE_VERSION.into(),
+            origin: MorphophonologicalResourceOrigin::External,
+            source_id: external_tampered.source_id.clone(),
+            source_uri: Some("https://example.invalid/resource".into()),
+            revision: "fixture-rev".into(),
+            license: Some("CC-BY-SA-4.0".into()),
+            source_artifact_blake3: Some("0".repeat(64)),
+        };
+        external_tampered.validate().unwrap();
+        let before = external_tampered.resource_blake3();
+        external_tampered.resource_evidence.source_artifact_blake3 =
+            Some("1".repeat(64));
+        assert_ne!(before, external_tampered.resource_blake3());
     }
 
 
