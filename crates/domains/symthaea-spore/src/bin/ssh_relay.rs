@@ -4452,7 +4452,7 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                 eprintln!("[{}] {} Rolling back...", peer_addr, transaction.log_line());
                 match run_cmd("nixos-rebuild switch --rollback 2>&1").await {
                     Ok(r) => {
-                        let outcome = if r.exit_status == 0 { "committed" } else { "failed" };
+                        let outcome = if r.exit_status == 0 { "observed_success" } else { "failed" };
                         let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
@@ -4515,7 +4515,7 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                 );
                 match run_cmd(&cmd).await {
                     Ok(r) => {
-                        let outcome = if r.exit_status == 0 { "committed" } else { "failed" };
+                        let outcome = if r.exit_status == 0 { "observed_success" } else { "failed" };
                         let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
@@ -4597,7 +4597,7 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                 let cmd = format!("systemctl {} {}.service 2>&1", action, service);
                 match run_cmd(&cmd).await {
                     Ok(r) => {
-                        let outcome = if r.exit_status == 0 { "committed" } else { "failed" };
+                        let outcome = if r.exit_status == 0 { "observed_success" } else { "failed" };
                         let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout,"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
