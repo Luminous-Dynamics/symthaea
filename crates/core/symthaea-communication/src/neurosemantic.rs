@@ -3071,6 +3071,18 @@ mod tests {
         };
         let recovery_bytes = serde_json::to_vec(&recovery_method).unwrap();
         let representation_bytes = serde_json::to_vec(&representation_method).unwrap();
+        let evaluation_manifest = NeurosemanticRemediationEvaluationManifest {
+            schema_version: NEUROSEMANTIC_REMEDIATION_EVALUATION_MANIFEST_SCHEMA_VERSION,
+            evaluation_ref: "evaluation-1".into(),
+            source_dataset_manifest_hash: forget_set.source_dataset_manifest_hash.clone(),
+            forget_set_manifest_hash: forget_set.fingerprint().unwrap(),
+            retain_set_manifest_hash: retain_set.fingerprint().unwrap(),
+            study_protocol_hash: content_hash(protocol_bytes),
+            evaluation_split_manifest_hash: content_hash(b"split-1"),
+            recovery_method_hash: recovery_method.fingerprint().unwrap(),
+            representation_probe_method_hash: representation_method.fingerprint().unwrap(),
+        };
+        let evaluation_manifest_bytes = serde_json::to_vec(&evaluation_manifest).unwrap();
         let impact = NeurosemanticRemediationImpactArtifact {
             schema_version: NEUROSEMANTIC_REMEDIATION_IMPACT_ARTIFACT_SCHEMA_VERSION,
             impact_ref: "impact-1".into(),
@@ -3081,6 +3093,7 @@ mod tests {
             post_remediation_lineage_ref: post_lineage.lineage_ref.clone(),
             post_remediation_lineage_hash: compute_derivation_provenance_hash(&post_lineage.lineage_ref, &post_bytes),
             lifecycle_receipt_hash: lifecycle.fingerprint().unwrap(),
+            evaluation_manifest_hash: evaluation_manifest.fingerprint().unwrap(),
             remediation_action: NeurosemanticArtifactLifecycleAction::Erasure,
             study_protocol_hash: content_hash(protocol_bytes),
             evaluation_split_manifest_hash: content_hash(b"split-1"),
@@ -3110,6 +3123,7 @@ mod tests {
         };
         assert!(impact.validate().is_ok());
         assert!(impact.verify_lifecycle_binding(&lifecycle).is_ok());
+        assert!(impact.verify_evaluation_manifest_bytes(&evaluation_manifest_bytes).is_ok());
         assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PreRemediation, &pre_bytes).is_ok());
         assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PostRemediation, &post_bytes).is_ok());
         assert!(impact.verify_evaluation_set_pair_bytes(&forget_bytes, &retain_bytes).is_ok());
@@ -3123,6 +3137,10 @@ mod tests {
         assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::ResidualRisk, b"residual").is_ok());
         assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::RecoveryRisk, b"recovery").is_ok());
         assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::RepresentationResidual, b"representation").is_ok());
+
+        let mut evaluation_swap = evaluation_manifest.clone();
+        evaluation_swap.retain_set_manifest_hash = content_hash(b"other-retain-set");
+        assert!(impact.verify_evaluation_manifest_bytes(&serde_json::to_vec(&evaluation_swap).unwrap()).is_err());
 
         let mut overlap = retain_set.clone();
         overlap.member_artifact_hashes = vec![forget_set.member_artifact_hashes[0].clone()];
