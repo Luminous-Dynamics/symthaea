@@ -2731,6 +2731,34 @@ mod tests {
     }
 
     #[test]
+    fn deserialized_resolution_rejects_semantically_duplicate_relationship_methods() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let mut resolution = resolved_method(&request);
+        resolution.relationship_methods.push(
+            ClaimVerificationMethod::new(
+                "https://EXAMPLE.TEST:443/controller/../controller#key-1",
+            )
+            .unwrap(),
+        );
+        resolution.relationship_methods.sort();
+
+        assert!(matches!(
+            resolution.validate_structure(),
+            Err(VerificationFailure::Structural(message))
+                if message.contains("semantically duplicate URL values")
+        ));
+    }
+
+    #[test]
     fn deserialized_verification_request_and_resolution_require_fragment_identifiers() {
         let claim = fixture_claim();
         let mut request = VerificationRequest::from_claim(
