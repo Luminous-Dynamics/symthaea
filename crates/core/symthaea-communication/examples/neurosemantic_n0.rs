@@ -7,7 +7,7 @@ use symthaea_communication::{
     NeurosemanticPacket, NeurosemanticPayload, NeurosemanticReplayTracker, RepresentationFamily,
     NeurosemanticDataClass, NeurosemanticDataPolicy, NeurosemanticInferenceClass,
     NeurosemanticHandlingPolicy, NeurosemanticRetentionPolicy, ReplayDecision,
-    NeurosemanticPolicyProvenanceBinding,
+    NeurosemanticPolicyAuthorityAttestation, NeurosemanticPolicyProvenanceBinding,
 };
 
 fn main() -> Result<(), String> {
@@ -115,6 +115,7 @@ fn main() -> Result<(), String> {
         lease_id: lease.lease_id.clone(),
     };
     message.validate(&lease, 1_500)?;
+    use ed25519_dalek::Signer;
     let signing_key = ed25519_dalek::SigningKey::from_bytes(&[7u8; 32]);
     let policy_fingerprint = message.packet.data_policy.handling.fingerprint_for_attestation();
     let authority_message = NeurosemanticPolicyAuthorityAttestation::message_bytes(
@@ -133,9 +134,7 @@ fn main() -> Result<(), String> {
         policy_provenance_hash: message.packet.data_policy.handling.policy_provenance_hash.clone(),
         issued_at_unix_s: 1_000,
         expires_at_unix_s: 2_000,
-        signature: ed25519_dalek::Signer::sign(&signing_key, &authority_message)
-            .to_bytes()
-            .to_vec(),
+        signature: signing_key.sign(&authority_message).to_bytes().to_vec(),
     };
     let policy_provenance_binding: NeurosemanticPolicyProvenanceBinding = message
         .packet

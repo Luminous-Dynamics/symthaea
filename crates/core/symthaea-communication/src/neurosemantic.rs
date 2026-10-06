@@ -252,7 +252,7 @@ impl NeurosemanticPolicyAuthorityAttestation {
             .map_err(|_| "neurosemantic authority signature verification failed".to_string())
     }
 
-    fn fingerprint(&self) -> Result<String, String> {
+    pub fn fingerprint_for_attestation(&self) -> Result<String, String> {
         let mut canonical = self.clone();
         canonical.signature.clear();
         let bytes = serde_json::to_vec(&canonical)
@@ -292,7 +292,7 @@ impl NeurosemanticPolicyProvenanceBinding {
 }
 
 impl NeurosemanticHandlingPolicy {
-    fn fingerprint(&self) -> Result<String, String> {
+    pub fn fingerprint_for_attestation(&self) -> Result<String, String> {
         let mut canonical = self.clone();
         canonical.policy_provenance_hash.clear();
         let bytes = serde_json::to_vec(&canonical)
@@ -341,7 +341,7 @@ impl NeurosemanticHandlingPolicy {
         Ok(NeurosemanticPolicyProvenanceBinding {
             policy_provenance_ref: self.policy_provenance_ref.clone(),
             policy_provenance_hash: self.policy_provenance_hash.clone(),
-            handling_policy_fingerprint: self.fingerprint()?,
+            handling_policy_fingerprint: self.fingerprint_for_attestation()?,
             authority_ref: String::new(),
             key_ref: String::new(),
             attestation_fingerprint: String::new(),
@@ -364,7 +364,7 @@ impl NeurosemanticHandlingPolicy {
         if record_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
             return Err("neurosemantic policy provenance record exceeds the serialized artifact limit".into());
         }
-        let policy_fingerprint = self.fingerprint()?;
+        let policy_fingerprint = self.fingerprint_for_attestation()?;
         if compute_policy_provenance_hash(&self.policy_provenance_ref, record_bytes)
             != self.policy_provenance_hash
         {
@@ -1142,9 +1142,16 @@ mod tests {
     }
 
     fn policy_provenance_binding() -> NeurosemanticPolicyProvenanceBinding {
-        semantic_policy()
+        let policy = semantic_policy();
+        let (attestation, verifying_key) = authority_attestation(&policy);
+        policy
             .handling
-            .bind_policy_provenance_bytes(b"synthetic-policy-record-1")
+            .bind_policy_provenance_with_attestation(
+                b"synthetic-policy-record-1",
+                &attestation,
+                &verifying_key,
+                150,
+            )
             .unwrap()
     }
 
@@ -1153,7 +1160,7 @@ mod tests {
     ) -> (NeurosemanticPolicyAuthorityAttestation, VerifyingKey) {
         use ed25519_dalek::{Signer, SigningKey};
         let signing_key = SigningKey::from_bytes(&[7u8; 32]);
-        let fingerprint = policy.handling.fingerprint().unwrap();
+        let fingerprint = policy.handling.fingerprint_for_attestation().unwrap();
         let hash = policy.handling.policy_provenance_hash.clone();
         let message = NeurosemanticPolicyAuthorityAttestation::message_bytes(
             "mycelix-policy-authority",
@@ -1305,12 +1312,49 @@ mod tests {
     }
 
     #[test]
+    fn authority_attestation_rejects_tampering_wrong_key_and_policy() {
+        let policy = semantic_policy();
+        let (mut attestation, verifying_key) = authority_attestation(&policy);
+        attestation.signature[0] ^= 0x01;
+        assert!(attestation
+            .verify(
+                &policy.handling.fingerprint_for_attestation().unwrap(),
+                &policy.handling.policy_provenance_hash,
+                &verifying_key,
+                150
+            )
+            .is_err());
+
+        let (good_attestation, _) = authority_attestation(&policy);
+        let wrong_key = ed25519_dalek::SigningKey::from_bytes(&[8u8; 32]);
+        assert!(good_attestation
+            .verify(
+                &policy.handling.fingerprint_for_attestation().unwrap(),
+                &policy.handling.policy_provenance_hash,
+                &wrong_key.verifying_key(),
+                150
+            )
+            .is_err());
+
+        let mut changed_policy = policy.clone();
+        changed_policy.handling.retention = NeurosemanticRetentionPolicy::Ephemeral;
+        assert!(good_attestation
+            .verify(
+                &changed_policy.handling.fingerprint_for_attestation().unwrap(),
+                &changed_policy.handling.policy_provenance_hash,
+                &verifying_key,
+                150
+            )
+            .is_err());
+    }
+
+    #[test]
     fn authority_attestation_verifies_exact_policy_and_provenance() {
         let policy = semantic_policy();
         let (attestation, verifying_key) = authority_attestation(&policy);
         assert!(attestation
             .verify(
-                &policy.handling.fingerprint().unwrap(),
+                &policy.handling.fingerprint_for_attestation().unwrap(),
                 &policy.handling.policy_provenance_hash,
                 &verifying_key,
                 150
@@ -1324,7 +1368,7 @@ mod tests {
         );
         assert!(changed
             .verify(
-                &policy.handling.fingerprint().unwrap(),
+                &policy.handling.fingerprint_for_attestation().unwrap(),
                 &policy.handling.policy_provenance_hash,
                 &verifying_key,
                 150
