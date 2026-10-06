@@ -168,9 +168,12 @@ def has_draft_guard(expression: str | None) -> bool:
 
 
 def require_ready_event(path: Path, pr_block: list[str]) -> None:
-    if not any("ready_for_review" in line for line in pr_block):
+    required_events = ("ready_for_review", "converted_to_draft")
+    missing = [event for event in required_events if not any(event in line for line in pr_block)]
+    if missing:
         raise SafetyError(
-            f"{path}: runner-capable pull_request workflow must include ready_for_review"
+            f"{path}: runner-capable pull_request workflow must include "
+            f"draft-transition activity types: {missing!r}"
         )
 
 
@@ -268,7 +271,7 @@ def validate_ci_delegation() -> tuple[int, int]:
 def self_test() -> None:
     safe = """on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
 jobs:
   test:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
