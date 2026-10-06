@@ -283,17 +283,16 @@ impl NixServicePostStateObservationV1 {
 
     pub fn state_digest(&self) -> Result<String, NixPostStateErrorV1> {
         self.validate_shape()?;
-        let mut h = Hasher::new();
-        h.update(STABILITY_SAMPLE_DOMAIN_V1);
-        put_u8(&mut h, operation_tag(self.operation));
-        put_str(&mut h, &self.unit);
-        put_u8(&mut h, load_state_tag(self.load_state));
-        put_u8(&mut h, active_state_tag(self.active_state));
-        put_str(&mut h, &self.sub_state);
-        put_u8(&mut h, unit_file_state_tag(self.unit_file_state));
-        put_str(&mut h, &self.service_result);
-        put_opt_str(&mut h, self.invocation_id.as_deref());
-        Ok(h.finalize().to_hex().to_string())
+        Ok(semantic_state_digest(
+            self.operation,
+            &self.unit,
+            self.load_state,
+            self.active_state,
+            &self.sub_state,
+            self.unit_file_state,
+            &self.service_result,
+            self.invocation_id.as_deref(),
+        ))
     }
 }
 
@@ -663,6 +662,12 @@ impl NixPostStateReceiptV1 {
             systemd_job_unit,
             systemd_job_object_path,
             systemd_job_result,
+            observed_unit_object_path: observation.unit_object_path.clone(),
+            observed_load_state: observation.load_state,
+            observed_active_state: observation.active_state,
+            observed_sub_state: observation.sub_state.clone(),
+            observed_unit_file_state: observation.unit_file_state,
+            observed_service_result: observation.service_result.clone(),
             systemd_manager_owner: manager_owner,
             pre_invocation_id: expectation.pre_invocation_id.clone(),
             post_invocation_id: observation.invocation_id.clone(),
@@ -780,7 +785,20 @@ impl NixPostStateReceiptV1 {
         if let Some(result) = &self.systemd_job_result {
             require_nonempty(result, "systemd job result")?;
         }
+        validate_systemd_unit_object_path(&self.observed_unit_object_path)?;
+        require_nonempty(&self.observed_sub_state, "observed service sub-state")?;
+        require_nonempty(&self.observed_service_result, "observed service result")?;
         validate_unique_manager_owner(&self.systemd_manager_owner)?;
+        let recomputed_state_digest = semantic_state_digest(
+            self.operation,
+            &self.target_unit,
+            self.observed_load_state,
+            self.observed_active_state,
+            &self.observed_sub_state,
+            self.observed_unit_file_state,
+            &self.observed_service_result,
+            self.post_invocation_id.as_deref(),
+        );
         validate_optional_invocation_id(self.pre_invocation_id.as_deref(), "pre-invocation id")?;
         validate_optional_invocation_id(self.post_invocation_id.as_deref(), "post-invocation id")?;
         require_nonempty(&self.observer_identity, "observer identity")?;
@@ -797,8 +815,10 @@ impl NixPostStateReceiptV1 {
                 .ok_or(NixPostStateErrorV1::InsufficientStabilitySamples)?;
             if last.operation != self.operation
                 || last.unit != self.target_unit
+                || last.unit_object_path != self.observed_unit_object_path
                 || last.observed_generation != self.observed_generation
                 || last.definition_digest != self.observed_definition_digest
+                || last.state_digest != recomputed_state_digest
                 || last.manager_owner != self.systemd_manager_owner
                 || last.invocation_id != self.post_invocation_id
             {
