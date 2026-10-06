@@ -927,13 +927,18 @@ fn load_or_create_fingerprint_key(path: &Path) -> Result<[u8; 32], String> {
                 path.display()
             )
         })?;
-    std::fs::set_permissions(
-        path,
+    file.set_permissions(
         std::os::unix::fs::PermissionsExt::from_mode(0o600),
     )
     .map_err(|error| {
         format!(
             "unable to restrict transaction fingerprint key {}: {error}",
+            path.display()
+        )
+    })?;
+    file.sync_all().map_err(|error| {
+        format!(
+            "unable to re-synchronize transaction fingerprint key {} after permission hardening: {error}",
             path.display()
         )
     })?;
