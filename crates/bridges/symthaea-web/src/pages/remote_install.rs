@@ -1388,48 +1388,6 @@ pub fn RemoteInstallPanel(
                             <a href="https://github.com/Luminous-Dynamics/nixforhumanity/releases" target="_blank">"NixForHumanity USB"</a>
                             ", then enter the address, one-time password, and per-run relay token shown on its console."
                         </p>
-                        {move || layout_requires_luks(disk_layout.get(), filesystem.get()).then(|| view! {
-                            <div class="encryption-passphrase-panel" style="margin-bottom: 1rem; padding: 0.9rem; border: 1px solid var(--glass-border); border-radius: 8px;">
-                                <strong style="display:block; margin-bottom:0.35rem;">"Disk encryption passphrase"</strong>
-                                <p class="field-hint" style="margin-bottom:0.7rem;">
-                                    "This unlocks the LUKS2 disk. It is separate from your login password, is never saved in browser storage, and remains your recovery fallback even when TPM2 or FIDO2 is enabled."
-                                </p>
-                                <div class="connect-form">
-                                    <div class="field">
-                                        <label class="field-label">"Passphrase"</label>
-                                        <input type="password" class="field-input"
-                                            aria-label="Disk encryption passphrase"
-                                            autocomplete="new-password"
-                                            placeholder="At least 12 characters"
-                                            prop:value=move || luks_passphrase.get()
-                                            on:input=move |ev| luks_passphrase.set(event_target_value(&ev))
-                                        />
-                                    </div>
-                                    <div class="field">
-                                        <label class="field-label">"Confirm passphrase"</label>
-                                        <input type="password" class="field-input"
-                                            aria-label="Confirm disk encryption passphrase"
-                                            autocomplete="new-password"
-                                            placeholder="Repeat passphrase"
-                                            prop:value=move || luks_passphrase_confirm.get()
-                                            on:input=move |ev| luks_passphrase_confirm.set(event_target_value(&ev))
-                                        />
-                                    </div>
-                                </div>
-                                {move || {
-                                    let p = luks_passphrase.get();
-                                    let c = luks_passphrase_confirm.get();
-                                    if !p.is_empty() && p.len() < 12 {
-                                        Some(view! { <p class="warning-msg">"Use at least 12 characters for the disk-unlock passphrase."</p> })
-                                    } else if !c.is_empty() && p != c {
-                                        Some(view! { <p class="error-msg">"Passphrases do not match."</p> })
-                                    } else {
-                                        None
-                                    }
-                                }}
-                            </div>
-                        })}
-
                         <div class="connect-form">
                             <div class="field" style="flex: 2;">
                                 <label class="field-label">"Target Address"</label>
@@ -1516,6 +1474,48 @@ pub fn RemoteInstallPanel(
                     </div>
                 }
             })}
+
+                        {move || layout_requires_luks(disk_layout.get(), filesystem.get()).then(|| view! {
+                            <div class="encryption-passphrase-panel" style="margin-bottom: 1rem; padding: 0.9rem; border: 1px solid var(--glass-border); border-radius: 8px;">
+                                <strong style="display:block; margin-bottom:0.35rem;">"Disk encryption passphrase"</strong>
+                                <p class="field-hint" style="margin-bottom:0.7rem;">
+                                    "This unlocks the LUKS2 disk. It is separate from your login password, is never saved in browser storage, and remains your recovery fallback even when TPM2 or FIDO2 is enabled."
+                                </p>
+                                <div class="connect-form">
+                                    <div class="field">
+                                        <label class="field-label">"Passphrase"</label>
+                                        <input type="password" class="field-input"
+                                            aria-label="Disk encryption passphrase"
+                                            autocomplete="new-password"
+                                            placeholder="At least 12 characters"
+                                            prop:value=move || luks_passphrase.get()
+                                            on:input=move |ev| luks_passphrase.set(event_target_value(&ev))
+                                        />
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label">"Confirm passphrase"</label>
+                                        <input type="password" class="field-input"
+                                            aria-label="Confirm disk encryption passphrase"
+                                            autocomplete="new-password"
+                                            placeholder="Repeat passphrase"
+                                            prop:value=move || luks_passphrase_confirm.get()
+                                            on:input=move |ev| luks_passphrase_confirm.set(event_target_value(&ev))
+                                        />
+                                    </div>
+                                </div>
+                                {move || {
+                                    let p = luks_passphrase.get();
+                                    let c = luks_passphrase_confirm.get();
+                                    if !p.is_empty() && p.len() < 12 {
+                                        Some(view! { <p class="warning-msg">"Use at least 12 characters for the disk-unlock passphrase."</p> })
+                                    } else if !c.is_empty() && p != c {
+                                        Some(view! { <p class="error-msg">"Passphrases do not match."</p> })
+                                    } else {
+                                        None
+                                    }
+                                }}
+                            </div>
+                        })}
 
             // ── Probing indicator ──
             {move || (relay_state.get() == RelayState::Connecting || relay_state.get() == RelayState::Probing).then(|| {
