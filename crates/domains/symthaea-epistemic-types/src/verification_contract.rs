@@ -2694,7 +2694,8 @@ mod tests {
         )
         .unwrap();
         request.verification_method =
-            ClaimVerificationMethod::new("https://EXAMPLE.TEST:443/controller/./#key-1").unwrap();
+            ClaimVerificationMethod::new("https://EXAMPLE.TEST:443/controller/../controller#key-1")
+                .unwrap();
 
         let resolution = VerificationMethodResolution::from_controller_document(
             &request,
