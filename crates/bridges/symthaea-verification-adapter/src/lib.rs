@@ -1057,14 +1057,26 @@ fn extract_relationship_methods(
                 let method_controller = resolved_method.controller;
                 let lifecycle = resolved_method.lifecycle;
                 if let Some(expires) = relationship_expires {
-                    if lifecycle.expires.as_deref() != Some(expires.as_str()) {
+                    let method_expires = lifecycle.expires.as_deref().ok_or_else(|| {
+                        SnapshotError::Malformed(
+                            "relationship member expiry is present but verificationMethod lifecycle expiry is absent"
+                                .into(),
+                        )
+                    })?;
+                    if !timestamps_equal(method_expires, &expires)? {
                         return Err(SnapshotError::Malformed(
                             "relationship member expiry conflicts with verificationMethod lifecycle".into(),
                         ));
                     }
                 }
                 if let Some(revoked) = relationship_revoked {
-                    if lifecycle.revoked.as_deref() != Some(revoked.as_str()) {
+                    let method_revoked = lifecycle.revoked.as_deref().ok_or_else(|| {
+                        SnapshotError::Malformed(
+                            "relationship member revocation is present but verificationMethod lifecycle revocation is absent"
+                                .into(),
+                        )
+                    })?;
+                    if !timestamps_equal(method_revoked, &revoked)? {
                         return Err(SnapshotError::Malformed(
                             "relationship member revocation conflicts with verificationMethod lifecycle".into(),
                         ));
@@ -1078,6 +1090,14 @@ fn extract_relationship_methods(
     }
 
     Ok(methods)
+}
+
+fn timestamps_equal(left: &str, right: &str) -> Result<bool, SnapshotError> {
+    let left = chrono::DateTime::parse_from_rfc3339(left)
+        .map_err(|_| SnapshotError::Malformed("timestamp must be RFC3339".into()))?;
+    let right = chrono::DateTime::parse_from_rfc3339(right)
+        .map_err(|_| SnapshotError::Malformed("timestamp must be RFC3339".into()))?;
+    Ok(left == right)
 }
 
 fn optional_string(
@@ -1684,6 +1704,20 @@ mod tests {
                     if message.contains(expected_message)
             ));
         }
+    }
+
+    #[test]
+    fn equivalent_lifecycle_timestamp_spellings_are_semantically_equal() {
+        assert!(timestamps_equal(
+            "2026-10-06T00:00:00Z",
+            "2026-10-06T02:00:00+02:00"
+        )
+        .unwrap());
+        assert!(!timestamps_equal(
+            "2026-10-06T00:00:00Z",
+            "2026-10-06T00:00:01Z"
+        )
+        .unwrap());
     }
 
     #[test]
