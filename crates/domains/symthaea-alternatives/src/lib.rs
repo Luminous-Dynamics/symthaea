@@ -26,7 +26,7 @@ pub mod corpus;
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 27;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v36";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v37";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -2017,6 +2017,7 @@ impl ExperimentalDesignProvenance {
         &self,
         requirement: &FunctionalRequirement,
     ) -> Result<(), AssessmentError> {
+        requirement.validate()?;
         self.validate()?;
         if self.requirement_id != requirement.id {
             return Err(AssessmentError::ExperimentalDesignRequirementMismatch {
@@ -5663,6 +5664,13 @@ mod tests {
             error,
             AssessmentError::ExperimentalDesignRequirementDigestMismatch { .. }
         ));
+
+        let mut invalid_requirement = case.requirement.clone();
+        invalid_requirement.description.clear();
+        assert_eq!(
+            design.validate_against(&invalid_requirement).unwrap_err(),
+            AssessmentError::EmptyRequirementIdentity
+        );
     }
 
     #[test]
