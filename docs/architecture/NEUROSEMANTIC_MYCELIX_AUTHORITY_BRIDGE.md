@@ -63,6 +63,7 @@ The resolution is signed by the configured external resolver and binds, in one i
 
 - the external resolver and resolver key reference;
 - the authority and authority-key references;
+- the exact fingerprint of the authority attestation artifact being resolved;
 - the exact Symthaea handling-policy fingerprint;
 - the exact external policy-provenance reference and digest;
 - the exact subject, peer, lease identifier, and consent epoch;
@@ -76,7 +77,7 @@ Only `Active` status can produce a `NeurosemanticPolicyProvenanceBinding`. `Susp
 
 The resolution lifetime is bounded to 24 hours by the Symthaea protocol as a defensive upper bound. Deployments handling higher-risk neurosemantic data should use a materially shorter freshness window.
 
-The resolver signature authenticates the exact snapshot to the configured resolver key. The integration must still establish that the resolver key is trusted and authorized; signature verification is not itself a governance decision.
+The resolver signature authenticates the exact snapshot to the configured resolver key. The snapshot also commits to the exact authority-attestation fingerprint, preventing an otherwise valid but different attestation from being substituted after resolution. The integration must still establish that the resolver key is trusted and authorized; signature verification is not itself a governance decision.
 
 A resolution cannot outlive the authority attestation that it resolves. This prevents a freshness snapshot from extending an older issuer proof beyond its cryptographic validity window.
 
