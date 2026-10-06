@@ -143,6 +143,139 @@ pub struct NeurosemanticDerivationLineageRecord {
     pub generated_at_unix_s: u64,
 }
 
+/// Post-generation lifecycle action for a derived artifact. This records an
+/// external effect/evidence claim; it is not an authorization primitive.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum NeurosemanticArtifactLifecycleAction {
+    AccessRevocation,
+    Retention,
+    Erasure,
+    Rectification,
+    Supersession,
+}
+
+/// State reported for an external lifecycle action.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum NeurosemanticArtifactLifecycleState {
+    Requested,
+    Applied,
+    Verified,
+    Rejected,
+}
+
+pub const NEUROSEMANTIC_ARTIFACT_LIFECYCLE_RECEIPT_SCHEMA_VERSION: u16 = 1;
+
+/// Content-addressed evidence that a downstream lifecycle effect was observed.
+/// Validation establishes exact binding of the receipt to the artifact, lineage,
+/// and supplied effect evidence. It does not establish that the external effect
+/// actually occurred or that all copies/derivatives were changed.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticArtifactLifecycleReceipt {
+    pub schema_version: u16,
+    pub receipt_ref: String,
+    pub artifact_hash: String,
+    pub derivation_provenance_ref: String,
+    pub derivation_provenance_hash: String,
+    pub action: NeurosemanticArtifactLifecycleAction,
+    pub state: NeurosemanticArtifactLifecycleState,
+    pub effect_evidence_ref: String,
+    pub effect_evidence_hash: String,
+    /// Canonical Git object ID for the execution context that emitted the receipt.
+    pub execution_revision: String,
+    pub observed_at_unix_s: u64,
+    /// Replacement/superseding artifact identity for rectification or supersession.
+    pub resulting_artifact_hash: Option<String>,
+}
+
+impl NeurosemanticArtifactLifecycleReceipt {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != NEUROSEMANTIC_ARTIFACT_LIFECYCLE_RECEIPT_SCHEMA_VERSION
+            || !valid_identifier(&self.receipt_ref)
+            || !valid_blake3_digest(&self.artifact_hash)
+            || !valid_identifier(&self.derivation_provenance_ref)
+            || !valid_blake3_digest(&self.derivation_provenance_hash)
+            || !valid_identifier(&self.effect_evidence_ref)
+            || !valid_blake3_digest(&self.effect_evidence_hash)
+            || !valid_execution_revision(&self.execution_revision)
+        {
+            return Err("neurosemantic lifecycle receipt fields are invalid".into());
+        }
+
+        if let Some(resulting_artifact_hash) = &self.resulting_artifact_hash {
+            if !valid_blake3_digest(resulting_artifact_hash)
+                || resulting_artifact_hash == &self.artifact_hash
+            {
+                return Err("neurosemantic lifecycle replacement artifact identity is invalid".into());
+            }
+        }
+
+        match self.action {
+            NeurosemanticArtifactLifecycleAction::Rectification
+            | NeurosemanticArtifactLifecycleAction::Supersession => {
+                if self.resulting_artifact_hash.is_none() {
+                    return Err("neurosemantic lifecycle replacement action requires a resulting artifact hash".into());
+                }
+            }
+            NeurosemanticArtifactLifecycleAction::AccessRevocation
+            | NeurosemanticArtifactLifecycleAction::Retention
+            | NeurosemanticArtifactLifecycleAction::Erasure => {
+                if self.resulting_artifact_hash.is_some() {
+                    return Err("neurosemantic lifecycle non-replacement action cannot carry a resulting artifact hash".into());
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic lifecycle receipt JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let receipt: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("neurosemantic lifecycle receipt JSON: {error}"))?;
+        receipt.validate()?;
+        Ok(receipt)
+    }
+
+    /// Verify the concrete effect-evidence bytes against the exact receipt hash.
+    /// This proves evidence identity, not the truth of the external effect claim.
+    pub fn verify_effect_evidence_bytes(&self, evidence_bytes: &[u8]) -> bool {
+        self.validate().is_ok()
+            && evidence_bytes.len() <= MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            && content_hash(evidence_bytes) == self.effect_evidence_hash
+    }
+
+    /// Bind a lifecycle receipt to the exact derived artifact and lineage record
+    /// already carried by the policy boundary, while rejecting future-dated receipts.
+    pub fn verify_binding(
+        &self,
+        expected_artifact_hash: &str,
+        expected_derivation_provenance_ref: &str,
+        expected_derivation_provenance_hash: &str,
+        evidence_bytes: &[u8],
+        now_unix_s: u64,
+    ) -> Result<(), String> {
+        self.validate()?;
+        if self.artifact_hash != expected_artifact_hash
+            || self.derivation_provenance_ref != expected_derivation_provenance_ref
+            || self.derivation_provenance_hash != expected_derivation_provenance_hash
+        {
+            return Err("neurosemantic lifecycle receipt does not match the derived artifact lineage".into());
+        }
+        if self.observed_at_unix_s > now_unix_s {
+            return Err("neurosemantic lifecycle receipt is dated in the future".into());
+        }
+        if !self.verify_effect_evidence_bytes(evidence_bytes) {
+            return Err("neurosemantic lifecycle effect evidence hash mismatch".into());
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NeurosemanticHandlingAction {
     Transmit,
@@ -1782,6 +1915,141 @@ mod tests {
                 150,
             )
             .unwrap()
+    }
+
+    fn synthetic_lifecycle_receipt() -> (NeurosemanticArtifactLifecycleReceipt, Vec<u8>) {
+        let evidence = b"synthetic-lifecycle-effect-v1".to_vec();
+        (
+            NeurosemanticArtifactLifecycleReceipt {
+                schema_version: NEUROSEMANTIC_ARTIFACT_LIFECYCLE_RECEIPT_SCHEMA_VERSION,
+                receipt_ref: "synthetic-lifecycle-receipt-1".into(),
+                artifact_hash: synthetic_output_artifact_hash(),
+                derivation_provenance_ref: "synthetic-derivation-record-1".into(),
+                derivation_provenance_hash: compute_derivation_provenance_hash(
+                    "synthetic-derivation-record-1",
+                    &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
+                ),
+                action: NeurosemanticArtifactLifecycleAction::Erasure,
+                state: NeurosemanticArtifactLifecycleState::Verified,
+                effect_evidence_ref: "synthetic-lifecycle-effect-1".into(),
+                effect_evidence_hash: content_hash(&evidence),
+                execution_revision: "2".repeat(40),
+                observed_at_unix_s: 160,
+                resulting_artifact_hash: None,
+            },
+            evidence,
+        )
+    }
+
+    #[test]
+    fn lifecycle_receipt_binds_artifact_lineage_and_effect_evidence() {
+        let (receipt, evidence) = synthetic_lifecycle_receipt();
+        let lineage = synthetic_derivation_lineage_record();
+        let lineage_bytes = serde_json::to_vec(&lineage).unwrap();
+        assert!(receipt.validate().is_ok());
+        assert_eq!(
+            NeurosemanticArtifactLifecycleReceipt::from_json_bytes(
+                &serde_json::to_vec(&receipt).unwrap()
+            )
+            .unwrap(),
+            receipt
+        );
+        assert!(receipt.verify_effect_evidence_bytes(&evidence));
+        assert!(receipt
+            .verify_binding(
+                &lineage.output_artifact_hash,
+                &lineage.lineage_ref,
+                &compute_derivation_provenance_hash(&lineage.lineage_ref, &lineage_bytes),
+                &evidence,
+                170
+            )
+            .is_ok());
+
+        assert!(!receipt.verify_effect_evidence_bytes(
+            b"synthetic-lifecycle-effect-tampered"
+        ));
+        assert!(receipt
+            .verify_binding(
+                &content_hash(b"wrong-artifact"),
+                &lineage.lineage_ref,
+                &compute_derivation_provenance_hash(&lineage.lineage_ref, &lineage_bytes),
+                &evidence,
+                170
+            )
+            .is_err());
+        assert!(receipt
+            .verify_binding(
+                &lineage.output_artifact_hash,
+                "synthetic-derivation-record-2",
+                &compute_derivation_provenance_hash(&lineage.lineage_ref, &lineage_bytes),
+                &evidence,
+                170
+            )
+            .is_err());
+    }
+
+    #[test]
+    fn lifecycle_receipt_rejects_future_and_ambiguous_replacement_claims() {
+        let (mut receipt, evidence) = synthetic_lifecycle_receipt();
+        assert!(receipt.verify_binding(
+            &receipt.artifact_hash,
+            &receipt.derivation_provenance_ref,
+            &receipt.derivation_provenance_hash,
+            &evidence,
+            159
+        ).is_err());
+
+        receipt.action = NeurosemanticArtifactLifecycleAction::Rectification;
+        receipt.resulting_artifact_hash = None;
+        assert!(receipt.validate().is_err());
+
+        receipt.resulting_artifact_hash = Some(receipt.artifact_hash.clone());
+        assert!(receipt.validate().is_err());
+
+        receipt.resulting_artifact_hash = Some(content_hash(b"replacement-artifact"));
+        assert!(receipt.validate().is_ok());
+    }
+
+    #[test]
+    fn lifecycle_receipt_bounded_parser_and_schema_are_fail_closed() {
+        let (receipt, _) = synthetic_lifecycle_receipt();
+        let mut value = serde_json::to_value(&receipt).unwrap();
+        value.as_object_mut()
+            .unwrap()
+            .insert(
+                "schema_version".into(),
+                serde_json::json!(NEUROSEMANTIC_ARTIFACT_LIFECYCLE_RECEIPT_SCHEMA_VERSION - 1),
+            );
+        assert!(NeurosemanticArtifactLifecycleReceipt::from_json_bytes(
+            &serde_json::to_vec(&value).unwrap()
+        ).is_err());
+        let oversized = vec![b' '; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1];
+        assert!(NeurosemanticArtifactLifecycleReceipt::from_json_bytes(&oversized).is_err());
+    }
+
+    #[test]
+    fn lifecycle_receipt_action_schema_is_stable() {
+        for (action, expected) in [
+            (NeurosemanticArtifactLifecycleAction::AccessRevocation, "AccessRevocation"),
+            (NeurosemanticArtifactLifecycleAction::Retention, "Retention"),
+            (NeurosemanticArtifactLifecycleAction::Erasure, "Erasure"),
+            (NeurosemanticArtifactLifecycleAction::Rectification, "Rectification"),
+            (NeurosemanticArtifactLifecycleAction::Supersession, "Supersession"),
+        ] {
+            assert_eq!(serde_json::to_string(&action).unwrap(), format!(""{expected}""));
+        }
+    }
+
+    #[test]
+    fn lifecycle_receipt_state_schema_is_stable() {
+        for (state, expected) in [
+            (NeurosemanticArtifactLifecycleState::Requested, "Requested"),
+            (NeurosemanticArtifactLifecycleState::Applied, "Applied"),
+            (NeurosemanticArtifactLifecycleState::Verified, "Verified"),
+            (NeurosemanticArtifactLifecycleState::Rejected, "Rejected"),
+        ] {
+            assert_eq!(serde_json::to_string(&state).unwrap(), format!(""{expected}""));
+        }
     }
 
     fn authority_attestation(
