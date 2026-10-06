@@ -11,6 +11,8 @@ use crate::AppDatabase;
 use crate::aliases;
 use std::fmt::Write;
 
+const NIXOS_2605_NIXPKGS_REV: &str = "7fc6f2c20af09cdcaf48b92ec3121860139ec668";
+
 // ═══════════════════════════════════════════════════════
 // Input types
 // ═══════════════════════════════════════════════════════
@@ -1168,7 +1170,7 @@ mod tests {
         let result = generate(&test_hw(), &test_choices(), &[]);
         let flake = &result.flake_nix;
         assert!(flake.contains("nixosConfigurations.\"sovereign\""));
-        assert!(flake.contains("nixos-26.05"));
+        assert!(flake.contains(NIXOS_2605_NIXPKGS_REV));
         assert!(flake.contains("lanzaboote"));
     }
 
