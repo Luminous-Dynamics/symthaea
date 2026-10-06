@@ -5217,6 +5217,20 @@ window.drawLineChart = drawLineChart;
   }
 
   /**
+   * Escape untrusted values before inserting them into System Card HTML.
+   * Target/user metadata is not assumed to be safe merely because it came
+   * from a local scan or authenticated relay.
+   */
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /**
    * Render the System Card as HTML
    */
   function renderSystemCard(card) {
@@ -5238,16 +5252,16 @@ window.drawLineChart = drawLineChart;
       '</div>' +
 
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.82rem;">' +
-      (card.hardware.gpu_model ? '<div style="color:#7aa2f7;">GPU</div><div>' + card.hardware.gpu + '</div>' : '') +
-      '<div style="color:#7aa2f7;">Desktop</div><div>' + card.software.desktop + '</div>' +
-      '<div style="color:#7aa2f7;">Filesystem</div><div>' + card.software.filesystem + ' (' + card.software.subvolumes + ' subvols, zstd)</div>' +
-      '<div style="color:#7aa2f7;">Audio</div><div>' + card.software.audio + '</div>' +
+      (card.hardware.gpu_model ? '<div style="color:#7aa2f7;">GPU</div><div>' + escapeHtml(card.hardware.gpu) + '</div>' : '') +
+      '<div style="color:#7aa2f7;">Desktop</div><div>' + escapeHtml(card.software.desktop) + '</div>' +
+      '<div style="color:#7aa2f7;">Filesystem</div><div>' + escapeHtml(card.software.filesystem) + ' (' + card.software.subvolumes + ' subvols, zstd)</div>' +
+      '<div style="color:#7aa2f7;">Audio</div><div>' + escapeHtml(card.software.audio) + '</div>' +
       '</div>' +
 
       '<div style="margin-top:1rem;display:flex;flex-wrap:wrap;gap:0.4rem;justify-content:center;">' +
       securityBadges.map(function(b) {
         return '<span style="font-size:0.7rem;padding:0.2rem 0.6rem;background:rgba(158,206,106,0.15);' +
-          'border:1px solid rgba(158,206,106,0.3);border-radius:12px;color:#9ece6a;">' + b + '</span>';
+          'border:1px solid rgba(158,206,106,0.3);border-radius:12px;color:#9ece6a;">' + escapeHtml(b) + '</span>';
       }).join('') +
       '</div>' +
 
