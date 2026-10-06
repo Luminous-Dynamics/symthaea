@@ -104,6 +104,9 @@ pub enum NixSystemdObserverErrorV1 {
     #[error("systemd JobRemoved watcher manager owner mismatch")]
     WatcherManagerOwnerMismatch,
 
+    #[error("systemd JobRemoved watcher D-Bus bus incarnation mismatch")]
+    WatcherBusIncarnationMismatch,
+
     #[error("systemd JobRemoved signal timed out")]
     JobRemovedTimeout,
 
