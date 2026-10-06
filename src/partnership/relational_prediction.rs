@@ -1633,22 +1633,35 @@ impl HeldOutRelationalPredictionQualification {
         }
 
         let observed_scores = [
-            self.observed.persistence_baseline,
-            self.observed.isolated_agents,
-            self.observed.common_driver,
-            self.observed.synchrony_only,
-            self.observed.non_relational_context,
-            self.observed.relational_augmented,
-            self.observed.relational_profile,
+            (
+                self.observed.persistence_baseline,
+                PredictionFeatureSet::PersistenceBaseline,
+            ),
+            (self.observed.isolated_agents, PredictionFeatureSet::IsolatedAgents),
+            (self.observed.common_driver, PredictionFeatureSet::CommonDriver),
+            (self.observed.synchrony_only, PredictionFeatureSet::SynchronyOnly),
+            (
+                self.observed.non_relational_context,
+                PredictionFeatureSet::NonRelationalContext,
+            ),
+            (
+                self.observed.relational_augmented,
+                PredictionFeatureSet::RelationalAugmented,
+            ),
+            (
+                self.observed.relational_profile,
+                PredictionFeatureSet::RelationalProfile,
+            ),
         ];
-        for score in observed_scores {
-            if score.train_samples != self.config.train_samples
+        for (score, expected_feature_set) in observed_scores {
+            if score.feature_set != expected_feature_set
+                || score.train_samples != self.config.train_samples
                 || score.test_samples != self.config.test_samples
                 || score.parameter_count
-                    != if score.feature_set == PredictionFeatureSet::PersistenceBaseline {
+                    != if expected_feature_set == PredictionFeatureSet::PersistenceBaseline {
                         0
                     } else {
-                        feature_count(score.feature_set) + 1
+                        feature_count(expected_feature_set) + 1
                     }
                 || !score.mean_absolute_error.is_finite()
                 || score.mean_absolute_error < 0.0
@@ -2968,6 +2981,37 @@ mod tests {
             HeldOutRelationalPredictionSummary::compute(&build_samples(5.0), config());
 
         assert_eq!(result, Err(RelationalPredictionError::TemporalLeakage));
+    }
+
+    #[test]
+    fn qualification_rejects_tampered_summary_parameter_count() {
+        let samples = build_samples(0.5);
+        let qualification =
+            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
+
+        let mut tampered = qualification.clone();
+        tampered.observed.relational_augmented.parameter_count -= 1;
+
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn qualification_rejects_tampered_summary_feature_label() {
+        let samples = build_samples(0.5);
+        let qualification =
+            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
+
+        let mut tampered = qualification.clone();
+        tampered.observed.relational_profile.feature_set =
+            PredictionFeatureSet::RelationalAugmented;
+
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
     }
 
     #[test]
