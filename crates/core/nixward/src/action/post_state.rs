@@ -242,6 +242,8 @@ pub struct NixServicePostStateObservationV1 {
     /// Exact systemd Unit object identity used for the observation.
     pub unit_object_path: String,
     pub definition_identity: NixSystemdUnitDefinitionIdentityV1,
+    /// Observer-sealed byte-level definition content commitment for this observation.
+    pub definition_content_digest: String,
     pub load_state: ServiceLoadStateV1,
     pub active_state: ServiceActiveStateV1,
     pub sub_state: String,
@@ -268,6 +270,10 @@ impl NixServicePostStateObservationV1 {
         require_nonempty(&self.sub_state, "observed service sub-state")?;
         require_nonempty(&self.service_result, "observed service result")?;
         self.definition_identity.validate_shape()?;
+        validate_digest(
+            &self.definition_content_digest,
+            "observed definition content digest",
+        )?;
         if let Some(owner) = self.systemd_manager_owner.as_deref() {
             validate_unique_manager_owner(owner)?;
         }
@@ -310,6 +316,7 @@ pub struct NixPostStateStabilitySampleV1 {
     pub unit_object_path: String,
     pub observed_generation: u64,
     pub definition_digest: String,
+    pub definition_content_digest: String,
     pub state_digest: String,
     pub manager_owner: String,
     pub invocation_id: Option<String>,
@@ -326,6 +333,10 @@ impl NixPostStateStabilitySampleV1 {
         }
         validate_systemd_unit_object_path(&self.unit_object_path)?;
         validate_digest(&self.definition_digest, "stability definition digest")?;
+        validate_digest(
+            &self.definition_content_digest,
+            "stability definition content digest",
+        )?;
         validate_digest(&self.state_digest, "stability state digest")?;
         validate_unique_manager_owner(&self.manager_owner)?;
         validate_optional_invocation_id(self.invocation_id.as_deref(), "stability invocation id")?;
@@ -344,6 +355,7 @@ impl NixPostStateStabilitySampleV1 {
         put_str(&mut h, &self.unit_object_path);
         put_u64(&mut h, self.observed_generation);
         put_str(&mut h, &self.definition_digest);
+        put_str(&mut h, &self.definition_content_digest);
         put_str(&mut h, &self.state_digest);
         put_str(&mut h, &self.manager_owner);
         put_opt_str(&mut h, self.invocation_id.as_deref());
@@ -410,6 +422,7 @@ impl NixPostStateStabilityEvidenceV1 {
                 || sample.unit_object_path != first.unit_object_path
                 || sample.observed_generation != first.observed_generation
                 || sample.definition_digest != first.definition_digest
+                || sample.definition_content_digest != first.definition_content_digest
                 || sample.state_digest != first.state_digest
                 || sample.manager_owner != first.manager_owner
                 || sample.invocation_id != first.invocation_id
@@ -479,6 +492,7 @@ fn validate_stability_against_observation(
         || last.unit_object_path != observation.unit_object_path
         || last.observed_generation != observation.observed_generation
         || last.definition_digest != observation.definition_digest()?
+        || last.definition_content_digest != observation.definition_content_digest
         || last.state_digest != observation.state_digest()?
         || last.manager_owner != observation
             .systemd_manager_owner
