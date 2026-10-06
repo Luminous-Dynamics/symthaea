@@ -5288,6 +5288,18 @@ mod tests {
     }
 
     #[test]
+    fn measurement_uncertainty_component_evaluation_type_mutation_fails_closed() {
+        let mut uncertainty = test_uncertainty(&["component"]);
+        uncertainty.component_refs[0].evaluation_type =
+            MeasurementUncertaintyComponentEvaluationType::TypeB;
+        let error = uncertainty.validate().unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyComponentRefsDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
     fn measurement_uncertainty_evaluation_scope_mutation_fails_closed() {
         let c = candidate(
             "uncertainty-evaluation-scope",
