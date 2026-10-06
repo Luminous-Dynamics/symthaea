@@ -715,10 +715,7 @@ fn build_observation_from_properties(
 
     let definition_identity =
         NixSystemdUnitDefinitionIdentityV1::new(fragment_path, drop_in_paths)
-            .map_err(|error| NixSystemdObserverErrorV1::InvalidPropertyValue {
-                interface: SYSTEMD_UNIT_INTERFACE,
-                property: Box::leak(error.to_string().into_boxed_str()),
-            })?;
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
 
     if let Some(ref job) = job {
         let expected_job_type = NixSystemdJobTypeV1::for_operation(operation);
