@@ -1509,7 +1509,7 @@ mod tests {
                 &format!("sha256:{}", "AB".repeat(32)),
             ),
             Err(SnapshotError::Malformed(message))
-                if message.contains("sha256:<64 hex characters>")
+                if message.contains("sha256:<64 lowercase hex characters>")
         ));
     }
 
