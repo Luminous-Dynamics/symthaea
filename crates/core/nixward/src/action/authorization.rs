@@ -449,6 +449,9 @@ impl NixExecutionAuthorizationRecordV1 {
 pub struct NixLocalExecutionAuthorityV1 {
     intent: NixActionIntentV1,
     approval: ConsumedLocalApprovalDecisionV1,
+    /// Exact observer-sealed definition commitment used when this Service authority was promoted.
+    /// `None` for non-Service authorities.
+    service_definition_content_digest: Option<String>,
 }
 
 impl NixLocalExecutionAuthorityV1 {
@@ -471,7 +474,39 @@ impl NixLocalExecutionAuthorityV1 {
             return Err(NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture);
         }
         service_effect_context_digest_for_intent(&intent)?;
-        Ok(Self { intent, approval })
+        Ok(Self {
+            intent,
+            approval,
+            service_definition_content_digest: None,
+        })
+    }
+
+    /// Promote a consumed Service approval only after an observer-sealed definition-content capture.
+    ///
+    /// The content token is not caller-fabricable; it can only be obtained from the
+    /// read-only observer boundary. When an intent already carries a service-effect
+    /// context, this constructor additionally requires the sealed capture to match
+    /// both its source-identity and content commitments.
+    pub fn from_consumed_local_approval_with_definition_capture(
+        intent: NixActionIntentV1,
+        approval: ConsumedLocalApprovalDecisionV1,
+        content: &NixVerifiedServiceDefinitionContentV1,
+    ) -> Result<Self, NixAuthorizationErrorV1> {
+        if approval.decision_kind() != LocalApprovalDecisionKindV1::Approved {
+            return Err(NixAuthorizationErrorV1::NotApproved);
+        }
+        let digest = intent.digest()?;
+        if approval.decision_evidence().action_intent_digest != digest {
+            return Err(NixAuthorizationErrorV1::IntentMismatch);
+        }
+
+        let content_digest = validate_service_definition_capture_binding(&intent, content)?;
+        service_effect_context_digest_for_intent(&intent)?;
+        Ok(Self {
+            intent,
+            approval,
+            service_definition_content_digest: Some(content_digest),
+        })
     }
 
     /// Validate that the execution command is exactly the action that was approved.
@@ -504,6 +539,14 @@ impl NixLocalExecutionAuthorityV1 {
 
     pub(crate) fn projection_digest(&self) -> &str {
         self.approval.projection_digest()
+    }
+
+    /// Exact content commitment captured before Service authority promotion.
+    ///
+    /// This is deliberately metadata-only; the raw service definition bytes never
+    /// become part of the live authority object.
+    pub(crate) fn service_definition_content_digest(&self) -> Option<&str> {
+        self.service_definition_content_digest.as_deref()
     }
 }
 
@@ -784,6 +827,35 @@ fn validate_service_definition_capture(
         return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
     }
     Ok(())
+}
+
+fn validate_service_definition_capture_binding(
+    intent: &NixActionIntentV1,
+    content: &NixVerifiedServiceDefinitionContentV1,
+) -> Result<String, NixAuthorizationErrorV1> {
+    let NixActionDescriptorV1::Service { unit, .. } = &intent.action else {
+        return Err(NixAuthorizationErrorV1::UnexpectedServiceEffectContext);
+    };
+
+    let evidence = content.as_ref();
+    if evidence.unit != *unit {
+        return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
+    }
+
+    let content_digest = content
+        .digest()
+        .map_err(NixAuthorizationErrorV1::InvalidServiceEffectContext)?;
+
+    if let Some(context) = intent.service_effect_context() {
+        if context.unit != *unit
+            || context.authorized_definition_digest != evidence.source_identity_digest
+            || context.authorized_definition_content_digest != content_digest
+        {
+            return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
+        }
+    }
+
+    Ok(content_digest)
 }
 
 fn service_effect_context_digest_for_intent(
