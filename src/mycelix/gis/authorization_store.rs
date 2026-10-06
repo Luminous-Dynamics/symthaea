@@ -13331,6 +13331,24 @@ mod tests {
             .unwrap();
         assert_eq!(counts, (1, 1));
 
+        let lease_states: (String, String) = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT
+                    (SELECT state FROM authorization_leases
+                     WHERE authorization_instance='concurrent-native-a'),
+                    (SELECT state FROM authorization_leases
+                     WHERE authorization_instance='concurrent-native-b')",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert!(
+            (lease_states.0 == "dispatch_pending" && lease_states.1 == "prepared")
+                || (lease_states.0 == "prepared" && lease_states.1 == "dispatch_pending")
+        );
+
         let _ = std::fs::remove_file(path);
     }
 
