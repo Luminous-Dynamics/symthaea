@@ -231,6 +231,17 @@ jobs:
               + b"\x58\x40" + (b"\x00" * 64)
           )
 
+          receipt_payload_chunk_limit = (
+              b"\xd2\x84"
+              + b"\x47\xa2\x01\x26\x19\x01\x8b\x01"
+              + b"\xa1\x19\x01\x8c\xa1\x20\x81\x58\x26" + proof
+              + b"\x5f"
+              + (b"\x40" * 4097)
+              + b"\xff"
+              + b"\x58\x40"
+              + (b"\x00" * 64)
+          )
+
           outer_label_257 = (
               b"\xd2\x84"
               + b"\x59\x01\x06\xa1\x79\x01\x01" + (b"x" * 257) + b"\x00"
@@ -306,6 +317,8 @@ jobs:
               "fuzz_cose_key_es256/seed-label-257.cbor": key_label_257,
               "fuzz_cose_key_es256/seed-x-33.cbor": key_x_33,
               "fuzz_rfc9942_receipt/seed-attached-payload-33.cbor": receipt_payload_33,
+              "fuzz_rfc9942_receipt/seed-payload-4097-chunks.cbor":
+                  receipt_payload_chunk_limit,
               "fuzz_rfc9942_signature_with_receipts/seed-label-257.cbor": outer_label_257,
               "fuzz_rfc9942_proofs/seed-65-proof-vdp.cbor": vdp_65,
               "fuzz_rfc9942_proofs/seed-257-proof-vdp.cbor": vdp_257,
