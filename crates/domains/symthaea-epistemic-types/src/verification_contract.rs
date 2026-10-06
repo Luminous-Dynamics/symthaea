@@ -866,21 +866,13 @@ impl VerificationMethodResolution {
         resolved_verification_method_controller
             .validate_structure()
             .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
-        let resolved_controller = Url::parse(resolved_verification_method_controller.as_str())
+        Url::parse(resolved_verification_method_controller.as_str())
             .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
-        if resolved_controller.as_str() != controller_document_ref {
-            return Err(VerificationFailure::ControllerMismatch {
-                expected: ClaimControllerIdentity::new(controller_document_ref.clone())
-                    .expect("validated controller document URL"),
-                actual: resolved_verification_method_controller,
-            });
-        }
 
-        if request.expected_controller.as_str() != controller_document_ref {
+        if resolved_verification_method_controller != request.expected_controller {
             return Err(VerificationFailure::ControllerMismatch {
                 expected: request.expected_controller.clone(),
-                actual: ClaimControllerIdentity::new(controller_document_ref.clone())
-                    .expect("validated controller document URL"),
+                actual: resolved_verification_method_controller,
             });
         }
 
@@ -999,16 +991,8 @@ impl VerificationMethodResolution {
             });
         }
 
-        let resolved_controller =
-            Url::parse(self.resolved_verification_method_controller.as_str())
-                .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
-        if resolved_controller.as_str() != self.controller_document_ref {
-            return Err(VerificationFailure::ControllerMismatch {
-                expected: ClaimControllerIdentity::new(self.controller_document_ref.clone())
-                    .expect("validated controller document URL"),
-                actual: self.resolved_verification_method_controller.clone(),
-            });
-        }
+        Url::parse(self.resolved_verification_method_controller.as_str())
+            .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
 
         self.verification_relationship.validate_structure()?;
         let mut canonical_methods = self.relationship_methods.clone();
@@ -2051,6 +2035,51 @@ mod tests {
             ClaimControllerDocumentIdentity::new("not-a-url"),
             Err(VerificationFailure::InvalidControllerDocumentId)
         ));
+    }
+
+    #[test]
+    fn resolution_accepts_verification_method_controller_distinct_from_document() {
+        let claim = fixture_claim();
+        let mut request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://key-controller.example").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        request.controller_document_network_policy =
+            ControllerDocumentNetworkPolicy::strict_for_url(
+                request.verification_method.as_str()
+            )
+            .unwrap();
+
+        let resolution = VerificationMethodResolution::from_controller_document(
+            &request,
+            "https://example.test/controller",
+            ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
+            request.verification_method.clone(),
+            "Multikey",
+            &"44".repeat(32),
+            ClaimControllerIdentity::new("https://key-controller.example").unwrap(),
+            &[request.verification_method.clone()],
+            &"11".repeat(32),
+            VerificationMethodLifecycle::new(None, None).unwrap(),
+            ControllerDocumentSnapshotScope::historical_at(
+                request.freshness.lifecycle_reference_time(),
+                "snapshot:verification-history",
+                request.freshness.verification_time.as_str(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            resolution.resolved_verification_method_controller.as_str(),
+            "https://key-controller.example"
+        );
+        assert!(resolution.validate_structure().is_err());
     }
 
     #[test]
