@@ -13,7 +13,8 @@
 
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
-use std::io::Read;
+use std::io::{Read, Write};
+use std::os::unix::fs::OpenOptionsExt;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::net::TcpListener;
@@ -2769,7 +2770,27 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     // Write the secret through the filesystem API instead of
                     // embedding it in a shell command. This keeps the password
                     // out of the relay child-process argument list.
-                    if let Err(error) = tokio::fs::write(&pw_file, client_msg.user_password.as_bytes()).await {
+                    // Create with mode 0600 from the beginning so the secret is
+                    // never briefly exposed under a permissive umask.
+                    let mut pw_file_handle = match std::fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .mode(0o600)
+                        .open(&pw_file)
+                    {
+                        Ok(file) => file,
+                        Err(error) => {
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    RelayMessage::error(&format!("Failed to stage password: {}", error)).to_json(),
+                                ))
+                                .await;
+                            continue;
+                        }
+                    };
+                    if let Err(error) = pw_file_handle.write_all(client_msg.user_password.as_bytes()) {
+                        drop(pw_file_handle);
+                        let _ = tokio::fs::remove_file(&pw_file).await;
                         let _ = ws_tx
                             .send(Message::Text(
                                 RelayMessage::error(&format!("Failed to stage password: {}", error)).to_json(),
@@ -2777,15 +2798,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                             .await;
                         continue;
                     }
-                    if let Err(error) = run_cmd(&format!("chmod 600 {}", pw_file)).await {
-                        let _ = tokio::fs::remove_file(&pw_file).await;
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::error(&format!("Failed to protect staged password: {}", error)).to_json(),
-                            ))
-                            .await;
-                        continue;
-                    }
+                    drop(pw_file_handle);
                     let username = if client_msg.username.is_empty() {
                         "user"
                     } else {
@@ -2794,13 +2807,20 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     let pw_script = format!(
                         r#"
 # ── Set User Password ──
+# Always remove the staged credential, including on an earlier install failure.
+trap 'rm -f {pw_file}' EXIT
 echo "STAGE: Setting user password..."
-if [ -f {pw_file} ]; then
-    PW=$(cat {pw_file})
-    echo "{username}:$PW" | chroot /mnt chpasswd 2>/dev/null || true
-    rm -f {pw_file}
-    echo "  User password set."
+if [ ! -f {pw_file} ]; then
+    echo "ERROR: staged user password is missing."
+    exit 1
 fi
+PW=$(cat {pw_file})
+if ! echo "{username}:$PW" | chroot /mnt chpasswd 2>/dev/null; then
+    echo "ERROR: failed to set the requested user password."
+    exit 1
+fi
+rm -f {pw_file}
+echo "  User password set."
 "#,
                         pw_file = pw_file,
                         username = username
