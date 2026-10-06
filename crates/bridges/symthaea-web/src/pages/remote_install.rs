@@ -45,6 +45,20 @@ fn action_requires_request_id(action: &str) -> bool {
     )
 }
 
+fn durable_transaction_outcome(msg: &serde_json::Value) -> Option<&str> {
+    match msg
+        .get("transaction")
+        .and_then(|transaction| transaction.get("outcome"))
+        .and_then(serde_json::Value::as_str)
+    {
+        Some("observed_success") | Some("failed") | Some("indeterminate") => msg
+            .get("transaction")
+            .and_then(|transaction| transaction.get("outcome"))
+            .and_then(serde_json::Value::as_str),
+        _ => None,
+    }
+}
+
 
 // ═══════════════════════════════════════════════════════
 // Storage helpers — localStorage for non-sensitive data,
@@ -1132,32 +1146,57 @@ pub fn RemoteInstallPanel(
                     }
 
                     "exit" => {
-                        let code = typed.as_ref().and_then(|t| t.code).unwrap_or(-1);
-                        if code == 0 {
-                            relay_state.set(RelayState::Complete);
-                            progress.set(InstallProgress {
-                                stage: "Complete".into(),
-                                percentage: 100,
-                                phase: "FirstBreath".into(),
-                                message: "NixOS installed successfully!".into(),
-                            });
-                            set_install_log.update(|l| {
-                                l.push("Installation complete! Reboot to start NixOS.".into())
-                            });
-                            // Clear in-progress flag (Phase 4.3)
-                            remove_from_storage("si_install_in_progress");
-                             remove_from_storage("si_install_request_id");
-                            previous_install_in_progress.set(false);
-                        } else {
-                            relay_state.set(RelayState::Failed(format!(
-                                "Install exited with code {code}"
-                            )));
-                            set_install_log.update(|l| {
-                                l.push(format!("Installation failed (exit code {code})"))
-                            });
-                            remove_from_storage("si_install_in_progress");
-                             remove_from_storage("si_install_request_id");
-                            previous_install_in_progress.set(false);
+                        match durable_transaction_outcome(&msg) {
+                            Some("observed_success") => {
+                                relay_state.set(RelayState::Complete);
+                                progress.set(InstallProgress {
+                                    stage: "Complete".into(),
+                                    percentage: 100,
+                                    phase: "FirstBreath".into(),
+                                    message: "NixOS installed successfully!".into(),
+                                });
+                                set_install_log.update(|l| {
+                                    l.push("Installation complete! Reboot to start NixOS.".into())
+                                });
+                                remove_from_storage("si_install_in_progress");
+                                remove_from_storage("si_install_request_id");
+                                previous_install_in_progress.set(false);
+                            }
+                            Some("failed") => {
+                                let code = typed.as_ref().and_then(|t| t.code);
+                                relay_state.set(RelayState::Failed(match code {
+                                    Some(code) => format!("Install failed (durably recorded, exit code {code})"),
+                                    None => "Install failed (durably recorded).".into(),
+                                }));
+                                set_install_log.update(|l| {
+                                    l.push(match code {
+                                        Some(code) => format!("Installation failed (durably recorded, exit code {code})"),
+                                        None => "Installation failed (durably recorded).".into(),
+                                    })
+                                });
+                                remove_from_storage("si_install_in_progress");
+                                remove_from_storage("si_install_request_id");
+                                previous_install_in_progress.set(false);
+                            }
+                            Some("indeterminate") | None => {
+                                relay_state.set(RelayState::Failed(
+                                    "Install completion is uncertain; no new execution was authorized.".into(),
+                                ));
+                                set_install_log.update(|l| {
+                                    l.push("Install outcome is uncertain; request identity was retained for recovery.".into())
+                                });
+                                // Deliberately retain both persistence keys. A missing
+                                // durable terminal receipt must not become permission
+                                // to issue a fresh request for the same effect.
+                            }
+                            Some(_) => {
+                                relay_state.set(RelayState::Failed(
+                                    "Relay returned an unknown transaction outcome; treating install as uncertain.".into(),
+                                ));
+                                set_install_log.update(|l| {
+                                    l.push("Unknown transaction outcome; request identity was retained for recovery.".into())
+                                });
+                            }
                         }
                         persist_log_force();
                     }
