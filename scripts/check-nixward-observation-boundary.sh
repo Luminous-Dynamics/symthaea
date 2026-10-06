@@ -31,6 +31,8 @@ AUTHORITY_FILES=(
   crates/core/nixward/src/action/local_approval_store.rs
   crates/core/nixward/src/action/local_approval_submission.rs
   crates/core/nixward/src/action/service_domain.rs
+  crates/core/nixward/src/action/service_effect.rs
+  crates/core/nixward/src/action/service_effect_admission.rs
   crates/core/nixward/src/action/service_state.rs
   crates/core/nixward/src/action/systemd_definition.rs
   crates/core/nixward/src/action/systemd_observer.rs

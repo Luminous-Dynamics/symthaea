@@ -195,6 +195,8 @@ pub struct NixServicePostStateExpectationV1 {
     pub authorized_generation: u64,
     /// Exact systemd unit-definition source identity captured before execution.
     pub authorized_definition_digest: String,
+    /// Digest of the observer-produced definition-content commitment.
+    pub authorized_definition_content_digest: String,
     /// Restart proof requires both pre- and post-invocation identities.
     pub pre_invocation_id: Option<String>,
     /// Zero disables stability as a claim requirement. Non-zero requires a
@@ -210,6 +212,10 @@ impl NixServicePostStateExpectationV1 {
             return Err(NixPostStateErrorV1::InvalidGeneration);
         }
         validate_digest(&self.authorized_definition_digest, "authorized definition digest")?;
+        validate_digest(
+            &self.authorized_definition_content_digest,
+            "authorized definition content digest",
+        )?;
         validate_optional_invocation_id(self.pre_invocation_id.as_deref(), "pre-invocation id")?;
         Ok(())
     }
@@ -221,6 +227,7 @@ impl NixServicePostStateExpectationV1 {
             &self.unit,
             self.authorized_generation,
             &self.authorized_definition_digest,
+            &self.authorized_definition_content_digest,
             self.pre_invocation_id.as_deref(),
             self.required_stability_us,
         ))
@@ -518,6 +525,8 @@ pub struct NixPostStateReceiptV1 {
     /// Exact systemd FragmentPath + DropInPaths identity from the observed unit.
     pub observed_definition_identity: NixSystemdUnitDefinitionIdentityV1,
     pub observed_definition_digest: String,
+    /// Observer-produced definition-content commitment bound to the effect.
+    pub observed_definition_content_digest: String,
     pub operation: NixServiceOperationKindV1,
     pub systemd_job_id: Option<u32>,
     pub systemd_job_type: Option<NixSystemdJobTypeV1>,
@@ -667,6 +676,8 @@ impl NixPostStateReceiptV1 {
             authorized_definition_digest: expectation.authorized_definition_digest.clone(),
             observed_definition_identity: observation.definition_identity.clone(),
             observed_definition_digest,
+            observed_definition_content_digest:
+                expectation.authorized_definition_content_digest.clone(),
             operation: expectation.operation,
             systemd_job_id,
             systemd_job_type,
@@ -741,6 +752,8 @@ impl NixPostStateReceiptV1 {
             unit: self.target_unit.clone(),
             authorized_generation: self.authorized_generation,
             authorized_definition_digest: self.authorized_definition_digest.clone(),
+            authorized_definition_content_digest:
+                self.authorized_definition_content_digest.clone(),
             pre_invocation_id: self.pre_invocation_id.clone(),
             required_stability_us: self.required_stability_us,
         };
@@ -849,6 +862,7 @@ impl NixPostStateReceiptV1 {
             &self.target_unit,
             self.authorized_generation,
             &self.authorized_definition_digest,
+            &self.authorized_definition_content_digest,
             self.pre_invocation_id.as_deref(),
             self.required_stability_us,
         );
@@ -871,6 +885,19 @@ impl NixPostStateReceiptV1 {
             || self.authorized_definition_digest != self.observed_definition_digest
         {
             return Err(NixPostStateErrorV1::DefinitionMismatch);
+        }
+        validate_digest(
+            &self.authorized_definition_content_digest,
+            "authorized definition content digest",
+        )?;
+        validate_digest(
+            &self.observed_definition_content_digest,
+            "observed definition content digest",
+        )?;
+        if self.authorized_definition_content_digest
+            != self.observed_definition_content_digest
+        {
+            return Err(NixPostStateErrorV1::DefinitionContentMismatch);
         }
         if self.authorized_generation != self.observed_generation {
             return Err(NixPostStateErrorV1::GenerationMismatch);
@@ -1013,6 +1040,7 @@ impl NixPostStateReceiptV1 {
         put_str(&mut h, &self.observed_definition_digest);
         put_str(&mut h, &self.observed_definition_identity.fragment_path);
         put_str_vec(&mut h, &self.observed_definition_identity.drop_in_paths);
+        put_str(&mut h, &self.observed_definition_content_digest);
         put_u8(&mut h, operation_tag(self.operation));
         put_opt_u32(&mut h, self.systemd_job_id);
         match self.systemd_job_type {
@@ -1082,6 +1110,11 @@ fn validate_expectation_against_intent(
     }
     if context.authorized_definition_digest != expectation.authorized_definition_digest {
         return Err(NixPostStateErrorV1::DefinitionMismatch);
+    }
+    if context.authorized_definition_content_digest
+        != expectation.authorized_definition_content_digest
+    {
+        return Err(NixPostStateErrorV1::DefinitionContentMismatch);
     }
     if context.pre_invocation_id != expectation.pre_invocation_id {
         return Err(NixPostStateErrorV1::InvocationMismatch);
@@ -1204,6 +1237,7 @@ fn service_effect_digest(
     unit: &str,
     authorized_generation: u64,
     authorized_definition_digest: &str,
+    authorized_definition_content_digest: &str,
     pre_invocation_id: Option<&str>,
     required_stability_us: u64,
 ) -> String {
@@ -1213,6 +1247,7 @@ fn service_effect_digest(
     put_str(&mut h, unit);
     put_u64(&mut h, authorized_generation);
     put_str(&mut h, authorized_definition_digest);
+    put_str(&mut h, authorized_definition_content_digest);
     put_opt_str(&mut h, pre_invocation_id);
     put_u64(&mut h, required_stability_us);
     h.finalize().to_hex().to_string()
@@ -1502,6 +1537,8 @@ pub enum NixPostStateErrorV1 {
     GenerationMismatch,
     #[error("observed systemd unit-definition identity does not match authorization")]
     DefinitionMismatch,
+    #[error("definition-content commitment does not match authorization")]
+    DefinitionContentMismatch,
     #[error("systemd manager incarnation is missing")]
     MissingManagerOwner,
     #[error("systemd manager incarnation does not match the observation/job binding")]
@@ -1564,6 +1601,8 @@ mod tests {
             unit: "nginx.service".to_string(),
             authorized_generation: 42,
             authorized_definition_digest: definition().digest("nginx.service").unwrap(),
+            authorized_definition_content_digest:
+                "4444444444444444444444444444444444444444444444444444444444444444".to_string(),
             pre_invocation_id: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string()),
             required_stability_us: 0,
         }
@@ -1597,6 +1636,7 @@ mod tests {
                     generation,
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     definition_digest,
+                    "4444444444444444444444444444444444444444444444444444444444444444",
                     pre_invocation_id,
                     required_stability_us,
                 )
@@ -1658,6 +1698,7 @@ mod tests {
                     exp.authorized_generation,
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     exp.authorized_definition_digest.clone(),
+                    exp.authorized_definition_content_digest.clone(),
                     exp.pre_invocation_id.clone(),
                     exp.required_stability_us,
                 )
@@ -2618,6 +2659,7 @@ mod tests {
             &tampered.target_unit,
             tampered.authorized_generation,
             &tampered.authorized_definition_digest,
+            &tampered.authorized_definition_content_digest,
             tampered.pre_invocation_id.as_deref(),
             tampered.required_stability_us,
         );
