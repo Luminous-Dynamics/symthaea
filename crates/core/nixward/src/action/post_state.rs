@@ -622,7 +622,6 @@ impl NixPostStateReceiptV1 {
             systemd_job_unit,
             systemd_job_object_path,
             systemd_job_result,
-            systemd_manager_owner,
         ) = match &observation.systemd_job {
             Some(job) => (
                 Some(job.id),
@@ -630,9 +629,8 @@ impl NixPostStateReceiptV1 {
                 Some(job.unit.clone()),
                 Some(job.object_path.clone()),
                 Some(job.result.clone()),
-                Some(job.manager_owner.clone()),
             ),
-            None => (None, None, None, None, None, None),
+            None => (None, None, None, None, None),
         };
 
         let stability = stability.map(|value| value.as_ref().clone());
