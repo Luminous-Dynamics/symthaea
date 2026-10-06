@@ -1345,6 +1345,11 @@ pub enum PredictionNullFamily {
 
 /// Empirical null calibration for held-out relational prediction.
 ///
+/// The convenience constructor targets RelationalAugmented, matching the
+/// qualification protocol's critical nested comparison. Use
+/// compute_for_feature_set when a different feature family is explicitly
+/// intended.
+///
 /// The exceedance fraction is the fraction of surrogates whose relational model
 /// MSE is no worse than the observed relational model MSE. It is deliberately
 /// not named or exposed as a formal p-value.
@@ -1381,7 +1386,7 @@ impl PredictionNullSummary {
             samples,
             config,
             family,
-            PredictionFeatureSet::RelationalProfile,
+            PredictionFeatureSet::RelationalAugmented,
             surrogate_count,
         )
     }
@@ -3112,6 +3117,22 @@ mod tests {
         first.circular_shift_null.validate_trace().unwrap();
         first.feature_decoupling_null.validate_trace().unwrap();
         first.incremental_relational_null.validate_trace().unwrap();
+    }
+
+    #[test]
+    fn null_convenience_constructor_uses_qualification_feature_family() {
+        let summary = PredictionNullSummary::compute(
+            &build_samples(0.5),
+            config(),
+            PredictionNullFamily::CircularShift,
+            12,
+        )
+        .unwrap();
+
+        assert_eq!(
+            summary.feature_set,
+            PredictionFeatureSet::RelationalAugmented
+        );
     }
 
     #[test]
