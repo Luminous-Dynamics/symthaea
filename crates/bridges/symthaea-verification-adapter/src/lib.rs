@@ -1425,6 +1425,49 @@ mod tests {
     }
 
     #[test]
+    fn standard_jwk_material_projection_uses_only_required_members() {
+        let cases = [
+            (
+                serde_json::json!({
+                    "kty": "EC",
+                    "crv": "P-256",
+                    "x": "x",
+                    "y": "y",
+                    "kid": "metadata",
+                    "alg": "ES256"
+                }),
+                vec!["crv", "kty", "x", "y"],
+            ),
+            (
+                serde_json::json!({
+                    "kty": "OKP",
+                    "crv": "Ed25519",
+                    "x": "x",
+                    "kid": "metadata",
+                    "alg": "EdDSA"
+                }),
+                vec!["crv", "kty", "x"],
+            ),
+            (
+                serde_json::json!({
+                    "kty": "RSA",
+                    "n": "n",
+                    "e": "e",
+                    "kid": "metadata",
+                    "alg": "RS256"
+                }),
+                vec!["e", "kty", "n"],
+            ),
+        ];
+
+        for (jwk, expected_keys) in cases {
+            let projection = canonical_public_jwk_material(jwk.as_object().unwrap()).unwrap();
+            let actual_keys: Vec<&str> = projection.keys().map(String::as_str).collect();
+            assert_eq!(actual_keys, expected_keys);
+        }
+    }
+
+    #[test]
     fn jwk_material_digest_is_independent_of_json_member_order() {
         let first: Value = serde_json::from_str(
             r##"{"kty":"OKP","crv":"Ed25519","x":"VCpo2LMLhn6iWku8MKvSLg2ZAoC-nlOyPVQaO3FxVeQ","kid":"one"}"##
