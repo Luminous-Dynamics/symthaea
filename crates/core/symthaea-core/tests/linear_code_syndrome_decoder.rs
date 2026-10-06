@@ -675,6 +675,24 @@ fn error_words_up_to_weight(dimension: usize, max_weight: usize) -> Vec<BinaryCo
 
 // Independent test oracle: derive H as a nullspace basis using u64 row operations.
 // This intentionally does not call ParityCheckMatrix::from_code.
+fn independently_enumerated_codewords(code: &RandomLinearCode) -> Vec<BinaryCodeword> {
+    let basis = code.basis();
+    let combinations = 1usize << basis.len();
+    let mut words = Vec::with_capacity(combinations);
+
+    for mask in 0..combinations {
+        let mut word = BinaryCodeword::zero(code.dimension());
+        for (index, basis_word) in basis.iter().enumerate() {
+            if ((mask >> index) & 1) == 1 {
+                word.xor_assign(basis_word);
+            }
+        }
+        words.push(word);
+    }
+
+    words
+}
+
 fn independent_parity_check_rows(code: &RandomLinearCode) -> Vec<u64> {
     let dimension = code.dimension();
     assert!(dimension <= 64);
@@ -779,7 +797,26 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
             for seed_offset in 0..trials {
                 let seed = seed_base + seed_offset;
                 let code = RandomLinearCode::generate(dimension, rank, seed);
-                let codewords = code.enumerate();
+                let production_codewords = code.enumerate();
+                let codewords = independently_enumerated_codewords(&code);
+
+                let mut production_masks = production_codewords
+                    .iter()
+                    .map(|word| word.words()[0])
+                    .collect::<Vec<_>>();
+                let mut independent_masks = codewords
+                    .iter()
+                    .map(|word| word.words()[0])
+                    .collect::<Vec<_>>();
+                production_masks.sort_unstable();
+                independent_masks.sort_unstable();
+                assert_eq!(
+                    production_masks,
+                    independent_masks,
+                    "production codeword enumeration diverged from independent basis reconstruction: regime={dimension}x{rank} seed=0x{seed:X}"
+                );
+
+                assert_eq!(codewords.len(), 1usize << rank);
                 let min_distance = codewords
                     .iter()
                     .filter(|word| word.weight() > 0)
