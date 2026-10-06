@@ -34,8 +34,12 @@ pub struct NixSystemdUnitDefinitionContentFileV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixSystemdUnitDefinitionContentEvidenceV1 {
     pub unit: String,
-    /// CROSS-067 source identity commitment. Content is intentionally separate.
-    pub source_identity_digest: String,
+    /// Exact CROSS-067 source identity observed from systemd.
+    pub definition_identity: NixSystemdUnitDefinitionIdentityV1,
+    /// Unique D-Bus owner of systemd for this observation epoch.
+    pub manager_owner: String,
+    /// Exact systemd Unit object path resolved for this capture.
+    pub unit_object_path: String,
     pub files: Vec<NixSystemdUnitDefinitionContentFileV1>,
     pub captured_at_monotonic_us: u64,
 }
@@ -69,7 +73,14 @@ impl NixSystemdUnitDefinitionContentEvidenceV1 {
         if self.files.is_empty() || self.files.len() > MAX_DEFINITION_FILES {
             return Err(NixServiceEffectContextErrorV1::InvalidDefinitionFileSet);
         }
-        validate_digest(&self.source_identity_digest, "source identity digest")?;
+        self.definition_identity.validate_shape()?;
+        validate_unique_manager_owner(&self.manager_owner)?;
+        if self.unit_object_path.is_empty()
+            || self.unit_object_path.len() > MAX_STRING_BYTES
+            || !self.unit_object_path.starts_with("/org/freedesktop/systemd1/unit/")
+        {
+            return Err(NixServiceEffectContextErrorV1::InvalidDefinitionFilePath);
+        }
         let mut seen = std::collections::BTreeSet::new();
         for file in &self.files {
             if file.path.is_empty() || file.path.len() > MAX_STRING_BYTES || !file.path.starts_with('/') {
@@ -94,7 +105,9 @@ impl NixSystemdUnitDefinitionContentEvidenceV1 {
         let mut h = Hasher::new();
         h.update(b"nixward-systemd-unit-definition-content-v1");
         put_str(&mut h, &self.unit);
-        put_str(&mut h, &self.source_identity_digest);
+        put_str(&mut h, &self.definition_identity.digest(&self.unit)?);
+        put_str(&mut h, &self.manager_owner);
+        put_str(&mut h, &self.unit_object_path);
         put_u64(&mut h, self.files.len() as u64);
         for file in &self.files {
             put_str(&mut h, &file.path);
@@ -320,7 +333,13 @@ mod tests {
     fn content_evidence() -> NixSystemdUnitDefinitionContentEvidenceV1 {
         NixSystemdUnitDefinitionContentEvidenceV1 {
             unit: "nginx.service".into(),
-            source_identity_digest: "11".repeat(32),
+            definition_identity: NixSystemdUnitDefinitionIdentityV1::new(
+                "/nix/store/nginx.service",
+                vec!["/nix/store/nginx-dropin.conf".into()],
+            )
+            .unwrap(),
+            manager_owner: ":1.42".into(),
+            unit_object_path: "/org/freedesktop/systemd1/unit/nginx_2eservice".into(),
             files: vec![
                 NixSystemdUnitDefinitionContentFileV1 {
                     path: "/nix/store/nginx.service".into(),
@@ -403,6 +422,14 @@ mod tests {
         let mut changed = base;
         changed.files[1].path = "/nix/store/other.conf".into();
         assert_ne!(baseline, changed.digest().unwrap());
+
+        let mut changed = content_evidence();
+        changed.definition_identity.fragment_path = "/nix/store/other.service".into();
+        assert_ne!(baseline, changed.digest().unwrap());
+
+        let mut changed = content_evidence();
+        changed.manager_owner = ":1.43".into();
+        assert_ne!(baseline, changed.digest().unwrap());
     }
 
     #[test]
@@ -422,7 +449,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(context.authorized_definition_digest, evidence.source_identity_digest);
+        assert_eq!(
+            context.authorized_definition_digest,
+            evidence.definition_identity.digest(&evidence.unit).unwrap()
+        );
         assert_eq!(context.authorized_definition_content_digest, content_digest);
     }
 
