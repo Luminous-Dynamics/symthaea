@@ -120,9 +120,9 @@ This tests whether an apparent relational advantage depends on the channels work
 
 ### 5.3 IncrementalRelationalShift
 
-Synchrony and all non-relational context are held fixed while only the directional and turn-taking relational channels are shifted inside each train and test partition.
+Synchrony and all non-relational context are held fixed while only the directional and turn-taking relational channels are shifted inside each train and test partition. The three added channels are shifted together by the same non-zero circular offset, preserving their within-block temporal alignment while moving that entire incremental block away from its original placement.
 
-This is the targeted null for the critical RelationalAugmented vs NonRelationalContext comparison. It asks whether any incremental gain depends on the temporal organization of the added relational channels rather than merely on the presence of extra model capacity.
+This is the targeted null for the critical RelationalAugmented vs NonRelationalContext comparison. It asks whether any incremental gain depends on the temporal organization of the added relational block rather than merely on the presence of extra model capacity.
 
 All three null families retain their exact deterministic shift schedule, per-surrogate MSE vector, configuration, and input commitment. The trace is replayable against the supplied source samples. The in-memory qualification bundle additionally binds all three null traces to one top-level holdout configuration, the observed RelationalAugmented MSE, and their required interpretation statuses (observed = Measured, null = Proxy).
 
