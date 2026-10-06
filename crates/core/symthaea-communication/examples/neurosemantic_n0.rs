@@ -314,6 +314,21 @@ fn main() -> Result<(), String> {
         .is_ok();
     let lifecycle_chain_verified = lifecycle_applied.verify_transition(&lifecycle_base).is_ok()
         && lifecycle_receipt.verify_transition(&lifecycle_applied).is_ok();
+    let lifecycle_sequence_gap_blocked = {
+        let mut forged = lifecycle_receipt.clone();
+        forged.event_sequence = 4;
+        forged.verify_transition(&lifecycle_applied).is_err()
+    };
+    let lifecycle_state_regression_blocked = {
+        let mut forged = lifecycle_receipt.clone();
+        forged.state = NeurosemanticArtifactLifecycleState::Applied;
+        forged.verify_transition(&lifecycle_applied).is_err()
+    };
+    let lifecycle_timestamp_regression_blocked = {
+        let mut forged = lifecycle_receipt.clone();
+        forged.observed_at_unix_s = 1_589;
+        forged.verify_transition(&lifecycle_applied).is_err()
+    };
     let lifecycle_effect_evidence_mismatch_blocked = !lifecycle_receipt
         .verify_effect_evidence_bytes(b"synthetic-lifecycle-effect-tampered");
     let lifecycle_artifact_mismatch_blocked = lifecycle_receipt
@@ -768,6 +783,9 @@ fn main() -> Result<(), String> {
         "derivation_input_artifact_bounds_blocked": derivation_input_artifact_bounds_blocked,
         "lifecycle_receipt_binding_verified": lifecycle_receipt_binding_verified,
         "lifecycle_chain_verified": lifecycle_chain_verified,
+        "lifecycle_sequence_gap_blocked": lifecycle_sequence_gap_blocked,
+        "lifecycle_state_regression_blocked": lifecycle_state_regression_blocked,
+        "lifecycle_timestamp_regression_blocked": lifecycle_timestamp_regression_blocked,
         "lifecycle_replacement_lineage_verified": lifecycle_replacement_lineage_verified,
         "lifecycle_replacement_lineage_mismatch_blocked": lifecycle_replacement_lineage_mismatch_blocked,
         "lifecycle_effect_evidence_mismatch_blocked": lifecycle_effect_evidence_mismatch_blocked,
