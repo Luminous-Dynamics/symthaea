@@ -13802,10 +13802,19 @@ mod tests {
         // fence. A later attempt reusing the exact native authorization must
         // fail closed instead of being treated as first use.
         let replay_identity = first.native_replay_identity.clone();
-        store.connection().unwrap().execute(
-            "DELETE FROM authorization_native_replay_history WHERE native_replay_identity=?1",
-            params![replay_identity.as_str()],
-        ).unwrap();
+        let connection = store.connection().unwrap();
+        // Deliberately disable recursive triggers to simulate storage damage;
+        // ordinary application paths never get to bypass the append-only fence.
+        connection
+            .execute_batch("PRAGMA recursive_triggers=OFF;")
+            .unwrap();
+        connection
+            .execute(
+                "DELETE FROM authorization_native_replay_history
+                 WHERE native_replay_identity=?1",
+                params![replay_identity.as_str()],
+            )
+            .unwrap();
 
         let witness2 = ActionAuthorizationWitness {
             operation_id: Some("operation:admission-missing-native-history-2".into()),
