@@ -20,6 +20,9 @@ use super::authorization::{
     NixExecutionAuthorizationRecordV1,
 };
 use super::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
+use super::service_effect::{
+    NixSystemdUnitDefinitionContentFileV1, NixSystemdUnitDefinitionContentEvidenceV1,
+};
 use super::service_state::{
     ServiceActiveStateV1, ServiceLoadStateV1, ServiceUnitFileStateV1,
 };
@@ -244,6 +247,9 @@ pub struct NixServicePostStateObservationV1 {
     pub definition_identity: NixSystemdUnitDefinitionIdentityV1,
     /// Observer-sealed byte-level definition content commitment for this observation.
     pub definition_content_digest: String,
+    /// Compact manifest needed to independently recompute the content commitment.
+    /// Raw unit-file bytes are deliberately not retained.
+    pub definition_content_files: Vec<NixSystemdUnitDefinitionContentFileV1>,
     pub load_state: ServiceLoadStateV1,
     pub active_state: ServiceActiveStateV1,
     pub sub_state: String,
@@ -274,6 +280,17 @@ impl NixServicePostStateObservationV1 {
             &self.definition_content_digest,
             "observed definition content digest",
         )?;
+        let content_evidence = NixSystemdUnitDefinitionContentEvidenceV1 {
+            unit: self.unit.clone(),
+            source_identity_digest: self.definition_identity.digest(&self.unit)?,
+            files: self.definition_content_files.clone(),
+            captured_at_monotonic_us: self.observed_at_monotonic_us,
+        };
+        if content_evidence.digest().map_err(|_| NixPostStateErrorV1::DefinitionMismatch)?
+            != self.definition_content_digest
+        {
+            return Err(NixPostStateErrorV1::DefinitionMismatch);
+        }
         if let Some(owner) = self.systemd_manager_owner.as_deref() {
             validate_unique_manager_owner(owner)?;
         }
@@ -543,6 +560,8 @@ pub struct NixPostStateReceiptV1 {
     pub observed_definition_digest: String,
     /// Observer-sealed byte-level definition content commitment at post-state observation.
     pub observed_definition_content_digest: String,
+    /// Compact observed content manifest for independent receipt recomputation.
+    pub observed_definition_content_files: Vec<NixSystemdUnitDefinitionContentFileV1>,
     pub operation: NixServiceOperationKindV1,
     pub systemd_job_id: Option<u32>,
     pub systemd_job_type: Option<NixSystemdJobTypeV1>,
@@ -697,6 +716,7 @@ impl NixPostStateReceiptV1 {
             observed_definition_identity: observation.definition_identity.clone(),
             observed_definition_digest,
             observed_definition_content_digest: observation.definition_content_digest.clone(),
+            observed_definition_content_files: observation.definition_content_files.clone(),
             operation: expectation.operation,
             systemd_job_id,
             systemd_job_type,
@@ -904,6 +924,19 @@ impl NixPostStateReceiptV1 {
             "observed definition content digest",
         )?;
         self.observed_definition_identity.validate_shape()?;
+        let receipt_content_evidence = NixSystemdUnitDefinitionContentEvidenceV1 {
+            unit: self.target_unit.clone(),
+            source_identity_digest: self.observed_definition_digest.clone(),
+            files: self.observed_definition_content_files.clone(),
+            captured_at_monotonic_us: self.observed_at_monotonic_us,
+        };
+        if receipt_content_evidence
+            .digest()
+            .map_err(|_| NixPostStateErrorV1::DefinitionMismatch)?
+            != self.observed_definition_content_digest
+        {
+            return Err(NixPostStateErrorV1::DefinitionMismatch);
+        }
         let recomputed_definition_digest = self
             .observed_definition_identity
             .digest(&self.target_unit)?;
@@ -1055,6 +1088,13 @@ impl NixPostStateReceiptV1 {
         put_str(&mut h, &self.authorized_definition_content_digest);
         put_str(&mut h, &self.observed_definition_digest);
         put_str(&mut h, &self.observed_definition_content_digest);
+        put_u64(&mut h, self.observed_definition_content_files.len() as u64);
+        for file in &self.observed_definition_content_files {
+            put_str(&mut h, &file.path);
+            put_opt_str(&mut h, file.resolved_path.as_deref());
+            put_u64(&mut h, file.byte_len);
+            put_str(&mut h, &file.content_digest);
+        }
         put_str(&mut h, &self.observed_definition_identity.fragment_path);
         put_str_vec(&mut h, &self.observed_definition_identity.drop_in_paths);
         put_u8(&mut h, operation_tag(self.operation));
