@@ -96,4 +96,6 @@ jobs:
           path: |
             ${{ github.workspace }}/crates/bridges/symthaea-ui/webgpu-qualification.json
             ${{ github.workspace }}/crates/bridges/symthaea-ui/webgpu-qualification-screenshots/
-          if-no-files-found: error
+          if-no-files-found: warn
+          # The harness may fail before producing evidence (for example, node --check).
+          # Missing artifacts are therefore secondary to the authoritative step failure.
