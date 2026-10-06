@@ -254,9 +254,10 @@ async def main():
             raise AssertionError(f"/dev/vda missing from disk inventory: {names}")
         print("  [disks] ephemeral /dev/vda present")
 
+        install_request_id = uuid.uuid4().hex
         await ws.send(json.dumps({
             "action": "install",
-            "request_id": uuid.uuid4().hex,
+            "request_id": install_request_id,
             "layout": "single",
             "disk": "/dev/vda",
             "hostname": "e2e-test",
@@ -276,6 +277,28 @@ async def main():
                 if msg.get("code") != 0 or not complete:
                     raise AssertionError(f"install did not complete cleanly: {msg}")
                 break
+
+        # Replay the exact same request identity. The relay must return the
+        # stored terminal receipt without executing the destructive install again.
+        await ws.send(json.dumps({
+            "action": "install",
+            "request_id": install_request_id,
+            "layout": "single",
+            "disk": "/dev/vda",
+            "hostname": "e2e-test",
+            "timezone": "UTC",
+            "keyboard": "us",
+            "desktop": "none",
+            "gpu_driver": "auto",
+            "target_machine_digest": hw["target_machine_digest"],
+        }))
+        replay = await recv(ws, "transaction_replay", timeout=30)
+        receipt = replay.get("transaction", {})
+        if receipt.get("request_id") != install_request_id:
+            raise AssertionError(f"replay receipt lost request identity: {replay}")
+        if receipt.get("outcome") != "observed_success":
+            raise AssertionError(f"replay receipt is not the stored success: {replay}")
+        print("  [replay] identical install request was replayed without re-execution")
 
 asyncio.run(main())
 PYEOF
