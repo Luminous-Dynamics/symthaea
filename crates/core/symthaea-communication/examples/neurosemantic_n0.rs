@@ -267,8 +267,15 @@ fn main() -> Result<(), String> {
         .is_err();
 
     let lifecycle_effect_evidence = b"synthetic-lifecycle-effect-v1";
+    let lifecycle_verification_evidence = b"synthetic-independent-verification-v1";
+    let lifecycle_verification_scope = b"synthetic-target-set-v1:derived-artifact-only";
+    let lifecycle_verification_scope_ref = "synthetic-verification-scope-1";
     let derivation_ref = policy_provenance_binding.derivation_provenance_ref().to_string();
     let derivation_hash = policy_provenance_binding.derivation_provenance_hash().to_string();
+    let lifecycle_scope_hash = symthaea_communication::compute_lifecycle_verification_scope_hash(
+        lifecycle_verification_scope_ref,
+        lifecycle_verification_scope,
+    );
     let lifecycle_base = NeurosemanticArtifactLifecycleReceipt {
         schema_version: symthaea_communication::NEUROSEMANTIC_ARTIFACT_LIFECYCLE_RECEIPT_SCHEMA_VERSION,
         receipt_ref: "synthetic-lifecycle-receipt-1".into(),
@@ -279,28 +286,62 @@ fn main() -> Result<(), String> {
         previous_receipt_hash: None,
         action: NeurosemanticArtifactLifecycleAction::Erasure,
         state: NeurosemanticArtifactLifecycleState::Requested,
-        effect_evidence_ref: "synthetic-lifecycle-effect-1".into(),
-        effect_evidence_hash: symthaea_communication::content_hash(lifecycle_effect_evidence),
+        effect_evidence_ref: None,
+        effect_evidence_hash: None,
+        verification_agent_ref: None,
+        verification_evidence_ref: None,
+        verification_evidence_hash: None,
+        verification_target_effect_evidence_hash: None,
+        verification_scope: None,
+        verification_scope_ref: None,
+        verification_scope_hash: None,
         execution_revision: execution_revision.clone(),
         observed_at_unix_s: 1_580,
         resulting_artifact_hash: None,
         resulting_derivation_provenance_ref: None,
         resulting_derivation_provenance_hash: None,
     };
-    let lifecycle_applied = NeurosemanticArtifactLifecycleReceipt {
+    let lifecycle_accepted = NeurosemanticArtifactLifecycleReceipt {
         receipt_ref: "synthetic-lifecycle-receipt-2".into(),
         event_sequence: 1,
         previous_receipt_hash: Some(lifecycle_base.fingerprint()?),
-        state: NeurosemanticArtifactLifecycleState::Applied,
-        observed_at_unix_s: 1_590,
+        state: NeurosemanticArtifactLifecycleState::Accepted,
+        observed_at_unix_s: 1_581,
         ..lifecycle_base.clone()
     };
-    let lifecycle_receipt = NeurosemanticArtifactLifecycleReceipt {
+    let lifecycle_processing = NeurosemanticArtifactLifecycleReceipt {
         receipt_ref: "synthetic-lifecycle-receipt-3".into(),
         event_sequence: 2,
+        previous_receipt_hash: Some(lifecycle_accepted.fingerprint()?),
+        state: NeurosemanticArtifactLifecycleState::Processing,
+        observed_at_unix_s: 1_582,
+        ..lifecycle_accepted.clone()
+    };
+    let lifecycle_applied = NeurosemanticArtifactLifecycleReceipt {
+        receipt_ref: "synthetic-lifecycle-receipt-4".into(),
+        event_sequence: 3,
+        previous_receipt_hash: Some(lifecycle_processing.fingerprint()?),
+        state: NeurosemanticArtifactLifecycleState::Applied,
+        effect_evidence_ref: Some("synthetic-lifecycle-effect-1".into()),
+        effect_evidence_hash: Some(symthaea_communication::content_hash(lifecycle_effect_evidence)),
+        observed_at_unix_s: 1_583,
+        ..lifecycle_processing.clone()
+    };
+    let lifecycle_receipt = NeurosemanticArtifactLifecycleReceipt {
+        receipt_ref: "synthetic-lifecycle-receipt-5".into(),
+        event_sequence: 4,
         previous_receipt_hash: Some(lifecycle_applied.fingerprint()?),
-        state: NeurosemanticArtifactLifecycleState::Verified,
-        observed_at_unix_s: 1_600,
+        state: NeurosemanticArtifactLifecycleState::IndependentlyVerified,
+        verification_agent_ref: Some("synthetic-independent-verifier-1".into()),
+        verification_evidence_ref: Some("synthetic-independent-verification-1".into()),
+        verification_evidence_hash: Some(symthaea_communication::content_hash(lifecycle_verification_evidence)),
+        verification_target_effect_evidence_hash: lifecycle_applied.effect_evidence_hash.clone(),
+        verification_scope: Some(
+            symthaea_communication::NeurosemanticArtifactLifecycleVerificationScope::EnumeratedTargetSet,
+        ),
+        verification_scope_ref: Some(lifecycle_verification_scope_ref.into()),
+        verification_scope_hash: Some(lifecycle_scope_hash),
+        observed_at_unix_s: 1_584,
         ..lifecycle_applied.clone()
     };
     let lifecycle_receipt_binding_verified = lifecycle_receipt
@@ -312,11 +353,19 @@ fn main() -> Result<(), String> {
             1_700,
         )
         .is_ok();
-    let lifecycle_chain_verified = lifecycle_applied.verify_transition(&lifecycle_base).is_ok()
+    let lifecycle_independent_verification_verified = lifecycle_receipt
+        .verify_independent_verification_bytes(lifecycle_verification_evidence, 1_700)
+        .is_ok();
+    let lifecycle_verification_scope_verified = lifecycle_receipt
+        .verify_verification_scope_bytes(lifecycle_verification_scope)
+        .is_ok();
+    let lifecycle_chain_verified = lifecycle_accepted.verify_transition(&lifecycle_base).is_ok()
+        && lifecycle_processing.verify_transition(&lifecycle_accepted).is_ok()
+        && lifecycle_applied.verify_transition(&lifecycle_processing).is_ok()
         && lifecycle_receipt.verify_transition(&lifecycle_applied).is_ok();
     let lifecycle_sequence_gap_blocked = {
         let mut forged = lifecycle_receipt.clone();
-        forged.event_sequence = 4;
+        forged.event_sequence = 6;
         forged.verify_transition(&lifecycle_applied).is_err()
     };
     let lifecycle_state_regression_blocked = {
@@ -324,13 +373,44 @@ fn main() -> Result<(), String> {
         forged.state = NeurosemanticArtifactLifecycleState::Applied;
         forged.verify_transition(&lifecycle_applied).is_err()
     };
+    let lifecycle_skipped_stage_blocked = {
+        let mut forged = lifecycle_base.clone();
+        forged.event_sequence = 1;
+        forged.previous_receipt_hash = Some(lifecycle_base.fingerprint()?);
+        forged.state = NeurosemanticArtifactLifecycleState::Applied;
+        forged.effect_evidence_ref = Some("synthetic-lifecycle-effect-1".into());
+        forged.effect_evidence_hash = Some(symthaea_communication::content_hash(lifecycle_effect_evidence));
+        forged.verify_transition(&lifecycle_base).is_err()
+    };
     let lifecycle_timestamp_regression_blocked = {
         let mut forged = lifecycle_receipt.clone();
-        forged.observed_at_unix_s = 1_589;
+        forged.observed_at_unix_s = 1_582;
         forged.verify_transition(&lifecycle_applied).is_err()
     };
     let lifecycle_effect_evidence_mismatch_blocked = !lifecycle_receipt
         .verify_effect_evidence_bytes(b"synthetic-lifecycle-effect-tampered");
+    let lifecycle_independent_verification_mismatch_blocked = lifecycle_receipt
+        .verify_independent_verification_bytes(b"synthetic-independent-verification-tampered", 1_700)
+        .is_err();
+    let lifecycle_verifier_target_mismatch_blocked = {
+        let mut forged = lifecycle_receipt.clone();
+        forged.verification_target_effect_evidence_hash = Some(symthaea_communication::content_hash(b"other-effect"));
+        forged.validate().is_err()
+    };
+    let lifecycle_verifier_identity_required = {
+        let mut forged = lifecycle_receipt.clone();
+        forged.verification_agent_ref = None;
+        forged.validate().is_err()
+    };
+    let lifecycle_verification_scope_mismatch_blocked = {
+        let mut forged = lifecycle_receipt.clone();
+        forged.verification_scope_hash = Some(symthaea_communication::content_hash(b"wrong-scope"));
+        forged.validate().is_ok()
+            && forged.verify_verification_scope_bytes(lifecycle_verification_scope).is_err()
+    };
+    let lifecycle_verification_scope_tamper_blocked = lifecycle_receipt
+        .verify_verification_scope_bytes(b"synthetic-target-set-v1:TAMPERED")
+        .is_err();
     let lifecycle_artifact_mismatch_blocked = lifecycle_receipt
         .verify_binding(
             &symthaea_communication::content_hash(b"wrong-artifact"),
@@ -355,7 +435,7 @@ fn main() -> Result<(), String> {
             &derivation_ref,
             &derivation_hash,
             lifecycle_effect_evidence,
-            1_599,
+            1_583,
         )
         .is_err();
     let replacement_artifact_hash = symthaea_communication::content_hash(b"replacement-artifact");
@@ -376,7 +456,7 @@ fn main() -> Result<(), String> {
         symthaea_communication::compute_derivation_provenance_hash(
             &replacement_lineage.lineage_ref,
             &replacement_lineage_bytes,
-        )
+        ),
     );
     let lifecycle_replacement_lineage_verified = rectification_receipt
         .verify_resulting_lineage_binding_bytes(&replacement_lineage_bytes)
@@ -403,7 +483,6 @@ fn main() -> Result<(), String> {
         invalid.resulting_derivation_provenance_hash = None;
         invalid.validate().is_err()
     };
-
     let derivation_provenance_present =
         !message.packet.data_policy.handling.derivation_provenance_ref.is_empty();
     let derivation_provenance_hash_valid = message
@@ -782,13 +861,21 @@ fn main() -> Result<(), String> {
         "derivation_input_artifact_mismatch_blocked": derivation_input_artifact_mismatch_blocked,
         "derivation_input_artifact_bounds_blocked": derivation_input_artifact_bounds_blocked,
         "lifecycle_receipt_binding_verified": lifecycle_receipt_binding_verified,
+        "lifecycle_independent_verification_verified": lifecycle_independent_verification_verified,
+        "lifecycle_verification_scope_verified": lifecycle_verification_scope_verified,
         "lifecycle_chain_verified": lifecycle_chain_verified,
         "lifecycle_sequence_gap_blocked": lifecycle_sequence_gap_blocked,
+        "lifecycle_skipped_stage_blocked": lifecycle_skipped_stage_blocked,
         "lifecycle_state_regression_blocked": lifecycle_state_regression_blocked,
         "lifecycle_timestamp_regression_blocked": lifecycle_timestamp_regression_blocked,
         "lifecycle_replacement_lineage_verified": lifecycle_replacement_lineage_verified,
         "lifecycle_replacement_lineage_mismatch_blocked": lifecycle_replacement_lineage_mismatch_blocked,
         "lifecycle_effect_evidence_mismatch_blocked": lifecycle_effect_evidence_mismatch_blocked,
+        "lifecycle_independent_verification_mismatch_blocked": lifecycle_independent_verification_mismatch_blocked,
+        "lifecycle_verifier_target_mismatch_blocked": lifecycle_verifier_target_mismatch_blocked,
+        "lifecycle_verifier_identity_required": lifecycle_verifier_identity_required,
+        "lifecycle_verification_scope_mismatch_blocked": lifecycle_verification_scope_mismatch_blocked,
+        "lifecycle_verification_scope_tamper_blocked": lifecycle_verification_scope_tamper_blocked,
         "lifecycle_artifact_mismatch_blocked": lifecycle_artifact_mismatch_blocked,
         "lifecycle_lineage_mismatch_blocked": lifecycle_lineage_mismatch_blocked,
         "lifecycle_future_timestamp_blocked": lifecycle_future_timestamp_blocked,
