@@ -105,6 +105,7 @@ fn main() -> Result<(), String> {
                 permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
                 permitted_secondary_uses: BTreeSet::new(),
                 retention: NeurosemanticRetentionPolicy::UntilUnixS(2_000),
+                max_authority_resolution_age_s: 300,
             },
         },
         0.93,
@@ -482,6 +483,16 @@ fn main() -> Result<(), String> {
         )
         .is_err();
 
+    let policy_freshness_expired_before_resolution_expiry = message
+        .validate_for_handling(
+            &lease,
+            &policy_provenance_binding,
+            "ZA",
+            symthaea_communication::NeurosemanticHandlingAction::Transmit,
+            1_501,
+        )
+        .is_err();
+
     let authority_resolution_fresh_until = authority_resolution.expires_at_unix_s;
     let authority_resolution_expiry_blocked = message
         .validate_for_handling(
@@ -533,6 +544,7 @@ fn main() -> Result<(), String> {
         "authority_resolution_signature_blocked": resolution_signature_blocked,
         "authority_resolution_expiry_blocked": authority_resolution_expiry_blocked,
         "authority_resolution_predating_attestation_blocked": pre_attestation_resolution_blocked,
+        "policy_freshness_expired_before_resolution_expiry": policy_freshness_expired_before_resolution_expiry,
         "mutated_consent_lease_blocked": mutated_lease_blocked,
         "authority_proof_substitution_blocked": authority_proof_substitution_blocked
     });
