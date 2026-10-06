@@ -515,6 +515,8 @@ pub struct NixPostStateReceiptV1 {
     pub authorized_generation: u64,
     pub observed_generation: u64,
     pub authorized_definition_digest: String,
+    /// Exact systemd FragmentPath + DropInPaths identity from the observed unit.
+    pub observed_definition_identity: NixSystemdUnitDefinitionIdentityV1,
     pub observed_definition_digest: String,
     pub operation: NixServiceOperationKindV1,
     pub systemd_job_id: Option<u32>,
@@ -655,6 +657,7 @@ impl NixPostStateReceiptV1 {
             authorized_generation: expectation.authorized_generation,
             observed_generation: observation.observed_generation,
             authorized_definition_digest: expectation.authorized_definition_digest.clone(),
+            observed_definition_identity: observation.definition_identity.clone(),
             observed_definition_digest,
             operation: expectation.operation,
             systemd_job_id,
@@ -841,7 +844,13 @@ impl NixPostStateReceiptV1 {
             "authorized definition digest",
         )?;
         validate_digest(&self.observed_definition_digest, "observed definition digest")?;
-        if self.authorized_definition_digest != self.observed_definition_digest {
+        self.observed_definition_identity.validate_shape()?;
+        let recomputed_definition_digest = self
+            .observed_definition_identity
+            .digest(&self.target_unit)?;
+        if self.observed_definition_digest != recomputed_definition_digest
+            || self.authorized_definition_digest != self.observed_definition_digest
+        {
             return Err(NixPostStateErrorV1::DefinitionMismatch);
         }
         if self.authorized_generation != self.observed_generation {
@@ -983,6 +992,8 @@ impl NixPostStateReceiptV1 {
         put_u64(&mut h, self.observed_generation);
         put_str(&mut h, &self.authorized_definition_digest);
         put_str(&mut h, &self.observed_definition_digest);
+        put_str(&mut h, &self.observed_definition_identity.fragment_path);
+        put_str_vec(&mut h, &self.observed_definition_identity.drop_in_paths);
         put_u8(&mut h, operation_tag(self.operation));
         put_opt_u32(&mut h, self.systemd_job_id);
         match self.systemd_job_type {
@@ -2058,6 +2069,65 @@ mod tests {
             stability_sequence_digest(&evidence_changed.samples).unwrap();
         let receipt_b = build_receipt(&exp, &obs, Some(evidence_changed)).unwrap();
         assert_ne!(receipt_a.digest().unwrap(), receipt_b.digest().unwrap());
+    }
+
+    #[test]
+    fn serialized_receipt_rejects_definition_identity_mutation() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.observed_definition_identity.fragment_path =
+            "/nix/store/changed.service".into();
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::DefinitionMismatch
+        );
+    }
+
+    #[test]
+    fn serialized_receipt_rejects_recommitted_definition_against_authorized_digest() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.observed_definition_identity =
+            NixSystemdUnitDefinitionIdentityV1::new("/nix/store/changed.service", vec![])
+                .unwrap();
+        receipt.observed_definition_digest = receipt
+            .observed_definition_identity
+            .digest(&receipt.target_unit)
+            .unwrap();
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::DefinitionMismatch
+        );
+    }
+
+    #[test]
+    fn serialized_receipt_definition_identity_is_part_of_receipt_digest() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let receipt = build_receipt(&exp, &obs, None).unwrap();
+        let baseline = receipt.digest().unwrap();
+        let mut changed = receipt.clone();
+        changed.observed_definition_identity.drop_in_paths =
+            vec!["/nix/store/changed.conf".into()];
+        changed.observed_definition_digest = changed
+            .observed_definition_identity
+            .digest(&changed.target_unit)
+            .unwrap();
+        assert_ne!(baseline, changed.digest().unwrap());
     }
 
     #[test]
