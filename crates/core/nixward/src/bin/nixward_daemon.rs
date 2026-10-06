@@ -1520,7 +1520,7 @@ impl DaemonState {
                                     }
                                 };
 
-                                execution_authority = Some(match service_definition_content.as_ref() {
+                                let promotion_result = match service_definition_content.as_ref() {
                                     Some(content) => {
                                         NixLocalExecutionAuthorityV1::from_consumed_local_approval_with_definition_capture(
                                             intent,
@@ -1532,20 +1532,21 @@ impl DaemonState {
                                         intent,
                                         consumed_approval,
                                     ),
-                                } {
-                                        Ok(authority) => authority,
-                                        Err(error) => {
-                                            eprintln!(
-                                                "nixward-daemon: approved action could not be promoted to execution authority: {error}"
-                                            );
-                                            self.pending_action = None;
-                                            self.pending_action_intent_digest = None;
-                                            return (
-                                                dynamic_threshold,
-                                                Some(best_action.expected_free_energy),
-                                            );
-                                        }
-                                    });
+                                };
+                                execution_authority = Some(match promotion_result {
+                                    Ok(authority) => authority,
+                                    Err(error) => {
+                                        eprintln!(
+                                            "nixward-daemon: approved action could not be promoted to execution authority: {error}"
+                                        );
+                                        self.pending_action = None;
+                                        self.pending_action_intent_digest = None;
+                                        return (
+                                            dynamic_threshold,
+                                            Some(best_action.expected_free_energy),
+                                        );
+                                    }
+                                });
 
                                 eprintln!(
                                     "nixward-daemon: Watchdog APPROVED action: {}{}",
