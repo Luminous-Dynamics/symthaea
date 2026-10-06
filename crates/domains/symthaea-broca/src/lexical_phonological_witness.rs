@@ -404,6 +404,8 @@ mod tests {
                 .enumerate()
                 .map(|(index, segment)| LexicalPhonologicalMapping {
                     lexical_position: index,
+                    lexeme_id: binding.constituents[index].lexeme_id.clone(),
+                    morphophonological_form: binding.constituents[index].morphophonological_form.clone(),
                     segment_indices: vec![index],
                     symbols: vec![segment.symbol.clone()],
                 })
@@ -486,12 +488,16 @@ mod tests {
         let mut mappings = Vec::new();
         mappings.push(LexicalPhonologicalMapping {
             lexical_position: 0,
+            lexeme_id: binding.constituents[0].lexeme_id.clone(),
+            morphophonological_form: binding.constituents[0].morphophonological_form.clone(),
             segment_indices: vec![0, 1],
             symbols: vec!["P0".into(), "P1".into()],
         });
         for position in 1..binding.constituents.len() {
             mappings.push(LexicalPhonologicalMapping {
                 lexical_position: position,
+                lexeme_id: binding.constituents[position].lexeme_id.clone(),
+                morphophonological_form: binding.constituents[position].morphophonological_form.clone(),
                 segment_indices: vec![position + 1],
                 symbols: vec![segments[position + 1].symbol.clone()],
             });
