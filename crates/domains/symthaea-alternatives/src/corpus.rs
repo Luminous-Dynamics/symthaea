@@ -8,7 +8,7 @@ use blake3::Hasher;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-const BENCHMARK_MANIFEST_SCHEMA_VERSION: u16 = 19;
+const BENCHMARK_MANIFEST_SCHEMA_VERSION: u16 = 20;
 
 /// One frozen benchmark scenario.
 #[derive(Debug, Clone)]
@@ -132,6 +132,7 @@ fn evidence(
                     degrees_of_freedom_id: "benchmark-uncertainty-dof-v1".into(),
                     degrees_of_freedom_revision: "v1".into(),
                     degrees_of_freedom_digest: "benchmark-uncertainty-dof-digest-v1".into(),
+                    coverage_probability: Some(0.95),
                     coverage_method: Some(MeasurementUncertaintyCoverageMethodRef {
                         method_id: "benchmark-coverage-method-v1".into(),
                         method_revision: "v1".into(),
