@@ -17,11 +17,10 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use nixward::NixParser;
 use nixward::action::authorization::{
-    NixActionIntentV1, NixAuthorizationErrorV1, NixLocalExecutionAuthorityV1,
+    NixActionDescriptorV1, NixActionIntentV1, NixAuthorizationErrorV1,
+    NixLocalExecutionAuthorityV1,
 };
-use nixward::action::service_effect::{
-    NixServiceEffectContextV1, NixVerifiedServiceDefinitionContentV1,
-};
+use nixward::action::service_effect::NixVerifiedServiceDefinitionContentV1;
 use nixward::action::local_approval::LocalApprovalDecisionKindV1;
 use nixward::action::temporal::UnixMillisV1;
 #[cfg(target_os = "linux")]
