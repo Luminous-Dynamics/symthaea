@@ -193,17 +193,21 @@ The packet carries:
 - the score for every feature family;
 - per-family held-out feature timestamps and outcome timestamps;
 - independently retained held-out outcomes and predictions;
+- held-out feature rows for every fitted feature family;
+- the persistence baseline forecast for the persistence family;
 - fitted linear-model coefficients;
 - training-window feature means and scales.
 
-The packet verifier recomputes MAE/MSE from the retained prediction and outcome vectors and rejects mismatched metrics, non-finite values, missing feature families, inconsistent timestamps, mismatched provenance, and rolling-origin child packets that disagree with the parent configuration.
+The packet verifier recomputes each fitted-model held-out prediction from the retained feature row, fitted coefficients, and frozen training means/scales, and recomputes MAE/MSE from the resulting predictions and observed outcomes. For the persistence family it binds every retained prediction to the recorded constant baseline forecast. It therefore rejects tampered predictions even when the reported loss is also modified. The verifier also rejects non-finite values, wrong feature dimensions, missing feature families, inconsistent timestamps, mismatched provenance, and rolling-origin child packets that disagree with the parent configuration.
 
 The provenance fields are intentionally caller-supplied. The evaluator must not invent a dataset hash or software identity. A packet with absent or malformed provenance is therefore invalid for empirical qualification.
 
 JSON schemas are versioned in the emitted document:
 
-- `relational-prediction-evidence/v1` for one held-out segment;
-- `relational-prediction-rolling-evidence/v1` for the repeated-origin bundle.
+- `relational-prediction-evidence/v2` for one held-out segment;
+- `relational-prediction-rolling-evidence/v2` for the repeated-origin bundle.
+
+The evidence packet is intentionally not a self-contained copy of the training dataset. It retains enough of the held-out computation to independently reconstruct test predictions and verify the reported losses, while the caller-attested source-data SHA-256 remains the commitment to the underlying source artifact. Full coefficient-training replay still requires access to the exact source data identified by that digest.
 
 Serialization is an evidence transport mechanism, not an inference procedure. A valid packet proves that the recorded computation is internally self-consistent; it does not prove that the source data are scientifically appropriate, that the target is truly independent, or that the measured predictive difference is causal.
 
