@@ -1861,15 +1861,15 @@ impl ExperimentalDiscriminationTarget {
             ExperimentalDiscriminationSurface::Burden(dimension) => requirement
                 .comparison_scales
                 .get(dimension)
-                .map(|scale| &scale.basis),
+                .map(|scale| (scale.unit.as_str(), scale.scope.as_str(), &scale.basis)),
             ExperimentalDiscriminationSurface::PerformanceMetric(metric) => requirement
                 .performance_scales
                 .get(metric)
-                .map(|scale| &scale.basis),
+                .map(|scale| (scale.unit.as_str(), scale.scope.as_str(), &scale.basis)),
             ExperimentalDiscriminationSurface::OperatingCondition(condition) => requirement
                 .operating_envelope
                 .get(condition)
-                .map(|scale| &scale.basis),
+                .map(|scale| (scale.unit.as_str(), scale.scope.as_str(), &scale.basis)),
         }
     }
 }
@@ -5449,6 +5449,53 @@ mod tests {
             FrontierBlocker::MissingDimension(Dimension::Carbon)
         ));
     }
+    #[test]
+    fn experimental_discrimination_target_resolves_requirement_scale() {
+        let requirement = fixture_requirement();
+        let burden = ExperimentalDiscriminationTarget {
+            target_id: "burden-target".into(),
+            measurand_id: "measurand".into(),
+            left_candidate_id: "left".into(),
+            right_candidate_id: "right".into(),
+            surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+            decision_rule: ExperimentalDecisionRuleRef {
+                rule_id: "rule".into(),
+                rule_revision: "v1".into(),
+                rule_digest: "digest".into(),
+            },
+        };
+        let performance = ExperimentalDiscriminationTarget {
+            target_id: "performance-target".into(),
+            measurand_id: "measurand".into(),
+            left_candidate_id: "left".into(),
+            right_candidate_id: "right".into(),
+            surface: ExperimentalDiscriminationSurface::PerformanceMetric(
+                "throughput_per_hour".into(),
+            ),
+            decision_rule: burden.decision_rule.clone(),
+        };
+        let operating = ExperimentalDiscriminationTarget {
+            target_id: "operating-target".into(),
+            measurand_id: "measurand".into(),
+            left_candidate_id: "left".into(),
+            right_candidate_id: "right".into(),
+            surface: ExperimentalDiscriminationSurface::OperatingCondition(
+                "temperature".into(),
+            ),
+            decision_rule: burden.decision_rule.clone(),
+        };
+
+        let expected_basis = fixture_basis();
+        for target in [burden, performance, operating] {
+            let (unit, scope, basis) = target
+                .requirement_scale(&requirement)
+                .expect("fixture declares every target scale");
+            assert_eq!(unit, "unit");
+            assert_eq!(scope, "synthetic functional unit");
+            assert_eq!(basis, &expected_basis);
+        }
+    }
+
     #[test]
     fn experimental_design_requires_protocol_and_stopping_metadata() {
         let case = crate::corpus::five_pathway_adversarial_case();
