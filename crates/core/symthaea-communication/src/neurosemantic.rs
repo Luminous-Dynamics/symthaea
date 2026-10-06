@@ -2392,6 +2392,10 @@ mod tests {
         same_agent.verification_agent_ref = same_agent.effect_agent_ref.clone();
         assert!(same_agent.validate().is_err());
 
+        let mut invalid_effect_agent = receipt.clone();
+        invalid_effect_agent.effect_agent_ref = Some(String::new());
+        assert!(invalid_effect_agent.validate().is_err());
+
         receipt.action = NeurosemanticArtifactLifecycleAction::Rectification;
         receipt.resulting_artifact_hash = None;
         receipt.resulting_derivation_provenance_ref = None;
