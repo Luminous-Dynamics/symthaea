@@ -352,6 +352,42 @@ fn origin_is_allowed(origin: &str) -> bool {
             .any(|suffix| host == *suffix || host.ends_with(&format!(".{suffix}")))
 }
 
+fn read_token_file(path: &str) -> Result<String, String> {
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+        .map_err(|error| format!("unable to open token file {}: {error}", path))?;
+    let metadata = file
+        .metadata()
+        .map_err(|error| format!("unable to inspect token file {}: {error}", path))?;
+    if !metadata.file_type().is_file() {
+        return Err(format!("token file {} is not a regular file", path));
+    }
+    let mode = metadata.mode() & 0o777;
+    if mode & 0o077 != 0 {
+        return Err(format!(
+            "token file {} is group/world accessible (mode {:04o}); require 0600 or stricter",
+            path, mode
+        ));
+    }
+    if metadata.uid() != unsafe { libc::geteuid() } {
+        return Err(format!("token file {} is not owned by the relay process user", path));
+    }
+    use std::io::Read;
+    let mut token = String::new();
+    (&file)
+        .read_to_string(&mut token)
+        .map_err(|error| format!("unable to read token file {}: {error}", path))?;
+    let token = token.trim().to_string();
+    if token.is_empty() {
+        return Err(format!("token file {} is empty", path));
+    }
+    Ok(token)
+}
+
 fn auth_token_banner(token: &str, stderr_is_terminal: bool) -> String {
     if stderr_is_terminal {
         format!("  Auth token: {}", token)
@@ -6633,7 +6669,7 @@ fn generate_auth_token() -> String {
 fn usage() {
     eprintln!("NixForHumanity WebSocket Relay (local mode)");
     eprintln!("Usage:");
-    eprintln!("  ssh-relay [--port <port>] [--bind <addr>] [--token <token>] [--pxe [port]]");
+    eprintln!("  ssh-relay [--port <port>] [--bind <addr>] [--token <token> | --token-file <path>] [--pxe [port]]");
     eprintln!();
     eprintln!("Options:");
     eprintln!(
@@ -6643,6 +6679,7 @@ fn usage() {
     eprintln!("Security defaults:");
     eprintln!("  - Binds to 127.0.0.1 only");
     eprintln!("  - Requires an auth token over WebSocket (action: \"auth\")");
+    eprintln!("  - --token-file avoids exposing the bearer token in process arguments");
     eprintln!("  - Executes commands locally (no SSH)");
     eprintln!("  - 'exec' is disabled");
 }
@@ -6652,6 +6689,7 @@ async fn main() {
     let mut port: u16 = 8091;
     let mut bind_addr: String = "127.0.0.1".into();
     let mut token: Option<String> = None;
+    let mut token_file: Option<String> = None;
     let mut pxe_port: Option<u16> = None;
     let mut enable_tls = false;
     let mut tls_cert_path: Option<String> = None;
@@ -6671,6 +6709,7 @@ async fn main() {
                 }
             }
             "--token" => token = args.next(),
+            "--token-file" => token_file = args.next(),
             "--tls" => enable_tls = true,
             "--tls-cert" => tls_cert_path = args.next(),
             "--tls-key" => tls_key_path = args.next(),
@@ -6690,7 +6729,20 @@ async fn main() {
         }
     }
 
-    let token = token.unwrap_or_else(generate_auth_token);
+    if token.is_some() && token_file.is_some() {
+        eprintln!("ERROR: use either --token or --token-file, not both");
+        std::process::exit(2);
+    }
+    let token = match token_file.as_deref() {
+        Some(path) => match read_token_file(path) {
+            Ok(token) => token,
+            Err(error) => {
+                eprintln!("ERROR: {}", error);
+                std::process::exit(2);
+            }
+        },
+        None => token.unwrap_or_else(generate_auth_token),
+    };
     if token.is_empty() {
         eprintln!("ERROR: --token cannot be empty");
         std::process::exit(2);
@@ -6944,6 +6996,25 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
+    #[test]
+    fn token_file_requires_private_owner_only_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-token-file-{}",
+            new_session_id().unwrap()
+        ));
+        std::fs::write(&path, "secret-token
+").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert_eq!(read_token_file(path.to_str().unwrap()).unwrap(), "secret-token");
+
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
+        assert!(read_token_file(path.to_str().unwrap()).is_err());
+        let _ = std::fs::remove_file(&path);
+    }
+
     fn noninteractive_auth_banner_redacts_token() {
         let banner = auth_token_banner("super-secret-token", false);
         assert!(!banner.contains("super-secret-token"));
