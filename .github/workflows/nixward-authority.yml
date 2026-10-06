@@ -52,9 +52,11 @@ env:
 
 jobs:
   authority-primitives:
-    # Deliberately runs on draft PRs. This is a focused early correctness lane,
-    # not a substitute for repository-wide ready-for-review/main qualification.
+    # Runner admission follows the repository-wide draft-safety contract.
+    # Focused qualification is not a substitute for ready-for-review/main
+    # qualification, but it must never allocate a runner to a draft PR.
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 20
 
     steps:
