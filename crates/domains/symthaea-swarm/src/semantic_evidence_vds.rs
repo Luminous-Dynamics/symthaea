@@ -825,7 +825,11 @@ impl Rfc9942ReceiptEnvelope {
                 }
                 _=>{
                     protected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
-                    value_reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                    value_reader.skip_value_with_resource_limits(0, 4096, 64, usize::MAX)
+                        .map_err(|error|match error {
+                            Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                            _=>Rfc9942VdpError::InvalidEncoding,
+                        })?;
                 }
             }
             value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
@@ -1328,7 +1332,11 @@ impl Rfc9942SignatureWithReceipts {
                 protected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
             } else {
                 protected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
-                value_reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                value_reader.skip_value_with_resource_limits(0, 4096, 64, usize::MAX)
+                    .map_err(|error|match error {
+                        Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                        _=>Rfc9942VdpError::InvalidEncoding,
+                    })?;
             }
             value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         }
