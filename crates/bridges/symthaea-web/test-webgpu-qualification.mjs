@@ -258,7 +258,79 @@ async function canvasPixelSamples(page, selector, points) {
   );
 }
 
-function assertSemanticSceneSamples(samples) {
+async function screenshotCanvasPixelSamples(page, selector, points) {
+  const geometry = await page.$eval(selector, canvas => {
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      throw new Error('selected element is not a canvas');
+    }
+    const rect = canvas.getBoundingClientRect();
+    return {
+      rect: {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      },
+      width: canvas.width,
+      height: canvas.height,
+    };
+  });
+  const screenshot = await page.screenshot({
+    clip: geometry.rect,
+    type: 'png',
+  });
+  const dataUrl = screenshot.toString('base64');
+  const samples = await page.evaluate(async ({ dataUrl, points, width, height }) => {
+    const image = new Image();
+    image.src = 'data:image/png;base64,' + dataUrl;
+    await image.decode();
+    const probe = document.createElement('canvas');
+    probe.width = image.naturalWidth;
+    probe.height = image.naturalHeight;
+    const context = probe.getContext('2d');
+    if (!context) {
+      throw new Error('could not create screenshot compositor probe context');
+    }
+    context.drawImage(image, 0, 0);
+    const rgba = context.getImageData(0, 0, probe.width, probe.height).data;
+    return points.map(({ name, x, y }) => {
+      if (!Number.isInteger(x) || !Number.isInteger(y)
+        || x < 0 || y < 0 || x >= width || y >= height) {
+        throw new Error(`invalid compositor semantic probe ${name}: (${x},${y})`);
+      }
+      const sampleX = Math.min(
+        probe.width - 1,
+        Math.max(0, Math.round((x + 0.5) * probe.width / width)),
+      );
+      const sampleY = Math.min(
+        probe.height - 1,
+        Math.max(0, Math.round((y + 0.5) * probe.height / height)),
+      );
+      const offset = (sampleY * probe.width + sampleX) * 4;
+      return {
+        name,
+        source_x: x,
+        source_y: y,
+        screenshot_x: sampleX,
+        screenshot_y: sampleY,
+        rgba: [...rgba.slice(offset, offset + 4)],
+      };
+    });
+  }, { dataUrl, points, width: geometry.width, height: geometry.height });
+  return {
+    selector,
+    canvas_width: geometry.width,
+    canvas_height: geometry.height,
+    screenshot_width: geometry.rect.width,
+    screenshot_samples: samples,
+  };
+}
+
+function assertSemanticSceneSamples(
+  samples,
+  label = 'WebGPU',
+  classification = 'renderer',
+) {
   const byName = new Map(samples.map(sample => [sample.name, sample.rgba]));
   const background = byName.get('background');
   const polygon = byName.get('polygon');
@@ -267,21 +339,21 @@ function assertSemanticSceneSamples(samples) {
 
   if (!background || !polygon || !transformedLine || !circle) {
     throw new QualificationError(
-      `WebGPU semantic scene probes missing: ${JSON.stringify(samples)}`,
-      'renderer',
+      `${label} semantic scene probes missing: ${JSON.stringify(samples)}`,
+      classification,
     );
   }
 
   if (!(background[2] > background[0])) {
     throw new QualificationError(
-      `WebGPU background probe has unexpected channel ordering: ${JSON.stringify(background)}`,
-      'renderer',
+      `${label} background probe has unexpected channel ordering: ${JSON.stringify(background)}`,
+      classification,
     );
   }
   if (!(polygon[0] > polygon[2] + 40 && polygon[1] > polygon[2])) {
     throw new QualificationError(
-      `WebGPU polygon probe does not preserve the fixture's warm fill: ${JSON.stringify(polygon)}`,
-      'renderer',
+      `${label} polygon probe does not preserve the fixture's warm fill: ${JSON.stringify(polygon)}`,
+      classification,
     );
   }
   if (!(
@@ -289,16 +361,16 @@ function assertSemanticSceneSamples(samples) {
     && circle[1] > circle[0]
   )) {
     throw new QualificationError(
-      `WebGPU circle probe does not preserve the fixture's cool fill: ${JSON.stringify(circle)}`,
-      'renderer',
+      `${label} circle probe does not preserve the fixture's cool fill: ${JSON.stringify(circle)}`,
+      classification,
     );
   }
 
   const lineBrightness = (transformedLine[0] + transformedLine[1] + transformedLine[2]) / 3;
   if (lineBrightness < 120 || transformedLine[3] === 0) {
     throw new QualificationError(
-      `WebGPU transformed-line probe is unexpectedly dark: ${JSON.stringify(transformedLine)}`,
-      'renderer',
+      `${label} transformed-line probe is unexpectedly dark: ${JSON.stringify(transformedLine)}`,
+      classification,
     );
   }
 }
@@ -1468,6 +1540,38 @@ async function runMode(mode) {
       ]);
       assertSemanticMovieSamples(semanticMovieSamples);
 
+      const compositorSceneSamples = await screenshotCanvasPixelSamples(
+        page,
+        '#webgpu-cognitive-canvas',
+        [
+          { name: 'background', x: 32, y: 32 },
+          { name: 'polygon', x: 100, y: 100 },
+          { name: 'transformed-line', x: 43, y: 371 },
+          { name: 'circle', x: 360, y: 350 },
+        ],
+      );
+      assertSemanticSceneSamples(
+        compositorSceneSamples.screenshot_samples,
+        'WebGPU compositor scene',
+        'renderer',
+      );
+
+      const compositorMovieSamples = await screenshotCanvasPixelSamples(
+        page,
+        '#webgpu-movie-canvas',
+        [
+          { name: 'left', x: 48, y: 96 },
+          { name: 'right', x: 144, y: 96 },
+          { name: 'top', x: 96, y: 48 },
+          { name: 'bottom', x: 96, y: 144 },
+        ],
+      );
+      assertSemanticMovieSamples(
+        compositorMovieSamples.screenshot_samples,
+        'WebGPU compositor movie',
+        'renderer',
+      );
+
       if (firstSceneHash === blankSceneHash) {
         throw new QualificationError(
           'WebGPU cognitive canvas is indistinguishable from a blank canvas',
@@ -1497,6 +1601,36 @@ async function runMode(mode) {
 
       const repeatSceneHash = await canvasPngHash(page, '#webgpu-cognitive-canvas');
       const repeatMovieHash = await canvasPngHash(page, '#webgpu-movie-canvas');
+      const repeatCompositorSceneSamples = await screenshotCanvasPixelSamples(
+        page,
+        '#webgpu-cognitive-canvas',
+        [
+          { name: 'background', x: 32, y: 32 },
+          { name: 'polygon', x: 100, y: 100 },
+          { name: 'transformed-line', x: 43, y: 371 },
+          { name: 'circle', x: 360, y: 350 },
+        ],
+      );
+      const repeatCompositorMovieSamples = await screenshotCanvasPixelSamples(
+        page,
+        '#webgpu-movie-canvas',
+        [
+          { name: 'left', x: 48, y: 96 },
+          { name: 'right', x: 144, y: 96 },
+          { name: 'top', x: 96, y: 48 },
+          { name: 'bottom', x: 96, y: 144 },
+        ],
+      );
+      assertSemanticSceneSamples(
+        repeatCompositorSceneSamples.screenshot_samples,
+        'WebGPU compositor repeat scene',
+        'renderer',
+      );
+      assertSemanticMovieSamples(
+        repeatCompositorMovieSamples.screenshot_samples,
+        'WebGPU compositor repeat movie',
+        'renderer',
+      );
 
       if (repeatSceneHash !== firstSceneHash || repeatMovieHash !== firstMovieHash) {
         throw new QualificationError(
@@ -1519,6 +1653,8 @@ async function runMode(mode) {
         movie_hash: firstMovieHash,
         semantic_scene_samples: semanticSceneSamples,
         semantic_movie_samples: semanticMovieSamples,
+        compositor_scene_samples: compositorSceneSamples,
+        compositor_movie_samples: compositorMovieSamples,
         deterministic_repeat: true,
         page_errors: pageErrors,
         device_recovery: await page.evaluate(() => {
