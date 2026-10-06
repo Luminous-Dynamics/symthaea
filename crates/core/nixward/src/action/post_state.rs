@@ -2072,6 +2072,65 @@ mod tests {
     }
 
     #[test]
+    fn serialized_receipt_rejects_definition_identity_mutation() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.observed_definition_identity.fragment_path =
+            "/nix/store/changed.service".into();
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::DefinitionMismatch
+        );
+    }
+
+    #[test]
+    fn serialized_receipt_rejects_recommitted_definition_against_authorized_digest() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.observed_definition_identity =
+            NixSystemdUnitDefinitionIdentityV1::new("/nix/store/changed.service", vec![])
+                .unwrap();
+        receipt.observed_definition_digest = receipt
+            .observed_definition_identity
+            .digest(&receipt.target_unit)
+            .unwrap();
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::DefinitionMismatch
+        );
+    }
+
+    #[test]
+    fn serialized_receipt_definition_identity_is_part_of_receipt_digest() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let receipt = build_receipt(&exp, &obs, None).unwrap();
+        let baseline = receipt.digest().unwrap();
+        let mut changed = receipt.clone();
+        changed.observed_definition_identity.drop_in_paths =
+            vec!["/nix/store/changed.conf".into()];
+        changed.observed_definition_digest = changed
+            .observed_definition_identity
+            .digest(&changed.target_unit)
+            .unwrap();
+        assert_ne!(baseline, changed.digest().unwrap());
+    }
+
+    #[test]
     fn serialized_receipt_rejects_definition_digest_mismatch() {
         let exp = expectation(NixServiceOperationKindV1::Start);
         let obs = observation(
