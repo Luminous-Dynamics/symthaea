@@ -603,6 +603,7 @@ async function rawWebGpuExecutionCanary(page) {
           reason: info?.reason || null,
           message: info?.message || null,
         };
+        globalThis[statusKey] = deviceLost;
       });
 
       const width = 4;
@@ -830,6 +831,7 @@ async function rawWebGpuCompositorCanary(page) {
     const webgpuCanvas = document.createElement('canvas');
     const controlCanvas = document.createElement('canvas');
     const cleanupKey = '__symthaeaWebGpuCompositorCanaryCleanup';
+    const statusKey = '__symthaeaWebGpuCompositorCanaryStatus';
     let handoff = false;
     for (const canvas of [webgpuCanvas, controlCanvas]) {
       canvas.width = 64;
@@ -912,6 +914,7 @@ async function rawWebGpuCompositorCanary(page) {
       await new Promise(requestAnimationFrame);
       await new Promise(requestAnimationFrame);
 
+      globalThis[statusKey] = null;
       globalThis[cleanupKey] = () => {
         try {
           device?.destroy();
@@ -941,6 +944,7 @@ async function rawWebGpuCompositorCanary(page) {
         uncaptured_errors: uncapturedErrors,
         device_lost: deviceLost,
         cleanup_key: cleanupKey,
+        status_key: statusKey,
       };
     } catch (error) {
       return {
@@ -1459,10 +1463,28 @@ async function runMode(mode) {
             && diagnostics.raw_webgpu_compositor_canary.screenshot_pixel_delta.differing_pixels === 0;
         } finally {
           if (cleanupKey) {
+            const compositorLossAfterCapture = await page.evaluate(
+              ({ cleanupKey, statusKey }) => {
+                return {
+                  loss: globalThis[statusKey] || null,
+                  cleanup_present: typeof globalThis[cleanupKey] === 'function',
+                };
+              },
+              { cleanupKey, statusKey },
+            );
+            if (compositorLossAfterCapture.loss?.reason) {
+              throw new QualificationError(
+                `Synthetic compositor canary device lost during evidence capture: ${JSON.stringify(compositorLossAfterCapture.loss)}`,
+                'renderer',
+              );
+            }
             await page.evaluate(key => {
               globalThis[key]?.();
               delete globalThis[key];
             }, cleanupKey);
+            await page.evaluate(statusKey => {
+              delete globalThis[statusKey];
+            }, statusKey);
           }
         }
       }
@@ -1903,7 +1925,9 @@ async function runMode(mode) {
             ? 'browser-webgpu-hardware'
             : 'forced-gpu-disabled',
         capability,
+        raw_webgpu_execution_canary: diagnostics.raw_webgpu_execution_canary || null,
         raw_webgpu_canary: diagnostics.raw_webgpu_canary || null,
+        raw_webgpu_compositor_canary: diagnostics.raw_webgpu_compositor_canary || null,
         raw_webgpu_boundary: diagnostics.raw_webgpu_boundary || null,
         scene_hash: firstSceneHash,
         movie_hash: firstMovieHash,
@@ -2057,7 +2081,7 @@ try {
   }
 
   const artifact = {
-    schema: 'symthaea-ui-webgpu-qualification-v11',
+    schema: 'symthaea-ui-webgpu-qualification-v12',
     harness_self_tests_passed: true,
     url: URL,
     chromium: CHROMIUM,
