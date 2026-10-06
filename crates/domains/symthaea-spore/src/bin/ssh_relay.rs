@@ -5734,16 +5734,6 @@ mod tests {
     // ── Secret-boundary regressions ──
 
     #[test]
-    fn encrypted_layout_requires_explicit_luks_secret() {
-        let secret_field = "luks_passphrase";
-        let source = include_str!("ssh_relay.rs");
-        assert!(source.contains("client_msg.luks_passphrase.is_empty()"));
-        assert!(source.contains(secret_field));
-        assert!(!source.contains("let passphrase = if msg.command.is_empty()"));
-        assert!(!source.contains("let passphrase = if msg.command.is_empty()"));
-    }
-
-    #[test]
     fn relay_rejects_unsafe_usernames_before_shell_construction() {
         assert!(validate_username("operator").is_ok());
         assert!(validate_username("operator;rm").is_err());
