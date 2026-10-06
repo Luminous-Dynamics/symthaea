@@ -158,12 +158,22 @@ pub enum NeurosemanticArtifactLifecycleAction {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum NeurosemanticArtifactLifecycleState {
     Requested,
+    Accepted,
+    Processing,
     Applied,
-    Verified,
+    IndependentlyVerified,
     Rejected,
 }
 
-pub const NEUROSEMANTIC_ARTIFACT_LIFECYCLE_RECEIPT_SCHEMA_VERSION: u16 = 2;
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum NeurosemanticArtifactLifecycleVerificationScope {
+    /// Only the exact derived artifact named by the receipt was independently inspected.
+    ArtifactOnly,
+    /// A separately content-addressed target-set artifact enumerated the descendants inspected.
+    EnumeratedTargetSet,
+}
+
+pub const NEUROSEMANTIC_ARTIFACT_LIFECYCLE_RECEIPT_SCHEMA_VERSION: u16 = 3;
 
 /// Content-addressed evidence that a downstream lifecycle effect was observed.
 /// Validation establishes exact binding of the receipt to the artifact, lineage,
@@ -182,8 +192,21 @@ pub struct NeurosemanticArtifactLifecycleReceipt {
     pub previous_receipt_hash: Option<String>,
     pub action: NeurosemanticArtifactLifecycleAction,
     pub state: NeurosemanticArtifactLifecycleState,
-    pub effect_evidence_ref: String,
-    pub effect_evidence_hash: String,
+    /// Content-addressed evidence of the applied downstream effect. Absent before Applied.
+    pub effect_evidence_ref: Option<String>,
+    pub effect_evidence_hash: Option<String>,
+    /// Identity of the independently verifying actor/process. This is not a trust assertion.
+    pub verification_agent_ref: Option<String>,
+    /// Content-addressed evidence produced by the independent verifier.
+    pub verification_evidence_ref: Option<String>,
+    pub verification_evidence_hash: Option<String>,
+    /// Exact effect-evidence hash the verifier attests to have inspected.
+    pub verification_target_effect_evidence_hash: Option<String>,
+    /// Explicit scope of what was independently inspected.
+    pub verification_scope: Option<NeurosemanticArtifactLifecycleVerificationScope>,
+    /// For EnumeratedTargetSet, a separate artifact enumerating the checked descendants.
+    pub verification_scope_ref: Option<String>,
+    pub verification_scope_hash: Option<String>,
     /// Canonical Git object ID for the execution context that emitted the receipt.
     pub execution_revision: String,
     pub observed_at_unix_s: u64,
@@ -201,8 +224,6 @@ impl NeurosemanticArtifactLifecycleReceipt {
             || !valid_blake3_digest(&self.artifact_hash)
             || !valid_identifier(&self.derivation_provenance_ref)
             || !valid_blake3_digest(&self.derivation_provenance_hash)
-            || !valid_identifier(&self.effect_evidence_ref)
-            || !valid_blake3_digest(&self.effect_evidence_hash)
             || !valid_execution_revision(&self.execution_revision)
         {
             return Err("neurosemantic lifecycle receipt fields are invalid".into());
@@ -220,6 +241,74 @@ impl NeurosemanticArtifactLifecycleReceipt {
                 return Err("neurosemantic lifecycle previous receipt hash is invalid".into());
             }
             _ => {}
+        }
+
+        let has_effect = match (&self.effect_evidence_ref, &self.effect_evidence_hash) {
+            (Some(reference), Some(hash)) if valid_identifier(reference) && valid_blake3_digest(hash) => true,
+            (None, None) => false,
+            _ => return Err("neurosemantic lifecycle effect evidence reference/hash must be present together".into()),
+        };
+
+        let has_verification = match (
+            &self.verification_agent_ref,
+            &self.verification_evidence_ref,
+            &self.verification_evidence_hash,
+            &self.verification_target_effect_evidence_hash,
+            self.verification_scope,
+            &self.verification_scope_ref,
+            &self.verification_scope_hash,
+        ) {
+            (
+                Some(agent),
+                Some(reference),
+                Some(hash),
+                Some(target_hash),
+                Some(scope),
+                scope_ref,
+                scope_hash,
+            ) if valid_identifier(agent)
+                && valid_identifier(reference)
+                && valid_blake3_digest(hash)
+                && valid_blake3_digest(target_hash)
+                && match scope {
+                    NeurosemanticArtifactLifecycleVerificationScope::ArtifactOnly =>
+                        scope_ref.is_none() && scope_hash.is_none(),
+                    NeurosemanticArtifactLifecycleVerificationScope::EnumeratedTargetSet => matches!(
+                        (scope_ref, scope_hash),
+                        (Some(scope_reference), Some(scope_digest))
+                            if valid_identifier(scope_reference) && valid_blake3_digest(scope_digest)
+                    ),
+                } => true,
+            (None, None, None, None, None, None, None) => false,
+            _ => return Err("neurosemantic lifecycle verification evidence fields are incomplete".into()),
+        };
+
+        match self.state {
+            NeurosemanticArtifactLifecycleState::Requested
+            | NeurosemanticArtifactLifecycleState::Accepted
+            | NeurosemanticArtifactLifecycleState::Processing => {
+                if has_effect || has_verification {
+                    return Err("neurosemantic lifecycle pre-application state cannot claim effect or independent verification evidence".into());
+                }
+            }
+            NeurosemanticArtifactLifecycleState::Applied => {
+                if !has_effect || has_verification {
+                    return Err("neurosemantic applied lifecycle state requires effect evidence and no independent verification".into());
+                }
+            }
+            NeurosemanticArtifactLifecycleState::IndependentlyVerified => {
+                if !has_effect || !has_verification {
+                    return Err("neurosemantic independently-verified lifecycle state requires both effect and verifier evidence".into());
+                }
+                if self.verification_target_effect_evidence_hash != self.effect_evidence_hash {
+                    return Err("neurosemantic verifier target does not match the applied effect evidence".into());
+                }
+            }
+            NeurosemanticArtifactLifecycleState::Rejected => {
+                if has_verification {
+                    return Err("neurosemantic rejected lifecycle state cannot claim independent verification".into());
+                }
+            }
         }
 
         match self.action {
@@ -275,7 +364,65 @@ impl NeurosemanticArtifactLifecycleReceipt {
     pub fn verify_effect_evidence_bytes(&self, evidence_bytes: &[u8]) -> bool {
         self.validate().is_ok()
             && evidence_bytes.len() <= MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
-            && content_hash(evidence_bytes) == self.effect_evidence_hash
+            && self.effect_evidence_hash.is_some()
+            && content_hash(evidence_bytes)
+                == self.effect_evidence_hash.as_deref().unwrap_or_default()
+    }
+
+    /// Verify independent-verifier evidence against the exact effect evidence and scope.
+    /// This proves the verification artifact and target bindings, not verifier trustworthiness.
+    pub fn verify_independent_verification_bytes(
+        &self,
+        verification_evidence_bytes: &[u8],
+        now_unix_s: u64,
+    ) -> Result<(), String> {
+        self.validate()?;
+        if self.state != NeurosemanticArtifactLifecycleState::IndependentlyVerified {
+            return Err("neurosemantic lifecycle is not in independently-verified state".into());
+        }
+        if self.observed_at_unix_s > now_unix_s {
+            return Err("neurosemantic lifecycle verification receipt is dated in the future".into());
+        }
+        if verification_evidence_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err("neurosemantic lifecycle verification evidence exceeds the serialized artifact limit".into());
+        }
+        if content_hash(verification_evidence_bytes)
+            != self.verification_evidence_hash.as_deref().unwrap_or_default()
+        {
+            return Err("neurosemantic lifecycle verification evidence hash mismatch".into());
+        }
+        if self.verification_target_effect_evidence_hash != self.effect_evidence_hash {
+            return Err("neurosemantic lifecycle verifier target does not match effect evidence".into());
+        }
+        Ok(())
+    }
+
+    /// Verify the optional content-addressed target-set artifact for descendant coverage.
+    pub fn verify_verification_scope_bytes(&self, scope_bytes: &[u8]) -> Result<(), String> {
+        self.validate()?;
+        if self.verification_scope
+            != Some(NeurosemanticArtifactLifecycleVerificationScope::EnumeratedTargetSet)
+        {
+            return Err("neurosemantic lifecycle receipt does not declare an enumerated target-set scope".into());
+        }
+        if scope_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err("neurosemantic lifecycle verification scope exceeds the serialized artifact limit".into());
+        }
+        let scope_ref = self.verification_scope_ref.as_deref().ok_or_else(||
+            "neurosemantic lifecycle receipt has no verification scope reference".to_string(),
+        )?;
+        let expected_hash = self.verification_scope_hash.as_deref().ok_or_else(||
+            "neurosemantic lifecycle receipt has no verification scope hash".to_string(),
+        )?;
+        let mut bytes = Vec::with_capacity(scope_ref.len() + scope_bytes.len() + 64);
+        bytes.extend_from_slice(b"symthaea-neurosemantic-lifecycle-verification-scope-v1\0");
+        bytes.extend_from_slice(scope_ref.as_bytes());
+        bytes.push(0);
+        bytes.extend_from_slice(scope_bytes);
+        if content_hash(&bytes) != expected_hash {
+            return Err("neurosemantic lifecycle verification scope hash mismatch".into());
+        }
+        Ok(())
     }
 
     /// Content-address the exact receipt, including lifecycle state and chain linkage.
@@ -287,7 +434,8 @@ impl NeurosemanticArtifactLifecycleReceipt {
     }
 
     /// Verify the append-only state transition from one receipt to this receipt.
-    /// This prevents sequence gaps, predecessor substitution, and impossible state regressions.
+    /// This prevents sequence gaps, predecessor substitution, skipped lifecycle stages,
+    /// and impossible state regressions.
     pub fn verify_transition(&self, previous: &Self) -> Result<(), String> {
         self.validate()?;
         previous.validate()?;
@@ -305,10 +453,13 @@ impl NeurosemanticArtifactLifecycleReceipt {
             return Err("neurosemantic lifecycle receipt transition is not a valid append-only continuation".into());
         }
         match (previous.state, self.state) {
-            (NeurosemanticArtifactLifecycleState::Requested, NeurosemanticArtifactLifecycleState::Applied)
+            (NeurosemanticArtifactLifecycleState::Requested, NeurosemanticArtifactLifecycleState::Accepted)
+            | (NeurosemanticArtifactLifecycleState::Accepted, NeurosemanticArtifactLifecycleState::Processing)
+            | (NeurosemanticArtifactLifecycleState::Processing, NeurosemanticArtifactLifecycleState::Applied)
+            | (NeurosemanticArtifactLifecycleState::Applied, NeurosemanticArtifactLifecycleState::IndependentlyVerified)
             | (NeurosemanticArtifactLifecycleState::Requested, NeurosemanticArtifactLifecycleState::Rejected)
-            | (NeurosemanticArtifactLifecycleState::Applied, NeurosemanticArtifactLifecycleState::Verified)
-            | (NeurosemanticArtifactLifecycleState::Applied, NeurosemanticArtifactLifecycleState::Rejected) => Ok(()),
+            | (NeurosemanticArtifactLifecycleState::Accepted, NeurosemanticArtifactLifecycleState::Rejected)
+            | (NeurosemanticArtifactLifecycleState::Processing, NeurosemanticArtifactLifecycleState::Rejected) => Ok(()),
             _ => Err("neurosemantic lifecycle state transition is invalid".into()),
         }
     }
@@ -339,8 +490,8 @@ impl NeurosemanticArtifactLifecycleReceipt {
         Ok(record)
     }
 
-    /// Bind a lifecycle receipt to the exact derived artifact and lineage record
-    /// already carried by the policy boundary, while rejecting future-dated receipts.
+    /// Bind a lifecycle receipt to the exact derived artifact and lineage record already
+    /// carried by the policy boundary, while rejecting future-dated receipts.
     pub fn verify_binding(
         &self,
         expected_artifact_hash: &str,
@@ -365,7 +516,6 @@ impl NeurosemanticArtifactLifecycleReceipt {
         Ok(())
     }
 }
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NeurosemanticHandlingAction {
     Transmit,
@@ -2031,28 +2181,62 @@ mod tests {
             previous_receipt_hash: None,
             action: NeurosemanticArtifactLifecycleAction::Erasure,
             state: NeurosemanticArtifactLifecycleState::Requested,
-            effect_evidence_ref: "synthetic-lifecycle-effect-1".into(),
-            effect_evidence_hash: content_hash(&evidence),
+            effect_evidence_ref: None,
+            effect_evidence_hash: None,
+            verification_agent_ref: None,
+            verification_evidence_ref: None,
+            verification_evidence_hash: None,
+            verification_target_effect_evidence_hash: None,
+            verification_scope: None,
+            verification_scope_ref: None,
+            verification_scope_hash: None,
             execution_revision: "2".repeat(40),
             observed_at_unix_s: 158,
             resulting_artifact_hash: None,
             resulting_derivation_provenance_ref: None,
             resulting_derivation_provenance_hash: None,
         };
-        let applied = NeurosemanticArtifactLifecycleReceipt {
+        let accepted = NeurosemanticArtifactLifecycleReceipt {
             receipt_ref: "synthetic-lifecycle-receipt-2".into(),
             event_sequence: 1,
             previous_receipt_hash: Some(base.fingerprint().unwrap()),
-            state: NeurosemanticArtifactLifecycleState::Applied,
+            state: NeurosemanticArtifactLifecycleState::Accepted,
             observed_at_unix_s: 159,
             ..base.clone()
         };
-        let verified = NeurosemanticArtifactLifecycleReceipt {
+        let processing = NeurosemanticArtifactLifecycleReceipt {
             receipt_ref: "synthetic-lifecycle-receipt-3".into(),
             event_sequence: 2,
-            previous_receipt_hash: Some(applied.fingerprint().unwrap()),
-            state: NeurosemanticArtifactLifecycleState::Verified,
+            previous_receipt_hash: Some(accepted.fingerprint().unwrap()),
+            state: NeurosemanticArtifactLifecycleState::Processing,
             observed_at_unix_s: 160,
+            ..accepted.clone()
+        };
+        let effect_evidence_hash = content_hash(&evidence);
+        let applied = NeurosemanticArtifactLifecycleReceipt {
+            receipt_ref: "synthetic-lifecycle-receipt-4".into(),
+            event_sequence: 3,
+            previous_receipt_hash: Some(processing.fingerprint().unwrap()),
+            state: NeurosemanticArtifactLifecycleState::Applied,
+            effect_evidence_ref: Some("synthetic-lifecycle-effect-1".into()),
+            effect_evidence_hash: Some(effect_evidence_hash.clone()),
+            observed_at_unix_s: 161,
+            ..processing.clone()
+        };
+        let verification_evidence = b"synthetic-independent-verification-v1".to_vec();
+        let verified = NeurosemanticArtifactLifecycleReceipt {
+            receipt_ref: "synthetic-lifecycle-receipt-5".into(),
+            event_sequence: 4,
+            previous_receipt_hash: Some(applied.fingerprint().unwrap()),
+            state: NeurosemanticArtifactLifecycleState::IndependentlyVerified,
+            effect_evidence_ref: applied.effect_evidence_ref.clone(),
+            effect_evidence_hash: applied.effect_evidence_hash.clone(),
+            verification_agent_ref: Some("synthetic-independent-verifier-1".into()),
+            verification_evidence_ref: Some("synthetic-independent-verification-1".into()),
+            verification_evidence_hash: Some(content_hash(&verification_evidence)),
+            verification_target_effect_evidence_hash: Some(effect_evidence_hash),
+            verification_scope: Some(NeurosemanticArtifactLifecycleVerificationScope::ArtifactOnly),
+            observed_at_unix_s: 162,
             ..applied.clone()
         };
         let replacement_hash = content_hash(b"replacement-artifact");
@@ -2062,12 +2246,13 @@ mod tests {
             ..lineage.clone()
         };
         let replacement_bytes = serde_json::to_vec(&replacement_lineage).unwrap();
-        (base, applied, verified, evidence, replacement_lineage, replacement_bytes)
+        (base, accepted, processing, applied, verified, evidence, verification_evidence, replacement_lineage, replacement_bytes)
     }
 
     #[test]
-    fn lifecycle_receipt_binds_artifact_lineage_and_effect_evidence() {
-        let (requested, applied, verified, evidence, _, _) = synthetic_lifecycle_receipt_chain();
+    fn lifecycle_receipt_binds_artifact_lineage_effect_and_independent_verification() {
+        let (requested, accepted, processing, applied, verified, evidence, verification_evidence, _, _) =
+            synthetic_lifecycle_receipt_chain();
         let lineage = synthetic_derivation_lineage_record();
         let lineage_bytes = serde_json::to_vec(&lineage).unwrap();
         assert!(verified.validate().is_ok());
@@ -2078,6 +2263,7 @@ mod tests {
             verified
         );
         assert!(verified.verify_effect_evidence_bytes(&evidence));
+        assert!(verified.verify_independent_verification_bytes(&verification_evidence, 170).is_ok());
         assert!(verified.verify_binding(
             &lineage.output_artifact_hash,
             &lineage.lineage_ref,
@@ -2085,17 +2271,23 @@ mod tests {
             &evidence,
             170,
         ).is_ok());
-        assert!(applied.verify_transition(&requested).is_ok());
+        assert!(accepted.verify_transition(&requested).is_ok());
+        assert!(processing.verify_transition(&accepted).is_ok());
+        assert!(applied.verify_transition(&processing).is_ok());
         assert!(verified.verify_transition(&applied).is_ok());
         assert!(!verified.verify_effect_evidence_bytes(b"synthetic-lifecycle-effect-tampered"));
+        assert!(verified.verify_independent_verification_bytes(
+            b"synthetic-independent-verification-tampered",
+            170
+        ).is_err());
         let mut forged = verified.clone();
         forged.previous_receipt_hash = Some(content_hash(b"wrong-previous-receipt"));
         assert!(forged.verify_transition(&applied).is_err());
     }
 
     #[test]
-    fn lifecycle_receipt_rejects_future_and_ambiguous_replacement_claims() {
-        let (requested, applied, mut receipt, evidence, replacement_lineage, replacement_bytes) =
+    fn lifecycle_receipt_rejects_future_ambiguous_replacement_and_unverified_verification_claims() {
+        let (requested, accepted, processing, applied, mut receipt, evidence, verification_evidence, replacement_lineage, replacement_bytes) =
             synthetic_lifecycle_receipt_chain();
         assert!(receipt.verify_binding(
             &receipt.artifact_hash,
@@ -2105,7 +2297,17 @@ mod tests {
             159,
         ).is_err());
         assert!(receipt.verify_transition(&applied).is_ok());
-        assert!(applied.verify_transition(&requested).is_ok());
+        assert!(applied.verify_transition(&processing).is_ok());
+        assert!(processing.verify_transition(&accepted).is_ok());
+        assert!(accepted.verify_transition(&requested).is_ok());
+
+        let mut unbound = receipt.clone();
+        unbound.verification_target_effect_evidence_hash = Some(content_hash(b"other-effect"));
+        assert!(unbound.validate().is_err());
+
+        let mut missing_verifier = receipt.clone();
+        missing_verifier.verification_agent_ref = None;
+        assert!(missing_verifier.validate().is_err());
 
         receipt.action = NeurosemanticArtifactLifecycleAction::Rectification;
         receipt.resulting_artifact_hash = None;
@@ -2130,6 +2332,9 @@ mod tests {
         forged_lineage.output_artifact_hash = content_hash(b"other-artifact");
         let forged_bytes = serde_json::to_vec(&forged_lineage).unwrap();
         assert!(receipt.verify_resulting_lineage_binding_bytes(&forged_bytes).is_err());
+
+        let _ = verification_evidence;
+    }
     }
 
     #[test]
@@ -2166,11 +2371,23 @@ mod tests {
     fn lifecycle_receipt_state_schema_is_stable() {
         for (state, expected) in [
             (NeurosemanticArtifactLifecycleState::Requested, "Requested"),
+            (NeurosemanticArtifactLifecycleState::Accepted, "Accepted"),
+            (NeurosemanticArtifactLifecycleState::Processing, "Processing"),
             (NeurosemanticArtifactLifecycleState::Applied, "Applied"),
-            (NeurosemanticArtifactLifecycleState::Verified, "Verified"),
+            (NeurosemanticArtifactLifecycleState::IndependentlyVerified, "IndependentlyVerified"),
             (NeurosemanticArtifactLifecycleState::Rejected, "Rejected"),
         ] {
             assert_eq!(serde_json::to_string(&state).unwrap(), format!("\"{expected}\""));
+        }
+    }
+
+    #[test]
+    fn lifecycle_receipt_verification_scope_schema_is_stable() {
+        for (scope, expected) in [
+            (NeurosemanticArtifactLifecycleVerificationScope::ArtifactOnly, "ArtifactOnly"),
+            (NeurosemanticArtifactLifecycleVerificationScope::EnumeratedTargetSet, "EnumeratedTargetSet"),
+        ] {
+            assert_eq!(serde_json::to_string(&scope).unwrap(), format!("\"{expected}\""));
         }
     }
 
