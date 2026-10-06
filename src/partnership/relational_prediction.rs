@@ -495,6 +495,9 @@ pub enum PredictionNullFamily {
     CircularShift,
     /// Shift each relational channel by a distinct offset inside each partition.
     FeatureDecoupling,
+    /// Keep synchrony and all non-relational context fixed while shifting only
+    /// the incremental directionality/turn-taking channels.
+    IncrementalRelationalShift,
 }
 
 /// Empirical null calibration for held-out relational prediction.
@@ -505,6 +508,7 @@ pub enum PredictionNullFamily {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PredictionNullSummary {
     pub family: PredictionNullFamily,
+    pub feature_set: PredictionFeatureSet,
     pub requested_surrogate_count: usize,
     pub surrogate_count: usize,
     pub observed_relational_mse: f64,
@@ -521,6 +525,22 @@ impl PredictionNullSummary {
         family: PredictionNullFamily,
         surrogate_count: usize,
     ) -> Result<Self, RelationalPredictionError> {
+        Self::compute_for_feature_set(
+            samples,
+            config,
+            family,
+            PredictionFeatureSet::RelationalProfile,
+            surrogate_count,
+        )
+    }
+
+    pub fn compute_for_feature_set(
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+        family: PredictionNullFamily,
+        feature_set: PredictionFeatureSet,
+        surrogate_count: usize,
+    ) -> Result<Self, RelationalPredictionError> {
         validate_samples(samples)?;
         config.validate(samples.len())?;
         validate_temporal_boundary(samples, &config)?;
@@ -529,8 +549,7 @@ impl PredictionNullSummary {
             return Err(RelationalPredictionError::InvalidSurrogateCount);
         }
 
-        let observed =
-            fit_and_score(samples, &config, PredictionFeatureSet::RelationalProfile)?;
+        let observed = fit_and_score(samples, &config, feature_set)?;
 
         let capacity = config
             .train_samples
@@ -549,8 +568,7 @@ impl PredictionNullSummary {
         for index in 0..count {
             let shift = 1 + (index * capacity / count);
             let surrogate = make_surrogate(samples, &config, family, shift);
-            let score =
-                fit_and_score(&surrogate, &config, PredictionFeatureSet::RelationalProfile)?;
+            let score = fit_and_score(&surrogate, &config, feature_set)?;
 
             minimum_surrogate_mse = minimum_surrogate_mse.min(score.mean_squared_error);
             if score.mean_squared_error <= observed.mean_squared_error + 1e-12 {
@@ -560,6 +578,7 @@ impl PredictionNullSummary {
 
         Ok(Self {
             family,
+            feature_set,
             requested_surrogate_count: surrogate_count,
             surrogate_count: count,
             observed_relational_mse: observed.mean_squared_error,
@@ -867,11 +886,18 @@ fn make_surrogate(
                 let extra = match family {
                     PredictionNullFamily::CircularShift => 0,
                     PredictionNullFamily::FeatureDecoupling => channel_offset,
+                    PredictionNullFamily::IncrementalRelationalShift => channel_offset,
                 };
                 segment_start + (local_index + shift * (extra + 1)) % segment_len
             };
 
-            let alignment_sample = samples[source(0)];
+            let shifted_alignment =
+                !matches!(family, PredictionNullFamily::IncrementalRelationalShift);
+            let alignment_sample = if shifted_alignment {
+                samples[source(0)]
+            } else {
+                *sample
+            };
             let a_to_b_sample = samples[source(1)];
             let b_to_a_sample = samples[source(2)];
             let turn_taking_sample = samples[source(3)];
