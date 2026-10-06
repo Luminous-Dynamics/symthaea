@@ -6018,29 +6018,36 @@ echo '}'
                 let profile_name =
                     format!("symthaea-relay-{}", transaction.transaction_id);
                 let secret = format!("802-11-wireless-security.psk:{wifi_pw}\n");
-                if let Err(error) = tokio::fs::write(&secret_path, secret.as_bytes()).await {
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            RelayMessage::error(&format!(
-                                "Failed to stage Wi-Fi credential: {}",
-                                error
-                            ))
-                            .to_json(),
-                        ))
-                        .await;
-                    continue;
-                }
-                if let Err(error) = tokio::fs::set_permissions(
-                    &secret_path,
-                    std::os::unix::fs::PermissionsExt::from_mode(0o600),
-                )
-                .await
+                let mut secret_file = match std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .mode(0o600)
+                    .open(&secret_path)
                 {
+                    Ok(file) => file,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Failed to create protected Wi-Fi credential: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                if let Err(error) = secret_file
+                    .write_all(secret.as_bytes())
+                    .and_then(|_| secret_file.sync_all())
+                {
+                    drop(secret_file);
                     let _ = tokio::fs::remove_file(&secret_path).await;
                     let _ = ws_tx
                         .send(Message::Text(
                             RelayMessage::error(&format!(
-                                "Failed to protect Wi-Fi credential: {}",
+                                "Failed to flush Wi-Fi credential: {}",
                                 error
                             ))
                             .to_json(),
@@ -6048,6 +6055,7 @@ echo '}'
                         .await;
                     continue;
                 }
+                drop(secret_file);
 
                 eprintln!(
                     "[{}] {} Connecting to Wi-Fi SSID {}",
