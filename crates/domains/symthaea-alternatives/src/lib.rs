@@ -681,7 +681,6 @@ impl MeasurementUncertaintyRef {
             || self.measurement_model_id.is_empty()
             || self.measurement_model_revision.is_empty()
             || self.measurement_model_digest.is_empty()
-            || self.method_id.is_empty()
             || self.measurand_id.is_empty()
             || self.procedure_id.is_empty()
             || self.procedure_digest.is_empty()
