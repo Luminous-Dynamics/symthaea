@@ -1002,7 +1002,7 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
 
     for &(dimension, rank, observations, no_match, max_multiplicity, histogram) in &first {
         let total_decoded = histogram.iter().skip(1).sum::<usize>();
-        assert_eq!(total_decoded + no_match, *observations);
+        assert_eq!(total_decoded + no_match, observations);
         assert!(max_multiplicity <= 16);
         let histogram_serialized = histogram[1..]
             .iter()
