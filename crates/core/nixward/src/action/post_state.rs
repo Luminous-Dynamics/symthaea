@@ -1800,6 +1800,20 @@ mod tests {
             definition_identity: definition(),
             definition_content_digest:
                 "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string(),
+            definition_content_files: vec![
+                NixSystemdUnitDefinitionContentFileV1 {
+                    path: "/nix/store/authorized-unit.service".into(),
+                    resolved_path: None,
+                    byte_len: 10,
+                    content_digest: "1111111111111111111111111111111111111111111111111111111111111111".into(),
+                },
+                NixSystemdUnitDefinitionContentFileV1 {
+                    path: "/etc/systemd/system/nginx.service.d/override.conf".into(),
+                    resolved_path: None,
+                    byte_len: 20,
+                    content_digest: "2222222222222222222222222222222222222222222222222222222222222222".into(),
+                },
+            ],
             load_state: ServiceLoadStateV1::Loaded,
             active_state,
             sub_state: "running".to_string(),
