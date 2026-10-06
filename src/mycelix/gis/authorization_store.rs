@@ -4295,6 +4295,44 @@ fn validate_native_authority_pin_set(
         if persisted_state != row.0 {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
+        let replay_owner: Option<(
+            String, String, String, String,
+            Option<String>, Option<String>, Option<String>,
+            Option<String>, Option<String>, Option<String>,
+        )> = tx
+            .query_row(
+                "SELECT authorization_instance,attempt_id,operation_id,relying_party_id,
+                        native_authority_namespace,native_authorization_id,
+                        native_replay_derivation_digest,boundary_id,action_digest,target_identity
+                 FROM authorization_native_replay_history
+                 WHERE native_replay_identity=?1",
+                params![record.native_replay_identity.as_str()],
+                |r| Ok((
+                    r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?,
+                    r.get(4)?, r.get(5)?, r.get(6)?,
+                    r.get(7)?, r.get(8)?, r.get(9)?,
+                )),
+            )
+            .optional()?;
+        let replay_owner = replay_owner.ok_or_else(|| {
+            AuthorizationStoreError::InvalidState(
+                "dispatch record has no native replay history".into()
+            )
+        })?;
+        if replay_owner.0 != record.authorization_instance
+            || replay_owner.1 != record.attempt_id
+            || replay_owner.2 != record.operation_id
+            || replay_owner.3 != self.relying_party_id
+            || replay_owner.4.as_deref() != Some(record.native_authority_namespace.as_str())
+            || replay_owner.5.as_deref() != Some(record.native_authorization_id.as_str())
+            || replay_owner.6.as_deref() != Some(record.native_replay_derivation_digest.as_str())
+            || replay_owner.7.as_deref() != Some(record.boundary_id.as_str())
+            || replay_owner.8.as_deref() != Some(record.action_digest.as_str())
+            || replay_owner.9.as_deref() != Some(record.target_identity.as_str())
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
         if !matches!(row.0.as_str(), "dispatch_pending" | "invoked" | "indeterminate") {
             if let Some(receipt) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")? {
                 validate_persisted_terminal_evidence(
@@ -12999,6 +13037,136 @@ mod tests {
                 AuthorizationConsumptionError::ActionAlreadyClosed
             ))
         ));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn recovery_rejects_missing_native_replay_history() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-recovery-missing-native-history-{}.db",
+            std::process::id()
+        ));
+        let store = SqliteAuthorizationStore::open_with_relying_party(&path, "rp-recovery-missing-history")
+            .unwrap();
+        let effect = ActionEffectBinding::new(
+            "target-recovery-missing-history",
+            "prod",
+            "adapter-recovery-missing-history",
+        );
+        let action = EpistemicAction::new(
+            "recovery-missing-history",
+            "intervention",
+            super::super::ActionRisk::Critical,
+        )
+        .with_effect_binding(effect.clone());
+        let digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            operation_id: Some("operation:recovery-missing-history".into()),
+            authorization_instance: "recovery-missing-history".into(),
+            action_id: action.id.clone(),
+            action_digest: digest.clone(),
+            frame: "frame@1".into(),
+            support_digest: "sha256:support-recovery-missing-history".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:00:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+        store
+            .pin_native_authority_namespace(
+                "test-explicit-issuer",
+                "recovery-missing-history-authority",
+            )
+            .unwrap();
+        store
+            .pin_provider_status_source_digest("sha256:test-status-source")
+            .unwrap();
+        store
+            .pin_provider_status_verifier_configuration(
+                &TestProviderStatusVerifier.configuration(),
+            )
+            .unwrap();
+        store
+            .pin_provider_adapter_configuration(&ProviderAdapterConfiguration::new(
+                effect.adapter.clone(),
+                "test-adapter/v1",
+                "sha256:test-adapter-implementation",
+            ))
+            .unwrap();
+        store
+            .register_lease(&AuthorizationLease::new_with_instance(
+                witness.authorization_instance.clone(),
+                action.id.clone(),
+                digest,
+                witness.support_digest.clone(),
+                witness.policy.clone(),
+                1,
+                1,
+            ))
+            .unwrap();
+        let record = mark_dispatch_pending_bound_from_pinned_native_authority_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt:recovery-missing-history",
+            &action,
+            &effect,
+            "boundary:recovery-missing-history",
+            "operation:recovery-missing-history",
+            "recovery-missing-history-authority",
+            "native-grant:recovery-missing-history",
+        )
+        .unwrap();
+
+        let connection = store.connection().unwrap();
+        connection.execute_batch("PRAGMA recursive_triggers=OFF;").unwrap();
+        connection
+            .execute(
+                "DELETE FROM authorization_native_replay_history
+                 WHERE native_replay_identity=?1",
+                params![record.native_replay_identity.as_str()],
+            )
+            .unwrap();
+
+        let err = store
+            .recover_incomplete_attempt_for_boundary(
+                "boundary:recovery-missing-history",
+                "attempt:recovery-missing-history",
+            )
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::InvalidState(message)
+                if message.contains("no native replay history")
+        ));
+
+        let state: String = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT state FROM authorization_leases
+                 WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(state, "dispatch_pending");
+
+        let dispatch_state: String = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT state FROM authorization_dispatches
+                 WHERE authorization_instance=?1 AND attempt_id=?2",
+                params![
+                    witness.authorization_instance.as_str(),
+                    "attempt:recovery-missing-history"
+                ],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(dispatch_state, "dispatch_pending");
 
         let _ = std::fs::remove_file(path);
     }
