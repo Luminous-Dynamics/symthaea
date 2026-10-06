@@ -72,7 +72,8 @@ echo "Waiting for relay (up to 120s)..."
 for i in $(seq 1 120); do
     if curl -s --max-time 2 "http://127.0.0.1:${RELAY_PORT}" >/dev/null 2>&1 || \
        python3 -c "
-import asyncio, websockets
+import asyncio
+import uuid, websockets
 async def check():
     try:
         async with websockets.connect('ws://127.0.0.1:${RELAY_PORT}', close_timeout=2):
@@ -96,6 +97,7 @@ echo ""
 echo "Running WebSocket test sequence..."
 python3 - <<'PYEOF'
 import asyncio
+import uuid
 import json
 import sys
 
@@ -158,6 +160,7 @@ async def test():
         print(f"Step 4: Installing on {target}...")
         await ws.send(json.dumps({
             "action": "install",
+            "request_id": uuid.uuid4().hex,
             "disk": target,
             "layout": "single",
             "hostname": "e2e-test",
