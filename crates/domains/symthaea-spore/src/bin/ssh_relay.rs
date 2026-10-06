@@ -2803,7 +2803,17 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     "hardware_digest": blake3::hash(client_msg.hardware_nix.as_bytes()).to_hex().to_string(),
                     "disko_digest": blake3::hash(client_msg.disko_nix.as_bytes()).to_hex().to_string(),
                 });
-                let install_payload_bytes = serde_json::to_vec(&install_payload).unwrap_or_default();
+                let install_payload_bytes = match serde_json::to_vec(&install_payload) {
+                    Ok(bytes) => bytes,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Unable to serialize system transaction: {}", error)).to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
                 let transaction = match SystemTransaction::begin(
                     MutationKind::Install,
                     Some(&target_machine_digest),
@@ -3272,8 +3282,16 @@ echo "  User password set."
                 }
 
                 let exit_code = if complete { 0 } else { 1 };
+                let outcome = if exit_code == 0 { "committed" } else { "failed" };
                 let _ = ws_tx
-                    .send(Message::Text(RelayMessage::exit(exit_code).to_json()))
+                    .send(Message::Text(
+                        serde_json::json!({
+                            "type": "exit",
+                            "code": exit_code,
+                            "transaction": transaction.receipt(outcome)
+                        })
+                        .to_string(),
+                    ))
                     .await;
 
                 // SECURITY: Clean up temporary files containing sensitive data
