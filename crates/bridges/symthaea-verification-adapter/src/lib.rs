@@ -1006,36 +1006,38 @@ fn extract_relationship_methods(
     let mut seen = std::collections::HashSet::new();
 
     for entry in entries {
-        let (id, relationship_expires, relationship_revoked) = match entry {
-            Value::String(value) => (value.clone(), None, None),
-            Value::Object(object) => {
-                let id = required_string(object, "id")?.to_owned();
-                let absolute = base.join(&id).map_err(|_| {
-                    SnapshotError::Malformed(
-                        "verification relationship member id is not a valid URL".into(),
+        let (id, relationship_controller, relationship_expires, relationship_revoked) =
+            match entry {
+                Value::String(value) => (value.clone(), None, None, None),
+                Value::Object(object) => {
+                    let id = required_string(object, "id")?.to_owned();
+                    let absolute = base.join(&id).map_err(|_| {
+                        SnapshotError::Malformed(
+                            "verification relationship member id is not a valid URL".into(),
+                        )
+                    })?;
+                    let method = ClaimVerificationMethod::new(absolute.to_string())
+                        .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
+
+                    // An embedded relationship object is itself a verification-method
+                    // definition under CID 2.2.4, not merely an ID-bearing reference.
+                    // Validate its complete method shape even when it is not the method
+                    // requested by this verification operation.
+                    parse_verification_method_definition(method, object, &base)?;
+
+                    (
+                        id,
+                        optional_string(object, "controller")?,
+                        optional_timestamp(object, "expires")?,
+                        optional_timestamp(object, "revoked")?,
                     )
-                })?;
-                let method = ClaimVerificationMethod::new(absolute.to_string())
-                    .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
-
-                // An embedded relationship object is itself a verification-method
-                // definition under CID 2.2.4, not merely an ID-bearing reference.
-                // Validate its complete method shape even when it is not the method
-                // requested by this verification operation.
-                parse_verification_method_definition(method, object, &base)?;
-
-                (
-                    id,
-                    optional_timestamp(object, "expires")?,
-                    optional_timestamp(object, "revoked")?,
-                )
-            }
-            _ => {
-                return Err(SnapshotError::Malformed(
-                    "verification relationship entries must be strings or objects".into(),
-                ))
-            }
-        };
+                }
+                _ => {
+                    return Err(SnapshotError::Malformed(
+                        "verification relationship entries must be strings or objects".into(),
+                    ))
+                }
+            };
 
         let absolute = base
             .join(&id)
@@ -1049,6 +1051,24 @@ fn extract_relationship_methods(
         }
 
         if method == request.verification_method {
+            if let Some(controller) = relationship_controller {
+                let controller = resolve_document_url(
+                    &base,
+                    &controller,
+                    "verification relationship member controller",
+                )?;
+                let expected = document_ref;
+                if controller != expected {
+                    return Err(SnapshotError::Verification(
+                        VerificationFailure::ControllerMismatch {
+                            expected: ClaimControllerIdentity::new(expected.to_owned())
+                                .map_err(|error| SnapshotError::Malformed(error.to_owned()))?,
+                            actual: ClaimControllerIdentity::new(controller)
+                                .map_err(|error| SnapshotError::Malformed(error.to_owned()))?,
+                        },
+                    ));
+                }
+            }
             if relationship_expires.is_some() || relationship_revoked.is_some() {
                 let resolved_method = extract_verification_method(request, document, document_ref)?;
                 let method_controller = resolved_method.controller;
@@ -2236,53 +2256,12 @@ mod tests {
     }
 
     #[test]
-    fn embedded_relationship_method_controller_can_differ_from_document() {
-        let mut request = request();
-        request.expected_controller =
-            ClaimControllerIdentity::new("https://key-controller.example").unwrap();
-
-        let mut snapshot = snapshot();
-        snapshot.document = r##"{
-            "id": "https://example.test/controller",
-            "assertionMethod": [{
-                "id": "https://example.test/controller#key-1",
-                "type": "Multikey",
-                "controller": "https://key-controller.example",
-                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
-            }]
-        }"##.into();
-
-        let reference = snapshot.snapshot_reference().unwrap();
-        let adapter = JsonControllerDocumentSnapshotAdapter::new(
-            "/tmp/does-not-matter",
-            reference,
-        )
-        .unwrap();
-
-        let resolution = adapter.resolve_snapshot(&request, snapshot).unwrap();
-        assert_eq!(
-            resolution.resolved_verification_method_controller.as_str(),
-            "https://key-controller.example"
-        );
-        assert!(resolution.matches_request(&request));
-    }
-
-    #[test]
     fn relationship_controller_substitution_is_definitively_rejected() {
-        let mut request = request();
-        request.expected_controller =
-            ClaimControllerIdentity::new("https://example.test/controller").unwrap();
-
+        let request = request();
         let mut snapshot = snapshot();
-        snapshot.document = r##"{
-            "id": "https://example.test/controller",
-            "assertionMethod": [{
-                "id": "https://example.test/controller#key-1",
-                "type": "Multikey",
-                "controller": "https://evil.example",
-                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
-            }]
-        }"##.into();
+        snapshot.document = snapshot
+            .document
+            .replace(r##""assertionMethod": ["#key-1"]"##, r##""assertionMethod": [{"id": "#key-1", "controller": "https://evil.example"}]"##);
         let reference = snapshot.snapshot_reference().unwrap();
         let adapter =
             JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
