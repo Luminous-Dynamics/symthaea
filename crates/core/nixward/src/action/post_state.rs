@@ -1973,6 +1973,59 @@ mod tests {
     }
 
     #[test]
+    fn definition_content_mismatch_blocks_receipt_build() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.definition_content_digest =
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into();
+        assert_eq!(
+            build_receipt(&exp, &obs, None).unwrap_err(),
+            NixPostStateErrorV1::DefinitionMismatch
+        );
+    }
+
+    #[test]
+    fn stability_content_drift_is_not_hidden_by_recomputed_sequence_digest() {
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut evidence = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+        evidence.samples[1].definition_content_digest =
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".into();
+        evidence.sequence_digest = stability_sequence_digest(&evidence.samples).unwrap();
+        assert_eq!(
+            evidence.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::StabilityIdentityOrStateChanged
+        );
+    }
+
+    #[test]
+    fn receipt_content_manifest_tampering_fails_independent_recomputation() {
+        let mut receipt = build_receipt(
+            &expectation(NixServiceOperationKindV1::Start),
+            &observation(
+                NixServiceOperationKindV1::Start,
+                ServiceActiveStateV1::Active,
+                ServiceUnitFileStateV1::Enabled,
+            ),
+            None,
+        )
+        .unwrap();
+        receipt.observed_definition_content_files[0].content_digest =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".into();
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::DefinitionMismatch
+        );
+    }
+
+    #[test]
     fn stable_claim_requires_window_and_unchanged_state_change_timestamp() {
         let mut exp = expectation(NixServiceOperationKindV1::Start);
         exp.required_stability_us = 1_000;
