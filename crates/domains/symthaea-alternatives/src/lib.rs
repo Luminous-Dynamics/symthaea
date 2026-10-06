@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 36;
+pub const SCHEMA_VERSION: u16 = 37;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v49";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v50";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -538,6 +538,10 @@ pub struct MeasurementUncertaintyEvaluationRef {
     pub evaluation_id: String,
     /// Exact uncertainty identity evaluated by this record.
     pub uncertainty_id: String,
+    /// Exact observation identity evaluated by this record.
+    pub observation_id: String,
+    /// Exact observation-record digest evaluated by this record.
+    pub observation_record_digest: String,
     /// Exact uncertainty-budget identity evaluated by this record.
     pub uncertainty_budget_id: String,
     /// Revision of the exact uncertainty-budget record.
@@ -603,6 +607,8 @@ impl MeasurementUncertaintyEvaluationRef {
     pub fn validate(&self, expanded: bool) -> Result<(), AssessmentError> {
         if self.evaluation_id.is_empty()
             || self.uncertainty_id.is_empty()
+            || self.observation_id.is_empty()
+            || self.observation_record_digest.is_empty()
             || self.uncertainty_budget_id.is_empty()
             || self.uncertainty_budget_revision.is_empty()
             || self.uncertainty_budget_digest.is_empty()
@@ -746,6 +752,8 @@ impl MeasurementUncertaintyRef {
         let evaluation_scope = &self.evaluation;
         let scope_pairs = [
             ("uncertainty_id", evaluation_scope.uncertainty_id.as_str(), self.uncertainty_id.as_str()),
+            ("observation_id", evaluation_scope.observation_id.as_str(), self.observation_id.as_str()),
+            ("observation_record_digest", evaluation_scope.observation_record_digest.as_str(), self.observation_record_digest.as_str()),
             ("uncertainty_budget_id", evaluation_scope.uncertainty_budget_id.as_str(), self.uncertainty_budget_id.as_str()),
             ("uncertainty_budget_revision", evaluation_scope.uncertainty_budget_revision.as_str(), self.uncertainty_budget_revision.as_str()),
             ("uncertainty_budget_digest", evaluation_scope.uncertainty_budget_digest.as_str(), self.uncertainty_budget_digest.as_str()),
@@ -4487,6 +4495,8 @@ mod tests {
                     evaluation: MeasurementUncertaintyEvaluationRef {
                         evaluation_id: "fixture-uncertainty-evaluation-v1".into(),
                         uncertainty_id: format!("uncertainty:{id}"),
+                        observation_id: format!("observation:{id}"),
+                        observation_record_digest: format!("fixture-record-digest:{id}"),
                         uncertainty_budget_id: "fixture-uncertainty-budget-v1".into(),
                         uncertainty_budget_revision: "v1".into(),
                         uncertainty_budget_digest: "fixture-uncertainty-budget-digest-v1".into(),
@@ -4601,6 +4611,8 @@ mod tests {
             evaluation: MeasurementUncertaintyEvaluationRef {
                 evaluation_id: "evaluation".into(),
                 uncertainty_id: "u".into(),
+                observation_id: "observation".into(),
+                observation_record_digest: "record".into(),
                 uncertainty_budget_id: "budget-v1".into(),
                 uncertainty_budget_revision: "r1".into(),
                 uncertainty_budget_digest: "budget-digest-v1".into(),
@@ -5288,6 +5300,38 @@ mod tests {
         assert!(matches!(
             error,
             AssessmentError::MeasurementUncertaintyComponentModelDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_evaluation_observation_digest_scope_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-evaluation-observation-digest",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "evaluation-observation-digest",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .observation_record_digest = "different-observation-record".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyEvaluationScopeMismatch { .. }
         ));
     }
 
