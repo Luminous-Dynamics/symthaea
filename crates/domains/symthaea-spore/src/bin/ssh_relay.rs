@@ -2728,7 +2728,8 @@ async fn verify_service_postcondition(action: &str, service: &str) -> Result<boo
     ))
 }
 async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
-    let dir = tokio::fs::metadata(image_dir)
+    let image_dir = validate_image_path(image_dir)?;
+    let dir = tokio::fs::metadata(&image_dir)
         .await
         .map_err(|error| format!("image directory postcondition probe failed: {error}"))?;
     if !dir.is_dir() {
@@ -2744,11 +2745,11 @@ async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
             continue;
         }
 
-        let quoted_path = path.to_string_lossy().replace('\\', "\\'"); // path is relay-generated
+        let safe_path = path.to_string_lossy();
         let check_command = if artifact.ends_with(".zst") {
-            format!("zstd -t '{}'", quoted_path)
+            format!("zstd -t -- '{}'", safe_path)
         } else {
-            format!("tar -tzf '{}'", quoted_path)
+            format!("tar -tzf -- '{}'", safe_path)
         };
         let check = run_cmd(&check_command)
             .await
