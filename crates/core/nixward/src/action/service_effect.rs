@@ -25,6 +25,9 @@ const MAX_DEFINITION_FILE_BYTES: u64 = 8 * 1024 * 1024;
 pub struct NixSystemdUnitDefinitionContentFileV1 {
     /// Exact systemd-reported source path whose bytes were captured.
     pub path: String,
+    /// Canonical filesystem path actually opened when path resolution involved links.
+    /// `None` means the reported path itself was opened without canonical relocation.
+    pub resolved_path: Option<String>,
     /// Byte length observed while hashing the open file descriptor.
     pub byte_len: u64,
     /// BLAKE3 commitment to the exact bytes read from that descriptor.
@@ -98,6 +101,7 @@ impl NixSystemdUnitDefinitionContentEvidenceV1 {
         put_u64(&mut h, self.files.len() as u64);
         for file in &self.files {
             put_str(&mut h, &file.path);
+            put_opt_str(&mut h, file.resolved_path.as_deref());
             put_u64(&mut h, file.byte_len);
             put_str(&mut h, &file.content_digest);
         }
@@ -324,11 +328,13 @@ mod tests {
             files: vec![
                 NixSystemdUnitDefinitionContentFileV1 {
                     path: "/nix/store/nginx.service".into(),
+                    resolved_path: None,
                     byte_len: 10,
                     content_digest: "22".repeat(32),
                 },
                 NixSystemdUnitDefinitionContentFileV1 {
                     path: "/nix/store/nginx-dropin.conf".into(),
+                    resolved_path: None,
                     byte_len: 20,
                     content_digest: "33".repeat(32),
                 },
