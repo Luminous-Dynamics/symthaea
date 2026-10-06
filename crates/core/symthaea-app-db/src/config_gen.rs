@@ -912,7 +912,8 @@ fn build_flake_nix(choices: &UserChoices) -> String {
         writeln!(out, "    lanzaboote = {{").unwrap();
         writeln!(
             out,
-            "      url = \"github:nix-community/lanzaboote/v0.4.2\";"
+            "      url = \"github:nix-community/lanzaboote/{}\";",
+            LANZABOOTE_V042_REV
         )
         .unwrap();
         writeln!(out, "      inputs.nixpkgs.follows = \"nixpkgs\";").unwrap();
@@ -922,7 +923,7 @@ fn build_flake_nix(choices: &UserChoices) -> String {
         writeln!(out, "    home-manager = {{").unwrap();
         writeln!(
             out,
-            "      url = \"github:nix-community/home-manager/{}";",
+            "      url = \"github:nix-community/home-manager/{}\";",
             HOME_MANAGER_2605_REV
         )
         .unwrap();
