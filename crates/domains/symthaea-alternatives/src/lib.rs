@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 29;
+pub const SCHEMA_VERSION: u16 = 30;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v41";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v42";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -476,6 +476,8 @@ impl MeasurementUncertaintyStatement {
 pub struct MeasurementUncertaintyRef {
     /// Stable identity of the uncertainty statement.
     pub uncertainty_id: String,
+    /// Exact observation identity to which the uncertainty statement applies.
+    pub observation_id: String,
     /// Quantitative statement reported with the observation.
     pub statement: MeasurementUncertaintyStatement,
     /// Method used to evaluate the stated uncertainty.
@@ -496,6 +498,7 @@ impl MeasurementUncertaintyRef {
     /// Validate the structural and quantitative uncertainty statement.
     pub fn validate(&self) -> Result<(), AssessmentError> {
         if self.uncertainty_id.is_empty()
+            || self.observation_id.is_empty()
             || self.method_id.is_empty()
             || self.measurand_id.is_empty()
             || self.procedure_id.is_empty()
@@ -587,6 +590,13 @@ impl EvidenceRecord {
                     }
                 }
                 if let Some(observation) = &self.observation {
+                    if uncertainty.observation_id != observation.observation_id {
+                        return Err(AssessmentError::MeasurementUncertaintyObservationMismatch {
+                            evidence_id: self.id.clone(),
+                            evidence_observation_id: observation.observation_id.clone(),
+                            uncertainty_observation_id: uncertainty.observation_id.clone(),
+                        });
+                    }
                     if uncertainty.measurand_id != observation.measurand_id {
                         return Err(AssessmentError::MeasurementUncertaintyMeasurandMismatch {
                             evidence_id: self.id.clone(),
@@ -2389,6 +2399,15 @@ pub enum AssessmentError {
         /// Stated uncertainty unit.
         uncertainty_unit: String,
     },
+    /// Stated measurement uncertainty is attached to a different observation result.
+    MeasurementUncertaintyObservationMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Observation identity carried by the evidence.
+        evidence_observation_id: String,
+        /// Observation identity carried by the uncertainty analysis.
+        uncertainty_observation_id: String,
+    },
     /// Stated measurement uncertainty applies to a different measurand than the observation.
     MeasurementUncertaintyMeasurandMismatch {
         /// Evidence identifier.
@@ -2686,6 +2705,14 @@ impl std::fmt::Display for AssessmentError {
             } => write!(
                 f,
                 "evidence {evidence_id} unit {evidence_unit} does not match uncertainty unit {uncertainty_unit}"
+            ),
+            Self::MeasurementUncertaintyObservationMismatch {
+                evidence_id,
+                evidence_observation_id,
+                uncertainty_observation_id,
+            } => write!(
+                f,
+                "evidence {evidence_id} observation {evidence_observation_id} does not match uncertainty observation {uncertainty_observation_id}"
             ),
             Self::MeasurementUncertaintyMeasurandMismatch {
                 evidence_id,
@@ -3807,8 +3834,9 @@ mod tests {
                     | EvidenceKind::FieldObserved
                     | EvidenceKind::ContinuouslyMonitored
             )
-            .then(|| MeasurementUncertaintyRef {
+.then(|| MeasurementUncertaintyRef {
                 uncertainty_id: format!("uncertainty:{id}"),
+                observation_id: format!("observation:{id}"),
                 statement: MeasurementUncertaintyStatement::Expanded {
                     value: 0.1,
                     unit: "unit".into(),
@@ -4132,6 +4160,24 @@ mod tests {
                 EvidenceStance::Supports,
                 0.9,
             )],
+        );
+
+        let mut changed = c.clone();
+        changed.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .observation_id = "different-observation".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            AssessmentError::MeasurementUncertaintyObservationMismatch {
+                evidence_id: "uncertainty-binding-evidence".into(),
+                evidence_observation_id: "observation:uncertainty-binding-evidence".into(),
+                uncertainty_observation_id: "different-observation".into(),
+            }
         );
 
         let mut changed = c.clone();
@@ -5421,6 +5467,7 @@ mod tests {
     fn expanded_uncertainty_must_be_positive() {
         let uncertainty = MeasurementUncertaintyRef {
             uncertainty_id: "u".into(),
+            observation_id: "observation".into(),
             statement: MeasurementUncertaintyStatement::Expanded {
                 value: 0.0,
                 unit: "unit".into(),
