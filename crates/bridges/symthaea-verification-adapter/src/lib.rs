@@ -100,15 +100,20 @@ impl ControllerDocumentSnapshotFile {
             ));
         }
 
-        for (field, value) in [
-            ("snapshot state_at", self.state_at.as_str()),
-            ("snapshot resolved_at", self.resolved_at.as_str()),
-        ] {
-            validate_xsd11_date_time_stamp(value).map_err(|_| {
-                SnapshotError::Malformed(format!(
-                    "{field} must be a valid XML Schema 1.1 dateTimeStamp"
-                ))
-            })?;
+        let state_at = parse_xsd11_date_time_stamp(&self.state_at).map_err(|_| {
+            SnapshotError::Malformed(
+                "snapshot state_at must be a valid XML Schema 1.1 dateTimeStamp".into(),
+            )
+        })?;
+        let resolved_at = parse_xsd11_date_time_stamp(&self.resolved_at).map_err(|_| {
+            SnapshotError::Malformed(
+                "snapshot resolved_at must be a valid XML Schema 1.1 dateTimeStamp".into(),
+            )
+        })?;
+        if resolved_at < state_at {
+            return Err(SnapshotError::Malformed(
+                "snapshot resolved_at is earlier than state_at".into(),
+            ));
         }
 
         if self.document.is_empty() {
