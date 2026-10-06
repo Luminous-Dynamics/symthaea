@@ -1539,6 +1539,7 @@ mod tests {
             object_path: object_path.clone(),
             unit_object_path: unit_object_path.clone(),
             manager_owner: ":1.42".to_string(),
+            bus_id: "0123456789abcdef0123456789abcdef".to_string(),
         };
         valid.validate().unwrap();
 
