@@ -83,6 +83,7 @@ pub enum RelationalHarmonicError {
     NonFiniteValue(&'static str),
     OutOfRange(&'static str, f64),
     InsufficientSamples(usize),
+    InvalidSurrogateCount,
     NonMonotonicTime,
     NonUniformSampling,
 }
@@ -97,6 +98,9 @@ impl std::fmt::Display for RelationalHarmonicError {
             }
             Self::InsufficientSamples(n) => {
                 write!(f, "at least 2 samples are required; got {n}")
+            }
+            Self::InvalidSurrogateCount => {
+                write!(f, "surrogate_count must be greater than zero")
             }
             Self::NonMonotonicTime => {
                 write!(f, "relational sample times must increase strictly")
@@ -431,7 +435,7 @@ impl DirectionalInformationFlowSurrogateSummary {
         }
 
         if surrogate_count == 0 {
-            return Err(RelationalHarmonicError::InsufficientSamples(0));
+            return Err(RelationalHarmonicError::InvalidSurrogateCount);
         }
 
         validate_uniform_sampling(samples)?;
