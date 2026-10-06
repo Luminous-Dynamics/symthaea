@@ -2727,6 +2727,43 @@ async fn verify_service_postcondition(action: &str, service: &str) -> Result<boo
         unit_file_state.stdout.trim(),
     ))
 }
+async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
+    let dir = tokio::fs::metadata(image_dir)
+        .await
+        .map_err(|error| format!("image directory postcondition probe failed: {error}"))?;
+    if !dir.is_dir() {
+        return Err("image destination is not a directory".into());
+    }
+
+    for artifact in ["system.btrfs.zst", "system.tar.gz"] {
+        let path = std::path::Path::new(image_dir).join(artifact);
+        if let Ok(metadata) = tokio::fs::metadata(&path).await {
+            if metadata.is_file() && metadata.len() > 0 {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+async fn verify_wifi_connection(profile_name: &str) -> Result<bool, String> {
+    let result = run_cmd("nmcli -t -f NAME,DEVICE connection show --active").await
+        .map_err(|error| format!("Wi-Fi postcondition probe failed: {error}"))?;
+    if result.exit_status != 0 {
+        return Err(format!(
+            "Wi-Fi postcondition probe exited with {}: {}",
+            result.exit_status,
+            result.stderr.chars().take(200).collect::<String>()
+        ));
+    }
+
+    Ok(result.stdout.lines().any(|line| {
+        let Some((name, device)) = line.split_once(':') else {
+            return false;
+        };
+        name == profile_name && !device.trim().is_empty()
+    }))
+}
 
 fn finalize_transaction(
     ledger: &TransactionLedger,
@@ -6135,7 +6172,23 @@ echo "COMPLETE"
                     _ => None,
                 };
                 let (response_code, observed_outcome) = match image_exit_code {
-                    Some(0) => (0, TransactionOutcome::ObservedSuccess),
+                    Some(0) => match verify_image_artifact(&image_dest).await {
+                        Ok(true) => (0, TransactionOutcome::ObservedSuccess),
+                        Ok(false) => {
+                            eprintln!(
+                                "[{}] {} image command returned 0 but no non-empty image artifact was observed",
+                                peer_addr, transaction.log_line()
+                            );
+                            (1, TransactionOutcome::Indeterminate)
+                        }
+                        Err(error) => {
+                            eprintln!(
+                                "[{}] {} image postcondition probe failed: {}",
+                                peer_addr, transaction.log_line(), error
+                            );
+                            (1, TransactionOutcome::Indeterminate)
+                        }
+                    },
                     Some(code) => (code, TransactionOutcome::Failed),
                     None => (1, TransactionOutcome::Indeterminate),
                 };
@@ -6572,11 +6625,23 @@ echo '}'
                 .await;
 
                 let response = match result {
-                    Ok(r) => {
-                        let observed_outcome = if r.exit_status == 0 {
-                            TransactionOutcome::ObservedSuccess
-                        } else {
-                            TransactionOutcome::Failed
+                    Ok(r) if r.exit_status == 0 => {
+                        let observed_outcome = match verify_wifi_connection(&profile_name).await {
+                            Ok(true) => TransactionOutcome::ObservedSuccess,
+                            Ok(false) => {
+                                eprintln!(
+                                    "[{}] {} Wi-Fi command returned 0 but active connection was not observed",
+                                    peer_addr, transaction.log_line()
+                                );
+                                TransactionOutcome::Indeterminate
+                            }
+                            Err(error) => {
+                                eprintln!(
+                                    "[{}] {} Wi-Fi postcondition probe failed: {}",
+                                    peer_addr, transaction.log_line(), error
+                                );
+                                TransactionOutcome::Indeterminate
+                            }
                         };
                         let outcome = finalize_transaction(
                             &transaction_ledger,
@@ -6587,11 +6652,25 @@ echo '}'
                         serde_json::json!({
                             "type": "wifi_result",
                             "code": protocol_exit_code(r.exit_status, outcome),
-                            "data": if r.exit_status == 0 {
+                            "data": if outcome == TransactionOutcome::ObservedSuccess {
                                 "WiFi connected".to_string()
                             } else {
-                                r.stderr.chars().take(400).collect::<String>()
+                                "Wi-Fi activation completed but the active connection was not durably observed.".to_string()
                             },
+                            "transaction": transaction.receipt(outcome)
+                        })
+                    }
+                    Ok(r) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
+                        serde_json::json!({
+                            "type": "wifi_result",
+                            "code": protocol_exit_code(r.exit_status, outcome),
+                            "data": r.stderr.chars().take(400).collect::<String>(),
                             "transaction": transaction.receipt(outcome)
                         })
                     }
