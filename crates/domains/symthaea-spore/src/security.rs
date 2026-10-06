@@ -159,22 +159,69 @@ pub fn token_eq(a: &str, b: &str) -> bool {
 pub fn validate_nix_pure_eval(nix_content: &str) -> Result<(), String> {
     use std::process::Command;
 
-    // Wrap in a trivial evaluator — we just want to check it parses
+    const TRUSTED_PATH: &str =
+        "/run/current-system/sw/bin:/run/wrappers/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin:/sbin";
+    const TRUSTED_NIX_PATH: &str =
+        "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos:nixos-config=/etc/nixos/configuration.nix";
+
+    let nix = [
+        "/run/current-system/sw/bin/nix",
+        "/nix/var/nix/profiles/default/bin/nix",
+        "/usr/bin/nix",
+    ]
+    .into_iter()
+    .find(|path| std::path::Path::new(path).is_file())
+    .ok_or_else(|| "Failed to locate trusted nix executable".to_string())?;
+
+    // Wrap in a trivial evaluator — we just want to check it parses.
     let expr = format!(
         "let config = {{}}; pkgs = {{}}; lib = {{}}; in builtins.tryEval ({})",
         nix_content
     );
 
-    let output = Command::new("nix")
+    // This helper may execute as the privileged relay user. Match the relay's
+    // command-boundary policy instead of inheriting ambient Nix configuration,
+    // daemon/socket locations, user config directories, or dynamic-loader hooks.
+    let mut command = Command::new(nix);
+    command
         .args(["eval", "--pure-eval", "--expr", &expr])
+        .env("PATH", TRUSTED_PATH)
+        .env("NIX_PATH", TRUSTED_NIX_PATH);
+    for variable in [
+        "NIX_CONFIG",
+        "NIX_USER_CONF_FILES",
+        "NIX_REMOTE",
+        "NIX_DAEMON_SOCKET_PATH",
+        "NIX_STORE_DIR",
+        "NIX_DATA_DIR",
+        "NIX_LOG_DIR",
+        "NIX_STATE_DIR",
+        "NIX_CONF_DIR",
+        "NIX_CONFIG_HOME",
+        "NIX_STATE_HOME",
+        "NIX_CACHE_HOME",
+        "XDG_CONFIG_HOME",
+        "XDG_STATE_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_CONFIG_DIRS",
+        "NIX_IGNORE_SYMLINK_STORE",
+        "BASH_ENV",
+        "ENV",
+        "LD_PRELOAD",
+        "LD_LIBRARY_PATH",
+    ] {
+        command.env_remove(variable);
+    }
+
+    let output = command
         .output()
-        .map_err(|e| format!("Failed to run nix eval: {} (is nix installed?)", e))?;
+        .map_err(|e| format!("Failed to run trusted nix eval: {e}"))?;
 
     if output.status.success() {
         Ok(())
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        // Extract just the error message, not the full trace
+        // Extract just the error message, not the full trace.
         let msg = stderr
             .lines()
             .find(|l| l.contains("error:"))
