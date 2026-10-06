@@ -323,10 +323,10 @@ async function screenshotCanvasPixelStatistics(page, selector) {
       }
     }
     return {
-      width,
-      height,
-      screenshot_width: probe.width,
-      screenshot_height: probe.height,
+      width: probe.width,
+      height: probe.height,
+      source_width: width,
+      source_height: height,
       opaque_black_pixels: opaqueBlack,
       non_opaque_pixels: nonOpaque,
       non_black_pixels: nonBlack,
@@ -1938,7 +1938,7 @@ try {
   }
 
   const artifact = {
-    schema: 'symthaea-ui-webgpu-qualification-v7',
+    schema: 'symthaea-ui-webgpu-qualification-v8',
     harness_self_tests_passed: true,
     url: URL,
     chromium: CHROMIUM,
