@@ -1299,6 +1299,62 @@ impl SimpleG2P {
         }
     }
 
+    /// Verify that pronunciation-resource evidence still matches the exact embedded
+    /// resource compiled into this process.
+    ///
+    /// This is deliberately separate from receipt verification so historical/detached receipts
+    /// can remain inspectable even after the embedded resource is updated. A current-resource
+    /// verification is stronger: it proves the referenced resource identity still exists here.
+    pub fn verify_pronunciation_lexicon_evidence(
+        &self,
+        evidence: &PronunciationLexiconEvidence,
+    ) -> Result<()> {
+        if !evidence.is_well_formed() {
+            anyhow::bail!("pronunciation evidence is malformed");
+        }
+
+        match evidence.source_id.as_str() {
+            "symthaea-hand-lexicon-v1" => {
+                if evidence.dialect_scope != "en-unspecified"
+                    || evidence.variant_policy != "single-curated-entry"
+                    || evidence.selected_variant != "only-entry"
+                    || evidence.available_variants != 1
+                {
+                    anyhow::bail!(
+                        "hand-lexicon pronunciation evidence has unsupported scope or variant semantics"
+                    );
+                }
+                if evidence.resource_blake3 != self.hand_lexicon_blake3 {
+                    anyhow::bail!(
+                        "hand-lexicon pronunciation evidence does not match the current embedded resource"
+                    );
+                }
+            }
+            "cmudict-embedded-v1" => {
+                if evidence.dialect_scope != "en-US"
+                    || evidence.variant_policy != "primary-un-suffixed-entry"
+                    || evidence.selected_variant != "primary"
+                    || evidence.available_variants == 0
+                {
+                    anyhow::bail!(
+                        "CMUdict pronunciation evidence has unsupported scope or variant semantics"
+                    );
+                }
+                if evidence.resource_blake3 != hash_cmudict_resource() {
+                    anyhow::bail!(
+                        "CMUdict pronunciation evidence does not match the current embedded resource"
+                    );
+                }
+            }
+            _ => anyhow::bail!(
+                "unsupported pronunciation-resource source: {}",
+                evidence.source_id
+            ),
+        }
+
+        Ok(())
+    }
+
     /// Convert a word to ARPABET phonemes.
     ///
     /// Lookup order: hardcoded dictionary → CMU Pronouncing Dictionary (134K words) → letter rules.
@@ -3207,6 +3263,42 @@ mod tests {
             .word_to_phonemes_from_lexicon("serendipity")
             .expect("serendipity must have a CMU pronunciation");
         assert_eq!(source, "cmudict-embedded-v1");
+    }
+
+    #[test]
+    fn test_current_resource_verification_rejects_detached_resource_substitution() {
+        let g2p = SimpleG2P::new();
+        let (_, mut evidence) = g2p
+            .word_to_phonemes_from_lexicon_with_evidence("hello")
+            .expect("hello must have embedded pronunciation");
+
+        g2p.verify_pronunciation_lexicon_evidence(&evidence)
+            .expect("fresh hand-lexicon evidence must match the current resource");
+
+        evidence.resource_blake3 = "f".repeat(64);
+
+        assert!(
+            g2p.verify_pronunciation_lexicon_evidence(&evidence).is_err(),
+            "current-resource verification must reject a digest from a different resource"
+        );
+        assert!(evidence.is_well_formed());
+    }
+
+    #[test]
+    fn test_hand_lexicon_digest_is_insertion_order_independent() {
+        let mut left = HashMap::new();
+        left.insert("alpha".to_string(), vec!["AE1", "L", "F", "AH0"]);
+        left.insert("beta".to_string(), vec!["B", "EY1", "T", "AH0"]);
+
+        let mut right = HashMap::new();
+        right.insert("beta".to_string(), vec!["B", "EY1", "T", "AH0"]);
+        right.insert("alpha".to_string(), vec!["AE1", "L", "F", "AH0"]);
+
+        assert_eq!(
+            hash_hand_lexicon(&left),
+            hash_hand_lexicon(&right),
+            "resource identity must not depend on HashMap insertion order"
+        );
     }
 
     #[test]
