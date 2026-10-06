@@ -4077,8 +4077,8 @@ echo "  User password set."
                 }
 
                 if !staged_secret_paths.is_empty() {
-                    // Session-scoped paths are generated locally from the numeric
-                    // session id, so no user-controlled shell metacharacters can appear.
+                    // Transaction-scoped paths are derived locally from the validated
+                    // transaction identifier, so no user-controlled shell metacharacters can appear.
                     let cleanup = staged_secret_paths
                         .iter()
                         .map(|path| format!("rm -f -- {}", path))
@@ -4121,6 +4121,7 @@ echo "  User password set."
                                     .to_json(),
                             ))
                             .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
                         continue;
                     }
                 }
@@ -4148,6 +4149,7 @@ echo "  User password set."
                                 .to_json(),
                             ))
                             .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
                         continue;
                     }
                     Err(e) => {
@@ -4159,6 +4161,7 @@ echo "  User password set."
                                 RelayMessage::error(&format!("Upload failed: {}", e)).to_json(),
                             ))
                             .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
                         continue;
                     }
                 }
