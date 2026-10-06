@@ -180,7 +180,7 @@ for _ in $(seq 1 30); do
     TOKEN_LINE=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
         -p 2222 root@localhost "grep -oE 'Token: [^[:space:]]+' /tmp/e2e-relay.log | tail -1" 2>/dev/null || true)
     if [[ -n "$TOKEN_LINE" ]]; then
-        RELAY_TOKEN="\${TOKEN_LINE#Token: }"
+        RELAY_TOKEN="${TOKEN_LINE#Token: }"
         break
     fi
     sleep 1
@@ -191,7 +191,7 @@ if [[ -z "$RELAY_TOKEN" ]]; then
         -p 2222 root@localhost "cat /tmp/e2e-relay.log" 2>/dev/null || true
     exit 1
 fi
-echo "  VM relay token: \${RELAY_TOKEN:0:8}..."
+echo "  VM relay token: ${RELAY_TOKEN:0:8}..."
 
 # ── Step 4-7: Persistent authenticated protocol + install ──
 echo "Exercising authenticated install protocol against the VM-local relay..."
