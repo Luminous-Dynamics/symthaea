@@ -527,6 +527,14 @@ impl NeurosemanticArtifactLifecycleReceipt {
         {
             return Err("neurosemantic lifecycle receipt transition is not a valid append-only continuation".into());
         }
+        if previous.state == NeurosemanticArtifactLifecycleState::Applied
+            && self.state == NeurosemanticArtifactLifecycleState::IndependentlyVerified
+            && (self.effect_agent_ref != previous.effect_agent_ref
+                || self.effect_evidence_ref != previous.effect_evidence_ref
+                || self.effect_evidence_hash != previous.effect_evidence_hash)
+        {
+            return Err("neurosemantic independent verification cannot substitute the applied effect identity or evidence".into());
+        }
         match (previous.state, self.state) {
             (NeurosemanticArtifactLifecycleState::Requested, NeurosemanticArtifactLifecycleState::Accepted)
             | (NeurosemanticArtifactLifecycleState::Accepted, NeurosemanticArtifactLifecycleState::Processing)
@@ -2391,6 +2399,10 @@ mod tests {
         let mut same_agent = receipt.clone();
         same_agent.verification_agent_ref = same_agent.effect_agent_ref.clone();
         assert!(same_agent.validate().is_err());
+
+        let mut substituted_effect = receipt.clone();
+        substituted_effect.effect_evidence_hash = Some(content_hash(b"other-effect"));
+        assert!(substituted_effect.verify_transition(&applied).is_err());
 
         let mut invalid_effect_agent = receipt.clone();
         invalid_effect_agent.effect_agent_ref = Some(String::new());
