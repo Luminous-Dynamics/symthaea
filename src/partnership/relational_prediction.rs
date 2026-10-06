@@ -1495,6 +1495,7 @@ impl PredictionNullSummary {
     /// Reject malformed or tampered surrogate traces before interpretation.
     pub fn validate_trace(&self) -> Result<(), RelationalPredictionError> {
         validate_held_out_config_shape(&self.config)?;
+        validate_null_family_shape(self.family, &self.config)?;
         let capacity = self
             .config
             .train_samples
@@ -2126,6 +2127,21 @@ fn update_usize(hasher: &mut blake3::Hasher, value: usize) {
 
 fn update_f64(hasher: &mut blake3::Hasher, value: f64) {
     hasher.update(&value.to_bits().to_le_bytes());
+}
+
+fn validate_null_family_shape(
+    family: PredictionNullFamily,
+    config: &HeldOutRelationalPredictionConfig,
+) -> Result<(), RelationalPredictionError> {
+    if matches!(family, PredictionNullFamily::FeatureDecoupling)
+        && (config.train_samples < 5 || config.test_samples < 5)
+    {
+        return Err(RelationalPredictionError::InsufficientSamples(
+            config.train_samples.min(config.test_samples),
+        ));
+    }
+
+    Ok(())
 }
 
 fn validate_held_out_config_shape(
@@ -3267,6 +3283,30 @@ mod tests {
         assert_eq!(
             null_trace.validate_trace(),
             Err(RelationalPredictionError::InvalidSurrogateCount)
+        );
+    }
+
+    #[test]
+    fn null_trace_rejects_family_specific_undersized_partition() {
+        let mut summary = PredictionNullSummary::compute_for_feature_set(
+            &build_samples(0.5),
+            HeldOutRelationalPredictionConfig {
+                train_samples: 36,
+                test_samples: 5,
+                gap_samples: 4,
+                ridge_lambda: 1e-8,
+            },
+            PredictionNullFamily::FeatureDecoupling,
+            PredictionFeatureSet::RelationalAugmented,
+            3,
+        )
+        .unwrap();
+
+        summary.config.test_samples = 4;
+
+        assert_eq!(
+            summary.validate_trace(),
+            Err(RelationalPredictionError::InsufficientSamples(4))
         );
     }
 
