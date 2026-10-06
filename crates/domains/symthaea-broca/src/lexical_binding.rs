@@ -504,6 +504,13 @@ impl MorphophonologicalDerivationWitness {
             .validate()
             .map_err(|_| MorphophonologicalDerivationWitnessError::InvalidRuleSet)?;
 
+        if self.rule_set_blake3.trim().is_empty()
+            || self.rule_set_blake3.len() != 64
+            || !self.rule_set_blake3.bytes().all(|byte| byte.is_ascii_hexdigit())
+        {
+            return Err(MorphophonologicalDerivationWitnessError::MalformedRuleSetDigest);
+        }
+
         if self.rule_set_blake3 != rule_set.resource_blake3() {
             return Err(MorphophonologicalDerivationWitnessError::RuleSetContentMismatch);
         }
@@ -553,13 +560,6 @@ impl MorphophonologicalDerivationWitness {
 
         if self.language != binding.language {
             return Err(MorphophonologicalDerivationWitnessError::LanguageBindingMismatch);
-        }
-
-        if self.rule_set_blake3.trim().is_empty()
-            || self.rule_set_blake3.len() != 64
-            || !self.rule_set_blake3.bytes().all(|byte| byte.is_ascii_hexdigit())
-        {
-            return Err(MorphophonologicalDerivationWitnessError::MalformedRuleSetDigest);
         }
 
         if !matches!(binding.language.status, LanguageRuleStatus::Bound) {
@@ -1962,7 +1962,7 @@ mod tests {
         witness.rule_set_blake3 = "not-a-digest".into();
         assert_eq!(
             witness
-                .validate_against_binding(&binding)
+                .validate_against_binding_and_rule_set(&binding, &rule_set)
                 .expect_err("malformed rule-set digest must fail closed"),
             MorphophonologicalDerivationWitnessError::MalformedRuleSetDigest
         );
