@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 24;
+pub const SCHEMA_VERSION: u16 = 25;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-v33";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-v34";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -1847,10 +1847,10 @@ impl ExperimentalDiscriminationTarget {
         self.decision_rule.validate()
     }
 
-    fn requirement_basis<'a>(
+    fn requirement_scale<'a>(
         &'a self,
         requirement: &'a FunctionalRequirement,
-    ) -> Option<&'a ComparisonBasisRef> {
+    ) -> Option<(&'a str, &'a str, &'a ComparisonBasisRef)> {
         match &self.surface {
             ExperimentalDiscriminationSurface::Burden(dimension) => requirement
                 .comparison_scales
@@ -2013,7 +2013,7 @@ impl ExperimentalDesignProvenance {
                     target.target_id.clone(),
                 ));
             }
-            let Some(required_basis) = target.requirement_basis(requirement) else {
+            let Some((_, _, required_basis)) = target.requirement_scale(requirement) else {
                 return Err(AssessmentError::ExperimentalDesignSurfaceUndeclared(
                     target.target_id.clone(),
                 ));
@@ -2317,6 +2317,33 @@ pub enum AssessmentError {
         /// Target identity referenced by the observation.
         target_id: String,
     },
+    /// A design-bound observation uses a different unit from the requirement surface.
+    ExperimentalDesignObservationUnitMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Required unit.
+        expected_unit: String,
+        /// Actual unit.
+        actual_unit: String,
+    },
+    /// A design-bound observation uses a different scope from the requirement surface.
+    ExperimentalDesignObservationScopeMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Required scope.
+        expected_scope: String,
+        /// Actual scope.
+        actual_scope: String,
+    },
+    /// A design-bound observation uses a different comparison basis from the requirement surface.
+    ExperimentalDesignObservationBasisMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Required basis.
+        expected: ComparisonBasisRef,
+        /// Actual evidence basis.
+        actual: ComparisonBasisRef,
+    },
     /// An observation's procedure differs from the exact procedure prescribed by the design protocol.
     ExperimentalDesignProcedureMismatch {
         /// Evidence identifier carrying the observation.
@@ -2556,6 +2583,26 @@ impl std::fmt::Display for AssessmentError {
             } => write!(
                 f,
                 "evidence {evidence_id} procedure {actual_procedure_id} does not match protocol procedure {expected_procedure_id}"
+            ),
+            Self::ExperimentalDesignObservationUnitMismatch {
+                evidence_id,
+                expected_unit,
+                actual_unit,
+            } => write!(
+                f,
+                "evidence {evidence_id} unit {actual_unit} does not match experimental target unit {expected_unit}"
+            ),
+            Self::ExperimentalDesignObservationScopeMismatch {
+                evidence_id,
+                expected_scope,
+                actual_scope,
+            } => write!(
+                f,
+                "evidence {evidence_id} scope {actual_scope} does not match experimental target scope {expected_scope}"
+            ),
+            Self::ExperimentalDesignObservationBasisMismatch { evidence_id, .. } => write!(
+                f,
+                "evidence {evidence_id} comparison basis does not match experimental target surface"
             ),
             Self::ExperimentalDesignMeasurandMismatch {
                 evidence_id,
@@ -2829,6 +2876,36 @@ impl AlternativesEngine {
                         evidence_id: evidence.id.clone(),
                         candidate_id: candidate.id.clone(),
                         target_id: target.target_id.clone(),
+                    });
+                }
+                let Some((expected_unit, expected_scope, expected_basis)) =
+                    target.requirement_scale(requirement)
+                else {
+                    return Err(AssessmentError::ExperimentalDesignSurfaceUndeclared(
+                        target.target_id.clone(),
+                    ));
+                };
+                if evidence.scope != expected_scope {
+                    return Err(AssessmentError::ExperimentalDesignObservationScopeMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected_scope: expected_scope.to_string(),
+                        actual_scope: evidence.scope.clone(),
+                    });
+                }
+                if let Some(actual_unit) = evidence.unit.as_deref()
+                    && actual_unit != expected_unit
+                {
+                    return Err(AssessmentError::ExperimentalDesignObservationUnitMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected_unit: expected_unit.to_string(),
+                        actual_unit: actual_unit.to_string(),
+                    });
+                }
+                if evidence.basis != *expected_basis {
+                    return Err(AssessmentError::ExperimentalDesignObservationBasisMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected: expected_basis.clone(),
+                        actual: evidence.basis.clone(),
                     });
                 }
                 let observation_measurand = &observation.measurand_id;
@@ -5746,6 +5823,79 @@ mod tests {
                 design,
             )
             .unwrap();
+    }
+
+    #[test]
+    fn experimental_design_rejects_observation_scale_drift() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let mut candidates = case.candidates.clone();
+        let candidate_index = candidates.iter().position(|candidate| candidate.id == "product-redesign").unwrap();
+        let observed = candidates[candidate_index]
+            .evidence
+            .iter_mut()
+            .find(|evidence| evidence.kind == EvidenceKind::Observed)
+            .unwrap();
+        let evidence_id = observed.id.clone();
+        observed.observation.as_mut().unwrap().experimental_design_id = Some("design:scale".into());
+        observed.observation.as_mut().unwrap().experimental_target_id = Some("t1".into());
+        observed.unit = Some("wrong-unit".into());
+
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:scale".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:scale".into(),
+            hypothesis_statement: "Test water.".into(),
+            unresolved_uncertainty_refs: vec!["u1".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                target_uncertainty_width: None,
+            },
+            comparison_basis: basis,
+        };
+
+        let error = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                design,
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            AssessmentError::ExperimentalDesignObservationUnitMismatch {
+                evidence_id,
+                expected_unit: "burden-unit".into(),
+                actual_unit: "wrong-unit".into(),
+            }
+        );
     }
 
     #[test]
