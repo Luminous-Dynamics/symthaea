@@ -2721,10 +2721,10 @@ impl<'a> CborReader<'a> {
         }
         let value = match initial & 0x1f {
             0..=23 => (initial & 0x1f) as u64,
-            24 => self.read_uint_bounded(1, limit_end)?,
-            25 => self.read_uint_bounded(2, limit_end)?,
-            26 => self.read_uint_bounded(4, limit_end)?,
-            27 => self.read_uint_bounded(8, limit_end)?,
+            24 => self.read_uint_bounded(1, limit_end, resource_limits)?,
+            25 => self.read_uint_bounded(2, limit_end, resource_limits)?,
+            26 => self.read_uint_bounded(4, limit_end, resource_limits)?,
+            27 => self.read_uint_bounded(8, limit_end, resource_limits)?,
             _ => return Err(Rfc9162ProofDecodeError::InvalidEncoding),
         };
         usize::try_from(value).map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)
@@ -2748,10 +2748,10 @@ impl<'a> CborReader<'a> {
         }
         match initial & 0x1f {
             0..=23 => Ok((initial & 0x1f) as u64),
-            24 => self.read_uint_bounded(1, limit_end),
-            25 => self.read_uint_bounded(2, limit_end),
-            26 => self.read_uint_bounded(4, limit_end),
-            27 => self.read_uint_bounded(8, limit_end),
+            24 => self.read_uint_bounded(1, limit_end, resource_limits),
+            25 => self.read_uint_bounded(2, limit_end, resource_limits),
+            26 => self.read_uint_bounded(4, limit_end, resource_limits),
+            27 => self.read_uint_bounded(8, limit_end, resource_limits),
             _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
         }
     }
