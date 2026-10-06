@@ -675,8 +675,10 @@ impl MeasurementUncertaintyRef {
             return Err(AssessmentError::InvalidMeasurementUncertainty);
         }
         self.statement.validate()?;
-        self.evaluation
-            .validate(matches!(self.statement, MeasurementUncertaintyStatement::Expanded { .. }))?;
+        self.evaluation.validate(matches!(
+            &self.statement,
+            MeasurementUncertaintyStatement::Expanded { .. }
+        ))?;
 
         let mut canonical_component_refs = self.component_refs.clone();
         for component in &canonical_component_refs {
