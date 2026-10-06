@@ -223,7 +223,7 @@ impl Rfc9942Es256CoseKey {
 
         for (raw_key, raw_value) in entries {
             let mut key_reader=CborReader::new(&raw_key);
-            let label=key_reader.read_cose_label_key()
+            let label=key_reader.read_cose_label_key_with_resource_limits()
                 .map_err(|error|match error {
                     Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
                     _=>Rfc9942VdpError::InvalidEncoding,
@@ -781,7 +781,7 @@ impl Rfc9942ReceiptEnvelope {
         let mut protected_labels=std::collections::HashSet::new();
         for (raw_key,raw_value) in protected_entries{
             let mut key_reader=CborReader::new(&raw_key);
-            let label_key=key_reader.read_cose_label_key().map_err(|error|match error {
+            let label_key=key_reader.read_cose_label_key_with_resource_limits().map_err(|error|match error {
                     Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
                     _=>Rfc9942VdpError::InvalidEncoding,
                 })?;
@@ -811,7 +811,7 @@ impl Rfc9942ReceiptEnvelope {
                     let mut seen_crit=std::collections::HashSet::new();
                     for item in items{
                         let mut item_reader=CborReader::new(&item);
-                        let key=item_reader.read_cose_label_key().map_err(|error|match error {
+                        let key=item_reader.read_cose_label_key_with_resource_limits().map_err(|error|match error {
                     Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
                     _=>Rfc9942VdpError::InvalidEncoding,
                 })?;
@@ -845,7 +845,7 @@ impl Rfc9942ReceiptEnvelope {
         let mut unprotected_labels=std::collections::HashSet::new();
         for (raw_key,raw_value) in unprotected_entries{
             let mut key_reader=CborReader::new(&raw_key);
-            let label_key=key_reader.read_cose_label_key().map_err(|error|match error {
+            let label_key=key_reader.read_cose_label_key_with_resource_limits().map_err(|error|match error {
                     Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
                     _=>Rfc9942VdpError::InvalidEncoding,
                 })?;
@@ -1034,7 +1034,7 @@ impl Rfc9942SignatureWithReceipts {
         let mut seen_labels=std::collections::HashSet::new();
         for (raw_key,raw_value) in entries {
             let mut key_reader=CborReader::new(&raw_key);
-            let label=key_reader.read_cose_label_key().map_err(|error|match error {
+            let label=key_reader.read_cose_label_key_with_resource_limits().map_err(|error|match error {
                     Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
                     _=>Rfc9942VdpError::InvalidEncoding,
                 })?;
@@ -1274,7 +1274,7 @@ impl Rfc9942SignatureWithReceipts {
         let mut protected_labels = std::collections::HashSet::new();
         for (raw_key,raw_value) in protected_entries {
             let mut key_reader=CborReader::new(&raw_key);
-            let label_key=key_reader.read_cose_label_key()
+            let label_key=key_reader.read_cose_label_key_with_resource_limits()
                 .map_err(|error|match error {
                     Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
                     _=>Rfc9942VdpError::InvalidEncoding,
@@ -1310,7 +1310,7 @@ impl Rfc9942SignatureWithReceipts {
                 let mut seen_crit=std::collections::HashSet::new();
                 for item in items {
                     let mut item_reader=CborReader::new(&item);
-                    let key=item_reader.read_cose_label_key()
+                    let key=item_reader.read_cose_label_key_with_resource_limits()
                         .map_err(|error|match error {
                     Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
                     _=>Rfc9942VdpError::InvalidEncoding,
@@ -1345,7 +1345,7 @@ impl Rfc9942SignatureWithReceipts {
         let mut unprotected_labels=std::collections::HashSet::new();
         for (raw_key,raw_value) in unprotected_entries {
             let mut key_reader=CborReader::new(&raw_key);
-            let label_key=key_reader.read_cose_label_key()
+            let label_key=key_reader.read_cose_label_key_with_resource_limits()
                 .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             key_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             if !unprotected_labels.insert(label_key.clone()) {
@@ -2435,18 +2435,34 @@ impl<'a> CborReader<'a> {
         }
     }
 
-    fn read_cose_label_key(&mut self) -> Result<CborLabelKey, Rfc9162ProofDecodeError> {
-        match self.peek_major_type()? {
+    fn read_cose_label_key(
+        &mut self,
+    ) -> Result<CborLabelKey, Rfc9162ProofDecodeError> {
+        self.read_cose_label_key_with_mode(false)
+    }
+
+    fn read_cose_label_key_with_resource_limits(
+        &mut self,
+    ) -> Result<CborLabelKey, Rfc9162ProofDecodeError> {
+        self.read_cose_label_key_with_mode(true)
+    }
+
+    fn read_cose_label_key_with_mode(
+        &mut self,
+        resource_limits: bool,
+    ) -> Result<CborLabelKey, Rfc9162ProofDecodeError> {
+        let major=self.peek_major_type()?;
+        match major {
             0 => {
-                let value = self.read_u64()?;
+                let value=self.read_u64()?;
                 match i64::try_from(value) {
-                    Ok(value) => Ok(CborLabelKey::Integer(value)),
-                    Err(_) => Ok(CborLabelKey::Unsigned(value)),
+                    Ok(value)=>Ok(CborLabelKey::Integer(value)),
+                    Err(_)=>Ok(CborLabelKey::Unsigned(value)),
                 }
             }
             1 => {
                 let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
-                if initial>>5 != 1 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
+                if initial>>5!=1{return Err(Rfc9162ProofDecodeError::InvalidEncoding);}
                 self.offset+=1;
                 let ai=initial&0x1f;
                 let argument=match ai {
@@ -2457,24 +2473,23 @@ impl<'a> CborReader<'a> {
                     27=>self.read_uint(8,4_294_967_296)?,
                     _=>return Err(Rfc9162ProofDecodeError::InvalidEncoding),
                 };
-                if argument <= i64::MAX as u64 {
-                    Ok(CborLabelKey::Integer(-(argument as i64) - 1))
+                if argument<=i64::MAX as u64 {
+                    Ok(CborLabelKey::Integer(-(argument as i64)-1))
                 } else {
                     Ok(CborLabelKey::Negative(argument))
                 }
-            },
-            3 => self.read_text_bounded(256)
-                .map(CborLabelKey::Text)
-                .map_err(|error| match error {
-                    Rfc9162ProofDecodeError::InvalidStructure => {
-                        Rfc9162ProofDecodeError::ResourceLimitExceeded
-                    }
-                    other => other,
-                }),
-            _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
+            }
+            3 => {
+                let value=if resource_limits {
+                    self.read_text_bounded_with_resource_limits(256)?
+                } else {
+                    self.read_text_bounded(256)?
+                };
+                Ok(CborLabelKey::Text(value))
+            }
+            _=>Err(Rfc9162ProofDecodeError::InvalidEncoding),
         }
     }
-
     fn skip_value(&mut self, depth: usize) -> Result<(), Rfc9162ProofDecodeError> {
         self.skip_value_with_limits(depth, 4096, 64, usize::MAX)
     }
@@ -3183,7 +3198,25 @@ impl<'a> CborReader<'a> {
         let slice=&self.bytes[self.offset..end]; self.offset=end; Ok(slice)
     }
 
-    fn read_text_bounded(&mut self, max_len:usize)->Result<Vec<u8>,Rfc9162ProofDecodeError>{
+    fn read_text_bounded(
+        &mut self,
+        max_len: usize,
+    ) -> Result<Vec<u8>, Rfc9162ProofDecodeError> {
+        self.read_text_bounded_with_mode(max_len, false)
+    }
+
+    fn read_text_bounded_with_resource_limits(
+        &mut self,
+        max_len: usize,
+    ) -> Result<Vec<u8>, Rfc9162ProofDecodeError> {
+        self.read_text_bounded_with_mode(max_len, true)
+    }
+
+    fn read_text_bounded_with_mode(
+        &mut self,
+        max_len: usize,
+        oversize_is_resource: bool,
+    ) -> Result<Vec<u8>, Rfc9162ProofDecodeError> {
         let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
         self.offset+=1;
         if initial>>5!=3{return Err(Rfc9162ProofDecodeError::InvalidEncoding)}
@@ -3203,7 +3236,11 @@ impl<'a> CborReader<'a> {
                     return Err(Rfc9162ProofDecodeError::UnexpectedEof);
                 }
                 if chunks>=MAX_CBOR_TSTR_CHUNKS {
-                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    return Err(if oversize_is_resource {
+                        Rfc9162ProofDecodeError::ResourceLimitExceeded
+                    } else {
+                        Rfc9162ProofDecodeError::InvalidStructure
+                    });
                 }
                 let chunk_initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
                 if chunk_initial>>5!=3 || (chunk_initial&0x1f)==31 {
@@ -3221,7 +3258,11 @@ impl<'a> CborReader<'a> {
                 };
                 let n=usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?;
                 if n>max_len.saturating_sub(out.len()) {
-                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    return Err(if oversize_is_resource {
+                        Rfc9162ProofDecodeError::ResourceLimitExceeded
+                    } else {
+                        Rfc9162ProofDecodeError::InvalidStructure
+                    });
                 }
                 let end=self.offset.checked_add(n).ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
                 if end>self.bytes.len(){return Err(Rfc9162ProofDecodeError::UnexpectedEof)}
@@ -3235,7 +3276,13 @@ impl<'a> CborReader<'a> {
 
             let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65_536)?,27=>self.read_uint(8,4_294_967_296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)};
             let n=usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?;
-            if n>max_len{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
+            if n>max_len {
+                return Err(if oversize_is_resource {
+                    Rfc9162ProofDecodeError::ResourceLimitExceeded
+                } else {
+                    Rfc9162ProofDecodeError::InvalidStructure
+                });
+            }
             let end=self.offset.checked_add(n).ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
             if end>self.bytes.len(){return Err(Rfc9162ProofDecodeError::UnexpectedEof)}
             let bytes=&self.bytes[self.offset..end];
@@ -5255,6 +5302,40 @@ mod tests {
         assert_eq!(
             Rfc9942SignatureWithReceipts::from_cbor(&bytes),
             Err(Rfc9942VdpError::InvalidEncoding)
+        );
+    }
+
+    #[test]
+    fn cbor_generic_cose_label_text_cap_remains_structural() {
+        let mut wire=Vec::new();
+        cbor_text(&mut wire,&vec![b'x';257]);
+        let mut reader=CborReader::new(&wire);
+        assert_eq!(
+            reader.read_cose_label_key(),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+    }
+
+    #[test]
+    fn cbor_resource_aware_cose_label_text_cap_is_typed() {
+        let mut wire=Vec::new();
+        cbor_text(&mut wire,&vec![b'x';257]);
+        let mut reader=CborReader::new(&wire);
+        assert_eq!(
+            reader.read_cose_label_key_with_resource_limits(),
+            Err(Rfc9162ProofDecodeError::ResourceLimitExceeded)
+        );
+    }
+
+    #[test]
+    fn cbor_resource_aware_text_chunk_cap_is_typed_at_reader_boundary() {
+        let mut wire=vec![0x7f];
+        wire.extend(std::iter::repeat_n(0x60,MAX_CBOR_TSTR_CHUNKS+1));
+        wire.push(0xff);
+        let mut reader=CborReader::new(&wire);
+        assert_eq!(
+            reader.read_text_bounded_with_resource_limits(usize::MAX),
+            Err(Rfc9162ProofDecodeError::ResourceLimitExceeded)
         );
     }
 
