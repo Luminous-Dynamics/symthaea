@@ -826,6 +826,7 @@ fn load_or_create_fingerprint_key(path: &Path) -> Result<[u8; 32], String> {
             path.display()
         )
     })?;
+    sync_parent_directory(path)?;
     Ok(key)
 }
 
@@ -1176,6 +1177,8 @@ mod tests {
 
     #[test]
     fn ledger_rejects_oversized_event_on_load() {
+        use std::os::unix::fs::PermissionsExt;
+
         let name = random_operation_id().unwrap();
         let path = std::env::temp_dir()
             .join(format!("symthaea-transaction-ledger-oversized-{name}.jsonl"));
