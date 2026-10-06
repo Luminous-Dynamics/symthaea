@@ -96,21 +96,26 @@ static CMUDICT: LazyLock<HashMap<&'static str, Vec<&'static str>>> = LazyLock::n
         .collect()
 });
 
-/// Number of pronunciation entries available for a CMUdict root word, including its primary
-/// entry and any explicitly numbered alternates. This is metadata only; the strict path still
-/// selects exactly the primary/unsuffixed entry.
-static CMUDICT_VARIANT_COUNTS: LazyLock<HashMap<&'static str, usize>> = LazyLock::new(|| {
-    let mut counts = HashMap::with_capacity(135_000);
+/// CMUdict root metadata: whether an unsuffixed primary exists and how many entries are
+/// available in the embedded resource. The strict evidence path refuses a root without an
+/// explicit primary instead of relabeling an alternate as primary.
+static CMUDICT_VARIANT_METADATA: LazyLock<
+    HashMap<&'static str, (bool, usize)>,
+> = LazyLock::new(|| {
+    let mut metadata = HashMap::with_capacity(135_000);
     for line in CMUDICT_RAW.lines() {
         if line.starts_with(";;;") || line.is_empty() {
             continue;
         }
         if let Some((word_part, _)) = line.split_once(' ') {
             let word = word_part.split('(').next().unwrap_or(word_part);
-            *counts.entry(word).or_insert(0) += 1;
+            let is_primary = !word_part.contains('(');
+            let entry = metadata.entry(word).or_insert((false, 0usize));
+            entry.0 |= is_primary;
+            entry.1 += 1;
         }
     }
-    counts
+    metadata
 });
 
 /// Look up a word in the CMU Pronouncing Dictionary.
@@ -1357,6 +1362,14 @@ impl SimpleG2P {
         }
 
         let phonemes = cmudict_lookup(&clean)?;
+        let (has_primary, available_variants) =
+            CMUDICT_VARIANT_METADATA.get(clean.as_str()).copied().unwrap_or((false, 0));
+        if !has_primary || available_variants == 0 {
+            // The compatibility text path may retain a first alternate for malformed/legacy
+            // data, but strict evidence may only identify an explicitly present primary entry.
+            return None;
+        }
+
         Some((
             phonemes,
             PronunciationLexiconEvidence {
@@ -1364,7 +1377,7 @@ impl SimpleG2P {
                 dialect_scope: "en-US".to_string(),
                 variant_policy: "primary-un-suffixed-entry".to_string(),
                 selected_variant: "primary".to_string(),
-                available_variants: CMUDICT_VARIANT_COUNTS.get(clean.as_str()).copied().unwrap_or(1),
+                available_variants,
                 resource_blake3: hash_cmudict_resource(),
             },
         ))
@@ -3233,10 +3246,11 @@ mod tests {
         let word = candidates.first().expect("embedded CMUdict should contain alternate entries");
 
         let selected = cmudict_lookup(word).expect("selected CMU pronunciation must exist");
-        let count = CMUDICT_VARIANT_COUNTS
+        let (has_primary, count) = CMUDICT_VARIANT_METADATA
             .get(word)
             .copied()
             .expect("variant metadata must cover the selected entry");
+        assert!(has_primary);
         assert!(count > 1);
 
         let g2p = SimpleG2P::new();
