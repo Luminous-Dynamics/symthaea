@@ -68,6 +68,15 @@ fn parity_check_is_full_rank_and_annihilates_code_space() {
     );
     assert_eq!(parity_check.rows().len(), 31 - independent_generator_rank);
     assert_eq!(parity_check.columns().len(), 31);
+    let independent_check_rank = independent_binary_rank(
+        &parity_check
+            .rows()
+            .iter()
+            .map(|row| row.words()[0])
+            .collect::<Vec<_>>(),
+        code.dimension(),
+    );
+    assert_eq!(independent_check_rank, parity_check.rows().len());
 
     for codeword in code.enumerate() {
         let syndrome = parity_check.syndrome(&codeword).expect("same dimension");
