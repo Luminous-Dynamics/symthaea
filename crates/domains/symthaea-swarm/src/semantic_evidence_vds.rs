@@ -2174,6 +2174,7 @@ impl<'a> CborReader<'a> {
         }
     }
 
+    #[cfg(test)]
     fn read_map_entries_bounded(
         &mut self,
         max_entries: usize,
@@ -2181,6 +2182,7 @@ impl<'a> CborReader<'a> {
         self.read_map_entries_bounded_with_limits(max_entries, 4096, 64)
     }
 
+    #[cfg(test)]
     fn read_map_entries_bounded_with_limits(
         &mut self,
         max_entries: usize,
@@ -2195,6 +2197,7 @@ impl<'a> CborReader<'a> {
         )
     }
 
+    #[cfg(test)]
     fn read_map_entries_bounded_with_limits_and_bytes(
         &mut self,
         max_entries: usize,
