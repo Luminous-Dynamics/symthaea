@@ -3301,7 +3301,8 @@ mod tests {
             .expect("current UniMorph compiler must reproduce the exact rule set and witness");
 
         let mut compiler_revision_tampered = witness.clone();
-        compiler_revision_tampered.compiler_implementation_revision = "tampered-compiler-revision".into();
+        compiler_revision_tampered.compiler_implementation_revision =
+            Some("tampered-compiler-revision".into());
         assert_eq!(
             compiler_revision_tampered
                 .replay_unimorph_tsv_compilation(artifact, &rule_set)
@@ -3310,7 +3311,8 @@ mod tests {
         );
 
         let mut parser_revision_tampered = witness.clone();
-        parser_revision_tampered.source_parser_revision = "tampered-parser-revision".into();
+        parser_revision_tampered.source_parser_revision =
+            Some("tampered-parser-revision".into());
         assert_eq!(
             parser_revision_tampered
                 .replay_unimorph_tsv_compilation(artifact, &rule_set)
@@ -3320,7 +3322,7 @@ mod tests {
 
         let mut compiler_revision_recomputed = witness.clone();
         compiler_revision_recomputed.compiler_implementation_revision =
-            "tampered-compiler-revision".into();
+            Some("tampered-compiler-revision".into());
         compiler_revision_recomputed.transformation_blake3 =
             compiler_revision_recomputed.compute_transformation_blake3();
         assert_eq!(
@@ -3332,7 +3334,7 @@ mod tests {
 
         let mut parser_revision_recomputed = witness.clone();
         parser_revision_recomputed.source_parser_revision =
-            "tampered-parser-revision".into();
+            Some("tampered-parser-revision".into());
         parser_revision_recomputed.transformation_blake3 =
             parser_revision_recomputed.compute_transformation_blake3();
         assert_eq!(
@@ -3343,7 +3345,8 @@ mod tests {
         );
 
         let mut historical_revision = witness.clone();
-        historical_revision.compiler_implementation_revision = "historical-compiler-revision".into();
+        historical_revision.compiler_implementation_revision =
+            Some("historical-compiler-revision".into());
         historical_revision.transformation_blake3 =
             historical_revision.compute_transformation_blake3();
         historical_revision
