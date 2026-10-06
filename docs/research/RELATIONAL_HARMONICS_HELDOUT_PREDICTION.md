@@ -192,6 +192,8 @@ The rolling-origin qualification path applies three prediction null families at 
 
 IncrementalRelationalShift is the targeted nested null for the critical RelationalAugmented vs NonRelationalContext comparison: synchrony and non-relational context remain fixed while only the added relational channels are shifted.
 
+The in-memory rolling qualification bundle also retains the exact rolling configuration, the realized origin_starts schedule, and a BLAKE3 commitment over the complete source sequence plus that configuration. Its validator binds every per-origin null trace to the corresponding observed RelationalAugmented MSE and holdout configuration. A replay verifier reruns the complete observed-plus-null bundle against supplied samples and rejects a different source sequence, origin schedule, configuration, or surrogate count. This source-binding is separate from caller-attested SHA-256 provenance in the serialized evidence packet.
+
 
 ## 9. Evidence packet and provenance
 
