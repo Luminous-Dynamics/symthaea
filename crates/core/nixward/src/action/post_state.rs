@@ -820,9 +820,6 @@ pub enum NixPostStateErrorV1 {
 mod tests {
     use super::*;
 
-    const DIGEST: &str =
-        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-
     fn definition() -> NixSystemdUnitDefinitionIdentityV1 {
         NixSystemdUnitDefinitionIdentityV1::new(
             "/nix/store/authorized-unit.service",
@@ -1216,7 +1213,7 @@ mod tests {
                 sample_count: 2,
             }),
         );
-        assert_eq!(result.unwrap_err(), NixPostStateErrorV1::InvalidClaim);
+        assert_eq!(result.unwrap_err(), NixPostStateErrorV1::Violated);
     }
 
     #[test]
