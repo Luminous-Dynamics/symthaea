@@ -130,6 +130,10 @@ jobs:
           assert report["secondary_research_blocked"] is True
           assert report["sensitivity_escalation_blocked"] is True
           assert report["insufficient_capability_blocked"] is True
+          assert report["revoked_authority_resolution_blocked"] is True
+          assert report["wrong_authority_resolution_context_blocked"] is True
+          assert report["authority_resolution_signature_blocked"] is True
+          assert report["authority_resolution_expiry_blocked"] is True
 
           codec_report = json.loads(Path("target/communication-evidence/neurosemantic_hdc_codec_n0.json").read_text())
           assert codec_report["binary_frame_roundtrip_exact"] is True
