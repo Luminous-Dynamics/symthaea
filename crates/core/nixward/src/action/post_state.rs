@@ -1236,6 +1236,7 @@ fn service_effect_digest(
     unit: &str,
     authorized_generation: u64,
     authorized_definition_digest: &str,
+    authorized_definition_content_digest: &str,
     pre_invocation_id: Option<&str>,
     required_stability_us: u64,
 ) -> String {
@@ -1245,6 +1246,7 @@ fn service_effect_digest(
     put_str(&mut h, unit);
     put_u64(&mut h, authorized_generation);
     put_str(&mut h, authorized_definition_digest);
+    put_str(&mut h, authorized_definition_content_digest);
     put_opt_str(&mut h, pre_invocation_id);
     put_u64(&mut h, required_stability_us);
     h.finalize().to_hex().to_string()
@@ -2652,6 +2654,7 @@ mod tests {
             &tampered.target_unit,
             tampered.authorized_generation,
             &tampered.authorized_definition_digest,
+            &tampered.authorized_definition_content_digest,
             tampered.pre_invocation_id.as_deref(),
             tampered.required_stability_us,
         );
