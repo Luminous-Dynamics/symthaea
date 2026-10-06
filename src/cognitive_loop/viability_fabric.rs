@@ -209,6 +209,17 @@ pub struct ActionPrediction {
     pub authority_granted: bool,
 }
 
+/// Explicit disposition for a prediction that did not result in an observed action.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PredictionCancellation {
+    pub action_id: u64,
+    pub prediction_cycle: u64,
+    pub cancellation_cycle: u64,
+    pub reason: String,
+    #[serde(default)]
+    pub evidence_refs: Vec<String>,
+}
+
 /// Post-action observation. A prediction is never synthesized after the fact.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ActionOutcome {
@@ -296,6 +307,7 @@ pub struct ViabilityFabric {
     state: ViabilityState,
     pending_predictions: BTreeMap<u64, ActionPrediction>,
     outcomes: Vec<ActionOutcome>,
+    cancellations: Vec<PredictionCancellation>,
     max_outcomes: usize,
     max_pending_predictions: usize,
     highest_action_id: u64,
@@ -307,6 +319,7 @@ impl ViabilityFabric {
             state: ViabilityState::default(),
             pending_predictions: BTreeMap::new(),
             outcomes: Vec::with_capacity(max_outcomes.min(1024)),
+            cancellations: Vec::with_capacity(max_outcomes.min(1024)),
             max_outcomes,
             max_pending_predictions: max_outcomes.max(1).min(4096),
             highest_action_id: 0,
@@ -467,6 +480,50 @@ impl ViabilityFabric {
 
     pub fn outcomes(&self) -> &[ActionOutcome] {
         &self.outcomes
+    }
+
+    pub fn cancellations(&self) -> &[PredictionCancellation] {
+        &self.cancellations
+    }
+
+    /// Explicitly close a prediction when the action is cancelled or could not execute.
+    ///
+    /// This is preferable to silently dropping a pending prediction: long-lived
+    /// traces must distinguish "not observed" from "never happened."
+    pub fn cancel_prediction(
+        &mut self,
+        action_id: u64,
+        cancellation_cycle: u64,
+        reason: impl Into<String>,
+        evidence_refs: Vec<String>,
+    ) -> Result<(), &'static str> {
+        let Some(prediction) = self.pending_predictions.get(&action_id) else {
+            return Err("missing pre-action prediction");
+        };
+        if cancellation_cycle < prediction.cycle {
+            return Err("cancellation predates prediction");
+        }
+        if evidence_refs.is_empty() {
+            return Err("missing evidence reference");
+        }
+        if !evidence_refs.iter().all(|r| !r.trim().is_empty()) {
+            return Err("invalid evidence reference");
+        }
+
+        let prediction_cycle = prediction.cycle;
+        self.pending_predictions.remove(&action_id);
+
+        if self.max_outcomes > 0 && self.cancellations.len() >= self.max_outcomes {
+            self.cancellations.remove(0);
+        }
+        self.cancellations.push(PredictionCancellation {
+            action_id,
+            prediction_cycle,
+            cancellation_cycle,
+            reason: reason.into(),
+            evidence_refs,
+        });
+        Ok(())
     }
 }
 
@@ -633,6 +690,42 @@ mod tests {
         };
 
         assert!(fabric.observe_action(good).is_ok());
+    }
+
+    #[test]
+    fn cancellation_closes_pending_prediction_explicitly() {
+        let mut fabric = ViabilityFabric::new(4);
+        fabric.begin_cycle(2);
+        fabric.predict_action(ActionPrediction {
+            action_id: 1,
+            action_label: "test".to_string(),
+            cycle: 2,
+            predicted_world_delta: None,
+            predicted_self_delta: None,
+            predicted_goal_delta: None,
+            authority_granted: false,
+        }).unwrap();
+
+        assert!(fabric
+            .cancel_prediction(1, 3, "actuator unavailable", vec!["sim://cancel/1".to_string()])
+            .is_ok());
+        assert_eq!(fabric.cancellations().len(), 1);
+        assert!(fabric.outcomes().is_empty());
+
+        let outcome = ActionOutcome {
+            action_id: 1,
+            action_label: "test".to_string(),
+            cycle: 3,
+            pre_state_digest: 1,
+            post_state_digest: 2,
+            authority_granted: false,
+            safety_gate_passed: false,
+            prediction: None,
+            observed_effect: None,
+            prediction_error: PredictionErrorLedger::default(),
+            evidence_refs: vec!["sim://cancel/1".to_string()],
+        };
+        assert_eq!(fabric.observe_action(outcome), Err("missing pre-action prediction"));
     }
 
     #[test]
