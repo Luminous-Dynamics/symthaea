@@ -1710,6 +1710,8 @@ fn score_persistence_baseline(
     })
 }
 
+// Deterministic commitment over evaluator inputs: raw IEEE-754 bit patterns
+// and explicit field order avoid serialization-format drift.
 fn evaluation_input_digest(
     samples: &[RelationalPredictionSample],
     config: HeldOutRelationalPredictionConfig,
