@@ -1112,8 +1112,11 @@ impl VerificationMethodResolution {
                 "unsupported verification method resolution schema version".into(),
             ));
         }
-        Url::parse(self.verification_method.as_str())
+        let verification_method_url = Url::parse(self.verification_method.as_str())
             .map_err(|_| VerificationFailure::InvalidVerificationMethodUrl)?;
+        if verification_method_url.fragment().is_none() {
+            return Err(VerificationFailure::InvalidVerificationMethodUrl);
+        }
 
         if self.verification_method_type.trim().is_empty() {
             return Err(VerificationFailure::Structural(
@@ -1469,9 +1472,16 @@ impl VerificationRequest {
         self.verification_method
             .validate_structure()
             .map_err(|reason| VerificationFailure::Structural(reason.to_owned()))?;
+        let verification_method_url = Url::parse(self.verification_method.as_str())
+            .map_err(|_| VerificationFailure::InvalidVerificationMethodUrl)?;
+        if verification_method_url.fragment().is_none() {
+            return Err(VerificationFailure::InvalidVerificationMethodUrl);
+        }
         self.expected_controller
             .validate_structure()
             .map_err(|reason| VerificationFailure::Structural(reason.to_owned()))?;
+        Url::parse(self.expected_controller.as_str())
+            .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
         self.expected_verification_relationship.validate_structure()?;
         if let Some(digest) = &self.expected_transformed_document_digest {
             if !is_hex_digest(digest) {
@@ -2579,6 +2589,43 @@ mod tests {
                 Err(VerificationFailure::InvalidTimestamp { .. })
             ));
         }
+    }
+
+    #[test]
+    fn deserialized_verification_request_and_resolution_require_fragment_identifiers() {
+        let claim = fixture_claim();
+        let mut request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        request.verification_method =
+            ClaimVerificationMethod::new("https://example.test/controller").unwrap();
+        assert!(matches!(
+            request.validate_structure(),
+            Err(VerificationFailure::InvalidVerificationMethodUrl)
+        ));
+
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let mut resolution = resolved_method(&request);
+        resolution.verification_method =
+            ClaimVerificationMethod::new("https://example.test/controller").unwrap();
+        assert!(matches!(
+            resolution.validate_structure(),
+            Err(VerificationFailure::InvalidVerificationMethodUrl)
+        ));
     }
 
     #[test]
