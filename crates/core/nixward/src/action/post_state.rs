@@ -1597,6 +1597,7 @@ mod tests {
                     generation,
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     definition_digest,
+                    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
                     pre_invocation_id,
                     required_stability_us,
                 )
@@ -1658,6 +1659,7 @@ mod tests {
                     exp.authorized_generation,
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     exp.authorized_definition_digest.clone(),
+                    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".into(),
                     exp.pre_invocation_id.clone(),
                     exp.required_stability_us,
                 )
