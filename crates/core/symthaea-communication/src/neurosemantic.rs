@@ -3200,6 +3200,55 @@ mod tests {
         assert!(NeurosemanticRemediationImpactArtifact::from_json_bytes(&serde_json::to_vec(&legacy).unwrap()).is_err());
     }
     #[test]
+    fn remediation_evaluation_manifest_schema_is_fail_closed() {
+        let manifest = NeurosemanticRemediationEvaluationManifest {
+            schema_version: NEUROSEMANTIC_REMEDIATION_EVALUATION_MANIFEST_SCHEMA_VERSION,
+            evaluation_ref: "evaluation-schema-test".into(),
+            source_dataset_manifest_hash: content_hash(b"dataset"),
+            forget_set_manifest_hash: content_hash(b"forget-set"),
+            retain_set_manifest_hash: content_hash(b"retain-set"),
+            study_protocol_hash: content_hash(b"protocol"),
+            evaluation_split_manifest_hash: content_hash(b"split"),
+            recovery_method_hash: content_hash(b"recovery"),
+            representation_probe_method_hash: content_hash(b"representation"),
+        };
+        let encoded = serde_json::to_vec(&manifest).unwrap();
+        assert_eq!(NeurosemanticRemediationEvaluationManifest::from_json_bytes(&encoded).unwrap(), manifest);
+
+        let mut legacy = manifest.clone();
+        legacy.schema_version = 0;
+        assert!(NeurosemanticRemediationEvaluationManifest::from_json_bytes(&serde_json::to_vec(&legacy).unwrap()).is_err());
+
+        let mut ambiguous = manifest.clone();
+        ambiguous.forget_set_manifest_hash = ambiguous.retain_set_manifest_hash.clone();
+        assert!(ambiguous.validate().is_err());
+
+        let mut same_method = manifest.clone();
+        same_method.recovery_method_hash = same_method.representation_probe_method_hash.clone();
+        assert!(same_method.validate().is_err());
+
+        let oversized = vec![b' '; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1];
+        assert!(NeurosemanticRemediationEvaluationManifest::from_json_bytes(&oversized).is_err());
+    }
+
+    #[test]
+    fn remediation_evaluation_method_schema_is_fail_closed() {
+        let method = NeurosemanticRemediationEvaluationMethod {
+            schema_version: NEUROSEMANTIC_REMEDIATION_EVALUATION_METHOD_SCHEMA_VERSION,
+            method_ref: "recovery-method-schema-test".into(),
+            kind: NeurosemanticRemediationEvaluationMethodKind::RecoveryAttack,
+            protocol_hash: content_hash(b"protocol"),
+            implementation_revision: "5".repeat(40),
+        };
+        assert!(NeurosemanticRemediationEvaluationMethod::from_json_bytes(&serde_json::to_vec(&method).unwrap()).is_ok());
+        let mut invalid = method.clone();
+        invalid.method_ref = String::new();
+        assert!(invalid.validate().is_err());
+        let mut future = method.clone();
+        future.implementation_revision = "0".repeat(40);
+        assert!(future.validate().is_err());
+    }
+    #[test]
     fn lifecycle_receipt_action_schema_is_stable() {
         for (action, expected) in [
             (NeurosemanticArtifactLifecycleAction::AccessRevocation, "AccessRevocation"),
