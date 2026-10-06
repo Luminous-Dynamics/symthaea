@@ -31,6 +31,8 @@ pub mod plan_executor;
 pub mod service_manager;
 pub mod service_domain;
 pub mod service_state;
+#[cfg(feature = "systemd-observer")]
+pub mod systemd_observer;
 pub(crate) mod systemd_transport;
 pub mod temporal;
 
