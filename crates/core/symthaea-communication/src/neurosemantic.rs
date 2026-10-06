@@ -193,6 +193,8 @@ pub struct NeurosemanticRemediationImpactArtifact {
     pub pre_remediation_lineage_hash: String,
     pub post_remediation_lineage_ref: String,
     pub post_remediation_lineage_hash: String,
+    /// Exact fingerprint of the lifecycle receipt whose remediation effect is being evaluated.
+    pub lifecycle_receipt_hash: String,
     pub remediation_action: NeurosemanticArtifactLifecycleAction,
     pub study_protocol_hash: String,
     pub evaluation_split_manifest_hash: String,
@@ -220,6 +222,14 @@ pub enum NeurosemanticRemediationImpactDisposition {
     Inconclusive,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum NeurosemanticRemediationImpactEvidenceKind {
+    Forgetfulness,
+    UtilityImpact,
+    FairnessImpact,
+    ResidualRisk,
+}
+
 impl NeurosemanticRemediationImpactArtifact {
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_version != NEUROSEMANTIC_REMEDIATION_IMPACT_ARTIFACT_SCHEMA_VERSION
@@ -231,6 +241,7 @@ impl NeurosemanticRemediationImpactArtifact {
             || !valid_blake3_digest(&self.pre_remediation_lineage_hash)
             || !valid_identifier(&self.post_remediation_lineage_ref)
             || !valid_blake3_digest(&self.post_remediation_lineage_hash)
+            || !valid_blake3_digest(&self.lifecycle_receipt_hash)
             || self.pre_remediation_lineage_ref == self.post_remediation_lineage_ref
             || self.pre_remediation_lineage_hash == self.post_remediation_lineage_hash
             || !valid_blake3_digest(&self.study_protocol_hash)
@@ -251,7 +262,13 @@ impl NeurosemanticRemediationImpactArtifact {
             return Err("neurosemantic remediation impact artifact contains duplicate dimensions".into());
         }
         match self.remediation_action {
-            NeurosemanticArtifactLifecycleAction::Rectification | NeurosemanticArtifactLifecycleAction::Supersession | NeurosemanticArtifactLifecycleAction::Erasure | NeurosemanticArtifactLifecycleAction::AccessRevocation | NeurosemanticArtifactLifecycleAction::Retention => {}
+            NeurosemanticArtifactLifecycleAction::Rectification
+            | NeurosemanticArtifactLifecycleAction::Supersession
+            | NeurosemanticArtifactLifecycleAction::Erasure => {}
+            NeurosemanticArtifactLifecycleAction::AccessRevocation
+            | NeurosemanticArtifactLifecycleAction::Retention => {
+                return Err("neurosemantic remediation impact artifact requires model-affecting remediation".into());
+            }
         }
         Ok(())
     }
@@ -269,11 +286,37 @@ impl NeurosemanticRemediationImpactArtifact {
         Ok(artifact)
     }
 
-    pub fn verify_evidence_bytes(&self, evidence_bytes: &[u8], expected_hash: &str) -> bool {
-        self.validate().is_ok()
-            && evidence_bytes.len() <= MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
-            && valid_blake3_digest(expected_hash)
-            && content_hash(evidence_bytes) == expected_hash
+    pub fn verify_evidence_bytes(
+        &self,
+        kind: NeurosemanticRemediationImpactEvidenceKind,
+        evidence_bytes: &[u8],
+    ) -> Result<(), String> {
+        self.validate()?;
+        if evidence_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err("neurosemantic remediation impact evidence exceeds the serialized artifact limit".into());
+        }
+        let expected_hash = match kind {
+            NeurosemanticRemediationImpactEvidenceKind::Forgetfulness => &self.forget_evidence_hash,
+            NeurosemanticRemediationImpactEvidenceKind::UtilityImpact => &self.utility_impact_evidence_hash,
+            NeurosemanticRemediationImpactEvidenceKind::FairnessImpact => self
+                .fairness_impact_evidence_hash
+                .as_ref()
+                .ok_or_else(|| "neurosemantic remediation fairness evidence is not declared".to_string())?,
+            NeurosemanticRemediationImpactEvidenceKind::ResidualRisk => &self.residual_risk_evidence_hash,
+        };
+        if content_hash(evidence_bytes) != *expected_hash {
+            return Err("neurosemantic remediation impact evidence hash mismatch".into());
+        }
+        Ok(())
+    }
+
+    pub fn verify_lifecycle_binding(&self, lifecycle_receipt: &NeurosemanticArtifactLifecycleReceipt) -> Result<(), String> {
+        self.validate()?;
+        let fingerprint = lifecycle_receipt.fingerprint()?;
+        if fingerprint != self.lifecycle_receipt_hash {
+            return Err("neurosemantic remediation impact artifact is bound to a different lifecycle receipt".into());
+        }
+        Ok(())
     }
 
     pub fn fingerprint(&self) -> Result<String, String> {
