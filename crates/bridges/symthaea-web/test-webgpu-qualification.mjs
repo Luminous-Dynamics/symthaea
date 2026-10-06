@@ -1295,6 +1295,12 @@ async function runMode(mode) {
           'capability',
         );
       }
+      if (hardwareMode && capability.adapter_info?.is_fallback_adapter === true) {
+        throw new QualificationError(
+          `WebGPU hardware qualification selected a fallback adapter: ${JSON.stringify(capability.adapter_info)}`,
+          'capability',
+        );
+      }
       if (!diagnostics.raw_webgpu_execution_canary?.executed_red) {
         throw new QualificationError(
           `Raw WebGPU execution canary failed: ${JSON.stringify(diagnostics.raw_webgpu_execution_canary)}`,
@@ -1655,7 +1661,7 @@ try {
   }
 
   const artifact = {
-    schema: 'symthaea-ui-webgpu-qualification-v4',
+    schema: 'symthaea-ui-webgpu-qualification-v5',
     harness_self_tests_passed: true,
     url: URL,
     chromium: CHROMIUM,
@@ -1673,6 +1679,7 @@ try {
       adapter_request: {
         power_preference: 'high-performance',
         force_fallback_adapter: false,
+        hardware_mode_rejects_fallback_adapter: true,
       },
     },
     run_id: process.env.GITHUB_RUN_ID || null,
