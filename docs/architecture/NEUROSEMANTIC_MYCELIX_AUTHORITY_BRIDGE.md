@@ -112,12 +112,13 @@ with `Rejected` available as a terminal outcome from the pre-application states.
 
 `Applied` requires content-addressed effect evidence. `IndependentlyVerified` additionally requires:
 
-- an explicit verifier/agent reference;
+- an explicit verifier/agent reference that is distinct from the effect executor/agent;
 - separate content-addressed verification evidence;
 - an exact hash of the effect evidence that the verifier inspected;
-- an explicit verification scope (`ArtifactOnly` or `EnumeratedTargetSet`).
+- an explicit verification scope (`ArtifactOnly` or `EnumeratedTargetSet`);
+- for `EnumeratedTargetSet`, a schema-validated, content-addressed target-set record containing the root artifact plus unique target artifact hashes.
 
-For `EnumeratedTargetSet`, the checked target set is itself content-addressed, so an independent verifier can establish exactly which descendant set its verification evidence covered. This is still an evidence binding, not proof that the verifier is trustworthy, that every replica/cache/model descendant was discovered, or that the claimed external effect actually occurred.
+For `EnumeratedTargetSet`, the checked target set is itself schema-validated and content-addressed, so an independent verifier can establish exactly which artifact identities its verification evidence covered. The protocol also requires the verification agent to differ from the effect agent, preventing a single actor from satisfying the `IndependentlyVerified` state by self-labeling. These checks are still evidence bindings, not proof that the verifier is trustworthy, that every replica/cache/model descendant was discovered, or that the claimed external effect actually occurred.
 
 The transition checker is intentionally stricter than a status log: it rejects skipped lifecycle stages, predecessor substitution, sequence gaps, state regression, and observation-time rollback. A passing `IndependentlyVerified` receipt therefore means **the verifier evidence is bound to the exact recorded effect evidence and declared scope**; it does not mean “the system is globally safe after deletion.”
 
