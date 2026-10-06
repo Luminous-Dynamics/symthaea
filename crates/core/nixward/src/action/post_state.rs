@@ -1619,6 +1619,7 @@ mod tests {
             unit: "nginx.service".to_string(),
             authorized_generation: 42,
             authorized_definition_digest: definition().digest("nginx.service").unwrap(),
+            authorized_definition_content_digest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string(),
             pre_invocation_id: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string()),
             required_stability_us: 0,
         }
@@ -1714,7 +1715,7 @@ mod tests {
                     exp.authorized_generation,
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     exp.authorized_definition_digest.clone(),
-                    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".into(),
+                    exp.authorized_definition_content_digest.clone(),
                     exp.pre_invocation_id.clone(),
                     exp.required_stability_us,
                 )
@@ -1763,6 +1764,7 @@ mod tests {
             observed_generation: 42,
             unit_object_path: "/org/freedesktop/systemd1/unit/nginx_2eservice".to_string(),
             definition_identity: definition(),
+            definition_content_digest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string(),
             load_state: ServiceLoadStateV1::Loaded,
             active_state,
             sub_state: "running".to_string(),
@@ -1800,6 +1802,7 @@ mod tests {
                 unit_object_path: obs.unit_object_path.clone(),
                 observed_generation: obs.observed_generation,
                 definition_digest: obs.definition_digest().unwrap(),
+                definition_content_digest: obs.definition_content_digest.clone(),
                 state_digest: obs.state_digest().unwrap(),
                 manager_owner: obs.systemd_manager_owner.clone().unwrap(),
                 invocation_id: obs.invocation_id.clone(),
