@@ -305,6 +305,9 @@ impl NixServicePostStateObservationV1 {
             if self.systemd_manager_owner.as_deref() != Some(job.manager_owner.as_str()) {
                 return Err(NixPostStateErrorV1::ManagerOwnerMismatch);
             }
+            if job.bus_id != self.systemd_bus_id {
+                return Err(NixPostStateErrorV1::ManagerOwnerMismatch);
+            }
         }
         validate_optional_invocation_id(self.invocation_id.as_deref(), "post-invocation id")?;
         if self.observed_at_monotonic_us < self.state_change_at_monotonic_us {
