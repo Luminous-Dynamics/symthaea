@@ -68,12 +68,21 @@ fn read_required(path: &Path) -> Vec<u8> {
 fn main() {
     println!("cargo:rerun-if-changed=src/lexical_binding.rs");
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=Cargo.toml");
+    println!("cargo:rerun-if-changed=../../../Cargo.toml");
+    println!("cargo:rerun-if-changed=../../../Cargo.lock");
+    println!("cargo:rerun-if-changed=../../../rust-toolchain.toml");
 
     let manifest_dir = PathBuf::from(
         env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set by Cargo"),
     );
+    let workspace_root = manifest_dir.join("../../..");
     let source = read_required(&manifest_dir.join("src/lexical_binding.rs"));
     let build_script = read_required(&manifest_dir.join("build.rs"));
+    let crate_manifest = read_required(&manifest_dir.join("Cargo.toml"));
+    let workspace_manifest = read_required(&workspace_root.join("Cargo.toml"));
+    let cargo_lock = read_required(&workspace_root.join("Cargo.lock"));
+    let rust_toolchain = read_required(&workspace_root.join("rust-toolchain.toml"));
 
     // The implementation revision is an exact content identity of the compiler's source module
     // plus this build-time identity mechanism. It is deliberately not a manually maintained
@@ -99,7 +108,22 @@ fn main() {
     println!(
         "cargo:rustc-env=SYMTHAEA_UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION={implementation_revision}"
     );
+    // This is intentionally separate from compiler source identity: the same checked-in source
+    // can have different dependency/toolchain semantics if its build context changes.
+    let build_context_revision = domain_digest(
+        b"symthaea-broca-unimorph-compiler-build-context-revision-v1",
+        &[
+            &crate_manifest,
+            &workspace_manifest,
+            &cargo_lock,
+            &rust_toolchain,
+        ],
+    );
+
     println!(
         "cargo:rustc-env=SYMTHAEA_UNIMORPH_TSV_SOURCE_PARSER_REVISION={parser_revision}"
+    );
+    println!(
+        "cargo:rustc-env=SYMTHAEA_UNIMORPH_TSV_COMPILER_BUILD_CONTEXT_REVISION={build_context_revision}"
     );
 }
