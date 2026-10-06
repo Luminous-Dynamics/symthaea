@@ -1,0 +1,103 @@
+# Broca UniMorph compiler contract
+
+This document defines the evidence boundary for the deterministic UniMorph-style morphology compiler.
+
+## Source format
+
+The accepted input shape is a selected single-line record:
+
+lemma<TAB>form<TAB>feature1;feature2;...
+
+The source record is treated as UTF-8 bytes. Only a terminal LF or CRLF is removed for parsing. The three parsed fields are trimmed.
+
+## Normalization
+
+The current Symthaea adapter sorts feature tokens lexicographically and records that policy as:
+
+`trim-one-line-ending-sort-feature-tokens-sort-output-rules-v1`
+
+This is a Symthaea-local deterministic normalization policy.
+
+It is **not** the official UniMorph canonicalizer.
+
+The official UniMorph canonicalizer places the part-of-speech tag first, then universal tags by the category they represent, then language-specific tags lexicographically. It also checks for conflicts and inconsistencies.
+
+Therefore a compiler receipt using the current adapter must never describe its normalization as "UniMorph canonical form".
+
+## Executable projection
+
+The adapter converts only transformations directly representable by the narrow executable operation vocabulary:
+
+- identity
+- suffix append
+- prefix prepend
+
+It does not infer replacement, stem alternation, reduplication, deletion, or other morphophonological processes.
+
+Unsupported transformations fail closed.
+
+## Provenance
+
+A source-backed compilation witness binds:
+
+- the exact source artifact digest
+- exact selected source byte ranges
+- exact selected-record digests
+- exact source-record-to-rule identities
+- compiler identity and version
+- normalization policy
+- output executable rule-set digest
+- transformation digest
+
+The witness can re-execute the current adapter against the exact selected bytes and requires the exact executable output and witness to reproduce.
+
+## Evidence levels
+
+The following claims are distinct:
+
+1. **Artifact identity** — the supplied bytes match a recorded digest.
+2. **Source selection** — the selected byte ranges and per-record digests match the artifact.
+3. **Compiler replay** — the current adapter reproduces the exact executable representation.
+4. **Morphological replay** — the executable rules reproduce the recorded surface forms.
+5. **Linguistic validity** — the upstream resource or resulting grammar is linguistically correct.
+
+The current compiler provides evidence for levels 1–4 when the relevant bytes and witnesses are supplied.
+
+It does not establish level 5.
+
+## External corpus caution
+
+UniMorph language repositories can carry known data-quality issues. An external resource must therefore be treated as provenance-bearing input, not as an assertion of linguistic ground truth.
+
+The repository's issue tracker is part of the surrounding evidence context; individual source revisions should be pinned and independently replayable.
+
+## Frozen snapshot requirement
+
+Before an external UniMorph snapshot is admitted as a repository fixture, capture:
+
+- observed immutable upstream commit or release
+- language/version metadata where available
+- exact raw artifact bytes and digest
+- source URI
+- license/attribution evidence
+- exact selected byte ranges and digests
+- exact compiler/normalization version
+- exact emitted rule-set digest
+- reproducible compiler witness
+
+Do not invent a revision from a crawl timestamp or mutable branch name.
+
+## Claim ceiling
+
+A passing compiler witness means that the declared deterministic transformation can be reproduced from the declared source bytes.
+
+It does not mean:
+
+- the source dataset is complete
+- the source dataset is error-free
+- the source labels are correct
+- the derived rule system is a complete morphology engine
+- the resulting pronunciation is correct or natural
+- the resulting speech is human-appropriate
+
+Those require separate evidence and qualification.
