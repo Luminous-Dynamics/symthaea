@@ -1133,11 +1133,24 @@ fn gaussian_elimination(
     Ok(solution)
 }
 
-fn predict(coefficients: &[f64], features: &[f64]) -> f64 {
-    let mut prediction = coefficients[0];
-    for (coefficient, feature) in coefficients.iter().skip(1).zip(features) {
-        prediction += coefficient * feature;
+fn predict(model: &FittedLinearModel, features: &[f64]) -> f64 {
+    let mut prediction = model.coefficients[0];
+
+    for (((coefficient, mean), scale), feature) in model
+        .coefficients
+        .iter()
+        .skip(1)
+        .zip(&model.means)
+        .zip(&model.scales)
+        .zip(features)
+    {
+        let standardized = (*feature - *mean) / *scale;
+        if !standardized.is_finite() {
+            return f64::NAN;
+        }
+        prediction += coefficient * standardized;
     }
+
     prediction
 }
 
@@ -1262,6 +1275,30 @@ mod tests {
             gap_samples: 4,
             ridge_lambda: 1e-8,
         }
+    }
+
+    #[test]
+    fn train_only_standardization_is_deterministic_and_finite() {
+        let samples = build_samples(0.5);
+        let first = fit_linear_model(
+            &samples[..36],
+            PredictionFeatureSet::RelationalAugmented,
+            1e-8,
+        )
+        .unwrap();
+        let second = fit_linear_model(
+            &samples[..36],
+            PredictionFeatureSet::RelationalAugmented,
+            1e-8,
+        )
+        .unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(first.means.len(), 7);
+        assert_eq!(first.scales.len(), 7);
+        assert!(first.means.iter().all(|value| value.is_finite()));
+        assert!(first.scales.iter().all(|value| value.is_finite() && *value > 0.0));
+        assert!(first.coefficients.iter().all(|value| value.is_finite()));
     }
 
     #[test]
