@@ -57,7 +57,7 @@ A successful cryptographic signature check is evidence of signer control of a ke
 
 ## Concrete signed resolution contract
 
-The communication crate now materializes the recommended resolution as `NeurosemanticAuthorityResolutionAttestation`. The handling-policy schema is version 6 so this freshness requirement is a fail-closed schema change rather than an implicit default for older artifacts.
+The communication crate now materializes the recommended resolution as `NeurosemanticAuthorityResolutionAttestation`. The handling-policy schema is version 7: v5 introduced policy provenance, v6 introduced policy-specific authority-resolution freshness, and v7 introduced derivation/data-lineage binding. The resolution schema is version 2 because its status evidence is now content-addressed rather than represented only by an opaque source reference.
 
 The resolution is signed by the configured external resolver and binds, in one immutable snapshot:
 
@@ -71,17 +71,18 @@ The resolution is signed by the configured external resolver and binds, in one i
 - the communication purpose, channel, and direction;
 - an explicit authority status;
 - the status source reference;
+- the exact status-source record digest;
 - the status checked-at time and a bounded freshness expiry.
 
 Only `Active` status can produce a `NeurosemanticPolicyProvenanceBinding`. `Suspended`, `Revoked`, `Unknown`, and `Unavailable` are explicit fail-closed states.
 
 The resolution lifetime is bounded to 24 hours by the Symthaea protocol as a defensive upper bound. Deployments handling higher-risk neurosemantic data should use a materially shorter freshness window. The handling policy can now require an even shorter `max_authority_resolution_age_s`; the capability is rejected once the status snapshot exceeds that policy-specific age, even if the snapshot has not reached its own expiry.
 
-The resolver signature authenticates the exact snapshot to the configured resolver key. The snapshot also commits to the exact authority-attestation fingerprint, preventing an otherwise valid but different attestation from being substituted after resolution. The integration must still establish that the resolver key is trusted and authorized; signature verification is not itself a governance decision.
+The resolver signature authenticates the exact snapshot to the configured resolver key. The snapshot also commits to the exact authority-attestation fingerprint and a domain-separated BLAKE3 digest of the exact status-source reference plus status record bytes. This prevents an otherwise valid but different authority proof or status artifact from being substituted after resolution. The integration must still establish that the resolver key is trusted and authorized; signature verification is not itself a governance decision.
 
-A resolution cannot outlive the authority attestation that it resolves. This prevents a freshness snapshot from extending an older issuer proof beyond its cryptographic validity window. The status-check timestamp must also not predate the attestation issuance time; a resolver cannot use a later-discovered authority proof to retroactively justify an earlier resolution.
+A resolution cannot outlive the authority attestation that it resolves. The capability-minting boundary also requires the exact status-source record bytes to match the signed status-source digest; a mutable URI, database key, or status-list location alone is not treated as stable evidence. This prevents a freshness snapshot from extending an older issuer proof beyond its cryptographic validity window. The status-check timestamp must also not predate the attestation issuance time; a resolver cannot use a later-discovered authority proof to retroactively justify an earlier resolution.
 
-The resulting capability retains the exact resolution fingerprint and its context. Because the resolution also commits to the complete consent-lease fingerprint, changing scopes, sensitivity ceilings, data/inference permissions, validity, revocation state, or other lease fields invalidates an older capability even when an implementation accidentally reuses the same lease ID and epoch. Subsequent handling therefore fails closed when the resolution is expired, non-active, or bound to a different subject, peer, lease, consent state, purpose, channel, or direction.
+The resulting capability retains the exact resolution fingerprint, status-source reference/digest, and its context. Because the resolution also commits to the complete consent-lease fingerprint, changing scopes, sensitivity ceilings, data/inference permissions, validity, revocation state, or other lease fields invalidates an older capability even when an implementation accidentally reuses the same lease ID and epoch. Subsequent handling therefore fails closed when the resolution is expired, non-active, or bound to a different subject, peer, lease, consent state, purpose, channel, or direction.
 
 ## Recommended resolution object
 
