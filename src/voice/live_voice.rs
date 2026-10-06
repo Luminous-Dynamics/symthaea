@@ -1674,11 +1674,11 @@ mod tests {
 
     #[cfg(feature = "ssm_language")]
     #[test]
-    fn test_strict_english_lexicon_derivation_rejects_heuristic_fallback() {
+    fn test_strict_english_lexicon_derivation_uses_only_embedded_pronunciation() {
         use symthaea_broca::{
-            ContentBindingStatus, GrammaticalFunction, LanguageRuleBinding, LanguageRuleStatus,
-            LexemeBinding, LexicalSource, LinguisticFrame, PhonemeSlot, SpeechPlan,
-            StructuredDecoder, SyllableStress, ThoughtChannels, LexicalMorphosyntacticBinding,
+            GrammaticalFunction, LanguageRuleBinding, LanguageRuleStatus, LexemeBinding,
+            LexicalSource, LinguisticFrame, PhonemeSlot, SpeechPlan, StructuredDecoder,
+            SyllableStress, ThoughtChannels, LexicalMorphosyntacticBinding,
         };
 
         let genesis = GenesisSeed::from_phrase("strict-lexicon-witness-test");
@@ -1686,56 +1686,100 @@ mod tests {
         let channels = ThoughtChannels::with_intent(2);
         let readout = decoder.decode(&channels);
         let frame = LinguisticFrame::from_speech_plan(&SpeechPlan::from_readout(&channels, &readout));
+        let voice = LiveVoice::new_headless(&genesis);
 
-        let constituent = frame
-            .constituents
-            .first()
-            .expect("fixture frame must have a constituent");
-        let binding = LexicalMorphosyntacticBinding::new(
-            &frame,
-            LanguageRuleBinding {
-                language_tag: "en".into(),
-                status: LanguageRuleStatus::Bound,
-                rule_id: Some("fixture:rules:v1".into()),
-                provenance: Some("fixture:rules:v1".into()),
-                unbound_reason: None,
-            },
-            vec![LexemeBinding {
-                position: 0,
-                source: LexicalSource::SemanticConstituent {
-                    role: constituent.role.clone(),
-                    prime: constituent.prime.clone(),
+        let make_binding = |form: &str| {
+            let constituents = frame
+                .constituents
+                .iter()
+                .map(|slot| LexemeBinding {
+                    position: slot.position,
+                    source: LexicalSource::SemanticConstituent {
+                        role: slot.role.clone(),
+                        prime: slot.prime.clone(),
+                    },
+                    lemma: form.into(),
+                    lexeme_id: format!("en:fixture:{}", slot.position),
+                    grammatical_function: GrammaticalFunction::Other("fixture".into()),
+                    morphology: Vec::new(),
+                    morphophonological_form: Some(form.into()),
+                    provenance: "fixture:v1".into(),
+                    semantic_payload: true,
+                })
+                .collect::<Vec<_>>();
+
+            LexicalMorphosyntacticBinding::new(
+                &frame,
+                LanguageRuleBinding {
+                    language_tag: "en".into(),
+                    status: LanguageRuleStatus::Bound,
+                    rule_id: Some("fixture:rules:v1".into()),
+                    provenance: Some("fixture:rules:v1".into()),
+                    unbound_reason: None,
                 },
-                lemma: "zzzxxyq".into(),
-                lexeme_id: "en:fixture:unlisted".into(),
-                grammatical_function: GrammaticalFunction::Other("fixture".into()),
-                morphology: Vec::new(),
-                morphophonological_form: Some("zzzxxyq".into()),
-                provenance: "fixture:v1".into(),
-                semantic_payload: true,
-            }],
-            Vec::new(),
-            Vec::new(),
+                constituents,
+                Vec::new(),
+                Vec::new(),
+            )
+            .expect("fixture lexical binding")
+        };
+
+        let binding = make_binding("hello");
+        let (hello_phones, source) = voice
+            .g2p
+            .word_to_phonemes_from_lexicon("hello")
+            .expect("hello must be in an embedded pronunciation lexicon");
+
+        let mut segments = Vec::new();
+        for constituent in &binding.constituents {
+            let (phones, _) = voice
+                .g2p
+                .word_to_phonemes_from_lexicon(
+                    constituent
+                        .morphophonological_form
+                        .as_deref()
+                        .expect("fixture form"),
+                )
+                .expect("fixture form must have an embedded pronunciation");
+
+            for (index, phone) in phones.iter().enumerate() {
+                let base = phone.trim_end_matches(|c: char| c.is_ascii_digit());
+                let stress = match phone.chars().last() {
+                    Some('1') => SyllableStress::Primary,
+                    Some('2') => SyllableStress::Secondary,
+                    _ => SyllableStress::None,
+                };
+                segments.push(PhonemeSlot::new(
+                    base,
+                    segments.len(),
+                    stress,
+                    true,
+                    false,
+                    constituent.position + 1 == binding.constituents.len() && index + 1 == phones.len(),
+                ));
+            }
+        }
+
+        let (witness, sources) = voice
+            .derive_english_lexical_phonological_witness(&binding, &segments)
+            .expect("embedded lexicon should derive a witness");
+        assert_eq!(source, "symthaea-hand-lexicon-v1");
+        assert_eq!(sources, vec![source.to_string()]);
+        assert!(witness.validate_against_segments(&binding, &segments).is_ok());
+        assert_eq!(
+            witness.mappings[0].symbols[0],
+            hello_phones[0].trim_end_matches(|c: char| c.is_ascii_digit())
         );
 
-        // The fixture intentionally fails before any heuristic phonology can be admitted.
-        assert!(binding.is_err());
-
-        let mut plan = symthaea_broca::PhonologicalPlan::from_linguistic_frame(&frame);
-        plan.bind_segments(
-            vec![PhonemeSlot::new(
-                "Z",
-                0,
-                SyllableStress::Primary,
-                true,
-                false,
-                true,
-            )],
-            ContentBindingStatus::PhonologicallyBound,
-        )
-        .expect("explicit phonological fixture");
-        assert!(!plan.ready_for_realization());
+        let unlisted = make_binding("zzzxxyq");
+        assert!(
+            voice
+                .derive_english_lexical_phonological_witness(&unlisted, &segments)
+                .is_err(),
+            "unlisted forms must fail rather than using spelling-rule fallback"
+        );
     }
+
 
     #[cfg(feature = "ssm_language")]
     #[test]
