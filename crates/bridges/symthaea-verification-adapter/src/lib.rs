@@ -2030,6 +2030,48 @@ mod tests {
     }
 
     #[test]
+    fn equivalent_verification_method_url_is_resolved() {
+        let mut request = request();
+        request.verification_method =
+            symthaea_epistemic_types::ClaimVerificationMethod::new(
+                "https://EXAMPLE.TEST:443/controller/../controller#key-1",
+            )
+            .unwrap();
+
+        let snapshot = snapshot();
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+
+        let result = adapter.resolve_snapshot(&request, snapshot);
+        assert!(result.is_ok(), "{result:?}");
+        let (resolution, resolved_method) = result.unwrap();
+        assert_eq!(
+            resolved_method.id.as_str(),
+            "https://example.test/controller#key-1"
+        );
+        assert_eq!(
+            resolution.verification_method.as_str(),
+            "https://EXAMPLE.TEST:443/controller/../controller#key-1"
+        );
+    }
+
+    #[test]
+    fn equivalent_snapshot_document_url_is_accepted() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.controller_document_ref =
+            "https://EXAMPLE.TEST:443/controller/../controller".into();
+
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+
+        let result = adapter.resolve_snapshot(&request, snapshot);
+        assert!(result.is_ok(), "{result:?}");
+    }
+
+    #[test]
     fn relative_verification_method_definition_id_is_rejected() {
         let request = request();
         let mut snapshot = snapshot();
