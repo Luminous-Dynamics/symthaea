@@ -1380,7 +1380,7 @@ echo "STAGE: Generating configuration..."
 nixos-generate-config --root /mnt
 "#,
                 disk = msg.disk,
-                passphrase = passphrase
+                luks_key_file = luks_key_file
             );
 
             // Append configuration.nix (and optionally flake.nix) via heredoc.
