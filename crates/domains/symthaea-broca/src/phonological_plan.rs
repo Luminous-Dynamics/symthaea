@@ -10,6 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::lexical_binding::LexicalMorphosyntacticBinding;
+use crate::lexical_phonological_witness::LexicalPhonologicalWitness;
 use crate::linguistic_frame::LinguisticFrame;
 use crate::speech_plan::{IntonationIntent, SpeechPlan};
 
@@ -206,6 +207,57 @@ impl PhonologicalPlan {
         self.bind_lexical_segments(segments, binding.provenance_token())
     }
 
+    /// Re-validate a lexicalized plan against the concrete binding and retained witness.
+    ///
+    /// The witness is intentionally supplied explicitly because the current plan schema does not
+    /// persist its full lexical-to-segment mapping. This prevents the API from implying evidence
+    /// retention that the serialized plan does not actually provide.
+    pub fn validate_against_lexical_binding_and_witness(
+        &self,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        witness: &LexicalPhonologicalWitness,
+    ) -> Result<(), PhonologicalPlanError> {
+        binding
+            .validate_against_frame(frame)
+            .map_err(|_| PhonologicalPlanError::LexicalBindingMismatch)?;
+        self.validate_against_frame(frame)?;
+        witness
+            .validate_against_segments(binding, &self.segments)
+            .map_err(|_| PhonologicalPlanError::LexicalPhonologicalWitnessMismatch)?;
+
+        let expected_provenance = binding.provenance_token();
+        if self.content_binding != ContentBindingStatus::LexicallyBound
+            || self.lexical_provenance.as_deref() != Some(expected_provenance.as_str())
+        {
+            return Err(PhonologicalPlanError::LexicalBindingMismatch);
+        }
+
+        Ok(())
+    }
+
+    /// Bind a lexicalized phonological plan only when an explicit realization witness
+    /// validates the exact lexical-to-segment mapping.
+    ///
+    /// The witness proves coverage/order/index/symbol consistency for the supplied segment
+    /// stream; it remains a caller-supplied realization claim rather than an automatic G2P proof.
+    pub fn bind_lexical_segments_from_binding_with_witness(
+        &mut self,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        witness: &LexicalPhonologicalWitness,
+        segments: Vec<PhonemeSlot>,
+    ) -> Result<(), PhonologicalPlanError> {
+        binding
+            .validate_against_frame(frame)
+            .map_err(|_| PhonologicalPlanError::LexicalBindingMismatch)?;
+        self.validate_against_frame(frame)?;
+        witness
+            .validate_against_segments(binding, &segments)
+            .map_err(|_| PhonologicalPlanError::LexicalPhonologicalWitnessMismatch)?;
+        self.bind_lexical_segments(segments, binding.provenance_token())
+    }
+
     /// Validate that this lexicalized phonological plan carries the exact supplied binding.
     pub fn validate_against_lexical_binding(
         &self,
@@ -389,6 +441,7 @@ pub enum PhonologicalPlanError {
     LexicalBindingWithoutSegments,
     LexicalBindingWithoutProvenance,
     LexicalBindingMismatch,
+    LexicalPhonologicalWitnessMismatch,
     EmptyLexicalProvenance,
     InvalidLexicalProvenanceFormat,
     NonLexicalProvenance,
@@ -432,6 +485,9 @@ impl std::fmt::Display for PhonologicalPlanError {
             }
             Self::LexicalBindingMismatch => {
                 write!(f, "phonological plan does not match the supplied lexical binding")
+            }
+            Self::LexicalPhonologicalWitnessMismatch => {
+                write!(f, "phonological plan does not match the supplied lexical-to-phonological witness")
             }
             Self::EmptyLexicalProvenance => {
                 write!(f, "lexically bound plans require non-empty lexical provenance")
@@ -694,7 +750,7 @@ mod tests {
     }
 
     #[test]
-    fn lexical_bridge_binds_and_rejects_tampered_identity() {
+    fn lexical_bridge_requires_explicit_realization_witness() {
         let mut speech_plan = plan();
         speech_plan.focus_role = None;
         let frame = LinguisticFrame::from_speech_plan(&speech_plan);
@@ -732,34 +788,65 @@ mod tests {
         )
         .expect("fixture lexical binding must validate");
 
-        let mut phonological = PhonologicalPlan::from_linguistic_frame(&frame);
-        phonological
-            .bind_lexical_segments_from_binding(
-                &frame,
-                &binding,
-                vec![PhonemeSlot::new(
-                    "AH",
-                    0,
+        let segments = (0..binding.constituents.len())
+            .map(|index| {
+                PhonemeSlot::new(
+                    format!("P{index}"),
+                    index,
                     SyllableStress::Primary,
                     true,
                     false,
                     true,
-                )],
+                )
+            })
+            .collect::<Vec<_>>();
+        let witness = LexicalPhonologicalWitness::new(
+            &binding,
+            segments
+                .iter()
+                .enumerate()
+                .map(|(index, segment)| LexicalPhonologicalMapping {
+                    lexical_position: index,
+                    segment_indices: vec![index],
+                    symbols: vec![segment.symbol.clone()],
+                })
+                .collect(),
+        )
+        .expect("fixture witness must validate");
+
+        let mut phonological = PhonologicalPlan::from_linguistic_frame(&frame);
+        phonological
+            .bind_lexical_segments_from_binding_with_witness(
+                &frame,
+                &binding,
+                &witness,
+                segments.clone(),
             )
-            .expect("typed lexical-to-phonological bridge should bind");
+            .expect("witness-backed lexical-to-phonological bridge should bind");
         assert!(
             phonological
                 .validate_against_lexical_binding(&frame, &binding)
                 .is_ok()
         );
-
-        let mut tampered = binding.clone();
-        tampered.constituents[0].lemma.push_str("-tampered");
-        assert_eq!(
+        assert!(
             phonological
-                .validate_against_lexical_binding(&frame, &tampered)
-                .expect_err("tampered lexical identity must be rejected"),
-            PhonologicalPlanError::LexicalBindingMismatch
+                .validate_against_lexical_binding_and_witness(&frame, &binding, &witness)
+                .is_ok()
+        );
+
+        let mut tampered = segments;
+        tampered[0].symbol = "TAMPERED".into();
+        let mut second_plan = PhonologicalPlan::from_linguistic_frame(&frame);
+        assert_eq!(
+            second_plan
+                .bind_lexical_segments_from_binding_with_witness(
+                    &frame,
+                    &binding,
+                    &witness,
+                    tampered,
+                )
+                .expect_err("witness must reject symbol tampering"),
+            PhonologicalPlanError::LexicalPhonologicalWitnessMismatch
         );
     }
 

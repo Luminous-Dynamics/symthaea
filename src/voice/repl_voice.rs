@@ -1215,6 +1215,25 @@ impl SimpleG2P {
         self.apply_letter_rules(&clean)
     }
 
+    /// Look up a word using only the embedded pronunciation lexicons.
+    ///
+    /// Unlike word_to_phonemes(), this never falls back to spelling/letter rules.
+    /// That makes it suitable for evidence-generating paths where an absent lexical entry
+    /// must remain an explicit qualification failure rather than becoming a heuristic guess.
+    pub fn word_to_phonemes_from_lexicon(
+        &self,
+        word: &str,
+    ) -> Option<(Vec<&'static str>, &'static str)> {
+        let lower = word.to_lowercase();
+        let clean: String = lower.chars().filter(|c| c.is_alphabetic()).collect();
+
+        if let Some(phonemes) = self.dictionary.get(&clean) {
+            return Some((phonemes.clone(), "symthaea-hand-lexicon-v1"));
+        }
+
+        cmudict_lookup(&clean).map(|phonemes| (phonemes, "cmudict-embedded-v1"))
+    }
+
     /// Rule-based G2P with longest-match sliding window.
     ///
     /// Handles consonant clusters, vowel patterns, silent letters, and the
@@ -3012,6 +3031,33 @@ mod tests {
             "world should have multiple phonemes: {:?}",
             world
         );
+    }
+
+    #[test]
+    fn test_lexicon_lookup_does_not_use_letter_rule_fallback() {
+        let g2p = SimpleG2P::new();
+
+        assert!(g2p.word_to_phonemes_from_lexicon("syzygy").is_some());
+        assert!(
+            g2p.word_to_phonemes_from_lexicon("zzzxxyq-unlisted")
+                .is_none(),
+            "unlisted forms must remain an explicit lexicon miss"
+        );
+
+        let (hello, source) = g2p
+            .word_to_phonemes_from_lexicon("hello")
+            .expect("hello must have an embedded pronunciation");
+        assert_eq!(source, "symthaea-hand-lexicon-v1");
+        assert!(hello.len() >= 3);
+    }
+
+    #[test]
+    fn test_lexicon_lookup_reports_cmudict_source() {
+        let g2p = SimpleG2P::new();
+        let (_, source) = g2p
+            .word_to_phonemes_from_lexicon("serendipity")
+            .expect("serendipity must have a CMU pronunciation");
+        assert_eq!(source, "cmudict-embedded-v1");
     }
 
     #[test]
