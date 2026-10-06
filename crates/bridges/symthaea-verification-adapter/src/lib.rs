@@ -2269,11 +2269,20 @@ mod tests {
 
     #[test]
     fn relationship_controller_substitution_is_definitively_rejected() {
-        let request = request();
+        let mut request = request();
+        request.expected_controller =
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap();
+
         let mut snapshot = snapshot();
-        snapshot.document = snapshot
-            .document
-            .replace(r##""assertionMethod": ["#key-1"]"##, r##""assertionMethod": [{"id": "#key-1", "controller": "https://evil.example"}]"##);
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "assertionMethod": [{
+                "id": "https://example.test/controller#key-1",
+                "type": "Multikey",
+                "controller": "https://evil.example",
+                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+            }]
+        }"##.into();
         let reference = snapshot.snapshot_reference().unwrap();
         let adapter =
             JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
