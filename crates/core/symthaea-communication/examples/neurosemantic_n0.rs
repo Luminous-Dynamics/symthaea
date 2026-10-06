@@ -144,6 +144,7 @@ fn main() -> Result<(), String> {
         peer_ref: lease.peer_id.clone(),
         lease_id: lease.lease_id.clone(),
         consent_epoch: lease.consent_epoch,
+        consent_lease_fingerprint: lease.fingerprint_for_authorization()?,
         purpose: message.packet.purpose,
         channel: message.packet.channel,
         direction: message.packet.direction,
@@ -432,6 +433,18 @@ fn main() -> Result<(), String> {
         )
         .is_err();
 
+    let mut mutated_lease = lease.clone();
+    mutated_lease.max_write_sensitivity = CognitiveSensitivity::HighlyPrivate;
+    let mutated_lease_blocked = message
+        .validate_for_handling(
+            &mutated_lease,
+            &policy_provenance_binding,
+            "ZA",
+            symthaea_communication::NeurosemanticHandlingAction::Transmit,
+            1_500,
+        )
+        .is_err();
+
     let report = serde_json::json!({
         "execution_revision": execution_revision,
         "exact_graph_roundtrip": exact_roundtrip,
@@ -458,7 +471,8 @@ fn main() -> Result<(), String> {
         "revoked_authority_resolution_blocked": revoked_resolution_blocked,
         "wrong_authority_resolution_context_blocked": wrong_resolution_context_blocked,
         "authority_resolution_signature_blocked": resolution_signature_blocked,
-        "authority_resolution_expiry_blocked": authority_resolution_expiry_blocked
+        "authority_resolution_expiry_blocked": authority_resolution_expiry_blocked,
+        "mutated_consent_lease_blocked": mutated_lease_blocked
     });
 
     println!("{}", serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?);
