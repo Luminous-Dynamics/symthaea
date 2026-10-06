@@ -426,6 +426,16 @@ impl TransactionLedger {
                     self.path.display()
                 )
             })?;
+        std::fs::set_permissions(
+            &self.path,
+            std::os::unix::fs::PermissionsExt::from_mode(0o600),
+        )
+        .map_err(|error| {
+            format!(
+                "unable to restrict transaction ledger {}: {error}",
+                self.path.display()
+            )
+        })?;
         let line = serde_json::to_string(event)
             .map_err(|error| format!("unable to serialize transaction ledger event: {error}"))?;
         file.write_all(line.as_bytes())
