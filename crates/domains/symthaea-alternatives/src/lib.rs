@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 30;
+pub const SCHEMA_VERSION: u16 = 31;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v42";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v43";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -478,6 +478,8 @@ pub struct MeasurementUncertaintyRef {
     pub uncertainty_id: String,
     /// Exact observation identity to which the uncertainty statement applies.
     pub observation_id: String,
+    /// Digest of the exact observation record to which the uncertainty statement applies.
+    pub observation_record_digest: String,
     /// Quantitative statement reported with the observation.
     pub statement: MeasurementUncertaintyStatement,
     /// Method used to evaluate the stated uncertainty.
@@ -499,6 +501,7 @@ impl MeasurementUncertaintyRef {
     pub fn validate(&self) -> Result<(), AssessmentError> {
         if self.uncertainty_id.is_empty()
             || self.observation_id.is_empty()
+            || self.observation_record_digest.is_empty()
             || self.method_id.is_empty()
             || self.measurand_id.is_empty()
             || self.procedure_id.is_empty()
@@ -595,6 +598,13 @@ impl EvidenceRecord {
                             evidence_id: self.id.clone(),
                             evidence_observation_id: observation.observation_id.clone(),
                             uncertainty_observation_id: uncertainty.observation_id.clone(),
+                        });
+                    }
+                    if uncertainty.observation_record_digest != observation.record_digest {
+                        return Err(AssessmentError::MeasurementUncertaintyObservationRecordDigestMismatch {
+                            evidence_id: self.id.clone(),
+                            expected_observation_record_digest: observation.record_digest.clone(),
+                            actual_observation_record_digest: uncertainty.observation_record_digest.clone(),
                         });
                     }
                     if uncertainty.measurand_id != observation.measurand_id {
@@ -2399,7 +2409,7 @@ pub enum AssessmentError {
         /// Stated uncertainty unit.
         uncertainty_unit: String,
     },
-    /// Stated measurement uncertainty is attached to a different observation result.
+    /// Stated measurement uncertainty names a different observation result.
     MeasurementUncertaintyObservationMismatch {
         /// Evidence identifier.
         evidence_id: String,
@@ -2407,6 +2417,15 @@ pub enum AssessmentError {
         evidence_observation_id: String,
         /// Observation identity carried by the uncertainty analysis.
         uncertainty_observation_id: String,
+    },
+    /// Stated measurement uncertainty carries a different observation record digest.
+    MeasurementUncertaintyObservationRecordDigestMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Observation record digest expected by the evidence.
+        expected_observation_record_digest: String,
+        /// Observation record digest carried by the uncertainty analysis.
+        actual_observation_record_digest: String,
     },
     /// Stated measurement uncertainty applies to a different measurand than the observation.
     MeasurementUncertaintyMeasurandMismatch {
@@ -2713,6 +2732,14 @@ impl std::fmt::Display for AssessmentError {
             } => write!(
                 f,
                 "evidence {evidence_id} observation {evidence_observation_id} does not match uncertainty observation {uncertainty_observation_id}"
+            ),
+            Self::MeasurementUncertaintyObservationRecordDigestMismatch {
+                evidence_id,
+                expected_observation_record_digest,
+                actual_observation_record_digest,
+            } => write!(
+                f,
+                "evidence {evidence_id} observation record digest {expected_observation_record_digest} does not match uncertainty record digest {actual_observation_record_digest}"
             ),
             Self::MeasurementUncertaintyMeasurandMismatch {
                 evidence_id,
@@ -3837,6 +3864,7 @@ mod tests {
 .then(|| MeasurementUncertaintyRef {
                 uncertainty_id: format!("uncertainty:{id}"),
                 observation_id: format!("observation:{id}"),
+                observation_record_digest: format!("fixture-record-digest:{id}"),
                 statement: MeasurementUncertaintyStatement::Expanded {
                     value: 0.1,
                     unit: "unit".into(),
@@ -4177,6 +4205,24 @@ mod tests {
                 evidence_id: "uncertainty-binding-evidence".into(),
                 evidence_observation_id: "observation:uncertainty-binding-evidence".into(),
                 uncertainty_observation_id: "different-observation".into(),
+            }
+        );
+
+        let mut changed = c.clone();
+        changed.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .observation_record_digest = "different-record".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            AssessmentError::MeasurementUncertaintyObservationRecordDigestMismatch {
+                evidence_id: "uncertainty-binding-evidence".into(),
+                expected_observation_record_digest: "fixture-record-digest:uncertainty-binding-evidence".into(),
+                actual_observation_record_digest: "different-record".into(),
             }
         );
 
@@ -5468,6 +5514,7 @@ mod tests {
         let uncertainty = MeasurementUncertaintyRef {
             uncertainty_id: "u".into(),
             observation_id: "observation".into(),
+            observation_record_digest: "record".into(),
             statement: MeasurementUncertaintyStatement::Expanded {
                 value: 0.0,
                 unit: "unit".into(),
