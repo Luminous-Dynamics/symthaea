@@ -819,6 +819,13 @@ fn main() -> Result<(), String> {
             .verify_measurement_artifact_bytes(&measurement_bytes)
             .is_err()
     };
+    let remediation_measurement_missingness_fail_closed = {
+        let mut forged = measurement.clone();
+        forged.measurements[0].observed_sample_count = 1;
+        forged.measurements[0].status =
+            NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds;
+        forged.validate().is_err()
+    };
     let remediation_metric_definition_substitution_blocked = {
         let mut forged = measurement.clone();
         forged.metric_definitions[0].unit_ref = "other-unit".into();
@@ -1465,6 +1472,7 @@ fn main() -> Result<(), String> {
         "remediation_evaluation_manifest_verified": remediation_evaluation_manifest_verified,
         "remediation_measurement_verified": remediation_measurement_verified,
         "remediation_measurement_worst_case_binding_blocked": remediation_measurement_worst_case_binding_blocked,
+        "remediation_measurement_missingness_fail_closed": remediation_measurement_missingness_fail_closed,
         "remediation_metric_definition_substitution_blocked": remediation_metric_definition_substitution_blocked,
         "remediation_metric_definition_kind_mismatch_blocked": remediation_metric_definition_kind_mismatch_blocked,
         "remediation_metric_uncertainty_substitution_blocked": remediation_metric_uncertainty_substitution_blocked,
