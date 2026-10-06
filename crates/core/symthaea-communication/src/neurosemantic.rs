@@ -37,7 +37,7 @@ const MAX_NEUROSEMANTIC_RESOLVER_REF_BYTES: usize = 4096;
 const MAX_NEUROSEMANTIC_STATUS_SOURCE_REF_BYTES: usize = 4096;
 const MAX_NEUROSEMANTIC_AUTHORITY_RESOLUTION_TTL_S: u64 = 86_400;
 const NEUROSEMANTIC_AUTHORITY_RESOLUTION_DOMAIN: &[u8] =
-    b"symthaea-neurosemantic-authority-resolution-v1\\0";
+    b"symthaea-neurosemantic-authority-resolution-v1\0";
 
 /// Representation channel used for routing and authorization.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -96,7 +96,7 @@ pub enum NeurosemanticInferenceClass {
     Identity,
 }
 
-pub const NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION: u16 = 5;
+pub const NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION: u16 = 6;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum NeurosemanticSecondaryUse {
@@ -143,6 +143,9 @@ pub struct NeurosemanticHandlingPolicy {
     #[serde(default)]
     pub permitted_secondary_uses: BTreeSet<NeurosemanticSecondaryUse>,
     pub retention: NeurosemanticRetentionPolicy,
+    /// Maximum age of an external authority/status resolution accepted by this policy.
+    /// This is distinct from the protocol-wide 24-hour defensive upper bound.
+    pub max_authority_resolution_age_s: u64,
 }
 
 impl Default for NeurosemanticHandlingPolicy {
@@ -155,6 +158,7 @@ impl Default for NeurosemanticHandlingPolicy {
             permitted_destination_jurisdictions: BTreeSet::new(),
             permitted_secondary_uses: BTreeSet::new(),
             retention: NeurosemanticRetentionPolicy::Ephemeral,
+            max_authority_resolution_age_s: 300,
         }
     }
 }
@@ -580,6 +584,8 @@ impl NeurosemanticHandlingPolicy {
                 .all(|jurisdiction| valid_jurisdiction_id(jurisdiction))
             && self.permitted_destination_jurisdictions.contains(&self.origin_jurisdiction)
             && self.permitted_secondary_uses.len() <= MAX_NEUROSEMANTIC_SECONDARY_USE_CLASSES
+            && self.max_authority_resolution_age_s > 0
+            && self.max_authority_resolution_age_s <= MAX_NEUROSEMANTIC_AUTHORITY_RESOLUTION_TTL_S
             && matches!(
                 self.retention,
                 NeurosemanticRetentionPolicy::Ephemeral
@@ -643,6 +649,11 @@ impl NeurosemanticHandlingPolicy {
         }
         if resolution.expires_at_unix_s > attestation.expires_at_unix_s {
             return Err("neurosemantic authority resolution outlives its authority attestation".into());
+        }
+        if now_unix_s.saturating_sub(resolution.checked_at_unix_s)
+            > self.max_authority_resolution_age_s
+        {
+            return Err("neurosemantic authority resolution exceeds policy freshness bound".into());
         }
         if resolution.status != NeurosemanticAuthorityStatus::Active {
             return Err("neurosemantic authority resolution is not active".into());
@@ -1234,6 +1245,8 @@ impl AuthorizedNeurosemanticMessage {
             || provenance.authority_resolution_channel != self.packet.channel
             || provenance.authority_resolution_direction != self.packet.direction
             || now_unix_s < provenance.authority_resolution_checked_at_unix_s
+            || now_unix_s.saturating_sub(provenance.authority_resolution_checked_at_unix_s)
+                > self.packet.data_policy.handling.max_authority_resolution_age_s
             || now_unix_s >= provenance.authority_resolution_expires_at_unix_s
         {
             return Err("policy provenance capability does not match the current policy, consent context, or authority status".into());
@@ -1436,6 +1449,7 @@ mod tests {
                 permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
                 permitted_secondary_uses: BTreeSet::new(),
                 retention: NeurosemanticRetentionPolicy::UntilUnixS(200),
+                max_authority_resolution_age_s: 600,
             },
         }
     }
