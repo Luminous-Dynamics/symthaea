@@ -862,6 +862,7 @@ impl NixPostStateReceiptV1 {
             &self.target_unit,
             self.authorized_generation,
             &self.authorized_definition_digest,
+            &self.authorized_definition_content_digest,
             self.pre_invocation_id.as_deref(),
             self.required_stability_us,
         );
@@ -2656,6 +2657,7 @@ mod tests {
             &tampered.target_unit,
             tampered.authorized_generation,
             &tampered.authorized_definition_digest,
+            &tampered.authorized_definition_content_digest,
             tampered.pre_invocation_id.as_deref(),
             tampered.required_stability_us,
         );
