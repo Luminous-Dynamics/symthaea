@@ -1405,6 +1405,19 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_admission_rejects_inverted_times() {
+        let mut snapshot = snapshot();
+        snapshot.state_at = "2026-10-05T02:00:00Z".into();
+        snapshot.resolved_at = "2026-10-05T01:59:59Z".into();
+
+        assert!(matches!(
+            snapshot.validate_structure(),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("resolved_at is earlier than state_at")
+        ));
+    }
+
+    #[test]
     fn snapshot_timestamp_validation_matches_verification_contract() {
         let mut snapshot = snapshot();
         snapshot.state_at = "2026-10-05T24:00:00Z".into();
