@@ -140,7 +140,9 @@ pub use lexical_binding::{
     LanguageRuleStatus, LexemeBinding, LexicalBindingError, LexicalMorphosyntacticBinding,
     LexicalSource, MorphologicalFeature, MorphophonologicalDerivationStep,
     MorphophonologicalDerivationWitness, MorphophonologicalDerivationWitnessError,
-    MORPHOPHONOLOGICAL_DERIVATION_WITNESS_VERSION, LEXICAL_MORPHOSYNTACTIC_BINDING_VERSION,
+    MorphophonologicalRule, MorphophonologicalRuleOperation, MorphophonologicalRuleSet,
+    MorphophonologicalRuleSetError, MORPHOPHONOLOGICAL_DERIVATION_WITNESS_VERSION,
+    MORPHOPHONOLOGICAL_RULE_SET_VERSION, LEXICAL_MORPHOSYNTACTIC_BINDING_VERSION,
 };
 pub use linguistic_frame::{
     ConstituentSlot, FormulationStrategy, LinguisticBindingStatus, LinguisticFrame,
