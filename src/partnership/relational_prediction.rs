@@ -871,6 +871,17 @@ impl RollingOriginRelationalPredictionEvidence {
             return Err(RelationalPredictionError::InvalidSplit);
         }
 
+        for segment in &self.observed.segments {
+            validate_prediction_summary_shape(
+                segment,
+                self.config.train_samples,
+                self.config.test_samples,
+                self.config.gap_samples,
+            )?;
+            validate_forecast_horizon_from_summary(segment, self.config.forecast_horizon)?;
+        }
+        validate_rolling_summary_aggregates(&self.observed)?;
+
         for (index, origin) in self.origins.iter().enumerate() {
             let expected_start = self
                 .config
@@ -3042,6 +3053,35 @@ mod tests {
         .unwrap();
 
         evidence.origin_starts[1] += 1;
+
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn rolling_evidence_rejects_tampered_summary_aggregate_mse() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 2,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let provenance = provenance();
+        let mut evidence =
+            RollingOriginRelationalPredictionSummary::compute_evidence(
+                &samples,
+                config,
+                provenance,
+            )
+            .unwrap();
+
+        evidence.observed.mean_relational_augmented_mse += 0.01;
 
         assert_eq!(
             evidence.validate(),
