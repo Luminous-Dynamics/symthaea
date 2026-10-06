@@ -24,6 +24,9 @@ use symthaea_communication::{
     NeurosemanticRemediationMetricDefinition,
     NeurosemanticRemediationMetricDirection,
     NeurosemanticRemediationUncertainty,
+    NeurosemanticRemediationObservationRecord,
+    NeurosemanticRemediationObservationSetArtifact,
+    NeurosemanticRemediationMetricComputationArtifact,
 };
 
 fn main() -> Result<(), String> {
@@ -629,65 +632,250 @@ fn main() -> Result<(), String> {
     let evaluation_manifest_bytes =
         serde_json::to_vec(&evaluation_manifest).map_err(|e| e.to_string())?;
 
-    let measurement = NeurosemanticRemediationMeasurementArtifact {
-        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION,
-        measurement_ref: "synthetic-remediation-measurement-v1".into(),
-        metric_definitions: vec![
-            NeurosemanticRemediationMetricDefinition {
-                schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
-                metric_ref: "metric-forgetfulness".into(),
-                kind: NeurosemanticRemediationMeasurementKind::Forgetfulness,
-                estimand_ref: "forgetfulness-on-forget-set".into(),
-                scope_ref: "forget-set-v1".into(),
-                unit_ref: "proportion".into(),
-                aggregation_ref: "per-item-rate".into(),
-                direction: NeurosemanticRemediationMetricDirection::HigherIsBetter,
+    let metric_forgetfulness = NeurosemanticRemediationMetricDefinition {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
+        metric_ref: "metric-forgetfulness".into(),
+        kind: NeurosemanticRemediationMeasurementKind::Forgetfulness,
+        estimand_ref: "forgetfulness-on-forget-set".into(),
+        scope_ref: "forget-set-v1".into(),
+        unit_ref: "proportion".into(),
+        aggregation_ref: "per-item-rate".into(),
+        direction: NeurosemanticRemediationMetricDirection::HigherIsBetter,
+    };
+    let metric_utility = NeurosemanticRemediationMetricDefinition {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
+        metric_ref: "metric-utility".into(),
+        kind: NeurosemanticRemediationMeasurementKind::UtilityImpact,
+        estimand_ref: "utility-on-retain-set".into(),
+        scope_ref: "retain-set-v1".into(),
+        unit_ref: "proportion".into(),
+        aggregation_ref: "per-item-rate".into(),
+        direction: NeurosemanticRemediationMetricDirection::HigherIsBetter,
+    };
+    let metric_fairness = NeurosemanticRemediationMetricDefinition {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
+        metric_ref: "metric-fairness".into(),
+        kind: NeurosemanticRemediationMeasurementKind::FairnessImpact,
+        estimand_ref: "fairness-impact-on-declared-subgroups".into(),
+        scope_ref: "fairness-split-v1".into(),
+        unit_ref: "proportion".into(),
+        aggregation_ref: "worst-subgroup-gap".into(),
+        direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
+    };
+    let metric_recovery = NeurosemanticRemediationMetricDefinition {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
+        metric_ref: "metric-recovery".into(),
+        kind: NeurosemanticRemediationMeasurementKind::RecoveryRisk,
+        estimand_ref: "recovery-risk-on-forget-set".into(),
+        scope_ref: "forget-set-v1".into(),
+        unit_ref: "proportion".into(),
+        aggregation_ref: "attack-success-rate".into(),
+        direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
+    };
+    let metric_representation = NeurosemanticRemediationMetricDefinition {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
+        metric_ref: "metric-representation".into(),
+        kind: NeurosemanticRemediationMeasurementKind::RepresentationResidual,
+        estimand_ref: "representation-residual-on-forget-set".into(),
+        scope_ref: "forget-set-v1".into(),
+        unit_ref: "proportion".into(),
+        aggregation_ref: "probe-detection-rate".into(),
+        direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
+    };
+
+    let forget_observation_set = NeurosemanticRemediationObservationSetArtifact {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_OBSERVATION_SET_SCHEMA_VERSION,
+        observation_set_ref: "synthetic-forget-observations-v1".into(),
+        metric_ref: metric_forgetfulness.metric_ref.clone(),
+        kind: metric_forgetfulness.kind,
+        scope_ref: metric_forgetfulness.scope_ref.clone(),
+        eligible_subject_artifact_hashes: vec![
+            symthaea_communication::content_hash(b"forget-1"),
+            symthaea_communication::content_hash(b"forget-2"),
+        ],
+        observations: vec![
+            NeurosemanticRemediationObservationRecord {
+                observation_ref: "synthetic-forget-observation-1".into(),
+                subject_artifact_hash: symthaea_communication::content_hash(b"forget-1"),
+                failure_observed: false,
+                group_ref: None,
             },
-            NeurosemanticRemediationMetricDefinition {
-                schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
-                metric_ref: "metric-utility".into(),
-                kind: NeurosemanticRemediationMeasurementKind::UtilityImpact,
-                estimand_ref: "utility-on-retain-set".into(),
-                scope_ref: "retain-set-v1".into(),
-                unit_ref: "proportion".into(),
-                aggregation_ref: "per-item-rate".into(),
-                direction: NeurosemanticRemediationMetricDirection::HigherIsBetter,
-            },
-            NeurosemanticRemediationMetricDefinition {
-                schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
-                metric_ref: "metric-fairness".into(),
-                kind: NeurosemanticRemediationMeasurementKind::FairnessImpact,
-                estimand_ref: "fairness-impact-on-declared-subgroups".into(),
-                scope_ref: "fairness-split-v1".into(),
-                unit_ref: "proportion".into(),
-                aggregation_ref: "worst-subgroup-gap".into(),
-                direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
-            },
-            NeurosemanticRemediationMetricDefinition {
-                schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
-                metric_ref: "metric-recovery".into(),
-                kind: NeurosemanticRemediationMeasurementKind::RecoveryRisk,
-                estimand_ref: "recovery-risk-on-forget-set".into(),
-                scope_ref: "forget-set-v1".into(),
-                unit_ref: "proportion".into(),
-                aggregation_ref: "attack-success-rate".into(),
-                direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
-            },
-            NeurosemanticRemediationMetricDefinition {
-                schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
-                metric_ref: "metric-representation".into(),
-                kind: NeurosemanticRemediationMeasurementKind::RepresentationResidual,
-                estimand_ref: "representation-residual-on-forget-set".into(),
-                scope_ref: "forget-set-v1".into(),
-                unit_ref: "proportion".into(),
-                aggregation_ref: "probe-detection-rate".into(),
-                direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
+            NeurosemanticRemediationObservationRecord {
+                observation_ref: "synthetic-forget-observation-2".into(),
+                subject_artifact_hash: symthaea_communication::content_hash(b"forget-2"),
+                failure_observed: false,
+                group_ref: None,
             },
         ],
+    };
+    let retain_observation_set = NeurosemanticRemediationObservationSetArtifact {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_OBSERVATION_SET_SCHEMA_VERSION,
+        observation_set_ref: "synthetic-retain-observations-v1".into(),
+        metric_ref: metric_utility.metric_ref.clone(),
+        kind: metric_utility.kind,
+        scope_ref: metric_utility.scope_ref.clone(),
+        eligible_subject_artifact_hashes: vec![
+            symthaea_communication::content_hash(b"retain-1"),
+            symthaea_communication::content_hash(b"retain-2"),
+        ],
+        observations: vec![
+            NeurosemanticRemediationObservationRecord {
+                observation_ref: "synthetic-retain-observation-1".into(),
+                subject_artifact_hash: symthaea_communication::content_hash(b"retain-1"),
+                failure_observed: false,
+                group_ref: None,
+            },
+            NeurosemanticRemediationObservationRecord {
+                observation_ref: "synthetic-retain-observation-2".into(),
+                subject_artifact_hash: symthaea_communication::content_hash(b"retain-2"),
+                failure_observed: false,
+                group_ref: None,
+            },
+        ],
+    };
+    let fairness_observation_set = NeurosemanticRemediationObservationSetArtifact {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_OBSERVATION_SET_SCHEMA_VERSION,
+        observation_set_ref: "synthetic-fairness-observations-v1".into(),
+        metric_ref: metric_fairness.metric_ref.clone(),
+        kind: metric_fairness.kind,
+        scope_ref: metric_fairness.scope_ref.clone(),
+        eligible_subject_artifact_hashes: vec![
+            symthaea_communication::content_hash(b"fairness-1"),
+            symthaea_communication::content_hash(b"fairness-2"),
+        ],
+        observations: vec![
+            NeurosemanticRemediationObservationRecord {
+                observation_ref: "synthetic-fairness-observation-a".into(),
+                subject_artifact_hash: symthaea_communication::content_hash(b"fairness-1"),
+                failure_observed: false,
+                group_ref: Some("group-a".into()),
+            },
+            NeurosemanticRemediationObservationRecord {
+                observation_ref: "synthetic-fairness-observation-b".into(),
+                subject_artifact_hash: symthaea_communication::content_hash(b"fairness-2"),
+                failure_observed: false,
+                group_ref: Some("group-b".into()),
+            },
+        ],
+    };
+    let recovery_observation_set = NeurosemanticRemediationObservationSetArtifact {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_OBSERVATION_SET_SCHEMA_VERSION,
+        observation_set_ref: "synthetic-recovery-observations-v1".into(),
+        metric_ref: metric_recovery.metric_ref.clone(),
+        kind: metric_recovery.kind,
+        scope_ref: metric_recovery.scope_ref.clone(),
+        eligible_subject_artifact_hashes: vec![
+            symthaea_communication::content_hash(b"forget-1"),
+            symthaea_communication::content_hash(b"forget-2"),
+        ],
+        observations: vec![
+            NeurosemanticRemediationObservationRecord {
+                observation_ref: "synthetic-recovery-observation-1".into(),
+                subject_artifact_hash: symthaea_communication::content_hash(b"forget-1"),
+                failure_observed: false,
+                group_ref: None,
+            },
+            NeurosemanticRemediationObservationRecord {
+                observation_ref: "synthetic-recovery-observation-2".into(),
+                subject_artifact_hash: symthaea_communication::content_hash(b"forget-2"),
+                failure_observed: false,
+                group_ref: None,
+            },
+        ],
+    };
+    let representation_observation_set = NeurosemanticRemediationObservationSetArtifact {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_OBSERVATION_SET_SCHEMA_VERSION,
+        observation_set_ref: "synthetic-representation-observations-v1".into(),
+        metric_ref: metric_representation.metric_ref.clone(),
+        kind: metric_representation.kind,
+        scope_ref: metric_representation.scope_ref.clone(),
+        eligible_subject_artifact_hashes: vec![
+            symthaea_communication::content_hash(b"forget-1"),
+            symthaea_communication::content_hash(b"forget-2"),
+        ],
+        observations: vec![
+            NeurosemanticRemediationObservationRecord {
+                observation_ref: "synthetic-representation-observation-1".into(),
+                subject_artifact_hash: symthaea_communication::content_hash(b"forget-1"),
+                failure_observed: false,
+                group_ref: None,
+            },
+            NeurosemanticRemediationObservationRecord {
+                observation_ref: "synthetic-representation-observation-2".into(),
+                subject_artifact_hash: symthaea_communication::content_hash(b"forget-2"),
+                failure_observed: false,
+                group_ref: None,
+            },
+        ],
+    };
+
+    let observation_sets = vec![
+        forget_observation_set.clone(),
+        retain_observation_set.clone(),
+        fairness_observation_set.clone(),
+        recovery_observation_set.clone(),
+        representation_observation_set.clone(),
+    ];
+    let computation_for = |definition: &NeurosemanticRemediationMetricDefinition,
+                           observation_set: &NeurosemanticRemediationObservationSetArtifact,
+                           computation_ref: &str|
+        NeurosemanticRemediationMetricComputationArtifact {
+            schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_METRIC_COMPUTATION_SCHEMA_VERSION,
+            computation_ref: computation_ref.into(),
+            metric_ref: definition.metric_ref.clone(),
+            kind: definition.kind,
+            metric_definition_hash: definition.fingerprint().unwrap(),
+            observation_set_hash: observation_set
+                .fingerprint(&definition.aggregation_ref)
+                .unwrap(),
+            aggregation_ref: definition.aggregation_ref.clone(),
+            execution_revision: execution_revision.clone(),
+            estimate_numerator: 0,
+            estimate_scale: 4,
+            eligible_sample_count: observation_set.eligible_subject_artifact_hashes.len() as u64,
+            observed_sample_count: observation_set.observations.len() as u64,
+            failure_count: 0,
+        };
+    let computation_artifacts = vec![
+        computation_for(&metric_forgetfulness, &observation_sets[0], "synthetic-computation-forgetfulness-v1"),
+        computation_for(&metric_utility, &observation_sets[1], "synthetic-computation-utility-v1"),
+        computation_for(&metric_fairness, &observation_sets[2], "synthetic-computation-fairness-v1"),
+        computation_for(&metric_recovery, &observation_sets[3], "synthetic-computation-recovery-v1"),
+        computation_for(&metric_representation, &observation_sets[4], "synthetic-computation-representation-v1"),
+    ];
+    let computation_bytes: Vec<Vec<u8>> = computation_artifacts
+        .iter()
+        .map(|artifact| serde_json::to_vec(artifact).map_err(|e| e.to_string()))
+        .collect::<Result<_, _>>()?;
+    let computation_byte_refs: Vec<&[u8]> =
+        computation_bytes.iter().map(Vec::as_slice).collect();
+    let observation_set_bytes: Vec<Vec<u8>> = observation_sets
+        .iter()
+        .map(|artifact| {
+            serde_json::to_vec(artifact).map_err(|e| e.to_string())
+        })
+        .collect::<Result<_, _>>()?;
+    let observation_set_byte_refs: Vec<&[u8]> =
+        observation_set_bytes.iter().map(Vec::as_slice).collect();
+
+    let measurement = NeurosemanticRemediationMeasurementArtifact {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION,
+        measurement_ref: "synthetic-remediation-measurement-v2".into(),
+        metric_definitions: vec![
+            metric_forgetfulness.clone(),
+            metric_utility.clone(),
+            metric_fairness.clone(),
+            metric_recovery.clone(),
+            metric_representation.clone(),
+        ],
+        metric_computation_artifact_hashes: computation_artifacts
+            .iter()
+            .map(|artifact| artifact.fingerprint().unwrap())
+            .collect(),
         measurements: vec![
             NeurosemanticRemediationMeasurement {
-                metric_ref: "metric-forgetfulness".into(),
-                kind: NeurosemanticRemediationMeasurementKind::Forgetfulness,,
+                metric_ref: metric_forgetfulness.metric_ref,
+                kind: metric_forgetfulness.kind,
                 status: NeurosemanticRemediationImpactDisposition::Inconclusive,
                 estimate_numerator: 0,
                 estimate_scale: 4,
@@ -697,8 +885,8 @@ fn main() -> Result<(), String> {
                 failure_count: 0,
             },
             NeurosemanticRemediationMeasurement {
-                metric_ref: "metric-utility".into(),
-                kind: NeurosemanticRemediationMeasurementKind::UtilityImpact,,
+                metric_ref: metric_utility.metric_ref,
+                kind: metric_utility.kind,
                 status: NeurosemanticRemediationImpactDisposition::Inconclusive,
                 estimate_numerator: 0,
                 estimate_scale: 4,
@@ -708,8 +896,8 @@ fn main() -> Result<(), String> {
                 failure_count: 0,
             },
             NeurosemanticRemediationMeasurement {
-                metric_ref: "metric-fairness".into(),
-                kind: NeurosemanticRemediationMeasurementKind::FairnessImpact,,
+                metric_ref: metric_fairness.metric_ref,
+                kind: metric_fairness.kind,
                 status: NeurosemanticRemediationImpactDisposition::Inconclusive,
                 estimate_numerator: 0,
                 estimate_scale: 4,
@@ -719,8 +907,8 @@ fn main() -> Result<(), String> {
                 failure_count: 0,
             },
             NeurosemanticRemediationMeasurement {
-                metric_ref: "metric-recovery".into(),
-                kind: NeurosemanticRemediationMeasurementKind::RecoveryRisk,,
+                metric_ref: metric_recovery.metric_ref,
+                kind: metric_recovery.kind,
                 status: NeurosemanticRemediationImpactDisposition::Inconclusive,
                 estimate_numerator: 0,
                 estimate_scale: 4,
@@ -730,8 +918,8 @@ fn main() -> Result<(), String> {
                 failure_count: 0,
             },
             NeurosemanticRemediationMeasurement {
-                metric_ref: "metric-representation".into(),
-                kind: NeurosemanticRemediationMeasurementKind::RepresentationResidual,,
+                metric_ref: metric_representation.metric_ref,
+                kind: metric_representation.kind,
                 status: NeurosemanticRemediationImpactDisposition::Inconclusive,
                 estimate_numerator: 0,
                 estimate_scale: 4,
@@ -812,6 +1000,100 @@ fn main() -> Result<(), String> {
         remediation_impact.verify_evaluation_manifest_bytes(&evaluation_manifest_bytes).is_ok();
     let remediation_measurement_verified =
         remediation_impact.verify_measurement_artifact_bytes(&measurement_bytes).is_ok();
+    let remediation_measurement_computation_verified =
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &measurement_bytes,
+                &computation_byte_refs,
+                &observation_set_byte_refs,
+            )
+            .is_ok();
+    let remediation_metric_estimate_forgery_blocked = {
+        let mut forged = computation_artifacts[0].clone();
+        forged.estimate_numerator = 1;
+        let mut forged_bytes = computation_bytes.clone();
+        forged_bytes[0] = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        let forged_refs: Vec<&[u8]> = forged_bytes.iter().map(Vec::as_slice).collect();
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &measurement_bytes,
+                &forged_refs,
+                &observation_set_byte_refs,
+            )
+            .is_err()
+    };
+    let remediation_observation_substitution_blocked = {
+        let mut forged = observation_sets[0].clone();
+        forged.observations[0].failure_observed = true;
+        let forged_bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        let mut supplied = observation_set_bytes.clone();
+        supplied[0] = forged_bytes;
+        let supplied_refs: Vec<&[u8]> = supplied.iter().map(Vec::as_slice).collect();
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &measurement_bytes,
+                &computation_byte_refs,
+                &supplied_refs,
+            )
+            .is_err()
+    };
+    let remediation_observation_omission_blocked = {
+        let mut forged = observation_sets[0].clone();
+        forged.observations.pop();
+        let forged_bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        let mut supplied = observation_set_bytes.clone();
+        supplied[0] = forged_bytes;
+        let supplied_refs: Vec<&[u8]> = supplied.iter().map(Vec::as_slice).collect();
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &measurement_bytes,
+                &computation_byte_refs,
+                &supplied_refs,
+            )
+            .is_err()
+    };
+    let remediation_observation_duplicate_blocked = {
+        let mut forged = observation_sets[0].clone();
+        forged.observations.push(forged.observations[0].clone());
+        let forged_bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        let mut supplied = observation_set_bytes.clone();
+        supplied[0] = forged_bytes;
+        let supplied_refs: Vec<&[u8]> = supplied.iter().map(Vec::as_slice).collect();
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &measurement_bytes,
+                &computation_byte_refs,
+                &supplied_refs,
+            )
+            .is_err()
+    };
+    let remediation_observation_scope_substitution_blocked = {
+        let mut forged = observation_sets[0].clone();
+        forged.scope_ref = "other-scope-v1".into();
+        let forged_bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        let mut supplied = observation_set_bytes.clone();
+        supplied[0] = forged_bytes;
+        let supplied_refs: Vec<&[u8]> = supplied.iter().map(Vec::as_slice).collect();
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &measurement_bytes,
+                &computation_byte_refs,
+                &supplied_refs,
+            )
+            .is_err()
+    };
+    let remediation_computation_substitution_blocked = {
+        let mut forged = computation_bytes.clone();
+        forged.swap(0, 1);
+        let forged_refs: Vec<&[u8]> = forged.iter().map(Vec::as_slice).collect();
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &measurement_bytes,
+                &forged_refs,
+                &observation_set_byte_refs,
+            )
+            .is_err()
+    };
     let remediation_measurement_worst_case_binding_blocked = {
         let mut forged = remediation_impact.clone();
         forged.disposition = NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds;
@@ -846,6 +1128,7 @@ fn main() -> Result<(), String> {
                 upper_numerator: 1,
                 scale: 4,
                 confidence_level_bps: 9_500,
+                uncertainty_method_ref: "wilson-interval-v1".into(),
             };
         let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
         remediation_impact.verify_measurement_artifact_bytes(&bytes).is_err()
@@ -1471,6 +1754,13 @@ fn main() -> Result<(), String> {
         "remediation_evaluation_environment_verified": remediation_evaluation_environment_verified,
         "remediation_evaluation_manifest_verified": remediation_evaluation_manifest_verified,
         "remediation_measurement_verified": remediation_measurement_verified,
+        "remediation_measurement_computation_verified": remediation_measurement_computation_verified,
+        "remediation_metric_estimate_forgery_blocked": remediation_metric_estimate_forgery_blocked,
+        "remediation_observation_substitution_blocked": remediation_observation_substitution_blocked,
+        "remediation_observation_omission_blocked": remediation_observation_omission_blocked,
+        "remediation_observation_duplicate_blocked": remediation_observation_duplicate_blocked,
+        "remediation_observation_scope_substitution_blocked": remediation_observation_scope_substitution_blocked,
+        "remediation_computation_substitution_blocked": remediation_computation_substitution_blocked,
         "remediation_measurement_worst_case_binding_blocked": remediation_measurement_worst_case_binding_blocked,
         "remediation_measurement_missingness_fail_closed": remediation_measurement_missingness_fail_closed,
         "remediation_metric_definition_substitution_blocked": remediation_metric_definition_substitution_blocked,
