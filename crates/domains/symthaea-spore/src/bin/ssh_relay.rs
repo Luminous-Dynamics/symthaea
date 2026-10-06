@@ -4356,14 +4356,11 @@ echo '}'
                 );
 
                 let backup_dir = format!("/tmp/symthaea-preserve-{}", transaction.transaction_id);
-                let preserve_script = format!(
-                    r#"
+                let mut preserve_script = r#"
 set -eo pipefail
 umask 077
-BACKUP_DIR="{backup_dir}"
-mkdir -m 700 -p "$BACKUP_DIR""#,
-                    backup_dir = backup_dir
-                );
+BACKUP_DIR="__BACKUP_DIR__"
+mkdir -m 700 -p "$BACKUP_DIR"
 echo '{"backup_dir":"'"$BACKUP_DIR"'","items":['
 FIRST=true
 
@@ -4450,9 +4447,9 @@ printf '{"type":"home_dirs","name":"/home (%s)","size":"%s","path":"not backed u
 # Summary
 TOTAL_SIZE=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1)
 echo '],"total_size":"'"$TOTAL_SIZE"'"}'
-"#,
-                );
-                
+"#;
+                preserve_script = preserve_script.replace("__BACKUP_DIR__", &backup_dir);
+
                 match run_cmd(&preserve_script).await {
                     Ok(result) => {
                         eprintln!("[{}] Data preservation complete", peer_addr);
@@ -4483,7 +4480,7 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                                         TransactionOutcome::Indeterminate
                                     )
                                 })
-                                    .to_json(),
+                                .to_string(),
                             ))
                             .await;
                     }
