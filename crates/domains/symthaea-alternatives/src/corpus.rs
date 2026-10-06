@@ -650,6 +650,28 @@ mod tests {
     }
 
     #[test]
+    fn manifest_identity_changes_when_calibration_traceability_changes() {
+        let case = five_pathway_adversarial_case();
+        let original = case.manifest_hash();
+
+        let mut changed = case.clone();
+        let observed = changed
+            .candidates
+            .iter_mut()
+            .flat_map(|candidate| candidate.evidence.iter_mut())
+            .find(|evidence| evidence.observation.is_some())
+            .unwrap();
+        observed
+            .observation
+            .as_mut()
+            .unwrap()
+            .calibration_chain_refs[0]
+            .calibration_record_digest = "tampered-calibration-record".into();
+
+        assert_ne!(original, changed.manifest_hash());
+    }
+
+    #[test]
     fn manifest_identity_changes_when_evidence_changes() {
         let case = five_pathway_adversarial_case();
         let original_hash = case.manifest_hash();
