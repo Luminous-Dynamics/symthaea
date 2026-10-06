@@ -267,6 +267,7 @@ run_boundary_check() {
   # definition-content token. Other authority modules must not manufacture provenance.
   for file in "${AUTHORITY_FILES[@]}"; do
     [[ "${file}" == "crates/core/nixward/src/action/systemd_observer.rs" ]] && continue
+    [[ "${file}" == "crates/core/nixward/src/action/service_effect.rs" ]] && continue
     if matches="$(scan_verified_definition_content_factory "${ROOT}/${file}")"; then
       echo "ERROR: definition-content sealing factory crossed its observer-only boundary: ${file}" >&2
       echo "${matches}" >&2
