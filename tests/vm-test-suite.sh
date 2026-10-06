@@ -267,6 +267,13 @@ async def test():
         r = jload(await asyncio.wait_for(ws.recv(), 15))
         assert r["type"] == "connected"
 
+        await ws.send(json.dumps({"action":"probe_hardware"}))
+        r = jload(await asyncio.wait_for(ws.recv(), 30))
+        assert r.get("type") == "hardware_probe", f"Probe failed: {r}"
+        hw = jload(r["data"])
+        target_machine_digest = hw["target_machine_digest"]
+        assert len(target_machine_digest) == 64
+
         await ws.send(json.dumps({"action":"discover_disks"}))
         r = jload(await asyncio.wait_for(ws.recv(), 15))
         assert r["type"] == "disks", f"Expected disks: {r}"
@@ -458,7 +465,8 @@ async def test():
             "gpu_driver": "modesetting",
             "timezone": "UTC",
             "keyboard": "us",
-            "luks_passphrase": "testpassphrase123"
+            "luks_passphrase": "testpassphrase123",
+            "target_machine_digest": target_machine_digest
         }))
 
         last_stage = ""
