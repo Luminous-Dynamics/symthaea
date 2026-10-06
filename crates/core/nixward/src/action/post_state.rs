@@ -748,6 +748,8 @@ impl NixPostStateReceiptV1 {
             unit: self.target_unit.clone(),
             authorized_generation: self.authorized_generation,
             authorized_definition_digest: self.authorized_definition_digest.clone(),
+            authorized_definition_content_digest:
+                self.authorized_definition_content_digest.clone(),
             pre_invocation_id: self.pre_invocation_id.clone(),
             required_stability_us: self.required_stability_us,
         };
@@ -1089,6 +1091,11 @@ fn validate_expectation_against_intent(
     }
     if context.authorized_definition_digest != expectation.authorized_definition_digest {
         return Err(NixPostStateErrorV1::DefinitionMismatch);
+    }
+    if context.authorized_definition_content_digest
+        != expectation.authorized_definition_content_digest
+    {
+        return Err(NixPostStateErrorV1::DefinitionContentMismatch);
     }
     if context.pre_invocation_id != expectation.pre_invocation_id {
         return Err(NixPostStateErrorV1::InvocationMismatch);
@@ -1606,6 +1613,7 @@ mod tests {
                     generation,
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     definition_digest,
+                    "4444444444444444444444444444444444444444444444444444444444444444",
                     pre_invocation_id,
                     required_stability_us,
                 )
@@ -1667,6 +1675,7 @@ mod tests {
                     exp.authorized_generation,
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     exp.authorized_definition_digest.clone(),
+                    exp.authorized_definition_content_digest.clone(),
                     exp.pre_invocation_id.clone(),
                     exp.required_stability_us,
                 )
