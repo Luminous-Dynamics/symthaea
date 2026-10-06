@@ -12,7 +12,7 @@ UI connected to a local WebSocket relay. The threat model accounts for:
 | **CSRF via WebSocket** | Cross-origin page connects to relay | Origin header validated in `accept_hdr_async` before upgrade |
 | **Token brute force** | Attacker guesses relay auth token | Cryptographic 256-bit tokens via `/dev/urandom`, constant-time comparison, per-IP rate limiting |
 | **Credential theft via XSS** | Script reads auth token from storage | Tokens in `sessionStorage` (cleared on tab close), not `localStorage` |
-| **LUKS passphrase leakage** | Passphrase visible in `ps aux` | Written to temp key-file with `chmod 600`, passed via `--key-file`, deleted immediately |
+| **LUKS passphrase leakage** | Passphrase visible in `ps aux` | Written to a 0600 temporary key file and passed through file/stdin paths rather than command-line arguments; deleted after use |
 | **Cache poisoning** | MITM injects malicious WASM/binary | SHA-384 SRI verification in Web Worker + Service Worker before cache.put() |
 | **Password newline injection** | Newlines in password break `chpasswd` | Rejected at relay before script generation |
 | **sed regex injection** | Self-healing sed uses unescaped variables | All sed patterns escaped via `printf | sed 's/[|\\&]/\\&/g'` |
@@ -39,7 +39,7 @@ Target Machine — runs the install script
 - Its own generated shell scripts (from validated inputs)
 
 ### What the relay does NOT trust
-- Browser-supplied Nix configuration (sanitized via heredoc + rnix validation)
+- Browser-supplied Nix configuration (pure-eval validation is advisory; the relay must not treat browser text as an authorization primitive)
 - Browser-supplied disk paths, hostnames, timezones (validated via security module)
 - WebSocket Origin headers (checked before upgrade)
 - Auth tokens (constant-time comparison)
@@ -69,7 +69,7 @@ cargo +nightly fuzz run fuzz_sanitize_input -- -max_total_time=300
 
 | Risk | Severity | Status |
 |------|----------|--------|
-| Hardcoded `initialPassword = "changeme"` in generated configs | Medium | User must change on first login; random password generation planned |
+| Hardcoded `initialPassword = "changeme"` in relay fallback configs | Closed | Removed from all 12 installer layouts; credentials are applied post-install through a protected temporary file |
 | `time` 0.3.44 stack exhaustion DoS (RUSTSEC-2026-0009) | Low | Blocked by Holochain serde pin |
 | `rsa` Marvin timing attack (RUSTSEC-2023-0071) | Negligible | Feature-gated behind `lancedb-backend`, wrong attack vector |
 | Shell scripts for disk operations | Accepted | Disk partitioning inherently requires root shell; typed Nix generation planned for config transfer |
@@ -78,6 +78,10 @@ cargo +nightly fuzz run fuzz_sanitize_input -- -max_total_time=300
 
 See `docs/TYPED_NIX_GENERATION_PLAN.md` for the 4-phase plan to eliminate
 shell heredocs entirely via SCP-based config transfer.
+
+The relay credential path now also creates the staged user password with mode
+0600 from the start, removes it on all script exits, and fails the installation
+when the requested password cannot be applied.
 
 ## Reporting Vulnerabilities
 
