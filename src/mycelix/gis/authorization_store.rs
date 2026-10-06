@@ -766,8 +766,7 @@ fn backfill_native_replay_history(
                 target_identity,
             ],
         )?;
-        tx.commit()?;
-    Ok(())
+        Ok(())
     }
 
     let dispatch_rows: Vec<(
@@ -826,6 +825,7 @@ fn backfill_native_replay_history(
         )?;
     }
 
+    tx.commit()?;
     Ok(())
 }
 
@@ -11617,6 +11617,72 @@ mod tests {
 
             let _ = std::fs::remove_file(path);
         }
+    }
+
+    #[test]
+    fn native_replay_history_backfill_rolls_back_on_conflict() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-native-replay-backfill-rollback-{}.db",
+            std::process::id()
+        ));
+        {
+            let store = SqliteAuthorizationStore::open(&path).unwrap();
+            let connection = store.connection().unwrap();
+            connection
+                .execute(
+                    "INSERT INTO authorization_dispatches(
+                        authorization_instance,attempt_id,operation_id,native_replay_identity,
+                        action_id,action_digest,provider_idempotency_key,target_identity,
+                        audience,adapter,adapter_revision,adapter_implementation_digest,
+                        boundary_id,attempt_binding_digest,state)
+                     VALUES(
+                        'backfill-dispatch','attempt-dispatch','operation-dispatch',
+                        'sha256:backfill-conflict','action-dispatch','sha256:action-dispatch',
+                        'provider-dispatch','target-dispatch','audience-dispatch','adapter-dispatch',
+                        'adapter-v1','sha256:adapter','boundary-dispatch',
+                        'sha256:binding','succeeded')",
+                    [],
+                )
+                .unwrap();
+            connection
+                .execute(
+                    "INSERT INTO authorization_terminal_evidence(
+                        authorization_instance,attempt_id,operation_id,native_replay_identity,
+                        boundary_id,action_digest,provider_idempotency_key,target_identity,
+                        audience,outcome,evidence_id,evidence_digest,attempt_binding_digest,
+                        verifier_id,verifier_config_digest,trust_anchor_digest,
+                        evidence_profile_digest,verification_digest)
+                     VALUES(
+                        'backfill-terminal','attempt-terminal','operation-terminal',
+                        'sha256:backfill-conflict','boundary-terminal','sha256:action-terminal',
+                        'provider-terminal','target-terminal','audience-terminal','failed',
+                        'evidence-terminal','sha256:evidence-terminal','sha256:binding-terminal',
+                        'verifier','sha256:verifier-config','sha256:trust','sha256:profile',
+                        'sha256:verification')",
+                    [],
+                )
+                .unwrap();
+        }
+
+        let reopened = SqliteAuthorizationStore::open(&path);
+        assert!(matches!(
+            reopened,
+            Err(AuthorizationStoreError::InvalidState(message))
+                if message.contains("conflicting native replay history provenance")
+        ));
+
+        let connection = Connection::open(&path).unwrap();
+        let ledger_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM authorization_native_replay_history
+                 WHERE native_replay_identity='sha256:backfill-conflict'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(ledger_count, 0);
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
