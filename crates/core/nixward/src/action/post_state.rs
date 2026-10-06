@@ -323,7 +323,7 @@ impl NixPostStateStabilitySampleV1 {
         Ok(())
     }
 
-    fn digest(&self) -> Result<String, NixPostStateErrorV1> {
+    pub(crate) fn digest(&self) -> Result<String, NixPostStateErrorV1> {
         self.validate_shape()?;
         let mut h = Hasher::new();
         h.update(STABILITY_SAMPLE_DOMAIN_V1);
@@ -439,7 +439,7 @@ impl NixVerifiedPostStateStabilityEvidenceV1 {
     }
 }
 
-fn stability_sequence_digest(
+pub(crate) fn stability_sequence_digest(
     samples: &[NixPostStateStabilitySampleV1],
 ) -> Result<String, NixPostStateErrorV1> {
     let mut h = Hasher::new();
