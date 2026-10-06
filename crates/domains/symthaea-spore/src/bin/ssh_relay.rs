@@ -53,17 +53,13 @@ async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
     } else {
         "/bin/sh"
     };
-    // Inherit the full system environment (PATH, NIX_PATH, etc.)
-    // and ensure common NixOS paths are available
+    // Preserve other ambient variables as needed, but never inherit PATH:
+    // a privileged relay must resolve tools only from trusted system locations.
     let mut command = tokio::process::Command::new(shell);
     command.arg("-c").arg(cmd);
-    // Supplement PATH with NixOS-specific locations
-    let sys_path = std::env::var("PATH").unwrap_or_default();
-    let full_path = format!(
-        "{}:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/local/bin:/usr/bin:/bin:/sbin",
-        sys_path
-    );
-    command.env("PATH", &full_path);
+    const TRUSTED_PATH: &str =
+        "/run/current-system/sw/bin:/run/wrappers/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin:/sbin";
+    command.env("PATH", TRUSTED_PATH);
     // Ensure NIX_PATH is set for nixos-install
     if std::env::var("NIX_PATH").is_err() {
         command.env("NIX_PATH", "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos:nixos-config=/etc/nixos/configuration.nix");
@@ -2801,16 +2797,11 @@ fn parse_generation_link(value: &str) -> Option<u64> {
 }
 
 async fn current_system_generation() -> Result<u64, String> {
-    let result = run_cmd("readlink /nix/var/nix/profiles/system").await
+    let link = tokio::fs::read_link("/nix/var/nix/profiles/system")
+        .await
         .map_err(|error| format!("active generation probe failed: {error}"))?;
-    if result.exit_status != 0 {
-        return Err(format!(
-            "active generation probe exited with {}: {}",
-            result.exit_status,
-            result.stderr.chars().take(200).collect::<String>()
-        ));
-    }
-    parse_generation_link(&result.stdout)
+    let link = link.to_string_lossy();
+    parse_generation_link(&link)
         .ok_or_else(|| "active system profile has an invalid generation link".into())
 }
 
@@ -7590,6 +7581,15 @@ mod tests {
         let banner = auth_token_banner("super-secret-token", true);
         assert!(banner.contains("super-secret-token"));
         assert!(banner.starts_with("  Auth token: "));
+    }
+
+    #[test]
+    fn generation_probe_uses_profile_link_shape() {
+        assert_eq!(parse_generation_link("system-1-link"), Some(1));
+        assert_eq!(
+            parse_generation_link("/nix/var/nix/profiles/system-99-link"),
+            Some(99)
+        );
     }
 
     #[test]
