@@ -230,6 +230,12 @@ pub enum NeurosemanticRemediationImpactEvidenceKind {
     ResidualRisk,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum NeurosemanticRemediationImpactLineageSide {
+    PreRemediation,
+    PostRemediation,
+}
+
 impl NeurosemanticRemediationImpactArtifact {
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_version != NEUROSEMANTIC_REMEDIATION_IMPACT_ARTIFACT_SCHEMA_VERSION
@@ -260,6 +266,15 @@ impl NeurosemanticRemediationImpactArtifact {
         let unique_dimensions: BTreeSet<&str> = self.dimensions.iter().map(String::as_str).collect();
         if unique_dimensions.len() != self.dimensions.len() {
             return Err("neurosemantic remediation impact artifact contains duplicate dimensions".into());
+        }
+        for required in ["forgetfulness", "utility-impact", "residual-risk"] {
+            if !unique_dimensions.contains(required) {
+                return Err(format!("neurosemantic remediation impact artifact omits required dimension: {required}"));
+            }
+        }
+        let fairness_declared = unique_dimensions.contains("fairness-impact");
+        if fairness_declared != self.fairness_impact_evidence_hash.is_some() {
+            return Err("neurosemantic remediation fairness dimension and evidence must be declared together".into());
         }
         match self.remediation_action {
             NeurosemanticArtifactLifecycleAction::Rectification
@@ -317,6 +332,38 @@ impl NeurosemanticRemediationImpactArtifact {
             return Err("neurosemantic remediation impact artifact is bound to a different lifecycle receipt".into());
         }
         Ok(())
+    }
+
+    pub fn verify_lineage_bytes(
+        &self,
+        side: NeurosemanticRemediationImpactLineageSide,
+        lineage_record_bytes: &[u8],
+    ) -> Result<NeurosemanticDerivationLineageRecord, String> {
+        self.validate()?;
+        if lineage_record_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err("neurosemantic remediation lineage evidence exceeds the serialized artifact limit".into());
+        }
+        let record = NeurosemanticDerivationLineageRecord::from_json_bytes(lineage_record_bytes)?;
+        let (expected_ref, expected_hash, expected_model_hash) = match side {
+            NeurosemanticRemediationImpactLineageSide::PreRemediation => (
+                &self.pre_remediation_lineage_ref,
+                &self.pre_remediation_lineage_hash,
+                &self.pre_remediation_model_hash,
+            ),
+            NeurosemanticRemediationImpactLineageSide::PostRemediation => (
+                &self.post_remediation_lineage_ref,
+                &self.post_remediation_lineage_hash,
+                &self.post_remediation_model_hash,
+            ),
+        };
+        if record.lineage_ref != *expected_ref
+            || record.output_artifact_hash != *expected_model_hash
+            || compute_derivation_provenance_hash(&record.lineage_ref, lineage_record_bytes)
+                != *expected_hash
+        {
+            return Err("neurosemantic remediation lineage binding mismatch".into());
+        }
+        Ok(record)
     }
 
     pub fn fingerprint(&self) -> Result<String, String> {
