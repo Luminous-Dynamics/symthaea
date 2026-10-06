@@ -38,6 +38,17 @@ impl NixVerifiedNixOSGenerationV1 {
     pub fn generation(&self) -> u64 { self.generation }
     pub fn profile_path(&self) -> &Path { &self.profile_path }
     pub fn link_target(&self) -> &Path { &self.link_target }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(generation: u64) -> Self {
+        Self {
+            generation,
+            profile_path: PathBuf::from(SYSTEM_PROFILE),
+            link_target: PathBuf::from(format!(
+                "system-{generation}-link"
+            )),
+        }
+    }
 }
 
 fn parse_generation_link(target: &Path) -> Result<u64, NixOSGenerationObserverErrorV1> {
