@@ -3103,6 +3103,83 @@ mod tests {
     }
 
     #[test]
+    fn unimorph_tsv_compiler_rejects_duplicate_lemma_feature_identity() {
+        let artifact = b"walk\twalked\tV;PST\nwalk\twalkt\tV;PST\n";
+        let first_len = b"walk\twalked\tV;PST\n".len();
+        let slices = vec![
+            MorphophonologicalSourceSlice {
+                record_id: "walk-past-a".into(),
+                byte_offset: 0,
+                byte_length: first_len,
+                record_blake3: blake3::hash(&artifact[..first_len]).to_hex().to_string(),
+            },
+            MorphophonologicalSourceSlice {
+                record_id: "walk-past-b".into(),
+                byte_offset: first_len,
+                byte_length: artifact.len() - first_len,
+                record_blake3: blake3::hash(&artifact[first_len..]).to_hex().to_string(),
+            },
+        ];
+
+        let error = MorphophonologicalRuleSet::compile_unimorph_tsv_source(
+            "en",
+            "en-unspecified",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "fixture:unimorph-tsv",
+                "fixture-snapshot-v1",
+            )
+            .unwrap(),
+            "fixture:unimorph:v1",
+            "fixture:compiler:v1",
+            artifact,
+            slices,
+        )
+        .expect_err("duplicate lemma and feature identity must fail closed");
+
+        assert_eq!(
+            error,
+            MorphophonologicalUnimorphCompilerError::DuplicateLemmaAndFeatureBundle
+        );
+    }
+
+    #[test]
+    fn unimorph_tsv_compiler_preserves_external_resource_origin() {
+        let artifact = b"walk\twalked\tV;PST\n";
+        let evidence = MorphophonologicalResourceEvidence::external_from_artifact(
+            "fixture:external-unimorph",
+            "https://example.invalid/unimorph/eng",
+            "fixture-release-v1",
+            "CC-BY-SA-3.0",
+            artifact,
+        )
+        .unwrap();
+
+        let (rule_set, witness) = MorphophonologicalRuleSet::compile_unimorph_tsv_source(
+            "en",
+            "en-unspecified",
+            evidence,
+            "fixture:unimorph:v1",
+            "fixture:compiler:v1",
+            artifact,
+            vec![MorphophonologicalSourceSlice {
+                record_id: "walk-past".into(),
+                byte_offset: 0,
+                byte_length: artifact.len(),
+                record_blake3: blake3::hash(artifact).to_hex().to_string(),
+            }],
+        )
+        .expect("external evidence should pass through the compiler unchanged");
+
+        assert_eq!(
+            rule_set.resource_evidence.origin,
+            MorphophonologicalResourceOrigin::External
+        );
+        witness
+            .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
+            .expect("external artifact evidence should replay");
+    }
+
+    #[test]
     fn unimorph_tsv_compiler_rejects_unsupported_alternation_instead_of_guessing() {
         let artifact = b"study\tstudies\tV;PRS\n";
         let slices = vec![MorphophonologicalSourceSlice {
