@@ -2678,6 +2678,56 @@ fn protocol_exit_code(child_exit_code: u32, outcome: TransactionOutcome) -> Opti
     }
 }
 
+fn service_postcondition_met(
+    action: &str,
+    active_state: &str,
+    unit_file_state: &str,
+) -> bool {
+    match action {
+        "start" | "restart" | "reload" => active_state == "active",
+        "stop" => active_state != "active",
+        "enable" => unit_file_state == "enabled",
+        "disable" => unit_file_state == "disabled",
+        _ => false,
+    }
+}
+
+async fn verify_service_postcondition(action: &str, service: &str) -> Result<bool, String> {
+    let unit = format!("{}.service", service);
+    let active_state = run_cmd(&format!(
+        "systemctl show --property=ActiveState --value '{}'",
+        unit.replace(''', "'\''")
+    ))
+    .await
+    .map_err(|error| format!("service postcondition probe failed: {error}"))?;
+    if active_state.exit_status != 0 {
+        return Err(format!(
+            "service postcondition probe exited with {}: {}",
+            active_state.exit_status,
+            active_state.stderr.chars().take(200).collect::<String>()
+        ));
+    }
+    let unit_file_state = run_cmd(&format!(
+        "systemctl show --property=UnitFileState --value '{}'",
+        unit.replace(''', "'\''")
+    ))
+    .await
+    .map_err(|error| format!("service enablement postcondition probe failed: {error}"))?;
+    if unit_file_state.exit_status != 0 {
+        return Err(format!(
+            "service enablement postcondition probe exited with {}: {}",
+            unit_file_state.exit_status,
+            unit_file_state.stderr.chars().take(200).collect::<String>()
+        ));
+    }
+
+    Ok(service_postcondition_met(
+        action,
+        active_state.stdout.trim(),
+        unit_file_state.stdout.trim(),
+    ))
+}
+
 fn finalize_transaction(
     ledger: &TransactionLedger,
     transaction: &SystemTransaction,
@@ -5184,11 +5234,23 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                 eprintln!("[{}] {} {} {}...", peer_addr, transaction.log_line(), action, service);
                 let cmd = format!("systemctl {} {}.service 2>&1", action, service);
                 match run_cmd(&cmd).await {
-                    Ok(r) => {
-                        let observed_outcome = if r.exit_status == 0 {
-                            TransactionOutcome::ObservedSuccess
-                        } else {
-                            TransactionOutcome::Failed
+                    Ok(r) if r.exit_status == 0 => {
+                        let observed_outcome = match verify_service_postcondition(action, &service).await {
+                            Ok(true) => TransactionOutcome::ObservedSuccess,
+                            Ok(false) => {
+                                eprintln!(
+                                    "[{}] {} service postcondition did not match requested action",
+                                    peer_addr, transaction.log_line()
+                                );
+                                TransactionOutcome::Indeterminate
+                            }
+                            Err(error) => {
+                                eprintln!(
+                                    "[{}] {} service postcondition probe failed: {}",
+                                    peer_addr, transaction.log_line(), error
+                                );
+                                TransactionOutcome::Indeterminate
+                            }
                         };
                         let outcome = finalize_transaction(
                             &transaction_ledger,
@@ -5196,7 +5258,34 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                             observed_outcome,
                             &peer_addr,
                         );
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":protocol_exit_code(r.exit_status, outcome),"data":r.stdout,"transaction":transaction.receipt(outcome)}).to_string())).await;
+                        let data = if outcome == TransactionOutcome::ObservedSuccess {
+                            r.stdout
+                        } else {
+                            format!(
+                                "{}\nService action completed with exit code 0, but requested post-state was not durably observed.",
+                                r.stdout
+                            )
+                        };
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({
+                            "type":"exit",
+                            "code":protocol_exit_code(r.exit_status, outcome),
+                            "data":data,
+                            "transaction":transaction.receipt(outcome)
+                        }).to_string())).await;
+                    }
+                    Ok(r) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({
+                            "type":"exit",
+                            "code":protocol_exit_code(r.exit_status, outcome),
+                            "data":r.stdout,
+                            "transaction":transaction.receipt(outcome)
+                        }).to_string())).await;
                     }
                     Err(e) => {
                         let _ = ws_tx
@@ -7298,6 +7387,20 @@ mod tests {
         let banner = auth_token_banner("super-secret-token", true);
         assert!(banner.contains("super-secret-token"));
         assert!(banner.starts_with("  Auth token: "));
+    }
+
+    #[test]
+    fn service_postconditions_match_requested_native_state() {
+        assert!(service_postcondition_met("start", "active", "disabled"));
+        assert!(service_postcondition_met("restart", "active", "enabled"));
+        assert!(service_postcondition_met("reload", "active", "enabled"));
+        assert!(!service_postcondition_met("start", "inactive", "enabled"));
+        assert!(service_postcondition_met("stop", "inactive", "enabled"));
+        assert!(!service_postcondition_met("stop", "active", "enabled"));
+        assert!(service_postcondition_met("enable", "inactive", "enabled"));
+        assert!(!service_postcondition_met("enable", "active", "disabled"));
+        assert!(service_postcondition_met("disable", "inactive", "disabled"));
+        assert!(!service_postcondition_met("disable", "inactive", "enabled"));
     }
 
     #[test]
