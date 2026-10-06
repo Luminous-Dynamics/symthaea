@@ -29,8 +29,8 @@
 
 use super::relational_harmonics::EvidenceStatus;
 
-const EVIDENCE_SCHEMA: &str = "relational-prediction-evidence/v3";
-const ROLLING_EVIDENCE_SCHEMA: &str = "relational-prediction-rolling-evidence/v3";
+const EVIDENCE_SCHEMA: &str = "relational-prediction-evidence/v4";
+const ROLLING_EVIDENCE_SCHEMA: &str = "relational-prediction-rolling-evidence/v4";
 const FEATURE_SCHEMA: &str = "relational-prediction-features/v1";
 const MODEL_SCHEMA: &str = "linear-ridge-standardized-v1";
 
@@ -474,6 +474,7 @@ impl PredictionEvidenceRecord {
 #[derive(Debug, Clone, PartialEq)]
 pub struct HeldOutRelationalPredictionEvidence {
     pub provenance: RelationalPredictionProvenance,
+    pub config: HeldOutRelationalPredictionConfig,
     pub summary: HeldOutRelationalPredictionSummary,
     pub records: Vec<PredictionEvidenceRecord>,
 }
@@ -520,8 +521,16 @@ pub struct HeldOutRelationalPredictionSummary {
 impl HeldOutRelationalPredictionEvidence {
     pub fn validate(&self) -> Result<(), RelationalPredictionError> {
         validate_evidence_provenance(&self.provenance)?;
+        validate_held_out_config_shape(&self.config)?;
+        if self.summary.train_samples != self.config.train_samples
+            || self.summary.test_samples != self.config.test_samples
+            || self.summary.gap_samples != self.config.gap_samples
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
         if self.records.is_empty()
-            || self.records
+            || self
+                .records
                 .iter()
                 .any(|record| record.evaluation_input_blake3 != self.records[0].evaluation_input_blake3)
         {
@@ -539,7 +548,10 @@ impl HeldOutRelationalPredictionEvidence {
 
         for record in &self.records {
             record.validate_trace()?;
-            if record.train_samples != self.summary.train_samples
+            if record.train_samples != self.config.train_samples
+                || record.test_samples != self.config.test_samples
+                || record.ridge_lambda != self.config.ridge_lambda
+                || record.train_samples != self.summary.train_samples
                 || record.test_samples != self.summary.test_samples
                 || record.score() != self.summary.score(record.feature_set)
             {
@@ -641,16 +653,12 @@ impl HeldOutRelationalPredictionEvidence {
                 .map(|record| record.evaluation_input_blake3.as_str())
                 .unwrap_or(""),
             "split": {
-                "train_samples": self.summary.train_samples,
-                "test_samples": self.summary.test_samples,
-                "gap_samples": self.summary.gap_samples,
+                "train_samples": self.config.train_samples,
+                "test_samples": self.config.test_samples,
+                "gap_samples": self.config.gap_samples,
                 "minimum_outcome_horizon": self.summary.minimum_outcome_horizon,
                 "maximum_outcome_horizon": self.summary.maximum_outcome_horizon,
-                "ridge_lambda": self
-                    .records
-                    .first()
-                    .map(|record| record.ridge_lambda)
-                    .unwrap_or(0.0)
+                "ridge_lambda": self.config.ridge_lambda
             },
             "scores": scores,
             "records": records
@@ -678,6 +686,7 @@ impl HeldOutRelationalPredictionSummary {
 
         let evidence = HeldOutRelationalPredictionEvidence {
             provenance,
+            config,
             summary,
             records,
         };
@@ -1771,6 +1780,26 @@ fn update_f64(hasher: &mut blake3::Hasher, value: f64) {
     hasher.update(&value.to_bits().to_le_bytes());
 }
 
+fn validate_held_out_config_shape(
+    config: &HeldOutRelationalPredictionConfig,
+) -> Result<(), RelationalPredictionError> {
+    if config.train_samples < 8
+        || config.test_samples < 4
+        || !config.ridge_lambda.is_finite()
+        || config.ridge_lambda < 0.0
+    {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    config
+        .train_samples
+        .checked_add(config.gap_samples)
+        .and_then(|value| value.checked_add(config.test_samples))
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+    Ok(())
+}
+
 fn feature_count(feature_set: PredictionFeatureSet) -> usize {
     match feature_set {
         PredictionFeatureSet::PersistenceBaseline => 0,
@@ -2351,6 +2380,29 @@ mod tests {
         .unwrap();
 
         evidence.records[1].ridge_lambda = 0.25;
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_rejects_tampered_top_level_split_config() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        evidence.config.test_samples += 1;
+
         assert_eq!(
             evidence.validate(),
             Err(RelationalPredictionError::InvalidSplit)
