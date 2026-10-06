@@ -2451,12 +2451,6 @@ impl<'a> CborReader<'a> {
         }
     }
 
-    fn read_cose_label_key(
-        &mut self,
-    ) -> Result<CborLabelKey, Rfc9162ProofDecodeError> {
-        self.read_cose_label_key_with_mode(false)
-    }
-
     fn read_cose_label_key_with_resource_limits(
         &mut self,
     ) -> Result<CborLabelKey, Rfc9162ProofDecodeError> {
@@ -2925,14 +2919,6 @@ impl<'a> CborReader<'a> {
             });
         }
         Ok(())
-    }
-
-    fn skip_bstr_value(
-        &mut self,
-        max_len: usize,
-        limit_end: usize,
-    ) -> Result<(), Rfc9162ProofDecodeError> {
-        self.skip_bstr_value_with_mode(max_len, limit_end, false)
     }
 
     fn skip_bstr_value_with_mode(
@@ -3420,15 +3406,6 @@ impl<'a> CborReader<'a> {
     /// members a larger limit than the generic opaque-value scanner. Returning
     /// the decoded bstr payloads directly avoids first passing them through the
     /// generic 4 KiB skip_value bstr cap.
-    fn read_bstr_items_bounded(
-        &mut self,
-        max_items: usize,
-        max_item_len: usize,
-        max_total_len: usize,
-    ) -> Result<Vec<Vec<u8>>, Rfc9162ProofDecodeError> {
-        self.read_bstr_items_bounded_with_mode(max_items, max_item_len, max_total_len, false)
-    }
-
     /// RFC 9942 receipt collections treat their per-receipt and aggregate byte
     /// ceilings as defensive resource bounds rather than generic structure.
     fn read_bstr_items_bounded_with_resource_limits(
@@ -4577,14 +4554,14 @@ mod tests {
         wire.push(0x40);
         let mut reader=CborReader::new(&wire);
         assert_eq!(
-            reader.read_bstr_items_bounded(2, 4, 4),
+            reader.read_bstr_items_bounded_with_mode(2, 4, 4, false),
             Err(Rfc9162ProofDecodeError::InvalidStructure)
         );
 
         let wire=vec![0x9f, 0x40, 0x40, 0x40, 0xff];
         let mut reader=CborReader::new(&wire);
         assert_eq!(
-            reader.read_bstr_items_bounded(2, 4, 8),
+            reader.read_bstr_items_bounded_with_mode(2, 4, 8, false),
             Err(Rfc9162ProofDecodeError::InvalidStructure)
         );
     }
@@ -4635,7 +4612,7 @@ mod tests {
         let wire = vec![0x82, 0x44, 0xaa, 0xbb, 0xcc, 0xdd, 0x41, 0xee];
         let mut reader = CborReader::new(&wire);
         assert_eq!(
-            reader.read_bstr_items_bounded(2, 4, 4),
+            reader.read_bstr_items_bounded_with_mode(2, 4, 4, false),
             Err(Rfc9162ProofDecodeError::InvalidStructure)
         );
         // The second member's payload byte remains unread: the aggregate
@@ -5343,7 +5320,7 @@ mod tests {
         cbor_text(&mut wire,&vec![b'x';257]);
         let mut reader=CborReader::new(&wire);
         assert_eq!(
-            reader.read_cose_label_key(),
+            reader.read_cose_label_key_with_mode(false),
             Err(Rfc9162ProofDecodeError::InvalidStructure)
         );
     }
