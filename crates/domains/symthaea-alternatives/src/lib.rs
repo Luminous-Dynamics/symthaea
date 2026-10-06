@@ -642,11 +642,6 @@ impl MeasurementUncertaintyEvaluationRef {
         {
             return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation);
         }
-        if let Some(probability) = self.coverage_probability {
-            if !probability.is_finite() || !(0.0..1.0).contains(&probability) {
-                return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation);
-            }
-        }
         match (&self.coverage_method, &self.coverage_probability, expanded) {
             (Some(method), Some(probability), true) => {
                 method.validate()?;
@@ -654,12 +649,8 @@ impl MeasurementUncertaintyEvaluationRef {
                     return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation);
                 }
             }
-            (Some(method), _, false) => method.validate()?,
-            (None, Some(_), false) => {}
-            (_, None, true) => {
-                return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation)
-            }
             (None, None, false) => {}
+            _ => return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation),
         }
         Ok(())
     }
@@ -5581,6 +5572,26 @@ mod tests {
     fn measurement_uncertainty_expanded_rejects_invalid_coverage_probability() {
         let mut uncertainty = test_uncertainty(&["component"]);
         uncertainty.evaluation.coverage_probability = Some(1.0);
+        let error = uncertainty.validate().unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::InvalidMeasurementUncertaintyEvaluation
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_standard_rejects_expanded_coverage_metadata() {
+        let mut uncertainty = test_uncertainty(&["component"]);
+        uncertainty.statement = MeasurementUncertaintyStatement::Standard {
+            value: 0.05,
+            unit: "unit".into(),
+        };
+        uncertainty.evaluation.coverage_probability = Some(0.95);
+        uncertainty.evaluation.coverage_method = Some(MeasurementUncertaintyCoverageMethodRef {
+            method_id: "coverage".into(),
+            method_revision: "r1".into(),
+            method_digest: "coverage-digest".into(),
+        });
         let error = uncertainty.validate().unwrap_err();
         assert!(matches!(
             error,
