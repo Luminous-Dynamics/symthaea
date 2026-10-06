@@ -306,18 +306,51 @@ impl TransactionLedger {
     }
 
     fn load(&self) -> Result<HashMap<String, JournalRecord>, String> {
-        let file = match File::open(&self.path) {
-            Ok(file) => file,
+        let metadata = match std::fs::metadata(&self.path) {
+            Ok(metadata) => metadata,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                 return Ok(HashMap::new());
             }
             Err(error) => {
                 return Err(format!(
-                    "unable to read transaction ledger {}: {error}",
+                    "unable to inspect transaction ledger {}: {error}",
                     self.path.display()
                 ));
             }
         };
+        if !metadata.file_type().is_file() {
+            return Err(format!(
+                "transaction ledger {} is not a regular file",
+                self.path.display()
+            ));
+        }
+        let mode = {
+            use std::os::unix::fs::PermissionsExt;
+            metadata.permissions().mode() & 0o777
+        };
+        if mode != 0o600 {
+            return Err(format!(
+                "transaction ledger {} has unsafe permissions {:04o}; require 0600",
+                self.path.display(),
+                mode
+            ));
+        }
+        {
+            use std::os::unix::fs::MetadataExt;
+            let owner = unsafe { libc::geteuid() };
+            if metadata.uid() != owner {
+                return Err(format!(
+                    "transaction ledger {} is not owned by relay user",
+                    self.path.display()
+                ));
+            }
+        }
+        let file = File::open(&self.path).map_err(|error| {
+            format!(
+                "unable to read transaction ledger {}: {error}",
+                self.path.display()
+            )
+        })?;
 
         let mut records = HashMap::new();
         for (line_number, line) in BufReader::new(file).lines().enumerate() {
@@ -654,6 +687,21 @@ mod tests {
         assert!(validate_request_id("short").is_err());
         assert!(validate_request_id("0123456789abcdef!").is_err());
         assert!(validate_request_id(&"a".repeat(129)).is_err());
+    }
+
+    #[test]
+    fn ledger_rejects_unsafe_existing_file_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let name = random_operation_id().unwrap();
+        let path =
+            std::env::temp_dir().join(format!("symthaea-transaction-ledger-permissions-{name}.jsonl"));
+        std::fs::write(&path, "").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let error = ledger.load().expect_err("group-readable ledger must fail closed");
+        assert!(error.contains("unsafe permissions"));
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]
