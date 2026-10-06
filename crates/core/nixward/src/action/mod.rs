@@ -52,7 +52,7 @@ pub use post_state::{
     NixPostStateStabilityEvidenceV1, NixPostconditionAssessmentV1,
     NixServicePostStateExpectationV1, NixServicePostStateObservationV1,
     NixSystemdJobEvidenceV1, NixSystemdJobTypeV1,
-    NixSystemdUnitDefinitionIdentityV1,
+    NixSystemdUnitDefinitionIdentityV1, NixVerifiedPostStateObservationV1,
 };
 pub use config_writer::{ConfigPatch, ConfigWriter, WriteResult};
 pub use daemon_incarnation::{DaemonApprovalContextErrorV1, LiveDaemonIncarnationV1};
