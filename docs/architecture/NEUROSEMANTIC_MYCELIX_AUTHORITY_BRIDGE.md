@@ -88,7 +88,7 @@ The resulting capability retains the exact resolution fingerprint, status-source
 
 The external lineage record should be machine-readable and independently verifiable. Symthaea's compact `NeurosemanticDerivationLineageRecord` models a minimum useful subset of provenance concepts:
 
-- bounded input artifact references with corresponding content hashes;
+- bounded input artifact references with corresponding content hashes, independently verifiable when source bytes are available;
 - transformation/activity reference and revision;
 - exact output artifact BLAKE3 hash;
 - exact execution Git revision;
