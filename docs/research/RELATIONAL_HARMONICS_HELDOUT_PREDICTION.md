@@ -175,13 +175,6 @@ The rolling-origin qualification path applies three prediction null families at 
 IncrementalRelationalShift is the targeted nested null for the critical RelationalAugmented vs NonRelationalContext comparison: synchrony and non-relational context remain fixed while only the added relational channels are shifted.
 
 
-
-- CircularShift;
-- FeatureDecoupling;
-- IncrementalRelationalShift.
-
-IncrementalRelationalShift is the most targeted null for the nested comparison: isolated-agent state, common driver, and synchrony remain fixed while only the added directional/turn-taking relational channels are shifted.
-
 ## 9. Repeated rolling-origin evaluation
 
 A single blocked holdout is an implementation qualification, not a scientific result.
@@ -197,11 +190,11 @@ The production research protocol therefore uses repeated forward-only origins wi
 
 Each origin creates a new contiguous future-held-out segment. No future origin is allowed to become training data for an earlier origin.
 
-The evaluator reports the per-origin scores as well as mean MSE across origins. This keeps the repeated evaluation auditable rather than hiding heterogeneity inside one aggregate.
+The evaluator reports the per-origin scores as well as mean MSE across origins. It also exposes the full per-origin relative MSE-improvement vector for the critical RelationalAugmented vs NonRelationalContext comparison, together with median improvement, worst-origin improvement, and counts of origins beating the nested baseline and persistence. These are descriptive diagnostics, not pass/fail criteria. This keeps the repeated evaluation auditable rather than hiding heterogeneity inside one aggregate.
 
-The mean is descriptive only. It is not a substitute for an inferential procedure that accounts for dependence between overlapping rolling windows.
+The mean is descriptive only. It is not a substitute for an inferential procedure that accounts for dependence between repeated rolling estimates. The current protocol deliberately makes held-out test windows disjoint, but training windows may still overlap across origins, so the origin-level scores are not assumed IID.
 
-The design is deliberately descriptive at this stage. Predictive-error differences across strongly dependent origins should not automatically be converted into a classical IID significance test. Recent work shows that strong dependence can materially distort predictive-accuracy inference, so the first qualification target is repeatability and effect stability rather than a convenient p-value. [Coroneo & Iacone, 2025](https://doi.org/10.1016/j.ijforecast.2024.11.003)
+The design is deliberately descriptive at this stage. Predictive-error differences across strongly dependent origins should not automatically be converted into a classical IID significance test. Recent forecast-evaluation work explicitly develops procedures that account for autocorrelation and overlapping forecast windows, reinforcing the need to preserve loss differentials and their dependence structure before choosing formal inference. [Grant, Mrazik & Satchell, 2026](https://doi.org/10.1002/for.70150)
 
 ## 10. What would count as meaningful evidence
 
@@ -245,6 +238,11 @@ Recent interpersonal-synchrony work reinforces the need for this conservative de
 
 - Gordon, I. & Bartsch, R. P. (2026), Nature Reviews Psychology 5, 201–215:
   https://doi.org/10.1038/s44159-026-00535-4
+
+A September 2026 methodological review further frames synchrony inference around specificity, generality, and sensitivity, and recommends explicit controls for common inputs/shared influences plus model-class and timescale commitments:
+
+- Danyluck et al. (2026), Psychophysiology 63(9), e70404:
+  https://doi.org/10.1111/psyp.70404
 
 Transfer-entropy work also supports retaining a finite-sample qualification boundary. Kirkley (2025) describes positive bias in sparse finite data and the difficulty of statistical significance for conventional finite-data estimators:
 
