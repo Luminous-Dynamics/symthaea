@@ -351,7 +351,10 @@ impl TransactionLedger {
         // final component with a restrictive mode, then validate the directory
         // descriptor actually opened. Existing unsafe ownership/modes fail
         // closed instead of being repaired through a pathname.
-        match std::fs::create_dir(parent) {
+        use std::os::unix::fs::DirBuilderExt;
+        let mut builder = std::fs::DirBuilder::new();
+        builder.mode(0o700);
+        match builder.create(parent) {
             Ok(()) => {}
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
             Err(error) => {
