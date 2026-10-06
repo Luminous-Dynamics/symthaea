@@ -567,9 +567,9 @@ impl NixPostStateReceiptV1 {
         if authorization.decision != NixAuthorizationDecisionV1::Approved {
             return Err(NixPostStateErrorV1::AuthorizationNotApproved);
         }
-        if authorization.action_intent_digest != action_intent_digest {
-            return Err(NixPostStateErrorV1::AuthorizationIntentMismatch);
-        }
+        authorization
+            .validate_against_intent(intent)
+            .map_err(|_| NixPostStateErrorV1::AuthorizationIntentMismatch)?;
         match &intent.action {
             NixActionDescriptorV1::Service { operation, unit }
                 if *operation == expectation.operation && unit == &expectation.unit => {}
