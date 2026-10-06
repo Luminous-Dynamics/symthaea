@@ -90,7 +90,7 @@ ExperimentalDesignProvenance uses typed discrimination targets rather than free-
 Observations linked to an experimental design must also carry that exact design identity. Observations carrying a design identity without a supplied design are rejected, as are observations carrying a different design identity. This makes proposal-to-observation lineage bidirectional at the Symthaea boundary rather than merely advisory.
 
 
-Experimental observations are now bound to the exact documented procedure prescribed by the experimental protocol. A design-bound observation must match the design's protocol procedure identity exactly; procedure drift fails closed. This keeps the planned protocol distinct from merely having an observation produced by some procedure.
+Experimental observations are now bound to the exact documented procedure prescribed by the experimental protocol. A design-bound observation must match both the design's protocol procedure identity and its exact procedure digest; procedure identity or semantic procedure drift fails closed. This keeps the planned protocol distinct from merely having an observation produced by some procedure.
 
 
 ### Requirement-semantic binding
