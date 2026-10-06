@@ -32,6 +32,7 @@ AUTHORITY_FILES=(
   crates/core/nixward/src/action/local_approval_submission.rs
   crates/core/nixward/src/action/service_domain.rs
   crates/core/nixward/src/action/service_state.rs
+  crates/core/nixward/src/action/systemd_definition.rs
   crates/core/nixward/src/action/systemd_observer.rs
   crates/core/nixward/src/action/systemd_transport.rs
   crates/core/nixward/src/action/temporal.rs
@@ -57,6 +58,7 @@ SYSTEMD_OBSERVER_MUTATION_CALL_PATTERN='(?:\.call|\.call_method|\.call_noreply)\
 SYSTEMD_OBSERVER_PROXY_MUTATION_PATTERN='\.set_property\(|\.set\(|\.into_inner\(\)|\.inner(?:_mut)?\(\)'
 SYSTEMD_OBSERVER_AUTHORITY_IMPORT_PATTERN='\bsuper::(?:executor|authorization|systemd_mutation)\b'
 VERIFIED_STABILITY_FACTORY_PATTERN='\bNixVerifiedPostStateStabilityEvidenceV1::from_observer[[:space:]]*\('
+DEFINITION_CONTENT_WRITE_PATTERN='\.(?:write|write_all|set_len|truncate)\(|(?:\.create_new|\.create)\('
 SYSTEMD_TRANSPORT_PUBLIC_API_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(observe_service_properties|observe_service_state_properties)[[:space:]]*\('
 
 scan_diagnostic_boundary() {
@@ -102,6 +104,11 @@ scan_systemd_observer_proxy_mutation() {
 scan_verified_stability_factory() {
   local file="$1"
   rg -n --pcre2 "${VERIFIED_STABILITY_FACTORY_PATTERN}" "$file"
+}
+
+scan_definition_content_write() {
+  local file="$1"
+  rg -n --pcre2 "${DEFINITION_CONTENT_WRITE_PATTERN}" "$file"
 }
 
 scan_public_systemd_transport_api() {
@@ -256,6 +263,13 @@ run_boundary_check() {
     fi
   done
 
+  # CROSS-068: definition-content observation is strictly read-only.
+  if matches="$(scan_definition_content_write "${ROOT}/crates/core/nixward/src/action/systemd_definition.rs")"; then
+    echo "ERROR: definition-content observer contains a filesystem write API" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
+
   if matches="$(scan_public_systemd_transport_api "${ROOT}/crates/core/nixward/src/action/systemd_transport.rs")"; then
     echo "ERROR: raw systemd transport entry point must remain crate-private" >&2
     echo "${matches}" >&2
@@ -352,6 +366,12 @@ run_self_test() {
   printf '%s\n' 'let _ = NixOSCommand::Custom { .. };' > "${tmp}/legacy-custom.rs"
   if scan_legacy_custom_command "${tmp}/legacy-custom.rs"; then :; else
     echo "ERROR: CROSS-022 self-test failed to detect legacy Custom command material" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'let _ = OpenOptions::new().write(true);' > "${tmp}/definition-write.rs"
+  if scan_definition_content_write "${tmp}/definition-write.rs"; then :; else
+    echo "ERROR: CROSS-068 self-test failed to detect definition observer write API" >&2
     return 1
   fi
 
