@@ -461,6 +461,10 @@ Relevant literature supports studying interpersonal coordination as a dynamical,
   https://doi.org/10.1038/s44159-026-00535-4
 - Systematic review of spontaneous interpersonal coordination, including limits of cross-correlation and the potential value of spectral/cross-recurrence methods:
   https://pmc.ncbi.nlm.nih.gov/articles/PMC8542929/
+- Shared-stimulus synchrony study showing that a common stimulus can synchronize neural, physiological, and behavioral signals across observers:
+  https://pmc.ncbi.nlm.nih.gov/articles/PMC9802497/
+- Kirkley (2025), finite-data transfer entropy and the statistical significance problem for sparse/binning regimes:
+  https://doi.org/10.1103/tcss-5hn3
 - Schreiber (2000), transfer entropy for directional information transfer:
   https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.85.461
 - Kleyko et al., HDC/VSA survey:
