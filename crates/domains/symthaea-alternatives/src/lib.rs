@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 33;
+pub const SCHEMA_VERSION: u16 = 34;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v46";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v47";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -504,6 +504,8 @@ impl MeasurementUncertaintyComponentRef {
             || self.uncertainty_budget_id.is_empty()
             || self.uncertainty_budget_revision.is_empty()
             || self.uncertainty_budget_digest.is_empty()
+            || self.uncertainty_budget_component_set_digest.is_empty()
+            || self.uncertainty_budget_component_count == 0
             || self.measurement_model_id.is_empty()
             || self.measurement_model_revision.is_empty()
             || self.measurement_model_digest.is_empty()
@@ -529,6 +531,10 @@ pub struct MeasurementUncertaintyRef {
     pub uncertainty_budget_revision: String,
     /// Digest of the exact uncertainty-budget record.
     pub uncertainty_budget_digest: String,
+    /// Digest attested by the exact budget record for its complete canonical component frontier.
+    pub uncertainty_budget_component_set_digest: String,
+    /// Component count attested by the exact uncertainty-budget record.
+    pub uncertainty_budget_component_count: usize,
     /// Exact measurement-model identity governing the uncertainty evaluation.
     pub measurement_model_id: String,
     /// Revision of the exact measurement model.
@@ -641,8 +647,29 @@ impl MeasurementUncertaintyRef {
             return Err(AssessmentError::DuplicateMeasurementUncertaintyComponentReference);
         }
 
+        if self.uncertainty_budget_component_count != canonical_component_refs.len() {
+            return Err(
+                AssessmentError::MeasurementUncertaintyBudgetComponentCountMismatch {
+                    uncertainty_id: self.uncertainty_id.clone(),
+                    expected_component_count: self.uncertainty_budget_component_count,
+                    actual_component_count: canonical_component_refs.len(),
+                },
+            );
+        }
+
         let expected_component_refs_digest =
             canonical_measurement_uncertainty_component_refs_hash(&canonical_component_refs)?;
+        if self.uncertainty_budget_component_set_digest != expected_component_refs_digest {
+            return Err(
+                AssessmentError::MeasurementUncertaintyBudgetComponentSetDigestMismatch {
+                    uncertainty_id: self.uncertainty_id.clone(),
+                    expected_component_set_digest: self
+                        .uncertainty_budget_component_set_digest
+                        .clone(),
+                    actual_component_set_digest: expected_component_refs_digest.clone(),
+                },
+            );
+        }
         if self.component_refs_digest != expected_component_refs_digest {
             return Err(AssessmentError::MeasurementUncertaintyComponentRefsDigestMismatch {
                 uncertainty_id: self.uncertainty_id.clone(),
@@ -2594,6 +2621,24 @@ pub enum AssessmentError {
         expected_budget_revision: String,
         actual_budget_revision: String,
     },
+    /// The submitted uncertainty component count differs from the count attested by the budget.
+    MeasurementUncertaintyBudgetComponentCountMismatch {
+        /// Uncertainty identity.
+        uncertainty_id: String,
+        /// Count attested by the uncertainty budget.
+        expected_component_count: usize,
+        /// Count represented by the submitted component frontier.
+        actual_component_count: usize,
+    },
+    /// The submitted component frontier differs from the frontier attested by the budget.
+    MeasurementUncertaintyBudgetComponentSetDigestMismatch {
+        /// Uncertainty identity.
+        uncertainty_id: String,
+        /// Canonical component-set digest attested by the uncertainty budget.
+        expected_component_set_digest: String,
+        /// Canonical component-set digest computed from submitted components.
+        actual_component_set_digest: String,
+    },
     /// A component carries a different uncertainty-budget digest.
     MeasurementUncertaintyComponentBudgetDigestMismatch {
         uncertainty_id: String,
@@ -2958,6 +3003,22 @@ impl std::fmt::Display for AssessmentError {
             } => write!(
                 f,
                 "uncertainty {uncertainty_id} component {component_id} budget {actual_budget_id}@{actual_budget_revision} does not match {expected_budget_id}@{expected_budget_revision}"
+            ),
+            Self::MeasurementUncertaintyBudgetComponentCountMismatch {
+                uncertainty_id,
+                expected_component_count,
+                actual_component_count,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} budget attests {expected_component_count} components but submission contains {actual_component_count}"
+            ),
+            Self::MeasurementUncertaintyBudgetComponentSetDigestMismatch {
+                uncertainty_id,
+                expected_component_set_digest,
+                actual_component_set_digest,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} submitted component frontier digest {actual_component_set_digest} does not match budget-attested frontier {expected_component_set_digest}"
             ),
             Self::MeasurementUncertaintyComponentBudgetDigestMismatch {
                 uncertainty_id,
@@ -4033,6 +4094,8 @@ struct CanonicalMeasurementUncertaintyBinding<'a> {
     uncertainty_budget_id: &'a str,
     uncertainty_budget_revision: &'a str,
     uncertainty_budget_digest: &'a str,
+    uncertainty_budget_component_set_digest: &'a str,
+    uncertainty_budget_component_count: usize,
     measurement_model_id: &'a str,
     measurement_model_revision: &'a str,
     measurement_model_digest: &'a str,
@@ -4064,6 +4127,8 @@ fn canonical_measurement_uncertainty_binding_hash(
         uncertainty_budget_id: &uncertainty.uncertainty_budget_id,
         uncertainty_budget_revision: &uncertainty.uncertainty_budget_revision,
         uncertainty_budget_digest: &uncertainty.uncertainty_budget_digest,
+        uncertainty_budget_component_set_digest: &uncertainty.uncertainty_budget_component_set_digest,
+        uncertainty_budget_component_count: uncertainty.uncertainty_budget_component_count,
         measurement_model_id: &uncertainty.measurement_model_id,
         measurement_model_revision: &uncertainty.measurement_model_revision,
         measurement_model_digest: &uncertainty.measurement_model_digest,
@@ -4206,6 +4271,8 @@ mod tests {
                     uncertainty_budget_id: "fixture-uncertainty-budget-v1".into(),
                     uncertainty_budget_revision: "v1".into(),
                     uncertainty_budget_digest: "fixture-uncertainty-budget-digest-v1".into(),
+                    uncertainty_budget_component_set_digest: String::new(),
+                    uncertainty_budget_component_count: 0,
                     measurement_model_id: "fixture-measurement-model-v1".into(),
                     measurement_model_revision: "v1".into(),
                     measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
@@ -4228,6 +4295,9 @@ mod tests {
                         &uncertainty.component_refs,
                     )
                     .unwrap();
+                uncertainty.uncertainty_budget_component_set_digest =
+                    uncertainty.component_refs_digest.clone();
+                uncertainty.uncertainty_budget_component_count = uncertainty.component_refs.len();
                 uncertainty.binding_digest =
                     canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
                 uncertainty
@@ -4276,6 +4346,8 @@ mod tests {
             uncertainty_budget_id: "budget-v1".into(),
             uncertainty_budget_revision: "r1".into(),
             uncertainty_budget_digest: "budget-digest-v1".into(),
+            uncertainty_budget_component_set_digest: String::new(),
+            uncertainty_budget_component_count: 0,
             measurement_model_id: "model-v1".into(),
             measurement_model_revision: "r1".into(),
             measurement_model_digest: "model-digest-v1".into(),
@@ -4296,6 +4368,9 @@ mod tests {
         uncertainty.component_refs_digest =
             canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
                 .unwrap();
+        uncertainty.uncertainty_budget_component_set_digest =
+            uncertainty.component_refs_digest.clone();
+        uncertainty.uncertainty_budget_component_count = uncertainty.component_refs.len();
         uncertainty.binding_digest =
             canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
         uncertainty
@@ -4933,6 +5008,71 @@ mod tests {
         assert!(matches!(
             error,
             AssessmentError::MeasurementUncertaintyComponentModelDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_budget_component_count_fails_closed() {
+        let c = candidate(
+            "uncertainty-component-count",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "component-count",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .component_refs
+            .push(test_component("additional-component"));
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBudgetComponentCountMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_budget_component_set_digest_fails_closed() {
+        let c = candidate(
+            "uncertainty-component-frontier",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "component-frontier",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .component_refs[0]
+            .component_record_digest = "different-component-record".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyComponentRefsDigestMismatch { .. }
+                | AssessmentError::MeasurementUncertaintyBudgetComponentSetDigestMismatch { .. }
         ));
     }
 

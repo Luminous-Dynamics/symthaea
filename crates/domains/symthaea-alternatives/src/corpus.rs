@@ -89,6 +89,8 @@ fn evidence(
                 uncertainty_budget_id: "benchmark-uncertainty-budget-v1".into(),
                 uncertainty_budget_revision: "v1".into(),
                 uncertainty_budget_digest: "benchmark-uncertainty-budget-digest-v1".into(),
+                uncertainty_budget_component_set_digest: String::new(),
+                uncertainty_budget_component_count: 0,
                 measurement_model_id: "benchmark-measurement-model-v1".into(),
                 measurement_model_revision: "v1".into(),
                 measurement_model_digest: "benchmark-measurement-model-digest-v1".into(),
@@ -120,6 +122,9 @@ fn evidence(
                     &uncertainty.component_refs,
                 )
                 .unwrap();
+            uncertainty.uncertainty_budget_component_set_digest =
+                uncertainty.component_refs_digest.clone();
+            uncertainty.uncertainty_budget_component_count = uncertainty.component_refs.len();
             uncertainty.binding_digest =
                 super::canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
             uncertainty
