@@ -120,9 +120,9 @@ pub const MORPHOPHONOLOGICAL_DERIVATION_WITNESS_VERSION: &str =
     "broca-morphophonological-derivation-witness-v2";
 
 pub const MORPHOPHONOLOGICAL_RULE_SET_VERSION: &str =
-    "broca-morphophonological-rule-set-v1";
+    "broca-morphophonological-rule-set-v2";
 pub const MORPHOPHONOLOGICAL_RULE_SELECTION_POLICY: &str =
-    "exact-feature-single-rule-v1";
+    "exact-lemma-and-feature-single-rule-v2";
 pub const MORPHOPHONOLOGICAL_RESOURCE_EVIDENCE_VERSION: &str =
     "broca-morphophonological-resource-evidence-v2";
 
@@ -566,6 +566,12 @@ pub enum MorphophonologicalRuleOperation {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MorphophonologicalRule {
     pub rule_id: String,
+    /// Optional exact lemma scope. When present, the rule applies only to that lemma.
+    ///
+    /// This enables compiled paradigm data where many lemmas share the same feature bundle.
+    /// Generic and lemma-scoped candidates are not prioritized implicitly; multiple matches
+    /// remain an ambiguity and fail closed.
+    pub lemma: Option<String>,
     pub morphology: Vec<MorphologicalFeature>,
     pub operation: MorphophonologicalRuleOperation,
 }
@@ -655,6 +661,11 @@ impl MorphophonologicalRuleSet {
             if rule.rule_id.trim().is_empty() {
                 return Err(MorphophonologicalRuleSetError::EmptyRuleId);
             }
+            if let Some(lemma) = rule.lemma.as_deref() {
+                if lemma.trim().is_empty() {
+                    return Err(MorphophonologicalRuleSetError::InvalidLemmaScope);
+                }
+            }
             if !rule_ids.insert(rule.rule_id.clone()) {
                 return Err(MorphophonologicalRuleSetError::DuplicateRuleId);
             }
@@ -700,6 +711,7 @@ impl MorphophonologicalRuleSet {
             .rules
             .iter()
             .filter(|rule| canonical_morphology(&rule.morphology) == expected)
+            .filter(|rule| rule.lemma.as_deref().map_or(true, |scoped| scoped == lemma))
             .collect::<Vec<_>>();
 
         let rule = match matches.as_slice() {
@@ -828,6 +840,7 @@ pub enum MorphophonologicalRuleSetError {
     EmptyRuleSet,
     EmptyRuleId,
     DuplicateRuleId,
+    InvalidLemmaScope,
     InvalidMorphology,
     AmbiguousFeatureMatch,
     EmptyOperationOperand,
@@ -852,6 +865,7 @@ impl std::fmt::Display for MorphophonologicalRuleSetError {
             Self::EmptyRuleSet => write!(f, "morphophonological rule set must contain at least one rule"),
             Self::EmptyRuleId => write!(f, "morphophonological rule id must be non-empty"),
             Self::DuplicateRuleId => write!(f, "morphophonological rule ids must be unique"),
+            Self::InvalidLemmaScope => write!(f, "morphophonological rule lemma scope must be non-empty"),
             Self::InvalidMorphology => write!(f, "morphophonological rule morphology contains duplicate feature categories"),
             Self::AmbiguousFeatureMatch => write!(f, "morphophonological rule set contains duplicate exact feature matches"),
             Self::EmptyOperationOperand => write!(f, "morphophonological rule operation operand must be non-empty"),
@@ -2354,6 +2368,66 @@ mod tests {
         assert_eq!(
             error,
             MorphophonologicalDerivationWitnessError::LanguageRulesMustBeBound
+        );
+    }
+
+    #[test]
+    fn morphophonological_rule_selection_binds_exact_lemma_scope() {
+        let binding = morphophonological_fixture_binding();
+        let rule_set = MorphophonologicalRuleSet::new(
+            "en",
+            "fixture:lemma-scoped-rules-v2",
+            "en-US",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "fixture:lemma-scoped-rules-v2",
+                "fixture-v2",
+            )
+            .unwrap(),
+            "fixture:english-morphology:v2",
+            "fixture:rules:v2",
+            vec![
+                MorphophonologicalRule {
+                    rule_id: "fixture:walk-past".into(),
+                    lemma: Some("walk".into()),
+                    morphology: vec![MorphologicalFeature {
+                        category: "tense".into(),
+                        value: "past".into(),
+                    }],
+                    operation: MorphophonologicalRuleOperation::AppendSuffix {
+                        suffix: "ed".into(),
+                    },
+                },
+                MorphophonologicalRule {
+                    rule_id: "fixture:jump-past".into(),
+                    lemma: Some("jump".into()),
+                    morphology: vec![MorphologicalFeature {
+                        category: "tense".into(),
+                        value: "past".into(),
+                    }],
+                    operation: MorphophonologicalRuleOperation::AppendSuffix {
+                        suffix: "ed".into(),
+                    },
+                },
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(
+            rule_set.derive("walk", &binding.constituents[0].morphology).unwrap(),
+            ("walked".into(), "fixture:walk-past".into())
+        );
+        assert_eq!(
+            rule_set.derive(
+                "jump",
+                &binding.constituents[0].morphology
+            ).unwrap(),
+            ("jumped".into(), "fixture:jump-past".into())
+        );
+        assert_eq!(
+            rule_set
+                .derive("run", &binding.constituents[0].morphology)
+                .expect_err("unscoped lemma must not borrow another lemma's rule"),
+            MorphophonologicalRuleSetError::NoMatchingRule
         );
     }
 
