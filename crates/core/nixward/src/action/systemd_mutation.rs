@@ -158,6 +158,16 @@ fn validate_job_object_path(
     if value.is_empty() || value.len() > 4096 || !value.starts_with(JOB_PATH_PREFIX) {
         return Err(NixSystemdMutationTransportErrorV1::InvalidJobObjectPath);
     }
+    let suffix = &value[JOB_PATH_PREFIX.len()..];
+    if suffix.is_empty() || suffix.contains('/') {
+        return Err(NixSystemdMutationTransportErrorV1::InvalidJobObjectPath);
+    }
+    let id = suffix
+        .parse::<u32>()
+        .map_err(|_| NixSystemdMutationTransportErrorV1::InvalidJobObjectPath)?;
+    if id == 0 {
+        return Err(NixSystemdMutationTransportErrorV1::InvalidJobObjectPath);
+    }
     Ok(())
 }
 
@@ -205,8 +215,18 @@ mod tests {
     #[test]
     fn returned_job_path_must_be_in_systemd_job_namespace() {
         let good = OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42").unwrap();
-        let bad = OwnedObjectPath::try_from("/org/freedesktop/systemd1/unit/nginx_2eservice").unwrap();
+        let bad_namespace =
+            OwnedObjectPath::try_from("/org/freedesktop/systemd1/unit/nginx_2eservice").unwrap();
+        let bad_id = OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/not-a-number").unwrap();
+        let zero = OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/0").unwrap();
+        let nested = OwnedObjectPath::try_from(
+            "/org/freedesktop/systemd1/job/42/extra",
+        )
+        .unwrap();
         validate_job_object_path(&good).unwrap();
-        assert!(validate_job_object_path(&bad).is_err());
+        assert!(validate_job_object_path(&bad_namespace).is_err());
+        assert!(validate_job_object_path(&bad_id).is_err());
+        assert!(validate_job_object_path(&zero).is_err());
+        assert!(validate_job_object_path(&nested).is_err());
     }
 }
