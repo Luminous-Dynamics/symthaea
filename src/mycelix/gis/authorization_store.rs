@@ -666,6 +666,7 @@ fn backfill_bound_attempt_boundaries_from_dispatch(
 fn backfill_native_replay_history(
     connection: &mut Connection,
 ) -> Result<(), AuthorizationStoreError> {
+    let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
     fn reconcile_source(
         connection: &Connection,
         native_replay_identity: &str,
@@ -765,7 +766,8 @@ fn backfill_native_replay_history(
                 target_identity,
             ],
         )?;
-        Ok(())
+        tx.commit()?;
+    Ok(())
     }
 
     let dispatch_rows: Vec<(
@@ -773,7 +775,7 @@ fn backfill_native_replay_history(
         Option<String>,Option<String>,Option<String>,
         String,String,String,
     )> = {
-        let mut stmt = connection.prepare(
+        let mut stmt = tx.prepare(
             "SELECT native_replay_identity,authorization_instance,attempt_id,operation_id,
                     COALESCE(relying_party_id,''),native_authority_namespace,native_authorization_id,
                     native_replay_derivation_digest,boundary_id,action_digest,target_identity
@@ -789,7 +791,7 @@ fn backfill_native_replay_history(
     };
     for row in dispatch_rows {
         reconcile_source(
-            connection,
+            &tx,
             &row.0,&row.1,&row.2,&row.3,&row.4,
             row.5.as_deref(),row.6.as_deref(),row.7.as_deref(),
             row.8.as_deref(),row.9.as_deref(),row.10.as_deref(),
@@ -801,7 +803,7 @@ fn backfill_native_replay_history(
         Option<String>,Option<String>,Option<String>,
         String,String,String,
     )> = {
-        let mut stmt = connection.prepare(
+        let mut stmt = tx.prepare(
             "SELECT native_replay_identity,authorization_instance,attempt_id,operation_id,
                     COALESCE(relying_party_id,''),native_authority_namespace,native_authorization_id,
                     native_replay_derivation_digest,boundary_id,action_digest,target_identity
@@ -817,7 +819,7 @@ fn backfill_native_replay_history(
     };
     for row in terminal_rows {
         reconcile_source(
-            connection,
+            &tx,
             &row.0,&row.1,&row.2,&row.3,&row.4,
             row.5.as_deref(),row.6.as_deref(),row.7.as_deref(),
             row.8.as_deref(),row.9.as_deref(),row.10.as_deref(),
@@ -3376,7 +3378,7 @@ fn validate_native_authority_pin_set(
         // The native replay ledger is the durable one-time authority fact.
         // It intentionally survives dispatch/terminal retention and is the
         // authoritative transaction-time uniqueness boundary for this grant.
-        tx.execute(
+        let insert_result = tx.execute(
             "INSERT INTO authorization_native_replay_history(
                 native_replay_identity,authorization_instance,attempt_id,operation_id,
                 relying_party_id,native_authority_namespace,native_authorization_id,
@@ -3395,7 +3397,23 @@ fn validate_native_authority_pin_set(
                 record.action_digest,
                 record.target_identity,
             ],
-        )?;
+        );
+
+        if let Err(error) = insert_result {
+            if matches!(
+                error,
+                rusqlite::Error::SqliteFailure(
+                    ref sqlite_error,
+                    _
+                ) if matches!(
+                    sqlite_error.code,
+                    rusqlite::ErrorCode::ConstraintViolation
+                )
+            ) {
+                return Err(AuthorizationConsumptionError::InvalidBinding.into());
+            }
+            return Err(error.into());
+        }
 
         tx.execute(
             "INSERT INTO authorization_dispatches
@@ -13211,6 +13229,14 @@ mod tests {
         let r1 = t1.join().unwrap();
         let r2 = t2.join().unwrap();
         assert_ne!(r1.is_ok(), r2.is_ok());
+
+        let loser = if r1.is_err() { r1 } else { r2 };
+        assert!(matches!(
+            loser,
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
 
         let store = SqliteAuthorizationStore::open_with_relying_party_clock_and_policy(
             &path,
