@@ -29,8 +29,8 @@
 
 use super::relational_harmonics::EvidenceStatus;
 
-const EVIDENCE_SCHEMA: &str = "relational-prediction-evidence/v1";
-const ROLLING_EVIDENCE_SCHEMA: &str = "relational-prediction-rolling-evidence/v1";
+const EVIDENCE_SCHEMA: &str = "relational-prediction-evidence/v2";
+const ROLLING_EVIDENCE_SCHEMA: &str = "relational-prediction-rolling-evidence/v2";
 const FEATURE_SCHEMA: &str = "relational-prediction-features/v1";
 const MODEL_SCHEMA: &str = "linear-ridge-standardized-v1";
 
@@ -304,6 +304,12 @@ pub struct PredictionEvidenceRecord {
     pub outcome_times: Vec<f64>,
     pub observed_outcomes: Vec<f64>,
     pub predictions: Vec<f64>,
+    /// Held-out feature rows retained so fitted-model predictions can be
+    /// independently recomputed from retained coefficients and frozen
+    /// training preprocessing parameters.
+    pub test_features: Vec<Vec<f64>>,
+    /// The constant forecast used by the persistence baseline.
+    pub baseline_prediction: Option<f64>,
     pub fit_coefficients: Option<Vec<f64>>,
     pub feature_means: Vec<f64>,
     pub feature_scales: Vec<f64>,
@@ -334,9 +340,14 @@ impl PredictionEvidenceRecord {
             return Err(RelationalPredictionError::InvalidSplit);
         }
 
+        let expected_feature_count = feature_count(self.feature_set);
+
         if let Some(coefficients) = &self.fit_coefficients {
-            if coefficients.len() != self.feature_means.len() + 1
+            if coefficients.len() != expected_feature_count + 1
+                || coefficients.len() != self.feature_means.len() + 1
                 || coefficients.len() != self.feature_scales.len() + 1
+                || self.test_features.len() != self.test_samples
+                || self.baseline_prediction.is_some()
             {
                 return Err(RelationalPredictionError::InvalidSplit);
             }
@@ -346,10 +357,37 @@ impl PredictionEvidenceRecord {
                     .feature_scales
                     .iter()
                     .any(|value| !value.is_finite() || *value <= 0.0)
+                || self.test_features.iter().any(|row| {
+                    row.len() != expected_feature_count
+                        || row.iter().any(|value| !value.is_finite())
+                })
             {
                 return Err(RelationalPredictionError::ModelFitFailed);
             }
-        } else if !self.feature_means.is_empty() || !self.feature_scales.is_empty() {
+
+            let model = FittedLinearModel {
+                coefficients: coefficients.clone(),
+                means: self.feature_means.clone(),
+                scales: self.feature_scales.clone(),
+            };
+            for (features, recorded_prediction) in
+                self.test_features.iter().zip(&self.predictions)
+            {
+                let recomputed = predict(&model, features);
+                let tolerance =
+                    1e-12 * recomputed.abs().max(recorded_prediction.abs()).max(1.0);
+                if !recomputed.is_finite()
+                    || !recorded_prediction.is_finite()
+                    || (recomputed - *recorded_prediction).abs() > tolerance
+                {
+                    return Err(RelationalPredictionError::InvalidSplit);
+                }
+            }
+        } else if !self.feature_means.is_empty()
+            || !self.feature_scales.is_empty()
+            || !self.test_features.is_empty()
+            || self.baseline_prediction.is_none_or(|value| !value.is_finite())
+        {
             return Err(RelationalPredictionError::InvalidSplit);
         }
 
@@ -359,6 +397,20 @@ impl PredictionEvidenceRecord {
             || self.predictions.iter().any(|value| !value.is_finite())
         {
             return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        if self.fit_coefficients.is_none() {
+            let baseline = self
+                .baseline_prediction
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let tolerance = 1e-12 * baseline.abs().max(1.0);
+            if self
+                .predictions
+                .iter()
+                .any(|prediction| (*prediction - baseline).abs() > tolerance)
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
         }
 
         for pair in self.feature_times.windows(2) {
@@ -1323,6 +1375,8 @@ fn prediction_evidence_record_json(record: &PredictionEvidenceRecord) -> serde_j
         "outcome_times": &record.outcome_times,
         "observed_outcomes": &record.observed_outcomes,
         "predictions": &record.predictions,
+        "test_features": &record.test_features,
+        "baseline_prediction": record.baseline_prediction,
         "fit_coefficients": &record.fit_coefficients,
         "feature_means": &record.feature_means,
         "feature_scales": &record.feature_scales,
@@ -1427,17 +1481,22 @@ fn fit_prediction_record(
     let mut outcome_times = Vec::with_capacity(config.test_samples);
     let mut observed_outcomes = Vec::with_capacity(config.test_samples);
     let mut predictions = Vec::with_capacity(config.test_samples);
+    let mut test_features = Vec::with_capacity(config.test_samples);
     let mut absolute_error = 0.0;
     let mut squared_error = 0.0;
 
     for sample in &samples[test_start..test_end] {
+        let features = feature_vector(sample, feature_set);
         let prediction = match (&model, baseline) {
-            (Some(model), None) => predict(model, &feature_vector(sample, feature_set)),
+            (Some(model), None) => predict(model, &features),
             (None, Some(value)) => value,
             _ => return Err(RelationalPredictionError::ModelFitFailed),
         };
         if !prediction.is_finite() {
             return Err(RelationalPredictionError::ModelFitFailed);
+        }
+        if model.is_some() {
+            test_features.push(features);
         }
 
         let error = prediction - sample.future_outcome;
@@ -1463,6 +1522,8 @@ fn fit_prediction_record(
         outcome_times,
         observed_outcomes,
         predictions,
+        test_features,
+        baseline_prediction: baseline,
         fit_coefficients,
         feature_means,
         feature_scales,
@@ -1549,6 +1610,18 @@ fn score_persistence_baseline(
         mean_absolute_error: absolute_error / n,
         mean_squared_error: squared_error / n,
     })
+}
+
+fn feature_count(feature_set: PredictionFeatureSet) -> usize {
+    match feature_set {
+        PredictionFeatureSet::PersistenceBaseline => 0,
+        PredictionFeatureSet::IsolatedAgents => 2,
+        PredictionFeatureSet::CommonDriver => 1,
+        PredictionFeatureSet::SynchronyOnly => 1,
+        PredictionFeatureSet::NonRelationalContext => 4,
+        PredictionFeatureSet::RelationalAugmented => 7,
+        PredictionFeatureSet::RelationalProfile => 4,
+    }
 }
 
 fn feature_vector(
@@ -1964,6 +2037,7 @@ mod tests {
         assert!(json.contains(MODEL_SCHEMA));
         assert!(json.contains("RelationalAugmented"));
         assert!(json.contains("predictions"));
+        assert!(json.contains("test_features"));
         assert_eq!(evidence.records.len(), 7);
         assert_eq!(
             evidence.records[0].score(),
@@ -1997,7 +2071,7 @@ mod tests {
 
         evidence.validate().unwrap();
         let json = evidence.to_json().unwrap();
-        assert!(json.contains("relational-prediction-rolling-evidence/v1"));
+        assert!(json.contains("relational-prediction-rolling-evidence/v2"));
         assert!(json.contains("per_origin_improvement"));
         assert_eq!(evidence.origins.len(), 2);
     }
@@ -2018,6 +2092,90 @@ mod tests {
         .unwrap();
 
         evidence.records[1].ridge_lambda = 0.25;
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_trace_rejects_tampered_prediction() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        let record = evidence
+            .records
+            .iter_mut()
+            .find(|record| record.feature_set == PredictionFeatureSet::RelationalAugmented)
+            .unwrap();
+        record.predictions[0] += 0.01;
+
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_trace_rejects_tampered_test_feature() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        let record = evidence
+            .records
+            .iter_mut()
+            .find(|record| record.feature_set == PredictionFeatureSet::RelationalAugmented)
+            .unwrap();
+        record.test_features[0][0] += 0.01;
+
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn persistence_evidence_rejects_tampered_baseline_prediction() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        let record = evidence
+            .records
+            .iter_mut()
+            .find(|record| record.feature_set == PredictionFeatureSet::PersistenceBaseline)
+            .unwrap();
+        record.baseline_prediction = Some(record.baseline_prediction.unwrap() + 0.01);
+
         assert_eq!(
             evidence.validate(),
             Err(RelationalPredictionError::InvalidSplit)
