@@ -343,12 +343,11 @@ impl NixPostStateStabilitySampleV1 {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixPostStateStabilityEvidenceV1 {
-    /// Measured on the same monotonic clock as the systemd state-change timestamp.
     pub required_window_us: u64,
     pub window_start_monotonic_us: u64,
     pub window_end_monotonic_us: u64,
-    pub last_state_change_at_monotonic_us: u64,
-    pub sample_count: u32,
+    pub samples: Vec<NixPostStateStabilitySampleV1>,
+    pub sequence_digest: String,
 }
 
 impl NixPostStateStabilityEvidenceV1 {
@@ -366,17 +365,89 @@ impl NixPostStateStabilityEvidenceV1 {
         {
             return Err(NixPostStateErrorV1::StabilityWindowTooShort);
         }
-        if self.sample_count < 2 {
+        if self.samples.len() < 2 {
             return Err(NixPostStateErrorV1::InsufficientStabilitySamples);
         }
-        // If systemd's StateChangeTimestamp is at or before the beginning of
-        // the stability window, the observed state has not changed since that
-        // timestamp according to the unit's own state-change clock.
-        if self.last_state_change_at_monotonic_us > self.window_start_monotonic_us {
-            return Err(NixPostStateErrorV1::StateChangedDuringStabilityWindow);
+        validate_digest(&self.sequence_digest, "stability sequence digest")?;
+
+        for sample in &self.samples {
+            sample.validate_shape()?;
+            if sample.captured_at_monotonic_us < self.window_start_monotonic_us
+                || sample.captured_at_monotonic_us > self.window_end_monotonic_us
+            {
+                return Err(NixPostStateErrorV1::StabilitySampleOutsideWindow);
+            }
+            if sample.state_change_at_monotonic_us > self.window_start_monotonic_us {
+                return Err(NixPostStateErrorV1::StateChangedDuringStabilityWindow);
+            }
+        }
+
+        for pair in self.samples.windows(2) {
+            if pair[1].captured_at_monotonic_us <= pair[0].captured_at_monotonic_us {
+                return Err(NixPostStateErrorV1::StabilitySamplesNotIncreasing);
+            }
+        }
+
+        let first = &self.samples[0];
+        for sample in &self.samples[1..] {
+            if sample.operation != first.operation
+                || sample.unit != first.unit
+                || sample.unit_object_path != first.unit_object_path
+                || sample.observed_generation != first.observed_generation
+                || sample.definition_digest != first.definition_digest
+                || sample.state_digest != first.state_digest
+                || sample.manager_owner != first.manager_owner
+                || sample.invocation_id != first.invocation_id
+                || sample.state_change_at_monotonic_us != first.state_change_at_monotonic_us
+            {
+                return Err(NixPostStateErrorV1::StabilityIdentityOrStateChanged);
+            }
+        }
+
+        let expected = stability_sequence_digest(&self.samples)?;
+        if self.sequence_digest != expected {
+            return Err(NixPostStateErrorV1::StabilitySequenceDigestMismatch);
         }
         Ok(())
     }
+
+    pub fn digest(&self) -> Result<String, NixPostStateErrorV1> {
+        self.validate_shape()?;
+        Ok(self.sequence_digest.clone())
+    }
+}
+
+/// Observer-sealed stability evidence. Serialized stability data must cross the
+/// observer boundary before it may be used to promote a receipt to Proven.
+pub struct NixVerifiedPostStateStabilityEvidenceV1 {
+    evidence: NixPostStateStabilityEvidenceV1,
+}
+
+impl NixVerifiedPostStateStabilityEvidenceV1 {
+    pub(crate) fn from_observer(
+        evidence: NixPostStateStabilityEvidenceV1,
+    ) -> Result<Self, NixPostStateErrorV1> {
+        evidence.validate_shape()?;
+        Ok(Self { evidence })
+    }
+
+    pub(crate) fn as_ref(&self) -> &NixPostStateStabilityEvidenceV1 {
+        &self.evidence
+    }
+}
+
+fn stability_sequence_digest(
+    samples: &[NixPostStateStabilitySampleV1],
+) -> Result<String, NixPostStateErrorV1> {
+    let mut h = Hasher::new();
+    h.update(STABILITY_SEQUENCE_DOMAIN_V1);
+    put_u32(&mut h, u32::try_from(samples.len()).map_err(|_| {
+        NixPostStateErrorV1::TooManyStabilitySamples
+    })?);
+    for sample in samples {
+        put_str(&mut h, &sample.digest()?);
+    }
+    Ok(h.finalize().to_hex().to_string())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -970,6 +1041,53 @@ fn validate_unique_manager_owner(value: &str) -> Result<(), NixPostStateErrorV1>
     Ok(())
 }
 
+fn validate_unique_manager_owner(value: &str) -> Result<(), NixPostStateErrorV1> {
+    if value.is_empty() || value.len() > 255 || !value.starts_with(':') {
+        return Err(NixPostStateErrorV1::InvalidManagerOwner);
+    }
+    let mut elements = value[1..].split('.');
+    let first = elements.next().unwrap_or_default();
+    if first.is_empty() || elements.next().is_none() {
+        return Err(NixPostStateErrorV1::InvalidManagerOwner);
+    }
+    for element in std::iter::once(first).chain(elements) {
+        if element.is_empty()
+            || !element
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+        {
+            return Err(NixPostStateErrorV1::InvalidManagerOwner);
+        }
+    }
+    Ok(())
+}
+
+fn validate_unique_manager_owner(value: &str) -> Result<(), NixPostStateErrorV1> {
+    validate_unique_manager_owner(value)
+}
+
+fn validate_systemd_unit_object_path(value: &str) -> Result<(), NixPostStateErrorV1> {
+    if value.is_empty()
+        || value.len() > MAX_PATH_BYTES
+        || !value.starts_with(SYSTEMD_UNIT_PATH_PREFIX)
+        || value.ends_with('/')
+    {
+        return Err(NixPostStateErrorV1::InvalidPath("systemd unit object path"));
+    }
+    let suffix = &value[SYSTEMD_UNIT_PATH_PREFIX.len()..];
+    if suffix.is_empty()
+        || suffix.split('/').any(|element| {
+            element.is_empty()
+                || !element
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        })
+    {
+        return Err(NixPostStateErrorV1::InvalidPath("systemd unit object path"));
+    }
+    Ok(())
+}
+
 fn validate_digest(value: &str, field: &'static str) -> Result<(), NixPostStateErrorV1> {
     if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(NixPostStateErrorV1::InvalidDigest(field));
@@ -1081,6 +1199,16 @@ pub enum NixPostStateErrorV1 {
     StabilityWindowTooShort,
     #[error("insufficient stability samples")]
     InsufficientStabilitySamples,
+    #[error("stability sample falls outside the declared window")]
+    StabilitySampleOutsideWindow,
+    #[error("stability samples are not strictly increasing")]
+    StabilitySamplesNotIncreasing,
+    #[error("stability sample identity or semantic state changed")]
+    StabilityIdentityOrStateChanged,
+    #[error("stability sequence digest does not match the samples")]
+    StabilitySequenceDigestMismatch,
+    #[error("too many stability samples")]
+    TooManyStabilitySamples,
     #[error("state changed during stability window")]
     StateChangedDuringStabilityWindow,
     #[error("observation predates the recorded state-change timestamp")]
@@ -1095,6 +1223,10 @@ pub enum NixPostStateErrorV1 {
     GenerationMismatch,
     #[error("observed systemd unit-definition identity does not match authorization")]
     DefinitionMismatch,
+    #[error("systemd manager incarnation is missing")]
+    MissingManagerOwner,
+    #[error("systemd manager incarnation does not match the observation/job binding")]
+    ManagerOwnerMismatch,
     #[error("incomplete systemd job evidence")]
     IncompleteJobEvidence,
     #[error("duplicate drop-in path")]
