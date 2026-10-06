@@ -199,12 +199,8 @@ fn compute_overall_digest(
         put_str(&mut hasher, path);
     }
     put_str(&mut hasher, manager_owner);
-    put_u64(&mut hasher, files.len() as u64);    if files.is_empty() || files.len() > MAX_FILES {
-        return Err(NixSystemdDefinitionContentErrorV1::InvalidFileCount);
-    }
-    let mut hasher = Hasher::new();
-    hasher.update(DEFINITION_CONTENT_DOMAIN_V1);
     put_u64(&mut hasher, files.len() as u64);
+
     for file in files {
         file.validate_shape()?;
         hasher.update(DEFINITION_FILE_DOMAIN_V1);
@@ -219,8 +215,6 @@ fn compute_overall_digest(
         put_i64(&mut hasher, file.ctime_nanoseconds);
     }
     Ok(hasher.finalize().to_hex().to_string())
-}
-
 }
 
 fn hash_exact_file(path: &str) -> Result<NixDefinitionFileContentDigestV1, NixSystemdDefinitionContentErrorV1> {
