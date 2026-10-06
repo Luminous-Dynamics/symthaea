@@ -754,14 +754,14 @@ fn collapse_xsd_whitespace(value: &str) -> String {
     let mut normalized = String::with_capacity(value.len());
     let mut pending_space = false;
 
-    for byte in value.bytes() {
-        match byte {
-            b' ' | b'\t' | b'\n' | b'\r' => pending_space = true,
+    for character in value.chars() {
+        match character {
+            ' ' | '\t' | '\n' | '\r' => pending_space = true,
             _ => {
                 if pending_space && !normalized.is_empty() {
                     normalized.push(' ');
                 }
-                normalized.push(byte as char);
+                normalized.push(character);
                 pending_space = false;
             }
         }
