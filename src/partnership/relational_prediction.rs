@@ -2395,7 +2395,7 @@ mod tests {
             RelationalPredictionProvenance::new(
                 "RH-006-v1",
                 "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
             )
             .unwrap(),
         )
