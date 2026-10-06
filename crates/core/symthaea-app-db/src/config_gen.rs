@@ -12,6 +12,8 @@ use crate::aliases;
 use std::fmt::Write;
 
 const NIXOS_2605_NIXPKGS_REV: &str = "7fc6f2c20af09cdcaf48b92ec3121860139ec668";
+const LANZABOOTE_V042_REV: &str = "a65905a09e2c43ff63be8c0e86a93712361f871e";
+const HOME_MANAGER_2605_REV: &str = "db7d5e2332710f5abb088f6b5de927d7f9511b35";
 
 // ═══════════════════════════════════════════════════════
 // Input types
@@ -920,7 +922,8 @@ fn build_flake_nix(choices: &UserChoices) -> String {
         writeln!(out, "    home-manager = {{").unwrap();
         writeln!(
             out,
-            "      url = \"github:nix-community/home-manager/release-26.05\";"
+            "      url = \"github:nix-community/home-manager/{}";",
+            HOME_MANAGER_2605_REV
         )
         .unwrap();
         writeln!(out, "      inputs.nixpkgs.follows = \"nixpkgs\";").unwrap();
@@ -1172,6 +1175,8 @@ mod tests {
         let flake = &result.flake_nix;
         assert!(flake.contains("nixosConfigurations.\"sovereign\""));
         assert!(flake.contains(NIXOS_2605_NIXPKGS_REV));
+        assert!(flake.contains(LANZABOOTE_V042_REV));
+        assert!(flake.contains(HOME_MANAGER_2605_REV));
         assert!(flake.contains("lanzaboote"));
     }
 
