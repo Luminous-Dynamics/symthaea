@@ -326,9 +326,9 @@ fn harmonic_summary(samples: &[RelationalSample]) -> HarmonicSummary {
 pub struct RelationalSignalSample {
     /// Monotone observation time in caller-defined units.
     pub time: f64,
-    /// Normalized scalar state summary for agent A.
+    /// Scalar state summary for agent A in caller-defined units.
     pub agent_a: f64,
-    /// Normalized scalar state summary for agent B.
+    /// Scalar state summary for agent B in caller-defined units.
     pub agent_b: f64,
 }
 
