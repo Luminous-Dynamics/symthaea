@@ -771,15 +771,6 @@ impl MorphophonologicalCompilationWitness {
         }
         self.validate_current_unimorph_implementation()?;
 
-        if self.compiler_implementation_revision != UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION {
-            return Err(
-                MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch,
-            );
-        }
-        if self.source_parser_revision != UNIMORPH_TSV_SOURCE_PARSER_REVISION {
-            return Err(MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch);
-        }
-
         let (recompiled_rule_set, recompiled_witness) =
             MorphophonologicalRuleSet::compile_unimorph_tsv_source(
                 output_rule_set.language_tag.clone(),
@@ -3322,6 +3313,20 @@ mod tests {
                 .replay_unimorph_tsv_compilation(artifact, &rule_set)
                 .expect_err("recomputing the commitment must not self-certify a parser revision"),
             MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch
+        );
+
+        let mut historical_revision = witness.clone();
+        historical_revision.compiler_implementation_revision = "historical-compiler-revision".into();
+        historical_revision.transformation_blake3 =
+            historical_revision.compute_transformation_blake3();
+        historical_revision
+            .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
+            .expect("historical structural validation should remain inspectable");
+        assert_eq!(
+            historical_revision
+                .replay_unimorph_tsv_compilation(artifact, &rule_set)
+                .expect_err("current replay must reject a historical implementation revision"),
+            MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch
         );
 
         let mut replay_tampered = witness.clone();
