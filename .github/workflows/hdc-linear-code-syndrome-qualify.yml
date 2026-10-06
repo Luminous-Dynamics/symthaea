@@ -302,7 +302,7 @@ jobs:
           OUTPUT="$(cargo +1.96.1 test --locked \
             --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
             --test linear_code_syndrome_decoder \
-            beyond_unique_radius_decoder_matches_nearest_or_no_match_without_claiming_target_recovery -- --nocapture 2>&1)
+            beyond_unique_radius_decoder_matches_nearest_or_no_match_without_claiming_target_recovery -- --nocapture 2>&1)"
           COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^BEYOND_RADIUS_LEDGER=')"
           test "$COUNT" -eq 1
           LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^BEYOND_RADIUS_LEDGER=//p')"
