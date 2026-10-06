@@ -303,18 +303,19 @@ impl ViabilityFabric {
         Ok(())
     }
 
-    /// Close an action prediction with observed evidence.
+    /// Close a pre-existing action prediction with observed evidence.
+    ///
+    /// The prediction is removed from the pending set and attached to the outcome.
+    /// A caller cannot inject a prediction at observation time: this is deliberately
+    /// fail-closed against post-hoc rationalization.
     pub fn observe_action(&mut self, mut outcome: ActionOutcome) -> Result<(), &'static str> {
-        if let Some(predicted) = self.pending_predictions.remove(&outcome.action_id) {
-            if outcome.prediction.is_some() {
-                return Err("outcome already contains a prediction");
-            }
-            outcome.prediction = Some(predicted);
-        }
-
-        let Some(prediction) = &outcome.prediction else {
+        let Some(prediction) = self.pending_predictions.remove(&outcome.action_id) else {
             return Err("missing pre-action prediction");
         };
+
+        if outcome.prediction.is_some() {
+            return Err("outcome already contains a prediction");
+        }
 
         if prediction.action_id != outcome.action_id {
             return Err("prediction/action identity mismatch");
@@ -324,6 +325,7 @@ impl ViabilityFabric {
             return Err("outcome predates prediction");
         }
 
+        outcome.prediction = Some(prediction);
         outcome.prediction_error = outcome.prediction_error.bounded();
 
         if self.max_outcomes > 0 && self.outcomes.len() >= self.max_outcomes {
@@ -398,6 +400,38 @@ mod tests {
         };
 
         assert_eq!(fabric.observe_action(outcome), Err("missing pre-action prediction"));
+    }
+
+    #[test]
+    fn post_hoc_prediction_in_outcome_is_rejected() {
+        let mut fabric = ViabilityFabric::new(4);
+        fabric.begin_cycle(7);
+
+        let injected_prediction = ActionPrediction {
+            action_id: 42,
+            action_label: "test".to_string(),
+            cycle: 7,
+            predicted_world_delta: None,
+            predicted_self_delta: None,
+            predicted_goal_delta: None,
+            authority_granted: true,
+        };
+
+        let outcome = ActionOutcome {
+            action_id: 42,
+            action_label: "test".to_string(),
+            cycle: 7,
+            pre_state_digest: 1,
+            post_state_digest: 2,
+            authority_granted: true,
+            safety_gate_passed: true,
+            prediction: Some(injected_prediction),
+            observed_effect: None,
+            prediction_error: PredictionErrorLedger::default(),
+        };
+
+        assert_eq!(fabric.observe_action(outcome), Err("missing pre-action prediction"));
+        assert!(fabric.outcomes().is_empty());
     }
 
     #[test]
