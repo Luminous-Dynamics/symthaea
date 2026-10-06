@@ -633,12 +633,19 @@ impl MorphophonologicalCompilationWitness {
             .validate()
             .map_err(|_| MorphophonologicalCompilationWitnessError::InvalidRuleSet)?;
 
+        let compiler_id = compiler_id.into();
+        let compiler_version = compiler_version.into();
+        let known_unimorph_compiler =
+            compiler_id == UNIMORPH_TSV_COMPILER_ID && compiler_version == UNIMORPH_TSV_COMPILER_VERSION;
+
         let witness = Self {
             version: MORPHOPHONOLOGICAL_COMPILATION_WITNESS_VERSION.to_string(),
-            compiler_id: compiler_id.into(),
-            compiler_version: compiler_version.into(),
-            compiler_implementation_revision: UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION.to_string(),
-            source_parser_revision: UNIMORPH_TSV_SOURCE_PARSER_REVISION.to_string(),
+            compiler_id,
+            compiler_version,
+            compiler_implementation_revision: known_unimorph_compiler
+                .then(|| UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION.to_string()),
+            source_parser_revision: known_unimorph_compiler
+                .then(|| UNIMORPH_TSV_SOURCE_PARSER_REVISION.to_string()),
             normalization_policy: normalization_policy.into(),
             source_artifact_blake3: blake3::hash(source_artifact).to_hex().to_string(),
             source_selection_blake3: String::new(),
