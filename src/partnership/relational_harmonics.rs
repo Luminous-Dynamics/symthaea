@@ -958,6 +958,90 @@ mod tests {
         assert!(flow.net_a_to_b.is_finite());
     }
 
+
+    #[test]
+    fn common_driver_control_collapses_shared_stimulus_correlation() {
+        let samples = (0..96)
+            .map(|i| {
+                let z = (i as f64 * 0.13).sin();
+                let a = z + 0.02 * (i as f64 * 0.71).sin();
+                let b = z + 0.02 * (i as f64 * 0.37).cos();
+                CommonDriverSignalSample::new(i as f64, z, a, b)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        let control = CommonDriverControlSummary::compute(&samples).unwrap();
+
+        assert!(control.raw_zero_lag_correlation.abs() > 0.9);
+        assert!(control.controlled_zero_lag_correlation.abs() < 0.35);
+        assert!(control.absolute_correlation_reduction > 0.55);
+        assert_eq!(control.status, EvidenceStatus::Measured);
+    }
+
+    #[test]
+    fn common_driver_control_requires_uniform_sampling() {
+        let samples = (0..16)
+            .map(|i| {
+                let time = if i == 8 { i as f64 + 0.25 } else { i as f64 };
+                CommonDriverSignalSample::new(
+                    time,
+                    (i as f64 * 0.11).sin(),
+                    (i as f64 * 0.17).sin(),
+                    (i as f64 * 0.19).sin(),
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            CommonDriverControlSummary::compute(&samples),
+            Err(RelationalHarmonicError::NonUniformSampling)
+        );
+    }
+
+    #[test]
+    fn shuffled_partner_null_is_deterministic_and_reported_as_proxy() {
+        let samples = (0..96)
+            .map(|i| {
+                let a = (i as f64 * 0.173).sin();
+                let b = ((i as f64 - 3.0) * 0.173).sin();
+                RelationalSignalSample::new(i as f64, a, b)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        let first = PartnerShuffleSurrogateSummary::compute(&samples, 8, 12).unwrap();
+        let second = PartnerShuffleSurrogateSummary::compute(&samples, 8, 12).unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(first.status, EvidenceStatus::Proxy);
+        assert_eq!(first.surrogate_count, 12);
+        assert!(first.observed_best_absolute_correlation > 0.9);
+        assert!(first.exceedance_fraction >= 0.0);
+        assert!(first.exceedance_fraction <= 1.0);
+        assert!(first.max_surrogate_absolute_correlation >= 0.0);
+    }
+
+    #[test]
+    fn shuffled_partner_calibration_rejects_empty_surrogate_request() {
+        let samples = (0..16)
+            .map(|i| {
+                RelationalSignalSample::new(
+                    i as f64,
+                    (i as f64 * 0.2).sin(),
+                    (i as f64 * 0.2).cos(),
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            PartnerShuffleSurrogateSummary::compute(&samples, 4, 0),
+            Err(RelationalHarmonicError::InsufficientSamples(0))
+        );
+    }
+
     #[test]
     fn no_aggregate_score_is_exposed() {
         let samples = (0..8)
