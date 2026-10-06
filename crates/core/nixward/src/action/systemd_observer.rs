@@ -10,8 +10,10 @@
 //! and never mints execution authority.
 
 use super::post_state::{
+    NixPostStateStabilitySampleV1, NixPostStateStabilityEvidenceV1,
     NixServicePostStateObservationV1, NixSystemdJobEvidenceV1, NixSystemdJobTypeV1,
     NixSystemdUnitDefinitionIdentityV1, NixVerifiedPostStateObservationV1,
+    NixVerifiedPostStateStabilityEvidenceV1,
 };
 use super::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use super::service_state::{ServiceActiveStateV1, ServiceLoadStateV1, ServiceUnitFileStateV1};
