@@ -403,7 +403,7 @@ fn cose_key_rejects_indefinite_map_entry_count_above_cap() {
     let extra = 33 - valid_fields().len();
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&cose_key_with_indefinite_root(extra, true)),
-        Err(Rfc9942VdpError::InvalidEs256CoseKey)
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
     );
 }
 
@@ -453,7 +453,7 @@ fn cose_key_rejects_bstr_chunk_count_above_exact_cap() {
     fields[5] = encoded;
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&key(&fields)),
-        Err(Rfc9942VdpError::InvalidEs256CoseKey)
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
     );
 }
 
@@ -468,7 +468,7 @@ fn cose_key_rejects_tstr_chunk_count_above_exact_cap() {
     fields[0] = encoded;
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&key(&fields)),
-        Err(Rfc9942VdpError::InvalidEs256CoseKey)
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
     );
 }
 
