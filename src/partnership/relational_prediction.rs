@@ -434,6 +434,26 @@ pub struct HeldOutRelationalPredictionSummary {
 }
 
 impl HeldOutRelationalPredictionSummary {
+    pub fn compute_evidence(
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+        provenance: RelationalPredictionProvenance,
+    ) -> Result<HeldOutRelationalPredictionEvidence, RelationalPredictionError> {
+        let summary = Self::compute(samples, config)?;
+        let records = PredictionFeatureSet::all()
+            .into_iter()
+            .map(|feature_set| fit_prediction_record(samples, &config, feature_set))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let evidence = HeldOutRelationalPredictionEvidence {
+            provenance,
+            summary,
+            records,
+        };
+        evidence.validate()?;
+        Ok(evidence)
+    }
+
     pub fn compute(
         samples: &[RelationalPredictionSample],
         config: HeldOutRelationalPredictionConfig,
