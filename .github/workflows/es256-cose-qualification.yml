@@ -303,6 +303,28 @@ jobs:
               + b"\x40"
           )
 
+          nested_receipt_signature_limit = (
+              b"\xd2\x84"
+              + b"\x47\xa2\x01\x26\x19\x01\x8b\x01"
+              + b"\xa1\x19\x01\x8c\xa1\x20\x81\x58\x22"
+              + b"\x83\x02\x00\x81\x58\x20"
+              + (b"\x00" * 32)
+              + b"\xf6\x5a\x00\x01\x00\x01"
+              + (b"\x00" * 65537)
+          )
+          nested_receipt_collection = (
+              b"\xd2\x84"
+              + b"\x41\xa0"
+              + b"\xa1\x19\x01\x8a\x81\x5a"
+              + bytes([(len(nested_receipt_signature_limit) >> 24) & 0xff,
+                      (len(nested_receipt_signature_limit) >> 16) & 0xff,
+                      (len(nested_receipt_signature_limit) >> 8) & 0xff,
+                      len(nested_receipt_signature_limit) & 0xff])
+              + nested_receipt_signature_limit
+              + b"\xf6\x58\x40"
+              + (b"\x00" * 64)
+          )
+
           # Exercise the bounded indefinite-bstr chunk-count ceiling with
           # 4097 zero-length chunks. This is distinct from the large definite
           # bstr seed: it reaches the MAX_CBOR_BSTR_CHUNKS admission path.
@@ -347,6 +369,8 @@ jobs:
                   large_tagged_outer,
               "fuzz_rfc9942_signature_with_receipts/seed-17-receipts.cbor":
                   receipt_count_17,
+              "fuzz_rfc9942_signature_with_receipts/seed-nested-receipt-signature-limit.cbor":
+                  nested_receipt_collection,
               "fuzz_rfc9942_signature_with_receipts/seed-indefinite-bstr-4097-chunks.cbor":
                   indefinite_bstr_4097_chunks,
               "fuzz_rfc9942_signature_with_receipts/seed-indefinite-tstr-4097-chunks.cbor":
