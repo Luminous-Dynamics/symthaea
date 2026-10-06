@@ -407,6 +407,12 @@ impl NeurosemanticRemediationMeasurementArtifact {
                 }
             }
         }
+        if definition_refs
+            .iter()
+            .any(|metric_ref| !measurement_refs.contains(metric_ref))
+        {
+            return Err("neurosemantic remediation measurement contains an unused metric definition".into());
+        }
         for required in [
             NeurosemanticRemediationMeasurementKind::Forgetfulness,
             NeurosemanticRemediationMeasurementKind::UtilityImpact,
