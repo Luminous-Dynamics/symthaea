@@ -404,6 +404,33 @@ Move the current consciousness-derived partnership update behind an explicitly n
 
 Compare weighted bundling versus role-keyed binding on held-out relational retrieval, keeping the result as an ablation rather than assuming one representation is superior.
 
+### RH-006 — nested predictive qualification and rolling-origin evaluation
+
+Once relational features exist, the strongest next test is not another relational metric. It is incremental predictive value.
+
+The evaluator should compare:
+
+- a persistence baseline;
+- isolated-agent state;
+- common-driver context;
+- synchrony;
+- a nested non-relational context model containing isolated agents + common driver + synchrony;
+- a relationally augmented model adding directionality and turn-taking.
+
+The critical comparison is:
+
+RelationalAugmented vs NonRelationalContext
+
+The prediction target must be independently observed after the feature window. A fixed blocked holdout is useful for implementation qualification, but repeated rolling-origin evaluation is the appropriate next research design.
+
+Three null families should be retained:
+
+- joint circular shift;
+- channel decoupling;
+- incremental relational shift that keeps synchrony and non-relational context fixed while disrupting only the added relational channels.
+
+Do not infer statistical significance from a single split or from raw means across dependent rolling windows. Preserve per-origin loss vectors and defer inferential testing until the dependence structure and multiplicity strategy are prespecified.
+
 ### RH-005 — common-driver and partner-null calibration
 
 The next qualification layer should require both controls before interpreting relational structure as partner-specific:
