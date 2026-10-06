@@ -547,6 +547,18 @@ pub struct MeasurementUncertaintyEvaluationRef {
     pub covariance_model_revision: String,
     /// Digest of the exact covariance/dependence model.
     pub covariance_model_digest: String,
+    /// Stable identity of the probability-distribution treatment used by the evaluation.
+    pub probability_distribution_id: String,
+    /// Revision of the exact probability-distribution treatment.
+    pub probability_distribution_revision: String,
+    /// Digest of the exact probability-distribution treatment.
+    pub probability_distribution_digest: String,
+    /// Stable identity of the degrees-of-freedom record supporting the evaluation.
+    pub degrees_of_freedom_id: String,
+    /// Revision of the exact degrees-of-freedom record.
+    pub degrees_of_freedom_revision: String,
+    /// Digest of the exact degrees-of-freedom record.
+    pub degrees_of_freedom_digest: String,
     /// Optional provenance for the coverage-factor method; required for expanded uncertainty.
     pub coverage_method: Option<MeasurementUncertaintyCoverageMethodRef>,
 }
@@ -566,6 +578,12 @@ impl MeasurementUncertaintyEvaluationRef {
             || self.covariance_model_id.is_empty()
             || self.covariance_model_revision.is_empty()
             || self.covariance_model_digest.is_empty()
+            || self.probability_distribution_id.is_empty()
+            || self.probability_distribution_revision.is_empty()
+            || self.probability_distribution_digest.is_empty()
+            || self.degrees_of_freedom_id.is_empty()
+            || self.degrees_of_freedom_revision.is_empty()
+            || self.degrees_of_freedom_digest.is_empty()
         {
             return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation);
         }
@@ -4390,6 +4408,12 @@ mod tests {
                         covariance_model_id: "fixture-uncertainty-covariance-v1".into(),
                         covariance_model_revision: "v1".into(),
                         covariance_model_digest: "fixture-uncertainty-covariance-digest-v1".into(),
+                        probability_distribution_id: "fixture-uncertainty-distribution-v1".into(),
+                        probability_distribution_revision: "v1".into(),
+                        probability_distribution_digest: "fixture-uncertainty-distribution-digest-v1".into(),
+                        degrees_of_freedom_id: "fixture-uncertainty-dof-v1".into(),
+                        degrees_of_freedom_revision: "v1".into(),
+                        degrees_of_freedom_digest: "fixture-uncertainty-dof-digest-v1".into(),
                         coverage_method: Some(MeasurementUncertaintyCoverageMethodRef {
                             method_id: "fixture-coverage-method-v1".into(),
                             method_revision: "v1".into(),
@@ -4483,6 +4507,12 @@ mod tests {
                 covariance_model_id: "covariance".into(),
                 covariance_model_revision: "r1".into(),
                 covariance_model_digest: "covariance-digest".into(),
+                probability_distribution_id: "distribution".into(),
+                probability_distribution_revision: "r1".into(),
+                probability_distribution_digest: "distribution-digest".into(),
+                degrees_of_freedom_id: "dof".into(),
+                degrees_of_freedom_revision: "r1".into(),
+                degrees_of_freedom_digest: "dof-digest".into(),
                 coverage_method: Some(MeasurementUncertaintyCoverageMethodRef {
                     method_id: "coverage".into(),
                     method_revision: "r1".into(),
@@ -5230,6 +5260,38 @@ mod tests {
             .unwrap()
             .evaluation
             .covariance_model_digest = "different-covariance-digest".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBindingDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_combination_method_digest_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-combination-digest",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "combination-digest",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .combination_method_digest = "different-combination-digest".into();
         let error = AlternativesEngine
             .assess(&fixture_requirement(), &[changed], None)
             .unwrap_err();
