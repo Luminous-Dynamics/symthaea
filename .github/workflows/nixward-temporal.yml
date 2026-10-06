@@ -26,7 +26,10 @@ env:
 
 jobs:
   temporal-evidence:
+    # Runner admission follows the repository-wide draft-safety contract.
+    # The ready_for_review event above ensures the first ready head is checked.
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 20
 
     steps:
