@@ -552,11 +552,27 @@ fn create_transaction_artifact_dir(transaction_id: &str) -> Result<String, Strin
 }
 
 fn remove_transaction_artifact_dir(path: &str) {
-    if let Err(error) = std::fs::remove_dir(path) {
+    let valid = path
+        .strip_prefix("/tmp/nixforhumanity-transaction-")
+        .is_some_and(|suffix| {
+            suffix.len() == 32 && suffix.bytes().all(|byte| byte.is_ascii_hexdigit())
+        });
+    if !valid {
         eprintln!(
-            "unable to remove transaction artifact directory {}: {}",
-            path, error
+            "refusing to recursively remove invalid transaction artifact path {}",
+            path
         );
+        return;
+    }
+    if let Err(error) = std::fs::remove_dir_all(path) {
+        // Missing is benign during best-effort cleanup; any other error is
+        // surfaced because it may leave sensitive or authoritative staging data.
+        if error.kind() != std::io::ErrorKind::NotFound {
+            eprintln!(
+                "unable to remove transaction artifact directory {}: {}",
+                path, error
+            );
+        }
     }
 }
 
@@ -8537,6 +8553,8 @@ mod tests {
             .expect_err("reusing a transaction artifact namespace must fail closed");
         assert!(error.contains("already exists"));
 
+        std::fs::create_dir_all(format!("{path}/config")).unwrap();
+        std::fs::write(format!("{path}/config/staged-secret"), b"secret").unwrap();
         remove_transaction_artifact_dir(&path);
         assert!(!std::path::Path::new(&path).exists());
     }
@@ -8578,7 +8596,7 @@ mod tests {
     }
 
     #[test]
-    fn single_luks_script_uses_session_scoped_keyfile_not_secret_text() {
+    fn single_luks_script_uses_transaction_scoped_keyfile_not_secret_text() {
         let message = ClientMessage {
             action: "install".into(),
             request_id: String::new(),
