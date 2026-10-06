@@ -316,6 +316,12 @@ impl NeurosemanticArtifactLifecycleReceipt {
             _ => return Err("neurosemantic lifecycle effect evidence reference/hash must be present together".into()),
         };
 
+        if let Some(effect_agent) = &self.effect_agent_ref {
+            if !valid_identifier(effect_agent) {
+                return Err("neurosemantic lifecycle effect agent reference is invalid".into());
+            }
+        }
+
         let has_verification = match (
             &self.verification_agent_ref,
             &self.verification_evidence_ref,
