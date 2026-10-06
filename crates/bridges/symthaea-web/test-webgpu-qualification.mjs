@@ -293,36 +293,41 @@ async function screenshotCanvasPixelSamples(page, selector, points) {
     }
     context.drawImage(image, 0, 0);
     const rgba = context.getImageData(0, 0, probe.width, probe.height).data;
-    return points.map(({ name, x, y }) => {
-      if (!Number.isInteger(x) || !Number.isInteger(y)
-        || x < 0 || y < 0 || x >= width || y >= height) {
-        throw new Error(`invalid compositor semantic probe ${name}: (${x},${y})`);
-      }
-      const sampleX = Math.min(
-        probe.width - 1,
-        Math.max(0, Math.round((x + 0.5) * probe.width / width)),
-      );
-      const sampleY = Math.min(
-        probe.height - 1,
-        Math.max(0, Math.round((y + 0.5) * probe.height / height)),
-      );
-      const offset = (sampleY * probe.width + sampleX) * 4;
-      return {
-        name,
-        source_x: x,
-        source_y: y,
-        screenshot_x: sampleX,
-        screenshot_y: sampleY,
-        rgba: [...rgba.slice(offset, offset + 4)],
-      };
-    });
+    return {
+      width: probe.width,
+      height: probe.height,
+      samples: points.map(({ name, x, y }) => {
+        if (!Number.isInteger(x) || !Number.isInteger(y)
+          || x < 0 || y < 0 || x >= width || y >= height) {
+          throw new Error(`invalid compositor semantic probe ${name}: (${x},${y})`);
+        }
+        const sampleX = Math.min(
+          probe.width - 1,
+          Math.max(0, Math.floor((x + 0.5) * probe.width / width)),
+        );
+        const sampleY = Math.min(
+          probe.height - 1,
+          Math.max(0, Math.floor((y + 0.5) * probe.height / height)),
+        );
+        const offset = (sampleY * probe.width + sampleX) * 4;
+        return {
+          name,
+          source_x: x,
+          source_y: y,
+          screenshot_x: sampleX,
+          screenshot_y: sampleY,
+          rgba: [...rgba.slice(offset, offset + 4)],
+        };
+      }),
+    };
   }, { dataUrl, points, width: geometry.width, height: geometry.height });
   return {
     selector,
     canvas_width: geometry.width,
     canvas_height: geometry.height,
-    screenshot_width: geometry.rect.width,
-    screenshot_samples: samples,
+    screenshot_width: samples.width,
+    screenshot_height: samples.height,
+    screenshot_samples: samples.samples,
   };
 }
 
@@ -1797,7 +1802,7 @@ try {
   }
 
   const artifact = {
-    schema: 'symthaea-ui-webgpu-qualification-v5',
+    schema: 'symthaea-ui-webgpu-qualification-v6',
     harness_self_tests_passed: true,
     url: URL,
     chromium: CHROMIUM,
