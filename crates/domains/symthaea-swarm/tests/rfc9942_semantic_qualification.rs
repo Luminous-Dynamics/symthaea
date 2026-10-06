@@ -1217,6 +1217,68 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
 
 
 #[test]
+fn rfc9942_outer_signature_failure_short_circuits_inner_proof_work() {
+    let candidate = b"candidate";
+    let leaves = vec![candidate.to_vec(), b"other-entry".to_vec()];
+    let vds = Rfc9162Sha256Vds;
+    let head = vds.tree_head(&leaves);
+
+    // Build an inner Receipt whose signature is valid for its bytes but whose
+    // inclusion proof is deliberately wrong. This makes the inner proof path
+    // independently fail while leaving its cryptographic signature valid.
+    let mut invalid_proof = vds.inclusion_proof(&leaves, 0).unwrap().to_cbor();
+    let last_proof_byte = invalid_proof.len() - 1;
+    invalid_proof[last_proof_byte] ^= 0x01;
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![invalid_proof]).unwrap();
+
+    let unsigned_receipt = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp.clone(),
+        Rfc9942ReceiptPayload::Attached(head.root()),
+        vec![0u8; 64],
+    )
+    .unwrap();
+    let rng = SystemRandom::new();
+    let signer = rfc8392_signing_key(&rng);
+    let receipt_tbs = unsigned_receipt.signature1_tbs(&[], None).unwrap();
+    let receipt_signature = signer.sign(&rng, &receipt_tbs).unwrap().as_ref().to_vec();
+    let invalid_receipt = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp,
+        Rfc9942ReceiptPayload::Attached(head.root()),
+        receipt_signature,
+    )
+    .unwrap();
+
+    let key = rfc8392_public_key();
+    assert_eq!(
+        invalid_receipt.verify_es256_inclusion(candidate, &key, &[], None),
+        Err(Rfc9942VdpError::NoMatchingProof)
+    );
+
+    // The outer signature is independently valid before tampering.
+    let signed_outer = signed_outer(&invalid_receipt, candidate, false);
+    signed_outer
+        .verify_es256(&key, &[], None)
+        .expect("outer signature must initially verify");
+
+    // Now invalidate only the outer signature. The combined verifier should
+    // reject at the authenticated outer boundary before touching the invalid
+    // inner proof, rather than exposing the inner proof failure as precedence.
+    let mut wire = signed_outer.to_cbor();
+    let last_signature_byte = wire.len() - 1;
+    wire[last_signature_byte] ^= 0x01;
+    let both_invalid = Rfc9942SignatureWithReceipts::from_cbor(&wire).unwrap();
+
+    assert_eq!(
+        both_invalid.verify_es256_inclusion_receipt_state(
+            0, &key, &key, &[], &[], None,
+        ),
+        Err(Rfc9942VdpError::InvalidEs256Signature)
+    );
+}
+
+#[test]
 fn detached_inclusion_state_derives_and_binds_root() {
     let candidate = b"detached-candidate";
     let leaves = vec![candidate.to_vec(), b"other-entry".to_vec()];
