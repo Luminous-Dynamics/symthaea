@@ -9,7 +9,7 @@ use symthaea_communication::{
     NeurosemanticHandlingPolicy, NeurosemanticRetentionPolicy, ReplayDecision,
     NeurosemanticPolicyAuthorityAttestation, NeurosemanticPolicyProvenanceBinding,
     NeurosemanticAuthorityResolutionAttestation, NeurosemanticAuthorityStatus,
-    NeurosemanticConsentBindingContext,
+    NeurosemanticConsentBindingContext, NeurosemanticDerivationLineageRecord,
 };
 
 fn main() -> Result<(), String> {
@@ -60,6 +60,35 @@ fn main() -> Result<(), String> {
         serde_json::from_slice(&graph_bytes).map_err(|e| e.to_string())?;
     let exact_roundtrip = decoded == graph;
 
+    let execution_revision = std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|revision| revision.trim().to_string())
+        .filter(|revision| revision.len() == 40 || revision.len() == 64)
+        .filter(|revision| revision.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        .filter(|revision| revision.bytes().any(|byte| byte != b'0'))
+        .ok_or_else(|| "unable to resolve exact execution revision".to_string())?;
+
+    let derivation_payload = NeurosemanticPayload::SemanticGraph(graph_bytes.clone());
+    let derivation_output_artifact_hash = symthaea_communication::content_hash(
+        &serde_json::to_vec(&derivation_payload).map_err(|e| e.to_string())?,
+    );
+    let derivation_lineage_record = NeurosemanticDerivationLineageRecord {
+        schema_version: symthaea_communication::NEUROSEMANTIC_DERIVATION_LINEAGE_SCHEMA_VERSION,
+        lineage_ref: "synthetic-derivation-record-1".into(),
+        input_artifact_refs: vec!["synthetic-input-1".into(), "synthetic-input-2".into()],
+        activity_ref: "synthetic-semantic-graph-transform".into(),
+        activity_revision: "transform-v1".into(),
+        output_artifact_hash: derivation_output_artifact_hash.clone(),
+        execution_revision: execution_revision.clone(),
+        generated_at_unix_s: 1_200,
+    };
+    let derivation_record_bytes =
+        serde_json::to_vec(&derivation_lineage_record).map_err(|e| e.to_string())?;
+
     let lease = CognitiveConsentLease {
         lease_id: "n0-lease".into(),
         subject_id: "subject".into(),
@@ -104,8 +133,9 @@ fn main() -> Result<(), String> {
                 derivation_provenance_ref: "synthetic-derivation-record-1".into(),
                 derivation_provenance_hash: symthaea_communication::compute_derivation_provenance_hash(
                     "synthetic-derivation-record-1",
-                    b"synthetic-derivation-record-1",
+                    &derivation_record_bytes,
                 ),
+                derivation_output_artifact_hash,
                 origin_jurisdiction: "ZA".into(),
                 permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
                 permitted_secondary_uses: BTreeSet::new(),
@@ -196,7 +226,7 @@ fn main() -> Result<(), String> {
         .handling
         .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
-            b"synthetic-derivation-record-1",
+            &derivation_record_bytes,
             b"synthetic-status-record-1",
             &authority_attestation,
             &signing_key.verifying_key(),
@@ -223,12 +253,33 @@ fn main() -> Result<(), String> {
         .packet
         .data_policy
         .handling
-        .verify_derivation_provenance_binding_bytes(b"synthetic-derivation-record-1");
+        .verify_derivation_provenance_binding_bytes(&derivation_record_bytes);
+    let mut mismatched_derivation_lineage_record = derivation_lineage_record.clone();
+    mismatched_derivation_lineage_record.lineage_ref = "synthetic-derivation-record-2".into();
+    let mismatched_derivation_record_bytes =
+        serde_json::to_vec(&mismatched_derivation_lineage_record).map_err(|e| e.to_string())?;
     let derivation_provenance_mismatch_blocked = !message
         .packet
         .data_policy
         .handling
-        .verify_derivation_provenance_binding_bytes(b"synthetic-derivation-record-2");
+        .verify_derivation_provenance_binding_bytes(&mismatched_derivation_record_bytes);
+    let derivation_lineage_structured = message
+        .packet
+        .data_policy
+        .handling
+        .verify_derivation_provenance_record_bytes(&derivation_record_bytes)
+        .map(|record| record.output_artifact_hash == message.packet.payload_hash)
+        .unwrap_or(false);
+    let mut malformed_derivation_lineage = derivation_lineage_record.clone();
+    malformed_derivation_lineage.execution_revision = "placeholder".into();
+    let malformed_derivation_bytes =
+        serde_json::to_vec(&malformed_derivation_lineage).map_err(|e| e.to_string())?;
+    let malformed_derivation_lineage_blocked = message
+        .packet
+        .data_policy
+        .handling
+        .verify_derivation_provenance_record_bytes(&malformed_derivation_bytes)
+        .is_err();
 
     let mut reference_mismatch = message.clone();
     reference_mismatch
@@ -373,18 +424,6 @@ fn main() -> Result<(), String> {
         ExpressionDecision::Block(_)
     );
 
-    let execution_revision = std::process::Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .output()
-        .ok()
-        .filter(|output| output.status.success())
-        .and_then(|output| String::from_utf8(output.stdout).ok())
-        .map(|revision| revision.trim().to_string())
-        .filter(|revision| revision.len() == 40 || revision.len() == 64)
-        .filter(|revision| revision.bytes().all(|byte| byte.is_ascii_hexdigit()))
-        .filter(|revision| revision.bytes().any(|byte| byte != b'0'))
-        .ok_or_else(|| "unable to resolve exact execution revision".to_string())?;
-
     let substituted_authority_attestation = {
         let changed_message = NeurosemanticPolicyAuthorityAttestation::message_bytes(
             &authority_attestation.authority_ref,
@@ -414,7 +453,7 @@ fn main() -> Result<(), String> {
             .handling
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
-                b"synthetic-derivation-record-1",
+                &derivation_record_bytes,
                 b"synthetic-status-record-1",
                 &substituted_authority_attestation,
                 &signing_key.verifying_key(),
@@ -437,7 +476,7 @@ fn main() -> Result<(), String> {
         .handling
         .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
-            b"synthetic-derivation-record-1",
+            &derivation_record_bytes,
             b"synthetic-status-record-1",
             &authority_attestation,
             &signing_key.verifying_key(),
@@ -465,7 +504,7 @@ fn main() -> Result<(), String> {
         .handling
         .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
-            b"synthetic-derivation-record-1",
+            &derivation_record_bytes,
             b"synthetic-status-record-1",
             &authority_attestation,
             &signing_key.verifying_key(),
@@ -482,7 +521,7 @@ fn main() -> Result<(), String> {
         .handling
         .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
-            b"synthetic-derivation-record-1",
+            &derivation_record_bytes,
             b"synthetic-status-record-2",
             &authority_attestation,
             &signing_key.verifying_key(),
@@ -501,7 +540,7 @@ fn main() -> Result<(), String> {
         .handling
         .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
-            b"synthetic-derivation-record-1",
+            &derivation_record_bytes,
             b"synthetic-status-record-1",
             &authority_attestation,
             &signing_key.verifying_key(),
@@ -524,7 +563,7 @@ fn main() -> Result<(), String> {
         .handling
         .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
-            b"synthetic-derivation-record-1",
+            &derivation_record_bytes,
             b"synthetic-status-record-1",
             &authority_attestation,
             &signing_key.verifying_key(),
@@ -580,6 +619,8 @@ fn main() -> Result<(), String> {
         "derivation_provenance_present": derivation_provenance_present,
         "derivation_provenance_hash_valid": derivation_provenance_hash_valid,
         "derivation_provenance_mismatch_blocked": derivation_provenance_mismatch_blocked,
+        "derivation_lineage_structured": derivation_lineage_structured,
+        "malformed_derivation_lineage_blocked": malformed_derivation_lineage_blocked,
         "stale_policy_provenance_binding_blocked": stale_policy_binding_blocked,
         "inference_escalation_blocked": inference_escalation_blocked,
         "first_packet_accepted": accepted == ReplayDecision::Accept,
