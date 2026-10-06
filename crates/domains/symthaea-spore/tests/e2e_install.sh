@@ -91,7 +91,9 @@ cleanup() {
     [[ -n "$RELAY_PID" ]] && kill "$RELAY_PID" 2>/dev/null || true
     if [[ "$REMOTE_RELAY" == true ]]; then
         ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -p 2222 root@localhost "pkill -f '/tmp/e2e-ssh-relay' || true; rm -f /tmp/e2e-ssh-relay /tmp/e2e-relay.log" \
+            -p 2222 root@localhost \
+            "if [ -s /tmp/e2e-relay.pid ]; then kill \$(cat /tmp/e2e-relay.pid) 2>/dev/null || true; fi; \
+             rm -f /tmp/e2e-relay.pid /tmp/e2e-ssh-relay /tmp/e2e-relay.log" \
             2>/dev/null || true
     fi
     if [[ "$KEEP_VM" == false && -n "$QEMU_PID" ]]; then
@@ -168,8 +170,9 @@ scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
     "$RELAY_BIN" root@localhost:/tmp/e2e-ssh-relay >/dev/null
 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
     -p 2222 root@localhost \
-    "chmod 700 /tmp/e2e-ssh-relay && rm -f /tmp/e2e-relay.log && \
-     nohup /tmp/e2e-ssh-relay --port $RELAY_PORT --bind 0.0.0.0 >/tmp/e2e-relay.log 2>&1 &"
+    "chmod 700 /tmp/e2e-ssh-relay && rm -f /tmp/e2e-relay.log /tmp/e2e-relay.pid && \
+     nohup /tmp/e2e-ssh-relay --port $RELAY_PORT --bind 0.0.0.0 >/tmp/e2e-relay.log 2>&1 & \
+     echo \$! >/tmp/e2e-relay.pid"
 REMOTE_RELAY=true
 
 echo "Waiting for VM-local relay token..."
