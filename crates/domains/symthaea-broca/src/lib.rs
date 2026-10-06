@@ -140,8 +140,9 @@ pub use lexical_binding::{
     LanguageRuleStatus, LexemeBinding, LexicalBindingError, LexicalMorphosyntacticBinding,
     LexicalSource, MorphologicalFeature, MorphophonologicalDerivationStep,
     MorphophonologicalDerivationWitness, MorphophonologicalDerivationWitnessError,
-    MorphophonologicalRule, MorphophonologicalRuleOperation, MorphophonologicalRuleSet,
-    MorphophonologicalRuleSetError, MORPHOPHONOLOGICAL_DERIVATION_WITNESS_VERSION,
+    MorphophonologicalResourceEvidence, MorphophonologicalResourceEvidenceError,
+    MorphophonologicalResourceOrigin, MorphophonologicalRule, MorphophonologicalRuleOperation,
+    MorphophonologicalRuleSet, MorphophonologicalRuleSetError, MORPHOPHONOLOGICAL_DERIVATION_WITNESS_VERSION,
     MORPHOPHONOLOGICAL_RULE_SELECTION_POLICY, MORPHOPHONOLOGICAL_RULE_SET_VERSION,
     LEXICAL_MORPHOSYNTACTIC_BINDING_VERSION,
 };
