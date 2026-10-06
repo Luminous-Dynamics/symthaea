@@ -408,3 +408,39 @@ The handling policy now carries two distinct machine-readable provenance fields:
 The provenance binding was introduced as schema v5, schema v6 added policy-specific authority-resolution freshness, schema v7 added derivation-lineage identity, and schema v8 binds the lineage output artifact to the packet payload identity. Older handling artifacts fail closed rather than being silently upgraded into newer authorization semantics. Provenance digests remain domain-separated and length-delimited to avoid ambiguous concatenation.
 
 Downstream handling calls should receive the resulting provenance-binding token. The token also fingerprints the complete packet handling-policy state, so mutating destination, retention, secondary-use, jurisdiction, or provenance fields after verification invalidates the token rather than allowing a stale authorization capability to survive. The token is intentionally not an issuer credential: it proves that the exact supplied record matches the packet's declared reference and digest, while the external policy/identity authority remains responsible for authenticating who issued that record and whether it is current.
+
+
+## Post-generation lifecycle evidence
+
+Lineage answers **where a derived artifact came from**; lifecycle evidence answers **what a
+downstream system claims happened to that artifact afterward**. These are deliberately
+separate boundaries.
+
+The protocol now defines a versioned NeurosemanticArtifactLifecycleReceipt containing:
+
+- the exact derived artifact hash;
+- the exact derivation provenance reference and digest;
+- a lifecycle action (AccessRevocation, Retention, Erasure, Rectification, or Supersession);
+- an externally reported state (Requested, Applied, Verified, or Rejected);
+- a content-addressed effect-evidence reference and digest;
+- the execution revision and observation time;
+- an optional resulting-artifact hash for rectification/supersession.
+
+verify_binding(...) independently checks the receipt against the expected output artifact and
+lineage identities, recomputes the supplied effect-evidence hash, and rejects future-dated
+receipts. Replacement actions require a distinct resulting artifact identity.
+
+This is intentionally **effect evidence, not authority**. A valid receipt proves that the exact
+receipt and the exact supplied evidence bytes agree with the declared identities. It does not
+prove that an external erasure, revocation, rectification, or supersession actually occurred,
+nor that every replica, backup, derived model, or downstream cache was changed. Authorization
+remains the responsibility of the policy/identity layer.
+
+This separation is important for future correction and erasure workflows. Recent 2026 BCI
+privacy research highlights the need for traceable data lineage alongside machine unlearning,
+while other 2026 work emphasizes auditable evidence, prospective evaluation, and rollback rather
+than treating a system's own explanation or status flag as sufficient evidence.
+
+For this reason, any future unlearning/rectification receipt should carry the relevant effect
+evidence and, where safety or fairness is material, post-change evaluation evidence rather than
+a bare unlearned=true claim.
