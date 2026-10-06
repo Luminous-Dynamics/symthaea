@@ -297,6 +297,26 @@ fn default_port() -> u16 {
     22
 }
 
+/// Restrict restore inputs to image directories produced by this relay.
+///
+/// The generic input sanitizer is intentionally broader for other paths, but
+/// restoring an image is destructive and must not accept arbitrary filesystem
+/// locations merely because they contain shell-safe characters.
+fn validate_image_path(value: &str) -> Result<String, String> {
+    const PREFIX: &str = "/tmp/nixforhumanity-image-";
+    let path = sanitize_input(value, "image path", true)?;
+    let suffix = path.strip_prefix(PREFIX).ok_or_else(|| {
+        format!(
+            "Image path must be a relay-created image under {}",
+            PREFIX
+        )
+    })?;
+    if suffix.len() != 32 || !suffix.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err("Image path has an invalid transaction identifier".into());
+    }
+    Ok(path)
+}
+
 /// Generate a collision-resistant session identifier from the OS CSPRNG.
 ///
 /// Session IDs are used in temporary filenames and log paths. They must not
@@ -5182,10 +5202,11 @@ echo "REBUILD_COMPLETE"
                 );
 
                 let script_template = r#"
-set -eo pipefail
+set -euo pipefail
+umask 077
 echo "STAGE: Creating system image..."
 DEST="__IMAGE_DEST__"
-mkdir -p "$DEST"
+mkdir -m 700 -p "$DEST"
 
 # Snapshot current btrfs root
 if btrfs subvolume snapshot -r / "$DEST/root-snapshot" 2>/dev/null; then
@@ -5354,7 +5375,7 @@ echo "COMPLETE"
             }
 
             "restore_image" => {
-                let image_path = match sanitize_input(&client_msg.command, "image path", true) {
+                let image_path = match validate_image_path(&client_msg.command) {
                     Ok(p) => p,
                     Err(e) => {
                         let _ = ws_tx
@@ -6173,6 +6194,15 @@ mod tests {
     use super::*;
 
     #[test]
+    #[test]
+    fn image_paths_are_strictly_transaction_scoped() {
+        assert!(validate_image_path("/tmp/nixforhumanity-image-0123456789abcdef0123456789abcdef").is_ok());
+        assert!(validate_image_path("/etc").is_err());
+        assert!(validate_image_path("/tmp/nixforhumanity-image-0123").is_err());
+        assert!(validate_image_path("/tmp/nixforhumanity-image-0123456789abcdef0123456789abcdeg").is_err());
+        assert!(validate_image_path("/tmp/nixforhumanity-image-0123456789abcdef/../etc").is_err());
+    }
+
     fn transaction_ids_are_random_and_not_clock_derived() {
         let first = SystemTransaction::begin(MutationKind::Rollback, None, b"rollback").unwrap();
         let second = SystemTransaction::begin(MutationKind::Rollback, None, b"rollback").unwrap();
