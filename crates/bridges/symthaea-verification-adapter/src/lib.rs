@@ -924,7 +924,12 @@ fn parse_verification_method_definition(
     base: &url::Url,
 ) -> Result<ResolvedVerificationMethod, SnapshotError> {
     let id = required_string(object, "id")?;
-    let absolute_id = resolve_document_url(base, id, "verification method id")?;
+    // CID defines the verification-method id as a URL, not a relative
+    // URL-reference. Relationship properties may use relative references, but the
+    // id inside a verification-method definition must already be an absolute URL.
+    let absolute_id = url::Url::parse(id)
+        .map_err(|_| SnapshotError::Malformed("verification method id must be a valid absolute URL".into()))?
+        .to_string();
     let method_id = ClaimVerificationMethod::new(absolute_id)
         .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
     if method_id != expected_method {
@@ -965,7 +970,11 @@ fn parse_verification_method_definition(
     };
 
     let controller = required_string(object, "controller")?;
-    let controller = resolve_document_url(base, controller, "verification method controller")?;
+    // CID defines verification-method controller as a URL. Do not silently turn
+    // a relative URL-reference into a conforming controller value by resolving it.
+    let controller = url::Url::parse(controller)
+        .map_err(|_| SnapshotError::Malformed("verification method controller must be a valid absolute URL".into()))?
+        .to_string();
     let controller = ClaimControllerIdentity::new(controller)
         .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
     let expires = optional_timestamp(object, "expires")?;
@@ -2012,7 +2021,7 @@ mod tests {
     }
 
     #[test]
-    fn relative_embedded_relationship_method_can_supply_the_definition() {
+    fn relative_verification_method_definition_id_is_rejected() {
         let request = request();
         let mut snapshot = snapshot();
         snapshot.document = r##"{
@@ -2020,7 +2029,7 @@ mod tests {
             "assertionMethod": [{
                 "id": "#key-1",
                 "type": "Multikey",
-                "controller": "controller",
+                "controller": "https://example.test/controller",
                 "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
             }]
         }"##.into();
@@ -2028,13 +2037,12 @@ mod tests {
         let reference = snapshot.snapshot_reference().unwrap();
         let adapter =
             JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
-        let resolution = adapter.resolve_snapshot(&request, snapshot).unwrap();
 
-        assert_eq!(resolution.verification_method, request.verification_method);
-        assert_eq!(
-            resolution.resolved_verification_method_controller.as_str(),
-            "https://example.test/controller"
-        );
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("verification method id must be a valid absolute URL")
+        ));
     }
 
     #[test]
@@ -2072,13 +2080,13 @@ mod tests {
     }
 
     #[test]
-    fn relative_verification_method_controller_is_resolved_to_document_url() {
+    fn relative_verification_method_controller_is_rejected() {
         let request = request();
         let mut snapshot = snapshot();
         snapshot.document = r##"{
             "id": "https://example.test/controller",
             "verificationMethod": [{
-                "id": "#key-1",
+                "id": "https://example.test/controller#key-1",
                 "type": "Multikey",
                 "controller": "controller",
                 "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
@@ -2089,12 +2097,12 @@ mod tests {
         let reference = snapshot.snapshot_reference().unwrap();
         let adapter =
             JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
-        let resolution = adapter.resolve_snapshot(&request, snapshot).unwrap();
 
-        assert_eq!(
-            resolution.resolved_verification_method_controller.as_str(),
-            "https://example.test/controller"
-        );
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("verification method controller must be a valid absolute URL")
+        ));
     }
 
     #[test]
