@@ -2805,6 +2805,94 @@ async fn verify_installed_configuration(expected: Option<&[u8]>) -> Result<bool,
         None => Ok(true),
     }
 }
+fn validate_preservation_path(value: &str) -> Result<String, String> {
+    const PREFIX: &str = "/tmp/symthaea-preserve-";
+    let path = value.trim();
+    if path.len() != PREFIX.len() + 32
+        || !path.starts_with(PREFIX)
+        || !path[PREFIX.len()..].bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err("preservation directory is not a valid transaction-scoped path".into());
+    }
+    Ok(path.to_owned())
+}
+
+async fn verify_preservation_artifacts(backup_dir: &str) -> Result<bool, String> {
+    let path = validate_preservation_path(backup_dir)?;
+
+    use std::os::unix::fs::MetadataExt;
+    let dir = tokio::fs::metadata(&path)
+        .await
+        .map_err(|error| format!("preservation directory postcondition probe failed: {error}"))?;
+    if !dir.is_dir() {
+        return Err("preservation destination is not a directory".into());
+    }
+    let mode = dir.mode() & 0o777;
+    if mode != 0o700 {
+        return Err(format!(
+            "preservation directory has unsafe mode {:04o}; require 0700",
+            mode
+        ));
+    }
+    if dir.uid() != unsafe { libc::geteuid() } {
+        return Err("preservation directory is not owned by the relay process user".into());
+    }
+
+    // /etc is always an attempted preservation artifact. A terminal success
+    // is meaningful only if that archive exists and passes both compression
+    // and archive-format integrity checks.
+    let etc_archive = std::path::Path::new(&path).join("etc-backup.tar.gz");
+    let etc_metadata = tokio::fs::metadata(&etc_archive)
+        .await
+        .map_err(|error| format!("required /etc preservation artifact is missing: {error}"))?;
+    if !etc_metadata.is_file() || etc_metadata.len() == 0 {
+        return Ok(false);
+    }
+
+    for entry in std::fs::read_dir(&path)
+        .map_err(|error| format!("preservation directory enumeration failed: {error}"))?
+    {
+        let entry = entry.map_err(|error| format!("preservation directory entry failed: {error}"))?;
+        let metadata = entry
+            .metadata()
+            .map_err(|error| format!("preservation artifact metadata failed: {error}"))?;
+        if !metadata.file_type().is_file() {
+            return Ok(false);
+        }
+
+        let mode = metadata.mode() & 0o777;
+        if mode & 0o077 != 0 || metadata.uid() != unsafe { libc::geteuid() } {
+            return Ok(false);
+        }
+
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !(name.ends_with(".tar.gz") || name.ends_with(".sql.gz")) {
+            return Ok(false);
+        }
+        if metadata.len() == 0 {
+            return Ok(false);
+        }
+
+        let archive = entry.path().to_string_lossy().to_string();
+        let gzip_check = run_cmd(&format!("gzip -t -- '{}'", archive))
+            .await
+            .map_err(|error| format!("preservation gzip integrity probe failed: {error}"))?;
+        if gzip_check.exit_status != 0 {
+            return Ok(false);
+        }
+        if name.ends_with(".tar.gz") {
+            let tar_check = run_cmd(&format!("tar -tzf '{}'", archive))
+                .await
+                .map_err(|error| format!("preservation tar integrity probe failed: {error}"))?;
+            if tar_check.exit_status != 0 {
+                return Ok(false);
+            }
+        }
+    }
+
+    Ok(true)
+}
+
 
 
 fn parse_generation_link(value: &str) -> Option<u64> {
@@ -4994,10 +5082,10 @@ echo '}'
 
                 let backup_dir = format!("/tmp/symthaea-preserve-{}", transaction.transaction_id);
                 let mut preserve_script = r#"
-set -eo pipefail
+set -euo pipefail
 umask 077
 BACKUP_DIR="__BACKUP_DIR__"
-mkdir -m 700 -p "$BACKUP_DIR"
+mkdir -m 700 "$BACKUP_DIR"
 echo '{"backup_dir":"'"$BACKUP_DIR"'","items":['
 FIRST=true
 
@@ -5005,12 +5093,16 @@ FIRST=true
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   IMAGES=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep -v '<none>' | head -20)
   if [ -n "$IMAGES" ]; then
-    echo "$IMAGES" | while read img; do
+    echo "$IMAGES" | while read -r img; do
       [ "$FIRST" = true ] && FIRST=false || echo ','
+      IMAGE_FILE="$BACKUP_DIR/docker-$(echo "$img" | tr '/:' '_').tar.gz"
       echo "  Saving Docker image: $img" >&2
-      docker save "$img" | gzip > "$BACKUP_DIR/docker-$(echo "$img" | tr '/:' '_').tar.gz" 2>/dev/null
-      SIZE=$(du -h "$BACKUP_DIR/docker-$(echo "$img" | tr '/:' '_').tar.gz" | cut -f1)
-      printf '{"type":"docker_image","name":"%s","size":"%s","path":"%s"}' "$img" "$SIZE" "$BACKUP_DIR/docker-$(echo "$img" | tr '/:' '_').tar.gz"
+      docker save "$img" | gzip > "$IMAGE_FILE"
+      test -s "$IMAGE_FILE"
+      gzip -t -- "$IMAGE_FILE"
+      tar -tzf "$IMAGE_FILE" >/dev/null
+      SIZE=$(du -h "$IMAGE_FILE" | cut -f1)
+      printf '{"type":"docker_image","name":"%s","size":"%s","path":"%s"}' "$img" "$SIZE" "$IMAGE_FILE"
     done
   fi
 fi
@@ -5018,93 +5110,142 @@ fi
 # PostgreSQL databases
 if command -v pg_dumpall >/dev/null 2>&1 && pgrep -x postgres >/dev/null 2>&1; then
   echo "  Dumping PostgreSQL databases..." >&2
-  su - postgres -c "pg_dumpall" 2>/dev/null | gzip > "$BACKUP_DIR/postgresql-all.sql.gz" || true
-  if [ -f "$BACKUP_DIR/postgresql-all.sql.gz" ]; then
-    SIZE=$(du -h "$BACKUP_DIR/postgresql-all.sql.gz" | cut -f1)
-    [ "$FIRST" = true ] && FIRST=false || echo ','
-    printf '{"type":"postgresql","name":"all databases","size":"%s","path":"%s"}' "$SIZE" "$BACKUP_DIR/postgresql-all.sql.gz"
-  fi
+  PG_ARCHIVE="$BACKUP_DIR/postgresql-all.sql.gz"
+  su - postgres -c "pg_dumpall" 2>/dev/null | gzip > "$PG_ARCHIVE"
+  test -s "$PG_ARCHIVE"
+  gzip -t -- "$PG_ARCHIVE"
+  SIZE=$(du -h "$PG_ARCHIVE" | cut -f1)
+  [ "$FIRST" = true ] && FIRST=false || echo ','
+  printf '{"type":"postgresql","name":"all databases","size":"%s","path":"%s"}' "$SIZE" "$PG_ARCHIVE"
 fi
 
 # MySQL databases
 if command -v mysqldump >/dev/null 2>&1 && pgrep -x mysqld >/dev/null 2>&1; then
   echo "  Dumping MySQL databases..." >&2
-  mysqldump --all-databases 2>/dev/null | gzip > "$BACKUP_DIR/mysql-all.sql.gz" || true
-  if [ -f "$BACKUP_DIR/mysql-all.sql.gz" ]; then
-    SIZE=$(du -h "$BACKUP_DIR/mysql-all.sql.gz" | cut -f1)
-    [ "$FIRST" = true ] && FIRST=false || echo ','
-    printf '{"type":"mysql","name":"all databases","size":"%s","path":"%s"}' "$SIZE" "$BACKUP_DIR/mysql-all.sql.gz"
-  fi
+  MYSQL_ARCHIVE="$BACKUP_DIR/mysql-all.sql.gz"
+  mysqldump --all-databases 2>/dev/null | gzip > "$MYSQL_ARCHIVE"
+  test -s "$MYSQL_ARCHIVE"
+  gzip -t -- "$MYSQL_ARCHIVE"
+  SIZE=$(du -h "$MYSQL_ARCHIVE" | cut -f1)
+  [ "$FIRST" = true ] && FIRST=false || echo ','
+  printf '{"type":"mysql","name":"all databases","size":"%s","path":"%s"}' "$SIZE" "$MYSQL_ARCHIVE"
 fi
 
 # Web server content
 for webdir in /var/www /srv/http /usr/share/nginx/html; do
   if [ -d "$webdir" ] && [ "$(ls -A "$webdir" 2>/dev/null)" ]; then
     echo "  Backing up $webdir..." >&2
-    tar czf "$BACKUP_DIR/$(basename "$webdir").tar.gz" -C "$(dirname "$webdir")" "$(basename "$webdir")" 2>/dev/null || true
-    if [ -f "$BACKUP_DIR/$(basename "$webdir").tar.gz" ]; then
-      SIZE=$(du -h "$BACKUP_DIR/$(basename "$webdir").tar.gz" | cut -f1)
-      [ "$FIRST" = true ] && FIRST=false || echo ','
-      printf '{"type":"webdata","name":"%s","size":"%s","path":"%s"}' "$webdir" "$SIZE" "$BACKUP_DIR/$(basename "$webdir").tar.gz"
-    fi
+    WEB_ARCHIVE="$BACKUP_DIR/$(basename "$webdir").tar.gz"
+    tar czf "$WEB_ARCHIVE" -C "$(dirname "$webdir")" "$(basename "$webdir")"
+    test -s "$WEB_ARCHIVE"
+    gzip -t -- "$WEB_ARCHIVE"
+    tar -tzf "$WEB_ARCHIVE" >/dev/null
+    SIZE=$(du -h "$WEB_ARCHIVE" | cut -f1)
+    [ "$FIRST" = true ] && FIRST=false || echo ','
+    printf '{"type":"webdata","name":"%s","size":"%s","path":"%s"}' "$webdir" "$SIZE" "$WEB_ARCHIVE"
   fi
 done
 
 # Crontabs
 if [ -d /var/spool/cron ]; then
-  tar czf "$BACKUP_DIR/crontabs.tar.gz" /var/spool/cron 2>/dev/null || true
-  if [ -f "$BACKUP_DIR/crontabs.tar.gz" ]; then
-    [ "$FIRST" = true ] && FIRST=false || echo ','
-    printf '{"type":"crontabs","name":"all crontabs","size":"small","path":"%s"}' "$BACKUP_DIR/crontabs.tar.gz"
-  fi
+  CRONTAB_ARCHIVE="$BACKUP_DIR/crontabs.tar.gz"
+  tar czf "$CRONTAB_ARCHIVE" /var/spool/cron
+  test -s "$CRONTAB_ARCHIVE"
+  gzip -t -- "$CRONTAB_ARCHIVE"
+  tar -tzf "$CRONTAB_ARCHIVE" >/dev/null
+  [ "$FIRST" = true ] && FIRST=false || echo ','
+  printf '{"type":"crontabs","name":"all crontabs","size":"small","path":"%s"}' "$CRONTAB_ARCHIVE"
 fi
 
 # SSH keys and config
-if [ -d /root/.ssh ] || [ -d /home ]; then
-  tar czf "$BACKUP_DIR/ssh-keys.tar.gz" /root/.ssh /home/*/.ssh 2>/dev/null || true
-  if [ -f "$BACKUP_DIR/ssh-keys.tar.gz" ]; then
-    [ "$FIRST" = true ] && FIRST=false || echo ','
-    printf '{"type":"ssh_keys","name":"SSH keys and config","size":"small","path":"%s"}' "$BACKUP_DIR/ssh-keys.tar.gz"
-  fi
+SSH_LIST="$BACKUP_DIR/.ssh-sources"
+: > "$SSH_LIST"
+if [ -d /root/.ssh ]; then
+  printf '%s\0' /root/.ssh >> "$SSH_LIST"
 fi
-
-# /etc (system config)
-tar czf "$BACKUP_DIR/etc-backup.tar.gz" /etc 2>/dev/null || true
-if [ -f "$BACKUP_DIR/etc-backup.tar.gz" ]; then
-  SIZE=$(du -h "$BACKUP_DIR/etc-backup.tar.gz" | cut -f1)
+for home in /home/*; do
+  [ -d "$home/.ssh" ] && printf '%s\0' "$home/.ssh" >> "$SSH_LIST"
+done
+if [ -s "$SSH_LIST" ]; then
+  SSH_ARCHIVE="$BACKUP_DIR/ssh-keys.tar.gz"
+  tar czf "$SSH_ARCHIVE" --null --files-from="$SSH_LIST"
+  test -s "$SSH_ARCHIVE"
+  gzip -t -- "$SSH_ARCHIVE"
+  tar -tzf "$SSH_ARCHIVE" >/dev/null
   [ "$FIRST" = true ] && FIRST=false || echo ','
-  printf '{"type":"system_config","name":"/etc","size":"%s","path":"%s"}' "$SIZE" "$BACKUP_DIR/etc-backup.tar.gz"
+  printf '{"type":"ssh_keys","name":"SSH keys and config","size":"small","path":"%s"}' "$SSH_ARCHIVE"
 fi
+rm -f -- "$SSH_LIST"
 
-# Home directories (offer to preserve)
-HOME_SIZE=$(du -sh /home 2>/dev/null | cut -f1)
+# /etc (system config) — required for terminal preservation success.
+ETC_ARCHIVE="$BACKUP_DIR/etc-backup.tar.gz"
+tar czf "$ETC_ARCHIVE" /etc
+test -s "$ETC_ARCHIVE"
+gzip -t -- "$ETC_ARCHIVE"
+tar -tzf "$ETC_ARCHIVE" >/dev/null
+SIZE=$(du -h "$ETC_ARCHIVE" | cut -f1)
 [ "$FIRST" = true ] && FIRST=false || echo ','
-printf '{"type":"home_dirs","name":"/home (%s)","size":"%s","path":"not backed up — too large for auto-backup"}' "$HOME_SIZE" "$HOME_SIZE"
+printf '{"type":"system_config","name":"/etc","size":"%s","path":"%s"}' "$SIZE" "$ETC_ARCHIVE"
+
+# Home directories are intentionally not auto-archived.
+HOME_SIZE=$(du -sh /home 2>/dev/null | cut -f1 || printf 'unknown')
+[ "$FIRST" = true ] && FIRST=false || echo ','
+printf '{"type":"home_dirs","name":"/home (%s)","size":"%s","path":"not backed up — requires explicit user-directed preservation"}' "$HOME_SIZE" "$HOME_SIZE"
 
 # Summary
-TOTAL_SIZE=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1)
+TOTAL_SIZE=$(du -sh "$BACKUP_DIR")
 echo '],"total_size":"'"$TOTAL_SIZE"'"}'
 "#;
                 preserve_script = preserve_script.replace("__BACKUP_DIR__", &backup_dir);
 
                 match run_cmd(&preserve_script).await {
                     Ok(result) => {
-                        eprintln!("[{}] Data preservation complete", peer_addr);
+                        let (response_code, observed_outcome) =
+                            match verify_preservation_artifacts(&backup_dir).await {
+                                Ok(true) if result.exit_status == 0 => {
+                                    (0, TransactionOutcome::ObservedSuccess)
+                                }
+                                Ok(false) => {
+                                    eprintln!(
+                                        "[{}] {} preservation command returned success but native artifact verification failed",
+                                        peer_addr,
+                                        transaction.log_line()
+                                    );
+                                    (1, TransactionOutcome::Failed)
+                                }
+                                Err(error) => {
+                                    eprintln!(
+                                        "[{}] {} preservation postcondition probe failed: {}",
+                                        peer_addr,
+                                        transaction.log_line(),
+                                        error
+                                    );
+                                    (1, TransactionOutcome::Indeterminate)
+                                }
+                            };
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            if result.exit_status == 0 {
+                                observed_outcome
+                            } else {
+                                TransactionOutcome::Failed
+                            },
+                            &peer_addr,
+                        );
+                        eprintln!(
+                            "[{}] {} Data preservation completed with {:?}",
+                            peer_addr,
+                            transaction.log_line(),
+                            outcome
+                        );
                         let _ = ws_tx
                             .send(Message::Text(
                                 serde_json::json!({
                                     "type": "data_preserved",
                                     "data": result.stdout,
-                                    "transaction": transaction.receipt(finalize_transaction(
-                                        &transaction_ledger,
-                                        &transaction,
-                                        if result.exit_status == 0 {
-                                            TransactionOutcome::ObservedSuccess
-                                        } else {
-                                            TransactionOutcome::Failed
-                                        },
-                                        &peer_addr,
-                                    ))
+                                    "transaction": transaction.receipt(outcome),
+                                    "exit_code": protocol_exit_code(response_code, outcome)
                                 })
                                 .to_string(),
                             ))
@@ -7690,6 +7831,44 @@ mod tests {
         assert!(!verify_image_artifact(dir.to_str().unwrap()).await.unwrap());
 
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn preservation_postcondition_rejects_missing_or_corrupt_required_archive() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let name = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!("symthaea-preserve-postcondition-{name}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        // validate_preservation_path is intentionally strict, so use the
+        // relay's exact transaction-scoped namespace for the fixture.
+        let tx_dir = std::env::temp_dir().join(format!(
+            "symthaea-preserve-0123456789abcdef0123456789abcdef"
+        ));
+        let _ = std::fs::remove_dir_all(&tx_dir);
+        std::fs::create_dir(&tx_dir).unwrap();
+        std::fs::set_permissions(&tx_dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let archive = tx_dir.join("etc-backup.tar.gz");
+        let archive_path = archive.to_string_lossy().replace('\', "\\'");
+        let create = run_cmd(&format!(
+            "tar -czf '{}' --files-from /dev/null",
+            archive_path
+        ))
+        .await
+        .unwrap();
+        assert_eq!(create.exit_status, 0);
+        std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        assert!(verify_preservation_artifacts(tx_dir.to_str().unwrap()).await.unwrap());
+
+        std::fs::write(&archive, b"corrupt gzip").unwrap();
+        assert!(!verify_preservation_artifacts(tx_dir.to_str().unwrap()).await.unwrap());
+
+        let _ = std::fs::remove_dir_all(dir);
+        let _ = std::fs::remove_dir_all(tx_dir);
     }
 
     #[test]
