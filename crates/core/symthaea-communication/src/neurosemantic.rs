@@ -2036,7 +2036,7 @@ mod tests {
             (NeurosemanticArtifactLifecycleAction::Rectification, "Rectification"),
             (NeurosemanticArtifactLifecycleAction::Supersession, "Supersession"),
         ] {
-            assert_eq!(serde_json::to_string(&action).unwrap(), format!(""{expected}""));
+            assert_eq!(serde_json::to_string(&action).unwrap(), format!("\"{expected}\""));
         }
     }
 
@@ -2048,7 +2048,7 @@ mod tests {
             (NeurosemanticArtifactLifecycleState::Verified, "Verified"),
             (NeurosemanticArtifactLifecycleState::Rejected, "Rejected"),
         ] {
-            assert_eq!(serde_json::to_string(&state).unwrap(), format!(""{expected}""));
+            assert_eq!(serde_json::to_string(&state).unwrap(), format!("\"{expected}\""));
         }
     }
 
