@@ -195,8 +195,8 @@ future hardware.
 
 The replay tracker is bounded to 4096 active sender/recipient/lease/consent-epoch keys. The
 public `observe_authorized` path validates the consent lease before consuming replay-tracker
-state; the lower-level `observe` function is intended for callers that already performed
-authorization.
+state. Replay insertion is not exposed as an independently callable public admission path,
+so callers cannot consume tracker capacity without a finite authorization lease.
 
 Authentication, confidentiality, lease signing, revocation distribution, and durable audit
 remain deployment responsibilities for the outer identity/transport layers.
@@ -354,9 +354,36 @@ Thus there are deliberately separate gates:
 1. packet integrity;
 2. consent and data/inference authorization;
 3. downstream handling policy;
-4. external identity/policy provenance and revocation authority.
+4. external identity/policy attestation;
+5. current external authority/status resolution bound to the exact subject, peer, consent epoch, purpose, channel, and direction.
 
 Passing one gate does not imply passage through the others.
+
+Passing one gate does not imply passage through the others.
+
+### Authoritative status resolution
+
+A cryptographically valid policy attestation is still insufficient to authorize a current
+handling operation. The same signed policy could otherwise be replayed after an external
+issuer is suspended, or could be reused across a different subject, peer, consent epoch,
+purpose, channel, or direction.
+
+The bridge therefore defines a separate signed
+`NeurosemanticAuthorityResolutionAttestation`. It records the resolver/key reference, the
+resolved authority/key, exact policy/provenance bindings, the exact consent context, an
+explicit status (`Active`, `Suspended`, `Revoked`, `Unknown`, or `Unavailable`), a status
+source reference, and checked-at/expiry timestamps.
+
+Only a fresh `Active` resolution can be combined with the policy attestation to create the
+handling capability. The resolution has a protocol-enforced maximum lifetime of 24 hours,
+and it cannot outlive the authority attestation it resolves. Deployments can and should use
+shorter status freshness windows for higher-risk data.
+
+The resulting capability retains the exact resolution fingerprint and context. A subsequent
+handling request therefore fails closed when the resolution is expired or otherwise belongs
+to a different consent context. The resolver signature authenticates the snapshot to the
+configured resolver key; trust in that resolver key remains an external identity/governance
+decision.
 
 ### External policy provenance hardening
 
