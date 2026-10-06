@@ -122,6 +122,9 @@ impl NixSystemdUnitDefinitionContentEvidenceV1 {
             put_u64(&mut h, file.byte_len);
             put_str(&mut h, &file.content_digest);
         }
+        // Capture time is evidence metadata, not content identity. Keeping it
+        // outside the commitment makes the content digest independently
+        // recomputable from durable file metadata.
         Ok(h.finalize().to_hex().to_string())
     }
 }
@@ -472,6 +475,10 @@ mod tests {
         let mut changed = content_evidence();
         changed.files[0].resolved_path = Some("/nix/store/other.service".into());
         assert_ne!(baseline, changed.digest().unwrap());
+
+        let mut unchanged = content_evidence();
+        unchanged.captured_at_monotonic_us = 2;
+        assert_eq!(baseline, unchanged.digest().unwrap());
     }
 
     #[test]
