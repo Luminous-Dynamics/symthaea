@@ -118,43 +118,92 @@ pub enum NixServiceEffectAdmissionErrorV1 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
 
     #[test]
     fn admission_binds_observer_content_digest_into_intent() {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("nginx.service");
-        fs::write(&path, b"[Service]\nExecStart=/bin/true\n").unwrap();
+        std::fs::write(&path, b"[Service]\nExecStart=/bin/true\n").unwrap();
 
         let identity = super::super::post_state::NixSystemdUnitDefinitionIdentityV1::new(
             path.to_str().unwrap(),
             vec![],
         )
         .unwrap();
+        let commitment =
+            NixVerifiedSystemdDefinitionContentCommitmentV1::from_observer(
+                "nginx.service",
+                &identity,
+                ":1.42",
+            )
+            .unwrap();
 
-        let commitment = NixVerifiedSystemdDefinitionContentCommitmentV1 {
-            commitment: super::super::systemd_definition::NixSystemdDefinitionContentCommitmentV1 {
-                unit: "nginx.service".into(),
-                definition_identity: identity.clone(),
-                manager_owner: ":1.42".into(),
-                files: Vec::new(),
-                overall_digest: "f".repeat(64),
-            },
-        };
+        let admission = NixServiceEffectAdmissionV1::from_observed_definition_content(
+            "host:test",
+            "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=1111111111111111111111111111111111111111111111111111111111111111",
+            NixServiceOperationKindV1::Start,
+            42,
+            "1111111111111111111111111111111111111111111111111111111111111111",
+            None,
+            1_000,
+            &commitment,
+        )
+        .unwrap();
 
-        // The private wrapper is intentionally unavailable outside the module in
-        // production; this test only proves the admission relation conceptually.
-        let _ = commitment;
+        assert_eq!(
+            admission.definition_content_digest,
+            commitment.digest()
+        );
+        assert_eq!(
+            admission
+                .intent
+                .service_effect_context
+                .as_ref()
+                .unwrap()
+                .authorized_definition_content_digest,
+            commitment.digest()
+        );
+        assert!(!admission.context_digest.is_empty());
     }
 
     #[test]
-    fn admission_is_rejected_without_observer_sealed_content() {
-        fn accepts(
-            _commitment: &NixVerifiedSystemdDefinitionContentCommitmentV1,
-        ) -> Result<(), NixServiceEffectAdmissionErrorV1> {
-            Ok(())
-        }
+    fn admission_fails_closed_on_pre_state_context_mismatch() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("nginx.service");
+        std::fs::write(&path, b"safe").unwrap();
 
-        let _ = accepts;
+        let identity = super::super::post_state::NixSystemdUnitDefinitionIdentityV1::new(
+            path.to_str().unwrap(),
+            vec![],
+        )
+        .unwrap();
+        let commitment =
+            NixVerifiedSystemdDefinitionContentCommitmentV1::from_observer(
+                "nginx.service",
+                &identity,
+                ":1.42",
+            )
+            .unwrap();
+
+        let result = NixServiceEffectAdmissionV1::from_observed_definition_content(
+            "host:test",
+            "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            NixServiceOperationKindV1::Start,
+            42,
+            "1111111111111111111111111111111111111111111111111111111111111111",
+            None,
+            0,
+            &commitment,
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn admission_is_structurally_impossible_without_verified_content() {
+        // The API takes the opaque verified commitment type rather than the
+        // serializable raw commitment, so an unverified digest cannot satisfy
+        // the parameter type.
+        let _ = NixServiceEffectAdmissionV1::from_observed_definition_content;
     }
 }
