@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 39;
+pub const SCHEMA_VERSION: u16 = 40;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v52";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-v53";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -364,6 +364,33 @@ impl EvidenceSourceIdentity {
     }
 }
 
+/// Exact external reference for one link in a declared calibration/traceability chain.
+///
+/// This is a structural provenance reference only. Symthaea does not verify
+/// the external calibration record or the continuity of the chain.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CalibrationTraceabilityRef {
+    /// Stable identity of the exact calibration/comparison record.
+    pub calibration_id: String,
+    /// Revision of the exact calibration/comparison record.
+    pub calibration_revision: String,
+    /// Digest of the exact calibration/comparison record.
+    pub calibration_record_digest: String,
+}
+
+impl CalibrationTraceabilityRef {
+    /// Validate the exact external calibration-record reference.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.calibration_id.is_empty()
+            || self.calibration_revision.is_empty()
+            || self.calibration_record_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidObservationProvenance);
+        }
+        Ok(())
+    }
+}
+
 /// Exact provenance reference for a physical or operational observation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObservationProvenanceRef {
@@ -383,8 +410,8 @@ pub struct ObservationProvenanceRef {
     pub record_digest: String,
     /// Optional measurement-system identity.
     pub measurement_system_id: Option<String>,
-    /// Canonical references forming the declared calibration/traceability chain.
-    pub calibration_chain_refs: Vec<String>,
+    /// Ordered exact references forming the declared calibration/traceability chain.
+    pub calibration_chain_refs: Vec<CalibrationTraceabilityRef>,
     /// Optional experimental-design identity that caused this observation to be collected.
     pub experimental_design_id: Option<String>,
     /// Optional exact discrimination target within that experimental design.
@@ -402,7 +429,6 @@ impl ObservationProvenanceRef {
             || self.procedure_digest.is_empty()
             || self.record_digest.is_empty()
             || self.calibration_chain_refs.is_empty()
-            || self.calibration_chain_refs.iter().any(String::is_empty)
         {
             return Err(AssessmentError::InvalidObservationProvenance);
         }
@@ -423,6 +449,9 @@ impl ObservationProvenanceRef {
         }
         if self.experimental_target_id.is_some() && self.experimental_design_id.is_none() {
             return Err(AssessmentError::InvalidObservationProvenance);
+        }
+        for calibration in &self.calibration_chain_refs {
+            calibration.validate()?;
         }
         Ok(())
     }
@@ -4469,7 +4498,11 @@ mod tests {
                 procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
                 record_digest: format!("fixture-record-digest:{id}"),
                 measurement_system_id: Some("fixture-measurement-system-v1".into()),
-                calibration_chain_refs: vec!["fixture-calibration-chain-v1".into()],
+                calibration_chain_refs: vec![CalibrationTraceabilityRef {
+            calibration_id: "fixture-calibration-chain-v1".into(),
+            calibration_revision: "v1".into(),
+            calibration_record_digest: "fixture-calibration-chain-record-digest-v1".into(),
+        }],
                 experimental_design_id: None,
                 experimental_target_id: None,
             }),
@@ -8093,7 +8126,11 @@ mod tests {
             procedure_digest: "procedure-digest".into(),
             record_digest: "record".into(),
             measurement_system_id: Some("system".into()),
-            calibration_chain_refs: vec!["calibration".into()],
+            calibration_chain_refs: vec![CalibrationTraceabilityRef {
+            calibration_id: "calibration".into(),
+            calibration_revision: "v1".into(),
+            calibration_record_digest: "calibration-digest".into(),
+        }],
             experimental_design_id: None,
             experimental_target_id: None,
         };
@@ -8122,6 +8159,61 @@ mod tests {
         assert_eq!(
             protocol.validate().unwrap_err(),
             AssessmentError::InvalidExperimentalDesign
+        );
+    }
+
+    #[test]
+    fn observation_provenance_rejects_incomplete_calibration_link() {
+        let mut observation = ObservationProvenanceRef {
+            observation_id: "obs".into(),
+            subject_id: "subject".into(),
+            activity_id: "activity".into(),
+            measurand_id: "measurand".into(),
+            procedure_id: "procedure".into(),
+            procedure_digest: "procedure-digest".into(),
+            record_digest: "record".into(),
+            measurement_system_id: Some("system".into()),
+            calibration_chain_refs: vec![CalibrationTraceabilityRef {
+                calibration_id: "calibration".into(),
+                calibration_revision: "v1".into(),
+                calibration_record_digest: "calibration-digest".into(),
+            }],
+            experimental_design_id: None,
+            experimental_target_id: None,
+        };
+        observation.validate().unwrap();
+        observation.calibration_chain_refs[0].calibration_record_digest.clear();
+        assert_eq!(
+            observation.validate().unwrap_err(),
+            AssessmentError::InvalidObservationProvenance
+        );
+    }
+
+    #[test]
+    fn calibration_traceability_mutation_changes_assessment_receipt() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let original = AlternativesEngine
+            .assess(&case.requirement, &case.candidates, Some(case.incumbent_id))
+            .unwrap();
+        let mut mutated = case.clone();
+        let observed = mutated.candidates[0]
+            .evidence
+            .iter_mut()
+            .find(|e| e.observation.is_some())
+            .unwrap();
+        observed
+            .observation
+            .as_mut()
+            .unwrap()
+            .calibration_chain_refs[0]
+            .calibration_record_digest = "tampered-calibration-record".into();
+        let changed = AlternativesEngine
+            .assess(&mutated.requirement, &mutated.candidates, Some(mutated.incumbent_id))
+            .unwrap();
+        assert_ne!(original.receipt.payload_hash, changed.receipt.payload_hash);
+        assert_ne!(
+            original.candidates[0].evidence_digest,
+            changed.candidates[0].evidence_digest
         );
     }
 
