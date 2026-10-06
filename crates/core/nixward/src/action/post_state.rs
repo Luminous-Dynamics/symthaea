@@ -1792,28 +1792,41 @@ mod tests {
         active_state: ServiceActiveStateV1,
         unit_file_state: ServiceUnitFileStateV1,
     ) -> NixServicePostStateObservationV1 {
+        let definition_content_files = vec![
+            NixSystemdUnitDefinitionContentFileV1 {
+                path: "/nix/store/authorized-unit.service".into(),
+                resolved_path: None,
+                byte_len: 10,
+                content_digest:
+                    "1111111111111111111111111111111111111111111111111111111111111111".into(),
+            },
+            NixSystemdUnitDefinitionContentFileV1 {
+                path: "/etc/systemd/system/nginx.service.d/override.conf".into(),
+                resolved_path: None,
+                byte_len: 20,
+                content_digest:
+                    "2222222222222222222222222222222222222222222222222222222222222222".into(),
+            },
+        ];
+        let definition_identity = definition();
+        let definition_content_digest =
+            NixSystemdUnitDefinitionContentEvidenceV1 {
+                unit: "nginx.service".into(),
+                source_identity_digest: definition_identity.digest("nginx.service").unwrap(),
+                files: definition_content_files.clone(),
+                captured_at_monotonic_us: 2_000,
+            }
+            .digest()
+            .unwrap();
+
         NixServicePostStateObservationV1 {
             operation,
             unit: "nginx.service".to_string(),
             observed_generation: 42,
             unit_object_path: "/org/freedesktop/systemd1/unit/nginx_2eservice".to_string(),
-            definition_identity: definition(),
-            definition_content_digest:
-                "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string(),
-            definition_content_files: vec![
-                NixSystemdUnitDefinitionContentFileV1 {
-                    path: "/nix/store/authorized-unit.service".into(),
-                    resolved_path: None,
-                    byte_len: 10,
-                    content_digest: "1111111111111111111111111111111111111111111111111111111111111111".into(),
-                },
-                NixSystemdUnitDefinitionContentFileV1 {
-                    path: "/etc/systemd/system/nginx.service.d/override.conf".into(),
-                    resolved_path: None,
-                    byte_len: 20,
-                    content_digest: "2222222222222222222222222222222222222222222222222222222222222222".into(),
-                },
-            ],
+            definition_identity,
+            definition_content_digest,
+            definition_content_files,
             load_state: ServiceLoadStateV1::Loaded,
             active_state,
             sub_state: "running".to_string(),
