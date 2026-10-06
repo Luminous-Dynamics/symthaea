@@ -516,12 +516,13 @@ impl NixSystemdJobHandleV1 {
 }
 
 fn validate_unique_owner(owner: &str) -> Result<(), NixSystemdObserverErrorV1> {
-    if owner.is_empty() || owner.len() > 255 || !owner.starts_with(':') {
-        return Err(NixSystemdObserverErrorV1::InvalidJobIdentity(
-            "invalid systemd unique bus owner".to_string(),
-        ));
-    }
-    Ok(())
+    zbus::names::UniqueName::try_from(owner)
+        .map(|_| ())
+        .map_err(|_| {
+            NixSystemdObserverErrorV1::InvalidJobIdentity(
+                "invalid systemd unique bus owner".to_string(),
+            )
+        })
 }
 
 fn validate_manager_signal_sender(
@@ -922,7 +923,7 @@ mod tests {
     #[test]
     fn unique_systemd_manager_owner_is_strict() {
         assert!(validate_unique_owner(":1.42").is_ok());
-        assert!(validate_unique_owner(":").is_ok());
+        assert!(validate_unique_owner(":").is_err());
         assert!(validate_unique_owner("org.freedesktop.systemd1").is_err());
         assert!(validate_unique_owner("").is_err());
         assert!(validate_unique_owner(&"x".repeat(256)).is_err());
