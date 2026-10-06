@@ -147,8 +147,7 @@ pub struct WorldModelBridge {
 
 impl Default for WorldModelBridge {
     fn default() -> Self {
-        // Default 4-level hierarchy
-        let level_dims = vec![64, 128, 256, 128];
+        // Default 4-level hierarchy and eight generic action slots.
         Self::with_actions(8)
     }
 }
@@ -365,6 +364,10 @@ impl WorldModelBridge {
             }
         }
     }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
     #[test]
     fn action_conditioned_model_learns_constant_delta() {
         let mut model = WorldModelBridge::with_actions(2);
@@ -397,5 +400,5 @@ impl WorldModelBridge {
         let state = vec![0.0f32; 64];
         assert!(model.predict_action(2, &state).is_none());
     }
-
 }
+
