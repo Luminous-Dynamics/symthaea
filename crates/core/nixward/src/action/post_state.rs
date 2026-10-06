@@ -374,6 +374,7 @@ impl NixPostStateReceiptV1 {
             _ => return Err(NixPostStateErrorV1::IntentEffectMismatch),
         }
         expectation.validate_shape()?;
+        validate_expectation_against_intent(intent, expectation)?;
         observation.validate_shape()?;
         require_nonempty(&observer_identity, "observer identity")?;
         require_nonempty(&observer_version, "observer version")?;
@@ -672,6 +673,53 @@ impl NixPostStateReceiptV1 {
     }
 }
 
+fn validate_expectation_against_intent(
+    intent: &NixActionIntentV1,
+    expectation: &NixServicePostStateExpectationV1,
+) -> Result<(), NixPostStateErrorV1> {
+    match &intent.action {
+        NixActionDescriptorV1::Service { operation, unit }
+            if *operation == expectation.operation && unit == &expectation.unit => {}
+        _ => return Err(NixPostStateErrorV1::IntentEffectMismatch),
+    }
+
+    let Some(pre_state_identity) = intent.pre_state_identity.as_deref() else {
+        return Err(NixPostStateErrorV1::MissingBoundPreState);
+    };
+
+    if let Some(generation) = pre_state_identity.strip_prefix("generation:") {
+        let generation = generation
+            .parse::<u64>()
+            .map_err(|_| NixPostStateErrorV1::InvalidBoundPreState)?;
+        if generation != expectation.authorized_generation {
+            return Err(NixPostStateErrorV1::GenerationMismatch);
+        }
+        return Ok(());
+    }
+
+    let prefix = "nixward-service-pre-state-v1|generation=";
+    let Some(rest) = pre_state_identity.strip_prefix(prefix) else {
+        return Err(NixPostStateErrorV1::InvalidBoundPreState);
+    };
+    let (generation, rest) = rest
+        .split_once("|unit=")
+        .ok_or(NixPostStateErrorV1::InvalidBoundPreState)?;
+    let generation = generation
+        .parse::<u64>()
+        .map_err(|_| NixPostStateErrorV1::InvalidBoundPreState)?;
+    let (unit, _) = rest
+        .split_once("|state=")
+        .ok_or(NixPostStateErrorV1::InvalidBoundPreState)?;
+
+    if generation != expectation.authorized_generation {
+        return Err(NixPostStateErrorV1::GenerationMismatch);
+    }
+    if unit != expectation.unit {
+        return Err(NixPostStateErrorV1::UnitMismatch);
+    }
+    Ok(())
+}
+
 fn evaluate_postcondition(
     expectation: &NixServicePostStateExpectationV1,
     observation: &NixServicePostStateObservationV1,
@@ -944,6 +992,10 @@ pub enum NixPostStateErrorV1 {
     AuthorizationRecordMismatch,
     #[error("action intent does not describe the expected service effect")]
     IntentEffectMismatch,
+    #[error("service effect has no bound pre-state identity")]
+    MissingBoundPreState,
+    #[error("bound pre-state identity is malformed")]
+    InvalidBoundPreState,
 }
 
 #[cfg(test)]
@@ -1487,6 +1539,69 @@ mod tests {
         assert_eq!(
             tampered.verify_against(&intent, &authorization).unwrap_err(),
             NixPostStateErrorV1::AuthorizationRecordMismatch
+        );
+    }
+
+    #[test]
+    fn expectation_generation_must_match_authorized_intent_pre_state() {
+        let mut exp = expectation(NixServiceOperationKindV1::Start);
+        exp.authorized_generation = 43;
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        assert_eq!(
+            build_receipt(&exp, &obs, None).unwrap_err(),
+            NixPostStateErrorV1::GenerationMismatch
+        );
+    }
+
+    #[test]
+    fn missing_pre_state_binding_is_not_acceptable_for_service_receipts() {
+        use super::super::authorization::{
+            NixActionIntentV1, NixActionScopeV1, NixAuthorizationProfileV1,
+        };
+
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let verified = NixVerifiedPostStateObservationV1::from_observer(obs).unwrap();
+        let intent = NixActionIntentV1 {
+            subject_identity: "host:test".to_string(),
+            pre_state_identity: None,
+            action: NixActionDescriptorV1::Service {
+                operation: exp.operation,
+                unit: exp.unit.clone(),
+            },
+            maximum_scope: NixActionScopeV1::SystemModify,
+            preconditions: Vec::new(),
+            required_postconditions: Vec::new(),
+            rollback_or_recovery_ref: None,
+        };
+        let authorization = NixExecutionAuthorizationRecordV1 {
+            action_intent_digest: intent.digest().unwrap(),
+            profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
+            authority_ref: "approval:test".to_string(),
+            issued_at_unix_ms: 1,
+            expires_at_unix_ms: None,
+            decision: NixAuthorizationDecisionV1::Approved,
+        };
+        assert_eq!(
+            NixPostStateReceiptV1::build(
+                &intent,
+                &authorization,
+                &exp,
+                &verified,
+                None,
+                "systemd-observer-v1",
+                "1",
+            )
+            .unwrap_err(),
+            NixPostStateErrorV1::MissingBoundPreState
         );
     }
 
