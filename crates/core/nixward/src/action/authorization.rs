@@ -496,9 +496,8 @@ impl NixLocalExecutionAuthorityV1 {
             return Err(NixAuthorizationErrorV1::IntentMismatch);
         }
 
-        let content_digest = validate_service_definition_capture_binding(&intent, content)?;
+        validate_service_definition_capture_binding(&intent, content)?;
         service_effect_context_digest_for_intent(&intent)?;
-        let _content_digest = content_digest;
         Ok(Self {
             intent,
             approval,
