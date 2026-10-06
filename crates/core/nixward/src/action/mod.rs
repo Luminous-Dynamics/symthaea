@@ -31,6 +31,8 @@ pub mod plan_executor;
 pub mod service_manager;
 pub mod service_domain;
 pub mod service_effect;
+#[cfg(feature = "systemd-observer")]
+pub mod service_effect_admission;
 pub mod service_state;
 #[cfg(feature = "systemd-observer")]
 pub mod systemd_definition;
@@ -104,6 +106,10 @@ pub use plan_executor::{PlanExecutionResult, PlanExecutor, PlanStep, StepStatus}
 pub use service_manager::{ServiceManager, ServiceStatus};
 pub use service_effect::{
     NixServiceEffectContextErrorV1, NixServiceEffectContextV1,
+};
+#[cfg(feature = "systemd-observer")]
+pub use service_effect_admission::{
+    NixServiceEffectAdmissionErrorV1, NixServiceEffectAdmissionV1,
 };
 pub use service_domain::{NixServiceOperationErrorV1, NixServiceOperationKindV1, NixServiceOperationV1};
 #[cfg(feature = "systemd-observer")]
