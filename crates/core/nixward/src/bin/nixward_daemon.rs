@@ -1386,6 +1386,7 @@ impl DaemonState {
                                             self.pending_action = None;
                                             self.pending_action_intent_digest = None;
                                             self.pending_local_approval = None;
+                                            self.local_approval_consumed = None;
                                             return (
                                                 dynamic_threshold,
                                                 Some(best_action.expected_free_energy),
@@ -1408,6 +1409,7 @@ impl DaemonState {
                                             self.pending_action = None;
                                             self.pending_action_intent_digest = None;
                                             self.pending_local_approval = None;
+                                            self.local_approval_consumed = None;
                                             return (
                                                 dynamic_threshold,
                                                 Some(best_action.expected_free_energy),
@@ -1428,6 +1430,7 @@ impl DaemonState {
                                             self.pending_action = None;
                                             self.pending_action_intent_digest = None;
                                             self.pending_local_approval = None;
+                                            self.local_approval_consumed = None;
                                             return (
                                                 dynamic_threshold,
                                                 Some(best_action.expected_free_energy),
@@ -1450,6 +1453,7 @@ impl DaemonState {
                                             self.pending_action = None;
                                             self.pending_action_intent_digest = None;
                                             self.pending_local_approval = None;
+                                            self.local_approval_consumed = None;
                                             return (
                                                 dynamic_threshold,
                                                 Some(best_action.expected_free_energy),
