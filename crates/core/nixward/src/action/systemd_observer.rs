@@ -16,8 +16,14 @@ use super::post_state::{
     NixVerifiedPostStateStabilityEvidenceV1,
 };
 use super::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
+use super::service_effect::{
+    NixServiceDefinitionContentEvidenceV1, NixServiceEffectContextErrorV1,
+    NixSystemdUnitDefinitionContentFileV1, NixVerifiedServiceDefinitionContentV1,
+};
 use super::service_state::{ServiceActiveStateV1, ServiceLoadStateV1, ServiceUnitFileStateV1};
 use std::collections::HashMap;
+use std::fs::OpenOptions;
+use std::io::{self, Read, Seek, SeekFrom};
 use std::time::Duration;
 use thiserror::Error;
 use zbus::export::futures_util::StreamExt;
@@ -109,6 +115,21 @@ pub enum NixSystemdObserverErrorV1 {
 
     #[error("invalid verified post-state observation: {0}")]
     InvalidPostState(String),
+
+    #[error("definition content capture I/O error: {0}")]
+    DefinitionContentIo(String),
+
+    #[error("definition content changed while being captured")]
+    DefinitionContentMutationDetected,
+
+    #[error("definition content source is not a regular file")]
+    DefinitionContentNotRegular,
+
+    #[error("definition content source uses a trailing symbolic link")]
+    DefinitionContentSymlink,
+
+    #[error("definition content exceeds capture size limit")]
+    DefinitionContentTooLarge,
 }
 
 /// A one-shot, pre-armed watcher for the systemd Manager.JobRemoved signal.
@@ -308,6 +329,78 @@ impl NixSystemdReadOnlyObserverV1 {
             });
         }
         Ok(result)
+    }
+
+    /// Capture the exact bytes referenced by the current systemd definition identity.
+    ///
+    /// The result is observer-sealed and therefore suitable for construction of
+    /// an authority-bound service-effect context. The capture deliberately does
+    /// not persist raw bytes; it persists only per-file byte lengths and BLAKE3
+    /// commitments.
+    ///
+    /// Each file is opened read-only with O_NOFOLLOW on Linux, hashed twice from
+    /// the same descriptor, and checked with descriptor metadata before/after.
+    /// The systemd definition identity and manager incarnation are re-read after
+    /// capture. Any detected mutation or identity rollover fails closed.
+    pub async fn capture_service_definition_content(
+        &self,
+        unit: &str,
+    ) -> Result<NixVerifiedServiceDefinitionContentV1, NixSystemdObserverErrorV1> {
+        let expected_unit = canonical_unit(unit)?;
+        let manager_owner = self.systemd_manager_owner().await?;
+        let object_path = self.resolve_service_unit(&expected_unit).await?;
+        let identity = self
+            .read_definition_identity(&object_path, &expected_unit)
+            .await?;
+
+        let source_identity_digest = identity
+            .digest(&expected_unit)
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
+
+        let files = read_definition_content_files(&identity)?;
+        if files.is_empty() {
+            return Err(NixSystemdObserverErrorV1::DefinitionContentIo(
+                "systemd definition has no readable source files".into(),
+            ));
+        }
+
+        let post_owner = self.systemd_manager_owner().await?;
+        let post_object_path = self.resolve_service_unit(&expected_unit).await?;
+        let post_identity = self
+            .read_definition_identity(&post_object_path, &expected_unit)
+            .await?;
+        let post_identity_digest = post_identity
+            .digest(&expected_unit)
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
+
+        if post_owner != manager_owner
+            || post_object_path.as_str() != object_path.as_str()
+            || post_identity_digest != source_identity_digest
+        {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+
+        let evidence = NixServiceDefinitionContentEvidenceV1 {
+            unit: expected_unit,
+            source_identity_digest,
+            files,
+            captured_at_monotonic_us: monotonic_now_us()?,
+        };
+
+        NixVerifiedServiceDefinitionContentV1::from_observer(evidence)
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))
+    }
+
+    async fn read_definition_identity(
+        &self,
+        object_path: &OwnedObjectPath,
+        expected_unit: &str,
+    ) -> Result<NixSystemdUnitDefinitionIdentityV1, NixSystemdObserverErrorV1> {
+        validate_unit_object_path(object_path)?;
+        let properties = self
+            .get_all_properties(object_path, SYSTEMD_UNIT_INTERFACE)
+            .await?;
+        build_definition_identity_from_properties(&properties, expected_unit)
     }
 
     /// Arm the JobRemoved observation channel before any effect is dispatched.
@@ -855,6 +948,160 @@ fn parse_job_type(value: String) -> Result<NixSystemdJobTypeV1, NixSystemdObserv
             other.to_string(),
         )),
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DefinitionFileObjectIdentity {
+    dev: u64,
+    ino: u64,
+    mode: u32,
+    size: u64,
+    mtime_sec: i64,
+    mtime_nsec: i64,
+    ctime_sec: i64,
+    ctime_nsec: i64,
+}
+
+#[cfg(unix)]
+fn definition_file_identity(file: &std::fs::File) -> Result<DefinitionFileObjectIdentity, NixSystemdObserverErrorV1> {
+    use std::os::unix::fs::MetadataExt;
+    let metadata = file
+        .metadata()
+        .map_err(|error| NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string()))?;
+    if !metadata.is_file() {
+        return Err(NixSystemdObserverErrorV1::DefinitionContentNotRegular);
+    }
+    Ok(DefinitionFileObjectIdentity {
+        dev: metadata.dev(),
+        ino: metadata.ino(),
+        mode: metadata.mode(),
+        size: metadata.size(),
+        mtime_sec: metadata.mtime(),
+        mtime_nsec: metadata.mtime_nsec(),
+        ctime_sec: metadata.ctime(),
+        ctime_nsec: metadata.ctime_nsec(),
+    })
+}
+
+#[cfg(unix)]
+fn hash_open_definition_file(
+    file: &mut std::fs::File,
+) -> Result<(u64, String), NixSystemdObserverErrorV1> {
+    file.seek(SeekFrom::Start(0))
+        .map_err(|error| NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string()))?;
+    let mut hasher = blake3::Hasher::new();
+    let mut buffer = [0u8; 64 * 1024];
+    let mut length = 0u64;
+    loop {
+        let read = file
+            .read(&mut buffer)
+            .map_err(|error| NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string()))?;
+        if read == 0 {
+            break;
+        }
+        length = length
+            .checked_add(read as u64)
+            .ok_or(NixSystemdObserverErrorV1::DefinitionContentTooLarge)?;
+        if length > 8 * 1024 * 1024 {
+            return Err(NixSystemdObserverErrorV1::DefinitionContentTooLarge);
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok((length, hasher.finalize().to_hex().to_string()))
+}
+
+#[cfg(unix)]
+fn read_definition_content_file(
+    path: &str,
+) -> Result<NixSystemdUnitDefinitionContentFileV1, NixSystemdObserverErrorV1> {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let mut options = OpenOptions::new();
+    options.read(true);
+    let file = options
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
+        .open(path)
+        .map_err(|error| {
+            if error.raw_os_error() == Some(libc::ELOOP) {
+                NixSystemdObserverErrorV1::DefinitionContentSymlink
+            } else {
+                NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string())
+            }
+        })?;
+
+    let before = definition_file_identity(&file)?;
+    let (first_len, first_digest) = hash_open_definition_file(&mut { &file })?;
+    let middle = definition_file_identity(&file)?;
+    let (second_len, second_digest) = hash_open_definition_file(&mut { &file })?;
+    let after = definition_file_identity(&file)?;
+
+    if before != middle || middle != after || first_len != second_len || first_digest != second_digest {
+        return Err(NixSystemdObserverErrorV1::DefinitionContentMutationDetected);
+    }
+
+    Ok(NixSystemdUnitDefinitionContentFileV1 {
+        path: path.to_string(),
+        byte_len: second_len,
+        content_digest: second_digest,
+    })
+}
+
+#[cfg(not(unix))]
+fn read_definition_content_file(
+    _path: &str,
+) -> Result<NixSystemdUnitDefinitionContentFileV1, NixSystemdObserverErrorV1> {
+    Err(NixSystemdObserverErrorV1::DefinitionContentIo(
+        "definition content capture requires a Unix file-descriptor API".into(),
+    ))
+}
+
+fn read_definition_content_files(
+    identity: &NixSystemdUnitDefinitionIdentityV1,
+) -> Result<Vec<NixSystemdUnitDefinitionContentFileV1>, NixSystemdObserverErrorV1> {
+    let mut paths = Vec::with_capacity(1 + identity.drop_in_paths.len());
+    paths.push(identity.fragment_path.clone());
+    paths.extend(identity.drop_in_paths.iter().cloned());
+
+    let mut total = 0u64;
+    let mut files = Vec::with_capacity(paths.len());
+    for path in paths {
+        let file = read_definition_content_file(&path)?;
+        total = total
+            .checked_add(file.byte_len)
+            .ok_or(NixSystemdObserverErrorV1::DefinitionContentTooLarge)?;
+        if total > 64 * 1024 * 1024 {
+            return Err(NixSystemdObserverErrorV1::DefinitionContentTooLarge);
+        }
+        files.push(file);
+    }
+    Ok(files)
+}
+
+fn build_definition_identity_from_properties(
+    properties: &HashMap<String, OwnedValue>,
+    expected_unit: &str,
+) -> Result<NixSystemdUnitDefinitionIdentityV1, NixSystemdObserverErrorV1> {
+    let observed_id = canonical_unit(&required_string(
+        properties,
+        SYSTEMD_UNIT_INTERFACE,
+        "Id",
+    )?)?;
+    let names = required_strings(properties, SYSTEMD_UNIT_INTERFACE, "Names")?;
+    let canonical_names = names
+        .iter()
+        .map(|name| canonical_unit(name))
+        .collect::<Result<Vec<_>, _>>()?;
+    if observed_id != expected_unit && !canonical_names.iter().any(|name| name == expected_unit) {
+        return Err(NixSystemdObserverErrorV1::UnitIdentityMismatch {
+            requested: expected_unit.to_string(),
+            observed: observed_id,
+        });
+    }
+
+    let fragment_path = required_string(properties, SYSTEMD_UNIT_INTERFACE, "FragmentPath")?;
+    let drop_in_paths = required_strings(properties, SYSTEMD_UNIT_INTERFACE, "DropInPaths")?;
+    NixSystemdUnitDefinitionIdentityV1::new(fragment_path, drop_in_paths)
+        .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))
 }
 
 fn stability_sample_from_observation(
