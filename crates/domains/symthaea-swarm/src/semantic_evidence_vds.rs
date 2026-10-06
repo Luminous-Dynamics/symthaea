@@ -1511,8 +1511,7 @@ impl Rfc9942ReceiptCollection {
             let receipt = Rfc9942ReceiptEnvelope::from_cbor(&encoded)
                 .map_err(|error| match error {
                     Rfc9942VdpError::ResourceLimitExceeded
-                    | Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded
-                    | Rfc9942VdpError::SignaturePayloadResourceLimitExceeded => {
+                    | Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded => {
                         Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded
                     }
                     _ => Rfc9942VdpError::InvalidReceiptStructure,
