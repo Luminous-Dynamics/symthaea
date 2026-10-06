@@ -355,6 +355,19 @@ run_self_test() {
     return 1
   fi
 
+  printf '%s\n' 'NixVerifiedPostStateStabilityEvidenceV1::from_observer(evidence);' > "${tmp}/stability-factory.rs"
+  if scan_verified_stability_factory "${tmp}/stability-factory.rs"; then :; else
+    echo "ERROR: CROSS-062 self-test failed to detect stability observer-sealing factory use" >&2
+    return 1
+  fi
+
+  # The post-state tests may construct the private wrapper directly because
+  # they are child modules; the production factory remains observer-only.
+
+    echo "ERROR: CROSS-022 self-test failed to detect legacy Custom command material" >&2
+    return 1
+  fi
+
   # The validated aggregates must be rejected, while the closed enum remains
   # permitted to deserialize. This prevents the fence itself from regressing
   # into an over-broad "no Deserialize in service_domain.rs" rule.
