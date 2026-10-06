@@ -1447,7 +1447,22 @@ mod tests {
                 None,
             )
             .unwrap_err(),
-            NixAuthorizationErrorV1::MissingServiceEffectContext
+            NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture
+        );
+    }
+
+    #[test]
+    fn service_authorization_with_unsealed_context_still_fails_closed() {
+        let intent = contextual_service_intent();
+        assert_eq!(
+            LiveNixAuthorizationV1::local_explicit_confirmation(
+                &intent,
+                "approval:test",
+                1,
+                None,
+            )
+            .unwrap_err(),
+            NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture
         );
     }
 
