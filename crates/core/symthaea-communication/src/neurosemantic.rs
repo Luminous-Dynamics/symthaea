@@ -4446,6 +4446,7 @@ mod tests {
             metric_ref: definition.metric_ref.clone(),
             kind: definition.kind,
             scope_ref: definition.scope_ref.clone(),
+            population_manifest_hash: content_hash(b"population-for-computation-test"),
             eligible_subject_artifact_hashes: vec![
                 content_hash(b"item-1"),
                 content_hash(b"item-2"),
