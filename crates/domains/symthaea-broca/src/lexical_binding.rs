@@ -263,9 +263,16 @@ impl MorphophonologicalRuleSet {
         })
     }
 
+    /// Domain-separated identity of the exact executable rule-set content.
+    pub fn resource_blake3(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-morphophonological-rule-set-v1\\0");
+        hasher.update(self.grounding_surface().as_bytes());
+        hasher.finalize().to_hex().to_string()
+    }
+
     pub fn provenance_token(&self) -> String {
-        let digest = blake3::hash(self.grounding_surface().as_bytes());
-        digest.to_hex().to_string()
+        self.resource_blake3()
     }
 }
 
@@ -405,6 +412,8 @@ pub struct MorphophonologicalDerivationStep {
 pub struct MorphophonologicalDerivationWitness {
     pub version: String,
     pub language: LanguageRuleBinding,
+    /// Digest of the exact serialized executable rule set used for derivation.
+    pub rule_set_blake3: String,
     pub steps: Vec<MorphophonologicalDerivationStep>,
 }
 
@@ -416,6 +425,7 @@ impl MorphophonologicalDerivationWitness {
         let witness = Self {
             version: MORPHOPHONOLOGICAL_DERIVATION_WITNESS_VERSION.to_string(),
             language: binding.language.clone(),
+            rule_set_blake3: String::new(),
             steps,
         };
         witness.validate_against_binding(binding)?;
@@ -477,8 +487,10 @@ impl MorphophonologicalDerivationWitness {
             });
         }
 
-        Self::new(binding, steps)
-            .map_err(|_| MorphophonologicalDerivationWitnessError::InvalidDerivedWitness)
+        let mut witness = Self::new(binding, steps)
+            .map_err(|_| MorphophonologicalDerivationWitnessError::InvalidDerivedWitness)?;
+        witness.rule_set_blake3 = rule_set.resource_blake3();
+        Ok(witness)
     }
 
     /// Validate the retained trace against the executable rule set as well as the binding.
@@ -491,6 +503,10 @@ impl MorphophonologicalDerivationWitness {
         rule_set
             .validate()
             .map_err(|_| MorphophonologicalDerivationWitnessError::InvalidRuleSet)?;
+
+        if self.rule_set_blake3 != rule_set.resource_blake3() {
+            return Err(MorphophonologicalDerivationWitnessError::RuleSetContentMismatch);
+        }
 
         if binding.language.language_tag != rule_set.language_tag
             || binding.language.rule_id.as_deref() != Some(rule_set.rule_id.as_str())
@@ -537,6 +553,13 @@ impl MorphophonologicalDerivationWitness {
 
         if self.language != binding.language {
             return Err(MorphophonologicalDerivationWitnessError::LanguageBindingMismatch);
+        }
+
+        if self.rule_set_blake3.trim().is_empty()
+            || self.rule_set_blake3.len() != 64
+            || !self.rule_set_blake3.bytes().all(|byte| byte.is_ascii_hexdigit())
+        {
+            return Err(MorphophonologicalDerivationWitnessError::MalformedRuleSetDigest);
         }
 
         if !matches!(binding.language.status, LanguageRuleStatus::Bound) {
@@ -651,6 +674,8 @@ pub enum MorphophonologicalDerivationWitnessError {
     EmptyOutputForm { position: usize },
     InvalidRuleSet,
     RuleSetIdentityMismatch,
+    MalformedRuleSetDigest,
+    RuleSetContentMismatch,
     RuleExecutionFailed { position: usize },
     DerivedOutputMismatch { position: usize },
     AppliedRuleMismatch { position: usize },
@@ -678,6 +703,8 @@ impl std::fmt::Display for MorphophonologicalDerivationWitnessError {
             Self::EmptyOutputForm { position } => write!(f, "morphophonological derivation output at position {position} is empty"),
             Self::InvalidRuleSet => write!(f, "morphophonological derivation rule set is invalid"),
             Self::RuleSetIdentityMismatch => write!(f, "morphophonological derivation rule-set identity does not match the lexical language binding"),
+            Self::MalformedRuleSetDigest => write!(f, "morphophonological derivation witness rule-set digest is malformed"),
+            Self::RuleSetContentMismatch => write!(f, "morphophonological derivation witness does not match the exact executable rule-set content"),
             Self::RuleExecutionFailed { position } => write!(f, "morphophonological rule execution failed at position {position}"),
             Self::DerivedOutputMismatch { position } => write!(f, "executable morphophonological derivation does not reproduce position {position}'s retained output"),
             Self::AppliedRuleMismatch { position } => write!(f, "retained morphophonological witness selected a different executable rule at position {position}"),
@@ -1900,6 +1927,44 @@ mod tests {
             MorphophonologicalDerivationWitness::from_rule_set(&binding, &rule_set)
                 .expect_err("rule-set provenance drift must fail closed"),
             MorphophonologicalDerivationWitnessError::RuleSetIdentityMismatch
+        );
+    }
+
+
+    #[test]
+    fn morphophonological_rule_set_digest_binds_exact_rule_content() {
+        let mut rule_set = morphophonological_fixture_rule_set();
+        let before = rule_set.resource_blake3();
+        rule_set.rules[0].operation = MorphophonologicalRuleOperation::AppendSuffix {
+            suffix: "t".into(),
+        };
+        assert_ne!(before, rule_set.resource_blake3());
+    }
+
+    #[test]
+    fn morphophonological_derivation_rejects_rule_content_tampering() {
+        let binding = morphophonological_fixture_binding();
+        let rule_set = morphophonological_fixture_rule_set();
+        let mut witness = MorphophonologicalDerivationWitness::from_rule_set(&binding, &rule_set)
+            .expect("fixture rule set should derive the binding");
+        let mut tampered_rules = rule_set.clone();
+        tampered_rules.rules[0].operation = MorphophonologicalRuleOperation::AppendSuffix {
+            suffix: "t".into(),
+        };
+
+        assert_eq!(
+            witness
+                .validate_against_binding_and_rule_set(&binding, &tampered_rules)
+                .expect_err("exact rule content tampering must fail closed"),
+            MorphophonologicalDerivationWitnessError::RuleSetContentMismatch
+        );
+
+        witness.rule_set_blake3 = "not-a-digest".into();
+        assert_eq!(
+            witness
+                .validate_against_binding(&binding)
+                .expect_err("malformed rule-set digest must fail closed"),
+            MorphophonologicalDerivationWitnessError::MalformedRuleSetDigest
         );
     }
 
