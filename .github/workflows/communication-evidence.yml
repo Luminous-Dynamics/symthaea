@@ -125,13 +125,21 @@ jobs:
           assert report["derivation_input_artifact_mismatch_blocked"] is True
           assert report["derivation_input_artifact_bounds_blocked"] is True
           assert report["lifecycle_receipt_binding_verified"] is True
+          assert report["lifecycle_independent_verification_verified"] is True
+          assert report["lifecycle_verification_scope_verified"] is True
           assert report["lifecycle_chain_verified"] is True
+          assert report["lifecycle_skipped_stage_blocked"] is True
           assert report["lifecycle_sequence_gap_blocked"] is True
           assert report["lifecycle_state_regression_blocked"] is True
           assert report["lifecycle_timestamp_regression_blocked"] is True
           assert report["lifecycle_replacement_lineage_verified"] is True
           assert report["lifecycle_replacement_lineage_mismatch_blocked"] is True
           assert report["lifecycle_effect_evidence_mismatch_blocked"] is True
+          assert report["lifecycle_independent_verification_mismatch_blocked"] is True
+          assert report["lifecycle_verifier_target_mismatch_blocked"] is True
+          assert report["lifecycle_verifier_identity_required"] is True
+          assert report["lifecycle_verification_scope_mismatch_blocked"] is True
+          assert report["lifecycle_verification_scope_tamper_blocked"] is True
           assert report["lifecycle_artifact_mismatch_blocked"] is True
           assert report["lifecycle_lineage_mismatch_blocked"] is True
           assert report["lifecycle_future_timestamp_blocked"] is True
