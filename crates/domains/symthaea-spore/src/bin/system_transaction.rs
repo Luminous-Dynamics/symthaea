@@ -388,39 +388,70 @@ impl TransactionLedger {
                 ));
             }
         }
-        let file = File::open(&self.path).map_err(|error| {
-            format!(
-                "unable to read transaction ledger {}: {error}",
-                self.path.display()
-            )
-        })?;
+        // Re-open the already-validated ledger without following a symlink.
+        // O_NOFOLLOW closes the metadata/open race where the path could otherwise be
+        // replaced between symlink_metadata() and the actual read.
+        let file = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(&self.path)
+            .map_err(|error| {
+                format!(
+                    "unable to read transaction ledger {}: {error}",
+                    self.path.display()
+                )
+            })?;
 
         let mut records = HashMap::new();
         let mut transaction_owners = HashMap::<String, String>::new();
-        for (line_number, line) in BufReader::new(file).lines().enumerate() {
-            if line.len() > MAX_JOURNAL_EVENT_BYTES {
+        let mut reader = BufReader::new(file);
+        let mut line_number = 0usize;
+        loop {
+            let mut line = Vec::with_capacity(MAX_JOURNAL_EVENT_BYTES.min(4096));
+            let bytes_read = reader
+                .by_ref()
+                .take((MAX_JOURNAL_EVENT_BYTES + 1) as u64)
+                .read_until(b'\n', &mut line)
+                .map_err(|error| {
+                    format!(
+                        "unable to read transaction ledger {} line {}: {error}",
+                        self.path.display(),
+                        line_number + 1
+                    )
+                })?;
+            if bytes_read == 0 {
+                break;
+            }
+            line_number += 1;
+
+            // The one-byte allowance is solely for the record delimiter. If the
+            // bounded read fills the allowance without seeing a newline, the
+            // record is too large and the remainder is intentionally not read.
+            if line.len() > MAX_JOURNAL_EVENT_BYTES
+                && line.last().copied() != Some(b'\n')
+            {
                 return Err(format!(
                     "transaction ledger {} line {} exceeds {} bytes",
                     self.path.display(),
-                    line_number + 1,
+                    line_number,
                     MAX_JOURNAL_EVENT_BYTES
                 ));
             }
-            let line = line.map_err(|error| {
-                format!(
-                    "unable to read transaction ledger {} line {}: {error}",
-                    self.path.display(),
-                    line_number + 1
-                )
-            })?;
-            if line.trim().is_empty() {
+            if line.last().copied() == Some(b'\n') {
+                line.pop();
+            }
+            if line.last().copied() == Some(b'\r') {
+                line.pop();
+            }
+            if line.is_empty() {
                 continue;
             }
-            let event: JournalEvent = serde_json::from_str(&line).map_err(|error| {
+
+            let event: JournalEvent = serde_json::from_slice(&line).map_err(|error| {
                 format!(
                     "transaction ledger {} is malformed at line {}: {error}",
                     self.path.display(),
-                    line_number + 1
+                    line_number
                 )
             })?;
             if event.schema_version != SCHEMA_VERSION {
