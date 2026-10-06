@@ -670,14 +670,6 @@ impl MorphophonologicalCompilationWitness {
                 return Err(MorphophonologicalCompilationWitnessError::EmptyMetadata);
             }
         }
-        if self.compiler_implementation_revision != UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION {
-            return Err(
-                MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch,
-            );
-        }
-        if self.source_parser_revision != UNIMORPH_TSV_SOURCE_PARSER_REVISION {
-            return Err(MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch);
-        }
         if !is_canonical_blake3_digest(&self.source_artifact_blake3)
             || !is_canonical_blake3_digest(&self.source_selection_blake3)
             || !is_canonical_blake3_digest(&self.output_rule_set_blake3)
@@ -752,16 +744,33 @@ impl MorphophonologicalCompilationWitness {
     ///
     /// This is stronger than checking hashes alone: the current compiler implementation must
     /// reproduce the recorded transformation.
+    fn validate_current_unimorph_implementation(
+        &self,
+    ) -> Result<(), MorphophonologicalCompilationWitnessError> {
+        if self.compiler_implementation_revision != UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION {
+            return Err(
+                MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch,
+            );
+        }
+        if self.source_parser_revision != UNIMORPH_TSV_SOURCE_PARSER_REVISION {
+            return Err(MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch);
+        }
+        Ok(())
+    }
+
     pub fn replay_unimorph_tsv_compilation(
         &self,
         source_artifact: &[u8],
         output_rule_set: &MorphophonologicalRuleSet,
     ) -> Result<(), MorphophonologicalCompilationWitnessError> {
+        self.validate_shape()?;
         if self.compiler_id != UNIMORPH_TSV_COMPILER_ID
             || self.compiler_version != UNIMORPH_TSV_COMPILER_VERSION
         {
             return Err(MorphophonologicalCompilationWitnessError::UnsupportedCompiler);
         }
+        self.validate_current_unimorph_implementation()?;
+
         if self.compiler_implementation_revision != UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION {
             return Err(
                 MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch,
@@ -798,14 +807,6 @@ impl MorphophonologicalCompilationWitness {
         output_rule_set: &MorphophonologicalRuleSet,
     ) -> Result<(), MorphophonologicalCompilationWitnessError> {
         self.validate_shape()?;
-        if self.compiler_implementation_revision != UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION {
-            return Err(
-                MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch,
-            );
-        }
-        if self.source_parser_revision != UNIMORPH_TSV_SOURCE_PARSER_REVISION {
-            return Err(MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch);
-        }
         output_rule_set
             .validate()
             .map_err(|_| MorphophonologicalCompilationWitnessError::InvalidRuleSet)?;
@@ -3306,7 +3307,7 @@ mod tests {
             compiler_revision_recomputed.compute_transformation_blake3();
         assert_eq!(
             compiler_revision_recomputed
-                .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
+                .replay_unimorph_tsv_compilation(artifact, &rule_set)
                 .expect_err("recomputing the commitment must not self-certify a compiler revision"),
             MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch
         );
@@ -3318,7 +3319,7 @@ mod tests {
             parser_revision_recomputed.compute_transformation_blake3();
         assert_eq!(
             parser_revision_recomputed
-                .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
+                .replay_unimorph_tsv_compilation(artifact, &rule_set)
                 .expect_err("recomputing the commitment must not self-certify a parser revision"),
             MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch
         );
