@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 40;
+pub const SCHEMA_VERSION: u16 = 41;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-v53";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-v54";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -376,6 +376,8 @@ pub struct CalibrationTraceabilityRef {
     pub calibration_revision: String,
     /// Digest of the exact calibration/comparison record.
     pub calibration_record_digest: String,
+    /// Unix timestamp at which this calibration/comparison reference was used.
+    pub used_at_epoch_seconds: i64,
 }
 
 impl CalibrationTraceabilityRef {
@@ -4502,6 +4504,7 @@ mod tests {
             calibration_id: "fixture-calibration-chain-v1".into(),
             calibration_revision: "v1".into(),
             calibration_record_digest: "fixture-calibration-chain-record-digest-v1".into(),
+            used_at_epoch_seconds: 1_700_000_000,
         }],
                 experimental_design_id: None,
                 experimental_target_id: None,
@@ -8130,7 +8133,8 @@ mod tests {
             calibration_id: "calibration".into(),
             calibration_revision: "v1".into(),
             calibration_record_digest: "calibration-digest".into(),
-        }],
+                used_at_epoch_seconds: 1_700_000_000,
+            }],
             experimental_design_id: None,
             experimental_target_id: None,
         };
@@ -8177,6 +8181,7 @@ mod tests {
                 calibration_id: "calibration".into(),
                 calibration_revision: "v1".into(),
                 calibration_record_digest: "calibration-digest".into(),
+                used_at_epoch_seconds: 1_700_000_000,
             }],
             experimental_design_id: None,
             experimental_target_id: None,
@@ -8187,6 +8192,10 @@ mod tests {
             observation.validate().unwrap_err(),
             AssessmentError::InvalidObservationProvenance
         );
+
+        observation.calibration_chain_refs[0].calibration_record_digest = "calibration-digest".into();
+        observation.calibration_chain_refs[0].used_at_epoch_seconds = 1_700_000_001;
+        observation.validate().unwrap();
     }
 
     #[test]
