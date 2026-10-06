@@ -347,6 +347,26 @@ fn validate_extra_disks(extra_disks: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_install_layout(layout: &str) -> Result<(), String> {
+    match layout {
+        ""
+        | "alongside"
+        | "single"
+        | "single-zfs"
+        | "single-luks"
+        | "dual"
+        | "raid1-btrfs"
+        | "raid1-mdadm"
+        | "raid5-mdadm"
+        | "raid6-mdadm"
+        | "raid10-mdadm"
+        | "zfs-mirror"
+        | "zfs-raidz"
+        | "zfs-raidz2" => Ok(()),
+        _ => Err(format!("Unsupported install layout: {}", layout)),
+    }
+}
+
 fn validate_install_disk_topology(message: &ClientMessage) -> Result<(), String> {
     let require_distinct = |left_name: &str, left: &str, right_name: &str, right: &str| {
         let left = validate_disk_path(left)
@@ -2479,7 +2499,7 @@ echo "COMPLETE"
             script
         }
 
-        _ => format!("echo 'Unknown layout: {}'; exit 1", msg.layout),
+        _ => "echo 'Unknown install layout'; exit 1".to_string(),
     }
 }
 
@@ -3532,6 +3552,12 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     }
                 };
 
+                if let Err(error) = validate_install_layout(&client_msg.layout) {
+                    let _ = ws_tx
+                        .send(Message::Text(RelayMessage::error(&error).to_json()))
+                        .await;
+                    continue;
+                }
                 let requires_luks = client_msg.layout == "single-luks";
                 if requires_luks {
                     if client_msg.luks_passphrase.is_empty() {
@@ -8488,6 +8514,15 @@ mod tests {
         let error = validate_extra_disks(&extra_disks)
             .expect_err("an invalid extra disk must reject the entire collection");
         assert!(error.contains("Invalid extra disk"));
+    }
+
+    #[test]
+    fn install_layout_rejects_shell_breakout_payloads() {
+        assert!(validate_install_layout("single").is_ok());
+        assert!(validate_install_layout("").is_ok());
+        let error = validate_install_layout("single'; touch /tmp/pwned; #")
+            .expect_err("unknown layout must be rejected before script generation");
+        assert!(error.contains("Unsupported install layout"));
     }
 
     #[test]
