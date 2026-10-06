@@ -870,6 +870,7 @@ impl NixPostStateReceiptV1 {
             &self.target_unit,
             self.authorized_generation,
             &self.authorized_definition_digest,
+            &self.authorized_definition_content_digest,
             self.pre_invocation_id.as_deref(),
             self.required_stability_us,
         );
@@ -883,13 +884,23 @@ impl NixPostStateReceiptV1 {
             &self.authorized_definition_digest,
             "authorized definition digest",
         )?;
+        validate_digest(
+            &self.authorized_definition_content_digest,
+            "authorized definition content digest",
+        )?;
         validate_digest(&self.observed_definition_digest, "observed definition digest")?;
+        validate_digest(
+            &self.observed_definition_content_digest,
+            "observed definition content digest",
+        )?;
         self.observed_definition_identity.validate_shape()?;
         let recomputed_definition_digest = self
             .observed_definition_identity
             .digest(&self.target_unit)?;
         if self.observed_definition_digest != recomputed_definition_digest
             || self.authorized_definition_digest != self.observed_definition_digest
+            || self.authorized_definition_content_digest
+                != self.observed_definition_content_digest
         {
             return Err(NixPostStateErrorV1::DefinitionMismatch);
         }
