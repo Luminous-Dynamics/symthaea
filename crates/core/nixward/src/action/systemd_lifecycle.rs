@@ -40,6 +40,68 @@ impl NixSystemdLifecycleTransactionV1 {
         Self { observer, mutation }
     }
 
+    /// Execute the governed transport sequence after re-observing the
+    /// exact approved service pre-state *after* the watcher is armed.
+    ///
+    /// This narrows the mutation window: the final read-only pre-state check
+    /// occurs immediately before typed native dispatch, while the JobRemoved
+    /// watcher is already live.
+    pub async fn dispatch_and_observe_with_expected_pre_state(
+        &self,
+        operation: NixServiceOperationKindV1,
+        unit: &str,
+        expected_pre_state_identity: &str,
+        timeout: Duration,
+    ) -> Result<NixSystemdLifecycleEvidenceV1, NixSystemdLifecycleTransactionErrorV1> {
+        let operation = NixServiceOperationV1::new(unit.to_string(), operation)
+            .map_err(|error| {
+                NixSystemdLifecycleTransactionErrorV1::InvalidServiceOperation(error.to_string())
+            })?;
+        let expected_job_type = NixSystemdJobTypeV1::for_operation(operation.operation())
+            .ok_or(NixSystemdLifecycleTransactionErrorV1::UnsupportedOperation)?;
+
+        let watcher = self.observer.arm_job_removed_watcher().await?;
+        let manager_owner = watcher.manager_owner().to_string();
+
+        let pre_state = self
+            .observer
+            .observe_service_pre_state(operation.unit())
+            .await?;
+        if pre_state.identity() != expected_pre_state_identity {
+            return Err(
+                NixSystemdLifecycleTransactionErrorV1::PreStateMismatch {
+                    expected: expected_pre_state_identity.to_string(),
+                    observed: pre_state.identity().to_string(),
+                },
+            );
+        }
+
+        let job_path = self
+            .mutation
+            .dispatch_lifecycle_for_manager_owner(&operation, &manager_owner)
+            .await?;
+
+        let job = self
+            .observer
+            .capture_job(&job_path, operation.unit())
+            .await?;
+        if job.job_type() != expected_job_type {
+            return Err(NixSystemdLifecycleTransactionErrorV1::JobTypeMismatch);
+        }
+
+        let evidence = watcher.await_job_removed(&job, timeout).await?;
+        if evidence.manager_owner != manager_owner {
+            return Err(NixSystemdLifecycleTransactionErrorV1::ManagerOwnerMismatch);
+        }
+
+        Ok(NixSystemdLifecycleEvidenceV1 {
+            operation: operation.operation(),
+            unit: operation.unit().to_string(),
+            job: evidence,
+            manager_owner,
+        })
+    }
+
     /// Execute the non-authorizing transport sequence in the only supported order:
     ///
     /// watch -> dispatch -> capture -> await terminal signal.
@@ -91,6 +153,11 @@ pub enum NixSystemdLifecycleTransactionErrorV1 {
     JobTypeMismatch,
     #[error("systemd manager incarnation changed across the governed lifecycle sequence")]
     ManagerOwnerMismatch,
+    #[error("approved service pre-state does not match the final pre-dispatch observation: expected={expected}, observed={observed}")]
+    PreStateMismatch {
+        expected: String,
+        observed: String,
+    },
     #[error("systemd observer failed: {0}")]
     Observer(#[from] NixSystemdObserverErrorV1),
     #[error("systemd mutation transport failed: {0}")]
@@ -106,6 +173,11 @@ mod tests {
         let _ = NixSystemdJobRemovedWatcherV1::manager_owner;
         let result = NixSystemdJobTypeV1::for_operation(NixServiceOperationKindV1::Enable);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn lifecycle_pre_state_method_is_explicitly_available() {
+        let _ = NixSystemdLifecycleTransactionV1::dispatch_and_observe_with_expected_pre_state;
     }
 
     #[test]
