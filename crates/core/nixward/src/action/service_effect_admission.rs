@@ -18,6 +18,7 @@ use super::service_domain::NixServiceOperationKindV1;
 use super::service_effect::{
     NixServiceEffectContextErrorV1, NixServiceEffectContextV1,
 };
+use super::service_state::NixVerifiedServicePreStateV1;
 use super::systemd_definition::NixVerifiedSystemdDefinitionContentCommitmentV1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,17 +32,14 @@ impl NixServiceEffectAdmissionV1 {
     /// Admit one exact Service action using only an observer-sealed definition
     /// content commitment.
     ///
-    /// The caller must provide the independently observed pre-state digest and
-    /// generation. The admission layer never reads the filesystem and never
-    /// contacts systemd itself.
+    /// The caller must provide an observer-sealed pre-state token. The
+    /// admission layer never reads the filesystem and never contacts systemd itself.
     pub(crate) fn from_observed_definition_content(
         subject_identity: impl Into<String>,
-        pre_state_identity: impl Into<String>,
         operation: NixServiceOperationKindV1,
-        generation: u64,
-        pre_state_digest: impl Into<String>,
         pre_invocation_id: Option<String>,
         required_stability_us: u64,
+        pre_state: &NixVerifiedServicePreStateV1,
         commitment: &NixVerifiedSystemdDefinitionContentCommitmentV1,
     ) -> Result<Self, NixServiceEffectAdmissionErrorV1> {
         let commitment = commitment.as_ref();
@@ -65,11 +63,15 @@ impl NixServiceEffectAdmissionV1 {
                 NixServiceEffectAdmissionErrorV1::InvalidDefinitionContent(error.to_string())
             })?;
 
+        if pre_state.unit() != unit || pre_state.generation() == 0 {
+            return Err(NixServiceEffectAdmissionErrorV1::PreStateMismatch);
+        }
+
         let context = NixServiceEffectContextV1::new(
             operation,
             unit.clone(),
-            generation,
-            pre_state_digest,
+            pre_state.generation(),
+            pre_state.state_digest(),
             definition_digest,
             content_digest.clone(),
             pre_invocation_id,
@@ -79,7 +81,7 @@ impl NixServiceEffectAdmissionV1 {
 
         let intent = NixActionIntentV1 {
             subject_identity: subject_identity.into(),
-            pre_state_identity: Some(pre_state_identity.into()),
+            pre_state_identity: Some(pre_state.identity().to_string()),
             action: NixActionDescriptorV1::Service {
                 operation,
                 unit,
@@ -113,6 +115,8 @@ pub enum NixServiceEffectAdmissionErrorV1 {
     InvalidContext(NixServiceEffectContextErrorV1),
     #[error("invalid authorization intent: {0}")]
     InvalidAuthorizationIntent(NixAuthorizationErrorV1),
+    #[error("observer-sealed pre-state does not match the definition admission target")]
+    PreStateMismatch,
 }
 
 #[cfg(test)]
@@ -138,14 +142,25 @@ mod tests {
             )
             .unwrap();
 
+        let state = super::super::service_state::NixServiceObservedStateV1::from_observer_snapshot(
+            "nginx.service",
+            "nginx.service",
+            vec!["nginx.service".into()],
+            super::super::service_state::ServiceLoadStateV1::Loaded,
+            super::super::service_state::ServiceActiveStateV1::Active,
+            super::super::service_state::ServiceUnitFileStateV1::Enabled,
+            "running",
+        )
+        .unwrap();
+        let pre_state =
+            NixVerifiedServicePreStateV1::from_observer(&state, 42).unwrap();
+
         let admission = NixServiceEffectAdmissionV1::from_observed_definition_content(
             "host:test",
-            "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=1111111111111111111111111111111111111111111111111111111111111111",
             NixServiceOperationKindV1::Start,
-            42,
-            "1111111111111111111111111111111111111111111111111111111111111111",
             None,
             1_000,
+            &pre_state,
             &commitment,
         )
         .unwrap();
@@ -185,18 +200,46 @@ mod tests {
             )
             .unwrap();
 
+        let state = super::super::service_state::NixServiceObservedStateV1::from_observer_snapshot(
+            "nginx.service",
+            "nginx.service",
+            vec!["nginx.service".into()],
+            super::super::service_state::ServiceLoadStateV1::Loaded,
+            super::super::service_state::ServiceActiveStateV1::Active,
+            super::super::service_state::ServiceUnitFileStateV1::Enabled,
+            "running",
+        )
+        .unwrap();
+        let pre_state =
+            NixVerifiedServicePreStateV1::from_observer(&state, 42).unwrap();
+
+        let other_state =
+            super::super::service_state::NixServiceObservedStateV1::from_observer_snapshot(
+                "sshd.service",
+                "sshd.service",
+                vec!["sshd.service".into()],
+                super::super::service_state::ServiceLoadStateV1::Loaded,
+                super::super::service_state::ServiceActiveStateV1::Active,
+                super::super::service_state::ServiceUnitFileStateV1::Enabled,
+                "running",
+            )
+            .unwrap();
+        let other_pre_state =
+            NixVerifiedServicePreStateV1::from_observer(&other_state, 42).unwrap();
+
         let result = NixServiceEffectAdmissionV1::from_observed_definition_content(
             "host:test",
-            "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
             NixServiceOperationKindV1::Start,
-            42,
-            "1111111111111111111111111111111111111111111111111111111111111111",
             None,
             0,
+            &other_pre_state,
             &commitment,
         );
 
-        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            NixServiceEffectAdmissionErrorV1::PreStateMismatch
+        ));
     }
 
     #[test]

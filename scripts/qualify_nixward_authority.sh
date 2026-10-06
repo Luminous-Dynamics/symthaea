@@ -60,6 +60,8 @@ echo "-- post-state evidence tests --"
 cargo test -p nixward --lib action::post_state::tests
 echo "-- read-only systemd D-Bus observer tests --"
 cargo test -p nixward --features systemd-observer --lib action::systemd_observer::tests
+echo "-- sealed service pre-state tests --"
+cargo test -p nixward --features systemd-observer --lib action::service_state::tests
 echo "-- service-effect admission tests --"
 cargo test -p nixward --features systemd-observer --lib action::service_effect_admission::tests
 cargo test -p nixward --features systemd-observer --features systemd-mutation --lib action::systemd_lifecycle::tests
