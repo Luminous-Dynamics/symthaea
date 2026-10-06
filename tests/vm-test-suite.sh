@@ -449,7 +449,7 @@ async def test():
             "gpu_driver": "modesetting",
             "timezone": "UTC",
             "keyboard": "us",
-            "command": "testpassphrase123"
+            "luks_passphrase": "testpassphrase123"
         }))
 
         last_stage = ""
@@ -531,7 +531,7 @@ async def test():
         target = next((d["name"] for d in disks if "vda" in d["name"]), disks[0]["name"])
 
         # 5. Install with browser-generated config
-        config_nix = "{ config, pkgs, ... }:\n{\n  imports = [ ./hardware-configuration.nix ];\n  boot.loader.systemd-boot.enable = true;\n  boot.loader.efi.canTouchEfiVariables = true;\n  networking.hostName = \"test-nixos\";\n  networking.networkmanager.enable = true;\n  time.timeZone = \"UTC\";\n  i18n.defaultLocale = \"en_US.UTF-8\";\n  console.keyMap = \"us\";\n  hardware.graphics.enable = true;\n  services.pipewire = { enable = true; alsa.enable = true; pulse.enable = true; };\n  security.rtkit.enable = true;\n  users.users.testuser = {\n    isNormalUser = true;\n    extraGroups = [ \"wheel\" \"networkmanager\" ];\n    initialPassword = \"changeme\";\n  };\n  nix.settings.experimental-features = [ \"nix-command\" \"flakes\" ];\n  environment.systemPackages = with pkgs; [ vim git curl ];\n  system.stateVersion = \"25.05\";\n}\n"
+        config_nix = "{ config, pkgs, ... }:\n{\n  imports = [ ./hardware-configuration.nix ];\n  boot.loader.systemd-boot.enable = true;\n  boot.loader.efi.canTouchEfiVariables = true;\n  networking.hostName = \"test-nixos\";\n  networking.networkmanager.enable = true;\n  time.timeZone = \"UTC\";\n  i18n.defaultLocale = \"en_US.UTF-8\";\n  console.keyMap = \"us\";\n  hardware.graphics.enable = true;\n  services.pipewire = { enable = true; alsa.enable = true; pulse.enable = true; };\n  security.rtkit.enable = true;\n  nix.settings.experimental-features = [ \"nix-command\" \"flakes\" ];\n  environment.systemPackages = with pkgs; [ vim git curl ];\n  system.stateVersion = \"26.05\";\n}\n"
         flake_nix = "{\n  description = \"NixOS configuration for test-nixos\";\n  inputs.nixpkgs.url = \"github:NixOS/nixpkgs/nixos-26.05\";\n  outputs = { self, nixpkgs, ... }: {\n    nixosConfigurations.\"test-nixos\" = nixpkgs.lib.nixosSystem {\n      system = \"x86_64-linux\";\n      modules = [ ./configuration.nix ];\n    };\n  };\n}\n"
         print(f"  [install] Starting on {target} with browser config...")
         await ws.send(json.dumps({
