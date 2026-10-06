@@ -133,6 +133,9 @@ pub enum NixSystemdObserverErrorV1 {
 
     #[error("definition content exceeds capture size limit")]
     DefinitionContentTooLarge,
+
+    #[error("systemd reports that this unit needs daemon reload")]
+    DefinitionNeedsDaemonReload,
 }
 
 /// A one-shot, pre-armed watcher for the systemd Manager.JobRemoved signal.
@@ -352,9 +355,12 @@ impl NixSystemdReadOnlyObserverV1 {
         let expected_unit = canonical_unit(unit)?;
         let manager_owner = self.systemd_manager_owner().await?;
         let object_path = self.resolve_service_unit(&expected_unit).await?;
-        let identity = self
+        let (identity, need_daemon_reload) = self
             .read_definition_identity(&object_path, &expected_unit)
             .await?;
+        if need_daemon_reload {
+            return Err(NixSystemdObserverErrorV1::DefinitionNeedsDaemonReload);
+        }
 
         let source_identity_digest = identity
             .digest(&expected_unit)
@@ -369,9 +375,12 @@ impl NixSystemdReadOnlyObserverV1 {
 
         let post_owner = self.systemd_manager_owner().await?;
         let post_object_path = self.resolve_service_unit(&expected_unit).await?;
-        let post_identity = self
+        let (post_identity, post_need_daemon_reload) = self
             .read_definition_identity(&post_object_path, &expected_unit)
             .await?;
+        if post_need_daemon_reload {
+            return Err(NixSystemdObserverErrorV1::DefinitionNeedsDaemonReload);
+        }
         let post_identity_digest = post_identity
             .digest(&expected_unit)
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
@@ -401,12 +410,15 @@ impl NixSystemdReadOnlyObserverV1 {
         &self,
         object_path: &OwnedObjectPath,
         expected_unit: &str,
-    ) -> Result<NixSystemdUnitDefinitionIdentityV1, NixSystemdObserverErrorV1> {
+    ) -> Result<(NixSystemdUnitDefinitionIdentityV1, bool), NixSystemdObserverErrorV1> {
         validate_unit_object_path(object_path)?;
         let properties = self
             .get_all_properties(object_path, SYSTEMD_UNIT_INTERFACE)
             .await?;
-        build_definition_identity_from_properties(&properties, expected_unit)
+        let identity = build_definition_identity_from_properties(&properties, expected_unit)?;
+        let need_daemon_reload =
+            required_bool(&properties, SYSTEMD_UNIT_INTERFACE, "NeedDaemonReload")?;
+        Ok((identity, need_daemon_reload))
     }
 
     /// Arm the JobRemoved observation channel before any effect is dispatched.
@@ -844,6 +856,20 @@ fn required_string(
     interface: &'static str,
     property: &'static str,
 ) -> Result<String, NixSystemdObserverErrorV1> {
+    required_value(properties, interface, property)?
+        .clone()
+        .try_into()
+        .map_err(|_| NixSystemdObserverErrorV1::InvalidPropertyType {
+            interface,
+            property,
+        })
+}
+
+fn required_bool(
+    properties: &HashMap<String, OwnedValue>,
+    interface: &'static str,
+    property: &'static str,
+) -> Result<bool, NixSystemdObserverErrorV1> {
     required_value(properties, interface, property)?
         .clone()
         .try_into()
