@@ -498,18 +498,28 @@ impl RollingOriginRelationalPredictionQualification {
         }
 
         let observed = RollingOriginRelationalPredictionSummary::compute(samples, config)?;
-        let segment_total = config.train_samples
-            + config.gap_samples
-            + config.test_samples;
+        let segment_total = config
+            .train_samples
+            .checked_add(config.gap_samples)
+            .and_then(|value| value.checked_add(config.test_samples))
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
 
         let mut circular_shift_nulls = Vec::with_capacity(config.origin_count);
         let mut feature_decoupling_nulls = Vec::with_capacity(config.origin_count);
         let mut incremental_relational_nulls = Vec::with_capacity(config.origin_count);
 
         for origin in 0..config.origin_count {
-            let start = config.first_origin + origin * config.step_samples;
-            let end = start + segment_total;
-            let segment = &samples[start..end];
+            let start = config
+                .step_samples
+                .checked_mul(origin)
+                .and_then(|offset| config.first_origin.checked_add(offset))
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let end = start
+                .checked_add(segment_total)
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let segment = samples
+                .get(start..end)
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
             let held_out_config = HeldOutRelationalPredictionConfig {
                 train_samples: config.train_samples,
                 test_samples: config.test_samples,
