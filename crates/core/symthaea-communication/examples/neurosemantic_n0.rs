@@ -115,11 +115,38 @@ fn main() -> Result<(), String> {
         lease_id: lease.lease_id.clone(),
     };
     message.validate(&lease, 1_500)?;
+    let signing_key = ed25519_dalek::SigningKey::from_bytes(&[7u8; 32]);
+    let policy_fingerprint = message.packet.data_policy.handling.fingerprint_for_attestation();
+    let authority_message = NeurosemanticPolicyAuthorityAttestation::message_bytes(
+        "mycelix-policy-authority",
+        "test-key-1",
+        &policy_fingerprint,
+        &message.packet.data_policy.handling.policy_provenance_hash,
+        1_000,
+        2_000,
+    )?;
+    let authority_attestation = NeurosemanticPolicyAuthorityAttestation {
+        schema_version: symthaea_communication::NEUROSEMANTIC_POLICY_ATTESTATION_SCHEMA_VERSION,
+        authority_ref: "mycelix-policy-authority".into(),
+        key_ref: "test-key-1".into(),
+        handling_policy_fingerprint: policy_fingerprint,
+        policy_provenance_hash: message.packet.data_policy.handling.policy_provenance_hash.clone(),
+        issued_at_unix_s: 1_000,
+        expires_at_unix_s: 2_000,
+        signature: ed25519_dalek::Signer::sign(&signing_key, &authority_message)
+            .to_bytes()
+            .to_vec(),
+    };
     let policy_provenance_binding: NeurosemanticPolicyProvenanceBinding = message
         .packet
         .data_policy
         .handling
-        .bind_policy_provenance_bytes(b"synthetic-policy-record-1")?;
+        .bind_policy_provenance_with_attestation(
+            b"synthetic-policy-record-1",
+            &authority_attestation,
+            &signing_key.verifying_key(),
+            1_500,
+        )?;
     let handling_policy_provenance_present = !message
         .packet
         .data_policy

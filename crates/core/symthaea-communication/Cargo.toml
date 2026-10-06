@@ -13,6 +13,7 @@ hdc-codec = ["dep:symthaea-core"]
 serde = { workspace = true }
 serde_json = { workspace = true }
 blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
 clap = { workspace = true }
 hound = { workspace = true }
 symthaea-core = { path = "../symthaea-core", default-features = false, optional = true }

@@ -4,6 +4,7 @@
 //! This is not a claim that arbitrary thoughts can be decoded or written.
 
 use crate::{content_hash, RepresentationFamily};
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -27,6 +28,11 @@ pub const MAX_NEUROSEMANTIC_DESTINATION_JURISDICTIONS: usize = 16;
 
 const NEUROSEMANTIC_POLICY_PROVENANCE_DOMAIN: &[u8] =
     b"symthaea-neurosemantic-policy-provenance-v1\0";
+const NEUROSEMANTIC_POLICY_ATTESTATION_DOMAIN: &[u8] =
+    b"symthaea-neurosemantic-policy-attestation-v1\0";
+const MAX_NEUROSEMANTIC_AUTHORITY_REF_BYTES: usize = 4096;
+const MAX_NEUROSEMANTIC_AUTHORITY_KEY_REF_BYTES: usize = 4096;
+const MAX_NEUROSEMANTIC_AUTHORITY_SIGNATURE_BYTES: usize = 64;
 
 /// Representation channel used for routing and authorization.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -148,11 +154,111 @@ impl Default for NeurosemanticHandlingPolicy {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticPolicyAuthorityAttestation {
+    pub schema_version: u16,
+    /// External authority identifier. Symthaea does not establish trust in this
+    /// identifier; the deployment trust layer must map it to an authorized issuer.
+    pub authority_ref: String,
+    /// External key identifier used by the authority's trust registry.
+    pub key_ref: String,
+    /// Exact policy fingerprint that the authority attests.
+    pub handling_policy_fingerprint: String,
+    /// Exact provenance digest that the authority attests.
+    pub policy_provenance_hash: String,
+    /// Inclusive validity start for the attestation.
+    pub issued_at_unix_s: u64,
+    /// Exclusive validity end for the attestation.
+    pub expires_at_unix_s: u64,
+    /// Ed25519 signature over the domain-separated attestation message.
+    pub signature: Vec<u8>,
+}
+
+pub const NEUROSEMANTIC_POLICY_ATTESTATION_SCHEMA_VERSION: u16 = 1;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NeurosemanticPolicyProvenanceBinding {
     policy_provenance_ref: String,
     policy_provenance_hash: String,
     handling_policy_fingerprint: String,
+    authority_ref: String,
+    key_ref: String,
+    attestation_fingerprint: String,
+    attestation_expires_at_unix_s: u64,
+}
+
+impl NeurosemanticPolicyAuthorityAttestation {
+    pub fn message_bytes(
+        authority_ref: &str,
+        key_ref: &str,
+        handling_policy_fingerprint: &str,
+        policy_provenance_hash: &str,
+        issued_at_unix_s: u64,
+        expires_at_unix_s: u64,
+    ) -> Result<Vec<u8>, String> {
+        if !valid_identifier(authority_ref)
+            || authority_ref.len() > MAX_NEUROSEMANTIC_AUTHORITY_REF_BYTES
+            || !valid_identifier(key_ref)
+            || key_ref.len() > MAX_NEUROSEMANTIC_AUTHORITY_KEY_REF_BYTES
+            || !valid_blake3_digest(handling_policy_fingerprint)
+            || !valid_blake3_digest(policy_provenance_hash)
+            || issued_at_unix_s >= expires_at_unix_s
+        {
+            return Err("neurosemantic authority attestation fields are invalid".into());
+        }
+        let mut bytes = Vec::with_capacity(256);
+        bytes.extend_from_slice(NEUROSEMANTIC_POLICY_ATTESTATION_DOMAIN);
+        for value in [authority_ref.as_bytes(), key_ref.as_bytes(), handling_policy_fingerprint.as_bytes(), policy_provenance_hash.as_bytes()] {
+            bytes.extend_from_slice(&(value.len() as u64).to_le_bytes());
+            bytes.extend_from_slice(value);
+        }
+        bytes.extend_from_slice(&issued_at_unix_s.to_le_bytes());
+        bytes.extend_from_slice(&expires_at_unix_s.to_le_bytes());
+        Ok(bytes)
+    }
+
+    pub fn verify(
+        &self,
+        expected_policy_fingerprint: &str,
+        expected_policy_provenance_hash: &str,
+        verifying_key: &VerifyingKey,
+        now_unix_s: u64,
+    ) -> Result<(), String> {
+        if self.schema_version != NEUROSEMANTIC_POLICY_ATTESTATION_SCHEMA_VERSION
+            || self.handling_policy_fingerprint != expected_policy_fingerprint
+            || self.policy_provenance_hash != expected_policy_provenance_hash
+            || !valid_identifier(&self.authority_ref)
+            || !valid_identifier(&self.key_ref)
+            || self.signature.len() != MAX_NEUROSEMANTIC_AUTHORITY_SIGNATURE_BYTES
+            || now_unix_s < self.issued_at_unix_s
+            || now_unix_s >= self.expires_at_unix_s
+        {
+            return Err("neurosemantic authority attestation is invalid or outside its validity interval".into());
+        }
+        let message = Self::message_bytes(
+            &self.authority_ref,
+            &self.key_ref,
+            &self.handling_policy_fingerprint,
+            &self.policy_provenance_hash,
+            self.issued_at_unix_s,
+            self.expires_at_unix_s,
+        )?;
+        let signature_bytes: [u8; 64] = self.signature.as_slice()
+            .try_into()
+            .map_err(|_| "neurosemantic authority signature has invalid length".to_string())?;
+        let signature = Signature::from_bytes(&signature_bytes);
+        verifying_key
+            .verify(&message, &signature)
+            .map_err(|_| "neurosemantic authority signature verification failed".to_string())
+    }
+
+    fn fingerprint(&self) -> Result<String, String> {
+        let mut canonical = self.clone();
+        canonical.signature.clear();
+        let bytes = serde_json::to_vec(&canonical)
+            .map_err(|error| format!("authority attestation serialization: {error}"))?;
+        Ok(content_hash(&bytes))
+    }
 }
 
 impl NeurosemanticPolicyProvenanceBinding {
@@ -166,6 +272,22 @@ impl NeurosemanticPolicyProvenanceBinding {
 
     pub fn handling_policy_fingerprint(&self) -> &str {
         &self.handling_policy_fingerprint
+    }
+
+    pub fn authority_ref(&self) -> &str {
+        &self.authority_ref
+    }
+
+    pub fn key_ref(&self) -> &str {
+        &self.key_ref
+    }
+
+    pub fn attestation_fingerprint(&self) -> &str {
+        &self.attestation_fingerprint
+    }
+
+    pub fn attestation_expires_at_unix_s(&self) -> u64 {
+        self.attestation_expires_at_unix_s
     }
 }
 
@@ -220,6 +342,43 @@ impl NeurosemanticHandlingPolicy {
             policy_provenance_ref: self.policy_provenance_ref.clone(),
             policy_provenance_hash: self.policy_provenance_hash.clone(),
             handling_policy_fingerprint: self.fingerprint()?,
+            authority_ref: String::new(),
+            key_ref: String::new(),
+            attestation_fingerprint: String::new(),
+            attestation_expires_at_unix_s: u64::MAX,
+        })
+    }
+
+    /// Produce a handling capability only after both external-record binding and
+    /// authority attestation verification succeed.
+    pub fn bind_policy_provenance_with_attestation(
+        &self,
+        record_bytes: &[u8],
+        attestation: &NeurosemanticPolicyAuthorityAttestation,
+        verifying_key: &VerifyingKey,
+        now_unix_s: u64,
+    ) -> Result<NeurosemanticPolicyProvenanceBinding, String> {
+        if !self.validates() {
+            return Err("neurosemantic policy provenance state is invalid".into());
+        }
+        if record_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err("neurosemantic policy provenance record exceeds the serialized artifact limit".into());
+        }
+        let policy_fingerprint = self.fingerprint()?;
+        if compute_policy_provenance_hash(&self.policy_provenance_ref, record_bytes)
+            != self.policy_provenance_hash
+        {
+            return Err("neurosemantic policy provenance reference/record binding mismatch".into());
+        }
+        attestation.verify(&policy_fingerprint, &self.policy_provenance_hash, verifying_key, now_unix_s)?;
+        Ok(NeurosemanticPolicyProvenanceBinding {
+            policy_provenance_ref: self.policy_provenance_ref.clone(),
+            policy_provenance_hash: self.policy_provenance_hash.clone(),
+            handling_policy_fingerprint: policy_fingerprint,
+            authority_ref: attestation.authority_ref.clone(),
+            key_ref: attestation.key_ref.clone(),
+            attestation_fingerprint: attestation.fingerprint()?,
+            attestation_expires_at_unix_s: attestation.expires_at_unix_s,
         })
     }
 
@@ -766,8 +925,12 @@ impl AuthorizedNeurosemanticMessage {
                 != self.packet.data_policy.handling.policy_provenance_hash
             || provenance.handling_policy_fingerprint
                 != self.packet.data_policy.handling.fingerprint()?
+            || provenance.authority_ref.is_empty()
+            || provenance.key_ref.is_empty()
+            || now_unix_s >= provenance.attestation_expires_at_unix_s
+            || provenance.attestation_fingerprint.is_empty()
         {
-            return Err("policy provenance binding does not match the current packet handling policy".into());
+            return Err("policy provenance capability does not match the current policy or is expired".into());
         }
         self.validate(lease, now_unix_s)?;
         if !self.packet.data_policy.allows_handling(
@@ -985,6 +1148,38 @@ mod tests {
             .unwrap()
     }
 
+    fn authority_attestation(
+        policy: &NeurosemanticDataPolicy,
+    ) -> (NeurosemanticPolicyAuthorityAttestation, VerifyingKey) {
+        use ed25519_dalek::{Signer, SigningKey};
+        let signing_key = SigningKey::from_bytes(&[7u8; 32]);
+        let fingerprint = policy.handling.fingerprint().unwrap();
+        let hash = policy.handling.policy_provenance_hash.clone();
+        let message = NeurosemanticPolicyAuthorityAttestation::message_bytes(
+            "mycelix-policy-authority",
+            "test-key-1",
+            &fingerprint,
+            &hash,
+            100,
+            2_000,
+        )
+        .unwrap();
+        let signature = signing_key.sign(&message).to_bytes().to_vec();
+        (
+            NeurosemanticPolicyAuthorityAttestation {
+                schema_version: NEUROSEMANTIC_POLICY_ATTESTATION_SCHEMA_VERSION,
+                authority_ref: "mycelix-policy-authority".into(),
+                key_ref: "test-key-1".into(),
+                handling_policy_fingerprint: fingerprint,
+                policy_provenance_hash: hash,
+                issued_at_unix_s: 100,
+                expires_at_unix_s: 2_000,
+                signature,
+            },
+            signing_key.verifying_key(),
+        )
+    }
+
     fn lease() -> CognitiveConsentLease {
         CognitiveConsentLease {
             lease_id: "lease-1".into(),
@@ -1107,6 +1302,114 @@ mod tests {
         ] {
             assert_eq!(serde_json::to_string(&class).unwrap(), format!("\"{expected}\""));
         }
+    }
+
+    #[test]
+    fn authority_attestation_verifies_exact_policy_and_provenance() {
+        let policy = semantic_policy();
+        let (attestation, verifying_key) = authority_attestation(&policy);
+        assert!(attestation
+            .verify(
+                &policy.handling.fingerprint().unwrap(),
+                &policy.handling.policy_provenance_hash,
+                &verifying_key,
+                150
+            )
+            .is_ok());
+
+        let mut changed = attestation.clone();
+        changed.policy_provenance_hash = compute_policy_provenance_hash(
+            "synthetic-policy-record-1",
+            b"synthetic-policy-record-2",
+        );
+        assert!(changed
+            .verify(
+                &policy.handling.fingerprint().unwrap(),
+                &policy.handling.policy_provenance_hash,
+                &verifying_key,
+                150
+            )
+            .is_err());
+    }
+
+    #[test]
+    fn authority_attestation_expires_and_invalidates_binding() {
+        let policy = semantic_policy();
+        let (attestation, verifying_key) = authority_attestation(&policy);
+        let binding = policy
+            .handling
+            .bind_policy_provenance_with_attestation(
+                b"synthetic-policy-record-1",
+                &attestation,
+                &verifying_key,
+                150,
+            )
+            .unwrap();
+        assert_eq!(binding.authority_ref(), "mycelix-policy-authority");
+        assert!(policy
+            .handling
+            .bind_policy_provenance_with_attestation(
+                b"synthetic-policy-record-1",
+                &attestation,
+                &verifying_key,
+                2_000,
+            )
+            .is_err());
+    }
+
+    #[test]
+    fn handling_rejects_stale_or_unattested_provenance_capability() {
+        let policy = semantic_policy();
+        let (attestation, verifying_key) = authority_attestation(&policy);
+        let binding = policy
+            .handling
+            .bind_policy_provenance_with_attestation(
+                b"synthetic-policy-record-1",
+                &attestation,
+                &verifying_key,
+                150,
+            )
+            .unwrap();
+        let packet = NeurosemanticPacket::new_with_policy(
+            19,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            policy,
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: lease().consent_epoch,
+            lease_id: lease().lease_id,
+        };
+        assert!(message
+            .validate_for_handling(
+                &lease(),
+                &binding,
+                "ZA",
+                NeurosemanticHandlingAction::Transmit,
+                150,
+            )
+            .is_ok());
+
+        let mut expired = binding.clone();
+        expired.attestation_expires_at_unix_s = 150;
+        assert!(message
+            .validate_for_handling(
+                &lease(),
+                &expired,
+                "ZA",
+                NeurosemanticHandlingAction::Transmit,
+                150,
+            )
+            .is_err());
     }
 
     #[test]
