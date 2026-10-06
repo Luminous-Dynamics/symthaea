@@ -75,7 +75,7 @@ It proves a narrower fact:
 
 > the observer captured and independently committed the bytes of the systemd-reported source files across a checked descriptor-level observation interval, with the source identity and systemd manager incarnation rechecked around the capture.
 
-The qualification result remains Unproven until exact-head Actions complete successfully.
+The qualification result remains Unproven until exact-head Actions complete successfully. A queued, pending, skipped, or mergeable run is not evidence of PASS.
 
 ## Next tranche
 
