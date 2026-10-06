@@ -136,6 +136,7 @@ pub use systemd_lifecycle::{
 pub use service_state::{
     NixServiceEnablementEvidenceV1,
     NixServiceOperationCapabilitiesV1,
+    NixVerifiedServicePreStateV1,
     ServiceLoadStateV1,
     NixServiceObservedStateV1, NixServiceStateErrorV1, ServiceActiveStateV1,
     ServiceUnitFileStateV1,
