@@ -55,7 +55,7 @@ impl NixVerifiedPostStateObservationV1 {
     pub(crate) fn from_observer(
         observation: NixServicePostStateObservationV1,
     ) -> Result<Self, NixPostStateErrorV1> {
-        observation.as_ref().validate_shape()?;
+        observation.validate_shape()?;
         Ok(Self { observation })
     }
 
@@ -99,47 +99,6 @@ pub struct NixSystemdJobEvidenceV1 {
 }
 
 impl NixSystemdJobEvidenceV1 {
-    /// Re-bind a serialized receipt to the trusted typed intent and authorization record.
-    ///
-    /// This is the verifier-side complement to `build`: self-consistency of a
-    /// receipt digest is not enough because an attacker could otherwise replace
-    /// the referenced intent/auth digests and present the mutated receipt to a
-    /// consumer that does not dereference those records.
-    pub fn verify_against(
-        &self,
-        intent: &NixActionIntentV1,
-        authorization: &NixExecutionAuthorizationRecordV1,
-    ) -> Result<(), NixPostStateErrorV1> {
-        self.validate_shape()?;
-
-        let intent_digest = intent
-            .digest()
-            .map_err(|_| NixPostStateErrorV1::InvalidBoundIntent)?;
-        let authorization_digest = authorization
-            .digest()
-            .map_err(|_| NixPostStateErrorV1::InvalidBoundAuthorization)?;
-
-        if authorization.decision != NixAuthorizationDecisionV1::Approved {
-            return Err(NixPostStateErrorV1::AuthorizationNotApproved);
-        }
-        if self.action_intent_digest != intent_digest {
-            return Err(NixPostStateErrorV1::AuthorizationIntentMismatch);
-        }
-        if self.authorization_record_digest != authorization_digest {
-            return Err(NixPostStateErrorV1::AuthorizationRecordMismatch);
-        }
-        if authorization.action_intent_digest != intent_digest {
-            return Err(NixPostStateErrorV1::AuthorizationIntentMismatch);
-        }
-
-        match &intent.action {
-            NixActionDescriptorV1::Service { operation, unit }
-                if *operation == self.operation && unit == &self.target_unit => {}
-            _ => return Err(NixPostStateErrorV1::IntentEffectMismatch),
-        }
-        Ok(())
-    }
-
     pub fn validate_shape(&self) -> Result<(), NixPostStateErrorV1> {
         if self.id == 0 {
             return Err(NixPostStateErrorV1::InvalidJobId);
@@ -500,6 +459,45 @@ impl NixPostStateReceiptV1 {
         };
         receipt.validate_shape()?;
         Ok(receipt)
+    }
+
+    /// Re-bind a serialized receipt to the trusted typed intent and authorization record.
+    ///
+    /// Self-consistency of a receipt is insufficient: the referenced records
+    /// are the trust anchors and must be checked independently.
+    pub fn verify_against(
+        &self,
+        intent: &NixActionIntentV1,
+        authorization: &NixExecutionAuthorizationRecordV1,
+    ) -> Result<(), NixPostStateErrorV1> {
+        self.validate_shape()?;
+
+        let intent_digest = intent
+            .digest()
+            .map_err(|_| NixPostStateErrorV1::InvalidBoundIntent)?;
+        let authorization_digest = authorization
+            .digest()
+            .map_err(|_| NixPostStateErrorV1::InvalidBoundAuthorization)?;
+
+        if authorization.decision != NixAuthorizationDecisionV1::Approved {
+            return Err(NixPostStateErrorV1::AuthorizationNotApproved);
+        }
+        if self.action_intent_digest != intent_digest {
+            return Err(NixPostStateErrorV1::AuthorizationIntentMismatch);
+        }
+        if self.authorization_record_digest != authorization_digest {
+            return Err(NixPostStateErrorV1::AuthorizationRecordMismatch);
+        }
+        if authorization.action_intent_digest != intent_digest {
+            return Err(NixPostStateErrorV1::AuthorizationIntentMismatch);
+        }
+
+        match &intent.action {
+            NixActionDescriptorV1::Service { operation, unit }
+                if *operation == self.operation && unit == &self.target_unit => {}
+            _ => return Err(NixPostStateErrorV1::IntentEffectMismatch),
+        }
+        Ok(())
     }
 
     pub fn validate_shape(&self) -> Result<(), NixPostStateErrorV1> {
