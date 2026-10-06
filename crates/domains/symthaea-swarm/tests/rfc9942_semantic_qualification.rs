@@ -301,6 +301,32 @@ fn rfc9942_vdp_array_count_resource_limit_is_typed() {
 }
 
 #[test]
+fn rfc9942_nested_receipt_collection_resource_limit_is_preserved() {
+    let mut nested_receipt = vec![0xd2, 0x84];
+    nested_receipt.extend_from_slice(&[0x41, 0xa0]);
+    nested_receipt.push(0xa1);
+    nested_receipt.extend_from_slice(&[0x19, 0x01, 0x8a, 0x91]);
+    nested_receipt.extend(std::iter::repeat_n(0x40, 17));
+    nested_receipt.extend_from_slice(&[0xf6, 0x40]);
+
+    assert!(nested_receipt.len() < 256);
+
+    let mut outer = vec![0xd2, 0x84];
+    outer.extend_from_slice(&[0x41, 0xa0]);
+    outer.push(0xa1);
+    outer.extend_from_slice(&[0x19, 0x01, 0x8a, 0x81]);
+    outer.push(0x58);
+    outer.push(nested_receipt.len() as u8);
+    outer.extend_from_slice(&nested_receipt);
+    outer.extend_from_slice(&[0xf6, 0x40]);
+
+    assert_eq!(
+        Rfc9942SignatureWithReceipts::from_cbor(&outer),
+        Err(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded)
+    );
+}
+
+#[test]
 fn rfc9942_receipt_count_resource_limit_is_typed() {
     let mut encoded = vec![
         0xd2, 0x84, // COSE_Sign1
