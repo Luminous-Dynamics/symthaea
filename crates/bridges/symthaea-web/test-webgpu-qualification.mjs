@@ -1550,23 +1550,6 @@ async function runMode(mode) {
           'capability',
         );
       }
-      if (hardwareMode) {
-        for (const [canvas, configuration] of Object.entries(diagnostics.surface_configuration)) {
-          const snapshots = configuration.adapter_history || [];
-          if (snapshots.some(snapshot => snapshot.device_type === 'Cpu')) {
-            throw new QualificationError(
-              `WebGPU hardware qualification renderer selected a software adapter for ${canvas} during recovery: ${JSON.stringify(configuration)}`,
-              'capability',
-            );
-          }
-          if (snapshots.some(snapshot => !snapshot.name || !snapshot.device_type)) {
-            throw new QualificationError(
-              `WebGPU hardware qualification lacks adapter provenance for ${canvas} across recovery: ${JSON.stringify(configuration)}`,
-              'capability',
-            );
-          }
-        }
-      }
       if (!diagnostics.raw_webgpu_execution_canary?.executed_red) {
         throw new QualificationError(
           `Raw WebGPU execution canary failed: ${JSON.stringify(diagnostics.raw_webgpu_execution_canary)}`,
@@ -1740,6 +1723,24 @@ async function runMode(mode) {
       const expectedRendererFormat =
         expectedWgpuSurfaceFormat(diagnostics.browser_preferred_canvas_format);
       diagnostics.surface_configuration_expected_format = expectedRendererFormat;
+      if (hardwareMode) {
+
+        for (const [canvas, configuration] of Object.entries(diagnostics.surface_configuration)) {
+          const snapshots = configuration.adapter_history || [];
+          if (snapshots.some(snapshot => snapshot.device_type === 'Cpu')) {
+            throw new QualificationError(
+              `WebGPU hardware qualification renderer selected a software adapter for ${canvas} during recovery: ${JSON.stringify(configuration)}`,
+              'capability',
+            );
+          }
+          if (snapshots.some(snapshot => !snapshot.name || !snapshot.device_type)) {
+            throw new QualificationError(
+              `WebGPU hardware qualification lacks adapter provenance for ${canvas} across recovery: ${JSON.stringify(configuration)}`,
+              'capability',
+            );
+          }
+        }
+      }
       for (const [canvas, configuration] of Object.entries(diagnostics.surface_configuration)) {
         if (!configuration.selected_format_advertised
           || !configuration.selected_format_preferred
