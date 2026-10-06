@@ -22,7 +22,7 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 
 const SCHEMA_VERSION: u16 = 1;
-const CROSS_PROCESS_LOCK_PATH: &str = "/run/sovereign/system-mutation.lock";
+const CROSS_PROCESS_LOCK_PATH: &str = "/run/nixforhumanity-system-mutation.lock";
 
 #[derive(Debug)]
 pub(crate) struct MutationLease {
