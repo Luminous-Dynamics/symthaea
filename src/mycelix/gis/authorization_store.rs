@@ -690,6 +690,32 @@ fn backfill_native_replay_history(
             ));
         }
 
+        match (
+            native_authority_namespace.filter(|value| !value.is_empty()),
+            native_authorization_id.filter(|value| !value.is_empty()),
+            native_replay_derivation_digest.filter(|value| !value.is_empty()),
+        ) {
+            (None, None, None) => {}
+            (Some(namespace), Some(native_id), Some(derivation_digest)) => {
+                let derived = super::NativeReplayDerivation::derive(namespace, native_id)
+                    .map_err(|_| AuthorizationStoreError::InvalidState(
+                        "invalid native replay derivation witness during history backfill".into()
+                    ))?;
+                if derived.native_replay_identity != native_replay_identity
+                    || derived.derivation_digest != derivation_digest
+                {
+                    return Err(AuthorizationStoreError::InvalidState(
+                        "native replay history derivation mismatch during history backfill".into(),
+                    ));
+                }
+            }
+            _ => {
+                return Err(AuthorizationStoreError::InvalidState(
+                    "partial native replay derivation witness during history backfill".into(),
+                ));
+            }
+        }
+
         let existing: Option<(
             String, String, String, String,
             Option<String>, Option<String>, Option<String>,
@@ -826,6 +852,48 @@ fn backfill_native_replay_history(
     }
 
     tx.commit()?;
+    Ok(())
+}
+
+const NATIVE_REPLAY_HISTORY_BACKFILL_KEY: &str =
+    "authorization_native_replay_history_backfill_version";
+const NATIVE_REPLAY_HISTORY_BACKFILL_VERSION: &str = "v1";
+
+fn validate_native_replay_history_references(
+    connection: &Connection,
+) -> Result<(), AuthorizationStoreError> {
+    let missing: Option<String> = connection
+        .query_row(
+            "SELECT native_replay_identity
+             FROM authorization_dispatches
+             WHERE native_replay_identity IS NOT NULL
+               AND native_replay_identity <> ''
+               AND NOT EXISTS(
+                   SELECT 1
+                   FROM authorization_native_replay_history h
+                   WHERE h.native_replay_identity=authorization_dispatches.native_replay_identity
+               )
+             UNION ALL
+             SELECT native_replay_identity
+             FROM authorization_terminal_evidence
+             WHERE native_replay_identity IS NOT NULL
+               AND native_replay_identity <> ''
+               AND NOT EXISTS(
+                   SELECT 1
+                   FROM authorization_native_replay_history h
+                   WHERE h.native_replay_identity=authorization_terminal_evidence.native_replay_identity
+               )
+             LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+
+    if let Some(native_replay_identity) = missing {
+        return Err(AuthorizationStoreError::InvalidState(format!(
+            "native replay history missing for persisted lifecycle record: {native_replay_identity}"
+        )));
+    }
     Ok(())
 }
 
@@ -1810,11 +1878,51 @@ impl SqliteAuthorizationStore {
             }
         }
         tx.commit()?;
-        // Backfill only after legacy relying-party fields have been normalized.
-        // The replay ledger is then a stable historical authority even when
-        // those source rows are later compacted.
-        backfill_native_replay_history(&mut connection)?;
-        validate_native_replay_history_records(&connection)?;
+
+        // The one-time migration/backfill is explicitly distinguished from
+        // subsequent opens. Once the replay ledger has been established for
+        // this database generation, a missing row is corruption rather than a
+        // repair opportunity: recreating it from a remaining lifecycle view
+        // would allow that non-authoritative view to become the replay authority
+        // across restart.
+        let replay_history_backfill_version: Option<String> = connection
+            .query_row(
+                "SELECT value
+                 FROM authorization_store_metadata
+                 WHERE key=?1",
+                params![NATIVE_REPLAY_HISTORY_BACKFILL_KEY],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        match replay_history_backfill_version.as_deref() {
+            Some(NATIVE_REPLAY_HISTORY_BACKFILL_VERSION) => {
+                validate_native_replay_history_references(&connection)?;
+                validate_native_replay_history_records(&connection)?;
+            }
+            Some(other) => {
+                return Err(AuthorizationStoreError::InvalidState(format!(
+                    "unsupported native replay history backfill version: {other}"
+                )));
+            }
+            None => {
+                // Backfill only after legacy relying-party fields have been
+                // normalized. The replay ledger is then a stable historical
+                // authority even when those source rows are later compacted.
+                backfill_native_replay_history(&mut connection)?;
+                validate_native_replay_history_references(&connection)?;
+                validate_native_replay_history_records(&connection)?;
+                connection.execute(
+                    "INSERT INTO authorization_store_metadata(key,value)
+                     VALUES(?1,?2)",
+                    params![
+                        NATIVE_REPLAY_HISTORY_BACKFILL_KEY,
+                        NATIVE_REPLAY_HISTORY_BACKFILL_VERSION,
+                    ],
+                )?;
+            }
+        }
+
         // Install replay-owner guards only after legacy normalization and replay
         // history backfill, so migration itself cannot trip the new invariant.
         connection.execute_batch(
