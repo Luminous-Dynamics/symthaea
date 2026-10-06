@@ -2628,12 +2628,26 @@ fn finalize_transaction(
     }
 }
 
+fn install_process_command_matches(transaction_id: &str, cmdline: &[u8]) -> bool {
+    if transaction_id.len() != 32
+        || !transaction_id.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return false;
+    }
+    let expected_script = format!("/tmp/symthaea-install-{}.sh", transaction_id);
+    cmdline
+        .split(|byte| *byte == 0)
+        .any(|arg| arg == expected_script.as_bytes())
+}
+
 async fn install_process_is_alive(transaction_id: &str) -> bool {
-    if transaction_id.len() != 32 || !transaction_id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+    if transaction_id.len() != 32
+        || !transaction_id.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
         return false;
     }
     let pid_path = format!("/tmp/symthaea-install-{}.pid", transaction_id);
-    let pid_text = match tokio::fs::read_to_string(pid_path).await {
+    let pid_text = match tokio::fs::read_to_string(&pid_path).await {
         Ok(value) => value,
         Err(_) => return false,
     };
@@ -2641,6 +2655,29 @@ async fn install_process_is_alive(transaction_id: &str) -> bool {
         Ok(pid) if pid > 0 => pid,
         _ => return false,
     };
+
+    let proc_root = format!("/proc/{pid}");
+    let cmdline = match tokio::fs::read(format!("{proc_root}/cmdline")).await {
+        Ok(value) => value,
+        Err(_) => return false,
+    };
+    if !install_process_command_matches(transaction_id, &cmdline) {
+        return false;
+    }
+
+    // A zombie can still satisfy kill(pid, 0), but it is no longer executing
+    // the install. Treat it as not running and let the recovery state remain
+    // uncertain until a terminal journal event exists.
+    if let Ok(status) = tokio::fs::read_to_string(format!("{proc_root}/status")).await {
+        if status
+            .lines()
+            .any(|line| line.starts_with("State:") && line.contains("(zombie)"))
+        {
+            return false;
+        }
+    } else {
+        return false;
+    }
 
     match unsafe { libc::kill(pid, 0) } {
         0 => true,
@@ -7033,6 +7070,22 @@ mod tests {
         assert_ne!(first.transaction_id, second.transaction_id);
         assert_eq!(first.request_digest, second.request_digest);
         assert_eq!(first.transaction_id.len(), 32);
+    }
+
+    #[test]
+    fn install_process_identity_matches_only_its_transaction_script() {
+        let request_id = "0123456789abcdef0123456789abcdef";
+        let exact = format!(
+            "bash\0/tmp/symthaea-install-{request_id}.sh\0"
+        );
+        let other = b"bash\0/tmp/symthaea-install-ffffffffffffffffffffffffffffffff.sh\0";
+        let lookalike = format!(
+            "bash\0/tmp/symthaea-install-{request_id}-attacker.sh\0"
+        );
+        assert!(install_process_command_matches(request_id, exact.as_bytes()));
+        assert!(!install_process_command_matches(request_id, other));
+        assert!(!install_process_command_matches(request_id, lookalike.as_bytes()));
+        assert!(!install_process_command_matches("not-a-valid-id", exact.as_bytes()));
     }
 
     #[test]
