@@ -368,6 +368,9 @@ impl NixPostStateStabilityEvidenceV1 {
         if self.samples.len() < 2 {
             return Err(NixPostStateErrorV1::InsufficientStabilitySamples);
         }
+        if self.samples.len() > 64 {
+            return Err(NixPostStateErrorV1::TooManyStabilitySamples);
+        }
         validate_digest(&self.sequence_digest, "stability sequence digest")?;
 
         for sample in &self.samples {
@@ -1019,8 +1022,6 @@ fn claim_tag(claim: NixPostStateClaimV1) -> u8 {
 fn validate_unique_manager_owner(value: &str) -> Result<(), NixPostStateErrorV1> {
     // D-Bus unique connection names begin with ':' and contain at least two
     // non-empty dot-separated elements. Their maximum name length is 255.
-    // This mirrors the wire-level identity constraint without making the
-    // always-built evidence crate depend on zbus.
     if value.is_empty() || value.len() > 255 || !value.starts_with(':') {
         return Err(NixPostStateErrorV1::InvalidManagerOwner);
     }
@@ -1039,31 +1040,6 @@ fn validate_unique_manager_owner(value: &str) -> Result<(), NixPostStateErrorV1>
         }
     }
     Ok(())
-}
-
-fn validate_unique_manager_owner(value: &str) -> Result<(), NixPostStateErrorV1> {
-    if value.is_empty() || value.len() > 255 || !value.starts_with(':') {
-        return Err(NixPostStateErrorV1::InvalidManagerOwner);
-    }
-    let mut elements = value[1..].split('.');
-    let first = elements.next().unwrap_or_default();
-    if first.is_empty() || elements.next().is_none() {
-        return Err(NixPostStateErrorV1::InvalidManagerOwner);
-    }
-    for element in std::iter::once(first).chain(elements) {
-        if element.is_empty()
-            || !element
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
-        {
-            return Err(NixPostStateErrorV1::InvalidManagerOwner);
-        }
-    }
-    Ok(())
-}
-
-fn validate_unique_manager_owner(value: &str) -> Result<(), NixPostStateErrorV1> {
-    validate_unique_manager_owner(value)
 }
 
 fn validate_systemd_unit_object_path(value: &str) -> Result<(), NixPostStateErrorV1> {
