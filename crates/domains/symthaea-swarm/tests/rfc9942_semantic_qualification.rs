@@ -10,6 +10,7 @@ use symthaea_swarm::semantic_evidence_vds::{
     Rfc9162ConsistencyProof, Rfc9162InclusionProof, Rfc9942VdpError, Rfc9942Vdp,
     Rfc9942ReceiptCollection, Rfc9942VerifiedProof, Rfc9162Sha256Vds,
     Rfc9942Es256CoseKey, COSE_ES256_ALGORITHM_ID,
+    MAX_RFC9942_COSE_KEY_ENCODED_BYTES,
 };
 use ring::{rand::SystemRandom, signature::{EcdsaKeyPair, KeyPair}};
 use sha2::Digest;
@@ -1572,6 +1573,29 @@ fn rfc9942_es256_key_key_ops_resource_limit_is_typed() {
     );
 }
 
+
+#[test]
+fn rfc9942_es256_key_aggregate_map_resource_limit_is_typed() {
+    // Each extension value is individually within the 4 KiB opaque-value
+    // decoder bound, but four such values plus map framing exceed the 16 KiB
+    // aggregate COSE_Key admission budget. This proves the aggregate budget
+    // cannot be bypassed by splitting hostile material across entries.
+    let mut encoded = vec![0xa4];
+    for label in 1000i64..1004 {
+        encoded.extend_from_slice(&[0x19, (label >> 8) as u8, label as u8]);
+        encoded.extend_from_slice(&[0x59, 0x10, 0x00]);
+        encoded.extend(std::iter::repeat_n(0x00, 4096));
+    }
+
+    assert!(
+        encoded.len() > MAX_RFC9942_COSE_KEY_ENCODED_BYTES,
+        "regression wire must exceed aggregate key budget"
+    );
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&encoded),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
 
 #[test]
 fn rfc9942_receipt_crit_array_resource_limit_is_typed() {
