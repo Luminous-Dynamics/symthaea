@@ -831,10 +831,13 @@ fn extract_verification_method(
     let base = url::Url::parse(document_ref)
         .map_err(|_| SnapshotError::Malformed("controller document id must be a valid URL".into()))?;
 
-    if let Some(methods) = document
-        .get("verificationMethod")
-        .and_then(Value::as_array)
-    {
+    if let Some(value) = document.get("verificationMethod") {
+        let methods = value.as_array().ok_or_else(|| {
+            SnapshotError::Malformed(
+                "controller document verificationMethod must be an array when present".into(),
+            )
+        })?;
+
         let mut all_ids = std::collections::HashSet::new();
         for method in methods {
             let object = method.as_object().ok_or_else(|| {
@@ -1548,6 +1551,34 @@ mod tests {
                     if message.contains(expected_message)
             ));
         }
+    }
+
+    #[test]
+    fn verification_method_property_must_be_array_when_present() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "verificationMethod": {
+                "id": "https://example.test/controller#key-1",
+                "type": "Multikey",
+                "controller": "https://example.test/controller",
+                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+            },
+            "assertionMethod": ["https://example.test/controller#key-1"]
+        }"##.into();
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter = JsonControllerDocumentSnapshotAdapter::new(
+            "/tmp/does-not-matter",
+            reference,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("verificationMethod must be an array")
+        ));
     }
 
     #[test]
