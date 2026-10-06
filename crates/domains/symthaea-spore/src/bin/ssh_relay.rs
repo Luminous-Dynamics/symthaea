@@ -2592,6 +2592,27 @@ fn finalize_transaction(
     }
 }
 
+async fn install_process_is_alive(transaction_id: &str) -> bool {
+    if transaction_id.len() != 32 || !transaction_id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return false;
+    }
+    let pid_path = format!("/tmp/symthaea-install-{}.pid", transaction_id);
+    let pid_text = match tokio::fs::read_to_string(pid_path).await {
+        Ok(value) => value,
+        Err(_) => return false,
+    };
+    let pid = match pid_text.trim().parse::<i32>() {
+        Ok(pid) if pid > 0 => pid,
+        _ => return false,
+    };
+
+    match unsafe { libc::kill(pid, 0) } {
+        0 => true,
+        -1 => std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM),
+        _ => false,
+    }
+}
+
 async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin>(
     ws_stream: tokio_tungstenite::WebSocketStream<S>,
     peer_addr: String,
@@ -2755,6 +2776,73 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                             .await;
                     }
                 }
+            }
+
+            "check_install_status" => {
+                let receipt = match transaction_ledger.lookup(&client_msg.request_id) {
+                    Ok(Some(receipt)) => receipt,
+                    Ok(None) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "install_status",
+                                    "data": serde_json::json!({"status": "none"}).to_string()
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to read transaction recovery state: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                if receipt.mutation != MutationKind::Install {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error("Request id does not identify an install transaction")
+                                .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                let status = match receipt.outcome {
+                    TransactionOutcome::ObservedSuccess => "complete",
+                    TransactionOutcome::Failed => "failed",
+                    TransactionOutcome::Indeterminate => {
+                        if install_process_is_alive(&receipt.transaction_id).await {
+                            "running"
+                        } else {
+                            "uncertain"
+                        }
+                    }
+                };
+
+                let _ = ws_tx
+                    .send(Message::Text(
+                        serde_json::json!({
+                            "type": "install_status",
+                            "data": serde_json::json!({
+                                "status": status,
+                                "transaction_id": receipt.transaction_id,
+                                "request_id": receipt.request_id,
+                            }).to_string(),
+                            "transaction": receipt
+                        })
+                        .to_string(),
+                    ))
+                    .await;
             }
 
             "install" => {
