@@ -197,6 +197,7 @@ echo "  VM relay token: ${RELAY_TOKEN:0:8}..."
 echo "Exercising authenticated install protocol against the VM-local relay..."
 RELAY_TOKEN="$RELAY_TOKEN" RELAY_PORT="$RELAY_PORT" python3 - <<'PYEOF'
 import asyncio
+import uuid
 import json
 import os
 
@@ -255,6 +256,7 @@ async def main():
 
         await ws.send(json.dumps({
             "action": "install",
+            "request_id": uuid.uuid4().hex,
             "layout": "single",
             "disk": "/dev/vda",
             "hostname": "e2e-test",
