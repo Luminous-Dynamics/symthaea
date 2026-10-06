@@ -10,6 +10,8 @@
 //! - JSON output mode for structured results
 
 use crate::action::authorization::NixLocalExecutionAuthorityV1;
+#[cfg(feature = "systemd-observer")]
+use crate::action::NixSystemdReadOnlyObserverV1;
 use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use crate::action::service_manager::ServiceManager;
 use crate::action::service_state::NixServiceObservedStateV1;
@@ -1021,6 +1023,18 @@ impl NixOSExecutor {
                 u64::from(actual_generation),
                 &observed,
             )?;
+
+            #[cfg(feature = "systemd-observer")]
+            self.validate_authorized_service_definition_content(&authority, unit)
+                .await?;
+
+            #[cfg(not(feature = "systemd-observer"))]
+            return Err(
+                "typed Service execution requires the systemd read-only observer capability"
+                    .to_string(),
+            );
+
+            #[cfg(feature = "systemd-observer")]
             return Ok(());
         }
 
@@ -1039,6 +1053,53 @@ impl NixOSExecutor {
                 expected_generation, actual_generation
             ));
         }
+        Ok(())
+    }
+
+    #[cfg(feature = "systemd-observer")]
+    async fn validate_authorized_service_definition_content(
+        &mut self,
+        authority: &NixLocalExecutionAuthorityV1,
+        unit: &str,
+    ) -> Result<(), String> {
+        if self.dry_run {
+            return Ok(());
+        }
+
+        let expected_digest = authority
+            .service_definition_content_digest()
+            .ok_or_else(|| {
+                "Service execution authority has no bound definition-content commitment"
+                    .to_string()
+            })?;
+
+        let observer = NixSystemdReadOnlyObserverV1::connect_system()
+            .await
+            .map_err(|error| {
+                format!(
+                    "could not connect read-only systemd observer for definition revalidation: {error}"
+                )
+            })?;
+
+        let content = observer
+            .capture_service_definition_content(unit)
+            .await
+            .map_err(|error| {
+                format!("could not revalidate service definition content: {error}")
+            })?;
+        let actual_digest = content
+            .digest()
+            .map_err(|error| {
+                format!("could not digest revalidated service definition content: {error}")
+            })?;
+
+        if actual_digest != expected_digest {
+            return Err(format!(
+                "service definition content is stale or changed since approval: approved={} current={}",
+                expected_digest, actual_digest
+            ));
+        }
+
         Ok(())
     }
 

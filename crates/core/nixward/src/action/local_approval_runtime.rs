@@ -165,13 +165,28 @@ impl LocalApprovalRuntimeV1 {
         created_at: UnixMillisV1,
         expires_at: UnixMillisV1,
     ) -> Result<InstalledLocalApprovalRequestV1, LocalApprovalRuntimeErrorV1> {
-        let expected_intent = NixActionIntentV1::from_command(
+        let expected_base_intent = NixActionIntentV1::from_command(
             intent.subject_identity.clone(),
             intent.pre_state_identity.clone(),
             command,
         )?;
+        let expected_intent = match intent.service_effect_context() {
+            Some(context) => expected_base_intent
+                .with_service_effect_context(context.clone())?,
+            None => expected_base_intent,
+        };
         if intent != &expected_intent {
             return Err(LocalApprovalRuntimeErrorV1::IntentCommandMismatch);
+        }
+
+        if matches!(
+            command,
+            NixOSCommand::Service { .. }
+        ) && intent.service_effect_context().is_none()
+        {
+            return Err(LocalApprovalRuntimeErrorV1::Authorization(
+                super::authorization::NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture,
+            ));
         }
         let displayed_action = operator_visible_action_for_command(command);
 
@@ -801,6 +816,28 @@ mod tests {
         );
         assert_eq!(projection.projection_digest, projection.compute_digest().unwrap());
         projection.validate().unwrap();
+    }
+
+    #[test]
+    fn service_approval_request_requires_definition_content_bound_intent() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let result = runtime.create_pending_request(
+            &intent("nginx.service"),
+            &restart_command("nginx.service"),
+            RequiredApprovalProfileV1::SameUidProcessV1,
+            UnixMillisV1::new(now.saturating_sub(1_000)),
+            UnixMillisV1::new(now + 60_000),
+        );
+
+        assert!(matches!(
+            result,
+            Err(LocalApprovalRuntimeErrorV1::Authorization(
+                super::super::authorization::NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture
+            ))
+        ));
+        assert_eq!(runtime.pending_count().unwrap(), 0);
     }
 
     #[test]
