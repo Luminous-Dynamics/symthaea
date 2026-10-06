@@ -716,6 +716,9 @@ impl MorphophonologicalCompilationWitness {
         output_rule_set: &MorphophonologicalRuleSet,
     ) -> Result<(), MorphophonologicalCompilationWitnessError> {
         self.validate_shape()?;
+        output_rule_set
+            .validate()
+            .map_err(|_| MorphophonologicalCompilationWitnessError::InvalidRuleSet)?;
         if self.source_artifact_blake3
             != blake3::hash(source_artifact).to_hex().to_string()
         {
