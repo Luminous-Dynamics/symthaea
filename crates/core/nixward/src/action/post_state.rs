@@ -635,6 +635,8 @@ impl NixPostStateReceiptV1 {
             None => (None, None, None, None, None, None),
         };
 
+        let stability = stability.map(|value| value.as_ref().clone());
+
         let receipt = Self {
             action_intent_digest,
             authorization_record_digest,
@@ -777,6 +779,19 @@ impl NixPostStateReceiptV1 {
             stability.validate_shape()?;
             if stability.window_end_monotonic_us > self.observed_at_monotonic_us {
                 return Err(NixPostStateErrorV1::StabilityAfterObservation);
+            }
+            let last = stability
+                .samples
+                .last()
+                .ok_or(NixPostStateErrorV1::InsufficientStabilitySamples)?;
+            if last.operation != self.operation
+                || last.unit != self.target_unit
+                || last.observed_generation != self.observed_generation
+                || last.definition_digest != self.observed_definition_digest
+                || last.manager_owner != self.systemd_manager_owner
+                || last.invocation_id != self.post_invocation_id
+            {
+                return Err(NixPostStateErrorV1::StabilityIdentityOrStateChanged);
             }
         }
 
