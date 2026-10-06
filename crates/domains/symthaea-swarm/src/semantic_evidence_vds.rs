@@ -861,7 +861,7 @@ impl Rfc9942ReceiptEnvelope {
                 vdp=Some(parsed);
             }else{
                 unprotected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
-                value_reader.skip_value_with_bstr_resource_limits(0, MAX_RFC9942_RECEIPT_BYTES)
+                value_reader.skip_value_with_resource_limits(0, MAX_RFC9942_RECEIPT_BYTES, 64, usize::MAX)
                     .map_err(|error|match error {
                         Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
                         _=>Rfc9942VdpError::InvalidEncoding,
@@ -2162,21 +2162,7 @@ impl<'a> CborReader<'a> {
         &mut self,
         max_entries: usize,
     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Rfc9162ProofDecodeError> {
-        self.read_map_entries_bounded_with_bstr_limit(max_entries, 4096)
-    }
-
-    /// Variant of the bounded map reader with a protocol-specific bstr cap.
-    ///
-    /// The generic opaque scanner intentionally uses a conservative 4 KiB
-    /// bstr bound. RFC 9942 containers such as VDP/proof arrays and the
-    /// receipts collection have larger, explicit profile limits and must
-    /// propagate those limits while scanning their enclosing maps.
-    fn read_map_entries_bounded_with_bstr_limit(
-        &mut self,
-        max_entries: usize,
-        max_bstr_len: usize,
-    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Rfc9162ProofDecodeError> {
-        self.read_map_entries_bounded_with_limits(max_entries, max_bstr_len, 64)
+        self.read_map_entries_bounded_with_limits(max_entries, 4096, 64)
     }
 
     fn read_map_entries_bounded_with_limits(
@@ -2491,16 +2477,6 @@ impl<'a> CborReader<'a> {
 
     fn skip_value(&mut self, depth: usize) -> Result<(), Rfc9162ProofDecodeError> {
         self.skip_value_with_limits(depth, 4096, 64, usize::MAX)
-    }
-
-    fn skip_value_with_bstr_resource_limits(
-        &mut self,
-        depth: usize,
-        max_bstr_len: usize,
-    ) -> Result<(), Rfc9162ProofDecodeError> {
-        self.skip_value_with_limits_mode(
-            depth, max_bstr_len, 64, usize::MAX, true,
-        )
     }
 
     fn skip_value_with_limits(
