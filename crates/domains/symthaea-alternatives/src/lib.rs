@@ -4210,6 +4210,24 @@ mod tests {
 
         let mut changed = c.clone();
         changed.evidence[0]
+            .observation
+            .as_mut()
+            .unwrap()
+            .record_digest = "replacement-observation-record".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            AssessmentError::MeasurementUncertaintyObservationRecordDigestMismatch {
+                evidence_id: "uncertainty-binding-evidence".into(),
+                expected_observation_record_digest: "replacement-observation-record".into(),
+                actual_observation_record_digest: "fixture-record-digest:uncertainty-binding-evidence".into(),
+            }
+        );
+
+        let mut changed = c.clone();
+        changed.evidence[0]
             .uncertainty
             .as_mut()
             .unwrap()
