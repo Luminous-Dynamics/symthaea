@@ -1878,6 +1878,45 @@ mod tests {
     }
 
     #[test]
+    fn single_holdout_split_rejects_arithmetic_overflow() {
+        let config = HeldOutRelationalPredictionConfig {
+            train_samples: usize::MAX,
+            test_samples: 4,
+            gap_samples: 1,
+            ridge_lambda: 1e-8,
+        };
+
+        assert_eq!(
+            config.validate(usize::MAX),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_packet_preserves_ridge_configuration() {
+        let samples = build_samples(0.5);
+        let ridge_lambda = 0.125;
+        let config = HeldOutRelationalPredictionConfig {
+            ridge_lambda,
+            ..config()
+        };
+        let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config,
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        assert!(evidence.records.iter().all(|record| record.ridge_lambda == ridge_lambda));
+        assert!(evidence.to_json().unwrap().contains("0.125"));
+    }
+
+    #[test]
     fn evidence_packet_validates_and_serializes() {
         let samples = build_samples(0.5);
         let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
