@@ -63,12 +63,26 @@ impl NixDefinitionFileContentDigestV1 {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixSystemdDefinitionContentCommitmentV1 {
+    pub unit: String,
+    pub definition_identity: NixSystemdUnitDefinitionIdentityV1,
+    pub manager_owner: String,
     pub files: Vec<NixDefinitionFileContentDigestV1>,
     pub overall_digest: String,
 }
 
 impl NixSystemdDefinitionContentCommitmentV1 {
     pub fn validate_shape(&self) -> Result<(), NixSystemdDefinitionContentErrorV1> {
+        super::service_domain::NixServiceOperationV1::new(
+            self.unit.clone(),
+            super::service_domain::NixServiceOperationKindV1::Start,
+        )
+        .map_err(|error| {
+            NixSystemdDefinitionContentErrorV1::InvalidServiceUnit(error.to_string())
+        })?;
+        self.definition_identity
+            .validate_shape()
+            .map_err(NixSystemdDefinitionContentErrorV1::InvalidDefinitionIdentity)?;
+        validate_manager_owner(&self.manager_owner)?;
         if self.files.is_empty() || self.files.len() > MAX_FILES {
             return Err(NixSystemdDefinitionContentErrorV1::InvalidFileCount);
         }
@@ -108,7 +122,9 @@ impl std::fmt::Debug for NixVerifiedSystemdDefinitionContentCommitmentV1 {
 
 impl NixVerifiedSystemdDefinitionContentCommitmentV1 {
     pub(crate) fn from_observer(
+        unit: &str,
         identity: &NixSystemdUnitDefinitionIdentityV1,
+        manager_owner: &str,
     ) -> Result<Self, NixSystemdDefinitionContentErrorV1> {
         identity
             .validate_shape()
@@ -129,7 +145,15 @@ impl NixVerifiedSystemdDefinitionContentCommitmentV1 {
         }
 
         let commitment = NixSystemdDefinitionContentCommitmentV1 {
-            overall_digest: compute_overall_digest(&files)?,
+            unit: unit.to_string(),
+            definition_identity: identity.clone(),
+            manager_owner: manager_owner.to_string(),
+            overall_digest: compute_overall_digest(
+                unit,
+                identity,
+                manager_owner,
+                &files,
+            )?,
             files,
         };
         commitment.validate_shape()?;
@@ -146,9 +170,36 @@ impl NixVerifiedSystemdDefinitionContentCommitmentV1 {
 }
 
 fn compute_overall_digest(
+    unit: &str,
+    identity: &NixSystemdUnitDefinitionIdentityV1,
+    manager_owner: &str,
     files: &[NixDefinitionFileContentDigestV1],
 ) -> Result<String, NixSystemdDefinitionContentErrorV1> {
     if files.is_empty() || files.len() > MAX_FILES {
+        return Err(NixSystemdDefinitionContentErrorV1::InvalidFileCount);
+    }
+    super::service_domain::NixServiceOperationV1::new(
+        unit.to_string(),
+        super::service_domain::NixServiceOperationKindV1::Start,
+    )
+    .map_err(|error| {
+        NixSystemdDefinitionContentErrorV1::InvalidServiceUnit(error.to_string())
+    })?;
+    identity
+        .validate_shape()
+        .map_err(NixSystemdDefinitionContentErrorV1::InvalidDefinitionIdentity)?;
+    validate_manager_owner(manager_owner)?;
+
+    let mut hasher = Hasher::new();
+    hasher.update(DEFINITION_CONTENT_DOMAIN_V1);
+    put_str(&mut hasher, unit);
+    put_str(&mut hasher, &identity.fragment_path);
+    put_u64(&mut hasher, identity.drop_in_paths.len() as u64);
+    for path in &identity.drop_in_paths {
+        put_str(&mut hasher, path);
+    }
+    put_str(&mut hasher, manager_owner);
+    put_u64(&mut hasher, files.len() as u64);    if files.is_empty() || files.len() > MAX_FILES {
         return Err(NixSystemdDefinitionContentErrorV1::InvalidFileCount);
     }
     let mut hasher = Hasher::new();
@@ -168,6 +219,8 @@ fn compute_overall_digest(
         put_i64(&mut hasher, file.ctime_nanoseconds);
     }
     Ok(hasher.finalize().to_hex().to_string())
+}
+
 }
 
 fn hash_exact_file(path: &str) -> Result<NixDefinitionFileContentDigestV1, NixSystemdDefinitionContentErrorV1> {
@@ -263,6 +316,27 @@ fn open_read_only_exact(path: &str) -> Result<File, NixSystemdDefinitionContentE
     std::fs::OpenOptions::new().read(true).open(path).map_err(NixSystemdDefinitionContentErrorV1::Open)
 }
 
+fn validate_manager_owner(value: &str) -> Result<(), NixSystemdDefinitionContentErrorV1> {
+    if value.is_empty() || value.len() > 255 || !value.starts_with(':') {
+        return Err(NixSystemdDefinitionContentErrorV1::InvalidManagerOwner);
+    }
+    let mut elements = value[1..].split('.');
+    let first = elements.next().unwrap_or_default();
+    if first.is_empty() || elements.next().is_none() {
+        return Err(NixSystemdDefinitionContentErrorV1::InvalidManagerOwner);
+    }
+    for element in std::iter::once(first).chain(elements) {
+        if element.is_empty()
+            || !element
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+        {
+            return Err(NixSystemdDefinitionContentErrorV1::InvalidManagerOwner);
+        }
+    }
+    Ok(())
+}
+
 fn validate_path(path: &str) -> Result<(), NixSystemdDefinitionContentErrorV1> {
     if path.is_empty() || path.len() > MAX_PATH_BYTES || !path.starts_with('/') || path.as_bytes().contains(&0) {
         return Err(NixSystemdDefinitionContentErrorV1::InvalidPath);
@@ -308,6 +382,9 @@ pub enum NixSystemdDefinitionContentErrorV1 {
     #[error("file content changed during repeated observation")] ContentChangedDuringObservation,
     #[error("file metadata changed during repeated observation")] MetadataChangedDuringObservation,
     #[error("invalid file identity")] InvalidFileIdentity,
+    #[error("invalid service unit: {0}")] InvalidServiceUnit(String),
+    #[error("invalid systemd manager unique owner")] InvalidManagerOwner,
+
 }
 
 #[cfg(test)]
@@ -320,7 +397,11 @@ mod tests {
         let path = temp.path().join("nginx.service");
         std::fs::write(&path, b"[Service]\nExecStart=/bin/true\n").unwrap();
         let identity = NixSystemdUnitDefinitionIdentityV1::new(path.to_str().unwrap(), vec![]).unwrap();
-        let first = NixVerifiedSystemdDefinitionContentCommitmentV1::from_observer(&identity).unwrap();
+        let first = NixVerifiedSystemdDefinitionContentCommitmentV1::from_observer(
+            "nginx.service",
+            &identity,
+            ":1.42",
+        ).unwrap();
         let second = NixVerifiedSystemdDefinitionContentCommitmentV1::from_observer(&identity).unwrap();
         assert_eq!(first.digest(), second.digest());
         assert_eq!(first.as_ref().files.len(), 1);
