@@ -40,6 +40,8 @@ pub struct NixSystemdUnitDefinitionContentEvidenceV1 {
     pub unit: String,
     /// CROSS-067 source identity commitment. Content is intentionally separate.
     pub source_identity_digest: String,
+    /// systemd manager incarnation observed for this capture epoch.
+    pub manager_owner: String,
     pub files: Vec<NixSystemdUnitDefinitionContentFileV1>,
     pub captured_at_monotonic_us: u64,
 }
@@ -74,6 +76,7 @@ impl NixSystemdUnitDefinitionContentEvidenceV1 {
             return Err(NixServiceEffectContextErrorV1::InvalidDefinitionFileSet);
         }
         validate_digest(&self.source_identity_digest, "source identity digest")?;
+        validate_unique_manager_owner(&self.manager_owner)?;
         let mut seen = std::collections::BTreeSet::new();
         for file in &self.files {
             if file.path.is_empty() || file.path.len() > MAX_STRING_BYTES || !file.path.starts_with('/') {
@@ -107,6 +110,7 @@ impl NixSystemdUnitDefinitionContentEvidenceV1 {
         h.update(b"nixward-systemd-unit-definition-content-v1");
         put_str(&mut h, &self.unit);
         put_str(&mut h, &self.source_identity_digest);
+        put_str(&mut h, &self.manager_owner);
         put_u64(&mut h, self.files.len() as u64);
         for file in &self.files {
             put_str(&mut h, &file.path);
@@ -227,6 +231,27 @@ impl NixServiceEffectContextV1 {
     }
 }
 
+fn validate_unique_manager_owner(value: &str) -> Result<(), NixServiceEffectContextErrorV1> {
+    if value.is_empty() || value.len() > 255 || !value.starts_with(':') {
+        return Err(NixServiceEffectContextErrorV1::InvalidManagerOwner);
+    }
+    let mut elements = value[1..].split('.');
+    let first = elements.next().unwrap_or_default();
+    if first.is_empty() || elements.next().is_none() {
+        return Err(NixServiceEffectContextErrorV1::InvalidManagerOwner);
+    }
+    for element in std::iter::once(first).chain(elements) {
+        if element.is_empty()
+            || !element.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-'
+            })
+        {
+            return Err(NixServiceEffectContextErrorV1::InvalidManagerOwner);
+        }
+    }
+    Ok(())
+}
+
 fn validate_digest(
     value: &str,
     field: &'static str,
@@ -310,6 +335,8 @@ pub enum NixServiceEffectContextErrorV1 {
     InvalidCaptureTimestamp,
     #[error("definition content unit does not match the service intent")]
     DefinitionContentUnitMismatch,
+    #[error("invalid systemd manager unique owner")]
+    InvalidManagerOwner,
 }
 
 #[cfg(test)]
@@ -334,6 +361,7 @@ mod tests {
         NixSystemdUnitDefinitionContentEvidenceV1 {
             unit: "nginx.service".into(),
             source_identity_digest: "11".repeat(32),
+            manager_owner: ":1.42".into(),
             files: vec![
                 NixSystemdUnitDefinitionContentFileV1 {
                     path: "/nix/store/nginx.service".into(),
@@ -409,6 +437,10 @@ mod tests {
 
         let mut changed = base.clone();
         changed.files[0].content_digest = "44".repeat(32);
+        assert_ne!(baseline, changed.digest().unwrap());
+
+        let mut changed = base;
+        changed.manager_owner = ":1.43".into();
         assert_ne!(baseline, changed.digest().unwrap());
 
         let mut changed = base.clone();
