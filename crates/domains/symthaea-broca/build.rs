@@ -9,13 +9,31 @@ use std::{
     path::{Path, PathBuf},
 };
 
+fn canonical_source_bytes(bytes: &[u8]) -> Vec<u8> {
+    let mut canonical = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'\r' {
+            if bytes.get(index + 1) == Some(&b'\n') {
+                index += 1;
+            }
+            canonical.push(b'\n');
+        } else {
+            canonical.push(bytes[index]);
+        }
+        index += 1;
+    }
+    canonical
+}
+
 fn domain_digest(domain: &[u8], surfaces: &[&[u8]]) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(domain);
     hasher.update(b"\0");
     for surface in surfaces {
-        hasher.update(&(surface.len() as u64).to_le_bytes());
-        hasher.update(surface);
+        let canonical = canonical_source_bytes(surface);
+        hasher.update(&(canonical.len() as u64).to_le_bytes());
+        hasher.update(&canonical);
     }
     hasher.finalize().to_hex().to_string()
 }
