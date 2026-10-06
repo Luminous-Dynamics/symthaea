@@ -2630,7 +2630,6 @@ mod tests {
             source_record_id: None,
             rule_provenance: "fixture:rules:v1".into(),
             applied_rule_id: "fixture:past-tense".into(),
-            source_record_id: None,
         }
     }
 
@@ -2949,7 +2948,6 @@ mod tests {
         );
     }
 
-    #[test]
     #[test]
     fn morphophonological_rule_set_rejects_ambiguous_exact_feature_rules() {
         let error = MorphophonologicalRuleSet::new(
