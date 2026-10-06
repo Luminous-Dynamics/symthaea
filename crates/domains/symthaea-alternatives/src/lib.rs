@@ -5682,7 +5682,6 @@ mod tests {
                 protocol_digest: "digest".into(),
                 procedure_id: "fixture-measurement-procedure-v1".into(),
                 procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
-                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
                 basis: basis.clone(),
             },
             stopping_criteria: ExperimentalStoppingCriteria {
@@ -5738,7 +5737,6 @@ mod tests {
                 protocol_revision: "v1".into(),
                 protocol_digest: "digest".into(),
                 procedure_id: "fixture-measurement-procedure-v1".into(),
-                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
                 procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
                 basis: basis.clone(),
             },
@@ -6077,7 +6075,6 @@ mod tests {
                 protocol_digest: "digest".into(),
                 procedure_id: "fixture-measurement-procedure-v1".into(),
                 procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
-                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
                 basis: basis.clone(),
             },
             stopping_criteria: ExperimentalStoppingCriteria {
@@ -6155,7 +6152,6 @@ mod tests {
                 protocol_revision: "v1".into(),
                 protocol_digest: "digest".into(),
                 procedure_id: "fixture-measurement-procedure-v1".into(),
-                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
                 procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
                 basis: basis.clone(),
             },
