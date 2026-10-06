@@ -6731,8 +6731,12 @@ else
     echo "ERROR: No image found at {path}"
     exit 1
 fi
-cp "{path}/configuration.nix" /mnt/etc/nixos/ 2>/dev/null || true
-cp "{path}/hardware-configuration.nix" /mnt/etc/nixos/ 2>/dev/null || true
+if [ -f "{path}/configuration.nix" ]; then
+    cp "{path}/configuration.nix" /mnt/etc/nixos/
+fi
+if [ -f "{path}/hardware-configuration.nix" ]; then
+    cp "{path}/hardware-configuration.nix" /mnt/etc/nixos/
+fi
 echo "STAGE: Image restored"
 echo "COMPLETE"
 "#,
