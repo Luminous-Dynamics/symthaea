@@ -1103,7 +1103,7 @@ mod tests {
 
         assert_eq!(
             DirectionalInformationFlowSurrogateSummary::compute(&samples, 16, 0),
-            Err(RelationalHarmonicError::InsufficientSamples(0))
+            Err(RelationalHarmonicError::InvalidSurrogateCount)
         );
     }
 
