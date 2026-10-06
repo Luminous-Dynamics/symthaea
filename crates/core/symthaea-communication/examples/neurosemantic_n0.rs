@@ -18,6 +18,9 @@ use symthaea_communication::{
     NeurosemanticRemediationEvaluationMethodKind, NeurosemanticRemediationEvaluationMethod,
     NeurosemanticRemediationEvaluationManifest,
     NeurosemanticRemediationEvaluationEnvironment,
+    NeurosemanticRemediationMeasurement,
+    NeurosemanticRemediationMeasurementArtifact,
+    NeurosemanticRemediationMeasurementKind,
 };
 
 fn main() -> Result<(), String> {
@@ -623,6 +626,45 @@ fn main() -> Result<(), String> {
     let evaluation_manifest_bytes =
         serde_json::to_vec(&evaluation_manifest).map_err(|e| e.to_string())?;
 
+    let measurement = NeurosemanticRemediationMeasurementArtifact {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION,
+        measurement_ref: "synthetic-remediation-measurement-v1".into(),
+        measurements: vec![
+            NeurosemanticRemediationMeasurement {
+                kind: NeurosemanticRemediationMeasurementKind::Forgetfulness,
+                status: NeurosemanticRemediationImpactDisposition::Inconclusive,
+                sample_count: 2,
+                failure_count: 0,
+            },
+            NeurosemanticRemediationMeasurement {
+                kind: NeurosemanticRemediationMeasurementKind::UtilityImpact,
+                status: NeurosemanticRemediationImpactDisposition::Inconclusive,
+                sample_count: 2,
+                failure_count: 0,
+            },
+            NeurosemanticRemediationMeasurement {
+                kind: NeurosemanticRemediationMeasurementKind::FairnessImpact,
+                status: NeurosemanticRemediationImpactDisposition::Inconclusive,
+                sample_count: 2,
+                failure_count: 0,
+            },
+            NeurosemanticRemediationMeasurement {
+                kind: NeurosemanticRemediationMeasurementKind::RecoveryRisk,
+                status: NeurosemanticRemediationImpactDisposition::Inconclusive,
+                sample_count: 2,
+                failure_count: 0,
+            },
+            NeurosemanticRemediationMeasurement {
+                kind: NeurosemanticRemediationMeasurementKind::RepresentationResidual,
+                status: NeurosemanticRemediationImpactDisposition::Inconclusive,
+                sample_count: 2,
+                failure_count: 0,
+            },
+        ],
+        worst_case_disposition: NeurosemanticRemediationImpactDisposition::Inconclusive,
+    };
+    let measurement_bytes = serde_json::to_vec(&measurement).map_err(|e| e.to_string())?;
+
     let remediation_impact = NeurosemanticRemediationImpactArtifact {
         schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_IMPACT_ARTIFACT_SCHEMA_VERSION,
         impact_ref: "synthetic-remediation-impact-1".into(),
@@ -640,6 +682,7 @@ fn main() -> Result<(), String> {
         ),
         lifecycle_receipt_hash,
         evaluation_manifest_hash: evaluation_manifest.fingerprint()?,
+        measurement_artifact_hash: measurement.fingerprint()?,
         evaluation_agent_ref: "synthetic-evaluation-agent-1".into(),
         evaluation_verifier_ref: "synthetic-evaluation-verifier-1".into(),
         evaluation_verification_evidence_hash,
@@ -687,6 +730,8 @@ fn main() -> Result<(), String> {
             .is_ok();
     let remediation_evaluation_manifest_verified =
         remediation_impact.verify_evaluation_manifest_bytes(&evaluation_manifest_bytes).is_ok();
+    let remediation_measurement_verified =
+        remediation_impact.verify_measurement_artifact_bytes(&measurement_bytes).is_ok();
     let remediation_pre_lineage_verified = remediation_impact
         .verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PreRemediation, &pre_model_lineage_bytes)
         .is_ok();
@@ -747,6 +792,22 @@ fn main() -> Result<(), String> {
         forged.execution_revision = "4".repeat(40);
         let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
         remediation_impact.verify_evaluation_environment_bytes(&bytes).is_err()
+    };
+    let remediation_measurement_substitution_blocked = {
+        let mut forged = measurement.clone();
+        forged.measurements[0].status =
+            NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds;
+        let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        remediation_impact.verify_measurement_artifact_bytes(&bytes).is_err()
+    };
+    let remediation_measurement_dimension_drop_blocked = {
+        let mut forged = measurement.clone();
+        forged.measurements.retain(|item| {
+            item.kind != NeurosemanticRemediationMeasurementKind::RepresentationResidual
+        });
+        forged.worst_case_disposition = forged.recomputed_worst_case_disposition()?;
+        let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        remediation_impact.verify_measurement_artifact_bytes(&bytes).is_err()
     };
     let remediation_evaluation_manifest_substitution_blocked = {
         let mut forged = evaluation_manifest.clone();
@@ -1269,6 +1330,8 @@ fn main() -> Result<(), String> {
         "remediation_evaluation_verification_evidence_substitution_blocked": remediation_evaluation_verification_evidence_substitution_blocked,
         "remediation_evaluation_environment_substitution_blocked": remediation_evaluation_environment_substitution_blocked,
         "remediation_evaluation_environment_revision_mismatch_blocked": remediation_evaluation_environment_revision_mismatch_blocked,
+        "remediation_measurement_substitution_blocked": remediation_measurement_substitution_blocked,
+        "remediation_measurement_dimension_drop_blocked": remediation_measurement_dimension_drop_blocked,
         "remediation_evaluation_manifest_substitution_blocked": remediation_evaluation_manifest_substitution_blocked,
         "remediation_set_pair_verified": remediation_set_pair_verified,
         "remediation_recovery_method_verified": remediation_recovery_method_verified,
@@ -1289,6 +1352,7 @@ fn main() -> Result<(), String> {
         "remediation_evaluation_verification_evidence_verified": remediation_evaluation_verification_evidence_verified,
         "remediation_evaluation_environment_verified": remediation_evaluation_environment_verified,
         "remediation_evaluation_manifest_verified": remediation_evaluation_manifest_verified,
+        "remediation_measurement_verified": remediation_measurement_verified,
         "remediation_pre_lineage_verified": remediation_pre_lineage_verified,
         "remediation_post_lineage_verified": remediation_post_lineage_verified,
         "remediation_forget_evidence_verified": remediation_forget_evidence_verified,
