@@ -215,13 +215,16 @@ impl Default for HeldOutRelationalPredictionConfig {
 
 impl HeldOutRelationalPredictionConfig {
     fn validate(&self, total_samples: usize) -> Result<(), RelationalPredictionError> {
-        if self.train_samples < 8
-            || self.test_samples < 4
-            || self.train_samples
-                .saturating_add(self.gap_samples)
-                .saturating_add(self.test_samples)
-                > total_samples
-        {
+        if self.train_samples < 8 || self.test_samples < 4 {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        let required_samples = self
+            .train_samples
+            .checked_add(self.gap_samples)
+            .and_then(|value| value.checked_add(self.test_samples))
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+        if required_samples > total_samples {
             return Err(RelationalPredictionError::InvalidSplit);
         }
 
