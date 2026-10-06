@@ -107,3 +107,8 @@ The heuristic next-measurement result also uses typed discrimination targets. Ea
 
 
 Uncertainty-based stopping criteria are target-specific rather than bare numeric widths. Each stopping bound names the exact discrimination target and the unit in which its maximum interval width is expressed, preventing ambiguity when a campaign covers multiple measurands or units.
+
+
+### Calibration-chain binding
+
+Each declared calibration/traceability link is represented as an exact external reference `(calibration_id, revision, record_digest)` rather than an opaque string. The chain remains ordered because calibration hierarchy is meaningful. Symthaea validates the reference structure and binds it into the candidate evidence digest and assessment receipt; it does not independently verify calibration certificates, establish metrological traceability, or certify that the external chain is unbroken. NIST describes metrological traceability as a property of a measurement result related to a reference through a documented, unbroken chain of calibrations, each contributing to measurement uncertainty. citeturn201657search0turn201657search8
