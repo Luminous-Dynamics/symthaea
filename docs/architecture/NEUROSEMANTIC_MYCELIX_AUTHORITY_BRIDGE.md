@@ -57,7 +57,7 @@ A successful cryptographic signature check is evidence of signer control of a ke
 
 ## Concrete signed resolution contract
 
-The communication crate now materializes the recommended resolution as `NeurosemanticAuthorityResolutionAttestation`.
+The communication crate now materializes the recommended resolution as `NeurosemanticAuthorityResolutionAttestation`. The handling-policy schema is version 6 so this freshness requirement is a fail-closed schema change rather than an implicit default for older artifacts.
 
 The resolution is signed by the configured external resolver and binds, in one immutable snapshot:
 
@@ -75,7 +75,7 @@ The resolution is signed by the configured external resolver and binds, in one i
 
 Only `Active` status can produce a `NeurosemanticPolicyProvenanceBinding`. `Suspended`, `Revoked`, `Unknown`, and `Unavailable` are explicit fail-closed states.
 
-The resolution lifetime is bounded to 24 hours by the Symthaea protocol as a defensive upper bound. Deployments handling higher-risk neurosemantic data should use a materially shorter freshness window.
+The resolution lifetime is bounded to 24 hours by the Symthaea protocol as a defensive upper bound. Deployments handling higher-risk neurosemantic data should use a materially shorter freshness window. The handling policy can now require an even shorter `max_authority_resolution_age_s`; the capability is rejected once the status snapshot exceeds that policy-specific age, even if the snapshot has not reached its own expiry.
 
 The resolver signature authenticates the exact snapshot to the configured resolver key. The snapshot also commits to the exact authority-attestation fingerprint, preventing an otherwise valid but different attestation from being substituted after resolution. The integration must still establish that the resolver key is trusted and authorized; signature verification is not itself a governance decision.
 
