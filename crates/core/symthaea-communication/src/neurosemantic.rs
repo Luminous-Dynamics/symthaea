@@ -454,6 +454,9 @@ impl NeurosemanticRemediationImpactArtifact {
                 .as_ref()
                 .ok_or_else(|| "neurosemantic remediation fairness evidence is not declared".to_string())?,
             NeurosemanticRemediationImpactEvidenceKind::ResidualRisk => &self.residual_risk_evidence_hash,
+            NeurosemanticRemediationImpactEvidenceKind::RecoveryRisk => &self.recovery_evidence_hash,
+            NeurosemanticRemediationImpactEvidenceKind::RepresentationResidual =>
+                &self.representation_residual_evidence_hash,
         };
         if content_hash(evidence_bytes) != *expected_hash {
             return Err("neurosemantic remediation impact evidence hash mismatch".into());
