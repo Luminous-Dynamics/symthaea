@@ -151,6 +151,7 @@ jobs:
           assert report["lifecycle_rectification_requires_replacement_lineage"] is True
           assert report["remediation_impact_structured"] is True
           assert report["remediation_lifecycle_binding_verified"] is True
+          assert report["remediation_evaluation_manifest_verified"] is True
           assert report["remediation_pre_lineage_verified"] is True
           assert report["remediation_post_lineage_verified"] is True
           assert report["remediation_set_pair_verified"] is True
@@ -169,6 +170,7 @@ jobs:
           assert report["remediation_model_substitution_blocked"] is True
           assert report["remediation_lineage_execution_revision_mismatch_blocked"] is True
           assert report["remediation_lineage_substitution_blocked"] is True
+          assert report["remediation_evaluation_manifest_substitution_blocked"] is True
           assert report["remediation_set_role_substitution_blocked"] is True
           assert report["remediation_set_overlap_blocked"] is True
           assert report["remediation_recovery_method_substitution_blocked"] is True
