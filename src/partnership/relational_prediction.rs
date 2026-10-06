@@ -1532,6 +1532,7 @@ pub struct HeldOutRelationalPredictionQualification {
     pub observed: HeldOutRelationalPredictionSummary,
     pub circular_shift_null: PredictionNullSummary,
     pub feature_decoupling_null: PredictionNullSummary,
+    pub incremental_relational_null: PredictionNullSummary,
 }
 
 impl HeldOutRelationalPredictionQualification {
@@ -1541,16 +1542,25 @@ impl HeldOutRelationalPredictionQualification {
         surrogate_count: usize,
     ) -> Result<Self, RelationalPredictionError> {
         let observed = HeldOutRelationalPredictionSummary::compute(samples, config)?;
-        let circular_shift_null = PredictionNullSummary::compute(
+        let circular_shift_null = PredictionNullSummary::compute_for_feature_set(
             samples,
             config,
             PredictionNullFamily::CircularShift,
+            PredictionFeatureSet::RelationalAugmented,
             surrogate_count,
         )?;
-        let feature_decoupling_null = PredictionNullSummary::compute(
+        let feature_decoupling_null = PredictionNullSummary::compute_for_feature_set(
             samples,
             config,
             PredictionNullFamily::FeatureDecoupling,
+            PredictionFeatureSet::RelationalAugmented,
+            surrogate_count,
+        )?;
+        let incremental_relational_null = PredictionNullSummary::compute_for_feature_set(
+            samples,
+            config,
+            PredictionNullFamily::IncrementalRelationalShift,
+            PredictionFeatureSet::RelationalAugmented,
             surrogate_count,
         )?;
 
@@ -1558,6 +1568,7 @@ impl HeldOutRelationalPredictionQualification {
             observed,
             circular_shift_null,
             feature_decoupling_null,
+            incremental_relational_null,
         })
     }
 }
@@ -2737,18 +2748,40 @@ mod tests {
             first.feature_decoupling_null.family,
             PredictionNullFamily::FeatureDecoupling
         );
+        assert_eq!(
+            first.incremental_relational_null.family,
+            PredictionNullFamily::IncrementalRelationalShift
+        );
+        assert_eq!(
+            first.circular_shift_null.feature_set,
+            PredictionFeatureSet::RelationalAugmented
+        );
+        assert_eq!(
+            first.feature_decoupling_null.feature_set,
+            PredictionFeatureSet::RelationalAugmented
+        );
+        assert_eq!(
+            first.incremental_relational_null.feature_set,
+            PredictionFeatureSet::RelationalAugmented
+        );
         assert_eq!(first.circular_shift_null.status, EvidenceStatus::Proxy);
         assert_eq!(first.feature_decoupling_null.status, EvidenceStatus::Proxy);
+        assert_eq!(first.incremental_relational_null.status, EvidenceStatus::Proxy);
         assert_eq!(first.circular_shift_null.surrogate_count, 12);
         assert_eq!(first.feature_decoupling_null.surrogate_count, 12);
+        assert_eq!(first.incremental_relational_null.surrogate_count, 12);
         assert!(
             (0.0..=1.0).contains(&first.circular_shift_null.exceedance_fraction)
         );
         assert!(
             (0.0..=1.0).contains(&first.feature_decoupling_null.exceedance_fraction)
         );
+        assert!(
+            (0.0..=1.0).contains(&first.incremental_relational_null.exceedance_fraction)
+        );
         first.circular_shift_null.validate_trace().unwrap();
         first.feature_decoupling_null.validate_trace().unwrap();
+        first.incremental_relational_null.validate_trace().unwrap();
     }
 
     #[test]
