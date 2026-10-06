@@ -622,6 +622,22 @@ mod tests {
     }
 
     #[test]
+    fn morphophonological_form_tampering_fails_closed() {
+        let binding = binding();
+        let mut witness = witness_for_segments(&binding);
+        witness.mappings[0].morphophonological_form = Some("different-form".into());
+
+        assert_eq!(
+            witness
+                .validate_against_binding(&binding)
+                .expect_err("morphophonological-form tampering must fail"),
+            LexicalPhonologicalWitnessError::LexicalIdentityMismatch {
+                lexical_position: 0,
+            }
+        );
+    }
+
+    #[test]
     fn symbol_tampering_fails_closed() {
         let binding = binding();
         let witness = witness_for_segments(&binding);
