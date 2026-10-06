@@ -308,7 +308,12 @@ impl NixActionIntentV1 {
 
         match (&self.action, &self.service_effect_context) {
             (NixActionDescriptorV1::Service { operation, unit }, Some(context)) => {
-                validate_service_effect_context_binding(context, *operation, unit)?;
+                validate_service_effect_context_binding(
+                    context,
+                    *operation,
+                    unit,
+                    self.pre_state_identity.as_deref(),
+                )?;
             }
             (NixActionDescriptorV1::Service { .. }, None) => {}
             (_, Some(_)) => return Err(NixAuthorizationErrorV1::UnexpectedServiceEffectContext),
@@ -676,11 +681,41 @@ fn validate_service_effect_context_binding(
     context: &NixServiceEffectContextV1,
     operation: NixServiceOperationKindV1,
     unit: &str,
+    pre_state_identity: Option<&str>,
 ) -> Result<(), NixAuthorizationErrorV1> {
     context
         .validate_shape()
         .map_err(NixAuthorizationErrorV1::InvalidServiceEffectContext)?;
     if context.operation != operation || context.unit != unit {
+        return Err(NixAuthorizationErrorV1::ServiceEffectContextMismatch);
+    }
+
+    let Some(pre_state_identity) = pre_state_identity else {
+        return Err(NixAuthorizationErrorV1::MissingServiceEffectContext);
+    };
+    let prefix = "nixward-service-pre-state-v1|generation=";
+    let Some(rest) = pre_state_identity.strip_prefix(prefix) else {
+        return Err(NixAuthorizationErrorV1::MissingServiceEffectContext);
+    };
+    let (generation, rest) = rest
+        .split_once("|unit=")
+        .ok_or(NixAuthorizationErrorV1::InvalidServiceEffectContext(
+            NixServiceEffectContextErrorV1::InvalidDigest("pre-state identity"),
+        ))?;
+    let generation = generation
+        .parse::<u64>()
+        .map_err(|_| NixAuthorizationErrorV1::InvalidServiceEffectContext(
+            NixServiceEffectContextErrorV1::InvalidDigest("pre-state identity"),
+        ))?;
+    let (identity_unit, state_digest) = rest
+        .split_once("|state=")
+        .ok_or(NixAuthorizationErrorV1::InvalidServiceEffectContext(
+            NixServiceEffectContextErrorV1::InvalidDigest("pre-state identity"),
+        ))?;
+    if generation != context.authorized_generation
+        || identity_unit != context.unit
+        || state_digest != context.pre_state_digest
+    {
         return Err(NixAuthorizationErrorV1::ServiceEffectContextMismatch);
     }
     Ok(())
@@ -695,7 +730,12 @@ fn service_effect_context_digest_for_intent(
                 .service_effect_context
                 .as_ref()
                 .ok_or(NixAuthorizationErrorV1::MissingServiceEffectContext)?;
-            validate_service_effect_context_binding(context, *operation, unit)?;
+            validate_service_effect_context_binding(
+                context,
+                *operation,
+                unit,
+                intent.pre_state_identity.as_deref(),
+            )?;
             Ok(Some(
                 context
                     .digest()
