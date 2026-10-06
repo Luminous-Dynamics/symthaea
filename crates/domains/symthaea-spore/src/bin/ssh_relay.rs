@@ -932,7 +932,8 @@ mkswap /mnt/swap/swapfile
 echo "STAGE: Installing NixOS..."
 echo "This may take several minutes as packages are downloaded..."
 
-# Self-healing install loop: retry up to 3 times, fixing broken packages
+# Bounded retry of the exact same install plan.
+# A failed realization must never trigger an unreviewed configuration mutation.
 ATTEMPT=1
 MAX_ATTEMPTS=3
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
@@ -947,30 +948,8 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
             echo "ERROR: Install failed after $MAX_ATTEMPTS attempts"
             exit 1
         fi
-        # Parse the error and try to fix
-        echo "STAGE: Self-healing (attempt $ATTEMPT)..."
-        # Extract the failing package from the build log
-        FAILED_PKG=$(nixos-install --no-root-passwd 2>&1 | grep -oP "error:.*building.*'/nix/store/\K[^']*" | head -1 || true)
-        FAILED_ATTR=$(nixos-install --no-root-passwd 2>&1 | grep -oP "attribute '\\K[^']*" | head -1 || true)
-        if [ -n "$FAILED_ATTR" ]; then
-            echo "  Detected failing attribute: $FAILED_ATTR"
-            # Try to find an alternative
-            ALT=$(nix search nixpkgs "$FAILED_ATTR" --json 2>/dev/null | head -c 500 | grep -oP '"legacyPackages\.x86_64-linux\.\K[^"]*' | head -1 || true)
-            if [ -n "$ALT" ]; then
-                echo "  Found alternative: $ALT"
-                # Replace in configuration.nix
-                sed -i "s|$(printf '%s' "$FAILED_ATTR" | sed 's/[|\\&]/\\&/g')|$(printf '%s' "$ALT" | sed 's/[|\\&]/\\&/g')|g" /mnt/etc/nixos/configuration.nix 2>/dev/null || true
-                echo "  Config updated: $FAILED_ATTR → $ALT"
-            else
-                echo "  No alternative found for $FAILED_ATTR — removing from config"
-                sed -i "/$(printf '%s' "$FAILED_ATTR" | sed 's/[\/\\&\[\].*^$]/\\&/g')/d" /mnt/etc/nixos/configuration.nix 2>/dev/null || true
-            fi
-        elif [ -n "$FAILED_PKG" ]; then
-            echo "  Detected failing derivation: $FAILED_PKG"
-            echo "  Retrying (may be a transient network error)..."
-        else
-            echo "  Could not identify failing package — retrying..."
-        fi
+        echo "STAGE: Retry unchanged plan (attempt $ATTEMPT)..."
+        echo "  No automatic configuration edits will be made."
     fi
     ATTEMPT=$((ATTEMPT + 1))
 done
@@ -1124,7 +1103,8 @@ mkswap /mnt/swap/swapfile
 echo "STAGE: Installing NixOS..."
 echo "This may take several minutes as packages are downloaded..."
 
-# Self-healing install loop: retry up to 3 times, fixing broken packages
+# Bounded retry of the exact same install plan.
+# A failed realization must never trigger an unreviewed configuration mutation.
 ATTEMPT=1
 MAX_ATTEMPTS=3
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
@@ -1139,30 +1119,8 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
             echo "ERROR: Install failed after $MAX_ATTEMPTS attempts"
             exit 1
         fi
-        # Parse the error and try to fix
-        echo "STAGE: Self-healing (attempt $ATTEMPT)..."
-        # Extract the failing package from the build log
-        FAILED_PKG=$(nixos-install --no-root-passwd 2>&1 | grep -oP "error:.*building.*'/nix/store/\K[^']*" | head -1 || true)
-        FAILED_ATTR=$(nixos-install --no-root-passwd 2>&1 | grep -oP "attribute '\\K[^']*" | head -1 || true)
-        if [ -n "$FAILED_ATTR" ]; then
-            echo "  Detected failing attribute: $FAILED_ATTR"
-            # Try to find an alternative
-            ALT=$(nix search nixpkgs "$FAILED_ATTR" --json 2>/dev/null | head -c 500 | grep -oP '"legacyPackages\.x86_64-linux\.\K[^"]*' | head -1 || true)
-            if [ -n "$ALT" ]; then
-                echo "  Found alternative: $ALT"
-                # Replace in configuration.nix
-                sed -i "s|$(printf '%s' "$FAILED_ATTR" | sed 's/[|\\&]/\\&/g')|$(printf '%s' "$ALT" | sed 's/[|\\&]/\\&/g')|g" /mnt/etc/nixos/configuration.nix 2>/dev/null || true
-                echo "  Config updated: $FAILED_ATTR → $ALT"
-            else
-                echo "  No alternative found for $FAILED_ATTR — removing from config"
-                sed -i "/$(printf '%s' "$FAILED_ATTR" | sed 's/[\/\\&\[\].*^$]/\\&/g')/d" /mnt/etc/nixos/configuration.nix 2>/dev/null || true
-            fi
-        elif [ -n "$FAILED_PKG" ]; then
-            echo "  Detected failing derivation: $FAILED_PKG"
-            echo "  Retrying (may be a transient network error)..."
-        else
-            echo "  Could not identify failing package — retrying..."
-        fi
+        echo "STAGE: Retry unchanged plan (attempt $ATTEMPT)..."
+        echo "  No automatic configuration edits will be made."
     fi
     ATTEMPT=$((ATTEMPT + 1))
 done
@@ -1464,7 +1422,8 @@ mkswap /mnt/swap/swapfile
 echo "STAGE: Installing NixOS..."
 echo "This may take several minutes as packages are downloaded..."
 
-# Self-healing install loop: retry up to 3 times, fixing broken packages
+# Bounded retry of the exact same install plan.
+# A failed realization must never trigger an unreviewed configuration mutation.
 ATTEMPT=1
 MAX_ATTEMPTS=3
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
@@ -1479,30 +1438,8 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
             echo "ERROR: Install failed after $MAX_ATTEMPTS attempts"
             exit 1
         fi
-        # Parse the error and try to fix
-        echo "STAGE: Self-healing (attempt $ATTEMPT)..."
-        # Extract the failing package from the build log
-        FAILED_PKG=$(nixos-install --no-root-passwd 2>&1 | grep -oP "error:.*building.*'/nix/store/\K[^']*" | head -1 || true)
-        FAILED_ATTR=$(nixos-install --no-root-passwd 2>&1 | grep -oP "attribute '\\K[^']*" | head -1 || true)
-        if [ -n "$FAILED_ATTR" ]; then
-            echo "  Detected failing attribute: $FAILED_ATTR"
-            # Try to find an alternative
-            ALT=$(nix search nixpkgs "$FAILED_ATTR" --json 2>/dev/null | head -c 500 | grep -oP '"legacyPackages\.x86_64-linux\.\K[^"]*' | head -1 || true)
-            if [ -n "$ALT" ]; then
-                echo "  Found alternative: $ALT"
-                # Replace in configuration.nix
-                sed -i "s|$(printf '%s' "$FAILED_ATTR" | sed 's/[|\\&]/\\&/g')|$(printf '%s' "$ALT" | sed 's/[|\\&]/\\&/g')|g" /mnt/etc/nixos/configuration.nix 2>/dev/null || true
-                echo "  Config updated: $FAILED_ATTR → $ALT"
-            else
-                echo "  No alternative found for $FAILED_ATTR — removing from config"
-                sed -i "/$(printf '%s' "$FAILED_ATTR" | sed 's/[\/\\&\[\].*^$]/\\&/g')/d" /mnt/etc/nixos/configuration.nix 2>/dev/null || true
-            fi
-        elif [ -n "$FAILED_PKG" ]; then
-            echo "  Detected failing derivation: $FAILED_PKG"
-            echo "  Retrying (may be a transient network error)..."
-        else
-            echo "  Could not identify failing package — retrying..."
-        fi
+        echo "STAGE: Retry unchanged plan (attempt $ATTEMPT)..."
+        echo "  No automatic configuration edits will be made."
     fi
     ATTEMPT=$((ATTEMPT + 1))
 done
