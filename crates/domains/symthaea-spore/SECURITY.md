@@ -39,6 +39,7 @@ Target Machine — runs the install script
 - Its own generated shell scripts (from validated inputs)
 
 ### What the relay does NOT trust
+- Browser-supplied usernames; they are validated before any shell construction
 - Browser-supplied Nix configuration (pure-eval validation is advisory; the relay must not treat browser text as an authorization primitive)
 - Browser-supplied disk paths, hostnames, timezones (validated via security module)
 - WebSocket Origin headers (checked before upgrade)
@@ -69,7 +70,7 @@ cargo +nightly fuzz run fuzz_sanitize_input -- -max_total_time=300
 
 | Risk | Severity | Status |
 |------|----------|--------|
-| Hardcoded `initialPassword = "changeme"` in relay fallback configs | Closed | Removed from all 12 installer layouts; credentials are applied post-install through a protected temporary file |
+| Hardcoded `initialPassword = "changeme"` in relay fallback configs | Closed | Removed from all 13 installer layouts; user credentials are applied post-install through a protected temporary file |
 | `time` 0.3.44 stack exhaustion DoS (RUSTSEC-2026-0009) | Low | Blocked by Holochain serde pin |
 | `rsa` Marvin timing attack (RUSTSEC-2023-0071) | Negligible | Feature-gated behind `lancedb-backend`, wrong attack vector |
 | Shell scripts for disk operations | Accepted | Disk partitioning inherently requires root shell; typed Nix generation planned for config transfer |
