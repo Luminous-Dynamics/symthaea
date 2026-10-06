@@ -1614,6 +1614,48 @@ pub struct HeldOutRelationalPredictionQualification {
 }
 
 impl HeldOutRelationalPredictionQualification {
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        if self.observed.status != EvidenceStatus::Measured
+            || self.observed.relational_augmented.feature_set
+                != PredictionFeatureSet::RelationalAugmented
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        let expected_mse = self.observed.relational_augmented.mean_squared_error;
+        let nulls = [
+            (
+                PredictionNullFamily::CircularShift,
+                &self.circular_shift_null,
+            ),
+            (
+                PredictionNullFamily::FeatureDecoupling,
+                &self.feature_decoupling_null,
+            ),
+            (
+                PredictionNullFamily::IncrementalRelationalShift,
+                &self.incremental_relational_null,
+            ),
+        ];
+
+        for (expected_family, null_trace) in nulls {
+            null_trace.validate_trace()?;
+            if null_trace.family != expected_family
+                || null_trace.feature_set != PredictionFeatureSet::RelationalAugmented
+                || null_trace.status != EvidenceStatus::Proxy
+                || null_trace.config.train_samples != self.observed.train_samples
+                || null_trace.config.test_samples != self.observed.test_samples
+                || null_trace.config.gap_samples != self.observed.gap_samples
+                || null_trace.config.ridge_lambda < 0.0
+                || (null_trace.observed_relational_mse - expected_mse).abs() > 1e-12
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn compute(
         samples: &[RelationalPredictionSample],
         config: HeldOutRelationalPredictionConfig,
@@ -2870,6 +2912,29 @@ mod tests {
             HeldOutRelationalPredictionSummary::compute(&build_samples(5.0), config());
 
         assert_eq!(result, Err(RelationalPredictionError::TemporalLeakage));
+    }
+
+    #[test]
+    fn qualification_binds_nulls_to_observed_result() {
+        let samples = build_samples(0.5);
+        let qualification =
+            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
+
+        qualification.validate().unwrap();
+
+        let mut tampered = qualification.clone();
+        tampered.circular_shift_null.observed_relational_mse += 0.01;
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
+        let mut status_tampered = qualification.clone();
+        status_tampered.incremental_relational_null.status = EvidenceStatus::Measured;
+        assert_eq!(
+            status_tampered.validate(),
+            Err(RelationalPredictionError::InvalidSurrogateCount)
+        );
     }
 
     #[test]
