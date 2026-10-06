@@ -11,8 +11,6 @@ use thiserror::Error;
 pub const PLAN_VERSION: u16 = 1;
 pub const RECEIPT_VERSION: u16 = 1;
 pub const HDC_BIND_XOR_KERNEL_ID: &str = "symthaea.hdc.bind_xor.v1";
-pub const HDC_BIND_XOR_KERNEL_DIGEST: &str =
-    "b12c0d7f6a6b7ed2a1c5d5dcb9f8e0b9f1b8b6e1b1d2f0b9e7f0d9c4e4e6f5a1";
 
 /// Stable identifier for the kind of execution backend that actually ran.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,10 +46,8 @@ impl GpuOperation {
         }
     }
 
-    pub const fn kernel_digest(self) -> &'static str {
-        match self {
-            Self::HdcBindXor { .. } => HDC_BIND_XOR_KERNEL_DIGEST,
-        }
+    pub fn kernel_digest(self) -> String {
+        digest_bytes(self.kernel_id().as_bytes())
     }
 
     pub const fn input_count(self) -> usize {
@@ -126,13 +122,6 @@ impl OperationPlan {
             return Err(PlanError::InputCount {
                 expected: self.operation.input_count(),
                 actual: self.inputs.len(),
-            });
-        }
-
-        if self.operation.kernel_digest() != HDC_BIND_XOR_KERNEL_DIGEST {
-            return Err(PlanError::KernelDigestMismatch {
-                expected: HDC_BIND_XOR_KERNEL_DIGEST,
-                actual: self.operation.kernel_digest(),
             });
         }
 
@@ -288,7 +277,7 @@ impl CpuReferenceExecutor {
                     operation: plan.operation,
                     plan_digest: plan.digest_hex(),
                     kernel_id: plan.operation.kernel_id().to_owned(),
-                    kernel_digest: plan.operation.kernel_digest().to_owned(),
+                    kernel_digest: plan.operation.kernel_digest(),
                     input_digest,
                     output_digest: digest_bytes(output.as_bytes()),
                     determinism: plan.determinism,
@@ -352,8 +341,6 @@ pub enum PlanError {
     UnsupportedVersion(u16),
     #[error("expected {expected} inputs, got {actual}")]
     InputCount { expected: usize, actual: usize },
-    #[error("kernel digest mismatch: expected {expected}, got {actual}")]
-    KernelDigestMismatch { expected: &'static str, actual: &'static str },
     #[error("{field} requires {expected} bytes, got {actual}")]
     ShapeMismatch { field: String, expected: u64, actual: u64 },
     #[error("input budget exceeded: {bytes} > {max}")]
@@ -497,7 +484,8 @@ mod tests {
             operation: GpuOperation::HdcBindXor { dimensions: 8 },
             plan_digest: String::new(),
             kernel_id: HDC_BIND_XOR_KERNEL_ID.to_owned(),
-            kernel_digest: HDC_BIND_XOR_KERNEL_DIGEST.to_owned(),
+            kernel_digest: GpuOperation::HdcBindXor { dimensions: 8 }
+                .kernel_digest(),
             input_digest: "x".to_owned(),
             output_digest: "x".to_owned(),
             determinism: DeterminismMode::Strict,
