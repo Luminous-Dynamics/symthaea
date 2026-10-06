@@ -1163,10 +1163,12 @@ fn stability_sample_from_observation(
         definition_digest: observation.definition_digest().map_err(|error| {
             NixSystemdObserverErrorV1::InvalidPostState(error.to_string())
         })?,
+        definition_content_digest: observation.definition_content_digest.clone(),
         state_digest: observation.state_digest().map_err(|error| {
             NixSystemdObserverErrorV1::InvalidPostState(error.to_string())
         })?,
         manager_owner: manager_owner.to_string(),
+        systemd_bus_id: observation.systemd_bus_id.clone(),
         invocation_id: observation.invocation_id.clone(),
         state_change_at_monotonic_us: observation.state_change_at_monotonic_us,
         captured_at_monotonic_us: observation.observed_at_monotonic_us,
