@@ -172,6 +172,14 @@ The rolling-origin qualification path applies three prediction null families at 
 - FeatureDecoupling;
 - IncrementalRelationalShift.
 
+IncrementalRelationalShift is the targeted nested null for the critical RelationalAugmented vs NonRelationalContext comparison: synchrony and non-relational context remain fixed while only the added relational channels are shifted.
+
+
+
+- CircularShift;
+- FeatureDecoupling;
+- IncrementalRelationalShift.
+
 IncrementalRelationalShift is the most targeted null for the nested comparison: isolated-agent state, common driver, and synchrony remain fixed while only the added directional/turn-taking relational channels are shifted.
 
 ## 9. Repeated rolling-origin evaluation
