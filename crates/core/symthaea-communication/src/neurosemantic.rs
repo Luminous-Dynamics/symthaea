@@ -605,6 +605,27 @@ impl NeurosemanticRemediationImpactArtifact {
         Ok(())
     }
 
+    pub fn verify_evaluation_bundle_identity(
+        &self,
+        evaluation_manifest_bytes: &[u8],
+        forget_manifest_bytes: &[u8],
+        retain_manifest_bytes: &[u8],
+    ) -> Result<(), String> {
+        self.validate()?;
+        let manifest = NeurosemanticRemediationEvaluationManifest::from_json_bytes(evaluation_manifest_bytes)?;
+        if manifest.fingerprint()? != self.evaluation_manifest_hash {
+            return Err("neurosemantic remediation evaluation manifest fingerprint mismatch".into());
+        }
+        let forget = NeurosemanticRemediationEvaluationSetManifest::from_json_bytes(forget_manifest_bytes)?;
+        let retain = NeurosemanticRemediationEvaluationSetManifest::from_json_bytes(retain_manifest_bytes)?;
+        self.verify_evaluation_set_pair_bytes(forget_manifest_bytes, retain_manifest_bytes)?;
+        if manifest.source_dataset_manifest_hash != forget.source_dataset_manifest_hash
+            || manifest.source_dataset_manifest_hash != retain.source_dataset_manifest_hash
+        {
+            return Err("neurosemantic remediation evaluation manifest source dataset does not match evaluation sets".into());
+        }
+        Ok(())
+    }
     pub fn verify_evaluation_set_pair_bytes(
         &self,
         forget_manifest_bytes: &[u8],
@@ -3127,6 +3148,18 @@ mod tests {
         assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PreRemediation, &pre_bytes).is_ok());
         assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PostRemediation, &post_bytes).is_ok());
         assert!(impact.verify_evaluation_set_pair_bytes(&forget_bytes, &retain_bytes).is_ok());
+        assert!(impact.verify_evaluation_bundle_identity(
+            &evaluation_manifest_bytes,
+            &forget_bytes,
+            &retain_bytes,
+        ).is_ok());
+        let mut source_swap = retain_set.clone();
+        source_swap.source_dataset_manifest_hash = content_hash(b"other-dataset");
+        assert!(impact.verify_evaluation_bundle_identity(
+            &evaluation_manifest_bytes,
+            &forget_bytes,
+            &serde_json::to_vec(&source_swap).unwrap(),
+        ).is_err());
         assert!(impact.verify_evaluation_method_bytes(NeurosemanticRemediationEvaluationMethodKind::RecoveryAttack, &recovery_bytes).is_ok());
         assert!(impact.verify_evaluation_method_bytes(NeurosemanticRemediationEvaluationMethodKind::RepresentationResidualProbe, &representation_bytes).is_ok());
         assert!(impact.verify_study_protocol_bytes(protocol_bytes).is_ok());
