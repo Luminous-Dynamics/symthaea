@@ -1481,6 +1481,23 @@ fn monotonic_now_us() -> Result<u64, NixSystemdObserverErrorV1> {
 mod tests {
     use super::*;
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn openat2_rejects_intermediate_symlink_without_weaker_fallback() {
+        let directory = tempfile::tempdir().unwrap();
+        let target = directory.path().join("target");
+        let link = directory.path().join("link");
+        std::fs::create_dir(&target).unwrap();
+        std::fs::write(target.join("unit.service"), b"[Service]\n").unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        let result = open_definition_capture_path(&link.join("unit.service"));
+        assert_eq!(
+            result.unwrap_err(),
+            NixSystemdObserverErrorV1::DefinitionContentSymlink
+        );
+    }
+
     #[cfg(unix)]
     #[test]
     fn definition_content_reader_hashes_exact_file_bytes() {
