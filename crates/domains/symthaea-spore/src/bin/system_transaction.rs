@@ -29,6 +29,7 @@ const CROSS_PROCESS_LOCK_PATH: &str = "/run/nixforhumanity-system-mutation.lock"
 const LEDGER_PATH: &str = "/var/lib/nixforhumanity/system-transactions.jsonl";
 const FINGERPRINT_KEY_PATH: &str =
     "/var/lib/nixforhumanity/system-transaction-fingerprint.key";
+const MAX_JOURNAL_EVENT_BYTES: usize = 64 * 1024;
 
 #[derive(Debug)]
 pub(crate) struct MutationLease {
@@ -220,6 +221,46 @@ fn validate_request_id(value: &str) -> Result<&str, String> {
     Ok(value)
 }
 
+fn validate_transaction_id(value: &str) -> Result<(), String> {
+    if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("transaction_id must be exactly 32 hexadecimal characters".into());
+    }
+    Ok(())
+}
+
+fn validate_digest(value: &str, label: &str) -> Result<(), String> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    {
+        return Err(format!("{label} must be exactly 64 lowercase hexadecimal characters"));
+    }
+    Ok(())
+}
+
+fn sync_parent_directory(path: &Path) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("journal path {} has no parent directory", path.display()))?;
+    let directory = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(parent)
+        .map_err(|error| {
+            format!(
+                "unable to open transaction ledger directory {} for synchronization: {error}",
+                parent.display()
+            )
+        })?;
+    directory.sync_all().map_err(|error| {
+        format!(
+            "unable to synchronize transaction ledger directory {}: {error}",
+            parent.display()
+        )
+    })
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct JournalEvent {
     schema_version: u16,
@@ -355,7 +396,16 @@ impl TransactionLedger {
         })?;
 
         let mut records = HashMap::new();
+        let mut transaction_owners = HashMap::<String, String>::new();
         for (line_number, line) in BufReader::new(file).lines().enumerate() {
+            if line.len() > MAX_JOURNAL_EVENT_BYTES {
+                return Err(format!(
+                    "transaction ledger {} line {} exceeds {} bytes",
+                    self.path.display(),
+                    line_number + 1,
+                    MAX_JOURNAL_EVENT_BYTES
+                ));
+            }
             let line = line.map_err(|error| {
                 format!(
                     "unable to read transaction ledger {} line {}: {error}",
@@ -380,6 +430,50 @@ impl TransactionLedger {
                     SCHEMA_VERSION,
                     event.schema_version
                 ));
+            }
+            validate_request_id(&event.request_id).map_err(|error| {
+                format!(
+                    "transaction ledger invalid request_id at line {}: {}",
+                    line_number + 1,
+                    error
+                )
+            })?;
+            validate_transaction_id(&event.transaction_id).map_err(|error| {
+                format!(
+                    "transaction ledger invalid transaction_id at line {}: {}",
+                    line_number + 1,
+                    error
+                )
+            })?;
+            validate_digest(&event.request_digest, "request_digest").map_err(|error| {
+                format!(
+                    "transaction ledger invalid request digest at line {}: {}",
+                    line_number + 1,
+                    error
+                )
+            })?;
+            if let Some(target_digest) = event.target_machine_digest.as_deref() {
+                validate_digest(target_digest, "target_machine_digest").map_err(|error| {
+                    format!(
+                        "transaction ledger invalid target digest at line {}: {}",
+                        line_number + 1,
+                        error
+                    )
+                })?;
+            }
+
+            if let Some(owner) = transaction_owners.get(&event.transaction_id) {
+                if owner != &event.request_id {
+                    return Err(format!(
+                        "transaction ledger reuses transaction_id {} for request_ids {} and {}",
+                        event.transaction_id, owner, event.request_id
+                    ));
+                }
+            } else {
+                transaction_owners.insert(
+                    event.transaction_id.clone(),
+                    event.request_id.clone(),
+                );
             }
 
             match event.event.as_str() {
@@ -459,6 +553,15 @@ impl TransactionLedger {
     }
 
     fn append(&self, event: &JournalEvent) -> Result<(), String> {
+        let serialized = serde_json::to_string(event)
+            .map_err(|error| format!("unable to serialize transaction ledger event: {error}"))?;
+        if serialized.len() > MAX_JOURNAL_EVENT_BYTES {
+            return Err(format!(
+                "transaction ledger event exceeds {} bytes",
+                MAX_JOURNAL_EVENT_BYTES
+            ));
+        }
+
         let mut file = OpenOptions::new()
             .create(true)
             .append(true)
@@ -482,9 +585,7 @@ impl TransactionLedger {
                 self.path.display()
             )
         })?;
-        let line = serde_json::to_string(event)
-            .map_err(|error| format!("unable to serialize transaction ledger event: {error}"))?;
-        file.write_all(line.as_bytes())
+        file.write_all(serialized.as_bytes())
             .and_then(|_| file.write_all(b"\n"))
             .and_then(|_| file.sync_all())
             .map_err(|error| {
@@ -492,7 +593,12 @@ impl TransactionLedger {
                     "unable to commit transaction ledger {}: {error}",
                     self.path.display()
                 )
-            })
+            })?;
+
+        // fsync(file) does not necessarily make the containing directory entry
+        // durable across power loss; sync the directory explicitly as required
+        // for crash-consistent creation of the journal file.
+        sync_parent_directory(&self.path)
     }
 
     pub(crate) fn admit(
@@ -1001,6 +1107,89 @@ mod tests {
         assert_eq!(receipt.mutation, MutationKind::Install);
         assert_eq!(receipt.outcome, TransactionOutcome::Indeterminate);
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn ledger_rejects_invalid_transaction_identity_on_load() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-transaction-ledger-invalid-id-{name}.jsonl"));
+        let event = serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "event": "started",
+            "request_id": "valid-request-000001",
+            "transaction_id": "not-a-transaction-id",
+            "mutation": "install",
+            "target_machine_digest": null,
+            "request_digest": "a".repeat(64),
+            "outcome": null
+        });
+        std::fs::write(&path, format!("{event}\n")).unwrap();
+        std::fs::set_permissions(
+            &path,
+            std::os::unix::fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let error = ledger.load().expect_err("invalid transaction identity must fail closed");
+        assert!(error.contains("invalid transaction_id"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn ledger_rejects_transaction_id_reuse_across_requests() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-transaction-ledger-tx-collision-{name}.jsonl"));
+        let transaction_id = "0123456789abcdef0123456789abcdef";
+        let first = serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "event": "started",
+            "request_id": "request-one-000001",
+            "transaction_id": transaction_id,
+            "mutation": "install",
+            "target_machine_digest": null,
+            "request_digest": "a".repeat(64),
+            "outcome": null
+        });
+        let second = serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "event": "started",
+            "request_id": "request-two-000001",
+            "transaction_id": transaction_id,
+            "mutation": "rollback",
+            "target_machine_digest": null,
+            "request_digest": "b".repeat(64),
+            "outcome": null
+        });
+        std::fs::write(&path, format!("{first}\n{second}\n")).unwrap();
+        std::fs::set_permissions(
+            &path,
+            std::os::unix::fs::PermissionsExt::from_mode(0o600),
+        )
+        .unwrap();
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let error = ledger.load().expect_err("transaction ID collision must fail closed");
+        assert!(error.contains("reuses transaction_id"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn ledger_rejects_oversized_event_on_load() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-transaction-ledger-oversized-{name}.jsonl"));
+        let oversized = "x".repeat(MAX_JOURNAL_EVENT_BYTES + 1);
+        std::fs::write(&path, format!("{oversized}\n")).unwrap();
+        std::fs::set_permissions(
+            &path,
+            std::fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let error = ledger.load().expect_err("oversized event must fail closed");
+        assert!(error.contains("exceeds"));
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
