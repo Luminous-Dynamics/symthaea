@@ -17,8 +17,8 @@ use super::post_state::{
 };
 use super::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use super::service_effect::{
-    NixServiceDefinitionContentEvidenceV1, NixServiceEffectContextErrorV1,
-    NixSystemdUnitDefinitionContentFileV1, NixVerifiedServiceDefinitionContentV1,
+    NixServiceDefinitionContentEvidenceV1, NixSystemdUnitDefinitionContentFileV1,
+    NixVerifiedServiceDefinitionContentV1,
 };
 use super::service_state::{ServiceActiveStateV1, ServiceLoadStateV1, ServiceUnitFileStateV1};
 use std::collections::HashMap;
@@ -375,8 +375,9 @@ impl NixSystemdReadOnlyObserverV1 {
         let post_identity_digest = post_identity
             .digest(&expected_unit)
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
+        let final_owner = self.systemd_manager_owner().await?;
 
-        if post_owner != manager_owner {
+        if post_owner != manager_owner || final_owner != manager_owner {
             return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
         }
         if post_object_path.as_str() != object_path.as_str()
@@ -1309,6 +1310,40 @@ fn monotonic_now_us() -> Result<u64, NixSystemdObserverErrorV1> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn definition_content_reader_hashes_exact_file_bytes() {
+        use std::io::Write;
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("nginx.service");
+        let mut file = std::fs::File::create(&path).unwrap();
+        let bytes = b"[Service]\nExecStart=/usr/bin/nginx\n";
+        file.write_all(bytes).unwrap();
+        file.sync_all().unwrap();
+
+        let captured = read_definition_content_file(path.to_str().unwrap()).unwrap();
+        assert_eq!(captured.byte_len, bytes.len() as u64);
+        assert_eq!(
+            captured.content_digest,
+            blake3::hash(bytes).to_hex().to_string()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn definition_content_reader_rejects_trailing_symlink() {
+        let directory = tempfile::tempdir().unwrap();
+        let target = directory.path().join("real.service");
+        let link = directory.path().join("linked.service");
+        std::fs::write(&target, b"[Service]\n").unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        assert!(matches!(
+            read_definition_content_file(link.to_str().unwrap()),
+            Err(NixSystemdObserverErrorV1::DefinitionContentSymlink)
+        ));
+    }
 
     #[test]
     fn invocation_id_is_exactly_16_bytes() {
