@@ -4033,6 +4033,16 @@ fn validate_native_authority_pin_set(
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
+
+        // Do not let a consistently forged ledger row become a new authority
+        // source: its native replay identity must still be derivable from its
+        // persisted namespace and native authorization identifier.
+        Self::validate_persisted_native_replay_provenance(
+            record,
+            replay_owner.4.as_deref(),
+            replay_owner.5.as_deref(),
+            replay_owner.6.as_deref(),
+        )?;
         Ok(())
     }
 
@@ -13811,6 +13821,15 @@ mod tests {
         connection
             .execute(
                 "DELETE FROM authorization_native_replay_history
+                 WHERE native_replay_identity=?1",
+                params![replay_identity.as_str()],
+            )
+            .unwrap();
+        // Model ordinary compaction as well: dispatch is gone, while terminal
+        // evidence still proves that this native replay identity was consumed.
+        connection
+            .execute(
+                "DELETE FROM authorization_dispatches
                  WHERE native_replay_identity=?1",
                 params![replay_identity.as_str()],
             )
