@@ -2362,7 +2362,9 @@ fn make_surrogate(
                 let extra = match family {
                     PredictionNullFamily::CircularShift => 0,
                     PredictionNullFamily::FeatureDecoupling => channel_offset,
-                    PredictionNullFamily::IncrementalRelationalShift => channel_offset,
+                    // Keep the incremental relational block coherent while
+                    // shifting it away from its original temporal alignment.
+                    PredictionNullFamily::IncrementalRelationalShift => 0,
                 };
                 if segment_len < 2 {
                     return Err(RelationalPredictionError::InsufficientSamples(segment_len));
@@ -2974,6 +2976,46 @@ mod tests {
             status_tampered.validate(),
             Err(RelationalPredictionError::InvalidSurrogateCount)
         );
+    }
+
+    #[test]
+    fn incremental_relational_shift_preserves_baseline_and_moves_added_block_together() {
+        let samples = build_samples(0.5);
+        let config = config();
+        let shift = 3usize;
+        let surrogate = make_surrogate(
+            &samples,
+            &config,
+            PredictionNullFamily::IncrementalRelationalShift,
+            shift,
+        )
+        .unwrap();
+
+        for (index, (original, shifted)) in samples.iter().zip(&surrogate).enumerate() {
+            assert_eq!(shifted.feature_time, original.feature_time);
+            assert_eq!(shifted.outcome_time, original.outcome_time);
+            assert_eq!(shifted.agent_a, original.agent_a);
+            assert_eq!(shifted.agent_b, original.agent_b);
+            assert_eq!(shifted.alignment, original.alignment);
+            assert_eq!(shifted.common_driver, original.common_driver);
+
+            let train_or_test = if index < config.train_samples {
+                (0, config.train_samples)
+            } else if index >= config.test_start() {
+                (config.test_start(), config.test_samples)
+            } else {
+                continue;
+            };
+            let (segment_start, segment_len) = train_or_test;
+            let local_index = index - segment_start;
+            let source_index =
+                (local_index + (1 + (shift - 1) % (segment_len - 1))) % segment_len;
+            let source = &samples[segment_start + source_index];
+
+            assert_eq!(shifted.a_to_b, source.a_to_b);
+            assert_eq!(shifted.b_to_a, source.b_to_a);
+            assert_eq!(shifted.turn_taking, source.turn_taking);
+        }
     }
 
     #[test]
