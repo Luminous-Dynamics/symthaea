@@ -2449,14 +2449,6 @@ impl<'a> CborReader<'a> {
             None => Err(Rfc9162ProofDecodeError::UnexpectedEof),
         }
     }
-    fn read_bstr32(&mut self)->Result<[u8;32],Rfc9162ProofDecodeError>{
-        let value=self.read_bstr_bounded(32)?;
-        if value.len()!=32{return Err(Rfc9162ProofDecodeError::InvalidHashLength)}
-        let mut out=[0u8;32];
-        out.copy_from_slice(&value);
-        Ok(out)
-    }
-
     fn read_bstr32_with_resource_chunk_limits(&mut self)->Result<[u8;32],Rfc9162ProofDecodeError>{
         let value=self.read_bstr_bounded_with_resource_chunk_limits(32)?;
         if value.len()!=32{return Err(Rfc9162ProofDecodeError::InvalidHashLength)}
