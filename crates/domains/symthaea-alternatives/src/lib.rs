@@ -5499,6 +5499,29 @@ mod tests {
             assert_eq!(scope, "synthetic functional unit");
             assert_eq!(basis, &expected_basis);
         }
+
+        let mut expanded_requirement = requirement.clone();
+        expanded_requirement.performance_scales.insert(
+            "unconstrained_metric".into(),
+            ComparisonScale {
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: expected_basis,
+            },
+        );
+        let unconstrained = ExperimentalDiscriminationTarget {
+            target_id: "unconstrained-target".into(),
+            measurand_id: "measurand".into(),
+            left_candidate_id: "left".into(),
+            right_candidate_id: "right".into(),
+            surface: ExperimentalDiscriminationSurface::PerformanceMetric(
+                "unconstrained_metric".into(),
+            ),
+            decision_rule: burden.decision_rule.clone(),
+        };
+        assert!(unconstrained
+            .requirement_scale(&expanded_requirement)
+            .is_none());
     }
 
     #[test]
