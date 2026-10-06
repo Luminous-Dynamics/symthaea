@@ -53,7 +53,8 @@ OBSERVATION_CRATE_WIDE_FACTORY_PATTERN='\bpub\(crate\)[[:space:]]+(?:async[[:spa
 ENABLEMENT_EVIDENCE_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceEnablementEvidenceV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceEnablementEvidenceV1\b'
 ENABLEMENT_EVIDENCE_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceEnablementEvidenceV1[[:space:]]*\{.*?pub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+new[[:space:]]*\('
 OBSERVATION_PUBLIC_FACTORY_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(parse_systemd_properties|parse_systemd_observation|from_observed_state)[[:space:]]*\('
-SYSTEMD_OBSERVER_MUTATION_CALL_PATTERN='\.call\(\s*"(StartUnit|StopUnit|RestartUnit|ReloadUnit|EnableUnitFiles|DisableUnitFiles|SetUnitProperties|Start|Stop|Restart|Reload)"'
+SYSTEMD_OBSERVER_MUTATION_CALL_PATTERN='(?:\.call|\.call_method|\.call_noreply)\(\s*"(StartUnit|StopUnit|RestartUnit|ReloadUnit|EnableUnitFiles|DisableUnitFiles|SetUnitProperties|Start|Stop|Restart|Reload)"'
+SYSTEMD_OBSERVER_PROXY_MUTATION_PATTERN='\.set_property\(|\.into_inner\(\)'
 SYSTEMD_OBSERVER_AUTHORITY_IMPORT_PATTERN='\bsuper::(?:executor|authorization)\b'
 SYSTEMD_TRANSPORT_PUBLIC_API_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(observe_service_properties|observe_service_state_properties)[[:space:]]*\('
 
@@ -90,6 +91,11 @@ scan_systemd_observer_mutation_call() {
 scan_systemd_observer_authority_import() {
   local file="$1"
   rg -n --pcre2 "${SYSTEMD_OBSERVER_AUTHORITY_IMPORT_PATTERN}" "$file"
+}
+
+scan_systemd_observer_proxy_mutation() {
+  local file="$1"
+  rg -n --pcre2 "${SYSTEMD_OBSERVER_PROXY_MUTATION_PATTERN}" "$file"
 }
 
 scan_public_systemd_transport_api() {
@@ -223,6 +229,12 @@ run_boundary_check() {
   fi
   if matches="$(scan_systemd_observer_authority_import "${ROOT}/crates/core/nixward/src/action/systemd_observer.rs")"; then
     echo "ERROR: read-only systemd observer imports execution/authorization authority" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
+
+  if matches="$(scan_systemd_observer_proxy_mutation "${ROOT}/crates/core/nixward/src/action/systemd_observer.rs")"; then
+    echo "ERROR: read-only systemd observer unwraps or mutates a zbus proxy" >&2
     echo "${matches}" >&2
     failed=1
   fi
@@ -458,6 +470,12 @@ run_self_test() {
   printf '%s\n' 'use super::executor::NixOSExecutor;' > "${tmp}/systemd-observer-authority-import.rs"
   if scan_systemd_observer_authority_import "${tmp}/systemd-observer-authority-import.rs"; then :; else
     echo "ERROR: CROSS-059 self-test failed to detect observer authority import" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'properties.set_property("Enabled", value);' > "${tmp}/systemd-observer-proxy-mutation.rs"
+  if scan_systemd_observer_proxy_mutation "${tmp}/systemd-observer-proxy-mutation.rs"; then :; else
+    echo "ERROR: CROSS-059 self-test failed to detect observer proxy mutation" >&2
     return 1
   fi
 
