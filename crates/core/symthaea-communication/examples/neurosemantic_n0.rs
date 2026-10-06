@@ -689,6 +689,7 @@ fn main() -> Result<(), String> {
         metric_ref: metric_forgetfulness.metric_ref.clone(),
         kind: metric_forgetfulness.kind,
         scope_ref: metric_forgetfulness.scope_ref.clone(),
+        population_manifest_hash: forget_set_manifest.fingerprint()?,
         eligible_subject_artifact_hashes: vec![
             symthaea_communication::content_hash(b"forget-1"),
             symthaea_communication::content_hash(b"forget-2"),
@@ -714,6 +715,7 @@ fn main() -> Result<(), String> {
         metric_ref: metric_utility.metric_ref.clone(),
         kind: metric_utility.kind,
         scope_ref: metric_utility.scope_ref.clone(),
+        population_manifest_hash: retain_set_manifest.fingerprint()?,
         eligible_subject_artifact_hashes: vec![
             symthaea_communication::content_hash(b"retain-1"),
             symthaea_communication::content_hash(b"retain-2"),
@@ -739,6 +741,7 @@ fn main() -> Result<(), String> {
         metric_ref: metric_fairness.metric_ref.clone(),
         kind: metric_fairness.kind,
         scope_ref: metric_fairness.scope_ref.clone(),
+        population_manifest_hash: evaluation_split_manifest_hash.clone(),
         eligible_subject_artifact_hashes: vec![
             symthaea_communication::content_hash(b"fairness-1"),
             symthaea_communication::content_hash(b"fairness-2"),
@@ -764,6 +767,7 @@ fn main() -> Result<(), String> {
         metric_ref: metric_recovery.metric_ref.clone(),
         kind: metric_recovery.kind,
         scope_ref: metric_recovery.scope_ref.clone(),
+        population_manifest_hash: forget_set_manifest.fingerprint()?,
         eligible_subject_artifact_hashes: vec![
             symthaea_communication::content_hash(b"forget-1"),
             symthaea_communication::content_hash(b"forget-2"),
@@ -789,6 +793,7 @@ fn main() -> Result<(), String> {
         metric_ref: metric_representation.metric_ref.clone(),
         kind: metric_representation.kind,
         scope_ref: metric_representation.scope_ref.clone(),
+        population_manifest_hash: forget_set_manifest.fingerprint()?,
         eligible_subject_artifact_hashes: vec![
             symthaea_communication::content_hash(b"forget-1"),
             symthaea_communication::content_hash(b"forget-2"),
@@ -857,6 +862,11 @@ fn main() -> Result<(), String> {
         .collect::<Result<_, _>>()?;
     let observation_set_byte_refs: Vec<&[u8]> =
         observation_set_bytes.iter().map(Vec::as_slice).collect();
+    let population_manifest_byte_refs: Vec<&[u8]> = vec![
+        forget_set_manifest_bytes.as_slice(),
+        retain_set_manifest_bytes.as_slice(),
+        evaluation_split_manifest_bytes.as_slice(),
+    ];
 
     let measurement = NeurosemanticRemediationMeasurementArtifact {
         schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION,
@@ -1006,6 +1016,7 @@ fn main() -> Result<(), String> {
                 &measurement_bytes,
                 &computation_byte_refs,
                 &observation_set_byte_refs,
+                &population_manifest_byte_refs,
             )
             .is_ok();
     let remediation_metric_estimate_forgery_blocked = {
@@ -1079,6 +1090,39 @@ fn main() -> Result<(), String> {
                 &measurement_bytes,
                 &computation_byte_refs,
                 &supplied_refs,
+            )
+            .is_err()
+    };
+    let remediation_observation_population_substitution_blocked = {
+        let mut forged = observation_sets[0].clone();
+        forged.population_manifest_hash =
+            symthaea_communication::content_hash(b"other-population-manifest");
+        let forged_bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        let mut supplied = observation_set_bytes.clone();
+        supplied[0] = forged_bytes;
+        let supplied_refs: Vec<&[u8]> = supplied.iter().map(Vec::as_slice).collect();
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &measurement_bytes,
+                &computation_byte_refs,
+                &supplied_refs,
+                &population_manifest_byte_refs,
+            )
+            .is_err()
+    };
+    let remediation_observation_membership_cherry_pick_blocked = {
+        let mut forged = observation_sets[0].clone();
+        forged.eligible_subject_artifact_hashes.pop();
+        let forged_bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        let mut supplied = observation_set_bytes.clone();
+        supplied[0] = forged_bytes;
+        let supplied_refs: Vec<&[u8]> = supplied.iter().map(Vec::as_slice).collect();
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &measurement_bytes,
+                &computation_byte_refs,
+                &supplied_refs,
+                &population_manifest_byte_refs,
             )
             .is_err()
     };
@@ -1761,6 +1805,8 @@ fn main() -> Result<(), String> {
         "remediation_observation_duplicate_blocked": remediation_observation_duplicate_blocked,
         "remediation_observation_scope_substitution_blocked": remediation_observation_scope_substitution_blocked,
         "remediation_computation_substitution_blocked": remediation_computation_substitution_blocked,
+        "remediation_observation_population_substitution_blocked": remediation_observation_population_substitution_blocked,
+        "remediation_observation_membership_cherry_pick_blocked": remediation_observation_membership_cherry_pick_blocked,
         "remediation_measurement_worst_case_binding_blocked": remediation_measurement_worst_case_binding_blocked,
         "remediation_measurement_missingness_fail_closed": remediation_measurement_missingness_fail_closed,
         "remediation_metric_definition_substitution_blocked": remediation_metric_definition_substitution_blocked,
