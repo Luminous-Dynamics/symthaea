@@ -720,6 +720,9 @@ impl MorphophonologicalCompilationWitness {
                 if !ids.insert(slice.record_id.clone()) {
                     return Err(MorphophonologicalCompilationWitnessError::DuplicateSourceRecordId);
                 }
+                if slice.byte_length == 0 {
+                    return Err(MorphophonologicalCompilationWitnessError::EmptySourceSlice);
+                }
                 let end = slice
                     .byte_offset
                     .checked_add(slice.byte_length)
@@ -904,6 +907,7 @@ pub enum MorphophonologicalCompilationWitnessError {
     MalformedDigest,
     EmptySourceSelection,
     MalformedSourceSlice,
+    EmptySourceSlice,
     DuplicateSourceRecordId,
     SourceRangeOverflow,
     OverlappingSourceSlices,
@@ -933,6 +937,7 @@ impl std::fmt::Display for MorphophonologicalCompilationWitnessError {
             Self::MalformedDigest => write!(f, "morphophonological compilation witness contains a malformed BLAKE3 digest"),
             Self::EmptySourceSelection => write!(f, "morphophonological compilation witness must select at least one source record"),
             Self::MalformedSourceSlice => write!(f, "morphophonological compilation witness contains a malformed source slice"),
+            Self::EmptySourceSlice => write!(f, "morphophonological compilation witness source slice must contain at least one byte"),
             Self::DuplicateSourceRecordId => write!(f, "morphophonological compilation witness source record ids must be unique"),
             Self::SourceRangeOverflow => write!(f, "morphophonological compilation witness source range overflows"),
             Self::OverlappingSourceSlices => write!(f, "morphophonological compilation witness source slices must not overlap"),
@@ -3755,4 +3760,58 @@ mod tests {
     }
 
 
+}
+
+
+#[test]
+fn compilation_witness_rejects_empty_source_slice() {
+    let artifact = b"row0\n";
+    let rule_set = MorphophonologicalRuleSet::new(
+        "en",
+        "fixture:rules:v1",
+        "en-US",
+        MorphophonologicalResourceEvidence::hand_authored(
+            "fixture:rules:v1",
+            "fixture-v1",
+        )
+        .expect("fixture resource evidence"),
+        "fixture:rules:v1",
+        "fixture:rules:v1",
+        vec![MorphophonologicalRule {
+            rule_id: "fixture:identity".into(),
+            source_record_id: Some("row0".into()),
+            lemma: Some("row0".into()),
+            morphology: vec![MorphologicalFeature {
+                category: "fixture".into(),
+                value: "identity".into(),
+            }],
+            operation: MorphophonologicalRuleOperation::Identity,
+        }],
+    )
+    .expect("rule set");
+
+    let witness = MorphophonologicalCompilationWitness::new(
+        "fixture-compiler",
+        "fixture-compiler-v1",
+        "fixture-normalization-v1",
+        artifact,
+        vec![MorphophonologicalSourceSlice {
+            record_id: "row0".into(),
+            byte_offset: 0,
+            byte_length: artifact.len(),
+            record_blake3: blake3::hash(artifact).to_hex().to_string(),
+        }],
+        &rule_set,
+    )
+    .expect("compilation witness");
+
+    let mut tampered = witness;
+    tampered.source_slices[0].byte_length = 0;
+    tampered.source_slices[0].record_blake3 =
+        blake3::hash(b"").to_hex().to_string();
+
+    assert_eq!(
+        tampered.validate_shape(),
+        Err(MorphophonologicalCompilationWitnessError::EmptySourceSlice)
+    );
 }
