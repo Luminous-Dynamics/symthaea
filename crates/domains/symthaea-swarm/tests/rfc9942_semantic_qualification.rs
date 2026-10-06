@@ -1400,29 +1400,26 @@ fn rfc9942_vdp_map_resource_limit_remains_typed() {
 
 #[test]
 fn rfc9942_protected_header_map_entry_resource_limit_is_typed() {
-    let mut protected = Vec::new();
-    cbor_map_len(&mut protected, 33);
-    for label in 100..133 {
-        cbor_int(&mut protected, label);
-        cbor_uint(&mut protected, 0);
+    let mut protected = vec![0xb8, 0x21];
+    for label in 100..133u8 {
+        protected.extend_from_slice(&[0x18, label, 0x00]);
     }
+    assert_eq!(protected.len(), 101);
 
-    let mut receipt = vec![0xd2, 0x84];
-    cbor_bytes(&mut receipt, &protected);
-    cbor_map_len(&mut receipt, 0);
-    receipt.push(0xf6);
-    cbor_bytes(&mut receipt, &[0u8; 64]);
+    let mut receipt = vec![0xd2, 0x84, 0x58, protected.len() as u8];
+    receipt.extend_from_slice(&protected);
+    receipt.extend_from_slice(&[0xa0, 0xf6, 0x58, 0x40]);
+    receipt.extend_from_slice(&[0u8; 64]);
 
     assert_eq!(
         Rfc9942ReceiptEnvelope::from_cbor(&receipt),
         Err(Rfc9942VdpError::ResourceLimitExceeded)
     );
 
-    let mut outer = vec![0xd2, 0x84];
-    cbor_bytes(&mut outer, &protected);
-    cbor_map_len(&mut outer, 0);
-    outer.push(0xf6);
-    cbor_bytes(&mut outer, &[0u8; 64]);
+    let mut outer = vec![0xd2, 0x84, 0x58, protected.len() as u8];
+    outer.extend_from_slice(&protected);
+    outer.extend_from_slice(&[0xa0, 0xf6, 0x58, 0x40]);
+    outer.extend_from_slice(&[0u8; 64]);
 
     assert_eq!(
         Rfc9942SignatureWithReceipts::from_cbor(&outer),
@@ -1571,9 +1568,9 @@ fn rfc9942_indefinite_crit_array_resource_limit_is_typed() {
         encoded.push(0x40);
 
         let result = if context == "receipt" {
-            Rfc9942ReceiptEnvelope::from_cbor(&encoded)
+            Rfc9942ReceiptEnvelope::from_cbor(&encoded).map(|_| ())
         } else {
-            Rfc9942SignatureWithReceipts::from_cbor(&encoded)
+            Rfc9942SignatureWithReceipts::from_cbor(&encoded).map(|_| ())
         };
         assert_eq!(
             result,
