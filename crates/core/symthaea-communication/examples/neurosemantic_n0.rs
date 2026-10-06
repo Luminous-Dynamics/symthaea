@@ -170,11 +170,16 @@ fn main() -> Result<(), String> {
         peer_ref: resolution_context.peer_ref.clone(),
         lease_id: resolution_context.lease_id.clone(),
         consent_epoch: resolution_context.consent_epoch,
+        consent_lease_fingerprint: resolution_context.consent_lease_fingerprint.clone(),
         purpose: resolution_context.purpose,
         channel: resolution_context.channel,
         direction: resolution_context.direction,
         status: NeurosemanticAuthorityStatus::Active,
         status_source_ref: "mycelix-status:synthetic-1".into(),
+        status_source_hash: symthaea_communication::compute_status_source_hash(
+            "mycelix-status:synthetic-1",
+            b"synthetic-status-record-1",
+        ),
         checked_at_unix_s: 1_200,
         expires_at_unix_s: 1_800,
         signature: Vec::new(),
@@ -192,6 +197,7 @@ fn main() -> Result<(), String> {
         .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
             b"synthetic-derivation-record-1",
+            b"synthetic-status-record-1",
             &authority_attestation,
             &signing_key.verifying_key(),
             &authority_resolution,
@@ -409,6 +415,7 @@ fn main() -> Result<(), String> {
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
                 b"synthetic-derivation-record-1",
+                b"synthetic-status-record-1",
                 &substituted_authority_attestation,
                 &signing_key.verifying_key(),
                 &authority_resolution,
@@ -431,6 +438,7 @@ fn main() -> Result<(), String> {
         .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
             b"synthetic-derivation-record-1",
+            b"synthetic-status-record-1",
             &authority_attestation,
             &signing_key.verifying_key(),
             &forged_resolution,
@@ -458,9 +466,27 @@ fn main() -> Result<(), String> {
         .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
             b"synthetic-derivation-record-1",
+            b"synthetic-status-record-1",
             &authority_attestation,
             &signing_key.verifying_key(),
             &wrong_context_resolution,
+            &resolver_signing_key.verifying_key(),
+            &resolution_context,
+            1_500,
+        )
+        .is_err();
+
+    let authority_status_source_mismatch_blocked = message
+        .packet
+        .data_policy
+        .handling
+        .bind_policy_provenance_with_attestation_and_resolution(
+            b"synthetic-policy-record-1",
+            b"synthetic-derivation-record-1",
+            b"synthetic-status-record-2",
+            &authority_attestation,
+            &signing_key.verifying_key(),
+            &authority_resolution,
             &resolver_signing_key.verifying_key(),
             &resolution_context,
             1_500,
@@ -476,6 +502,7 @@ fn main() -> Result<(), String> {
         .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
             b"synthetic-derivation-record-1",
+            b"synthetic-status-record-1",
             &authority_attestation,
             &signing_key.verifying_key(),
             &tampered_resolution,
@@ -498,6 +525,7 @@ fn main() -> Result<(), String> {
         .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
             b"synthetic-derivation-record-1",
+            b"synthetic-status-record-1",
             &authority_attestation,
             &signing_key.verifying_key(),
             &pre_attestation_resolution,
@@ -573,7 +601,8 @@ fn main() -> Result<(), String> {
         "authority_resolution_predating_attestation_blocked": pre_attestation_resolution_blocked,
         "policy_freshness_expired_before_resolution_expiry": policy_freshness_expired_before_resolution_expiry,
         "mutated_consent_lease_blocked": mutated_lease_blocked,
-        "authority_proof_substitution_blocked": authority_proof_substitution_blocked
+        "authority_proof_substitution_blocked": authority_proof_substitution_blocked,
+        "authority_status_source_mismatch_blocked": authority_status_source_mismatch_blocked
     });
 
     println!("{}", serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?);
