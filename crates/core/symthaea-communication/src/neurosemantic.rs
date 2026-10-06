@@ -1537,6 +1537,28 @@ impl NeurosemanticDerivationLineageRecord {
         Ok(record)
     }
 
+    /// Verify one concrete input artifact against the exact content hash recorded
+    /// for that lineage input. The reference identifies the intended entity; the hash
+    /// makes the supplied bytes independently checkable.
+    pub fn verify_input_artifact_bytes(
+        &self,
+        index: usize,
+        artifact_bytes: &[u8],
+    ) -> Result<(), String> {
+        self.validate()?;
+        let expected_hash = self
+            .input_artifact_hashes
+            .get(index)
+            .ok_or_else(|| "neurosemantic derivation lineage input index out of bounds".to_string())?;
+        if artifact_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err("neurosemantic derivation lineage input artifact exceeds the serialized artifact limit".into());
+        }
+        if content_hash(artifact_bytes) != *expected_hash {
+            return Err("neurosemantic derivation lineage input artifact hash mismatch".into());
+        }
+        Ok(())
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_version != NEUROSEMANTIC_DERIVATION_LINEAGE_SCHEMA_VERSION
             || !valid_identifier(&self.lineage_ref)
@@ -2532,6 +2554,21 @@ mod tests {
 
         let oversized = vec![b' '; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1];
         assert!(NeurosemanticDerivationLineageRecord::from_json_bytes(&oversized).is_err());
+    }
+
+    #[test]
+    fn derivation_lineage_verifies_concrete_input_artifacts() {
+        let record = synthetic_derivation_lineage_record();
+        assert!(record.verify_input_artifact_bytes(0, b"synthetic-input-artifact-1").is_ok());
+        assert!(record.verify_input_artifact_bytes(1, b"synthetic-input-artifact-2").is_ok());
+        assert!(record.verify_input_artifact_bytes(0, b"synthetic-input-artifact-tampered").is_err());
+        assert!(record.verify_input_artifact_bytes(2, b"synthetic-input-artifact-3").is_err());
+        assert!(record
+            .verify_input_artifact_bytes(
+                0,
+                &vec![b'x'; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1],
+            )
+            .is_err());
     }
 
     #[test]
