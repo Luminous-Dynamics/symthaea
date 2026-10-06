@@ -8200,7 +8200,7 @@ mod tests {
 
         let path = std::env::temp_dir().join(format!(
             "symthaea-token-file-{}",
-            new_session_id().unwrap()
+            random_operation_id().unwrap()
         ));
         std::fs::write(&path, "secret-token\n").unwrap();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
