@@ -270,7 +270,12 @@ pub struct NeurosemanticPolicyProvenanceBinding {
 
 impl NeurosemanticAuthorityResolutionAttestation {
     pub fn message_bytes(&self) -> Result<Vec<u8>, String> {
+        // Validate the signature-independent fields before signing so callers
+        // cannot manufacture a cryptographically valid proof over an invalid
+        // authority-resolution record.
         let mut unsigned = self.clone();
+        unsigned.signature = vec![0; MAX_NEUROSEMANTIC_AUTHORITY_SIGNATURE_BYTES];
+        unsigned.validate()?;
         unsigned.signature.clear();
         let encoded = serde_json::to_vec(&unsigned)
             .map_err(|error| format!("authority resolution serialization: {error}"))?;
@@ -586,6 +591,9 @@ impl NeurosemanticHandlingPolicy {
             resolution_verifying_key,
             now_unix_s,
         )?;
+        if resolution.expires_at_unix_s > attestation.expires_at_unix_s {
+            return Err("neurosemantic authority resolution outlives its authority attestation".into());
+        }
         if resolution.status != NeurosemanticAuthorityStatus::Active {
             return Err("neurosemantic authority resolution is not active".into());
         }
@@ -1792,6 +1800,47 @@ mod tests {
         assert_eq!(binding.authority_resolution_status, NeurosemanticAuthorityStatus::Active);
         assert_eq!(binding.authority_resolution_consent_epoch, 7);
         assert_eq!(binding.authority_resolution_subject_ref, "subject");
+    }
+
+    #[test]
+    fn authority_resolution_message_requires_valid_unsigned_fields() {
+        let policy = semantic_policy();
+        let (attestation, _) = authority_attestation(&policy);
+        let context = binding_context();
+        let (mut resolution, _) =
+            authority_resolution(&policy, &attestation, &context, 100, 2_000);
+
+        resolution.expires_at_unix_s = resolution.checked_at_unix_s;
+        assert!(resolution.message_bytes().is_err());
+
+        let mut resolution, = (authority_resolution(&policy, &attestation, &context, 100, 2_000),);
+        resolution.0.resolver_ref.clear();
+        assert!(resolution.0.message_bytes().is_err());
+    }
+
+    #[test]
+    fn authority_resolution_cannot_outlive_authority_attestation() {
+        let policy = semantic_policy();
+        let (attestation, authority_key) = authority_attestation(&policy);
+        let context = binding_context();
+        let mut resolution = authority_resolution(&policy, &attestation, &context, 100, 1_900).0;
+        let resolver_key = ed25519_dalek::SigningKey::from_bytes(&[9u8; 32]);
+        resolution.signature =
+            ed25519_dalek::Signer::sign(&resolver_key, &resolution.message_bytes().unwrap())
+                .to_bytes()
+                .to_vec();
+        assert!(policy
+            .handling
+            .bind_policy_provenance_with_attestation_and_resolution(
+                b"synthetic-policy-record-1",
+                &attestation,
+                &authority_key,
+                &resolution,
+                &resolver_key.verifying_key(),
+                &context,
+                1_500,
+            )
+            .is_err());
     }
 
     #[test]
