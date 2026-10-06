@@ -117,7 +117,14 @@ impl NixSystemdDefinitionContentCommitmentV1 {
             }
         }
         validate_digest(&self.overall_digest)?;
-        if self.overall_digest != compute_overall_digest(&self.files)? {
+        if self.overall_digest
+            != compute_overall_digest(
+                &self.unit,
+                &self.definition_identity,
+                &self.manager_owner,
+                &self.files,
+            )?
+        {
             return Err(NixSystemdDefinitionContentErrorV1::OverallDigestMismatch);
         }
         Ok(())
