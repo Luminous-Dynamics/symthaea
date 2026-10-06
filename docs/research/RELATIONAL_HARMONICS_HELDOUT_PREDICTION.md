@@ -198,16 +198,16 @@ The packet carries:
 - fitted linear-model coefficients;
 - training-window feature means and scales.
 
-The packet verifier recomputes each fitted-model held-out prediction from the retained feature row, fitted coefficients, and frozen training means/scales, and recomputes MAE/MSE from the resulting predictions and observed outcomes. For the persistence family it binds every retained prediction to the recorded constant baseline forecast. It therefore rejects tampered predictions even when the reported loss is also modified. The verifier also rejects non-finite values, wrong feature dimensions, missing feature families, inconsistent timestamps, mismatched provenance, and rolling-origin child packets that disagree with the parent configuration.
+The packet verifier recomputes each fitted-model held-out prediction from the retained feature row, fitted coefficients, and frozen training means/scales, and recomputes MAE/MSE from the resulting predictions and observed outcomes. A replay verifier can additionally rerun the complete evaluation against supplied samples and reject any mismatch in training data, preprocessing, fitted coefficients, predictions, scores, or the computed input commitment. For the persistence family it binds every retained prediction to the recorded constant baseline forecast. It therefore rejects tampered predictions even when the reported loss is also modified. The verifier also rejects non-finite values, wrong feature dimensions, missing feature families, inconsistent timestamps, mismatched provenance, and rolling-origin child packets that disagree with the parent configuration.
 
 The provenance fields are intentionally caller-supplied. The evaluator must not invent a dataset hash or software identity. A packet with absent or malformed provenance is therefore invalid for empirical qualification.
 
 JSON schemas are versioned in the emitted document:
 
-- `relational-prediction-evidence/v2` for one held-out segment;
-- `relational-prediction-rolling-evidence/v2` for the repeated-origin bundle.
+- `relational-prediction-evidence/v3` for one held-out segment;
+- `relational-prediction-rolling-evidence/v3` for the repeated-origin bundle.
 
-For rolling-origin bundles, the packet also retains `origin_starts`, the exact source-sample start index realized for each child segment. Validation recomputes these from `first_origin` and `step_samples`, so the declared schedule and retained child packets cannot silently diverge.
+For rolling-origin bundles, the packet also retains `origin_starts`, the exact source-sample start index realized for each child segment. The parent packet also commits to the complete source sequence used to derive those starts, so replay can distinguish a schedule mismatch from a different input sequence. Validation recomputes these from `first_origin` and `step_samples`, so the declared schedule and retained child packets cannot silently diverge.
 
 The evidence packet is intentionally not a self-contained copy of the training dataset. It retains enough of the held-out computation to independently reconstruct test predictions and verify the reported losses, while the caller-attested source-data SHA-256 remains the commitment to the underlying source artifact. Full coefficient-training replay still requires access to the exact source data identified by that digest.
 
