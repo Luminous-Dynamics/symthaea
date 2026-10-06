@@ -33,6 +33,8 @@ pub mod service_domain;
 pub mod service_effect;
 pub mod service_state;
 #[cfg(feature = "systemd-observer")]
+pub mod systemd_definition;
+#[cfg(feature = "systemd-observer")]
 pub mod systemd_observer;
 #[cfg(feature = "systemd-mutation")]
 pub mod systemd_mutation;
@@ -104,6 +106,11 @@ pub use service_effect::{
     NixServiceEffectContextErrorV1, NixServiceEffectContextV1,
 };
 pub use service_domain::{NixServiceOperationErrorV1, NixServiceOperationKindV1, NixServiceOperationV1};
+#[cfg(feature = "systemd-observer")]
+pub use systemd_definition::{
+    NixDefinitionFileContentDigestV1, NixSystemdDefinitionContentCommitmentV1,
+    NixSystemdDefinitionContentErrorV1, NixVerifiedSystemdDefinitionContentCommitmentV1,
+};
 #[cfg(feature = "systemd-observer")]
 pub use systemd_observer::{
     NixSystemdJobHandleV1, NixSystemdJobRemovedWatcherV1, NixSystemdObserverErrorV1,
