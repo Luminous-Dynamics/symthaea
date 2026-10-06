@@ -16,7 +16,7 @@
 //! feature interval. It never touches production partnership state, cognition,
 //! relational_psi, trust, or response generation.
 //!
-//! The null layer has two deterministic families:
+//! The null layer has three deterministic families:
 //!
 //! - CircularShift: shift all relational channels together within each split,
 //!   destroying partner-specific alignment while preserving each channel's
@@ -24,6 +24,8 @@
 //! - FeatureDecoupling: shift relational channels by distinct offsets within
 //!   each split, preserving their individual temporal structure while breaking
 //!   the coherent relational bundle.
+//! - IncrementalRelationalShift: preserve synchrony and non-relational context
+//!   while shifting only the added directional/turn-taking channels.
 //!
 //! Null outputs are empirical calibration diagnostics, not p-values.
 
