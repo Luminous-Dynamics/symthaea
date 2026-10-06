@@ -232,11 +232,15 @@ pub struct NixServicePostStateObservationV1 {
     pub operation: NixServiceOperationKindV1,
     pub unit: String,
     pub observed_generation: u64,
+    /// Exact systemd Unit object identity used for the observation.
+    pub unit_object_path: String,
     pub definition_identity: NixSystemdUnitDefinitionIdentityV1,
     pub active_state: ServiceActiveStateV1,
     pub sub_state: String,
     pub unit_file_state: ServiceUnitFileStateV1,
     pub systemd_job: Option<NixSystemdJobEvidenceV1>,
+    /// Unique D-Bus owner of org.freedesktop.systemd1 for this observation.
+    pub systemd_manager_owner: Option<String>,
     pub invocation_id: Option<String>,
     /// systemd StateChangeTimestampMonotonic represented as monotonic microseconds.
     pub state_change_at_monotonic_us: u64,
@@ -250,10 +254,17 @@ impl NixServicePostStateObservationV1 {
         if self.observed_generation == 0 {
             return Err(NixPostStateErrorV1::InvalidGeneration);
         }
+        validate_systemd_unit_object_path(&self.unit_object_path)?;
         require_nonempty(&self.sub_state, "observed service sub-state")?;
         self.definition_identity.validate_shape()?;
+        if let Some(owner) = self.systemd_manager_owner.as_deref() {
+            validate_unique_manager_owner(owner)?;
+        }
         if let Some(job) = &self.systemd_job {
             job.validate_shape()?;
+            if self.systemd_manager_owner.as_deref() != Some(job.manager_owner.as_str()) {
+                return Err(NixPostStateErrorV1::ManagerOwnerMismatch);
+            }
         }
         validate_optional_invocation_id(self.invocation_id.as_deref(), "post-invocation id")?;
         if self.observed_at_monotonic_us < self.state_change_at_monotonic_us {
@@ -264,6 +275,69 @@ impl NixServicePostStateObservationV1 {
 
     pub fn definition_digest(&self) -> Result<String, NixPostStateErrorV1> {
         self.definition_identity.digest(&self.unit)
+    }
+
+    pub fn state_digest(&self) -> Result<String, NixPostStateErrorV1> {
+        self.validate_shape()?;
+        let mut h = Hasher::new();
+        h.update(STABILITY_SAMPLE_DOMAIN_V1);
+        put_u8(&mut h, operation_tag(self.operation));
+        put_str(&mut h, &self.unit);
+        put_u8(&mut h, active_state_tag(self.active_state));
+        put_str(&mut h, &self.sub_state);
+        put_u8(&mut h, unit_file_state_tag(self.unit_file_state));
+        put_opt_str(&mut h, self.invocation_id.as_deref());
+        Ok(h.finalize().to_hex().to_string())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NixPostStateStabilitySampleV1 {
+    pub operation: NixServiceOperationKindV1,
+    pub unit: String,
+    pub unit_object_path: String,
+    pub observed_generation: u64,
+    pub definition_digest: String,
+    pub state_digest: String,
+    pub manager_owner: String,
+    pub invocation_id: Option<String>,
+    pub state_change_at_monotonic_us: u64,
+    pub captured_at_monotonic_us: u64,
+}
+
+impl NixPostStateStabilitySampleV1 {
+    pub fn validate_shape(&self) -> Result<(), NixPostStateErrorV1> {
+        NixServiceOperationV1::new(self.unit.clone(), self.operation)
+            .map_err(|_| NixPostStateErrorV1::InvalidServiceUnit)?;
+        if self.observed_generation == 0 {
+            return Err(NixPostStateErrorV1::InvalidGeneration);
+        }
+        validate_systemd_unit_object_path(&self.unit_object_path)?;
+        validate_digest(&self.definition_digest, "stability definition digest")?;
+        validate_digest(&self.state_digest, "stability state digest")?;
+        validate_unique_manager_owner(&self.manager_owner)?;
+        validate_optional_invocation_id(self.invocation_id.as_deref(), "stability invocation id")?;
+        if self.captured_at_monotonic_us < self.state_change_at_monotonic_us {
+            return Err(NixPostStateErrorV1::ObservationBeforeStateChange);
+        }
+        Ok(())
+    }
+
+    fn digest(&self) -> Result<String, NixPostStateErrorV1> {
+        self.validate_shape()?;
+        let mut h = Hasher::new();
+        h.update(STABILITY_SAMPLE_DOMAIN_V1);
+        put_u8(&mut h, operation_tag(self.operation));
+        put_str(&mut h, &self.unit);
+        put_str(&mut h, &self.unit_object_path);
+        put_u64(&mut h, self.observed_generation);
+        put_str(&mut h, &self.definition_digest);
+        put_str(&mut h, &self.state_digest);
+        put_str(&mut h, &self.manager_owner);
+        put_opt_str(&mut h, self.invocation_id.as_deref());
+        put_u64(&mut h, self.state_change_at_monotonic_us);
+        put_u64(&mut h, self.captured_at_monotonic_us);
+        Ok(h.finalize().to_hex().to_string())
     }
 }
 
