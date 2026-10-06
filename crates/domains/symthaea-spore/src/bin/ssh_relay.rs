@@ -6069,13 +6069,21 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                 let transaction_dir = match create_transaction_artifact_dir(&transaction.transaction_id) {
                     Ok(path) => path,
                     Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!(
-                                    "Unable to create GC transaction artifact namespace: {}",
-                                    error
-                                ))
-                                .to_json(),
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("GC artifact namespace unavailable: {}", error),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
                             ))
                             .await;
                         continue;
@@ -6084,18 +6092,58 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                 let gc_log = format!("{transaction_dir}/gc.log");
                 let gc_status = format!("{transaction_dir}/gc.status");
                 let gc_pid = format!("{transaction_dir}/gc.pid");
-                let _ = run_cmd(&format!(
+                if let Err(error) = run_cmd(&format!(
                     "rm -f -- {} {} {} && touch {} {} {} && chmod 600 {} {} {}",
                     gc_log, gc_status, gc_pid,
                     gc_log, gc_status, gc_pid,
                     gc_log, gc_status, gc_pid
                 ))
-                .await;
-                let _ = run_cmd(&format!(
+                .await {
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type":"exit",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!("GC artifact setup could not be observed: {}", error),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
+                    continue;
+                }
+                if let Err(error) = run_cmd(&format!(
                     "(nix-collect-garbage -d --delete-older-than 30d > {} 2>&1; rc=$?; printf '%s\\n' "$rc" > {}) & printf '%s\\n' "$!" > {}",
                     gc_log, gc_status, gc_pid
                 ))
-                .await;
+                .await {
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type":"exit",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!("GC launch could not be observed: {}", error),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
+                    continue;
+                };
                 let _ = ws_tx
                     .send(Message::Text(
                         RelayMessage::output("Garbage collection started...", "stdout").to_json(),
@@ -6288,13 +6336,21 @@ echo '}'
                 let transaction_dir = match create_transaction_artifact_dir(&transaction.transaction_id) {
                     Ok(path) => path,
                     Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!(
-                                    "Unable to create rebuild transaction artifact namespace: {}",
-                                    error
-                                ))
-                                .to_json(),
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Rebuild artifact namespace unavailable: {}", error),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
                             ))
                             .await;
                         continue;
@@ -6314,15 +6370,24 @@ echo '}'
                 )
                 .await
                 {
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
                     let _ = ws_tx
                         .send(Message::Text(
-                            RelayMessage::error(&format!(
-                                "Unable to snapshot active configuration: {}",
-                                error
-                            ))
-                            .to_json(),
+                            serde_json::json!({
+                                "type":"exit",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!("Unable to establish config pre-state: {}", error),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
                         ))
                         .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
                 if let Err(error) = tokio::fs::set_permissions(
@@ -6332,15 +6397,24 @@ echo '}'
                 .await
                 {
                     let _ = tokio::fs::remove_file(&wc_preimage_path).await;
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
                     let _ = ws_tx
                         .send(Message::Text(
-                            RelayMessage::error(&format!(
-                                "Unable to protect active configuration snapshot: {}",
-                                error
-                            ))
-                            .to_json(),
+                            serde_json::json!({
+                                "type":"exit",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!("Unable to protect config pre-state: {}", error),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
                         ))
                         .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
 
@@ -6349,11 +6423,24 @@ echo '}'
                 // delimiter must not become a command-injection boundary.
                 if let Err(e) = tokio::fs::write(&wc_config_path, client_msg.configuration_nix.as_bytes()).await {
                     let _ = tokio::fs::remove_file(&wc_preimage_path).await;
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
                     let _ = ws_tx
                         .send(Message::Text(
-                            RelayMessage::error(&format!("Config staging failed: {}", e)).to_json(),
+                            serde_json::json!({
+                                "type":"exit",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!("Config staging could not be established: {}", e),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
                         ))
                         .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
                 if let Err(e) = tokio::fs::set_permissions(
@@ -6363,12 +6450,24 @@ echo '}'
                 .await
                 {
                     let _ = tokio::fs::remove_file(&wc_config_path).await;
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
                     let _ = ws_tx
                         .send(Message::Text(
-                            RelayMessage::error(&format!("Config permission setup failed: {}", e))
-                                .to_json(),
+                            serde_json::json!({
+                                "type":"exit",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!("Config staging permissions could not be established: {}", e),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
                         ))
                         .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
 
@@ -6413,12 +6512,24 @@ echo "REBUILD_COMPLETE"
                 if let Err(e) = tokio::fs::write(&wc_script_path, rebuild_script.as_bytes()).await {
                     let _ = tokio::fs::remove_file(&wc_config_path).await;
                     let _ = tokio::fs::remove_file(&wc_preimage_path).await;
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
                     let _ = ws_tx
                         .send(Message::Text(
-                            RelayMessage::error(&format!("Rebuild staging failed: {}", e))
-                                .to_json(),
+                            serde_json::json!({
+                                "type":"exit",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!("Rebuild script staging could not be established: {}", e),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
                         ))
                         .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
                 if let Err(e) = tokio::fs::set_permissions(
@@ -6430,12 +6541,24 @@ echo "REBUILD_COMPLETE"
                     let _ = tokio::fs::remove_file(&wc_config_path).await;
                     let _ = tokio::fs::remove_file(&wc_preimage_path).await;
                     let _ = tokio::fs::remove_file(&wc_script_path).await;
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
                     let _ = ws_tx
                         .send(Message::Text(
-                            RelayMessage::error(&format!("Rebuild permission setup failed: {}", e))
-                                .to_json(),
+                            serde_json::json!({
+                                "type":"exit",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!("Rebuild script permissions could not be established: {}", e),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
                         ))
                         .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
                 let launch_setup = run_cmd(&format!(
@@ -6452,15 +6575,24 @@ echo "REBUILD_COMPLETE"
                     let _ = tokio::fs::remove_file(&wc_config_path).await;
                     let _ = tokio::fs::remove_file(&wc_preimage_path).await;
                     let _ = tokio::fs::remove_file(&wc_script_path).await;
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
                     let _ = ws_tx
                         .send(Message::Text(
-                            RelayMessage::error(&format!(
-                                "Rebuild status staging failed: {}",
-                                error
-                            ))
-                            .to_json(),
+                            serde_json::json!({
+                                "type":"exit",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!("Rebuild status staging could not be established: {}", error),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
                         ))
                         .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
 
@@ -6479,15 +6611,24 @@ echo "REBUILD_COMPLETE"
                     let _ = tokio::fs::remove_file(&wc_log_path).await;
                     let _ = tokio::fs::remove_file(&wc_status_path).await;
                     let _ = tokio::fs::remove_file(&wc_pid_path).await;
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
                     let _ = ws_tx
                         .send(Message::Text(
-                            RelayMessage::error(&format!(
-                                "Rebuild launch failed: {}",
-                                error
-                            ))
-                            .to_json(),
+                            serde_json::json!({
+                                "type":"exit",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!("Rebuild launch could not be observed: {}", error),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
                         ))
                         .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
                 let _ = ws_tx
