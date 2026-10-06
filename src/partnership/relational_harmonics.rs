@@ -422,6 +422,146 @@ impl DirectionalInformationFlow {
     }
 }
 
+
+/// A paired signal plus an explicitly observed common driver.
+///
+/// The controlled statistic removes only the supplied driver and is intended
+/// to detect synchrony that can be explained by a shared external signal.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CommonDriverSignalSample {
+    pub time: f64,
+    pub common_driver: f64,
+    pub agent_a: f64,
+    pub agent_b: f64,
+}
+
+impl CommonDriverSignalSample {
+    pub fn new(
+        time: f64,
+        common_driver: f64,
+        agent_a: f64,
+        agent_b: f64,
+    ) -> Result<Self, RelationalHarmonicError> {
+        if !time.is_finite() {
+            return Err(RelationalHarmonicError::NonFiniteTime);
+        }
+
+        for (name, value) in [
+            ("common_driver", common_driver),
+            ("agent_a", agent_a),
+            ("agent_b", agent_b),
+        ] {
+            if !value.is_finite() {
+                return Err(RelationalHarmonicError::NonFiniteValue(name));
+            }
+        }
+
+        Ok(Self {
+            time,
+            common_driver,
+            agent_a,
+            agent_b,
+        })
+    }
+}
+
+/// Zero-lag association before and after a linear control for one common driver.
+///
+/// This is a narrow linear control rather than a general confounding solution.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CommonDriverControlSummary {
+    pub samples: usize,
+    pub raw_zero_lag_correlation: f64,
+    pub controlled_zero_lag_correlation: f64,
+    pub absolute_correlation_reduction: f64,
+    pub status: EvidenceStatus,
+}
+
+impl CommonDriverControlSummary {
+    pub fn compute(
+        samples: &[CommonDriverSignalSample],
+    ) -> Result<Self, RelationalHarmonicError> {
+        if samples.len() < 16 {
+            return Err(RelationalHarmonicError::InsufficientSamples(samples.len()));
+        }
+
+        for pair in samples.windows(2) {
+            if pair[1].time <= pair[0].time {
+                return Err(RelationalHarmonicError::NonMonotonicTime);
+            }
+        }
+
+        let dt0 = samples[1].time - samples[0].time;
+        let tolerance = 1e-6 * dt0.abs().max(1.0);
+        if !samples
+            .windows(2)
+            .all(|w| ((w[1].time - w[0].time) - dt0).abs() <= tolerance)
+        {
+            return Err(RelationalHarmonicError::NonUniformSampling);
+        }
+
+        let a = samples.iter().map(|s| s.agent_a).collect::<Vec<_>>();
+        let b = samples.iter().map(|s| s.agent_b).collect::<Vec<_>>();
+        let z = samples.iter().map(|s| s.common_driver).collect::<Vec<_>>();
+
+        let raw = pearson_correlation(&a, &b);
+        let controlled = partial_correlation_against_shared_driver(&a, &b, &z);
+
+        Ok(Self {
+            samples: samples.len(),
+            raw_zero_lag_correlation: raw,
+            controlled_zero_lag_correlation: controlled,
+            absolute_correlation_reduction: raw.abs() - controlled.abs(),
+            status: EvidenceStatus::Measured,
+        })
+    }
+}
+
+fn partial_correlation_against_shared_driver(
+    a: &[f64],
+    b: &[f64],
+    driver: &[f64],
+) -> f64 {
+    let n = a.len().min(b.len()).min(driver.len());
+    if n < 3 {
+        return 0.0;
+    }
+
+    let residual_a = residualize_on_single_driver(&a[..n], &driver[..n]);
+    let residual_b = residualize_on_single_driver(&b[..n], &driver[..n]);
+
+    pearson_correlation(&residual_a, &residual_b)
+}
+
+fn residualize_on_single_driver(values: &[f64], driver: &[f64]) -> Vec<f64> {
+    let n = values.len().min(driver.len());
+    if n < 2 {
+        return vec![0.0; n];
+    }
+
+    let mean_value = values[..n].iter().sum::<f64>() / n as f64;
+    let mean_driver = driver[..n].iter().sum::<f64>() / n as f64;
+
+    let mut covariance = 0.0;
+    let mut variance_driver = 0.0;
+
+    for i in 0..n {
+        let dv = driver[i] - mean_driver;
+        covariance += dv * (values[i] - mean_value);
+        variance_driver += dv * dv;
+    }
+
+    let slope = if variance_driver <= 1e-20 {
+        0.0
+    } else {
+        covariance / variance_driver
+    };
+
+    (0..n)
+        .map(|i| values[i] - (mean_value + slope * (driver[i] - mean_driver)))
+        .collect()
+}
+
 /// Lagged correlation structure computed directly from the independent
 /// agent signals.
 ///
