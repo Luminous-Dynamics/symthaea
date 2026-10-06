@@ -413,6 +413,9 @@ fn parse_unimorph_source_record(
     if text.trim().is_empty() {
         return Err(MorphophonologicalUnimorphCompilerError::EmptyRecord);
     }
+    if text.contains('\n') || text.contains('\r') {
+        return Err(MorphophonologicalUnimorphCompilerError::InvalidSourceFormat);
+    }
     let columns = text.split('\t').collect::<Vec<_>>();
     if columns.len() != 3 {
         return Err(MorphophonologicalUnimorphCompilerError::InvalidColumnCount);
@@ -3296,6 +3299,30 @@ mod tests {
             MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch
         );
 
+        let mut compiler_revision_recomputed = witness.clone();
+        compiler_revision_recomputed.compiler_implementation_revision =
+            "tampered-compiler-revision".into();
+        compiler_revision_recomputed.transformation_blake3 =
+            compiler_revision_recomputed.compute_transformation_blake3();
+        assert_eq!(
+            compiler_revision_recomputed
+                .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
+                .expect_err("recomputing the commitment must not self-certify a compiler revision"),
+            MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch
+        );
+
+        let mut parser_revision_recomputed = witness.clone();
+        parser_revision_recomputed.source_parser_revision =
+            "tampered-parser-revision".into();
+        parser_revision_recomputed.transformation_blake3 =
+            parser_revision_recomputed.compute_transformation_blake3();
+        assert_eq!(
+            parser_revision_recomputed
+                .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
+                .expect_err("recomputing the commitment must not self-certify a parser revision"),
+            MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch
+        );
+
         let mut replay_tampered = witness.clone();
         replay_tampered.normalization_policy = "different-normalization-v0".into();
         assert_eq!(
@@ -3330,6 +3357,29 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn unimorph_tsv_compiler_rejects_embedded_line_endings() {
+        let error = parse_unimorph_source_record(
+            "embedded-newline",
+            b"walk\nwalked\twalked\tV;PST",
+        )
+        .expect_err("embedded newline must not become part of a source field");
+        assert_eq!(
+            error,
+            MorphophonologicalUnimorphCompilerError::InvalidSourceFormat
+        );
+
+        let error = parse_unimorph_source_record(
+            "embedded-carriage-return",
+            b"walked\twalked\tV;PST\rjunk",
+        )
+        .expect_err("embedded carriage return must fail closed");
+        assert_eq!(
+            error,
+            MorphophonologicalUnimorphCompilerError::InvalidSourceFormat
+        );
+    }
+
     #[test]
     fn unimorph_tsv_compiler_rejects_duplicate_feature_tokens() {
         assert_eq!(
