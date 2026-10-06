@@ -3188,6 +3188,9 @@ mod tests {
             .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
             .expect("exact source selection and rule-set identity should replay");
 
+        assert!(witness.compiler_implementation_revision.is_none());
+        assert!(witness.source_parser_revision.is_none());
+
         let mut tampered = artifact.to_vec();
         tampered[0] = b'X';
         assert_eq!(
@@ -3232,6 +3235,35 @@ mod tests {
                 .validate_against_source_artifact_and_rule_set(artifact, &rule_tampered)
                 .expect_err("output rule-set tampering must fail closed"),
             MorphophonologicalCompilationWitnessError::OutputRuleSetMismatch
+        );
+    }
+
+    #[test]
+    fn compilation_witness_requires_identity_for_declared_unimorph_compiler() {
+        let rule_set = morphophonological_fixture_rule_set();
+        let artifact = b"row0	fixture
+";
+        let witness = MorphophonologicalCompilationWitness {
+            version: MORPHOPHONOLOGICAL_COMPILATION_WITNESS_VERSION.into(),
+            compiler_id: UNIMORPH_TSV_COMPILER_ID.into(),
+            compiler_version: "wrong-version".into(),
+            compiler_implementation_revision: None,
+            source_parser_revision: None,
+            normalization_policy: "fixture-normalization-v1".into(),
+            source_artifact_blake3: blake3::hash(artifact).to_hex().to_string(),
+            source_selection_blake3: String::new(),
+            source_slices: vec![MorphophonologicalSourceSlice {
+                record_id: "row0".into(),
+                byte_offset: 0,
+                byte_length: artifact.len(),
+                record_blake3: blake3::hash(artifact).to_hex().to_string(),
+            }],
+            output_rule_set_blake3: rule_set.resource_blake3(),
+            transformation_blake3: String::new(),
+        };
+        assert_eq!(
+            witness.validate_shape().expect_err("declared UniMorph compiler must carry identity"),
+            MorphophonologicalCompilationWitnessError::MissingCompilerIdentity
         );
     }
 
