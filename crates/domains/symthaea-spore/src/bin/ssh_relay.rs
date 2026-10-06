@@ -4764,8 +4764,11 @@ echo '}'
                         continue;
                     }
                 };
-                let config_digest = blake3::hash(client_msg.configuration_nix.as_bytes()).to_hex().to_string();
-                let transaction = match SystemTransaction::begin(MutationKind::WriteConfig, None, config_digest.as_bytes()) {
+                let transaction = match SystemTransaction::begin(
+                    MutationKind::WriteConfig,
+                    None,
+                    client_msg.configuration_nix.as_bytes(),
+                ) {
                     Ok(tx) => tx,
                     Err(error) => {
                         let _ = ws_tx
