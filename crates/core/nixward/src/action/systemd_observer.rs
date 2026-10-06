@@ -15,6 +15,11 @@ use super::post_state::{
     NixSystemdUnitDefinitionIdentityV1, NixVerifiedPostStateObservationV1,
     NixVerifiedPostStateStabilityEvidenceV1,
 };
+use super::systemd_definition::NixVerifiedSystemdDefinitionContentCommitmentV1;
+use super::systemd_definition::{
+    NixSystemdDefinitionContentCommitmentV1, NixSystemdDefinitionContentErrorV1,
+    NixVerifiedSystemdDefinitionContentCommitmentV1,
+};
 use super::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use super::service_state::{ServiceActiveStateV1, ServiceLoadStateV1, ServiceUnitFileStateV1};
 use std::collections::HashMap;
@@ -46,6 +51,7 @@ const REQUIRED_UNIT_PROPERTIES: &[&str] = &[
     "SubState",
     "FragmentPath",
     "DropInPaths",
+    "NeedDaemonReload",
     "UnitFileState",
     "StateChangeTimestampMonotonic",
     "InvocationID",
@@ -109,6 +115,12 @@ pub enum NixSystemdObserverErrorV1 {
 
     #[error("invalid verified post-state observation: {0}")]
     InvalidPostState(String),
+
+    #[error("invalid systemd definition-content observation: {0}")]
+    InvalidDefinitionContent(String),
+
+    #[error("invalid systemd definition-content observation: {0}")]
+    InvalidDefinitionContent(String),
 }
 
 /// A one-shot, pre-armed watcher for the systemd Manager.JobRemoved signal.
@@ -289,6 +301,122 @@ impl NixSystemdReadOnlyObserverV1 {
             timeout,
         )
         .await
+    }
+
+    /// Observe the exact systemd FragmentPath/DropInPaths sources and hash
+    /// their bytes without exposing those bytes to the caller.
+    ///
+    /// The source identity is read from systemd before hashing and re-read
+    /// afterward. A change in the systemd-reported source identity or manager
+    /// incarnation makes the content observation fail closed.
+    pub async fn observe_service_definition_content(
+        &self,
+        unit: &str,
+    ) -> Result<NixVerifiedSystemdDefinitionContentCommitmentV1, NixSystemdObserverErrorV1> {
+        let expected_unit = canonical_unit(unit)?;
+        let manager_owner = self.systemd_manager_owner().await?;
+        let object_path = self.resolve_service_unit(&expected_unit).await?;
+
+        let before_properties = self
+            .get_all_properties(&object_path, SYSTEMD_UNIT_INTERFACE)
+            .await?;
+        let before_identity = definition_identity_from_properties(&before_properties)?;
+        let before_need_daemon_reload = required_bool(
+            &before_properties,
+            SYSTEMD_UNIT_INTERFACE,
+            "NeedDaemonReload",
+        )?;
+        if before_need_daemon_reload {
+            return Err(NixSystemdObserverErrorV1::InvalidDefinitionContent(
+                "systemd reports NeedDaemonReload=true before content observation".to_string(),
+            ));
+        }
+
+        let commitment = NixVerifiedSystemdDefinitionContentCommitmentV1::from_observer(
+            &expected_unit,
+            &before_identity,
+            &manager_owner,
+        )
+        .map_err(|error| NixSystemdObserverErrorV1::InvalidDefinitionContent(error.to_string()))?;
+
+        let after_properties = self
+            .get_all_properties(&object_path, SYSTEMD_UNIT_INTERFACE)
+            .await?;
+        let after_identity = definition_identity_from_properties(&after_properties)?;
+        let after_need_daemon_reload = required_bool(
+            &after_properties,
+            SYSTEMD_UNIT_INTERFACE,
+            "NeedDaemonReload",
+        )?;
+        let post_manager_owner = self.systemd_manager_owner().await?;
+
+        if post_manager_owner != manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if after_identity != before_identity {
+            return Err(NixSystemdObserverErrorV1::InvalidDefinitionContent(
+                "systemd source identity changed during content observation".to_string(),
+            ));
+        }
+
+        let _ = NixSystemdDefinitionContentCommitmentV1::digest(commitment.as_ref())
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidDefinitionContent(error.to_string()))?;
+
+        Ok(commitment)
+    }
+
+    /// Hash the exact FragmentPath/DropInPaths reported by systemd.
+    ///
+    /// The public API accepts only a canonical service unit, not filesystem
+    /// paths. The systemd observer selects the source paths, hashes them
+    /// through the observer-sealed content module, then re-reads systemd's
+    /// source identity to detect path replacement during the observation.
+    pub async fn observe_service_definition_content(
+        &self,
+        unit: &str,
+    ) -> Result<NixVerifiedSystemdDefinitionContentCommitmentV1, NixSystemdObserverErrorV1> {
+        let expected_unit = canonical_unit(unit)?;
+        let manager_owner = self.systemd_manager_owner().await?;
+        let object_path = self.resolve_service_unit(&expected_unit).await?;
+
+        let before_properties = self
+            .get_all_properties(&object_path, SYSTEMD_UNIT_INTERFACE)
+            .await?;
+        let before_identity = definition_identity_from_properties(&before_properties)?;
+
+        let commitment = NixVerifiedSystemdDefinitionContentCommitmentV1::from_observer(
+            &expected_unit,
+            &before_identity,
+            &manager_owner,
+        )
+        .map_err(|error| NixSystemdObserverErrorV1::InvalidDefinitionContent(error.to_string()))?;
+
+        let after_properties = self
+            .get_all_properties(&object_path, SYSTEMD_UNIT_INTERFACE)
+            .await?;
+        let after_identity = definition_identity_from_properties(&after_properties)?;
+        let post_manager_owner = self.systemd_manager_owner().await?;
+
+        if post_manager_owner != manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if after_identity != before_identity {
+            return Err(NixSystemdObserverErrorV1::InvalidDefinitionContent(
+                "systemd source identity changed during content observation".to_string(),
+            ));
+        }
+        if after_need_daemon_reload {
+            return Err(NixSystemdObserverErrorV1::InvalidDefinitionContent(
+                "systemd reports NeedDaemonReload=true after content observation".to_string(),
+            ));
+        }
+
+        commitment
+            .as_ref()
+            .digest()
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidDefinitionContent(error.to_string()))?;
+
+        Ok(commitment)
     }
 
     /// Read Service.Result from the exact resolved unit object.
@@ -754,6 +882,20 @@ fn required_string(
         })
 }
 
+fn required_bool(
+    properties: &HashMap<String, OwnedValue>,
+    interface: &'static str,
+    property: &'static str,
+) -> Result<bool, NixSystemdObserverErrorV1> {
+    required_value(properties, interface, property)?
+        .clone()
+        .try_into()
+        .map_err(|_| NixSystemdObserverErrorV1::InvalidPropertyType {
+            interface,
+            property,
+        })
+}
+
 fn required_u64(
     properties: &HashMap<String, OwnedValue>,
     interface: &'static str,
@@ -884,6 +1026,23 @@ fn stability_sample_from_observation(
     })
 }
 
+fn definition_identity_from_properties(
+    properties: &HashMap<String, OwnedValue>,
+) -> Result<NixSystemdUnitDefinitionIdentityV1, NixSystemdObserverErrorV1> {
+    let fragment_path = required_string(
+        properties,
+        SYSTEMD_UNIT_INTERFACE,
+        "FragmentPath",
+    )?;
+    let drop_in_paths = required_strings(
+        properties,
+        SYSTEMD_UNIT_INTERFACE,
+        "DropInPaths",
+    )?;
+    NixSystemdUnitDefinitionIdentityV1::new(fragment_path, drop_in_paths)
+        .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))
+}
+
 fn build_observation_from_properties(
     operation: NixServiceOperationKindV1,
     expected_unit: &str,
@@ -956,9 +1115,7 @@ fn build_observation_from_properties(
         NixSystemdObserverErrorV1::UnknownStateVocabulary("UnitFileState".to_string())
     })?;
 
-    let fragment_path = required_string(properties, SYSTEMD_UNIT_INTERFACE, "FragmentPath")?;
-    let drop_in_paths =
-        required_strings(properties, SYSTEMD_UNIT_INTERFACE, "DropInPaths")?;
+    let definition_identity = definition_identity_from_properties(properties)?;
     let state_change_at_monotonic_us = required_u64(
         properties,
         SYSTEMD_UNIT_INTERFACE,
@@ -966,10 +1123,6 @@ fn build_observation_from_properties(
     )?;
     let invocation_id = required_invocation_id(properties)?;
     let observed_at_monotonic_us = monotonic_now_us()?;
-
-    let definition_identity =
-        NixSystemdUnitDefinitionIdentityV1::new(fragment_path, drop_in_paths)
-            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
 
     if let Some(ref job) = job {
         let expected_job_type = NixSystemdJobTypeV1::for_operation(operation)
