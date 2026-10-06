@@ -1448,7 +1448,9 @@ impl VerificationRequest {
             .cloned()
             .ok_or(VerificationFailure::MissingVerificationController)?;
 
-        if controller != expected_controller {
+        if !url_values_equivalent(controller.as_str(), expected_controller.as_str())
+            .unwrap_or(false)
+        {
             return Err(VerificationFailure::ControllerMismatch {
                 expected: expected_controller,
                 actual: controller,
