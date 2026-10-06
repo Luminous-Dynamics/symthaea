@@ -404,13 +404,24 @@ impl RollingOriginRelationalPredictionSummary {
         validate_rolling_config(samples.len(), &config)?;
 
         let mut segments = Vec::with_capacity(config.origin_count);
+        let segment_total = config
+            .train_samples
+            .checked_add(config.gap_samples)
+            .and_then(|value| value.checked_add(config.test_samples))
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+
         for origin in 0..config.origin_count {
-            let start = config.first_origin + origin * config.step_samples;
+            let start = config
+                .step_samples
+                .checked_mul(origin)
+                .and_then(|offset| config.first_origin.checked_add(offset))
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
             let end = start
-                + config.train_samples
-                + config.gap_samples
-                + config.test_samples;
-            let segment = &samples[start..end];
+                .checked_add(segment_total)
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let segment = samples
+                .get(start..end)
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
 
             segments.push(HeldOutRelationalPredictionSummary::compute(
                 segment,
@@ -546,12 +557,21 @@ fn validate_rolling_config(
         return Err(RelationalPredictionError::InvalidSplit);
     }
 
-    let final_end = config
-        .first_origin
-        .saturating_add((config.origin_count - 1).saturating_mul(config.step_samples))
-        .saturating_add(config.train_samples)
-        .saturating_add(config.gap_samples)
-        .saturating_add(config.test_samples);
+    let segment_total = config
+        .train_samples
+        .checked_add(config.gap_samples)
+        .and_then(|value| value.checked_add(config.test_samples))
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+    let final_start = config
+        .step_samples
+        .checked_mul(config.origin_count - 1)
+        .and_then(|offset| config.first_origin.checked_add(offset))
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+    let final_end = final_start
+        .checked_add(segment_total)
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
 
     if final_end > total_samples {
         return Err(RelationalPredictionError::InvalidSplit);
@@ -1232,6 +1252,20 @@ mod tests {
     }
 
     #[test]
+    fn rolling_origin_rejects_arithmetic_overflow() {
+        let samples = build_samples(0.5);
+        let result = RollingOriginRelationalPredictionSummary::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                first_origin: usize::MAX,
+                ..Default::default()
+            },
+        );
+
+        assert_eq!(result, Err(RelationalPredictionError::InvalidSplit));
+    }
+
+#[test]
     fn rolling_origin_rejects_zero_step_or_zero_origins() {
         let samples = build_samples(0.5);
 
