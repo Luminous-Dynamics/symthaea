@@ -411,6 +411,7 @@ fn decode_observation(cycle: u64, encoded: &[f32]) -> MicroWorldObservation {
         threat: get(3),
         progress: get(4),
     }
+    .clamp()
 }
 
 /// Weak baseline: assumes the world remains unchanged after every action.
@@ -555,7 +556,11 @@ pub fn run_homeostatic_agent<P: MicroWorldPredictor>(
                 action_id,
                 action_label: action.label().to_string(),
                 cycle: before.cycle,
-                predicted_world_delta: Some(signed_delta(before, predicted)),
+                predicted_world_delta: Some(signed_delta_with_confidence(
+                    before,
+                    predicted,
+                    predictor.prediction_confidence(action),
+                )),
                 predicted_self_delta: None,
                 predicted_goal_delta: None,
                 authority_granted: true,
@@ -932,6 +937,10 @@ mod tests {
         impl MicroWorldPredictor for Oracle {
             fn predict(&mut self, state: MicroWorldObservation, action: MicroAction) -> MicroWorldObservation {
                 transition(state, action)
+            }
+
+            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
+                1.0
             }
         }
 
