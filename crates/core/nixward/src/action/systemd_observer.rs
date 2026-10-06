@@ -23,7 +23,7 @@ use super::service_effect::{
 use super::service_state::{ServiceActiveStateV1, ServiceLoadStateV1, ServiceUnitFileStateV1};
 use std::collections::HashMap;
 use std::fs::OpenOptions;
-use std::io::{self, Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom};
 use std::time::Duration;
 use thiserror::Error;
 use zbus::export::futures_util::StreamExt;
