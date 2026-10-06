@@ -12005,7 +12005,42 @@ mod tests {
         assert_eq!(terminal_count_after_compaction, 0);
         assert_eq!(ledger_count, 1);
 
-        let update_err = store
+        // Restart after compaction. The one-time authority must remain spent
+        // even though both the live dispatch and terminal-evidence witnesses
+        // are gone from the database.
+        drop(store);
+        let reopened = SqliteAuthorizationStore::open(&path).unwrap();
+        let replay_after_restart = mark_dispatch_pending_bound_from_native_authority_for_test(
+            &reopened,
+            &witness_b.authorization_instance,
+            "attempt:terminal-history-b",
+            &action_b,
+            &effect_b,
+            "boundary:terminal-history-b",
+            "operation:terminal-history-b",
+            "issuer.terminal-history",
+            "native-grant:spent",
+        );
+        assert!(matches!(
+            replay_after_restart,
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+
+        let ledger_count_after_restart: i64 = reopened
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM authorization_native_replay_history
+                 WHERE native_replay_identity=?1",
+                params![terminal_native_identity.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(ledger_count_after_restart, 1);
+
+        let update_err = reopened
             .connection()
             .unwrap()
             .execute(
@@ -12017,7 +12052,7 @@ mod tests {
             .unwrap_err();
         assert!(update_err.to_string().contains("native replay history is append-only"));
 
-        let delete_err = store
+        let delete_err = reopened
             .connection()
             .unwrap()
             .execute(
