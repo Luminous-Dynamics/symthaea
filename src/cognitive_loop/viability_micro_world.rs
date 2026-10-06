@@ -14,6 +14,7 @@
 //! The benchmark is useful because it makes "prediction -> action -> consequence" a
 //! falsifiable interface before any physical robot or external model is involved.
 
+use super::goal_world::WorldModelBridge;
 use super::viability_fabric::{
     ActionOutcome, ActionPrediction, PredictionErrorLedger, ViabilityDelta, ViabilityFabric,
 };
@@ -40,6 +41,17 @@ impl MicroAction {
         Self::Rest,
         Self::Retreat,
     ];
+
+    pub fn index(self) -> usize {
+        match self {
+            Self::Observe => 0,
+            Self::Explore => 1,
+            Self::Harvest => 2,
+            Self::Repair => 3,
+            Self::Rest => 4,
+            Self::Retreat => 5,
+        }
+    }
 
     pub fn label(self) -> &'static str {
         match self {
@@ -310,6 +322,83 @@ pub fn benchmark_scenarios() -> Vec<MicroWorldScenario> {
 pub trait MicroWorldPredictor {
     fn predict(&mut self, state: MicroWorldObservation, action: MicroAction)
         -> MicroWorldObservation;
+
+    /// Optional online learning hook. The default is a fixed predictor.
+    fn observe_transition(
+        &mut self,
+        _before: MicroWorldObservation,
+        _action: MicroAction,
+        _after: MicroWorldObservation,
+    ) {
+    }
+}
+
+#[derive(Debug)]
+pub struct WorldModelBridgePredictor {
+    bridge: WorldModelBridge,
+}
+
+impl Default for WorldModelBridgePredictor {
+    fn default() -> Self {
+        Self {
+            bridge: WorldModelBridge::with_actions(MicroAction::ALL.len()),
+        }
+    }
+}
+
+impl WorldModelBridgePredictor {
+    pub fn model(&self) -> &WorldModelBridge {
+        &self.bridge
+    }
+}
+
+impl MicroWorldPredictor for WorldModelBridgePredictor {
+    fn predict(
+        &mut self,
+        state: MicroWorldObservation,
+        action: MicroAction,
+    ) -> MicroWorldObservation {
+        let encoded = encode_observation(state);
+        let Some(predicted) = self.bridge.predict_action(action.index(), &encoded) else {
+            return state;
+        };
+        decode_observation(state.cycle.saturating_add(1), &predicted)
+    }
+
+    fn observe_transition(
+        &mut self,
+        before: MicroWorldObservation,
+        action: MicroAction,
+        after: MicroWorldObservation,
+    ) {
+        let before_encoded = encode_observation(before);
+        let after_encoded = encode_observation(after);
+        let _ = self
+            .bridge
+            .observe_action_transition(action.index(), &before_encoded, &after_encoded);
+    }
+}
+
+fn encode_observation(state: MicroWorldObservation) -> Vec<f32> {
+    let mut encoded = vec![0.0f32; 64];
+    encoded[0] = state.energy as f32;
+    encoded[1] = state.integrity as f32;
+    encoded[2] = state.knowledge as f32;
+    encoded[3] = state.threat as f32;
+    encoded[4] = state.progress as f32;
+    encoded
+}
+
+fn decode_observation(cycle: u64, encoded: &[f32]) -> MicroWorldObservation {
+    let get = |index: usize| encoded.get(index).copied().unwrap_or(0.0) as f64;
+    MicroWorldObservation {
+        cycle,
+        energy: get(0),
+        integrity: get(1),
+        knowledge: get(2),
+        threat: get(3),
+        progress: get(4),
+    }
 }
 
 /// Weak baseline: assumes the world remains unchanged after every action.
@@ -448,6 +537,7 @@ pub fn run_homeostatic_agent<P: MicroWorldPredictor>(
 
         let after = world.step(action);
         let error = predicted.mean_absolute_delta(after);
+        predictor.observe_transition(before, action, after);
         cumulative_error += error;
         steps += 1;
         actions.push(action);
@@ -573,6 +663,7 @@ fn evaluate_predictor_scenario<P: MicroWorldPredictor>(
         let after = world.step(action);
         let actual_delta = signed_delta(before, after);
         let mae = predicted.mean_absolute_delta(after);
+        predictor.observe_transition(before, action, after);
         let baseline = PersistencePredictor::default()
             .predict(before, action)
             .mean_absolute_delta(after);
@@ -708,6 +799,26 @@ mod tests {
         let next = transition(state, MicroAction::Explore);
         assert!(next.energy < state.energy);
         assert!(next.integrity <= state.integrity);
+    }
+
+    #[test]
+    fn bridge_predictor_learns_from_repeated_transitions() {
+        let mut predictor = WorldModelBridgePredictor::default();
+        let before = MicroWorld::default().observe();
+        let after = transition(before, MicroAction::Explore);
+
+        let first = predictor.predict(before, MicroAction::Explore)
+            .mean_absolute_delta(after);
+
+        for _ in 0..32 {
+            predictor.observe_transition(before, MicroAction::Explore, after);
+        }
+
+        let learned = predictor.predict(before, MicroAction::Explore)
+            .mean_absolute_delta(after);
+
+        assert!(learned < first);
+        assert!(predictor.model().action_samples(MicroAction::Explore.index()) > 0);
     }
 
     #[test]
