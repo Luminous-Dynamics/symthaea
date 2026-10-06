@@ -3,11 +3,13 @@
 //! Remote Install — WebSocket client for the SSH relay.
 //!
 //! Security posture (Stop-the-Bleeding):
-//! - The SSH relay runs on the *operator machine* and binds to 127.0.0.1.
-//! - The relay requires a per-run WebSocket token (`action: "auth"`).
-//! - The target machine only exposes SSH with a one-time password shown on its console.
+//! - The relay is a local-capable machine agent and must authenticate each WebSocket session.
+//! - The relay is not a general-purpose exec gateway; privileged operations use typed actions.
+//! - Target-side hardware observations are authoritative for machine-affecting decisions.
+//! - Install requests carry a non-secret target-machine digest derived from /etc/machine-id.
+//! - The browser never persists disk-unlock passphrases and clears them after transmission.
 //!
-//! This panel connects to the local relay and asks it to SSH into the target.
+//! Remote relay URLs are permitted only over authenticated TLS transport.
 
 use leptos::prelude::*;
 use std::net::IpAddr;
