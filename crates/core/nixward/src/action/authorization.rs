@@ -384,6 +384,22 @@ impl NixExecutionAuthorizationRecordV1 {
         Ok(())
     }
 
+    pub fn validate_against_intent(
+        &self,
+        intent: &NixActionIntentV1,
+    ) -> Result<(), NixAuthorizationErrorV1> {
+        let intent_digest = intent.digest()?;
+        if self.action_intent_digest != intent_digest {
+            return Err(NixAuthorizationErrorV1::IntentMismatch);
+        }
+
+        let expected_context_digest = service_effect_context_digest_for_intent(intent)?;
+        if self.service_effect_context_digest != expected_context_digest {
+            return Err(NixAuthorizationErrorV1::ServiceEffectContextMismatch);
+        }
+        Ok(())
+    }
+
     pub fn digest(&self) -> Result<String, NixAuthorizationErrorV1> {
         self.validate_shape()?;
         let mut h = Hasher::new();
@@ -429,7 +445,6 @@ impl NixLocalExecutionAuthorityV1 {
         if approval.decision_evidence().action_intent_digest != digest {
             return Err(NixAuthorizationErrorV1::IntentMismatch);
         }
-        validate_service_authorization_context_for_intent(intent, &approval.decision_evidence())?;
         Ok(Self { intent, approval })
     }
 
@@ -627,6 +642,14 @@ pub enum NixAuthorizationErrorV1 {
     NotApproved,
     #[error("authorization is bound to a different action intent")]
     IntentMismatch,
+    #[error("service action is missing its authority-bound effect context")]
+    MissingServiceEffectContext,
+    #[error("service effect context does not match the typed service action")]
+    ServiceEffectContextMismatch,
+    #[error("service effect context is present for a non-service action")]
+    UnexpectedServiceEffectContext,
+    #[error("invalid service effect context: {0}")]
+    InvalidServiceEffectContext(NixServiceEffectContextErrorV1),
     #[error("authorization is not yet valid")]
     NotYetValid,
     #[error("authorization has expired")]
@@ -637,6 +660,58 @@ pub enum NixAuthorizationErrorV1 {
     InvalidExpiryWindow,
     #[error("execution finish time precedes start time")]
     InvalidExecutionWindow,
+}
+
+fn validate_service_effect_context_binding(
+    context: &NixServiceEffectContextV1,
+    operation: NixServiceOperationKindV1,
+    unit: &str,
+) -> Result<(), NixAuthorizationErrorV1> {
+    context
+        .validate_shape()
+        .map_err(NixAuthorizationErrorV1::InvalidServiceEffectContext)?;
+    if context.operation != operation || context.unit != unit {
+        return Err(NixAuthorizationErrorV1::ServiceEffectContextMismatch);
+    }
+    Ok(())
+}
+
+fn service_effect_context_digest_for_intent(
+    intent: &NixActionIntentV1,
+) -> Result<Option<String>, NixAuthorizationErrorV1> {
+    match &intent.action {
+        NixActionDescriptorV1::Service { operation, unit } => {
+            let context = intent
+                .service_effect_context
+                .as_ref()
+                .ok_or(NixAuthorizationErrorV1::MissingServiceEffectContext)?;
+            validate_service_effect_context_binding(context, *operation, unit)?;
+            Ok(Some(
+                context
+                    .digest()
+                    .map_err(NixAuthorizationErrorV1::InvalidServiceEffectContext)?,
+            ))
+        }
+        _ => {
+            if intent.service_effect_context.is_some() {
+                Err(NixAuthorizationErrorV1::UnexpectedServiceEffectContext)
+            } else {
+                Ok(None)
+            }
+        }
+    }
+}
+
+fn validate_hex_digest(
+    value: &str,
+    field: &'static str,
+) -> Result<(), NixAuthorizationErrorV1> {
+    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(NixAuthorizationErrorV1::InvalidServiceEffectContext(
+            NixServiceEffectContextErrorV1::InvalidDigest(field),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_action_shape(action: &NixActionDescriptorV1) -> Result<(), NixAuthorizationErrorV1> {
