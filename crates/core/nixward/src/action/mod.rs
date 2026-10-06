@@ -38,6 +38,8 @@ pub mod service_state;
 pub mod systemd_definition;
 #[cfg(feature = "systemd-observer")]
 pub mod systemd_observer;
+#[cfg(all(feature = "systemd-observer", feature = "systemd-mutation"))]
+pub mod systemd_lifecycle;
 #[cfg(feature = "systemd-mutation")]
 pub mod systemd_mutation;
 pub(crate) mod systemd_transport;
@@ -125,6 +127,11 @@ pub use systemd_observer::{
 #[cfg(feature = "systemd-mutation")]
 pub use systemd_mutation::{
     NixSystemdLifecycleMutationTransportV1, NixSystemdMutationTransportErrorV1,
+};
+#[cfg(all(feature = "systemd-observer", feature = "systemd-mutation"))]
+pub use systemd_lifecycle::{
+    NixSystemdLifecycleEvidenceV1, NixSystemdLifecycleTransactionErrorV1,
+    NixSystemdLifecycleTransactionV1,
 };
 pub use service_state::{
     NixServiceEnablementEvidenceV1,
