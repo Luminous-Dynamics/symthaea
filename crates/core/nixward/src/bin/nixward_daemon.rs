@@ -1540,7 +1540,7 @@ impl DaemonState {
                                 }
                             };
 
-                            execution_authority = Some(match definition_content {
+                            let promoted = match definition_content {
                                 Some(content) => {
                                     NixLocalExecutionAuthorityV1::from_consumed_local_approval_with_definition_capture(
                                         intent,
@@ -1552,13 +1552,23 @@ impl DaemonState {
                                     intent,
                                     consumed_approval,
                                 ),
-                            }
-                            .map_err(|error| {
-                                eprintln!(
-                                    "nixward-daemon: approved action could not be promoted to execution authority: {error}"
-                                );
-                                error
-                            })?);
+                            };
+
+                            execution_authority = match promoted {
+                                Ok(authority) => Some(authority),
+                                Err(error) => {
+                                    eprintln!(
+                                        "nixward-daemon: approved action could not be promoted to execution authority: {error}"
+                                    );
+                                    self.pending_action = None;
+                                    self.pending_action_intent_digest = None;
+                                    self.watchdog_status = None;
+                                    return (
+                                        dynamic_threshold,
+                                        Some(best_action.expected_free_energy),
+                                    );
+                                }
+                            };
 
 
 
