@@ -460,6 +460,78 @@ impl RollingOriginRelationalPredictionSummary {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct RollingOriginRelationalPredictionQualification {
+    pub observed: RollingOriginRelationalPredictionSummary,
+    pub circular_shift_nulls: Vec<PredictionNullSummary>,
+    pub feature_decoupling_nulls: Vec<PredictionNullSummary>,
+    pub incremental_relational_nulls: Vec<PredictionNullSummary>,
+}
+
+impl RollingOriginRelationalPredictionQualification {
+    pub fn compute(
+        samples: &[RelationalPredictionSample],
+        config: RollingOriginRelationalPredictionConfig,
+        surrogate_count: usize,
+    ) -> Result<Self, RelationalPredictionError> {
+        if surrogate_count == 0 {
+            return Err(RelationalPredictionError::InvalidSurrogateCount);
+        }
+
+        let observed = RollingOriginRelationalPredictionSummary::compute(samples, config)?;
+        let segment_total = config.train_samples
+            + config.gap_samples
+            + config.test_samples;
+
+        let mut circular_shift_nulls = Vec::with_capacity(config.origin_count);
+        let mut feature_decoupling_nulls = Vec::with_capacity(config.origin_count);
+        let mut incremental_relational_nulls = Vec::with_capacity(config.origin_count);
+
+        for origin in 0..config.origin_count {
+            let start = config.first_origin + origin * config.step_samples;
+            let end = start + segment_total;
+            let segment = &samples[start..end];
+            let held_out_config = HeldOutRelationalPredictionConfig {
+                train_samples: config.train_samples,
+                test_samples: config.test_samples,
+                gap_samples: config.gap_samples,
+                ridge_lambda: config.ridge_lambda,
+            };
+
+            circular_shift_nulls.push(PredictionNullSummary::compute_for_feature_set(
+                segment,
+                held_out_config,
+                PredictionNullFamily::CircularShift,
+                PredictionFeatureSet::RelationalAugmented,
+                surrogate_count,
+            )?);
+
+            feature_decoupling_nulls.push(PredictionNullSummary::compute_for_feature_set(
+                segment,
+                held_out_config,
+                PredictionNullFamily::FeatureDecoupling,
+                PredictionFeatureSet::RelationalAugmented,
+                surrogate_count,
+            )?);
+
+            incremental_relational_nulls.push(PredictionNullSummary::compute_for_feature_set(
+                segment,
+                held_out_config,
+                PredictionNullFamily::IncrementalRelationalShift,
+                PredictionFeatureSet::RelationalAugmented,
+                surrogate_count,
+            )?);
+        }
+
+        Ok(Self {
+            observed,
+            circular_shift_nulls,
+            feature_decoupling_nulls,
+            incremental_relational_nulls,
+        })
+    }
+}
+
 fn validate_rolling_config(
     total_samples: usize,
     config: &RollingOriginRelationalPredictionConfig,
@@ -1085,6 +1157,62 @@ mod tests {
     }
 
     #[test]
+    fn rolling_origin_nulls_target_the_nested_relational_model() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+
+        let qualification =
+            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8).unwrap();
+
+        assert_eq!(qualification.observed.origin_count, 4);
+        assert_eq!(qualification.circular_shift_nulls.len(), 4);
+        assert_eq!(qualification.feature_decoupling_nulls.len(), 4);
+        assert_eq!(qualification.incremental_relational_nulls.len(), 4);
+
+        for null in qualification
+            .circular_shift_nulls
+            .iter()
+            .chain(qualification.feature_decoupling_nulls.iter())
+            .chain(qualification.incremental_relational_nulls.iter())
+        {
+            assert_eq!(null.feature_set, PredictionFeatureSet::RelationalAugmented);
+            assert_eq!(null.status, EvidenceStatus::Proxy);
+            assert_eq!(null.surrogate_count, 8);
+            assert!((0.0..=1.0).contains(&null.exceedance_fraction));
+        }
+    }
+
+    #[test]
+    fn incremental_null_preserves_synchrony_and_breaks_relational_channels() {
+        let samples = build_samples(0.5);
+        let config = config();
+
+        let summary = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config,
+            PredictionNullFamily::IncrementalRelationalShift,
+            PredictionFeatureSet::RelationalAugmented,
+            8,
+        )
+        .unwrap();
+
+        assert_eq!(
+            summary.feature_set,
+            PredictionFeatureSet::RelationalAugmented
+        );
+        assert_eq!(summary.family, PredictionNullFamily::IncrementalRelationalShift);
+        assert_eq!(summary.status, EvidenceStatus::Proxy);
+    }
+
+#[test]
     fn rolling_origin_is_deterministic() {
         let samples = build_samples(0.5);
         let config = RollingOriginRelationalPredictionConfig {
