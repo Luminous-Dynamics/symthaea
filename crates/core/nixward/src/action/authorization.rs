@@ -536,7 +536,13 @@ impl NixLocalExecutionAuthorityV1 {
         self.approval.projection_digest()
     }
 
+    pub(crate) fn service_definition_content_digest(&self) -> Option<&str> {
+        self.intent
+            .service_effect_context()
+            .map(|context| context.authorized_definition_content_digest.as_str())
+    }
 }
+
 
 pub(crate) struct LiveNixAuthorizationV1 {
     record: NixExecutionAuthorizationRecordV1,
