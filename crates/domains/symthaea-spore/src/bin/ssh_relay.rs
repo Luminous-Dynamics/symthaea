@@ -2737,13 +2737,36 @@ async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
 
     for artifact in ["system.btrfs.zst", "system.tar.gz"] {
         let path = std::path::Path::new(image_dir).join(artifact);
-        if let Ok(metadata) = tokio::fs::metadata(&path).await {
-            if metadata.is_file() && metadata.len() > 0 {
-                return Ok(true);
-            }
+        let Ok(metadata) = tokio::fs::metadata(&path).await else {
+            continue;
+        };
+        if !metadata.is_file() || metadata.len() == 0 {
+            continue;
+        }
+
+        let quoted_path = path.to_string_lossy().replace('\\', "\\'"); // path is relay-generated
+        let check_command = if artifact.ends_with(".zst") {
+            format!("zstd -t '{}'", quoted_path)
+        } else {
+            format!("tar -tzf '{}'", quoted_path)
+        };
+        let check = run_cmd(&check_command)
+            .await
+            .map_err(|error| format!("image archive integrity probe failed: {error}"))?;
+        if check.exit_status == 0 {
+            return Ok(true);
         }
     }
     Ok(false)
+}
+
+fn wifi_connection_observed(output: &str, profile_name: &str) -> bool {
+    output.lines().any(|line| {
+        let Some((name, device)) = line.split_once(':') else {
+            return false;
+        };
+        name == profile_name && !device.trim().is_empty()
+    })
 }
 
 async fn verify_wifi_connection(profile_name: &str) -> Result<bool, String> {
@@ -2757,12 +2780,7 @@ async fn verify_wifi_connection(profile_name: &str) -> Result<bool, String> {
         ));
     }
 
-    Ok(result.stdout.lines().any(|line| {
-        let Some((name, device)) = line.split_once(':') else {
-            return false;
-        };
-        name == profile_name && !device.trim().is_empty()
-    }))
+    Ok(wifi_connection_observed(&result.stdout, profile_name))
 }
 
 fn finalize_transaction(
@@ -7466,6 +7484,39 @@ mod tests {
         let banner = auth_token_banner("super-secret-token", true);
         assert!(banner.contains("super-secret-token"));
         assert!(banner.starts_with("  Auth token: "));
+    }
+
+    #[test]
+    fn wifi_postcondition_requires_exact_active_profile_and_device() {
+        let profile = "symthaea-relay-0123456789abcdef0123456789abcdef";
+        let active = format!("{}:wlan0\nother-profile:eth0\n", profile);
+        assert!(wifi_connection_observed(&active, profile));
+        assert!(!wifi_connection_observed("other-profile:wlan0\n", profile));
+        assert!(!wifi_connection_observed(&format!("{}:\n", profile), profile));
+        assert!(!wifi_connection_observed(&format!("{}:wlan0-attacker\n", profile), "other"));
+    }
+
+    #[tokio::test]
+    async fn image_postcondition_requires_readable_nonempty_archive() {
+        let name = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!("symthaea-image-postcondition-{name}"));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let path = dir.join("system.tar.gz");
+        let archive_path = path.to_string_lossy().replace('\\', "\\'");
+        let create = run_cmd(&format!(
+            "tar -czf '{}' --files-from /dev/null",
+            archive_path
+        ))
+        .await
+        .unwrap();
+        assert_eq!(create.exit_status, 0);
+        assert!(verify_image_artifact(dir.to_str().unwrap()).await.unwrap());
+
+        std::fs::write(&path, b"not a tar archive").unwrap();
+        assert!(!verify_image_artifact(dir.to_str().unwrap()).await.unwrap());
+
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
