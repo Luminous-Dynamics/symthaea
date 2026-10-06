@@ -561,6 +561,7 @@ impl NixSystemdReadOnlyObserverV1 {
             generation,
             &object_path,
             &manager_owner,
+            &service_result,
             &unit_properties,
             job,
         )?;
@@ -889,6 +890,7 @@ fn build_observation_from_properties(
     generation: u64,
     unit_object_path: &OwnedObjectPath,
     manager_owner: &str,
+    service_result: &str,
     properties: &HashMap<String, OwnedValue>,
     job: Option<NixSystemdJobEvidenceV1>,
 ) -> Result<NixServicePostStateObservationV1, NixSystemdObserverErrorV1> {
