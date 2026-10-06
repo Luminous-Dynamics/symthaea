@@ -169,6 +169,7 @@ for dir in "${scope[@]}"; do
         echo "known orphan (allowlisted): ${f#./}  (${lines} lines)"
       else
         echo "ORPHAN: ${f#./}  (${lines} lines — no 'mod ${base};' anywhere in ${dir}/src)"
+        echo "::error file=${f#./},title=Orphan module::unreachable Rust source file"
         orphans=$((orphans + 1))
       fi
     fi
@@ -180,6 +181,7 @@ for dir in "${scope[@]}"; do
       if [[ "$root_lines" -eq 0 ]]; then
         sub=$(cat "${f%.rs}"/**/*.rs 2>/dev/null | wc -l)
         echo "STRANDED SUBTREE: ${f#./} is an empty module root beside $(basename "${f%.rs}")/ (${sub} lines unreachable)"
+        echo "::error file=${f#./},title=Stranded module subtree::unreachable Rust subtree"
         stranded=$((stranded + 1))
       fi
     fi
@@ -210,6 +212,7 @@ for dir in "${scope[@]}"; do
       if ! grep -qE '(^|[^[:alnum:]_])fn[[:space:]]+main[[:space:]]*\(' "$f"; then
         lines=$(wc -l < "$f")
         echo "BROKEN EXAMPLE: ${f#./}  (${lines} lines — no 'fn main'; 'cargo build --examples' fails)"
+        echo "::error file=${f#./},title=Broken example::example target has no fn main"
         broken_examples=$((broken_examples + 1))
       fi
     done
@@ -218,6 +221,7 @@ for dir in "${scope[@]}"; do
       # Top-level stubs are already reported above by the fn-main check.
       [[ "$(dirname "$f")" == "$dir/examples" ]] && continue
       echo "PLACEHOLDER EXAMPLE: ${f#./}  (contains only '// placeholder')"
+      echo "::error file=${f#./},title=Placeholder example::placeholder example source"
       broken_examples=$((broken_examples + 1))
     done < <(grep -rlxE '[[:space:]]*//[[:space:]]*placeholder[[:space:]]*' \
       --include='*.rs' "$dir/examples" 2>/dev/null)

@@ -41,6 +41,8 @@
 //! }
 //! ```
 
+pub mod action_provenance;
+pub mod authorization_store;
 pub mod curiosity;
 pub mod dht;
 pub mod epistemic_mirror;
@@ -51,6 +53,8 @@ pub mod socratic;
 pub mod uncertainty;
 pub mod zk_proofs;
 
+pub use action_provenance::*;
+pub use authorization_store::*;
 pub use curiosity::*;
 pub use dht::*;
 pub use epistemic_mirror::*;
@@ -101,6 +105,18 @@ impl GracefulIgnoranceSystem {
     /// Analyzes the query to determine what type of ignorance is present
     /// and quantifies the uncertainty.
     pub fn detect_ignorance(&self, query: &str) -> IgnoranceDetection {
+        self.detect_ignorance_in_frame(query, EpistemicFrame::default())
+    }
+
+    /// Detect ignorance under an explicitly supplied epistemic frame.
+    ///
+    /// The default detector remains backward-compatible, while callers that know their
+    /// ontology, evidence boundary, or causal model can make that context first-class.
+    pub fn detect_ignorance_in_frame(
+        &self,
+        query: &str,
+        frame: EpistemicFrame,
+    ) -> IgnoranceDetection {
         // 1. Classify the query domain
         let domain = self.classify_domain(query);
 
@@ -130,6 +146,7 @@ impl GracefulIgnoranceSystem {
             domain,
             eig,
             detected_at: SystemTime::now(),
+            frame,
         }
     }
 
@@ -142,6 +159,7 @@ impl GracefulIgnoranceSystem {
             detection,
             status: IgnoranceStatus::Active,
             resolution: None,
+            frame_revisions: Vec::new(),
             created_at: SystemTime::now(),
             updated_at: SystemTime::now(),
         };
@@ -436,6 +454,8 @@ pub struct IgnoranceDetection {
     pub eig: f32,
     /// When detected
     pub detected_at: SystemTime,
+    /// Epistemic frame qualifying the meaning of this detection.
+    pub frame: EpistemicFrame,
 }
 
 /// Knowledge check result
@@ -561,4 +581,101 @@ mod tests {
             _ => panic!("Expected OutOfDomain response"),
         }
     }
+    #[test]
+    fn test_default_epistemic_frame_is_explicit_and_versioned() {
+        let frame = EpistemicFrame::default();
+        assert_eq!(frame.identity(), "gis-default@1");
+        assert_eq!(frame.ontology_id, "general-v1");
+        assert!(!frame.known_blind_spots.is_empty());
+    }
+
+    #[test]
+    fn test_detection_carries_frame_provenance() {
+        let detection = GracefulIgnoranceSystem::new().detect_ignorance("What is 2 + 2?");
+        assert_eq!(detection.frame.identity(), "gis-default@1");
+        assert_eq!(detection.frame.ontology_id, "general-v1");
+    }
+
+    #[test]
+    fn test_frame_aware_detection_preserves_supplied_frame() {
+        let gis = GracefulIgnoranceSystem::new();
+        let frame = EpistemicFrame {
+            id: "institutional-v2".to_string(),
+            version: 2,
+            evidence_boundary: "public-records".to_string(),
+            ontology_id: "collective-agents-v2".to_string(),
+            causal_model_id: "institutional-feedback-v2".to_string(),
+            excluded_variables: vec!["private-intent".to_string()],
+            known_blind_spots: vec!["informal norms".to_string()],
+        };
+
+        let detection = gis.detect_ignorance_in_frame("Why did the institution act?", frame.clone());
+
+        assert_eq!(detection.frame, frame);
+        assert_eq!(detection.frame.identity(), "institutional-v2@2");
+    }
+
+    #[test]
+    fn test_same_query_can_be_evaluated_under_divergent_frames() {
+        let gis = GracefulIgnoranceSystem::new();
+        let social_frame = EpistemicFrame {
+            id: "social-system".to_string(),
+            version: 1,
+            evidence_boundary: "institutional-records".to_string(),
+            ontology_id: "collective-agents-v1".to_string(),
+            causal_model_id: "institutional-feedback-v1".to_string(),
+            excluded_variables: vec!["private-intent".to_string()],
+            known_blind_spots: vec!["unobserved informal norms".to_string()],
+        };
+        let material_frame = EpistemicFrame {
+            id: "material-system".to_string(),
+            version: 1,
+            evidence_boundary: "physical-observations".to_string(),
+            ontology_id: "material-agents-v1".to_string(),
+            causal_model_id: "physical-causation-v1".to_string(),
+            excluded_variables: vec!["institutional meaning".to_string()],
+            known_blind_spots: vec!["unobserved social rules".to_string()],
+        };
+
+        let social = gis.detect_ignorance_in_frame("Why did the institution act?", social_frame);
+        let material = gis.detect_ignorance_in_frame("Why did the institution act?", material_frame);
+
+        assert_eq!(social.query, material.query);
+        assert_ne!(social.frame.identity(), material.frame.identity());
+        let divergence = social.frame.divergence_from(&material.frame);
+        assert!(divergence.is_divergent());
+        assert!(divergence.ontology_changed);
+        assert!(divergence.causal_model_changed);
+        assert!(divergence.evidence_boundary_changed);
+    }
+
+    #[test]
+    fn test_frame_revision_is_provenance_divergence() {
+        let left = EpistemicFrame::default();
+        let mut right = left.clone();
+        assert!(!left.divergence_from(&right).is_divergent());
+
+        right.version = 2;
+        assert!(left.divergence_from(&right).is_divergent());
+        assert!(left.divergence_from(&right).version_changed);
+
+        let revision = EpistemicFrameRevision::new(
+            &left,
+            &right,
+            "newly observed entity",
+            Some("previously unrepresented institution".to_string()),
+            "expanded social ontology",
+            vec!["claim:C1".to_string(), "claim:C2".to_string()],
+        );
+        assert_eq!(revision.prior_frame, "gis-default@1");
+        assert_eq!(revision.revised_frame, "gis-default@2");
+        assert_eq!(revision.affected_conclusions.len(), 2);
+
+        right.ontology_id = "alternative-ontology-v1".to_string();
+        let divergence = left.divergence_from(&right);
+        assert!(divergence.is_divergent());
+        assert!(divergence.ontology_changed);
+    }
+
+
 }
