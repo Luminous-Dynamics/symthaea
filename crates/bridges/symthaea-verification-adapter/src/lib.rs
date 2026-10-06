@@ -22,7 +22,7 @@ mod strict_json;
 pub use eddsa_jcs_2022::{verify_eddsa_jcs_2022, EDDSA_JCS_2022};
 
 use symthaea_epistemic_types::{
-    url_values_equivalent,
+    url_values_equivalent, validate_xsd11_date_time_stamp,
     ClaimControllerDocumentIdentity, ClaimControllerIdentity, ClaimVerificationMethod,
     FederationDependency,
     ControllerDocumentDereferenceAttestation, ControllerDocumentResolutionSource,
@@ -98,6 +98,17 @@ impl ControllerDocumentSnapshotFile {
             return Err(SnapshotError::Malformed(
                 "controller-document snapshot reference must not contain a URL fragment".into(),
             ));
+        }
+
+        for (field, value) in [
+            ("snapshot state_at", self.state_at.as_str()),
+            ("snapshot resolved_at", self.resolved_at.as_str()),
+        ] {
+            validate_xsd11_date_time_stamp(value).map_err(|_| {
+                SnapshotError::Malformed(format!(
+                    "{field} must be a valid XML Schema 1.1 dateTimeStamp"
+                ))
+            })?;
         }
 
         if self.document.is_empty() {
@@ -1181,9 +1192,9 @@ fn optional_timestamp(
 ) -> Result<Option<String>, SnapshotError> {
     let value = optional_string(object, field)?;
     if let Some(value) = &value {
-        chrono::DateTime::parse_from_rfc3339(value).map_err(|_| {
+        validate_xsd11_date_time_stamp(value).map_err(|_| {
             SnapshotError::Malformed(format!(
-                "controller document field {field} must be RFC3339 when present"
+                "controller document field {field} must be a valid XML Schema 1.1 dateTimeStamp when present"
             ))
         })?;
     }
@@ -1371,6 +1382,42 @@ mod tests {
         let dereference = resolution.controller_document_dereference.as_ref().unwrap();
         assert_eq!(dereference.source, ControllerDocumentResolutionSource::ApplicationSnapshot);
         assert!(dereference.digest_multibase.is_some());
+    }
+
+    #[test]
+    fn snapshot_timestamp_validation_matches_verification_contract() {
+        let mut snapshot = snapshot();
+        snapshot.state_at = "2026-10-05T24:00:00Z".into();
+        snapshot.resolved_at = "2026-10-06T00:00:00Z".into();
+        assert!(snapshot.validate_structure().is_ok());
+
+        let mut snapshot = snapshot();
+        snapshot.state_at = "2026-10-05T24:00:00.1Z".into();
+        assert!(matches!(
+            snapshot.validate_structure(),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("XML Schema 1.1 dateTimeStamp")
+        ));
+    }
+
+    #[test]
+    fn lifecycle_timestamp_validation_accepts_xsd_end_of_day() {
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "assertionMethod": [{
+                "id": "https://example.test/controller#key-1",
+                "type": "Multikey",
+                "controller": "https://example.test/controller",
+                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+                "expires": "2026-10-05T24:00:00Z"
+            }]
+        }"##.into();
+
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+        assert!(adapter.resolve_snapshot(&request(), snapshot).is_ok());
     }
 
     #[test]
