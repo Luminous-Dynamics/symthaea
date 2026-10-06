@@ -1840,6 +1840,100 @@ mod tests {
     }
 
     #[test]
+    fn evidence_provenance_rejects_invalid_digest_shape() {
+        assert_eq!(
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "not-a-sha256",
+                "0123456789abcdef0123456789abcdef01234567",
+            ),
+            Err(RelationalPredictionError::InvalidEvidenceProvenance(
+                "source_data_sha256"
+            ))
+        );
+    }
+
+    #[test]
+    fn evidence_packet_validates_and_serializes() {
+        let samples = build_samples(0.5);
+        let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        evidence.validate().unwrap();
+        let json = evidence.to_json().unwrap();
+        assert!(json.contains("relational-prediction-evidence/v1"));
+        assert!(json.contains("RelationalAugmented"));
+        assert!(json.contains("predictions"));
+        assert_eq!(evidence.records.len(), 7);
+        assert_eq!(
+            evidence.records[0].score(),
+            evidence.summary.score(evidence.records[0].feature_set)
+        );
+    }
+
+    #[test]
+    fn rolling_evidence_validates_and_serializes() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 2,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let evidence = RollingOriginRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config,
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        evidence.validate().unwrap();
+        let json = evidence.to_json().unwrap();
+        assert!(json.contains("relational-prediction-rolling-evidence/v1"));
+        assert!(json.contains("per_origin_improvement"));
+        assert_eq!(evidence.origins.len(), 2);
+    }
+
+    #[test]
+    fn evidence_trace_rejects_tampered_loss() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        evidence.records[0].mean_squared_error += 0.1;
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
     fn train_only_standardization_is_deterministic_and_finite() {
         let samples = build_samples(0.5);
         let first = fit_linear_model(
