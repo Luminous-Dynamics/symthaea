@@ -124,7 +124,9 @@ The randomized qualification surface now probes deterministic observations from 
 existing moderate-rate and low-rate regimes, using an independent test-side
 parity-check construction based on u64 nullspace elimination. It does not call the
 decoder's parity-check constructor. The resulting syndrome is compared directly
-with the production parity-check syndrome for every probe.
+with the production parity-check syndrome for every probe. The independent check
+rows are also subjected to a separate rank computation and must have rank (n-k);
+row count alone is therefore not accepted as evidence of a full-rank parity check.
 
 The nearest-codeword oracle is also independently reconstructed from the generator
 basis by explicit GF(2) subset enumeration rather than calling the production
@@ -148,6 +150,8 @@ remain explicit NoMatchWithinBound results.
 
 The entire probe is repeated with identical seeds and observations and the
 complete multiplicity histogram (1 through 16) must be identical. The emitted
+ledger records the independent-check-rank and translation-equivariance gates
+alongside the syndrome and codeword oracle markers. The emitted
 ledger therefore exposes the full observed list-size distribution rather than
 only a selected prefix. This makes the empirical random-code result deterministic
 without pretending it is an asymptotic theorem.
