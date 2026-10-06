@@ -460,18 +460,6 @@ fn validate_image_path(value: &str) -> Result<String, String> {
     Ok(path)
 }
 
-/// Generate a collision-resistant session identifier from the OS CSPRNG.
-///
-/// Session IDs are used in temporary filenames and log paths. They must not
-/// depend only on wall-clock time, because distinct clients can connect in
-/// the same millisecond and otherwise collide across isolation boundaries.
-fn new_session_id() -> Result<u64, String> {
-    let mut bytes = [0u8; 8];
-    getrandom02::getrandom(&mut bytes)
-        .map_err(|error| format!("unable to obtain secure session randomness: {error}"))?;
-    Ok(u64::from_le_bytes(bytes))
-}
-
 fn transaction_artifact_dir_path(transaction_id: &str) -> Result<std::path::PathBuf, String> {
     if transaction_id.len() != 32
         || !transaction_id.bytes().all(|byte| byte.is_ascii_hexdigit())
@@ -3733,23 +3721,8 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 eprintln!("[{}] {}", peer_addr, transaction.log_line());
 
                 // Generate session-isolated log path (CRITICAL-4: prevents cross-session log tampering)
-                let session_id = match new_session_id() {
-                    Ok(id) => id,
-                    Err(error) => {
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::error(&format!(
-                                    "Unable to establish a secure install session: {}",
-                                    error
-                                ))
-                                .to_json(),
-                            ))
-                            .await;
-                        continue;
-                    }
-                };
-                // The transaction ID is the durable recovery identity. The
-                // session ID remains reserved for ephemeral secret/staging paths.
+                // The transaction ID is the sole durable and filesystem identity
+                // for this mutation's asynchronous artifact namespace.
                 let process_id = transaction.transaction_id.as_str();
                 let transaction_dir = match create_transaction_artifact_dir(process_id) {
                     Ok(path) => path,
@@ -4020,7 +3993,7 @@ echo "  User password set."
                 }
 
                 eprintln!(
-                    "[{}] Starting automated {} install on {} (session {})",
+                    "[{}] Starting automated {} install on {} (transaction {})",
                     peer_addr,
                     if client_msg.layout.is_empty() {
                         "single"
@@ -4028,7 +4001,7 @@ echo "  User password set."
                         &client_msg.layout
                     },
                     &disk,
-                    session_id
+                    transaction.transaction_id
                 );
 
                 let _ = ws_tx
@@ -8533,20 +8506,13 @@ mod tests {
         assert!(machine_binding_digest_hex_for("x\0y").is_err());
     }
 
-    #[test]
-    fn session_ids_are_non_deterministic() {
-        let first = new_session_id().expect("OS CSPRNG should be available");
-        let second = new_session_id().expect("OS CSPRNG should be available");
-        assert_ne!(first, second);
-    }
-
     fn transaction_artifact_namespace_is_private_and_collision_fail_closed() {
-        let transaction_id = "0123456789abcdef0123456789abcdef";
-        assert!(transaction_artifact_dir_path(transaction_id).is_ok());
+        let transaction_id = random_operation_id().expect("CSPRNG transaction ID should be available");
+        assert!(transaction_artifact_dir_path(&transaction_id).is_ok());
         assert!(transaction_artifact_dir_path("too-short").is_err());
         assert!(transaction_artifact_dir_path("0123456789abcdef0123456789abcdeg").is_err());
 
-        let path = create_transaction_artifact_dir(transaction_id)
+        let path = create_transaction_artifact_dir(&transaction_id)
             .expect("fresh transaction artifact namespace should be creatable");
         let metadata = std::fs::metadata(&path).expect("artifact directory should exist");
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
@@ -8554,7 +8520,15 @@ mod tests {
         assert_eq!(metadata.permissions().mode() & 0o777, 0o700);
         assert_eq!(metadata.uid(), unsafe { libc::geteuid() });
 
-        let error = create_transaction_artifact_dir(transaction_id)
+        // Cleanup is restricted to the transaction namespace shape; arbitrary
+        // paths are never accepted by the recursive cleanup helper.
+        let sentinel = std::env::temp_dir().join("symthaea-artifact-cleanup-sentinel");
+        std::fs::write(&sentinel, b"must-survive").unwrap();
+        remove_transaction_artifact_dir(sentinel.to_str().unwrap());
+        assert!(sentinel.exists());
+        let _ = std::fs::remove_file(&sentinel);
+
+        let error = create_transaction_artifact_dir(&transaction_id)
             .expect_err("reusing a transaction artifact namespace must fail closed");
         assert!(error.contains("already exists"));
 
