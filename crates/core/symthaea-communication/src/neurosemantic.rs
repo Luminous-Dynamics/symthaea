@@ -2606,6 +2606,11 @@ mod tests {
                 "synthetic-policy-record-1",
                 b"synthetic-policy-record-1",
             ),
+            derivation_provenance_ref: "synthetic-derivation-record-1".into(),
+            derivation_provenance_hash: compute_derivation_provenance_hash(
+                "synthetic-derivation-record-1",
+                b"synthetic-derivation-record-1",
+            ),
             origin_jurisdiction: "za".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["za".into()]),
             permitted_secondary_uses: BTreeSet::new(),
