@@ -1398,7 +1398,7 @@ impl DaemonState {
 
                             let intent = match (&cmd, approval_definition_content.as_ref()) {
                                 (NixOSCommand::Service { .. }, Some(content)) => {
-                                    let pre_state_identity = match pre_state_identity.as_deref() {
+                                    let pre_state_identity_ref = match pre_state_identity.as_deref() {
                                         Some(identity) => identity,
                                         None => {
                                             eprintln!(
@@ -1416,7 +1416,7 @@ impl DaemonState {
                                     };
                                     let context = match service_effect_context_from_capture(
                                         &cmd,
-                                        pre_state_identity,
+                                        pre_state_identity_ref,
                                         content,
                                     ) {
                                         Ok(context) => context,
