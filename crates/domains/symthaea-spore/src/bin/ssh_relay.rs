@@ -917,7 +917,7 @@ nixos-generate-config --root /mnt
                  \x20   \n\
                  \x20 }};\n\
                  \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs ];\n\
-                 \x20 system.stateVersion = \"25.05\";\n\
+                 \x20 system.stateVersion = \"26.05\";\n\
                  }}",
                 hostname = hostname,
             );
@@ -1087,7 +1087,7 @@ nixos-generate-config --root /mnt || echo "WARNING: nixos-generate-config failed
                  \x20 }};\n\
                  \n\
                  \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs ];\n\
-                 \x20 system.stateVersion = \"25.05\";\n\
+                 \x20 system.stateVersion = \"26.05\";\n\
                  }}",
                 hostname = hostname,
             );
@@ -1234,7 +1234,7 @@ echo '  networking.hostId = "deadbeef";' >> /mnt/etc/nixos/hardware-configuratio
             );
 
             let fallback_zfs = format!(
-                "{{ config, pkgs, ... }}:\n{{\n  imports = [ ./hardware-configuration.nix ];\n  networking.hostName = \"{hostname}\";\n  boot.loader.systemd-boot.enable = true;\n  boot.loader.efi.canTouchEfiVariables = true;\n  boot.supportedFilesystems = [ \"zfs\" ];\n  boot.zfs.devNodes = \"/dev/disk/by-id\";\n  networking.hostId = \"deadbeef\";\n  services.zfs.autoScrub.enable = true;\n  services.zfs.trim.enable = true;\n  users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];  }};\n  environment.systemPackages = with pkgs; [ vim git curl wget htop ];\n  system.stateVersion = \"25.05\";\n}}",
+                "{{ config, pkgs, ... }}:\n{{\n  imports = [ ./hardware-configuration.nix ];\n  networking.hostName = \"{hostname}\";\n  boot.loader.systemd-boot.enable = true;\n  boot.loader.efi.canTouchEfiVariables = true;\n  boot.supportedFilesystems = [ \"zfs\" ];\n  boot.zfs.devNodes = \"/dev/disk/by-id\";\n  networking.hostId = \"deadbeef\";\n  services.zfs.autoScrub.enable = true;\n  services.zfs.trim.enable = true;\n  users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];  }};\n  environment.systemPackages = with pkgs; [ vim git curl wget htop ];\n  system.stateVersion = \"26.05\";\n}}",
                 hostname = hostname,
             );
             script.push_str(&config_write_commands(
@@ -1399,7 +1399,7 @@ nixos-generate-config --root /mnt
                      \x20 }};\n\
                      \n\
                      \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs cryptsetup ];\n\
-                     \x20 system.stateVersion = \"25.05\";\n\
+                     \x20 system.stateVersion = \"26.05\";\n\
                      }}\n\
                      NIXCONF\n",
                     hostname = hostname,
@@ -1557,7 +1557,7 @@ nixos-generate-config --root /mnt
                  \x20 }};\n\
                  \n\
                  \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs ];\n\
-                 \x20 system.stateVersion = \"25.05\";\n\
+                 \x20 system.stateVersion = \"26.05\";\n\
                  }}",
                 hostname = hostname,
             );
@@ -1694,7 +1694,7 @@ nixos-generate-config --root /mnt
                  \x20   \n\
                  \x20 }};\n\
                  \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs ];\n\
-                 \x20 system.stateVersion = \"25.05\";\n\
+                 \x20 system.stateVersion = \"26.05\";\n\
                  }}",
                 hostname = hostname,
             );
@@ -1829,7 +1829,7 @@ mdadm --detail --scan >> /mnt/etc/mdadm.conf
                  \x20   \n\
                  \x20 }};\n\
                  \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs mdadm ];\n\
-                 \x20 system.stateVersion = \"25.05\";\n\
+                 \x20 system.stateVersion = \"26.05\";\n\
                  }}",
                 hostname = hostname,
             );
@@ -1970,7 +1970,7 @@ mdadm --detail --scan >> /mnt/etc/mdadm.conf 2>/dev/null || true
                  boot.swraid.enable = true;\n  \
                  services.openssh.enable = true;\n  \
                  users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" ];  }};\n  \
-                 system.stateVersion = \"25.05\";\n}}",
+                 system.stateVersion = \"26.05\";\n}}",
                 hostname = hostname
             );
             script.push_str(&config_write_commands(
@@ -2095,7 +2095,7 @@ nixos-generate-config --root /mnt
                  services.zfs.autoScrub.enable = true;\n  \
                  services.openssh.enable = true;\n  \
                  users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" ];  }};\n  \
-                 system.stateVersion = \"25.05\";\n}}",
+                 system.stateVersion = \"26.05\";\n}}",
                 hostname = hostname
             );
             script.push_str(&config_write_commands(
@@ -3146,7 +3146,7 @@ echo "  User password set."
 
                 // SECURITY: Clean up temporary files containing sensitive data
                 let _ = run_cmd(&format!(
-                    "rm -f {} {} /tmp/sovereign-user-pw-{}",
+                    "rm -f {} {} /tmp/sovereign-user-pw-{} /tmp/sovereign-luks-pw-{}",
                     script_path, log_path, session_id
                 ))
                 .await;
