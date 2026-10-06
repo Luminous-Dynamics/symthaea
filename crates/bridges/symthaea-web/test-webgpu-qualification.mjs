@@ -1551,9 +1551,16 @@ async function runMode(mode) {
       }
       if (hardwareMode) {
         for (const [canvas, configuration] of Object.entries(diagnostics.surface_configuration)) {
-          if (configuration.adapter_device_type === 'Cpu') {
+          const snapshots = configuration.adapter_history || [];
+          if (snapshots.some(snapshot => snapshot.device_type === 'Cpu')) {
             throw new QualificationError(
-              `WebGPU hardware qualification renderer selected a software adapter for ${canvas}: ${JSON.stringify(configuration)}`,
+              `WebGPU hardware qualification renderer selected a software adapter for ${canvas} during recovery: ${JSON.stringify(configuration)}`,
+              'capability',
+            );
+          }
+          if (snapshots.some(snapshot => !snapshot.name || !snapshot.device_type)) {
+            throw new QualificationError(
+              `WebGPU hardware qualification lacks adapter provenance for ${canvas} across recovery: ${JSON.stringify(configuration)}`,
               'capability',
             );
           }
@@ -1675,6 +1682,19 @@ async function runMode(mode) {
           const adapterBackend = canvas?.getAttribute('data-qualification-adapter-backend') || null;
           const adapterVendor = canvas?.getAttribute('data-qualification-adapter-vendor') || null;
           const adapterDevice = canvas?.getAttribute('data-qualification-adapter-device') || null;
+          const adapterSnapshot = initCount => {
+            const read = key =>
+              canvas?.getAttribute(
+                `data-qualification-adapter-${key}-init-${initCount}`,
+              ) || null;
+            return {
+              name: read('name'),
+              device_type: read('device-type'),
+              backend: read('backend'),
+              vendor: read('vendor'),
+              device: read('device'),
+            };
+          };
           const context = canvas instanceof HTMLCanvasElement
             ? canvas.getContext('webgpu')
             : null;
@@ -1696,6 +1716,7 @@ async function runMode(mode) {
             adapter_backend: adapterBackend,
             adapter_vendor: adapterVendor,
             adapter_device: adapterDevice,
+            adapter_history: [1, 2].map(adapterSnapshot),
             browser_configuration: browserConfiguration ? {
               format: browserConfiguration.format || null,
               usage: browserConfiguration.usage || null,
@@ -2115,7 +2136,7 @@ try {
   }
 
   const artifact = {
-    schema: 'symthaea-ui-webgpu-qualification-v13',
+    schema: 'symthaea-ui-webgpu-qualification-v14',
     harness_self_tests_passed: true,
     url: URL,
     chromium: CHROMIUM,
