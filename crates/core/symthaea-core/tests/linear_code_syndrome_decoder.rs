@@ -66,10 +66,7 @@ fn parity_check_is_full_rank_and_annihilates_code_space() {
         parity_check.syndrome_dimension(),
         31 - independent_generator_rank
     );
-    assert_eq!(
-        parity_check.rows().len(),
-        31 - independent_generator_rank
-    );
+    assert_eq!(parity_check.rows().len(), 31 - independent_generator_rank);
     assert_eq!(parity_check.columns().len(), 31);
 
     for codeword in code.enumerate() {
@@ -717,8 +714,8 @@ fn independent_binary_rank(rows: &[u64], dimension: usize) -> usize {
     let mut pivot_row = 0usize;
 
     for column in 0..dimension {
-        let Some(found) = (pivot_row..reduced.len())
-            .find(|&row| ((reduced[row] >> column) & 1) == 1)
+        let Some(found) =
+            (pivot_row..reduced.len()).find(|&row| ((reduced[row] >> column) & 1) == 1)
         else {
             continue;
         };
