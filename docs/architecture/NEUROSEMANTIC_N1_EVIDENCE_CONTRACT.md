@@ -179,6 +179,29 @@ The N0 implementation uses a schema-validated, content-addressed target-set reco
 The word independent is deliberately narrow: the protocol enforces that the verifier identity differs from the recorded effect agent. It does not establish that either identity is trustworthy or that the verifier followed its claimed procedure. A future deployment bridge must supply the relevant identity/key trust and audit semantics.
 
 For model-derived remediation, an IndependentlyVerified lifecycle receipt is still insufficient to claim preservation of utility, safety, or fairness. Any such claim requires a separate preregistered impact-evaluation artifact binding the exact pre/post model identities, derivation lineage, evaluation split/protocol, subgroup metrics, and observed behavior.
+## Model-remediation impact evidence
+
+A lifecycle receipt and a model-remediation evaluation answer different questions. The lifecycle receipt binds the recorded downstream effect and independent verification; this artifact binds whether the resulting model was actually evaluated for the declared impact dimensions.
+
+`NeurosemanticRemediationImpactArtifact` is schema v1 and requires:
+
+- distinct pre- and post-remediation model content identities;
+- independently bound pre- and post-remediation derivation lineage records;
+- the exact independently-verified lifecycle receipt fingerprint;
+- a fixed study-protocol hash and evaluation split-manifest hash;
+- separate content-addressed evidence for forgetfulness, retained utility/behavior, and residual/recovery risk;
+- optional fairness evidence only when the fairness dimension is explicitly declared;
+- an explicit disposition of `WithinDeclaredBounds`, `OutsideDeclaredBounds`, or `Inconclusive`.
+
+The implementation deliberately avoids one aggregate unlearning score. A passing lifecycle receipt or impact artifact does not establish complete erasure, legal compliance, safety, fairness, or absence of residual model influence.
+
+The N0 example uses synthetic evidence and therefore reports `Inconclusive`. Its purpose is to demonstrate identity binding and fail-closed substitution controls, not to qualify a real remediation method.
+
+Research direction: RULER demonstrates that output-level unlearning checks can miss residual information in internal representations, while recent benchmarks show that recovery attacks can reveal knowledge after apparently successful unlearning. Accordingly, a future N1 remediation campaign should retain both output-level and representation/recovery evidence rather than selecting whichever metric is most favorable. (Cosma & Finke, RULER, arXiv:2605.27569; Qian et al., Leak-Resistant Unlearning, arXiv:2608.04519.)
+
+Fairness and post-deployment effects must also be evaluated separately. Recent clinical-AI work found that forgetting medical records can interact with subgroup disparities, and NIST's 2026 monitoring guidance emphasizes that post-deployment monitoring is necessary because controlled pre-deployment evaluation cannot capture all real-world consequences. (Chen et al., *Nature Communications* 17, 6009, 2026, doi:10.1038/s41467-026-72601-7; NIST AI 800-4, 2026.)
+
+Therefore a future model-impact evidence bundle should stratify the declared results by the preregistered evaluation matrix, record negative/recovery controls, and preserve enough artifact identity to reproduce exactly which model versions and data partitions were tested.
 ## Privacy requirements
 
 Consent must specify the permitted data class and inference class separately. A participant agreeing to communication assistance does not automatically authorize unrelated secondary inference, model training, affective inference, or commercial analytics.
