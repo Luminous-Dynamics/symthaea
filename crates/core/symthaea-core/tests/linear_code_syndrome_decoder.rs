@@ -733,8 +733,8 @@ fn independent_parity_check_rows(code: &RandomLinearCode) -> Vec<u64> {
     }
 
     let mut checks = Vec::with_capacity(dimension - code.rank());
-    for free_column in 0..dimension {
-        if is_pivot[free_column] {
+    for (free_column, &pivot) in is_pivot.iter().enumerate() {
+        if pivot {
             continue;
         }
 
