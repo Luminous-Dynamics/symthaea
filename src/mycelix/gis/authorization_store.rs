@@ -1724,6 +1724,100 @@ impl SqliteAuthorizationStore {
                BEGIN
                  SELECT RAISE(ABORT, 'native replay history is append-only');
                END;
+             CREATE TRIGGER IF NOT EXISTS authorization_dispatch_replay_owner_insert
+               BEFORE INSERT ON authorization_dispatches
+               WHEN NEW.native_replay_identity <> ''
+               BEGIN
+                 SELECT CASE
+                   WHEN NOT EXISTS(
+                     SELECT 1 FROM authorization_native_replay_history h
+                     WHERE h.native_replay_identity=NEW.native_replay_identity
+                       AND h.authorization_instance=NEW.authorization_instance
+                       AND h.attempt_id=NEW.attempt_id
+                       AND h.operation_id=NEW.operation_id
+                       AND h.relying_party_id=COALESCE(NEW.relying_party_id,'')
+                       AND h.native_authority_namespace=NEW.native_authority_namespace
+                       AND h.native_authorization_id=NEW.native_authorization_id
+                       AND h.native_replay_derivation_digest=NEW.native_replay_derivation_digest
+                       AND h.boundary_id=NEW.boundary_id
+                       AND h.action_digest=NEW.action_digest
+                       AND h.target_identity=NEW.target_identity
+                   )
+                   THEN RAISE(ABORT, 'dispatch native replay history owner mismatch')
+                 END;
+               END;
+             CREATE TRIGGER IF NOT EXISTS authorization_dispatch_replay_owner_update
+               BEFORE UPDATE OF native_replay_identity,authorization_instance,attempt_id,operation_id,
+                 relying_party_id,native_authority_namespace,native_authorization_id,
+                 native_replay_derivation_digest,boundary_id,action_digest,target_identity
+               ON authorization_dispatches
+               WHEN NEW.native_replay_identity <> ''
+               BEGIN
+                 SELECT CASE
+                   WHEN NOT EXISTS(
+                     SELECT 1 FROM authorization_native_replay_history h
+                     WHERE h.native_replay_identity=NEW.native_replay_identity
+                       AND h.authorization_instance=NEW.authorization_instance
+                       AND h.attempt_id=NEW.attempt_id
+                       AND h.operation_id=NEW.operation_id
+                       AND h.relying_party_id=COALESCE(NEW.relying_party_id,'')
+                       AND h.native_authority_namespace=NEW.native_authority_namespace
+                       AND h.native_authorization_id=NEW.native_authorization_id
+                       AND h.native_replay_derivation_digest=NEW.native_replay_derivation_digest
+                       AND h.boundary_id=NEW.boundary_id
+                       AND h.action_digest=NEW.action_digest
+                       AND h.target_identity=NEW.target_identity
+                   )
+                   THEN RAISE(ABORT, 'dispatch native replay history owner mismatch')
+                 END;
+               END;
+             CREATE TRIGGER IF NOT EXISTS authorization_terminal_replay_owner_insert
+               BEFORE INSERT ON authorization_terminal_evidence
+               WHEN NEW.native_replay_identity <> ''
+               BEGIN
+                 SELECT CASE
+                   WHEN NOT EXISTS(
+                     SELECT 1 FROM authorization_native_replay_history h
+                     WHERE h.native_replay_identity=NEW.native_replay_identity
+                       AND h.authorization_instance=NEW.authorization_instance
+                       AND h.attempt_id=NEW.attempt_id
+                       AND h.operation_id=NEW.operation_id
+                       AND h.relying_party_id=COALESCE(NEW.relying_party_id,'')
+                       AND h.native_authority_namespace=NEW.native_authority_namespace
+                       AND h.native_authorization_id=NEW.native_authorization_id
+                       AND h.native_replay_derivation_digest=NEW.native_replay_derivation_digest
+                       AND h.boundary_id=NEW.boundary_id
+                       AND h.action_digest=NEW.action_digest
+                       AND h.target_identity=NEW.target_identity
+                   )
+                   THEN RAISE(ABORT, 'terminal native replay history owner mismatch')
+                 END;
+               END;
+             CREATE TRIGGER IF NOT EXISTS authorization_terminal_replay_owner_update
+               BEFORE UPDATE OF native_replay_identity,authorization_instance,attempt_id,operation_id,
+                 relying_party_id,native_authority_namespace,native_authorization_id,
+                 native_replay_derivation_digest,boundary_id,action_digest,target_identity
+               ON authorization_terminal_evidence
+               WHEN NEW.native_replay_identity <> ''
+               BEGIN
+                 SELECT CASE
+                   WHEN NOT EXISTS(
+                     SELECT 1 FROM authorization_native_replay_history h
+                     WHERE h.native_replay_identity=NEW.native_replay_identity
+                       AND h.authorization_instance=NEW.authorization_instance
+                       AND h.attempt_id=NEW.attempt_id
+                       AND h.operation_id=NEW.operation_id
+                       AND h.relying_party_id=COALESCE(NEW.relying_party_id,'')
+                       AND h.native_authority_namespace=NEW.native_authority_namespace
+                       AND h.native_authorization_id=NEW.native_authorization_id
+                       AND h.native_replay_derivation_digest=NEW.native_replay_derivation_digest
+                       AND h.boundary_id=NEW.boundary_id
+                       AND h.action_digest=NEW.action_digest
+                       AND h.target_identity=NEW.target_identity
+                   )
+                   THEN RAISE(ABORT, 'terminal native replay history owner mismatch')
+                 END;
+               END;
              DROP INDEX IF EXISTS authorization_dispatch_action_fence_idx;
              CREATE INDEX authorization_dispatch_action_fence_idx
                ON authorization_dispatches(relying_party_id, target_identity, action_digest, state);",
@@ -7565,6 +7659,85 @@ mod tests {
         ).unwrap();
         assert_eq!(replay,first);
         let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn sqlite_replay_owner_triggers_reject_dangling_dispatch_and_terminal_rows() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-replay-owner-triggers-{}.db",
+            std::process::id()
+        ));
+        let (store, action, witness) = fixture(&path);
+        let effect = ActionEffectBinding::new(
+            "target-replay-owner-trigger",
+            "prod",
+            "adapter-replay-owner-trigger",
+        );
+        let action = action.with_effect_binding(effect.clone());
+        let digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            operation_id: Some("operation:replay-owner-trigger".into()),
+            authorization_instance: "replay-owner-trigger".into(),
+            action_id: action.id.clone(),
+            action_digest: digest.clone(),
+            frame: witness.frame,
+            support_digest: "sha256:support-replay-owner-trigger".into(),
+            policy: witness.policy,
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:00:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(), action.id.clone(), digest.clone(),
+            witness.support_digest.clone(), witness.policy.clone(), 1, 1
+        )).unwrap();
+        store.prepare_for_execution_bound_with_operation(
+            &witness, &action, "frame@1",
+            "attempt:replay-owner-trigger", "boundary:replay-owner-trigger",
+            "operation:replay-owner-trigger"
+        ).unwrap();
+
+        let record = mark_dispatch_pending_bound_from_native_authority_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt:replay-owner-trigger",
+            &action,
+            &effect,
+            "boundary:replay-owner-trigger",
+            "operation:replay-owner-trigger",
+            "test-explicit-issuer",
+            "native-replay-owner-trigger",
+        ).unwrap();
+
+        let dangling_dispatch = store.connection().unwrap().execute(
+            "UPDATE authorization_dispatches
+             SET target_identity='forged-target'
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance.as_str(), record.attempt_id.as_str()],
+        );
+        assert!(dangling_dispatch.unwrap_err().to_string().contains(
+            "dispatch native replay history owner mismatch"
+        ));
+
+        store.mark_invoked_bound(&record, &TestProviderStatusVerifier).unwrap();
+        store.commit_bound_verified(
+            &record,
+            &verified_evidence(&record, ExecutionOutcome::Succeeded),
+            &TestProviderVerifier,
+        ).unwrap();
+
+        let dangling_terminal = store.connection().unwrap().execute(
+            "UPDATE authorization_terminal_evidence
+             SET target_identity='forged-target'
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance.as_str(), record.attempt_id.as_str()],
+        );
+        assert!(dangling_terminal.unwrap_err().to_string().contains(
+            "terminal native replay history owner mismatch"
+        ));
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
