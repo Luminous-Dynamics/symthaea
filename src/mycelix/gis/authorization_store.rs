@@ -718,12 +718,16 @@ fn backfill_native_replay_history(
         {
             let optional_matches = |incoming: Option<&str>, stored: &Option<String>| {
                 incoming.is_none()
+                    || incoming.is_some_and(|value| value.is_empty())
                     || incoming == stored.as_deref()
+            };
+            let legacy_scalar_matches = |incoming: &str, stored: &str| {
+                incoming.is_empty() || incoming == stored
             };
             if stored_authorization_instance != authorization_instance
                 || stored_attempt_id != attempt_id
-                || stored_operation_id != operation_id
-                || stored_relying_party_id != relying_party_id
+                || !legacy_scalar_matches(operation_id, &stored_operation_id)
+                || !legacy_scalar_matches(relying_party_id, &stored_relying_party_id)
                 || !optional_matches(native_authority_namespace, &stored_namespace)
                 || !optional_matches(native_authorization_id, &stored_native_id)
                 || !optional_matches(
@@ -11563,6 +11567,61 @@ mod tests {
 
             let _ = std::fs::remove_file(path);
         }
+    }
+
+    #[test]
+    fn legacy_terminal_replay_history_backfills_without_optional_provenance() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-legacy-native-replay-history-{}.db",
+            std::process::id()
+        ));
+        {
+            let store = SqliteAuthorizationStore::open_with_relying_party(
+                &path,
+                "rp-legacy-native-replay-history",
+            )
+            .unwrap();
+            store
+                .connection()
+                .unwrap()
+                .execute(
+                    "INSERT INTO authorization_terminal_evidence(
+                        authorization_instance,attempt_id,operation_id,native_replay_identity,
+                        boundary_id,action_digest,provider_idempotency_key,target_identity,
+                        audience,outcome,evidence_id,evidence_digest,attempt_binding_digest,
+                        verifier_id,verifier_config_digest,trust_anchor_digest,
+                        evidence_profile_digest,verification_digest)
+                     VALUES(
+                        'legacy-native-replay-history','legacy-attempt','','legacy-native',
+                        '','sha256:legacy-action','legacy-provider-key','legacy-target',
+                        'legacy-audience','failed','legacy-evidence','sha256:legacy-evidence',
+                        'sha256:legacy-binding','legacy-verifier',
+                        'sha256:legacy-verifier-config','sha256:legacy-trust',
+                        'sha256:legacy-profile','sha256:legacy-verification')",
+                    [],
+                )
+                .unwrap();
+        }
+
+        let reopened = SqliteAuthorizationStore::open_with_relying_party(
+            &path,
+            "rp-legacy-native-replay-history",
+        )
+        .unwrap();
+        let row: (String, String, String) = reopened
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT operation_id,relying_party_id,boundary_id
+                 FROM authorization_native_replay_history
+                 WHERE native_replay_identity='legacy-native'",
+                [],
+                |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(row, ("".into(), "".into(), "".into()));
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
