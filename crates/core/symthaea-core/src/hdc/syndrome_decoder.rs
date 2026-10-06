@@ -297,7 +297,7 @@ impl BoundedDistanceSyndromeDecoder {
             } => *matching_error_patterns,
             _ => unreachable!("unique outcome returned above"),
         };
-        debug_assert_eq!(matching_errors, expected_matches);
+        assert_eq!(matching_errors, expected_matches);
         result.list_complete = result.minimum_errors.len() == matching_errors;
 
         for error in &result.minimum_errors {
