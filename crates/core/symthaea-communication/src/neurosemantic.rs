@@ -3947,6 +3947,14 @@ mod tests {
             },
         ]);
         assert!(valid.validate().is_ok());
+        let mut legacy = valid.clone();
+        legacy.schema_version = 1;
+        assert!(
+            NeurosemanticRemediationMeasurementArtifact::from_json_bytes(
+                &serde_json::to_vec(&legacy).unwrap()
+            )
+            .is_err()
+        );
         let mut bad_uncertainty = valid.clone();
         if let NeurosemanticRemediationUncertainty::Interval { upper_numerator, .. } =
             &mut bad_uncertainty.measurements[0].uncertainty
@@ -3969,34 +3977,82 @@ mod tests {
 
     #[test]
     fn remediation_measurement_worst_case_is_recomputed_not_supplied() {
+        let definitions = [
+            (
+                "metric-forgetfulness",
+                NeurosemanticRemediationMeasurementKind::Forgetfulness,
+            ),
+            (
+                "metric-utility",
+                NeurosemanticRemediationMeasurementKind::UtilityImpact,
+            ),
+            (
+                "metric-recovery",
+                NeurosemanticRemediationMeasurementKind::RecoveryRisk,
+            ),
+            (
+                "metric-representation",
+                NeurosemanticRemediationMeasurementKind::RepresentationResidual,
+            ),
+        ];
+        let metric_definitions = definitions
+            .iter()
+            .map(|(metric_ref, kind)| NeurosemanticRemediationMetricDefinition {
+                schema_version: NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
+                metric_ref: (*metric_ref).into(),
+                kind: *kind,
+                estimand_ref: format!("{metric_ref}-estimand"),
+                scope_ref: "evaluation-set-v1".into(),
+                unit_ref: "proportion".into(),
+                aggregation_ref: "per-item-rate".into(),
+                direction: NeurosemanticRemediationMetricDirection::DescriptiveOnly,
+            })
+            .collect();
         let measured = NeurosemanticRemediationMeasurementArtifact {
             schema_version: NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION,
             measurement_ref: "measurement-worst-case".into(),
+            metric_definitions,
             measurements: vec![
                 NeurosemanticRemediationMeasurement {
+                    metric_ref: "metric-forgetfulness".into(),
                     kind: NeurosemanticRemediationMeasurementKind::Forgetfulness,
                     status: NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds,
+                    estimate_numerator: 0,
+                    estimate_scale: 4,
+                    uncertainty: NeurosemanticRemediationUncertainty::NotEstimated,
                     eligible_sample_count: 10,
                     observed_sample_count: 10,
                     failure_count: 0,
                 },
                 NeurosemanticRemediationMeasurement {
+                    metric_ref: "metric-utility".into(),
                     kind: NeurosemanticRemediationMeasurementKind::UtilityImpact,
                     status: NeurosemanticRemediationImpactDisposition::OutsideDeclaredBounds,
+                    estimate_numerator: 0,
+                    estimate_scale: 4,
+                    uncertainty: NeurosemanticRemediationUncertainty::NotEstimated,
                     eligible_sample_count: 10,
                     observed_sample_count: 10,
                     failure_count: 1,
                 },
                 NeurosemanticRemediationMeasurement {
+                    metric_ref: "metric-recovery".into(),
                     kind: NeurosemanticRemediationMeasurementKind::RecoveryRisk,
                     status: NeurosemanticRemediationImpactDisposition::Inconclusive,
+                    estimate_numerator: 0,
+                    estimate_scale: 4,
+                    uncertainty: NeurosemanticRemediationUncertainty::NotEstimated,
                     eligible_sample_count: 10,
                     observed_sample_count: 10,
                     failure_count: 0,
                 },
                 NeurosemanticRemediationMeasurement {
+                    metric_ref: "metric-representation".into(),
                     kind: NeurosemanticRemediationMeasurementKind::RepresentationResidual,
                     status: NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds,
+                    estimate_numerator: 0,
+                    estimate_scale: 4,
+                    uncertainty: NeurosemanticRemediationUncertainty::NotEstimated,
                     eligible_sample_count: 10,
                     observed_sample_count: 10,
                     failure_count: 0,
@@ -4008,7 +4064,10 @@ mod tests {
         let mut forged = measured.clone();
         forged.worst_case_disposition = NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds;
         assert!(forged.validate().is_err());
-        assert_eq!(measured.recomputed_worst_case_disposition().unwrap(), NeurosemanticRemediationImpactDisposition::Inconclusive);
+        assert_eq!(
+            measured.recomputed_worst_case_disposition().unwrap(),
+            NeurosemanticRemediationImpactDisposition::Inconclusive
+        );
         let mut outside_only = measured.clone();
         for item in &mut outside_only.measurements {
             if item.status == NeurosemanticRemediationImpactDisposition::Inconclusive {
@@ -4020,7 +4079,14 @@ mod tests {
         let mut invalid_counts = measured.clone();
         invalid_counts.measurements[0].failure_count = 11;
         assert!(invalid_counts.validate().is_err());
+        let mut missing_observation = measured.clone();
+        missing_observation.measurements[0].observed_sample_count = 9;
+        assert!(missing_observation.validate().is_ok());
+        missing_observation.measurements[0].status =
+            NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds;
+        assert!(missing_observation.validate().is_err());
     }
+
     #[test]
     fn lifecycle_receipt_action_schema_is_stable() {
         for (action, expected) in [
