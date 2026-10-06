@@ -82,37 +82,46 @@ fn evidence(
                 | EvidenceKind::ContinuouslyMonitored
         )
         .then(|| {
-            let mut uncertainty=MeasurementUncertaintyRef {
-                uncertainty_id:format!("benchmark-uncertainty:{id}"),
-                observation_id:format!("benchmark-observation:{id}"),
-                observation_record_digest:format!("benchmark-record-digest:{id}"),
-                uncertainty_budget_id:"benchmark-uncertainty-budget-v1".into(),
-                uncertainty_budget_revision:"v1".into(),
-                uncertainty_budget_digest:"benchmark-uncertainty-budget-digest-v1".into(),
-                measurement_model_id:"benchmark-measurement-model-v1".into(),
-                measurement_model_revision:"v1".into(),
-                measurement_model_digest:"benchmark-measurement-model-digest-v1".into(),
-                statement:MeasurementUncertaintyStatement::Expanded{value:0.1,unit:"burden-unit".into(),coverage_factor:2.0},
-                method_id:"benchmark-uncertainty-method-v1".into(),
-                measurand_id:format!("benchmark-measurand:{id}"),
-                procedure_id:"benchmark-measurement-procedure-v1".into(),
-                procedure_digest:"benchmark-measurement-procedure-v1-digest".into(),
-                component_refs:vec![MeasurementUncertaintyComponentRef {
-                    component_id:"benchmark-uncertainty-component-v1".into(),
-                    component_record_digest:"benchmark-uncertainty-component-record-v1".into(),
-                    uncertainty_budget_id:"benchmark-uncertainty-budget-v1".into(),
-                    uncertainty_budget_revision:"v1".into(),
-                    uncertainty_budget_digest:"benchmark-uncertainty-budget-digest-v1".into(),
-                    measurement_model_id:"benchmark-measurement-model-v1".into(),
-                    measurement_model_revision:"v1".into(),
-                    measurement_model_digest:"benchmark-measurement-model-digest-v1".into(),
+            let mut uncertainty = MeasurementUncertaintyRef {
+                uncertainty_id: format!("benchmark-uncertainty:{id}"),
+                observation_id: format!("benchmark-observation:{id}"),
+                observation_record_digest: format!("benchmark-record-digest:{id}"),
+                uncertainty_budget_id: "benchmark-uncertainty-budget-v1".into(),
+                uncertainty_budget_revision: "v1".into(),
+                uncertainty_budget_digest: "benchmark-uncertainty-budget-digest-v1".into(),
+                measurement_model_id: "benchmark-measurement-model-v1".into(),
+                measurement_model_revision: "v1".into(),
+                measurement_model_digest: "benchmark-measurement-model-digest-v1".into(),
+                statement: MeasurementUncertaintyStatement::Expanded {
+                    value: 0.1,
+                    unit: "burden-unit".into(),
+                    coverage_factor: 2.0,
+                },
+                method_id: "benchmark-uncertainty-method-v1".into(),
+                measurand_id: format!("benchmark-measurand:{id}"),
+                procedure_id: "benchmark-measurement-procedure-v1".into(),
+                procedure_digest: "benchmark-measurement-procedure-v1-digest".into(),
+                component_refs: vec![MeasurementUncertaintyComponentRef {
+                    component_id: "benchmark-uncertainty-component-v1".into(),
+                    component_record_digest: "benchmark-uncertainty-component-record-v1".into(),
+                    uncertainty_budget_id: "benchmark-uncertainty-budget-v1".into(),
+                    uncertainty_budget_revision: "v1".into(),
+                    uncertainty_budget_digest: "benchmark-uncertainty-budget-digest-v1".into(),
+                    measurement_model_id: "benchmark-measurement-model-v1".into(),
+                    measurement_model_revision: "v1".into(),
+                    measurement_model_digest: "benchmark-measurement-model-digest-v1".into(),
                 }],
-                component_refs_digest:String::new(),
-                record_digest:format!("benchmark-uncertainty-digest:{id}"),
-                binding_digest:String::new(),
+                component_refs_digest: String::new(),
+                record_digest: format!("benchmark-uncertainty-digest:{id}"),
+                binding_digest: String::new(),
             };
-            uncertainty.component_refs_digest=super::canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs).unwrap();
-            uncertainty.binding_digest=super::canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
+            uncertainty.component_refs_digest =
+                super::canonical_measurement_uncertainty_component_refs_hash(
+                    &uncertainty.component_refs,
+                )
+                .unwrap();
+            uncertainty.binding_digest =
+                super::canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
             uncertainty
         }),
         scope: "benchmark:functional-unit-v1|global".into(),
@@ -419,7 +428,9 @@ impl BenchmarkCase {
             }
             for evidence in &mut candidate.evidence {
                 if let Some(uncertainty) = &mut evidence.uncertainty {
-                    uncertainty.component_refs.sort_by(|a,b|a.component_id.cmp(&b.component_id));
+                    uncertainty
+                        .component_refs
+                        .sort_by(|a, b| a.component_id.cmp(&b.component_id));
                 }
             }
         }
