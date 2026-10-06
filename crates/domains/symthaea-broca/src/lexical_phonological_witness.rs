@@ -484,19 +484,38 @@ mod tests {
     #[test]
     fn swapped_lexical_mapping_fails_order_and_coverage_contract() {
         let binding = binding();
+        let mappings = vec![
+            LexicalPhonologicalMapping::from_lexical_binding(
+                &binding,
+                0,
+                vec![1],
+                vec!["DH".into()],
+            )
+            .expect("lexical position exists"),
+            LexicalPhonologicalMapping::from_lexical_binding(
+                &binding,
+                1,
+                vec![0],
+                vec!["AY".into()],
+            )
+            .expect("lexical position exists"),
+            LexicalPhonologicalMapping::from_lexical_binding(
+                &binding,
+                2,
+                vec![2],
+                vec!["IY".into()],
+            )
+            .expect("lexical position exists"),
+        ];
         let witness = LexicalPhonologicalWitness {
             version: LEXICAL_PHONOLOGICAL_WITNESS_VERSION.into(),
             lexical_binding_provenance: binding.provenance_token(),
-            mappings: {
-                let mut mappings = witness_for_segments(&binding).mappings;
-                mappings.swap(0, 1);
-                mappings
-            },
+            mappings,
         };
 
         assert_eq!(
             witness
-                .validate_against_segments(&binding, &segments())
+                .validate_against_segments(&binding, &segments(&binding))
                 .expect_err("swapped lexical realization must fail"),
             LexicalPhonologicalWitnessError::LexicalMappingOrderMismatch {
                 lexical_position: 1,
@@ -602,25 +621,26 @@ mod tests {
     #[test]
     fn missing_mapping_fails_closed() {
         let binding = binding();
+        let mappings = vec![
+            LexicalPhonologicalMapping::from_lexical_binding(
+                &binding,
+                0,
+                vec![0],
+                vec!["AY".into()],
+            )
+            .expect("lexical position exists"),
+            LexicalPhonologicalMapping::from_lexical_binding(
+                &binding,
+                1,
+                vec![1],
+                vec!["DH".into()],
+            )
+            .expect("lexical position exists"),
+        ];
         let witness = LexicalPhonologicalWitness {
             version: LEXICAL_PHONOLOGICAL_WITNESS_VERSION.into(),
             lexical_binding_provenance: binding.provenance_token(),
-            mappings: vec![
-                LexicalPhonologicalMapping {
-                    lexical_position: 0,
-                    lexeme_id: binding.constituents[0].lexeme_id.clone(),
-                    morphophonological_form: binding.constituents[0].morphophonological_form.clone(),
-                    segment_indices: vec![0],
-                    symbols: vec!["AY".into()],
-                },
-                LexicalPhonologicalMapping {
-                    lexical_position: 1,
-                    lexeme_id: binding.constituents[1].lexeme_id.clone(),
-                    morphophonological_form: binding.constituents[1].morphophonological_form.clone(),
-                    segment_indices: vec![1],
-                    symbols: vec!["DH".into()],
-                },
-            ],
+            mappings,
         };
 
         assert_eq!(
