@@ -1956,11 +1956,22 @@ impl VerificationEvidence {
                 actual: self.expected_transformed_document_digest.clone(),
             });
         }
-        if self.resolution.controller_document_ref != self.controller_document_ref
+        if !url_values_equivalent(
+            &self.resolution.controller_document_ref,
+            &self.controller_document_ref,
+        )
+        .unwrap_or(false)
             || self.resolution.controller_document_digest != self.controller_document_digest
-            || self.resolution.verification_method != self.controller_document_verification_method
-            || self.resolution.resolved_verification_method_controller
-                != self.resolved_verification_method_controller
+            || !url_values_equivalent(
+                self.resolution.verification_method.as_str(),
+                self.controller_document_verification_method.as_str(),
+            )
+            .unwrap_or(false)
+            || !url_values_equivalent(
+                self.resolution.resolved_verification_method_controller.as_str(),
+                self.resolved_verification_method_controller.as_str(),
+            )
+            .unwrap_or(false)
             || self.resolution.verification_relationship != self.verification_relationship
         {
             return Err(VerificationFailure::ResolutionEvidenceMismatch);
@@ -1971,13 +1982,23 @@ impl VerificationEvidence {
         }
         self.resolved_verification_method_controller.validate_structure()?;
         self.controller_document_verification_method.validate_structure()?;
-        if self.resolved_verification_method_controller != self.controller {
+        if !url_values_equivalent(
+            self.resolved_verification_method_controller.as_str(),
+            self.controller.as_str(),
+        )
+        .unwrap_or(false)
+        {
             return Err(VerificationFailure::ControllerMismatch {
                 expected: self.controller.clone(),
                 actual: self.resolved_verification_method_controller.clone(),
             });
         }
-        if self.controller_document_verification_method != self.verification_method {
+        if !url_values_equivalent(
+            self.controller_document_verification_method.as_str(),
+            self.verification_method.as_str(),
+        )
+        .unwrap_or(false)
+        {
             return Err(VerificationFailure::VerificationMethodMismatch {
                 expected: self.verification_method.clone(),
                 actual: self.controller_document_verification_method.clone(),
@@ -2013,10 +2034,26 @@ impl VerificationEvidence {
             && self.proof_purpose == request.proof_purpose
             && self.expected_transformed_document_digest
                 == request.expected_transformed_document_digest
-            && self.verification_method == request.verification_method
-            && self.controller == request.expected_controller
-            && self.resolved_verification_method_controller == request.expected_controller
-            && self.controller_document_verification_method == request.verification_method
+            && url_values_equivalent(
+                self.verification_method.as_str(),
+                request.verification_method.as_str(),
+            )
+            .unwrap_or(false)
+            && url_values_equivalent(
+                self.controller.as_str(),
+                request.expected_controller.as_str(),
+            )
+            .unwrap_or(false)
+            && url_values_equivalent(
+                self.resolved_verification_method_controller.as_str(),
+                request.expected_controller.as_str(),
+            )
+            .unwrap_or(false)
+            && url_values_equivalent(
+                self.controller_document_verification_method.as_str(),
+                request.verification_method.as_str(),
+            )
+            .unwrap_or(false)
             && self.verification_relationship == request.expected_verification_relationship
             && self.freshness == request.freshness
             && self.resolution.matches_request(request)
