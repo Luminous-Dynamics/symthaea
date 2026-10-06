@@ -2666,6 +2666,18 @@ where
     }
 }
 
+/// Map a child-process result into the legacy numeric response code without
+/// turning an undurable completion into a false success. A missing code
+/// serializes as JSON null, forcing callers to honor the typed transaction
+/// outcome when the durable completion receipt could not be written.
+fn protocol_exit_code(child_exit_code: u32, outcome: TransactionOutcome) -> Option<u32> {
+    match outcome {
+        TransactionOutcome::ObservedSuccess => Some(0),
+        TransactionOutcome::Failed => Some(child_exit_code.max(1)),
+        TransactionOutcome::Indeterminate => None,
+    }
+}
+
 fn finalize_transaction(
     ledger: &TransactionLedger,
     transaction: &SystemTransaction,
@@ -3795,7 +3807,7 @@ echo "  User password set."
                     .send(Message::Text(
                         serde_json::json!({
                             "type": "exit",
-                            "code": exit_code,
+                            "code": protocol_exit_code(exit_code, outcome),
                             "transaction": transaction.receipt(outcome)
                         })
                         .to_string(),
@@ -5017,7 +5029,7 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                             observed_outcome,
                             &peer_addr,
                         );
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":protocol_exit_code(r.exit_status, outcome),"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
                         let _ = ws_tx
@@ -5091,7 +5103,7 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                             observed_outcome,
                             &peer_addr,
                         );
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":protocol_exit_code(r.exit_status, outcome),"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
                         let _ = ws_tx
@@ -5184,7 +5196,7 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                             observed_outcome,
                             &peer_addr,
                         );
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout,"transaction":transaction.receipt(outcome)}).to_string())).await;
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":protocol_exit_code(r.exit_status, outcome),"data":r.stdout,"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
                         let _ = ws_tx
@@ -5363,7 +5375,7 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                     .send(Message::Text(
                         serde_json::json!({
                             "type":"exit",
-                            "code":gc_exit_code,
+                            "code": protocol_exit_code(gc_exit_code, outcome),
                             "transaction":transaction.receipt(outcome)
                         }).to_string(),
                     ))
@@ -5763,7 +5775,7 @@ echo "REBUILD_COMPLETE"
                     .send(Message::Text(
                         serde_json::json!({
                             "type":"exit",
-                            "code":exit_code,
+                            "code":protocol_exit_code(exit_code, outcome),
                             "transaction": transaction.receipt(outcome)
                         })
                         .to_string(),
@@ -6049,7 +6061,7 @@ echo "COMPLETE"
                     .send(Message::Text(
                         serde_json::json!({
                             "type": "exit",
-                            "code": response_code,
+                            "code": protocol_exit_code(response_code, outcome),
                             "transaction": transaction.receipt(outcome)
                         })
                         .to_string(),
@@ -6485,7 +6497,7 @@ echo '}'
                         );
                         serde_json::json!({
                             "type": "wifi_result",
-                            "code": r.exit_status,
+                            "code": protocol_exit_code(r.exit_status, outcome),
                             "data": if r.exit_status == 0 {
                                 "WiFi connected".to_string()
                             } else {
@@ -7286,6 +7298,33 @@ mod tests {
         let banner = auth_token_banner("super-secret-token", true);
         assert!(banner.contains("super-secret-token"));
         assert!(banner.starts_with("  Auth token: "));
+    }
+
+    #[test]
+    fn protocol_exit_code_fails_closed_on_indeterminate_completion() {
+        assert_eq!(
+            protocol_exit_code(0, TransactionOutcome::ObservedSuccess),
+            Some(0)
+        );
+        assert_eq!(
+            protocol_exit_code(23, TransactionOutcome::Failed),
+            Some(23)
+        );
+        assert_eq!(
+            protocol_exit_code(0, TransactionOutcome::Failed),
+            Some(1),
+            "a failed transaction must never expose a success code"
+        );
+        assert_eq!(
+            protocol_exit_code(0, TransactionOutcome::Indeterminate),
+            None,
+            "uncertain completion must not expose a false success code"
+        );
+        assert_eq!(
+            protocol_exit_code(23, TransactionOutcome::Indeterminate),
+            None,
+            "uncertain completion must not masquerade as an ordinary child failure"
+        );
     }
 
     #[test]
