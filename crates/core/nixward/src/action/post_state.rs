@@ -526,6 +526,7 @@ fn validate_stability_against_observation(
             .systemd_manager_owner
             .as_deref()
             .ok_or(NixPostStateErrorV1::MissingManagerOwner)?
+        || last.systemd_bus_id != observation.systemd_bus_id
         || last.invocation_id != observation.invocation_id
         || last.state_change_at_monotonic_us != observation.state_change_at_monotonic_us
         || last.captured_at_monotonic_us > observation.observed_at_monotonic_us
