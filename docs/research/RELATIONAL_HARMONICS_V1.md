@@ -223,7 +223,7 @@ The research module now exposes:
 
 A strong N1 fixture should therefore produce high raw synchrony and substantially reduced controlled association.
 
-This boundary is important because shared stimuli can themselves synchronize multiple observers' neural, physiological, and behavioral signals. Recent work continues to treat the interpretation of interpersonal synchrony as context-dependent rather than self-evidently interpersonal. citeturn614126search3turn614126search1
+This boundary is important because shared stimuli can themselves synchronize multiple observers' neural, physiological, and behavioral signals. Recent reviews continue to treat the interpretation of interpersonal synchrony as context-dependent rather than self-evidently interpersonal. See the cited common-stimulus synchrony study and Gordon & Bartsch (2026) in the literature section.
 
 ### N6.1 — pseudo-synchrony surrogate calibration
 
@@ -239,7 +239,7 @@ The research module now includes a deterministic circular-shift surrogate family
 
 The result is intentionally `Proxy`, not a formal p-value. It is a calibration diagnostic that can reveal whether an observed relationship survives a partner-reassignment null.
 
-A future statistical lane should replace or augment this deterministic circular family with a prespecified surrogate protocol and confidence/error control appropriate to the sampling design. Surrogate-based significance testing is a standard strategy for directional information measures and pseudo-synchrony, but estimator bias and finite sample size remain material concerns. citeturn614126search10turn614126search0
+A future statistical lane should replace or augment this deterministic circular family with a prespecified surrogate protocol and confidence/error control appropriate to the sampling design. Surrogate-based significance testing is a standard strategy for directional information measures and pseudo-synchrony, but estimator bias and finite sample size remain material concerns. See the cited pseudo-transfer-entropy study and Kirkley (2025) in the literature section.
 
 ### N2 — one-way mirroring
 
