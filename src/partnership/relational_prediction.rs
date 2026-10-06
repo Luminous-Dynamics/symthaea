@@ -2302,7 +2302,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn rolling_evidence_rejects_tampered_origin_schedule() {
         let samples = build_samples(0.5);
         let config = RollingOriginRelationalPredictionConfig {
@@ -2334,6 +2333,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn rolling_evidence_validates_and_serializes() {
         let samples = build_samples(0.5);
         let config = RollingOriginRelationalPredictionConfig {
@@ -2359,7 +2359,7 @@ mod tests {
 
         evidence.validate().unwrap();
         let json = evidence.to_json().unwrap();
-        assert!(json.contains("relational-prediction-rolling-evidence/v3"));
+        assert!(json.contains("relational-prediction-rolling-evidence/v4"));
         assert!(json.contains("per_origin_improvement"));
         assert_eq!(evidence.origins.len(), 2);
     }
