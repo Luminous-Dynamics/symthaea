@@ -298,6 +298,18 @@ impl WorldModelBridge {
         self.action_samples.get(action).copied()
     }
 
+    /// Confidence in an action-conditioned prediction.
+    ///
+    /// Confidence starts at zero and asymptotically approaches one as evidence
+    /// accumulates. This is deliberately evidence-weighted rather than a claim
+    /// that repeated observations establish causal truth.
+    pub fn action_confidence(&self, action: usize) -> Option<f32> {
+        self.action_samples.get(action).map(|&samples| {
+            let n = samples as f32;
+            (n / (n + 8.0)).clamp(0.0, 1.0)
+        })
+    }
+
     /// Reset the world model
     pub fn reset(&mut self) {
         for state in &mut self.level_states {
