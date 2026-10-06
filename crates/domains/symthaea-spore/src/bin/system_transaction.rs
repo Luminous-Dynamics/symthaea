@@ -188,8 +188,8 @@ mod tests {
 
     #[test]
     fn cross_process_lock_rejects_second_owner() {
-        let temp = tempfile::tempdir().unwrap();
-        let path = temp.path().join("mutation.lock");
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir().join(format!("symthaea-mutation-lock-test-{name}.lock"));
         let first = MutationLease::acquire_at(&path).unwrap();
         let second = MutationLease::acquire_at(&path);
         assert!(
@@ -198,6 +198,7 @@ mod tests {
         );
         drop(first);
         assert!(MutationLease::acquire_at(&path).is_ok());
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]
