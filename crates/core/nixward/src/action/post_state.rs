@@ -494,11 +494,15 @@ impl NixPostStateReceiptV1 {
             return Err(NixPostStateErrorV1::AuthorizationIntentMismatch);
         }
 
-        match &intent.action {
-            NixActionDescriptorV1::Service { operation, unit }
-                if *operation == self.operation && unit == &self.target_unit => {}
-            _ => return Err(NixPostStateErrorV1::IntentEffectMismatch),
-        }
+        let rebound_expectation = NixServicePostStateExpectationV1 {
+            operation: self.operation,
+            unit: self.target_unit.clone(),
+            authorized_generation: self.authorized_generation,
+            authorized_definition_digest: self.authorized_definition_digest.clone(),
+            pre_invocation_id: self.pre_invocation_id.clone(),
+            required_stability_us: self.required_stability_us,
+        };
+        validate_expectation_against_intent(intent, &rebound_expectation)?;
         Ok(())
     }
 
@@ -1603,6 +1607,82 @@ mod tests {
             .unwrap_err(),
             NixPostStateErrorV1::MissingBoundPreState
         );
+    }
+
+    #[test]
+    fn trusted_verifier_rejects_recomputed_generation_tampering() {
+        use super::super::authorization::{
+            NixActionIntentV1, NixActionScopeV1, NixAuthorizationProfileV1,
+        };
+
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let receipt = build_receipt(&exp, &obs, None).unwrap();
+
+        let intent = NixActionIntentV1 {
+            subject_identity: "host:test".to_string(),
+            pre_state_identity: Some("generation:42".to_string()),
+            action: NixActionDescriptorV1::Service {
+                operation: NixServiceOperationKindV1::Start,
+                unit: "nginx.service".to_string(),
+            },
+            maximum_scope: NixActionScopeV1::SystemModify,
+            preconditions: Vec::new(),
+            required_postconditions: Vec::new(),
+            rollback_or_recovery_ref: None,
+        };
+        let authorization = NixExecutionAuthorizationRecordV1 {
+            action_intent_digest: intent.digest().unwrap(),
+            profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
+            authority_ref: "approval:test".to_string(),
+            issued_at_unix_ms: 1,
+            expires_at_unix_ms: None,
+            decision: NixAuthorizationDecisionV1::Approved,
+        };
+
+        let mut tampered = receipt;
+        tampered.authorized_generation = 43;
+        tampered.observed_generation = 43;
+        tampered.effect_digest = service_effect_digest(
+            tampered.operation,
+            &tampered.target_unit,
+            tampered.authorized_generation,
+            &tampered.authorized_definition_digest,
+            tampered.pre_invocation_id.as_deref(),
+            tampered.required_stability_us,
+        );
+
+        assert_eq!(
+            tampered.verify_against(&intent, &authorization).unwrap_err(),
+            NixPostStateErrorV1::GenerationMismatch
+        );
+    }
+
+    #[test]
+    fn wrong_job_unit_is_not_proven_even_with_matching_job_type() {
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.systemd_job.as_mut().unwrap().unit = "sshd.service".to_string();
+
+        let receipt = build_receipt(
+            &expectation(NixServiceOperationKindV1::Start),
+            &obs,
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(
+            receipt.postcondition,
+            NixPostconditionAssessmentV1::Violated
+        );
+        assert_eq!(receipt.claim, NixPostStateClaimV1::Violated);
     }
 
     #[test]
