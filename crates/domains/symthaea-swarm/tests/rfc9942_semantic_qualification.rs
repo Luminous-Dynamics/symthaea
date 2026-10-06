@@ -1256,8 +1256,54 @@ fn rfc9942_outer_signature_failure_short_circuits_inner_proof_work() {
         Err(Rfc9942VdpError::NoMatchingProof)
     );
 
+    fn cbor_bstr(bytes: &[u8]) -> Vec<u8> {
+        assert!(bytes.len() < 256);
+        let mut out = if bytes.len() < 24 {
+            vec![0x40 | bytes.len() as u8]
+        } else {
+            vec![0x58, bytes.len() as u8]
+        };
+        out.extend_from_slice(bytes);
+        out
+    }
+
+    fn signed_outer(
+        receipt: &Rfc9942ReceiptEnvelope,
+        payload: &[u8],
+    ) -> Rfc9942SignatureWithReceipts {
+        let collection =
+            Rfc9942ReceiptCollection::new(vec![receipt.clone()]).unwrap().to_cbor();
+        let protected = [0xa1, 0x01, 0x26]; // { alg: -7 }
+        let mut unprotected = Vec::new();
+        unprotected.extend_from_slice(&[0xa1, 0x19, 0x01, 0x8a]);
+        unprotected.extend_from_slice(&collection);
+
+        let mut unsigned_wire = Vec::new();
+        unsigned_wire.extend_from_slice(&[0xd2, 0x84]);
+        unsigned_wire.extend_from_slice(&cbor_bstr(&protected));
+        unsigned_wire.extend_from_slice(&unprotected);
+        unsigned_wire.extend_from_slice(&cbor_bstr(payload));
+        unsigned_wire.extend_from_slice(&[0x58, 0x40]);
+        unsigned_wire.extend_from_slice(&[0u8; 64]);
+
+        let unsigned =
+            Rfc9942SignatureWithReceipts::from_cbor(&unsigned_wire).unwrap();
+        let rng = SystemRandom::new();
+        let signer = rfc8392_signing_key(&rng);
+        let tbs = unsigned.signature1_tbs(&[], None).unwrap();
+        let signature = signer.sign(&rng, &tbs).unwrap().as_ref().to_vec();
+
+        let mut signed_wire = Vec::new();
+        signed_wire.extend_from_slice(&[0xd2, 0x84]);
+        signed_wire.extend_from_slice(&cbor_bstr(&protected));
+        signed_wire.extend_from_slice(&unprotected);
+        signed_wire.extend_from_slice(&cbor_bstr(payload));
+        signed_wire.extend_from_slice(&cbor_bstr(&signature));
+        Rfc9942SignatureWithReceipts::from_cbor(&signed_wire).unwrap()
+    }
+
     // The outer signature is independently valid before tampering.
-    let signed_outer = signed_outer(&invalid_receipt, candidate, false);
+    let signed_outer = signed_outer(&invalid_receipt, candidate);
     signed_outer
         .verify_es256(&key, &[], None)
         .expect("outer signature must initially verify");
