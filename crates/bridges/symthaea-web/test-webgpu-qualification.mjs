@@ -1355,6 +1355,40 @@ function runHarnessSelfTests() {
     || expectedWgpuSurfaceFormat('bgra8unorm') !== 'Bgra8Unorm') {
     throw new Error('qualification harness self-test failed: browser/wgpu format mapping drift');
   }
+
+  const matchingBitmapSamples = [
+    { name: 'background', rgba: [4, 6, 10, 255] },
+    { name: 'polygon', rgba: [235, 122, 41, 255] },
+  ];
+  const matchingCompositorSamples = [
+    { name: 'background', rgba: [12, 14, 20, 255] },
+    { name: 'polygon', rgba: [228, 116, 39, 255] },
+  ];
+  assertCompositorMatchesCanvasBitmap(
+    matchingBitmapSamples,
+    matchingCompositorSamples,
+    'harness self-test compositor match',
+    'harness',
+  );
+
+  const divergentCompositorSamples = [
+    { name: 'background', rgba: [4, 6, 10, 255] },
+    { name: 'polygon', rgba: [235, 122, 58, 255] },
+  ];
+  let rejectedCompositorDivergence = false;
+  try {
+    assertCompositorMatchesCanvasBitmap(
+      matchingBitmapSamples,
+      divergentCompositorSamples,
+      'harness self-test compositor divergence',
+      'harness',
+    );
+  } catch (error) {
+    rejectedCompositorDivergence = error instanceof QualificationError;
+  }
+  if (!rejectedCompositorDivergence) {
+    throw new Error('qualification harness self-test failed: compositor divergence was accepted');
+  }
 }
 
 runHarnessSelfTests();
@@ -2081,7 +2115,7 @@ try {
   }
 
   const artifact = {
-    schema: 'symthaea-ui-webgpu-qualification-v12',
+    schema: 'symthaea-ui-webgpu-qualification-v13',
     harness_self_tests_passed: true,
     url: URL,
     chromium: CHROMIUM,
