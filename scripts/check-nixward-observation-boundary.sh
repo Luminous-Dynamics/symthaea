@@ -55,7 +55,7 @@ ENABLEMENT_EVIDENCE_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceEn
 OBSERVATION_PUBLIC_FACTORY_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(parse_systemd_properties|parse_systemd_observation|from_observed_state)[[:space:]]*\('
 SYSTEMD_OBSERVER_MUTATION_CALL_PATTERN='(?:\.call|\.call_method|\.call_noreply)\(\s*"(StartUnit|StopUnit|RestartUnit|ReloadUnit|EnableUnitFiles|DisableUnitFiles|SetUnitProperties|Start|Stop|Restart|Reload)"'
 SYSTEMD_OBSERVER_PROXY_MUTATION_PATTERN='\.set_property\(|\.set\(|\.into_inner\(\)|\.inner(?:_mut)?\(\)'
-SYSTEMD_OBSERVER_AUTHORITY_IMPORT_PATTERN='\bsuper::(?:executor|authorization)\b'
+SYSTEMD_OBSERVER_AUTHORITY_IMPORT_PATTERN='\bsuper::(?:executor|authorization|systemd_mutation)\b'
 SYSTEMD_TRANSPORT_PUBLIC_API_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(observe_service_properties|observe_service_state_properties)[[:space:]]*\('
 
 scan_diagnostic_boundary() {
