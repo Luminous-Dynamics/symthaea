@@ -530,6 +530,7 @@ impl MorphophonologicalDerivationWitness {
         witness.rule_set_dialect_scope = rule_set.dialect_scope.clone();
         witness.rule_set_selection_policy = rule_set.selection_policy.clone();
         witness.rule_set_blake3 = rule_set.resource_blake3();
+        witness.validate_against_binding_and_rule_set(binding, rule_set)?;
         Ok(witness)
     }
 
@@ -2043,8 +2044,32 @@ mod tests {
                     &morphophonological_fixture_binding(),
                     &tampered,
                 )
-                .expect_err("resource metadata tampering must fail closed"),
+                .expect_err("source metadata tampering must fail closed"),
             MorphophonologicalDerivationWitnessError::RuleSetMetadataMismatch
+        );
+
+        let mut scope_tampered = rule_set.clone();
+        scope_tampered.dialect_scope = "en-GB".into();
+        assert_ne!(rule_set.resource_blake3(), scope_tampered.resource_blake3());
+        witness.rule_set_source_id = rule_set.source_id.clone();
+        witness.rule_set_dialect_scope = scope_tampered.dialect_scope.clone();
+        assert_eq!(
+            witness
+                .validate_against_binding_and_rule_set(
+                    &morphophonological_fixture_binding(),
+                    &scope_tampered,
+                )
+                .expect_err("scope metadata tampering must fail closed"),
+            MorphophonologicalDerivationWitnessError::RuleSetMetadataMismatch
+        );
+
+        let mut policy_tampered = rule_set.clone();
+        policy_tampered.selection_policy = "first-match-v0".into();
+        assert_eq!(
+            policy_tampered
+                .validate()
+                .expect_err("unsupported selection policy must fail closed"),
+            MorphophonologicalRuleSetError::UnsupportedSelectionPolicy
         );
     }
 
