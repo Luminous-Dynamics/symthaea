@@ -1073,6 +1073,10 @@ fn make_surrogate(
     family: PredictionNullFamily,
     shift: usize,
 ) -> Result<Vec<RelationalPredictionSample>, RelationalPredictionError> {
+    if shift == 0 {
+        return Err(RelationalPredictionError::InvalidSurrogateCount);
+    }
+
     let test_start = config.test_start();
 
     samples
@@ -1404,6 +1408,27 @@ mod tests {
             assert_eq!(null.surrogate_count, 8);
             assert!((0.0..=1.0).contains(&null.exceedance_fraction));
         }
+    }
+
+    #[test]
+    fn make_surrogate_rejects_zero_shift() {
+        let samples = build_samples(0.5);
+        let config = HeldOutRelationalPredictionConfig {
+            train_samples: 8,
+            test_samples: 4,
+            gap_samples: 2,
+            ridge_lambda: 1e-8,
+        };
+
+        assert_eq!(
+            make_surrogate(
+                &samples,
+                &config,
+                PredictionNullFamily::CircularShift,
+                0,
+            ),
+            Err(RelationalPredictionError::InvalidSurrogateCount)
+        );
     }
 
     #[test]
