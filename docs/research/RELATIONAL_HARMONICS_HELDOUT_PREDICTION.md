@@ -226,6 +226,10 @@ The evaluator reports the per-origin scores as well as mean MSE across origins. 
 
 The mean is descriptive only. It is not a substitute for an inferential procedure that accounts for dependence between repeated rolling estimates. The current protocol deliberately makes held-out test windows disjoint, but training windows may still overlap across origins, so the origin-level scores are not assumed IID.
 
+Recent 2026 forecasting work also warns that apparent model preference can be driven by temporal instability and recommends rolling-origin evaluation to reduce sensitivity to an unusually favorable testing segment. That supports retaining the complete origin-level loss/improvement vector rather than reporting only its mean. [Liu et al. (2026)](https://doi.org/10.1016/j.orl.2026.107468)
+
+A separate 2026 literature describes rolling-origin forecast instability as changes in forecasts for the same target caused by later forecast origins. The present protocol intentionally does not estimate that quantity because its test windows are disjoint and each target is scored once. A future instability study would therefore be a separate protocol requiring repeated forecasts of shared targets rather than quietly changing this qualification definition. [Caljon et al. (2026)](https://doi.org/10.1016/j.ijforecast.2025.07.002)
+
 The design is deliberately descriptive at this stage. Predictive-error differences across strongly dependent origins should not automatically be converted into a classical IID significance test. Recent forecast-evaluation work explicitly develops procedures that account for autocorrelation and overlapping forecast windows, reinforcing the need to preserve loss differentials and their dependence structure before choosing formal inference. [Grant, Mrazik & Satchell, 2026](https://doi.org/10.1002/for.70150)
 
 ## 10. What would count as meaningful evidence
