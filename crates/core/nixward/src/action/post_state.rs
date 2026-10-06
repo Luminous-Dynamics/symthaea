@@ -1915,6 +1915,7 @@ mod tests {
                 definition_content_digest: obs.definition_content_digest.clone(),
                 state_digest: obs.state_digest().unwrap(),
                 manager_owner: obs.systemd_manager_owner.clone().unwrap(),
+                systemd_bus_id: obs.systemd_bus_id.clone(),
                 invocation_id: obs.invocation_id.clone(),
                 state_change_at_monotonic_us: obs.state_change_at_monotonic_us,
                 captured_at_monotonic_us: *captured_at_monotonic_us,
@@ -1928,6 +1929,21 @@ mod tests {
             samples,
             sequence_digest,
         }
+    }
+
+    #[test]
+    fn observation_rejects_job_from_different_dbus_epoch() {
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.systemd_job.as_mut().unwrap().bus_id =
+            "fedcba9876543210fedcba9876543210".into();
+        assert_eq!(
+            obs.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::ManagerOwnerMismatch
+        );
     }
 
     #[test]
