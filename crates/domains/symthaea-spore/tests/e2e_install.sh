@@ -262,6 +262,7 @@ async def main():
             "keyboard": "us",
             "desktop": "none",
             "gpu_driver": "auto",
+            "target_machine_digest": hw["target_machine_digest"],
         }))
 
         complete = False
