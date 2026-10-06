@@ -608,6 +608,13 @@ fn main() -> Result<(), String> {
         forged.lifecycle_receipt_hash = symthaea_communication::content_hash(b"other-receipt");
         forged.verify_lifecycle_binding(&lifecycle_receipt).is_err()
     };
+    let remediation_lifecycle_execution_revision_mismatch_blocked = {
+        let mut forged = lifecycle_receipt.clone();
+        forged.execution_revision = "4".repeat(40);
+        forged.previous_receipt_hash = None;
+        forged.event_sequence = 0;
+        remediation_impact.verify_lifecycle_binding(&forged).is_err()
+    };
     let remediation_model_substitution_blocked = {
         let mut forged = remediation_impact.clone();
         forged.post_remediation_model_hash = symthaea_communication::content_hash(b"wrong-model");
@@ -622,6 +629,15 @@ fn main() -> Result<(), String> {
         forged.verify_lineage_bytes(
             NeurosemanticRemediationImpactLineageSide::PostRemediation,
             &post_model_lineage_bytes,
+        ).is_err()
+    };
+    let remediation_lineage_execution_revision_mismatch_blocked = {
+        let mut forged = post_model_lineage.clone();
+        forged.execution_revision = "4".repeat(40);
+        let forged_bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        remediation_impact.verify_lineage_bytes(
+            NeurosemanticRemediationImpactLineageSide::PostRemediation,
+            &forged_bytes,
         ).is_err()
     };
     let remediation_protocol_verified = remediation_impact
@@ -1071,7 +1087,9 @@ fn main() -> Result<(), String> {
         "remediation_fairness_evidence_verified": remediation_fairness_evidence_verified,
         "remediation_residual_evidence_verified": remediation_residual_evidence_verified,
         "remediation_effect_evidence_substitution_blocked": remediation_effect_evidence_substitution_blocked,
+        "remediation_lifecycle_execution_revision_mismatch_blocked": remediation_lifecycle_execution_revision_mismatch_blocked,
         "remediation_model_substitution_blocked": remediation_model_substitution_blocked,
+        "remediation_lineage_execution_revision_mismatch_blocked": remediation_lineage_execution_revision_mismatch_blocked,
         "remediation_lineage_substitution_blocked": remediation_lineage_substitution_blocked,
         "remediation_protocol_verified": remediation_protocol_verified,
         "remediation_split_manifest_verified": remediation_split_manifest_verified,
