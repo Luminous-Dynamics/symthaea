@@ -1575,6 +1575,26 @@ fn rfc9942_es256_key_key_ops_resource_limit_is_typed() {
 
 
 #[test]
+fn rfc9942_es256_key_aggregate_map_below_cap_remains_semantic() {
+    // Four opaque extension values are each individually within the 4 KiB
+    // value bound and the complete map stays below the 16 KiB aggregate cap.
+    // The map is semantically incomplete, so the failure must remain
+    // InvalidEs256CoseKey rather than being mislabeled as resource exhaustion.
+    let mut encoded = vec![0xa4];
+    for label in 1000i64..1004 {
+        encoded.extend_from_slice(&[0x19, (label >> 8) as u8, label as u8]);
+        encoded.extend_from_slice(&[0x59, 0x0f, 0xf9]); // 4089-byte bstr
+        encoded.extend(std::iter::repeat_n(0x00, 4089));
+    }
+
+    assert_eq!(encoded.len(), MAX_RFC9942_COSE_KEY_ENCODED_BYTES - 3);
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&encoded),
+        Err(Rfc9942VdpError::InvalidEs256CoseKey)
+    );
+}
+
+#[test]
 fn rfc9942_es256_key_aggregate_map_resource_limit_is_typed() {
     // Each extension value is individually within the 4 KiB opaque-value
     // decoder bound, but four such values plus map framing exceed the 16 KiB
