@@ -112,6 +112,12 @@ impl ViabilityBand {
             && self.tolerated.1.is_finite()
             && self.preferred.0.is_finite()
             && self.preferred.1.is_finite()
+            && (0.0..=1.0).contains(&self.critical.0)
+            && (0.0..=1.0).contains(&self.critical.1)
+            && (0.0..=1.0).contains(&self.tolerated.0)
+            && (0.0..=1.0).contains(&self.tolerated.1)
+            && (0.0..=1.0).contains(&self.preferred.0)
+            && (0.0..=1.0).contains(&self.preferred.1)
             && self.critical.0 <= self.critical.1
             && self.critical.0 <= self.tolerated.0
             && self.tolerated.0 <= self.tolerated.1
@@ -291,6 +297,8 @@ pub struct ViabilityFabric {
     pending_predictions: BTreeMap<u64, ActionPrediction>,
     outcomes: Vec<ActionOutcome>,
     max_outcomes: usize,
+    max_pending_predictions: usize,
+    highest_action_id: u64,
 }
 
 impl ViabilityFabric {
@@ -300,6 +308,8 @@ impl ViabilityFabric {
             pending_predictions: BTreeMap::new(),
             outcomes: Vec::with_capacity(max_outcomes.min(1024)),
             max_outcomes,
+            max_pending_predictions: max_outcomes.max(1).min(4096),
+            highest_action_id: 0,
         }
     }
 
@@ -347,9 +357,34 @@ impl ViabilityFabric {
         if self.pending_predictions.contains_key(&prediction.action_id) {
             return Err("duplicate action prediction");
         }
+        if prediction.action_id <= self.highest_action_id {
+            return Err("action id is not monotonic");
+        }
+        if self.pending_predictions.len() >= self.max_pending_predictions {
+            return Err("pending prediction capacity exhausted");
+        }
         if prediction.cycle != self.state.cycle {
             return Err("prediction cycle does not match current cycle");
         }
+        if prediction.action_label.trim().is_empty() {
+            return Err("empty action label");
+        }
+        if prediction
+            .predicted_world_delta
+            .as_ref()
+            .is_some_and(|delta| !delta.is_valid())
+            || prediction
+                .predicted_self_delta
+                .as_ref()
+                .is_some_and(|delta| !delta.is_valid())
+            || prediction
+                .predicted_goal_delta
+                .as_ref()
+                .is_some_and(|delta| !delta.is_valid())
+        {
+            return Err("invalid action prediction");
+        }
+        self.highest_action_id = prediction.action_id;
         self.pending_predictions.insert(prediction.action_id, prediction);
         Ok(())
     }
@@ -598,6 +633,70 @@ mod tests {
         };
 
         assert!(fabric.observe_action(good).is_ok());
+    }
+
+    #[test]
+    fn action_ids_must_be_monotonic() {
+        let mut fabric = ViabilityFabric::new(4);
+        fabric.begin_cycle(1);
+
+        let prediction = ActionPrediction {
+            action_id: 2,
+            action_label: "test".to_string(),
+            cycle: 1,
+            predicted_world_delta: None,
+            predicted_self_delta: None,
+            predicted_goal_delta: None,
+            authority_granted: true,
+        };
+
+        fabric.predict_action(prediction.clone()).unwrap();
+        assert_eq!(
+            fabric.predict_action(prediction),
+            Err("duplicate action prediction")
+        );
+
+        let prediction_1 = ActionPrediction {
+            action_id: 1,
+            action_label: "test".to_string(),
+            cycle: 1,
+            predicted_world_delta: None,
+            predicted_self_delta: None,
+            predicted_goal_delta: None,
+            authority_granted: true,
+        };
+        assert_eq!(fabric.predict_action(prediction_1), Err("action id is not monotonic"));
+    }
+
+    #[test]
+    fn pending_prediction_capacity_is_bounded() {
+        let mut fabric = ViabilityFabric::new(2);
+        fabric.begin_cycle(1);
+
+        for action_id in [1, 2] {
+            fabric.predict_action(ActionPrediction {
+                action_id,
+                action_label: "test".to_string(),
+                cycle: 1,
+                predicted_world_delta: None,
+                predicted_self_delta: None,
+                predicted_goal_delta: None,
+                authority_granted: true,
+            }).unwrap();
+        }
+
+        assert_eq!(
+            fabric.predict_action(ActionPrediction {
+                action_id: 3,
+                action_label: "test".to_string(),
+                cycle: 1,
+                predicted_world_delta: None,
+                predicted_self_delta: None,
+                predicted_goal_delta: None,
+                authority_granted: true,
+            }),
+            Err("pending prediction capacity exhausted")
+        );
     }
 
     #[test]
