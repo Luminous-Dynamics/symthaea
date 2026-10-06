@@ -727,9 +727,29 @@ impl RollingOriginRelationalPredictionEvidence {
         if self.origins.len() != self.config.origin_count {
             return Err(RelationalPredictionError::InvalidSplit);
         }
+
         for origin in &self.origins {
             origin.validate()?;
+            if origin.provenance != self.provenance
+                || origin.summary.train_samples != self.config.train_samples
+                || origin.summary.test_samples != self.config.test_samples
+                || origin.summary.gap_samples != self.config.gap_samples
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+            for record in &origin.records {
+                for (feature_time, outcome_time) in
+                    record.feature_times.iter().zip(&record.outcome_times)
+                {
+                    let horizon = *outcome_time - *feature_time;
+                    let tolerance = 1e-9 * self.config.forecast_horizon.abs().max(1.0);
+                    if (horizon - self.config.forecast_horizon).abs() > tolerance {
+                        return Err(RelationalPredictionError::InvalidSplit);
+                    }
+                }
+            }
         }
+
         if self.origins.iter().any(|origin| origin.summary.status != EvidenceStatus::Measured) {
             return Err(RelationalPredictionError::InvalidSplit);
         }
@@ -742,10 +762,9 @@ impl RollingOriginRelationalPredictionEvidence {
         let origins = self.origins
             .iter()
             .map(|origin| {
-                serde_json::from_str::<serde_json::Value>(
-                    &origin.to_json().expect("validated evidence must serialize"),
-                )
-                .map_err(|_| RelationalPredictionError::ModelFitFailed)
+                let json = origin.to_json()?;
+                serde_json::from_str::<serde_json::Value>(&json)
+                    .map_err(|_| RelationalPredictionError::ModelFitFailed)
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -1903,6 +1922,39 @@ mod tests {
         assert!(json.contains("relational-prediction-evidence/v1"));
         assert!(json.contains("RelationalAugmented"));
         assert!(json.contains("predictions"));
+    }
+
+    #[test]
+    fn rolling_evidence_rejects_mismatched_child_provenance() {
+        let samples = build_samples(0.5);
+        let provenance = RelationalPredictionProvenance::new(
+            "RH-006-v1",
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "0123456789abcdef0123456789abcdef01234567",
+        )
+        .unwrap();
+
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 2,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let mut evidence =
+            RollingOriginRelationalPredictionSummary::compute_evidence(&samples, config, provenance)
+                .unwrap();
+
+        evidence.origins[1].provenance.protocol_id = "tampered".to_string();
+
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceProvenance(
+                "protocol_id"
+            ))
+        );
     }
 
     #[test]
