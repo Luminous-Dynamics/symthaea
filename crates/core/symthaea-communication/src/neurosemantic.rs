@@ -229,6 +229,7 @@ pub struct NeurosemanticAuthorityResolutionAttestation {
     pub resolver_key_ref: String,
     pub authority_ref: String,
     pub authority_key_ref: String,
+    pub authority_attestation_fingerprint: String,
     pub handling_policy_fingerprint: String,
     pub policy_provenance_ref: String,
     pub policy_provenance_hash: String,
@@ -301,6 +302,7 @@ impl NeurosemanticAuthorityResolutionAttestation {
             || self.authority_ref.len() > MAX_NEUROSEMANTIC_AUTHORITY_REF_BYTES
             || !valid_identifier(&self.authority_key_ref)
             || self.authority_key_ref.len() > MAX_NEUROSEMANTIC_AUTHORITY_KEY_REF_BYTES
+            || !valid_blake3_digest(&self.authority_attestation_fingerprint)
             || !valid_blake3_digest(&self.handling_policy_fingerprint)
             || !valid_identifier(&self.policy_provenance_ref)
             || !valid_blake3_digest(&self.policy_provenance_hash)
@@ -347,6 +349,8 @@ impl NeurosemanticAuthorityResolutionAttestation {
         expected_context.validate()?;
         if self.authority_ref != authority_attestation.authority_ref
             || self.authority_key_ref != authority_attestation.key_ref
+            || self.authority_attestation_fingerprint
+                != authority_attestation.fingerprint_for_attestation()?
             || self.handling_policy_fingerprint != expected_policy_fingerprint
             || self.policy_provenance_ref != expected_policy_provenance_ref
             || self.policy_provenance_hash != expected_policy_provenance_hash
@@ -1461,6 +1465,7 @@ mod tests {
             resolver_key_ref: "resolver-key-1".into(),
             authority_ref: attestation.authority_ref.clone(),
             authority_key_ref: attestation.key_ref.clone(),
+            authority_attestation_fingerprint: attestation.fingerprint_for_attestation().unwrap(),
             handling_policy_fingerprint: policy.handling.fingerprint_for_attestation().unwrap(),
             policy_provenance_ref: policy.handling.policy_provenance_ref.clone(),
             policy_provenance_hash: policy.handling.policy_provenance_hash.clone(),
@@ -1829,6 +1834,55 @@ mod tests {
                 &expired,
                 "ZA",
                 NeurosemanticHandlingAction::Transmit,
+                150,
+            )
+            .is_err());
+    }
+
+    #[test]
+    fn authority_resolution_rejects_valid_but_different_authority_proof() {
+        let policy = semantic_policy();
+        let (attestation, authority_key) = authority_attestation(&policy);
+        let context = binding_context();
+        let (resolution, resolver_key) =
+            authority_resolution(&policy, &attestation, &context, 100, 2_000);
+
+        use ed25519_dalek::Signer;
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&[7u8; 32]);
+        let changed_message = NeurosemanticPolicyAuthorityAttestation::message_bytes(
+            &attestation.authority_ref,
+            &attestation.key_ref,
+            &attestation.handling_policy_fingerprint,
+            &attestation.policy_provenance_hash,
+            110,
+            1_900,
+        )
+        .unwrap();
+        let substituted_attestation = NeurosemanticPolicyAuthorityAttestation {
+            issued_at_unix_s: 110,
+            expires_at_unix_s: 1_900,
+            signature: signing_key.sign(&changed_message).to_bytes().to_vec(),
+            ..attestation.clone()
+        };
+
+        assert!(substituted_attestation
+            .verify(
+                &policy.handling.fingerprint_for_attestation().unwrap(),
+                &policy.handling.policy_provenance_hash,
+                &authority_key,
+                150
+            )
+            .is_ok());
+
+        assert!(policy
+            .handling
+            .bind_policy_provenance_with_attestation_and_resolution(
+                b"synthetic-policy-record-1",
+                &substituted_attestation,
+                &authority_key,
+                &resolution,
+                &resolver_key,
+                &context,
                 150,
             )
             .is_err());
