@@ -289,7 +289,7 @@ fn rfc9942_vdp_resource_limit_is_not_collapsed_into_encoding_error() {
 #[test]
 fn rfc9942_vdp_array_count_resource_limit_is_typed() {
     let encoded = {
-        let mut value = vec![0xa1, 0x20, 0x98, 0x01, 0x01];
+        let mut value = vec![0xa1, 0x20, 0x99, 0x01, 0x01];
         value.extend(std::iter::repeat_n(0x40, 257));
         value
     };
@@ -1375,8 +1375,9 @@ fn rfc9942_receipt_signature_resource_limit_is_typed() {
         0x83, 0x02, 0x00, 0x81, // tree_size=2, leaf_index=0, one hash
         0x58, 0x20,
     ];
-    let mut vdp = vec![0xa1, 0x20, 0x81, 0x58, proof.len() as u8];
+    let mut vdp = vec![0xa1, 0x20, 0x81, 0x58, (proof.len() + 32) as u8];
     vdp.extend_from_slice(&proof);
+    vdp.extend_from_slice(&[0u8; 32]);
     let mut encoded = vec![0xd2, 0x84, 0x47];
     encoded.extend_from_slice(&protected);
     encoded.push(0xa1);
