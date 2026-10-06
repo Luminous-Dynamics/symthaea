@@ -2884,6 +2884,8 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 };
                 let log_path = format!("/tmp/symthaea-install-{}.log", session_id);
                 let script_path = format!("/tmp/symthaea-install-{}.sh", session_id);
+                let status_path = format!("/tmp/symthaea-install-{}.status", session_id);
+                let pid_path = format!("/tmp/symthaea-install-{}.pid", session_id);
 
                 // Create log file with restrictive permissions
                 let _ = run_cmd(&format!("touch {} && chmod 600 {}", log_path, log_path)).await;
@@ -3194,10 +3196,66 @@ echo "  User password set."
                     }
                 }
 
-                // Execute the install script in background, tail the log for streaming.
-                // The script runs with output redirected to a log file,
-                // while we poll the log file for new lines.
-                let _ = run_cmd(&format!("bash {} > {} 2>&1 &", script_path, log_path)).await;
+                // Execute the install script in the background with transaction-specific
+                // PID and exit-status records. A log marker alone is never success evidence.
+                let setup = run_cmd(&format!(
+                    "rm -f -- {} {} && touch {} {} && chmod 600 {} {}",
+                    status_path,
+                    pid_path,
+                    status_path,
+                    pid_path,
+                    status_path,
+                    pid_path
+                ))
+                .await;
+                if let Err(error) = setup {
+                    for secret_path in &staged_secret_paths {
+                        let _ = tokio::fs::remove_file(secret_path).await;
+                    }
+                    let _ = run_cmd(&format!(
+                        "rm -f -- {} {} {} {}",
+                        script_path, log_path, status_path, pid_path
+                    ))
+                    .await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Install status staging failed: {}",
+                                error
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+                if let Err(error) = run_cmd(&format!(
+                    "(bash {} > {} 2>&1; rc=$?; printf '%s\\n' \"$rc\" > {}) & printf '%s\\n' \"$!\" > {}",
+                    script_path,
+                    log_path,
+                    status_path,
+                    pid_path
+                ))
+                .await
+                {
+                    for secret_path in &staged_secret_paths {
+                        let _ = tokio::fs::remove_file(secret_path).await;
+                    }
+                    let _ = run_cmd(&format!(
+                        "rm -f -- {} {} {} {}",
+                        script_path, log_path, status_path, pid_path
+                    ))
+                    .await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Install launch failed: {}",
+                                error
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
                 let _ = ws_tx
                     .send(Message::Text(
                         RelayMessage::output("Installation started. Streaming output...", "stdout")
@@ -3207,7 +3265,6 @@ echo "  User password set."
 
                 // Poll the log file for new output
                 let mut last_lines = 0u64;
-                let mut complete = false;
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
@@ -3294,33 +3351,36 @@ echo "  User password set."
                         _ => {}
                     }
 
-                    if complete {
-                        break;
-                    }
-
-                    // Check if the install script is still running
-                    if let Ok(check) = run_cmd(&format!("pgrep -f {}", script_path)).await {
-                        if check.exit_status != 0 && last_lines > 0 {
-                            // Script finished but no COMPLETE marker — check exit code
-                            if let Ok(exit_check) = run_cmd(&format!("tail -1 {}", log_path)).await
-                            {
-                                let _ = ws_tx
-                                    .send(Message::Text(
-                                        RelayMessage::output(&exit_check.stdout, "stdout")
-                                            .to_json(),
-                                    ))
-                                    .await;
-                            }
+                    // Completion is defined only by the transaction-specific status file
+                    // or by the exact child PID disappearing. No broad process matching.
+                    if let Ok(check) = run_cmd(&format!(
+                        "test -s {} || ! kill -0 \"$(cat {} 2>/dev/null)\" 2>/dev/null",
+                        status_path,
+                        pid_path
+                    ))
+                    .await
+                    {
+                        if check.exit_status == 0 {
                             break;
                         }
                     }
                 }
 
-                let exit_code = if complete { 0 } else { 1 };
-                let outcome = if exit_code == 0 {
-                    TransactionOutcome::ObservedSuccess
-                } else {
-                    TransactionOutcome::Failed
+                let install_exit_code = match run_cmd(&format!(
+                    "cat {} 2>/dev/null",
+                    status_path
+                ))
+                .await
+                {
+                    Ok(result) if result.exit_status == 0 => {
+                        result.stdout.trim().parse::<u32>().ok()
+                    }
+                    _ => None,
+                };
+                let (exit_code, outcome) = match install_exit_code {
+                    Some(0) => (0, TransactionOutcome::ObservedSuccess),
+                    Some(code) => (code, TransactionOutcome::Failed),
+                    None => (1, TransactionOutcome::Indeterminate),
                 };
                 let _ = ws_tx
                     .send(Message::Text(
@@ -3335,8 +3395,8 @@ echo "  User password set."
 
                 // SECURITY: Clean up temporary files containing sensitive data
                 let _ = run_cmd(&format!(
-                    "rm -f {} {} /tmp/sovereign-user-pw-{} /tmp/sovereign-luks-pw-{}",
-                    script_path, log_path, session_id
+                    "rm -f -- {} {} {} {} /tmp/sovereign-user-pw-{} /tmp/sovereign-luks-pw-{}",
+                    script_path, log_path, status_path, pid_path, session_id
                 ))
                 .await;
                 eprintln!(
