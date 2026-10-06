@@ -539,12 +539,56 @@ fn main() -> Result<(), String> {
     let forget_evidence = b"synthetic-forgetfulness-evaluation-v1";
     let utility_evidence = b"synthetic-retained-utility-evaluation-v1";
     let fairness_evidence = b"synthetic-subgroup-impact-evaluation-v1";
-    let residual_evidence = b"synthetic-residual-recovery-evaluation-v1";
+    let residual_evidence = b"synthetic-residual-risk-evaluation-v1";
+    let recovery_evidence = b"synthetic-recovery-attack-evaluation-v1";
+    let representation_residual_evidence = b"synthetic-representation-residual-probe-v1";
     let study_protocol_bytes = b"synthetic-remediation-protocol-v1";
     let evaluation_split_manifest_bytes = b"synthetic-remediation-split-v1";
     let study_protocol_hash = symthaea_communication::content_hash(study_protocol_bytes);
     let evaluation_split_manifest_hash = symthaea_communication::content_hash(evaluation_split_manifest_bytes);
     let lifecycle_receipt_hash = lifecycle_receipt.fingerprint()?;
+
+    let source_dataset_manifest_hash = symthaea_communication::content_hash(b"synthetic-source-dataset-manifest-v1");
+    let forget_set_manifest = NeurosemanticRemediationEvaluationSetManifest {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_EVALUATION_SET_SCHEMA_VERSION,
+        set_ref: "synthetic-forget-set-v1".into(),
+        set_kind: NeurosemanticRemediationEvaluationSetKind::Forget,
+        source_dataset_manifest_hash: source_dataset_manifest_hash.clone(),
+        member_artifact_hashes: vec![
+            symthaea_communication::content_hash(b"synthetic-forget-member-1"),
+            symthaea_communication::content_hash(b"synthetic-forget-member-2"),
+        ],
+    };
+    let retain_set_manifest = NeurosemanticRemediationEvaluationSetManifest {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_EVALUATION_SET_SCHEMA_VERSION,
+        set_ref: "synthetic-retain-set-v1".into(),
+        set_kind: NeurosemanticRemediationEvaluationSetKind::Retain,
+        source_dataset_manifest_hash,
+        member_artifact_hashes: vec![
+            symthaea_communication::content_hash(b"synthetic-retain-member-1"),
+            symthaea_communication::content_hash(b"synthetic-retain-member-2"),
+        ],
+    };
+    let forget_set_manifest_bytes = serde_json::to_vec(&forget_set_manifest).map_err(|e| e.to_string())?;
+    let retain_set_manifest_bytes = serde_json::to_vec(&retain_set_manifest).map_err(|e| e.to_string())?;
+
+    let recovery_method = NeurosemanticRemediationEvaluationMethod {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_EVALUATION_METHOD_SCHEMA_VERSION,
+        method_ref: "synthetic-recovery-attack-v1".into(),
+        kind: NeurosemanticRemediationEvaluationMethodKind::RecoveryAttack,
+        protocol_hash: study_protocol_hash.clone(),
+        implementation_revision: execution_revision.clone(),
+    };
+    let representation_probe_method = NeurosemanticRemediationEvaluationMethod {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_EVALUATION_METHOD_SCHEMA_VERSION,
+        method_ref: "synthetic-representation-residual-probe-v1".into(),
+        kind: NeurosemanticRemediationEvaluationMethodKind::RepresentationResidualProbe,
+        protocol_hash: study_protocol_hash.clone(),
+        implementation_revision: execution_revision.clone(),
+    };
+    let recovery_method_bytes = serde_json::to_vec(&recovery_method).map_err(|e| e.to_string())?;
+    let representation_probe_method_bytes = serde_json::to_vec(&representation_probe_method).map_err(|e| e.to_string())?;
+
     let remediation_impact = NeurosemanticRemediationImpactArtifact {
         schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_IMPACT_ARTIFACT_SCHEMA_VERSION,
         impact_ref: "synthetic-remediation-impact-1".into(),
@@ -564,8 +608,14 @@ fn main() -> Result<(), String> {
         remediation_action: NeurosemanticArtifactLifecycleAction::Erasure,
         study_protocol_hash,
         evaluation_split_manifest_hash,
+        forget_set_manifest_hash: forget_set_manifest.fingerprint()?,
+        retain_set_manifest_hash: retain_set_manifest.fingerprint()?,
+        recovery_method_hash: recovery_method.fingerprint()?,
+        representation_probe_method_hash: representation_probe_method.fingerprint()?,
         forget_evidence_hash: symthaea_communication::content_hash(forget_evidence),
         utility_impact_evidence_hash: symthaea_communication::content_hash(utility_evidence),
+        recovery_evidence_hash: symthaea_communication::content_hash(recovery_evidence),
+        representation_residual_evidence_hash: symthaea_communication::content_hash(representation_residual_evidence),
         fairness_impact_evidence_hash: Some(symthaea_communication::content_hash(fairness_evidence)),
         residual_risk_evidence_hash: symthaea_communication::content_hash(residual_evidence),
         execution_revision: execution_revision.clone(),
@@ -576,33 +626,72 @@ fn main() -> Result<(), String> {
             "utility-impact".into(),
             "fairness-impact".into(),
             "residual-risk".into(),
+            "forget-set".into(),
+            "retain-set".into(),
+            "recovery-attack".into(),
+            "representation-residual".into(),
         ],
     };
     let remediation_impact_bytes = serde_json::to_vec(&remediation_impact).map_err(|e| e.to_string())?;
-    let remediation_impact_structured = NeurosemanticRemediationImpactArtifact::from_json_bytes(
-        &remediation_impact_bytes,
-    )
-    .is_ok();
-    let remediation_lifecycle_binding_verified =
-        remediation_impact.verify_lifecycle_binding(&lifecycle_receipt).is_ok();
+    let remediation_impact_structured = NeurosemanticRemediationImpactArtifact::from_json_bytes(&remediation_impact_bytes).is_ok();
+    let remediation_lifecycle_binding_verified = remediation_impact.verify_lifecycle_binding(&lifecycle_receipt).is_ok();
     let remediation_pre_lineage_verified = remediation_impact
         .verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PreRemediation, &pre_model_lineage_bytes)
         .is_ok();
     let remediation_post_lineage_verified = remediation_impact
         .verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PostRemediation, &post_model_lineage_bytes)
         .is_ok();
+    let remediation_set_pair_verified = remediation_impact
+        .verify_evaluation_set_pair_bytes(&forget_set_manifest_bytes, &retain_set_manifest_bytes)
+        .is_ok();
+    let remediation_recovery_method_verified = remediation_impact
+        .verify_evaluation_method_bytes(NeurosemanticRemediationEvaluationMethodKind::RecoveryAttack, &recovery_method_bytes)
+        .is_ok();
+    let remediation_representation_method_verified = remediation_impact
+        .verify_evaluation_method_bytes(NeurosemanticRemediationEvaluationMethodKind::RepresentationResidualProbe, &representation_probe_method_bytes)
+        .is_ok();
     let remediation_forget_evidence_verified = remediation_impact
-        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::Forgetfulness, forget_evidence)
-        .is_ok();
+        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::Forgetfulness, forget_evidence).is_ok();
     let remediation_utility_evidence_verified = remediation_impact
-        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::UtilityImpact, utility_evidence)
-        .is_ok();
+        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::UtilityImpact, utility_evidence).is_ok();
     let remediation_fairness_evidence_verified = remediation_impact
-        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::FairnessImpact, fairness_evidence)
-        .is_ok();
+        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::FairnessImpact, fairness_evidence).is_ok();
     let remediation_residual_evidence_verified = remediation_impact
-        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::ResidualRisk, residual_evidence)
-        .is_ok();
+        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::ResidualRisk, residual_evidence).is_ok();
+    let remediation_recovery_evidence_verified = remediation_impact
+        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::RecoveryRisk, recovery_evidence).is_ok();
+    let remediation_representation_residual_evidence_verified = remediation_impact
+        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::RepresentationResidual, representation_residual_evidence).is_ok();
+    let remediation_set_role_substitution_blocked = {
+        let mut forged = forget_set_manifest.clone();
+        forged.set_kind = NeurosemanticRemediationEvaluationSetKind::Retain;
+        let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        remediation_impact.verify_evaluation_set_manifest_bytes(NeurosemanticRemediationEvaluationSetKind::Forget, &bytes).is_err()
+    };
+    let remediation_set_overlap_blocked = {
+        let mut forged = retain_set_manifest.clone();
+        forged.member_artifact_hashes = vec![forget_set_manifest.member_artifact_hashes[0].clone()];
+        let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        remediation_impact.verify_evaluation_set_pair_bytes(&forget_set_manifest_bytes, &bytes).is_err()
+    };
+    let remediation_recovery_method_substitution_blocked = {
+        let mut forged = recovery_method.clone();
+        forged.method_ref = "synthetic-other-recovery-method".into();
+        let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        remediation_impact.verify_evaluation_method_bytes(NeurosemanticRemediationEvaluationMethodKind::RecoveryAttack, &bytes).is_err()
+    };
+    let remediation_representation_method_substitution_blocked = {
+        let mut forged = representation_probe_method.clone();
+        forged.protocol_hash = symthaea_communication::content_hash(b"other-protocol");
+        let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        remediation_impact.verify_evaluation_method_bytes(NeurosemanticRemediationEvaluationMethodKind::RepresentationResidualProbe, &bytes).is_err()
+    };
+    let remediation_recovery_evidence_substitution_blocked = remediation_impact
+        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::RecoveryRisk, b"tampered-recovery")
+        .is_err();
+    let remediation_representation_evidence_substitution_blocked = remediation_impact
+        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::RepresentationResidual, b"tampered-representation")
+        .is_err();
     let remediation_effect_evidence_substitution_blocked = {
         let mut forged = remediation_impact.clone();
         forged.lifecycle_receipt_hash = symthaea_communication::content_hash(b"other-receipt");
@@ -640,12 +729,8 @@ fn main() -> Result<(), String> {
             &forged_bytes,
         ).is_err()
     };
-    let remediation_protocol_verified = remediation_impact
-        .verify_study_protocol_bytes(study_protocol_bytes)
-        .is_ok();
-    let remediation_split_manifest_verified = remediation_impact
-        .verify_evaluation_split_manifest_bytes(evaluation_split_manifest_bytes)
-        .is_ok();
+    let remediation_protocol_verified = remediation_impact.verify_study_protocol_bytes(study_protocol_bytes).is_ok();
+    let remediation_split_manifest_verified = remediation_impact.verify_evaluation_split_manifest_bytes(evaluation_split_manifest_bytes).is_ok();
     let remediation_protocol_substitution_blocked = {
         let mut forged = remediation_impact.clone();
         forged.study_protocol_hash = symthaea_communication::content_hash(b"other-protocol");
@@ -667,12 +752,11 @@ fn main() -> Result<(), String> {
     let remediation_schema_migration_blocked = {
         let mut forged = remediation_impact.clone();
         forged.schema_version = 0;
-        NeurosemanticRemediationImpactArtifact::from_json_bytes(
-            &serde_json::to_vec(&forged).map_err(|e| e.to_string())?,
-        ).is_err()
+        NeurosemanticRemediationImpactArtifact::from_json_bytes(&serde_json::to_vec(&forged).map_err(|e| e.to_string())?).is_err()
     };
     let remediation_bound_claim_is_narrow =
-        remediation_impact.disposition == NeurosemanticRemediationImpactDisposition::Inconclusive;    let derivation_provenance_present =
+        remediation_impact.disposition == NeurosemanticRemediationImpactDisposition::Inconclusive;
+    let derivation_provenance_present =
         !message.packet.data_policy.handling.derivation_provenance_ref.is_empty();
     let derivation_provenance_hash_valid = message
         .packet
@@ -1075,6 +1159,21 @@ fn main() -> Result<(), String> {
         "lifecycle_rectification_requires_replacement_artifact": lifecycle_rectification_requires_replacement_artifact,
         "lifecycle_rectification_requires_replacement_lineage": lifecycle_rectification_requires_replacement_lineage,
         "remediation_impact_structured": remediation_impact_structured,
+        "remediation_set_pair_verified": remediation_set_pair_verified,
+        "remediation_recovery_method_verified": remediation_recovery_method_verified,
+        "remediation_representation_method_verified": remediation_representation_method_verified,
+        "remediation_forget_evidence_verified": remediation_forget_evidence_verified,
+        "remediation_utility_evidence_verified": remediation_utility_evidence_verified,
+        "remediation_fairness_evidence_verified": remediation_fairness_evidence_verified,
+        "remediation_residual_evidence_verified": remediation_residual_evidence_verified,
+        "remediation_recovery_evidence_verified": remediation_recovery_evidence_verified,
+        "remediation_representation_residual_evidence_verified": remediation_representation_residual_evidence_verified,
+        "remediation_set_role_substitution_blocked": remediation_set_role_substitution_blocked,
+        "remediation_set_overlap_blocked": remediation_set_overlap_blocked,
+        "remediation_recovery_method_substitution_blocked": remediation_recovery_method_substitution_blocked,
+        "remediation_representation_method_substitution_blocked": remediation_representation_method_substitution_blocked,
+        "remediation_recovery_evidence_substitution_blocked": remediation_recovery_evidence_substitution_blocked,
+        "remediation_representation_evidence_substitution_blocked": remediation_representation_evidence_substitution_blocked,
         "remediation_lifecycle_binding_verified": remediation_lifecycle_binding_verified,
         "remediation_pre_lineage_verified": remediation_pre_lineage_verified,
         "remediation_post_lineage_verified": remediation_post_lineage_verified,
