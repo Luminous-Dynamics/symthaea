@@ -102,3 +102,6 @@ Design-bound observations also have to match the target surface's declared unit,
 
 
 The heuristic next-measurement result also uses typed discrimination targets. Each target explicitly names the two frontier candidates and the burden dimension whose intervals overlap; the heuristic does not invent an experimental decision rule or protocol.
+
+
+Uncertainty-based stopping criteria are target-specific rather than bare numeric widths. Each stopping bound names the exact discrimination target and the unit in which its maximum interval width is expressed, preventing ambiguity when a campaign covers multiple measurands or units.
