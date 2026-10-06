@@ -172,7 +172,9 @@ impl NixSystemdReadOnlyObserverV1 {
         timeout: Duration,
     ) -> Result<NixVerifiedPostStateObservationV1, NixSystemdObserverErrorV1> {
         job.validate()?;
-        if job.job_type != NixSystemdJobTypeV1::for_operation(operation) {
+        let expected_job_type = NixSystemdJobTypeV1::for_operation(operation)
+            .ok_or(NixSystemdObserverErrorV1::JobCorrelationMismatch)?;
+        if job.job_type != expected_job_type {
             return Err(NixSystemdObserverErrorV1::JobCorrelationMismatch);
         }
         let completed_job = self.await_job_removed(job, timeout).await?;
