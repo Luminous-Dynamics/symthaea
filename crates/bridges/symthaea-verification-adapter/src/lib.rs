@@ -22,6 +22,7 @@ mod strict_json;
 pub use eddsa_jcs_2022::{verify_eddsa_jcs_2022, EDDSA_JCS_2022};
 
 use symthaea_epistemic_types::{
+    url_values_equivalent,
     ClaimControllerDocumentIdentity, ClaimControllerIdentity, ClaimVerificationMethod,
     FederationDependency,
     ControllerDocumentDereferenceAttestation, ControllerDocumentResolutionSource,
@@ -285,7 +286,12 @@ impl JsonControllerDocumentSnapshotAdapter {
         validate_json_media_type(&snapshot.response_media_type)?;
 
         let expected_document_ref = request.controller_document_ref()?;
-        if snapshot.controller_document_ref != expected_document_ref {
+        if !url_values_equivalent(
+            &snapshot.controller_document_ref,
+            &expected_document_ref,
+        )
+        .unwrap_or(false)
+        {
             return Err(SnapshotError::Verification(
                 VerificationFailure::ControllerDocumentMismatch {
                     expected: expected_document_ref,
@@ -316,7 +322,9 @@ impl JsonControllerDocumentSnapshotAdapter {
         })?;
 
         let document_id = required_string(object, "id")?;
-        if document_id != snapshot.controller_document_ref {
+        if !url_values_equivalent(document_id, &snapshot.controller_document_ref)
+            .unwrap_or(false)
+        {
             return Err(SnapshotError::Verification(
                 VerificationFailure::ControllerDocumentMismatch {
                     expected: snapshot.controller_document_ref.clone(),
@@ -868,7 +876,9 @@ fn extract_verification_method(
     document: &serde_json::Map<String, Value>,
     document_ref: &str,
 ) -> Result<ResolvedVerificationMethod, SnapshotError> {
-    let requested_id = request.verification_method.as_str();
+    let requested_id = url::Url::parse(request.verification_method.as_str())
+        .map_err(|_| SnapshotError::Malformed("verification method must be a valid URL".into()))?
+        .to_string();
     let base = url::Url::parse(document_ref)
         .map_err(|_| SnapshotError::Malformed("controller document id must be a valid URL".into()))?;
 
@@ -912,7 +922,8 @@ fn extract_verification_method(
     }
 
     parse_verification_method_definition(
-        request.verification_method.clone(),
+        ClaimVerificationMethod::new(requested_id)
+            .map_err(|error| SnapshotError::Malformed(error.to_owned()))?,
         candidates[0],
     )
 }
