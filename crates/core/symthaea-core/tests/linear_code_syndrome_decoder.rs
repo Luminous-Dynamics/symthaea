@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root.
 
 use symthaea_core::hdc::linear_code::{
-    BinaryCodeword, RandomLinearCode, basis_rank, factorization_affine_fiber, factorization_algebra,
+    BinaryCodeword, RandomLinearCode, factorization_affine_fiber, factorization_algebra,
 };
 use symthaea_core::hdc::syndrome_decoder::{
     BoundedDistanceDecode, BoundedDistanceSyndromeDecoder, ParityCheckMatrix,
@@ -57,11 +57,20 @@ fn parity_check_is_full_rank_and_annihilates_code_space() {
     let code = RandomLinearCode::generate(31, 5, 0x5EED);
     let parity_check = ParityCheckMatrix::from_code(&code).expect("parity-check matrix");
 
+    let independent_generator_rank = independent_generator_rank(&code);
+    assert_eq!(independent_generator_rank, 5);
+    assert_eq!(independent_generator_rank, code.rank());
+
     assert_eq!(parity_check.dimension(), 31);
-    assert_eq!(parity_check.syndrome_dimension(), 26);
-    assert_eq!(parity_check.rows().len(), 26);
+    assert_eq!(
+        parity_check.syndrome_dimension(),
+        31 - independent_generator_rank
+    );
+    assert_eq!(
+        parity_check.rows().len(),
+        31 - independent_generator_rank
+    );
     assert_eq!(parity_check.columns().len(), 31);
-    assert_eq!(basis_rank(parity_check.rows(), 31), 26);
 
     for codeword in code.enumerate() {
         let syndrome = parity_check.syndrome(&codeword).expect("same dimension");
@@ -72,7 +81,14 @@ fn parity_check_is_full_rank_and_annihilates_code_space() {
         "PARITY_CHECK_LEDGER=dimension={};code_rank={};check_rank={};syndrome_dimension={};fingerprint={}",
         code.dimension(),
         code.rank(),
-        basis_rank(parity_check.rows(), code.dimension()),
+        independent_binary_rank(
+            &parity_check
+                .rows()
+                .iter()
+                .map(|row| row.words()[0])
+                .collect::<Vec<_>>(),
+            code.dimension(),
+        ),
         parity_check.syndrome_dimension(),
         parity_check
             .fingerprint()
@@ -694,16 +710,56 @@ fn independently_enumerated_codewords(code: &RandomLinearCode) -> Vec<BinaryCode
     words
 }
 
+fn independent_binary_rank(rows: &[u64], dimension: usize) -> usize {
+    assert!(dimension <= 64);
+
+    let mut reduced = rows.to_vec();
+    let mut pivot_row = 0usize;
+
+    for column in 0..dimension {
+        let Some(found) = (pivot_row..reduced.len())
+            .find(|&row| ((reduced[row] >> column) & 1) == 1)
+        else {
+            continue;
+        };
+
+        reduced.swap(pivot_row, found);
+        for row in 0..reduced.len() {
+            if row != pivot_row && ((reduced[row] >> column) & 1) == 1 {
+                reduced[row] ^= reduced[pivot_row];
+            }
+        }
+        pivot_row += 1;
+        if pivot_row == reduced.len() {
+            break;
+        }
+    }
+
+    pivot_row
+}
+
+fn independent_generator_rank(code: &RandomLinearCode) -> usize {
+    let rows = code
+        .basis()
+        .iter()
+        .map(|word| word.words()[0])
+        .collect::<Vec<_>>();
+    independent_binary_rank(&rows, code.dimension())
+}
+
 fn independent_parity_check_rows(code: &RandomLinearCode) -> Vec<u64> {
     let dimension = code.dimension();
     assert!(dimension <= 64);
+
+    let independent_rank = independent_generator_rank(code);
+    assert_eq!(independent_rank, code.rank());
 
     let mut reduced = code
         .basis()
         .iter()
         .map(|word| word.words()[0])
         .collect::<Vec<_>>();
-    let mut pivots = Vec::with_capacity(code.rank());
+    let mut pivots = Vec::with_capacity(independent_rank);
     let mut pivot_row = 0usize;
 
     for column in 0..dimension {
@@ -725,14 +781,14 @@ fn independent_parity_check_rows(code: &RandomLinearCode) -> Vec<u64> {
         }
     }
 
-    assert_eq!(pivots.len(), code.rank());
+    assert_eq!(pivots.len(), independent_rank);
 
     let mut is_pivot = vec![false; dimension];
     for &pivot in &pivots {
         is_pivot[pivot] = true;
     }
 
-    let mut checks = Vec::with_capacity(dimension - code.rank());
+    let mut checks = Vec::with_capacity(dimension - independent_rank);
     for (free_column, &pivot) in is_pivot.iter().enumerate() {
         if pivot {
             continue;
@@ -746,7 +802,7 @@ fn independent_parity_check_rows(code: &RandomLinearCode) -> Vec<u64> {
         }
         checks.push(check);
     }
-    assert_eq!(checks.len(), dimension - code.rank());
+    assert_eq!(checks.len(), dimension - independent_rank);
     checks
 }
 
@@ -816,7 +872,10 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
                     "production codeword enumeration diverged from independent basis reconstruction: regime={dimension}x{rank} seed=0x{seed:X}"
                 );
 
-                assert_eq!(codewords.len(), 1usize << rank);
+                let independent_rank = independent_generator_rank(&code);
+                assert_eq!(independent_rank, rank);
+                assert_eq!(independent_rank, code.rank());
+                assert_eq!(codewords.len(), 1usize << independent_rank);
                 let min_distance = codewords
                     .iter()
                     .filter(|word| word.weight() > 0)
@@ -979,7 +1038,7 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
                 histogram[0], 0,
                 "zero multiplicity must never be recorded as a decoded list"
             );
-            assert!(max_multiplicity <= (1usize << rank));
+            assert!(max_multiplicity <= (1usize << independent_rank));
             ledgers.push((
                 dimension,
                 rank,
