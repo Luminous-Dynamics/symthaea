@@ -670,6 +670,7 @@ impl NixSystemdReadOnlyObserverV1 {
         let definition_content_digest = definition_content
             .digest()
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
+        let definition_content_files = definition_content.as_ref().files.clone();
 
         let observation = build_observation_from_properties(
             operation,
@@ -680,6 +681,7 @@ impl NixSystemdReadOnlyObserverV1 {
             &service_result,
             &unit_properties,
             &definition_content_digest,
+            definition_content_files,
             job,
         )?;
 
@@ -1178,6 +1180,7 @@ fn build_observation_from_properties(
     service_result: &str,
     properties: &HashMap<String, OwnedValue>,
     definition_content_digest: &str,
+    definition_content_files: Vec<NixSystemdUnitDefinitionContentFileV1>,
     job: Option<NixSystemdJobEvidenceV1>,
 ) -> Result<NixServicePostStateObservationV1, NixSystemdObserverErrorV1> {
     for property in REQUIRED_UNIT_PROPERTIES {
@@ -1272,6 +1275,7 @@ fn build_observation_from_properties(
         unit_object_path: unit_object_path.as_str().to_string(),
         definition_identity,
         definition_content_digest: definition_content_digest.to_string(),
+        definition_content_files,
         load_state,
         active_state,
         sub_state,
