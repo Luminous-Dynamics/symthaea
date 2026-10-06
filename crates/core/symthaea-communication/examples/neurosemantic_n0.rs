@@ -10,6 +10,8 @@ use symthaea_communication::{
     NeurosemanticPolicyAuthorityAttestation, NeurosemanticPolicyProvenanceBinding,
     NeurosemanticAuthorityResolutionAttestation, NeurosemanticAuthorityStatus,
     NeurosemanticConsentBindingContext, NeurosemanticDerivationLineageRecord,
+    NeurosemanticArtifactLifecycleReceipt, NeurosemanticArtifactLifecycleAction,
+    NeurosemanticArtifactLifecycleState,
 };
 
 fn main() -> Result<(), String> {
@@ -263,6 +265,66 @@ fn main() -> Result<(), String> {
     let derivation_input_artifact_bounds_blocked = derivation_lineage_record
         .verify_input_artifact_bytes(2, b"synthetic-input-artifact-3")
         .is_err();
+
+    let lifecycle_effect_evidence = b"synthetic-lifecycle-effect-v1";
+    let lifecycle_receipt = NeurosemanticArtifactLifecycleReceipt {
+        schema_version: symthaea_communication::NEUROSEMANTIC_ARTIFACT_LIFECYCLE_RECEIPT_SCHEMA_VERSION,
+        receipt_ref: "synthetic-lifecycle-receipt-1".into(),
+        artifact_hash: message.packet.payload_hash.clone(),
+        derivation_provenance_ref: policy_provenance_binding.derivation_provenance_ref().into(),
+        derivation_provenance_hash: policy_provenance_binding.derivation_provenance_hash().into(),
+        action: NeurosemanticArtifactLifecycleAction::Erasure,
+        state: NeurosemanticArtifactLifecycleState::Verified,
+        effect_evidence_ref: "synthetic-lifecycle-effect-1".into(),
+        effect_evidence_hash: symthaea_communication::content_hash(lifecycle_effect_evidence),
+        execution_revision: execution_revision.clone(),
+        observed_at_unix_s: 1_600,
+        resulting_artifact_hash: None,
+    };
+    let lifecycle_receipt_binding_verified = lifecycle_receipt
+        .verify_binding(
+            &message.packet.payload_hash,
+            policy_provenance_binding.derivation_provenance_ref(),
+            policy_provenance_binding.derivation_provenance_hash(),
+            lifecycle_effect_evidence,
+            1_700,
+        )
+        .is_ok();
+    let lifecycle_effect_evidence_mismatch_blocked = !lifecycle_receipt
+        .verify_effect_evidence_bytes(b"synthetic-lifecycle-effect-tampered");
+    let lifecycle_artifact_mismatch_blocked = lifecycle_receipt
+        .verify_binding(
+            &symthaea_communication::content_hash(b"wrong-artifact"),
+            policy_provenance_binding.derivation_provenance_ref(),
+            policy_provenance_binding.derivation_provenance_hash(),
+            lifecycle_effect_evidence,
+            1_700,
+        )
+        .is_err();
+    let lifecycle_lineage_mismatch_blocked = lifecycle_receipt
+        .verify_binding(
+            &message.packet.payload_hash,
+            "synthetic-derivation-record-2",
+            policy_provenance_binding.derivation_provenance_hash(),
+            lifecycle_effect_evidence,
+            1_700,
+        )
+        .is_err();
+    let lifecycle_future_timestamp_blocked = lifecycle_receipt
+        .verify_binding(
+            &message.packet.payload_hash,
+            policy_provenance_binding.derivation_provenance_ref(),
+            policy_provenance_binding.derivation_provenance_hash(),
+            lifecycle_effect_evidence,
+            1_599,
+        )
+        .is_err();
+    let lifecycle_rectification_requires_replacement_artifact = {
+        let mut invalid = lifecycle_receipt.clone();
+        invalid.action = NeurosemanticArtifactLifecycleAction::Rectification;
+        invalid.resulting_artifact_hash = None;
+        invalid.validate().is_err()
+    };
 
     let derivation_provenance_present =
         !message.packet.data_policy.handling.derivation_provenance_ref.is_empty();
@@ -641,6 +703,12 @@ fn main() -> Result<(), String> {
         "derivation_input_artifact_verified": derivation_input_artifact_verified,
         "derivation_input_artifact_mismatch_blocked": derivation_input_artifact_mismatch_blocked,
         "derivation_input_artifact_bounds_blocked": derivation_input_artifact_bounds_blocked,
+        "lifecycle_receipt_binding_verified": lifecycle_receipt_binding_verified,
+        "lifecycle_effect_evidence_mismatch_blocked": lifecycle_effect_evidence_mismatch_blocked,
+        "lifecycle_artifact_mismatch_blocked": lifecycle_artifact_mismatch_blocked,
+        "lifecycle_lineage_mismatch_blocked": lifecycle_lineage_mismatch_blocked,
+        "lifecycle_future_timestamp_blocked": lifecycle_future_timestamp_blocked,
+        "lifecycle_rectification_requires_replacement_artifact": lifecycle_rectification_requires_replacement_artifact,
         "stale_policy_provenance_binding_blocked": stale_policy_binding_blocked,
         "inference_escalation_blocked": inference_escalation_blocked,
         "first_packet_accepted": accepted == ReplayDecision::Accept,
