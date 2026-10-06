@@ -2783,6 +2783,16 @@ async fn verify_wifi_connection(profile_name: &str) -> Result<bool, String> {
 
     Ok(wifi_connection_observed(&result.stdout, profile_name))
 }
+fn configuration_bytes_match(actual: &[u8], expected: &[u8]) -> bool {
+    blake3::hash(actual) == blake3::hash(expected)
+}
+
+async fn verify_active_configuration(expected: &[u8]) -> Result<bool, String> {
+    let actual = tokio::fs::read("/etc/nixos/configuration.nix")
+        .await
+        .map_err(|error| format!("active configuration postcondition probe failed: {error}"))?;
+    Ok(configuration_bytes_match(&actual, expected))
+}
 
 fn finalize_transaction(
     ledger: &TransactionLedger,
@@ -5906,7 +5916,23 @@ echo "REBUILD_COMPLETE"
                     _ => None,
                 };
                 let (exit_code, observed_outcome) = match rebuild_exit_code {
-                    Some(0) => (0, TransactionOutcome::ObservedSuccess),
+                    Some(0) => match verify_active_configuration(client_msg.configuration_nix.as_bytes()).await {
+                        Ok(true) => (0, TransactionOutcome::ObservedSuccess),
+                        Ok(false) => {
+                            eprintln!(
+                                "[{}] {} rebuild returned 0 but active configuration does not match the requested bytes",
+                                peer_addr, transaction.log_line()
+                            );
+                            (1, TransactionOutcome::Indeterminate)
+                        }
+                        Err(error) => {
+                            eprintln!(
+                                "[{}] {} active configuration postcondition probe failed: {}",
+                                peer_addr, transaction.log_line(), error
+                            );
+                            (1, TransactionOutcome::Indeterminate)
+                        }
+                    },
                     Some(code) => (code, TransactionOutcome::Failed),
                     None => (1, TransactionOutcome::Indeterminate),
                 };
@@ -7485,6 +7511,13 @@ mod tests {
         let banner = auth_token_banner("super-secret-token", true);
         assert!(banner.contains("super-secret-token"));
         assert!(banner.starts_with("  Auth token: "));
+    }
+
+    #[test]
+    fn configuration_postcondition_requires_exact_requested_bytes() {
+        assert!(configuration_bytes_match(b"line1\nline2\n", b"line1\nline2\n"));
+        assert!(!configuration_bytes_match(b"line1\n", b"line1\r\n"));
+        assert!(!configuration_bytes_match(b"nix-config-a", b"nix-config-b"));
     }
 
     #[test]
