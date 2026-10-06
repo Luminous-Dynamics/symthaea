@@ -60,10 +60,12 @@ async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
     const TRUSTED_PATH: &str =
         "/run/current-system/sw/bin:/run/wrappers/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin:/sbin";
     command.env("PATH", TRUSTED_PATH);
-    // Ensure NIX_PATH is set for nixos-install
-    if std::env::var("NIX_PATH").is_err() {
-        command.env("NIX_PATH", "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos:nixos-config=/etc/nixos/configuration.nix");
-    }
+    // Pin NIX_PATH as well: Nix evaluation must not inherit an ambient
+    // caller-controlled search path in this privileged execution boundary.
+    command.env(
+        "NIX_PATH",
+        "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos:nixos-config=/etc/nixos/configuration.nix",
+    );
     let output = command.output().await?;
     Ok(CmdResult {
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
