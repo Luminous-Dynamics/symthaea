@@ -11424,8 +11424,13 @@ mod tests {
             .unwrap();
         assert_eq!(remaining, 1);
 
+        let mut fresh_witness = witness.clone();
+        fresh_witness.operation_id = Some("operation:second".into());
+
+        // Reusing the released attempt is forbidden even when the caller presents
+        // a new operation ID; the attempt identity is consumed by historical evidence.
         let old_attempt = store.prepare_for_execution_bound_with_operation(
-            &witness,
+            &fresh_witness,
             &action,
             "frame@1",
             "attempt:first",
@@ -11439,8 +11444,22 @@ mod tests {
             ))
         ));
 
-        let mut fresh_witness = witness.clone();
-        fresh_witness.operation_id = Some("operation:second".into());
+        // Reusing the released operation is independently forbidden on a fresh attempt.
+        let old_operation = store.prepare_for_execution_bound_with_operation(
+            &fresh_witness,
+            &action,
+            "frame@1",
+            "attempt:second-operation-reuse",
+            "boundary-failed-release",
+            "operation:first",
+        );
+        assert!(matches!(
+            old_operation,
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+
         store
             .prepare_for_execution_bound_with_operation(
                 &fresh_witness,
