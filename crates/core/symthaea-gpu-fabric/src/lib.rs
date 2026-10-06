@@ -46,7 +46,7 @@ impl GpuOperation {
         }
     }
 
-    pub fn kernel_digest(self) -> String {
+    pub fn semantic_kernel_digest(self) -> String {
         semantic_digest(self.kernel_id().as_bytes())
     }
 
@@ -263,12 +263,7 @@ impl CpuReferenceExecutor {
                 let output = BinaryHypervector::from_bytes(dimensions, bytes)
                     .map_err(ExecutionError::Vector)?;
 
-                let input_digest = digest_bytes(
-                    &inputs
-                        .iter()
-                        .flat_map(|vector| vector.as_bytes().iter().copied())
-                        .collect::<Vec<_>>(),
-                );
+                let input_digest = digest_hypervectors(inputs);
 
                 let receipt = ExecutionReceipt {
                     version: RECEIPT_VERSION,
@@ -412,7 +407,18 @@ fn digest_bytes(bytes: &[u8]) -> String {
     hasher.finalize().to_hex().to_string()
 }
 
-fn semantic_digest(bytes: &[u8]) -> String {
+fn digest_hypervectors(vectors: &[BinaryHypervector]) -> String {
+    let mut hasher = Hasher::new();
+    hasher.update(b"symthaea.gpu-fabric.inputs.binary-hypervectors.v1\0");
+    for vector in vectors {
+        hasher.update(&vector.dimensions.to_le_bytes());
+        hasher.update(&(vector.bytes.len() as u64).to_le_bytes());
+        hasher.update(&vector.bytes);
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
+fn semantic_kernel_digest(bytes: &[u8]) -> String {
     let mut hasher = Hasher::new();
     hasher.update(b"symthaea.gpu-fabric.semantic-kernel\0");
     hasher.update(bytes);
@@ -454,6 +460,18 @@ mod tests {
         let plan = OperationPlan::new(GpuOperation::HdcBindXor { dimensions: 16 });
         assert_eq!(plan.digest(), plan.digest());
         assert_ne!(plan.digest_hex(), "");
+        assert_eq!(
+            plan.operation.semantic_kernel_digest(),
+            plan.operation.semantic_kernel_digest()
+        );
+    }
+
+    #[test]
+    fn changing_limits_changes_plan_identity() {
+        let mut bounded = OperationPlan::new(GpuOperation::HdcBindXor { dimensions: 16 });
+        let original = bounded.digest_hex();
+        bounded.limits.max_output_bytes -= 1;
+        assert_ne!(original, bounded.digest_hex());
     }
 
     #[test]
