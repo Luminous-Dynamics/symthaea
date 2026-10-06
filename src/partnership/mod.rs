@@ -13,6 +13,7 @@
 
 pub mod partner_model;
 pub mod phi_dyad;
+pub mod relational_harmonics;
 pub mod trajectory;
 
 pub use partner_model::{HumanPartnerModel, InteractionEvent};
