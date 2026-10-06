@@ -364,6 +364,21 @@ Move the current consciousness-derived partnership update behind an explicitly n
 
 Compare weighted bundling versus role-keyed binding on held-out relational retrieval, keeping the result as an ablation rather than assuming one representation is superior.
 
+### RH-004 — directional information-flow qualification
+
+Use the repository's existing TransferEntropyEstimator rather than implementing a parallel estimator.
+
+The RH wrapper must:
+
+- take independent agent signals, not alignment or relational-score outputs;
+- require an explicit minimum sample floor;
+- require uniform sampling or an explicitly qualified resampling step;
+- report A→B, B→A, and net directional information flow separately;
+- label the result as a proxy until significance/surrogate controls are attached;
+- keep transfer entropy distinct from mechanistic causality.
+
+The existing estimator is a histogram estimator with a coarse history representation and should therefore be independently stress-tested for sample size, bin count, bias, and deterministic null behavior before any threshold is introduced.
+
 ## 14. Literature boundary
 
 Relevant literature supports studying interpersonal coordination as a dynamical, multimodal, and context-sensitive phenomenon, but does not establish the stronger ontological claims above.
