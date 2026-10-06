@@ -1002,6 +1002,56 @@ mod tests {
     }
 
     #[test]
+    fn successful_creator_provenance_requires_exact_mutation_and_target() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-transaction-provenance-{name}.jsonl"
+        ));
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let target_a = "a".repeat(64);
+        let target_b = "b".repeat(64);
+
+        let create = SystemTransaction::begin(
+            MutationKind::CreateImage,
+            "provenance-create-0001",
+            Some(&target_a),
+            b"create-system-image",
+        )
+        .unwrap();
+        assert!(matches!(
+            ledger.admit(create.clone()).unwrap(),
+            TransactionAdmission::New(_)
+        ));
+        ledger
+            .mark_completed(&create, TransactionOutcome::ObservedSuccess)
+            .unwrap();
+
+        assert!(ledger
+            .has_successful_transaction(
+                &create.transaction_id,
+                MutationKind::CreateImage,
+                Some(&target_a)
+            )
+            .unwrap());
+        assert!(!ledger
+            .has_successful_transaction(
+                &create.transaction_id,
+                MutationKind::CreateImage,
+                Some(&target_b)
+            )
+            .unwrap());
+        assert!(!ledger
+            .has_successful_transaction(
+                &create.transaction_id,
+                MutationKind::RestoreImage,
+                Some(&target_a)
+            )
+            .unwrap());
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn transaction_ids_are_random_and_unique() {
         let a = SystemTransaction::begin(MutationKind::Rollback, "request-a-00000001", None, b"rollback").unwrap();
         let b = SystemTransaction::begin(MutationKind::Rollback, "request-b-00000001", None, b"rollback").unwrap();
