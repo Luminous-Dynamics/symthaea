@@ -72,6 +72,8 @@ jobs:
             ${{ runner.os }}-es256-cose-
       - name: Run COSE_Key interoperability corpus
         run: cargo test -p symthaea-swarm --features semantic-receipts --test rfc9942_cose_key_corpus
+      - name: Run CBOR reader taxonomy regression suite
+        run: cargo test -p symthaea-swarm --features semantic-receipts --lib semantic_evidence_vds
       - name: Run focused RFC 9942 semantic qualification
         run: cargo test -p symthaea-swarm --features semantic-receipts --test rfc9942_semantic_qualification
       - name: Run RFC 8392 ES256 known-answer vector
