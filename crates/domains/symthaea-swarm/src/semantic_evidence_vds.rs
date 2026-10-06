@@ -3558,7 +3558,7 @@ impl Rfc9162ConsistencyProof {
         let mut r=CborReader::new(bytes); let indefinite_array=r.read_array_len_exact(3)?;
         let first=r.read_u64()?; let second=r.read_u64()?;
         let max_path=rfc9162_ceil_log2(second).saturating_add(1);
-        let items=r.read_array_items_bounded(MAX_RFC9162_CONSISTENCY_PROOF_PATH)?;
+        let items=r.read_array_items_bounded_with_resource_limits(MAX_RFC9162_CONSISTENCY_PROOF_PATH)?;
         if items.is_empty(){return Err(Rfc9162ProofDecodeError::InvalidStructure)}
         if items.len()>max_path{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
         let mut path=Vec::with_capacity(items.len());
@@ -3579,7 +3579,7 @@ impl Rfc9162InclusionProof {
         let mut r=CborReader::new(bytes); let indefinite_array=r.read_array_len_exact(3)?;
         let tree_size=r.read_u64()?; let leaf_index=r.read_u64()?;
         let max_path=rfc9162_ceil_log2(tree_size);
-        let items=r.read_array_items_bounded(MAX_RFC9162_INCLUSION_PROOF_PATH)?;
+        let items=r.read_array_items_bounded_with_resource_limits(MAX_RFC9162_INCLUSION_PROOF_PATH)?;
         if items.len()>max_path{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
         let mut path=Vec::with_capacity(items.len());
         for item in items{
