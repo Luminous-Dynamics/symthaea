@@ -16,13 +16,20 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use nixward::NixParser;
-use nixward::action::authorization::{NixActionIntentV1, NixAuthorizationErrorV1, NixLocalExecutionAuthorityV1};
+use nixward::action::authorization::{
+    NixActionIntentV1, NixAuthorizationErrorV1, NixLocalExecutionAuthorityV1,
+};
+use nixward::action::service_effect::{
+    NixServiceEffectContextV1, NixVerifiedServiceDefinitionContentV1,
+};
 use nixward::action::local_approval::LocalApprovalDecisionKindV1;
 use nixward::action::temporal::UnixMillisV1;
 #[cfg(target_os = "linux")]
 use nixward::action::local_approval_runtime::LocalApprovalRuntimeV1;
 #[cfg(target_os = "linux")]
 use nixward::action::local_approval_store::ConsumedLocalApprovalDecisionV1;
+#[cfg(target_os = "linux")]
+use nixward::action::systemd_observer::NixSystemdReadOnlyObserverV1;
 use nixward::action::service_domain::{NixServiceOperationErrorV1, NixServiceOperationKindV1, NixServiceOperationV1};
 use nixward::action::service_manager::ServiceManager;
 use nixward::encoding::{NixCodebook, ServiceState, SystemStateEncoder, SystemStateSnapshot};
@@ -61,6 +68,110 @@ fn render_typed_service_action(
 ) -> Result<nixward::action::executor::NixOSCommand, NixServiceOperationErrorV1> {
     let typed = NixServiceOperationV1::new(unit, operation)?;
     ServiceManager::typed_command(&typed)
+}
+
+#[cfg(target_os = "linux")]
+fn capture_service_definition_content(
+    unit: &str,
+) -> Result<NixVerifiedServiceDefinitionContentV1, String> {
+    let unit = unit.to_string();
+    let join = std::thread::Builder::new()
+        .name("nixward-definition-capture".to_string())
+        .spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|error| format!("could not build definition-capture runtime: {error}"))?;
+            runtime.block_on(async move {
+                let observer = NixSystemdReadOnlyObserverV1::connect_system()
+                    .await
+                    .map_err(|error| format!("could not connect systemd observer: {error}"))?;
+                observer
+                    .capture_service_definition_content(&unit)
+                    .await
+                    .map_err(|error| format!("could not capture service definition content: {error}"))
+            })
+        })
+        .map_err(|error| format!("could not spawn definition-capture worker: {error}"))?;
+
+    join.join()
+        .map_err(|_| "definition-capture worker panicked".to_string())?
+}
+
+fn parse_service_pre_state_identity(
+    identity: &str,
+    expected_generation: u64,
+    expected_unit: &str,
+) -> Result<String, String> {
+    let prefix = "nixward-service-pre-state-v1|generation=";
+    let rest = identity
+        .strip_prefix(prefix)
+        .ok_or_else(|| "invalid service pre-state identity prefix".to_string())?;
+    let (generation, rest) = rest
+        .split_once("|unit=")
+        .ok_or_else(|| "invalid service pre-state identity generation/unit separator".to_string())?;
+    let generation = generation
+        .parse::<u64>()
+        .map_err(|_| "invalid service pre-state generation".to_string())?;
+    let (unit, state_digest) = rest
+        .split_once("|state=")
+        .ok_or_else(|| "invalid service pre-state identity unit/state separator".to_string())?;
+    if generation != expected_generation || unit != expected_unit {
+        return Err("service pre-state identity does not match generation/unit".to_string());
+    }
+    if state_digest.len() != 64 || !state_digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("service pre-state identity contains invalid state digest".to_string());
+    }
+    Ok(state_digest.to_string())
+}
+
+fn bind_service_definition_content(
+    intent: NixActionIntentV1,
+    generation: u64,
+) -> Result<
+    (
+        NixActionIntentV1,
+        Option<NixVerifiedServiceDefinitionContentV1>,
+    ),
+    String,
+> {
+    let NixActionDescriptorV1::Service { operation, unit } = &intent.action else {
+        return Ok((intent, None));
+    };
+    let pre_state_identity = intent
+        .pre_state_identity
+        .as_deref()
+        .ok_or_else(|| "Service intent has no exact pre-state identity".to_string())?;
+    let pre_state_digest =
+        parse_service_pre_state_identity(pre_state_identity, generation, unit)?;
+    let content = capture_service_definition_content(unit)?;
+    let context = NixServiceEffectContextV1::new(
+        *operation,
+        unit.clone(),
+        generation,
+        pre_state_digest,
+        content
+            .as_ref()
+            .definition_identity
+            .digest(unit)
+            .map_err(|error| error.to_string())?,
+        content.digest().map_err(|error| error.to_string())?,
+        None,
+        0,
+    )
+    .map_err(|error| format!("could not construct service-effect context: {error}"))?;
+    let intent = intent
+        .with_service_effect_context(context)
+        .map_err(|error| format!("could not bind service-effect context: {error}"))?;
+    Ok((intent, Some(content)))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn bind_service_definition_content(
+    intent: NixActionIntentV1,
+    _generation: u64,
+) -> Result<(NixActionIntentV1, Option<NixVerifiedServiceDefinitionContentV1>), String> {
+    Ok((intent, None))
 }
 
 fn action_intent_digest_for_command(
