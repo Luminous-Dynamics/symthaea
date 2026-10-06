@@ -1469,6 +1469,16 @@ pub enum NixPostStateErrorV1 {
     OperationMismatch,
     #[error("service unit mismatch")]
     UnitMismatch,
+    #[error("service invocation identity does not match the authorized effect")]
+    InvocationMismatch,
+    #[error("stability contract does not match the authorized effect")]
+    StabilityContractMismatch,
+    #[error("pre-state digest does not match the authorized effect context")]
+    PreStateDigestMismatch,
+    #[error("missing authority-bound service effect context")]
+    MissingServiceEffectContext,
+    #[error("invalid service effect context: {0}")]
+    InvalidServiceEffectContext(String),
     #[error("observed generation does not match authorized generation")]
     GenerationMismatch,
     #[error("observed systemd unit-definition identity does not match authorization")]
