@@ -1009,12 +1009,29 @@ fn extract_relationship_methods(
         let (id, relationship_controller, relationship_expires, relationship_revoked) =
             match entry {
                 Value::String(value) => (value.clone(), None, None, None),
-                Value::Object(object) => (
-                    required_string(object, "id")?.to_owned(),
-                    optional_string(object, "controller")?,
-                    optional_timestamp(object, "expires")?,
-                    optional_timestamp(object, "revoked")?,
-                ),
+                Value::Object(object) => {
+                    let id = required_string(object, "id")?.to_owned();
+                    let absolute = base.join(&id).map_err(|_| {
+                        SnapshotError::Malformed(
+                            "verification relationship member id is not a valid URL".into(),
+                        )
+                    })?;
+                    let method = ClaimVerificationMethod::new(absolute.to_string())
+                        .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
+
+                    // An embedded relationship object is itself a verification-method
+                    // definition under CID 2.2.4, not merely an ID-bearing reference.
+                    // Validate its complete method shape even when it is not the method
+                    // requested by this verification operation.
+                    parse_verification_method_definition(method, object, &base)?;
+
+                    (
+                        id,
+                        optional_string(object, "controller")?,
+                        optional_timestamp(object, "expires")?,
+                        optional_timestamp(object, "revoked")?,
+                    )
+                }
                 _ => {
                     return Err(SnapshotError::Malformed(
                         "verification relationship entries must be strings or objects".into(),
@@ -2202,6 +2219,39 @@ mod tests {
             adapter.resolve_snapshot(&request, snapshot),
             Err(SnapshotError::Malformed(message))
                 if message.contains("multiple matching embedded definitions")
+        ));
+    }
+
+    #[test]
+    fn unrelated_embedded_relationship_method_must_be_conforming() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "verificationMethod": [{
+                "id": "https://example.test/controller#key-1",
+                "type": "Multikey",
+                "controller": "https://example.test/controller",
+                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+            }],
+            "assertionMethod": [{
+                "id": "https://example.test/controller#other-key",
+                "type": "Multikey",
+                "controller": "https://example.test/controller"
+            }, "https://example.test/controller#key-1"]
+        }"##.into();
+
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter = JsonControllerDocumentSnapshotAdapter::new(
+            "/tmp/does-not-matter",
+            reference,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("publicKeyMultibase")
         ));
     }
 
