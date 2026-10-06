@@ -479,13 +479,19 @@ impl LiveVoice {
                 cursor += 1;
             }
 
-            mappings.push(LexicalPhonologicalMapping {
-                lexical_position,
-                lexeme_id: constituent.lexeme_id.clone(),
-                morphophonological_form: constituent.morphophonological_form.clone(),
-                segment_indices: (start..cursor).collect(),
-                symbols,
-            });
+            mappings.push(
+                LexicalPhonologicalMapping::from_lexical_binding(
+                    binding,
+                    lexical_position,
+                    (start..cursor).collect(),
+                    symbols,
+                )
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "lexical position {lexical_position} disappeared during witness derivation"
+                    )
+                })?,
+            );
         }
 
         if segments[cursor..]
@@ -1952,14 +1958,14 @@ mod tests {
             segments
                 .iter()
                 .enumerate()
-                .map(|(index, segment)| LexicalPhonologicalMapping {
-                    lexical_position: index,
-                    lexeme_id: binding.constituents[index].lexeme_id.clone(),
-                    morphophonological_form: binding.constituents[index]
-                        .morphophonological_form
-                        .clone(),
-                    segment_indices: vec![index],
-                    symbols: vec![segment.symbol.clone()],
+                .map(|(index, segment)| {
+                    LexicalPhonologicalMapping::from_lexical_binding(
+                        &binding,
+                        index,
+                        vec![index],
+                        vec![segment.symbol.clone()],
+                    )
+                    .expect("lexical position exists")
                 })
                 .collect(),
         )
