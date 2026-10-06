@@ -606,6 +606,50 @@ pub(crate) fn validate_public_jwk_shape(
     Ok(())
 }
 
+fn canonical_public_jwk_material(
+    public_object: &serde_json::Map<String, Value>,
+) -> Result<std::collections::BTreeMap<String, Value>, SnapshotError> {
+    let kty = public_object
+        .get("kty")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            SnapshotError::Malformed(
+                "public JWK verification material requires a string kty".into(),
+            )
+        })?;
+
+    let required_members: &[&str] = match kty {
+        "EC" => &["crv", "kty", "x", "y"],
+        "OKP" => &["crv", "kty", "x"],
+        "RSA" => &["e", "kty", "n"],
+        // RFC 7638 requires the key-type-defining specification to identify the
+        // required members. Until an extension kty is explicitly understood here,
+        // retain the complete public map rather than risking a digest that omits
+        // unknown key material and aliases distinct keys.
+        _ => {
+            return Ok(public_object
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect());
+        }
+    };
+
+    required_members
+        .iter()
+        .map(|key| {
+            public_object
+                .get(*key)
+                .cloned()
+                .map(|value| ((*key).to_owned(), value))
+                .ok_or_else(|| {
+                    SnapshotError::Malformed(format!(
+                        "public JWK verification material is missing required member {key}"
+                    ))
+                })
+        })
+        .collect()
+}
+
 fn verification_method_material_digest(
     method_id: &ClaimVerificationMethod,
     method_type: &str,
@@ -669,10 +713,7 @@ fn verification_method_material_digest(
             }
             validate_public_jwk_shape(public_object)?;
 
-            let canonical_jwk: std::collections::BTreeMap<String, Value> = public_object
-                .iter()
-                .map(|(key, value)| (key.clone(), value.clone()))
-                .collect();
+            let canonical_jwk = canonical_public_jwk_material(public_object)?;
 
             serde_json::to_vec(&("JsonWebKey", canonical_jwk))
                 .map_err(|_| SnapshotError::Malformed("verification method material serialization failed".into()))?
@@ -685,7 +726,7 @@ fn verification_method_material_digest(
     };
 
     let encoded = (
-        "symthaea:verification-method-material:v1",
+        "symthaea:verification-method-material:v2",
         method_id.as_str(),
         method_type,
         material_bytes,
@@ -1332,6 +1373,55 @@ mod tests {
             adapter.resolve_snapshot(&request, snapshot),
             Err(SnapshotError::SnapshotReferenceMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn jwk_material_digest_ignores_optional_metadata() {
+        let method = ClaimVerificationMethod::new(
+            "https://example.test/controller#jwk-1"
+        )
+        .unwrap();
+        let first = serde_json::json!({
+            "id": "https://example.test/controller#jwk-1",
+            "type": "JsonWebKey",
+            "controller": "https://example.test/controller",
+            "publicKeyJwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "VCpo2LMLhn6iWku8MKvSLg2ZAoC-nlOyPVQaO3FxVeQ",
+                "kid": "thumbprint-a",
+                "alg": "EdDSA",
+                "use": "sig"
+            }
+        });
+        let second = serde_json::json!({
+            "id": "https://example.test/controller#jwk-1",
+            "type": "JsonWebKey",
+            "controller": "https://example.test/controller",
+            "publicKeyJwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "VCpo2LMLhn6iWku8MKvSLg2ZAoC-nlOyPVQaO3FxVeQ",
+                "kid": "thumbprint-b",
+                "alg": "some-future-suite",
+                "use": "enc"
+            }
+        });
+
+        let a = verification_method_material_digest(
+            &method,
+            "JsonWebKey",
+            first["publicKeyJwk"].as_object().unwrap(),
+        )
+        .unwrap();
+        let b = verification_method_material_digest(
+            &method,
+            "JsonWebKey",
+            second["publicKeyJwk"].as_object().unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(a, b);
     }
 
     #[test]
