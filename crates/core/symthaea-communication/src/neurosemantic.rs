@@ -2678,6 +2678,82 @@ mod tests {
     }
 
     #[test]
+    fn remediation_impact_artifact_binds_model_lineage_and_evidence_dimensions() {
+        let pre_model_hash = content_hash(b"model-pre");
+        let post_model_hash = content_hash(b"model-post");
+        let pre_lineage = NeurosemanticDerivationLineageRecord {
+            lineage_ref: "model-lineage-pre".into(),
+            output_artifact_hash: pre_model_hash.clone(),
+            ..synthetic_derivation_lineage_record()
+        };
+        let post_lineage = NeurosemanticDerivationLineageRecord {
+            lineage_ref: "model-lineage-post".into(),
+            output_artifact_hash: post_model_hash.clone(),
+            ..synthetic_derivation_lineage_record()
+        };
+        let pre_bytes = serde_json::to_vec(&pre_lineage).unwrap();
+        let post_bytes = serde_json::to_vec(&post_lineage).unwrap();
+        let lifecycle = synthetic_lifecycle_receipt_chain().4;
+        let impact = NeurosemanticRemediationImpactArtifact {
+            schema_version: NEUROSEMANTIC_REMEDIATION_IMPACT_ARTIFACT_SCHEMA_VERSION,
+            impact_ref: "impact-1".into(),
+            pre_remediation_model_hash: pre_model_hash.clone(),
+            post_remediation_model_hash: post_model_hash.clone(),
+            pre_remediation_lineage_ref: pre_lineage.lineage_ref.clone(),
+            pre_remediation_lineage_hash: compute_derivation_provenance_hash(&pre_lineage.lineage_ref, &pre_bytes),
+            post_remediation_lineage_ref: post_lineage.lineage_ref.clone(),
+            post_remediation_lineage_hash: compute_derivation_provenance_hash(&post_lineage.lineage_ref, &post_bytes),
+            lifecycle_receipt_hash: lifecycle.fingerprint().unwrap(),
+            remediation_action: NeurosemanticArtifactLifecycleAction::Erasure,
+            study_protocol_hash: content_hash(b"protocol-1"),
+            evaluation_split_manifest_hash: content_hash(b"split-1"),
+            forget_evidence_hash: content_hash(b"forget"),
+            utility_impact_evidence_hash: content_hash(b"utility"),
+            fairness_impact_evidence_hash: Some(content_hash(b"fairness")),
+            residual_risk_evidence_hash: content_hash(b"residual"),
+            execution_revision: "3".repeat(40),
+            observed_at_unix_s: 170,
+            disposition: NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds,
+            dimensions: vec!["forgetfulness".into(), "utility-impact".into(), "fairness-impact".into(), "residual-risk".into()],
+        };
+        assert!(impact.validate().is_ok());
+        assert!(impact.verify_lifecycle_binding(&lifecycle).is_ok());
+        assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PreRemediation, &pre_bytes).is_ok());
+        assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PostRemediation, &post_bytes).is_ok());
+        assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::Forgetfulness, b"forget").is_ok());
+        assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::UtilityImpact, b"utility").is_ok());
+        assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::FairnessImpact, b"fairness").is_ok());
+        assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::ResidualRisk, b"residual").is_ok());
+
+        let encoded = serde_json::to_vec(&impact).unwrap();
+        assert_eq!(NeurosemanticRemediationImpactArtifact::from_json_bytes(&encoded).unwrap(), impact);
+
+        let mut missing_required = impact.clone();
+        missing_required.dimensions.retain(|dimension| dimension != "residual-risk");
+        assert!(missing_required.validate().is_err());
+
+        let mut fairness_mismatch = impact.clone();
+        fairness_mismatch.fairness_impact_evidence_hash = None;
+        assert!(fairness_mismatch.validate().is_err());
+
+        let mut stale_receipt = impact.clone();
+        stale_receipt.lifecycle_receipt_hash = content_hash(b"different-receipt");
+        assert!(stale_receipt.verify_lifecycle_binding(&lifecycle).is_err());
+
+        let mut wrong_lineage = impact.clone();
+        wrong_lineage.post_remediation_model_hash = content_hash(b"wrong-model");
+        assert!(wrong_lineage.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PostRemediation, &post_bytes).is_err());
+
+        assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::ResidualRisk, b"tampered").is_err());
+
+        let mut legacy = impact.clone();
+        legacy.schema_version = 0;
+        assert!(NeurosemanticRemediationImpactArtifact::from_json_bytes(&serde_json::to_vec(&legacy).unwrap()).is_err());
+
+        let oversized = vec![b' '; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1];
+        assert!(NeurosemanticRemediationImpactArtifact::from_json_bytes(&oversized).is_err());
+    }
+    #[test]
     fn lifecycle_receipt_action_schema_is_stable() {
         for (action, expected) in [
             (NeurosemanticArtifactLifecycleAction::AccessRevocation, "AccessRevocation"),
