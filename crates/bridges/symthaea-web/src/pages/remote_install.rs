@@ -125,6 +125,8 @@ pub struct RemoteHardware {
     pub safety_message: String,
     pub detected_os: Vec<String>,
     pub chromebook: bool,
+    /// Non-secret digest binding this browser session to the exact target machine.
+    pub target_machine_digest: String,
 }
 
 #[derive(Clone, Debug)]
@@ -380,6 +382,14 @@ fn parse_hardware_probe(data: &str) -> Result<RemoteHardware, String> {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
     {
         return Err("hardware response has an invalid or missing architecture".into());
+    }
+
+    let target_machine_digest =
+        optional_string(object.get("target_machine_digest"), "target_machine_digest", 64)?;
+    if target_machine_digest.len() != 64
+        || !target_machine_digest.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    {
+        return Err("hardware response has an invalid target machine digest".into());
     }
 
     let mut hardware = RemoteHardware {
@@ -1384,6 +1394,7 @@ pub fn RemoteInstallPanel(
             "flake_nix": flake_nix.get().unwrap_or_default(),
             "user_password": user_password.get(),
             "luks_passphrase": luks_passphrase.get(),
+            "target_machine_digest": remote_hw.get().target_machine_digest,
         });
         send_msg(&msg);
         user_password.set(String::new());
@@ -1945,6 +1956,24 @@ mod tests {
         assert!(!layout_requires_luks("single", "btrfs"));
         assert!(!layout_requires_luks("single-luks", "zfs"));
         assert!(!layout_requires_luks("alongside", "btrfs"));
+    }
+
+    #[test]
+    fn hardware_probe_requires_target_identity_digest() {
+        let hardware = parse_hardware_probe(
+            r#"{"arch":"x86_64","target_machine_digest":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            hardware.target_machine_digest,
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        );
+
+        assert!(parse_hardware_probe(
+            r#"{"arch":"x86_64","target_machine_digest":"ABCDEF"}"#
+        )
+        .is_err());
+        assert!(parse_hardware_probe(r#"{"arch":"x86_64"}"#).is_err());
     }
 
     #[test]
