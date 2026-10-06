@@ -979,8 +979,54 @@ fn fit_linear_model(
     samples: &[RelationalPredictionSample],
     feature_set: PredictionFeatureSet,
     ridge_lambda: f64,
-) -> Result<Vec<f64>, RelationalPredictionError> {
+) -> Result<FittedLinearModel, RelationalPredictionError> {
+    if samples.is_empty() {
+        return Err(RelationalPredictionError::InsufficientSamples(0));
+    }
+
     let feature_count = feature_vector(&samples[0], feature_set).len();
+    let sample_count = samples.len() as f64;
+    let mut means = vec![0.0_f64; feature_count];
+
+    // Preprocessing statistics are fit exclusively on the training window.
+    for sample in samples {
+        let features = feature_vector(sample, feature_set);
+        for (mean, feature) in means.iter_mut().zip(features) {
+            *mean += feature;
+        }
+    }
+
+    for mean in &mut means {
+        *mean /= sample_count;
+        if !mean.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+    }
+
+    let mut scales = vec![0.0_f64; feature_count];
+    for sample in samples {
+        let features = feature_vector(sample, feature_set);
+        for ((scale, feature), mean) in scales.iter_mut().zip(features).zip(&means) {
+            let centered = feature - *mean;
+            *scale += centered * centered;
+            if !scale.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+        }
+    }
+
+    for scale in &mut scales {
+        *scale = (*scale / sample_count).sqrt();
+        if !scale.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+        // Constant training features are centered to zero; unit scale keeps
+        // the transform total and avoids division by zero.
+        if *scale <= 1e-12 {
+            *scale = 1.0;
+        }
+    }
+
     let dimension = feature_count + 1;
     let mut normal = vec![vec![0.0_f64; dimension + 1]; dimension];
 
@@ -988,22 +1034,43 @@ fn fit_linear_model(
         let features = feature_vector(sample, feature_set);
         let mut row = Vec::with_capacity(dimension);
         row.push(1.0);
-        row.extend(features);
+
+        for ((feature, mean), scale) in features.iter().zip(&means).zip(&scales) {
+            let standardized = (*feature - *mean) / *scale;
+            if !standardized.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+            row.push(standardized);
+        }
 
         for i in 0..dimension {
             for j in 0..dimension {
                 normal[i][j] += row[i] * row[j];
+                if !normal[i][j].is_finite() {
+                    return Err(RelationalPredictionError::ModelFitFailed);
+                }
             }
             normal[i][dimension] += row[i] * sample.future_outcome;
+            if !normal[i][dimension].is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
         }
     }
 
-    // Preserve the intercept; regularize only predictor coefficients.
+    // Ridge is applied in standardized predictor space, so lambda is not
+    // implicitly changed by the raw units of a feature.
     for i in 1..dimension {
         normal[i][i] += ridge_lambda;
+        if !normal[i][i].is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
     }
 
-    gaussian_elimination(&mut normal)
+    Ok(FittedLinearModel {
+        coefficients: gaussian_elimination(&mut normal)?,
+        means,
+        scales,
+    })
 }
 
 fn gaussian_elimination(
