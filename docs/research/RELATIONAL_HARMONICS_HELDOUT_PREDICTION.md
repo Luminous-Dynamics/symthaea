@@ -23,15 +23,19 @@ This lane does **not** establish:
 
 ## 2. Feature families
 
-The evaluator compares four fixed model families:
+The evaluator compares seven fixed model families:
 
 | Family | Inputs |
 |---|---|
+| PersistenceBaseline | last training outcome carried forward unchanged |
 | IsolatedAgents | agent A + agent B state summaries |
 | CommonDriver | supplied shared-context signal |
 | SynchronyOnly | current alignment |
-| RelationalProfile | alignment + A->B proxy + B->A proxy + turn-taking |
-| PersistenceBaseline | last training outcome carried forward unchanged |
+| NonRelationalContext | isolated agents + common driver + synchrony |
+| RelationalAugmented | all non-relational context + directional and turn-taking relational channels |
+| RelationalProfile | relational channels without isolated-agent/common-driver context |
+
+The critical nested comparison is **RelationalAugmented vs NonRelationalContext**. This asks whether directional and turn-taking relational information improves prediction after isolated-agent state, shared context, and synchrony have already been given to the competing model.
 
 The richer relational family must earn its additional degrees of freedom by reducing held-out error.
 
@@ -162,25 +166,51 @@ The qualification artifact should retain:
 
 A later rolling-origin implementation should expand this from one blocked holdout to repeated forward-only evaluation.
 
-## 9. What would count as meaningful evidence
+## 9. Repeated rolling-origin evaluation
+
+A single blocked holdout is an implementation qualification, not a scientific result.
+
+The production research protocol therefore uses repeated forward-only origins with fixed:
+
+- training-window length;
+- test-window length;
+- gap;
+- ridge coefficient;
+- forecast horizon semantics;
+- feature definitions.
+
+Each origin creates a new contiguous future-held-out segment. No future origin is allowed to become training data for an earlier origin.
+
+The evaluator reports the per-origin scores as well as mean MSE across origins. This keeps the repeated evaluation auditable rather than hiding heterogeneity inside one aggregate.
+
+The design is deliberately descriptive at this stage. Predictive-error differences across strongly dependent origins should not automatically be converted into a classical IID significance test. Recent work shows that strong dependence can materially distort predictive-accuracy inference, so the first qualification target is repeatability and effect stability rather than a convenient p-value. [Coroneo & Iacone, 2025](https://doi.org/10.1016/j.ijforecast.2024.11.003)
+
+## 10. What would count as meaningful evidence
 
 A strong result would require more than:
 
-RelationalProfile MSE < SynchronyOnly MSE
+RelationalAugmented MSE < SynchronyOnly MSE
 
 The stronger pattern is:
 
-- relational profile beats synchrony-only;
-- relational profile beats isolated-agent features;
-- relational profile beats the common-driver baseline;
-- the improvement repeats across held-out temporal segments;
+- RelationalAugmented beats the nested NonRelationalContext model;
+- RelationalAugmented also beats persistence;
+- the improvement repeats across multiple future-held-out origins;
+- the improvement is not explained by the common-driver baseline;
 - the improvement degrades under partner circular-shift nulls;
 - the improvement also degrades under feature-decoupling nulls;
-- results remain stable under prespecified changes to the temporal horizon and model regularization.
+- the direction and approximate magnitude are stable under prespecified horizons and fixed regularization choices;
+- no single favorable origin is responsible for the result.
+
+A useful negative result is:
+
+RelationalAugmented ~= NonRelationalContext
+
+because that would show that the additional relational channels do not yet add predictive information beyond obvious context and synchrony.
 
 A failure of any of these is informative and should narrow the claim rather than trigger threshold tuning.
 
-## 10. Literature boundary
+## 11. Literature boundary
 
 Time-series cross-validation guidance recommends evaluating future observations using training information that precedes them in time and warns against IID shuffling when observations are autocorrelated:
 
@@ -204,7 +234,7 @@ Surrogate approaches are established for directional information analysis, but t
 - Schreiber (2000), Physical Review Letters 85, 461–464:
   https://doi.org/10.1103/PhysRevLett.85.461
 
-## 11. Stop conditions
+## 12. Stop conditions
 
 Do not:
 
@@ -212,7 +242,7 @@ Do not:
 - call lower prediction error proof of causality;
 - treat null exceedance fractions as formal p-values;
 - treat synthetic fixture success as empirical validation;
-- select only the best split;
+- select only the best split or best rolling origin;
 - merge several feature families into one authoritative relational score;
 - infer love, wisdom, happiness, or consciousness directly from predictive performance.
 
