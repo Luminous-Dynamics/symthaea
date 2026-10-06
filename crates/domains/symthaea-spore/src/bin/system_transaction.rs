@@ -268,28 +268,38 @@ pub(crate) struct TransactionLedger {
 
 impl TransactionLedger {
     pub(crate) fn open_default() -> Result<Self, String> {
-        Self::open_at(std::path::Path::new(LEDGER_PATH))
+        let path = std::path::Path::new(LEDGER_PATH);
+        let parent = path
+            .parent()
+            .ok_or_else(|| "transaction ledger path has no parent directory".to_string())?;
+        std::fs::create_dir_all(parent).map_err(|error| {
+            format!(
+                "unable to create transaction ledger directory {}: {error}",
+                parent.display()
+            )
+        })?;
+        std::fs::set_permissions(
+            parent,
+            std::os::unix::fs::PermissionsExt::from_mode(0o700),
+        )
+        .map_err(|error| {
+            format!(
+                "unable to restrict transaction ledger directory {}: {error}",
+                parent.display()
+            )
+        })?;
+        Self::open_at(path)
     }
 
+    #[cfg(test)]
     fn open_at(path: &std::path::Path) -> Result<Self, String> {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|error| {
-                format!(
-                    "unable to create transaction ledger directory {}: {error}",
-                    parent.display()
-                )
-            })?;
-            std::fs::set_permissions(
-                parent,
-                std::os::unix::fs::PermissionsExt::from_mode(0o700),
-            )
-            .map_err(|error| {
-                format!(
-                    "unable to restrict transaction ledger directory {}: {error}",
-                    parent.display()
-                )
-            })?;
-        }
+        Ok(Self {
+            path: path.to_path_buf(),
+        })
+    }
+
+    #[cfg(not(test))]
+    fn open_at(path: &std::path::Path) -> Result<Self, String> {
         Ok(Self {
             path: path.to_path_buf(),
         })
