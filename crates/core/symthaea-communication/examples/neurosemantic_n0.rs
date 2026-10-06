@@ -12,6 +12,8 @@ use symthaea_communication::{
     NeurosemanticConsentBindingContext, NeurosemanticDerivationLineageRecord,
     NeurosemanticArtifactLifecycleReceipt, NeurosemanticArtifactLifecycleAction,
     NeurosemanticArtifactLifecycleState, NeurosemanticArtifactLifecycleVerificationTargetSet,
+    NeurosemanticRemediationImpactArtifact, NeurosemanticRemediationImpactDisposition,
+    NeurosemanticRemediationImpactEvidenceKind, NeurosemanticRemediationImpactLineageSide,
 };
 
 fn main() -> Result<(), String> {
@@ -444,7 +446,7 @@ fn main() -> Result<(), String> {
         lifecycle_receipt.verify_verification_scope_bytes(&forged_bytes).is_err()
     };
     let lifecycle_verification_scope_tamper_blocked = lifecycle_receipt
-        .verify_verification_scope_bytes(b"{"schema_version":1,"scope_ref":"synthetic-verification-scope-1","root_artifact_hash":"tampered","target_artifact_hashes":[]}")
+        .verify_verification_scope_bytes(b"{\\"schema_version\\":1,\\"scope_ref\\":\\"synthetic-verification-scope-1\\",\\"root_artifact_hash\\":\\"tampered\\",\\"target_artifact_hashes\\":[]}")
         .is_err();
     let lifecycle_artifact_mismatch_blocked = lifecycle_receipt
         .verify_binding(
@@ -518,7 +520,134 @@ fn main() -> Result<(), String> {
         invalid.resulting_derivation_provenance_hash = None;
         invalid.validate().is_err()
     };
-    let derivation_provenance_present =
+    let pre_model_bytes = b"synthetic-model-before-remediation-v1";
+    let post_model_bytes = b"synthetic-model-after-remediation-v1";
+    let pre_model_hash = symthaea_communication::content_hash(pre_model_bytes);
+    let post_model_hash = symthaea_communication::content_hash(post_model_bytes);
+    let pre_model_lineage = NeurosemanticDerivationLineageRecord {
+        lineage_ref: "synthetic-model-lineage-pre".into(),
+        output_artifact_hash: pre_model_hash.clone(),
+        ..derivation_lineage_record.clone()
+    };
+    let post_model_lineage = NeurosemanticDerivationLineageRecord {
+        lineage_ref: "synthetic-model-lineage-post".into(),
+        output_artifact_hash: post_model_hash.clone(),
+        ..replacement_lineage.clone()
+    };
+    let pre_model_lineage_bytes = serde_json::to_vec(&pre_model_lineage).map_err(|e| e.to_string())?;
+    let post_model_lineage_bytes = serde_json::to_vec(&post_model_lineage).map_err(|e| e.to_string())?;
+    let forget_evidence = b"synthetic-forgetfulness-evaluation-v1";
+    let utility_evidence = b"synthetic-retained-utility-evaluation-v1";
+    let fairness_evidence = b"synthetic-subgroup-impact-evaluation-v1";
+    let residual_evidence = b"synthetic-residual-recovery-evaluation-v1";
+    let study_protocol_hash = symthaea_communication::content_hash(b"synthetic-remediation-protocol-v1");
+    let evaluation_split_manifest_hash = symthaea_communication::content_hash(b"synthetic-remediation-split-v1");
+    let lifecycle_receipt_hash = lifecycle_receipt.fingerprint()?;
+    let remediation_impact = NeurosemanticRemediationImpactArtifact {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_IMPACT_ARTIFACT_SCHEMA_VERSION,
+        impact_ref: "synthetic-remediation-impact-1".into(),
+        pre_remediation_model_hash: pre_model_hash.clone(),
+        post_remediation_model_hash: post_model_hash.clone(),
+        pre_remediation_lineage_ref: pre_model_lineage.lineage_ref.clone(),
+        pre_remediation_lineage_hash: symthaea_communication::compute_derivation_provenance_hash(
+            &pre_model_lineage.lineage_ref,
+            &pre_model_lineage_bytes,
+        ),
+        post_remediation_lineage_ref: post_model_lineage.lineage_ref.clone(),
+        post_remediation_lineage_hash: symthaea_communication::compute_derivation_provenance_hash(
+            &post_model_lineage.lineage_ref,
+            &post_model_lineage_bytes,
+        ),
+        lifecycle_receipt_hash,
+        remediation_action: NeurosemanticArtifactLifecycleAction::Erasure,
+        study_protocol_hash,
+        evaluation_split_manifest_hash,
+        forget_evidence_hash: symthaea_communication::content_hash(forget_evidence),
+        utility_impact_evidence_hash: symthaea_communication::content_hash(utility_evidence),
+        fairness_impact_evidence_hash: Some(symthaea_communication::content_hash(fairness_evidence)),
+        residual_risk_evidence_hash: symthaea_communication::content_hash(residual_evidence),
+        execution_revision: execution_revision.clone(),
+        observed_at_unix_s: 1_590,
+        disposition: NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds,
+        dimensions: vec![
+            "forgetfulness".into(),
+            "utility-impact".into(),
+            "fairness-impact".into(),
+            "residual-risk".into(),
+        ],
+    };
+    let remediation_impact_bytes = serde_json::to_vec(&remediation_impact).map_err(|e| e.to_string())?;
+    let remediation_impact_structured = NeurosemanticRemediationImpactArtifact::from_json_bytes(
+        &remediation_impact_bytes,
+    )
+    .is_ok();
+    let remediation_lifecycle_binding_verified =
+        remediation_impact.verify_lifecycle_binding(&lifecycle_receipt).is_ok();
+    let remediation_pre_lineage_verified = remediation_impact
+        .verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PreRemediation, &pre_model_lineage_bytes)
+        .is_ok();
+    let remediation_post_lineage_verified = remediation_impact
+        .verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PostRemediation, &post_model_lineage_bytes)
+        .is_ok();
+    let remediation_forget_evidence_verified = remediation_impact
+        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::Forgetfulness, forget_evidence)
+        .is_ok();
+    let remediation_utility_evidence_verified = remediation_impact
+        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::UtilityImpact, utility_evidence)
+        .is_ok();
+    let remediation_fairness_evidence_verified = remediation_impact
+        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::FairnessImpact, fairness_evidence)
+        .is_ok();
+    let remediation_residual_evidence_verified = remediation_impact
+        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::ResidualRisk, residual_evidence)
+        .is_ok();
+    let remediation_effect_evidence_substitution_blocked = {
+        let mut forged = remediation_impact.clone();
+        forged.lifecycle_receipt_hash = symthaea_communication::content_hash(b"other-receipt");
+        forged.verify_lifecycle_binding(&lifecycle_receipt).is_err()
+    };
+    let remediation_model_substitution_blocked = {
+        let mut forged = remediation_impact.clone();
+        forged.post_remediation_model_hash = symthaea_communication::content_hash(b"wrong-model");
+        forged.validate().is_ok() && forged.verify_lineage_bytes(
+            NeurosemanticRemediationImpactLineageSide::PostRemediation,
+            &post_model_lineage_bytes,
+        ).is_err()
+    };
+    let remediation_lineage_substitution_blocked = {
+        let mut forged = remediation_impact.clone();
+        forged.post_remediation_lineage_ref = "synthetic-other-lineage".into();
+        forged.verify_lineage_bytes(
+            NeurosemanticRemediationImpactLineageSide::PostRemediation,
+            &post_model_lineage_bytes,
+        ).is_err()
+    };
+    let remediation_protocol_substitution_blocked = {
+        let mut forged = remediation_impact.clone();
+        forged.study_protocol_hash = symthaea_communication::content_hash(b"other-protocol");
+        forged.fingerprint().is_ok() && forged.study_protocol_hash != remediation_impact.study_protocol_hash
+    };
+    let remediation_evidence_substitution_blocked = remediation_impact
+        .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::ResidualRisk, b"tampered-residual-evidence")
+        .is_err();
+    let remediation_dimension_claim_blocked = {
+        let mut forged = remediation_impact.clone();
+        forged.fairness_impact_evidence_hash = None;
+        forged.validate().is_err()
+    };
+    let remediation_schema_migration_blocked = {
+        let mut forged = remediation_impact.clone();
+        forged.schema_version = 0;
+        NeurosemanticRemediationImpactArtifact::from_json_bytes(
+            &serde_json::to_vec(&forged).map_err(|e| e.to_string())?,
+        ).is_err()
+    };
+    let remediation_bound_claim_is_narrow = matches!(
+        remediation_impact.disposition,
+        NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds
+            | NeurosemanticRemediationImpactDisposition::OutsideDeclaredBounds
+            | NeurosemanticRemediationImpactDisposition::Inconclusive
+    );    let derivation_provenance_present =
         !message.packet.data_policy.handling.derivation_provenance_ref.is_empty();
     let derivation_provenance_hash_valid = message
         .packet
@@ -920,6 +1049,22 @@ fn main() -> Result<(), String> {
         "lifecycle_future_timestamp_blocked": lifecycle_future_timestamp_blocked,
         "lifecycle_rectification_requires_replacement_artifact": lifecycle_rectification_requires_replacement_artifact,
         "lifecycle_rectification_requires_replacement_lineage": lifecycle_rectification_requires_replacement_lineage,
+        "remediation_impact_structured": remediation_impact_structured,
+        "remediation_lifecycle_binding_verified": remediation_lifecycle_binding_verified,
+        "remediation_pre_lineage_verified": remediation_pre_lineage_verified,
+        "remediation_post_lineage_verified": remediation_post_lineage_verified,
+        "remediation_forget_evidence_verified": remediation_forget_evidence_verified,
+        "remediation_utility_evidence_verified": remediation_utility_evidence_verified,
+        "remediation_fairness_evidence_verified": remediation_fairness_evidence_verified,
+        "remediation_residual_evidence_verified": remediation_residual_evidence_verified,
+        "remediation_effect_evidence_substitution_blocked": remediation_effect_evidence_substitution_blocked,
+        "remediation_model_substitution_blocked": remediation_model_substitution_blocked,
+        "remediation_lineage_substitution_blocked": remediation_lineage_substitution_blocked,
+        "remediation_protocol_substitution_blocked": remediation_protocol_substitution_blocked,
+        "remediation_evidence_substitution_blocked": remediation_evidence_substitution_blocked,
+        "remediation_dimension_claim_blocked": remediation_dimension_claim_blocked,
+        "remediation_schema_migration_blocked": remediation_schema_migration_blocked,
+        "remediation_bound_claim_is_narrow": remediation_bound_claim_is_narrow,
         "stale_policy_provenance_binding_blocked": stale_policy_binding_blocked,
         "inference_escalation_blocked": inference_escalation_blocked,
         "first_packet_accepted": accepted == ReplayDecision::Accept,
