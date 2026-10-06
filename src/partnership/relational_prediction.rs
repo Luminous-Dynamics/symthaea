@@ -666,7 +666,7 @@ impl HeldOutRelationalPredictionSummary {
     ) -> Result<HeldOutRelationalPredictionEvidence, RelationalPredictionError> {
         let summary = Self::compute(samples, config)?;
         let evaluation_input_blake3 = evaluation_input_digest(samples, config);
-        let mut records = PredictionFeatureSet::all()
+        let records = PredictionFeatureSet::all()
             .into_iter()
             .map(|feature_set| fit_prediction_record(
                 samples,
