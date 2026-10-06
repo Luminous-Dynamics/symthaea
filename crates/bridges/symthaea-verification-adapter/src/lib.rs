@@ -1110,7 +1110,7 @@ fn extract_relationship_methods(
                     "verification relationship member controller",
                 )?;
                 let expected = document_ref;
-                if controller != expected {
+                if !url_values_equivalent(&controller, expected).unwrap_or(false) {
                     return Err(SnapshotError::Verification(
                         VerificationFailure::ControllerMismatch {
                             expected: ClaimControllerIdentity::new(expected.to_owned())
