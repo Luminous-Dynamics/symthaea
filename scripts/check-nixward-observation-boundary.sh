@@ -54,7 +54,7 @@ ENABLEMENT_EVIDENCE_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]
 ENABLEMENT_EVIDENCE_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceEnablementEvidenceV1[[:space:]]*\{.*?pub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+new[[:space:]]*\('
 OBSERVATION_PUBLIC_FACTORY_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(parse_systemd_properties|parse_systemd_observation|from_observed_state)[[:space:]]*\('
 SYSTEMD_OBSERVER_MUTATION_CALL_PATTERN='(?:\.call|\.call_method|\.call_noreply)\(\s*"(StartUnit|StopUnit|RestartUnit|ReloadUnit|EnableUnitFiles|DisableUnitFiles|SetUnitProperties|Start|Stop|Restart|Reload)"'
-SYSTEMD_OBSERVER_PROXY_MUTATION_PATTERN='\.set_property\(|\.into_inner\(\)'
+SYSTEMD_OBSERVER_PROXY_MUTATION_PATTERN='\.set_property\(|\.set\(|\.into_inner\(\)|\.inner(?:_mut)?\(\)'
 SYSTEMD_OBSERVER_AUTHORITY_IMPORT_PATTERN='\bsuper::(?:executor|authorization)\b'
 SYSTEMD_TRANSPORT_PUBLIC_API_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(observe_service_properties|observe_service_state_properties)[[:space:]]*\('
 
@@ -473,7 +473,7 @@ run_self_test() {
     return 1
   fi
 
-  printf '%s\n' 'properties.set_property("Enabled", value);' > "${tmp}/systemd-observer-proxy-mutation.rs"
+  printf '%s\n' 'properties.set_property("Enabled", value); properties.inner();' > "${tmp}/systemd-observer-proxy-mutation.rs"
   if scan_systemd_observer_proxy_mutation "${tmp}/systemd-observer-proxy-mutation.rs"; then :; else
     echo "ERROR: CROSS-059 self-test failed to detect observer proxy mutation" >&2
     return 1
