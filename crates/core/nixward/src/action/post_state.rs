@@ -489,10 +489,8 @@ pub struct NixPostStateReceiptV1 {
     pub systemd_job_unit: Option<String>,
     pub systemd_job_object_path: Option<String>,
     pub systemd_job_result: Option<String>,
-    /// Unique D-Bus owner of systemd1 for the captured job epoch.
-    ///
-    /// Present exactly when Job evidence is present.
-    pub systemd_manager_owner: Option<String>,
+    /// Unique D-Bus owner of systemd1 for the observed service-manager epoch.
+    pub systemd_manager_owner: String,
     pub pre_invocation_id: Option<String>,
     pub post_invocation_id: Option<String>,
     pub postcondition: NixPostconditionAssessmentV1,
@@ -513,7 +511,7 @@ impl NixPostStateReceiptV1 {
         authorization: &NixExecutionAuthorizationRecordV1,
         expectation: &NixServicePostStateExpectationV1,
         observation: &NixVerifiedPostStateObservationV1,
-        stability: Option<NixPostStateStabilityEvidenceV1>,
+        stability: Option<&NixVerifiedPostStateStabilityEvidenceV1>,
         observer_identity: impl Into<String>,
         observer_version: impl Into<String>,
     ) -> Result<Self, NixPostStateErrorV1> {
@@ -556,12 +554,18 @@ impl NixPostStateReceiptV1 {
         if expectation.authorized_definition_digest != observed_definition_digest {
             return Err(NixPostStateErrorV1::DefinitionMismatch);
         }
+        let manager_owner = observation
+            .systemd_manager_owner
+            .clone()
+            .ok_or(NixPostStateErrorV1::MissingManagerOwner)?;
 
-        if let Some(stability) = &stability {
+        if let Some(stability) = stability {
+            let stability = stability.as_ref();
             stability.validate_shape()?;
             if stability.window_end_monotonic_us > observation.observed_at_monotonic_us {
                 return Err(NixPostStateErrorV1::StabilityAfterObservation);
             }
+            validate_stability_against_observation(stability, observation)?;
         }
 
         let assessment = evaluate_postcondition(expectation, observation)?;
@@ -570,7 +574,7 @@ impl NixPostStateReceiptV1 {
                 if expectation.required_stability_us == 0 {
                     NixPostStateClaimV1::Observed
                 } else {
-                    match &stability {
+                    match stability.map(NixVerifiedPostStateStabilityEvidenceV1::as_ref) {
                         Some(stability)
                             if stability.required_window_us >= expectation.required_stability_us =>
                         {
@@ -618,7 +622,7 @@ impl NixPostStateReceiptV1 {
             systemd_job_unit,
             systemd_job_object_path,
             systemd_job_result,
-            systemd_manager_owner,
+            systemd_manager_owner: manager_owner,
             pre_invocation_id: expectation.pre_invocation_id.clone(),
             post_invocation_id: observation.invocation_id.clone(),
             postcondition: assessment,
@@ -715,7 +719,6 @@ impl NixPostStateReceiptV1 {
                 || self.systemd_job_unit.is_none()
                 || self.systemd_job_object_path.is_none()
                 || self.systemd_job_result.is_none()
-                || self.systemd_manager_owner.is_none()
             {
                 return Err(NixPostStateErrorV1::IncompleteJobEvidence);
             }
@@ -723,7 +726,6 @@ impl NixPostStateReceiptV1 {
             || self.systemd_job_unit.is_some()
             || self.systemd_job_object_path.is_some()
             || self.systemd_job_result.is_some()
-            || self.systemd_manager_owner.is_some()
         {
             return Err(NixPostStateErrorV1::IncompleteJobEvidence);
         }
@@ -737,9 +739,7 @@ impl NixPostStateReceiptV1 {
         if let Some(result) = &self.systemd_job_result {
             require_nonempty(result, "systemd job result")?;
         }
-        if let Some(owner) = &self.systemd_manager_owner {
-            validate_unique_manager_owner(owner)?;
-        }
+        validate_unique_manager_owner(&self.systemd_manager_owner)?;
         validate_optional_invocation_id(self.pre_invocation_id.as_deref(), "pre-invocation id")?;
         validate_optional_invocation_id(self.post_invocation_id.as_deref(), "post-invocation id")?;
         require_nonempty(&self.observer_identity, "observer identity")?;
@@ -827,7 +827,7 @@ impl NixPostStateReceiptV1 {
         put_opt_str(&mut h, self.systemd_job_unit.as_deref());
         put_opt_str(&mut h, self.systemd_job_object_path.as_deref());
         put_opt_str(&mut h, self.systemd_job_result.as_deref());
-        put_opt_str(&mut h, self.systemd_manager_owner.as_deref());
+        put_str(&mut h, &self.systemd_manager_owner);
         put_opt_str(&mut h, self.pre_invocation_id.as_deref());
         put_opt_str(&mut h, self.post_invocation_id.as_deref());
         put_u8(&mut h, assessment_tag(self.postcondition));
