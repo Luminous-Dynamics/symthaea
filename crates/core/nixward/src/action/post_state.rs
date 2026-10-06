@@ -1419,6 +1419,13 @@ fn claim_tag(claim: NixPostStateClaimV1) -> u8 {
     }
 }
 
+fn validate_bus_id(value: &str) -> Result<(), NixPostStateErrorV1> {
+    if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(NixPostStateErrorV1::InvalidManagerOwner);
+    }
+    Ok(())
+}
+
 fn validate_unique_manager_owner(value: &str) -> Result<(), NixPostStateErrorV1> {
     // D-Bus unique connection names begin with ':' and contain at least two
     // non-empty dot-separated elements. Their maximum name length is 255.
