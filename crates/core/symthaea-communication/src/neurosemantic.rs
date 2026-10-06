@@ -1733,7 +1733,6 @@ mod tests {
     #[test]
     fn handling_rejects_stale_or_unattested_provenance_capability() {
         let policy = semantic_policy();
-        let (attestation, verifying_key) = authority_attestation(&policy);
         let original_binding = policy_provenance_binding();
 
         let packet = NeurosemanticPacket::new_with_policy(
@@ -1824,7 +1823,7 @@ mod tests {
         let policy = semantic_policy();
         let (attestation, authority_key) = authority_attestation(&policy);
         let context = binding_context();
-        let mut resolution = authority_resolution(&policy, &attestation, &context, 100, 1_900).0;
+        let mut resolution = authority_resolution(&policy, &attestation, &context, 100, 2_100).0;
         let resolver_key = ed25519_dalek::SigningKey::from_bytes(&[9u8; 32]);
         resolution.signature =
             ed25519_dalek::Signer::sign(&resolver_key, &resolution.message_bytes().unwrap())
