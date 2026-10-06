@@ -18,6 +18,7 @@ on:
       - "crates/core/nixward/src/action/service_manager.rs"
       - "crates/core/nixward/src/action/service_state.rs"
       - "crates/core/nixward/src/action/service_effect_admission.rs"
+      - "crates/core/nixward/src/action/systemd_lifecycle.rs"
       - "crates/core/nixward/src/action/post_state.rs"
       - "crates/core/nixward/src/action/systemd_definition.rs"
       - "crates/core/nixward/src/action/systemd_observer.rs"
