@@ -8167,6 +8167,42 @@ mod tests {
     }
 
     #[test]
+    fn calibration_traceability_order_is_receipt_significant() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let original = AlternativesEngine
+            .assess(&case.requirement, &case.candidates, Some(case.incumbent_id))
+            .unwrap();
+        let mut changed = case.clone();
+        let observed = changed
+            .candidates
+            .iter_mut()
+            .flat_map(|candidate| candidate.evidence.iter_mut())
+            .find(|evidence| {
+                evidence
+                    .observation
+                    .as_ref()
+                    .is_some_and(|observation| observation.calibration_chain_refs.len() >= 1)
+            })
+            .unwrap();
+        let chain = &mut observed
+            .observation
+            .as_mut()
+            .unwrap()
+            .calibration_chain_refs;
+        chain.insert(0, CalibrationTraceabilityRef {
+            calibration_id: "additional-reference".into(),
+            calibration_revision: "v1".into(),
+            calibration_record_digest: "additional-record-digest".into(),
+            used_at_epoch_seconds: 1_700_000_001,
+        });
+
+        let changed_result = AlternativesEngine
+            .assess(&changed.requirement, &changed.candidates, Some(changed.incumbent_id))
+            .unwrap();
+        assert_ne!(original.receipt.payload_hash, changed_result.receipt.payload_hash);
+    }
+
+    #[test]
     fn observation_provenance_rejects_incomplete_calibration_link() {
         let mut observation = ObservationProvenanceRef {
             observation_id: "obs".into(),
