@@ -1344,9 +1344,9 @@ mod tests {
         stability: Option<NixPostStateStabilityEvidenceV1>,
     ) -> Result<NixPostStateReceiptV1, NixPostStateErrorV1> {
         let verified = NixVerifiedPostStateObservationV1::from_observer(obs.clone())?;
-        let verified_stability = stability
-            .map(NixVerifiedPostStateStabilityEvidenceV1::from_observer)
-            .transpose()?;
+        let verified_stability = stability.map(|evidence| {
+            NixVerifiedPostStateStabilityEvidenceV1 { evidence }
+        });
 
         use super::super::authorization::{
             NixActionIntentV1, NixAuthorizationProfileV1, NixActionScopeV1,
@@ -1764,6 +1764,113 @@ mod tests {
             obs.validate_shape().unwrap_err(),
             NixPostStateErrorV1::InvalidInvocationId("post-invocation id")
         );
+    }
+
+    #[test]
+    fn stability_sequence_rejects_non_increasing_capture_times() {
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut evidence = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+        evidence.samples[1].captured_at_monotonic_us = 1_000;
+        evidence.sequence_digest = stability_sequence_digest(&evidence.samples).unwrap();
+        assert_eq!(
+            evidence.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::StabilitySamplesNotIncreasing
+        );
+    }
+
+    #[test]
+    fn stability_sequence_detects_state_identity_change_even_when_digest_is_recomputed() {
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut evidence = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+        evidence.samples[1].state_digest =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".into();
+        evidence.sequence_digest = stability_sequence_digest(&evidence.samples).unwrap();
+        assert_eq!(
+            evidence.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::StabilityIdentityOrStateChanged
+        );
+    }
+
+    #[test]
+    fn stability_sequence_rejects_sequence_digest_tampering() {
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut evidence = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+        evidence.sequence_digest =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".into();
+        assert_eq!(
+            evidence.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::StabilitySequenceDigestMismatch
+        );
+    }
+
+    #[test]
+    fn stability_sequence_cannot_be_rebound_to_another_manager_epoch() {
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut evidence = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+        evidence.samples[1].manager_owner = ":1.124".into();
+        evidence.sequence_digest = stability_sequence_digest(&evidence.samples).unwrap();
+        assert_eq!(
+            evidence.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::StabilityIdentityOrStateChanged
+        );
+    }
+
+    #[test]
+    fn receipt_rejects_stability_from_a_different_unit_object() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut evidence = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+        evidence.samples[1].unit_object_path =
+            "/org/freedesktop/systemd1/unit/sshd_2eservice".into();
+        evidence.sequence_digest = stability_sequence_digest(&evidence.samples).unwrap();
+        let result = build_receipt(&exp, &obs, Some(evidence));
+        assert_eq!(
+            result.unwrap_err(),
+            NixPostStateErrorV1::StabilityIdentityOrStateChanged
+        );
+    }
+
+    #[test]
+    fn stable_sequence_is_committed_into_receipt_digest() {
+        let exp = {
+            let mut value = expectation(NixServiceOperationKindV1::Start);
+            value.required_stability_us = 1_000;
+            value
+        };
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let evidence = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+        let receipt_a = build_receipt(&exp, &obs, Some(evidence.clone())).unwrap();
+        let mut evidence_changed = evidence;
+        evidence_changed.samples[1].captured_at_monotonic_us = 2_100;
+        evidence_changed.window_end_monotonic_us = 2_100;
+        evidence_changed.sequence_digest =
+            stability_sequence_digest(&evidence_changed.samples).unwrap();
+        let receipt_b = build_receipt(&exp, &obs, Some(evidence_changed)).unwrap();
+        assert_ne!(receipt_a.digest().unwrap(), receipt_b.digest().unwrap());
     }
 
     #[test]
