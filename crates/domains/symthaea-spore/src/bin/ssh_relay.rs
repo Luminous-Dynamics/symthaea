@@ -5041,7 +5041,7 @@ echo "REBUILD_COMPLETE"
                 let exit_code = if complete { 0 } else { 1 };
                 let _ = ws_tx
                     .send(Message::Text(
-                        serde_json::json!({"type":"exit","code":exit_code,"transaction":transaction.receipt(if exit_code == 0 { "committed" } else { "failed" })}).to_string(),
+                        serde_json::json!({"type":"exit","code":exit_code,"transaction":transaction.receipt(if exit_code == 0 { "observed_success" } else { "failed" })}).to_string(),
                     ))
                     .await;
             }
