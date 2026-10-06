@@ -1647,13 +1647,43 @@ mod tests {
         .unwrap()
     }
 
+    fn definition_content_files() -> Vec<NixSystemdUnitDefinitionContentFileV1> {
+        vec![
+            NixSystemdUnitDefinitionContentFileV1 {
+                path: "/nix/store/authorized-unit.service".into(),
+                resolved_path: None,
+                byte_len: 10,
+                content_digest:
+                    "1111111111111111111111111111111111111111111111111111111111111111".into(),
+            },
+            NixSystemdUnitDefinitionContentFileV1 {
+                path: "/etc/systemd/system/nginx.service.d/override.conf".into(),
+                resolved_path: None,
+                byte_len: 20,
+                content_digest:
+                    "2222222222222222222222222222222222222222222222222222222222222222".into(),
+            },
+        ]
+    }
+
+    fn definition_content_digest() -> String {
+        NixSystemdUnitDefinitionContentEvidenceV1 {
+            unit: "nginx.service".into(),
+            source_identity_digest: definition().digest("nginx.service").unwrap(),
+            files: definition_content_files(),
+            captured_at_monotonic_us: 2_000,
+        }
+        .digest()
+        .unwrap()
+    }
+
     fn expectation(operation: NixServiceOperationKindV1) -> NixServicePostStateExpectationV1 {
         NixServicePostStateExpectationV1 {
             operation,
             unit: "nginx.service".to_string(),
             authorized_generation: 42,
             authorized_definition_digest: definition().digest("nginx.service").unwrap(),
-            authorized_definition_content_digest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string(),
+            authorized_definition_content_digest: definition_content_digest(),
             pre_invocation_id: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string()),
             required_stability_us: 0,
         }
@@ -1749,7 +1779,7 @@ mod tests {
                     exp.authorized_generation,
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     exp.authorized_definition_digest.clone(),
-                    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".into(),
+                    exp.authorized_definition_content_digest.clone(),
                     exp.pre_invocation_id.clone(),
                     exp.required_stability_us,
                 )
@@ -1792,22 +1822,7 @@ mod tests {
         active_state: ServiceActiveStateV1,
         unit_file_state: ServiceUnitFileStateV1,
     ) -> NixServicePostStateObservationV1 {
-        let definition_content_files = vec![
-            NixSystemdUnitDefinitionContentFileV1 {
-                path: "/nix/store/authorized-unit.service".into(),
-                resolved_path: None,
-                byte_len: 10,
-                content_digest:
-                    "1111111111111111111111111111111111111111111111111111111111111111".into(),
-            },
-            NixSystemdUnitDefinitionContentFileV1 {
-                path: "/etc/systemd/system/nginx.service.d/override.conf".into(),
-                resolved_path: None,
-                byte_len: 20,
-                content_digest:
-                    "2222222222222222222222222222222222222222222222222222222222222222".into(),
-            },
-        ];
+        let definition_content_files = definition_content_files();
         let definition_identity = definition();
         let definition_content_digest =
             NixSystemdUnitDefinitionContentEvidenceV1 {
