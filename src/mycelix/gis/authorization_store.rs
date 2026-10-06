@@ -3544,6 +3544,7 @@ fn validate_native_authority_pin_set(
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
         let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
+        self.validate_persisted_native_replay_history(&tx, record)?;
         if persisted_state != "dispatch_pending" {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
@@ -3623,6 +3624,7 @@ fn validate_native_authority_pin_set(
             let mut precheck_connection = self.connection()?;
             let precheck_tx = precheck_connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
             let persisted_state = self.validate_persisted_dispatch_record(&precheck_tx, record)?;
+            self.validate_persisted_native_replay_history(&precheck_tx, record)?;
             if persisted_state != "dispatch_pending" {
                 return Err(AuthorizationConsumptionError::InvalidBinding.into());
             }
@@ -3671,6 +3673,7 @@ fn validate_native_authority_pin_set(
             &record.status_source_digest,
         )?;
         let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
+        self.validate_persisted_native_replay_history(&tx, record)?;
         if persisted_state != "dispatch_pending" {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
@@ -3974,6 +3977,58 @@ fn validate_native_authority_pin_set(
         }
     }
 
+    /// Require the append-only native replay ledger to remain the exact
+    /// provenance owner of this effect-bound dispatch record.
+    ///
+    /// The ledger is the one-time native-authority fact. Dispatch/terminal
+    /// rows are lifecycle/evidence views and must never be sufficient on their
+    /// own to recreate, release, invoke, or recover a consumed native grant.
+    fn validate_persisted_native_replay_history(
+        &self,
+        tx: &Transaction<'_>,
+        record: &DurableDispatchRecord,
+    ) -> Result<(), AuthorizationStoreError> {
+        let replay_owner: Option<(
+            String, String, String, String,
+            Option<String>, Option<String>, Option<String>,
+            Option<String>, Option<String>, Option<String>,
+        )> = tx
+            .query_row(
+                "SELECT authorization_instance,attempt_id,operation_id,relying_party_id,
+                        native_authority_namespace,native_authorization_id,
+                        native_replay_derivation_digest,boundary_id,action_digest,target_identity
+                 FROM authorization_native_replay_history
+                 WHERE native_replay_identity=?1",
+                params![record.native_replay_identity.as_str()],
+                |r| Ok((
+                    r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?,
+                    r.get(4)?, r.get(5)?, r.get(6)?,
+                    r.get(7)?, r.get(8)?, r.get(9)?,
+                )),
+            )
+            .optional()?;
+        let replay_owner = replay_owner.ok_or_else(|| {
+            AuthorizationStoreError::InvalidState(
+                "dispatch record has no native replay history".into()
+            )
+        })?;
+
+        if replay_owner.0 != record.authorization_instance
+            || replay_owner.1 != record.attempt_id
+            || replay_owner.2 != record.operation_id
+            || replay_owner.3 != self.relying_party_id
+            || replay_owner.4.as_deref() != Some(record.native_authority_namespace.as_str())
+            || replay_owner.5.as_deref() != Some(record.native_authorization_id.as_str())
+            || replay_owner.6.as_deref() != Some(record.native_replay_derivation_digest.as_str())
+            || replay_owner.7.as_deref() != Some(record.boundary_id.as_str())
+            || replay_owner.8.as_deref() != Some(record.action_digest.as_str())
+            || replay_owner.9.as_deref() != Some(record.target_identity.as_str())
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        Ok(())
+    }
+
     /// Commit an outcome only through the frozen dispatch record. The record
     /// is revalidated immediately before the lease transition so the provider
     /// outcome cannot be attached to a different sink contract.
@@ -4220,6 +4275,7 @@ fn validate_native_authority_pin_set(
             let mut connection = self.connection()?;
             let tx = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
             let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
+            self.validate_persisted_native_replay_history(&tx, record)?;
             if matches!(persisted_state.as_str(), "succeeded" | "failed") {
                 if let Some(receipt) =
                     load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")?
@@ -4292,44 +4348,8 @@ fn validate_native_authority_pin_set(
         self.validate_native_authority_pin_set_snapshot(
             &tx, row.5.as_deref(), row.6.as_deref()
         )?;
+        self.validate_persisted_native_replay_history(&tx, record)?;
         if persisted_state != row.0 {
-            return Err(AuthorizationConsumptionError::InvalidBinding.into());
-        }
-        let replay_owner: Option<(
-            String, String, String, String,
-            Option<String>, Option<String>, Option<String>,
-            Option<String>, Option<String>, Option<String>,
-        )> = tx
-            .query_row(
-                "SELECT authorization_instance,attempt_id,operation_id,relying_party_id,
-                        native_authority_namespace,native_authorization_id,
-                        native_replay_derivation_digest,boundary_id,action_digest,target_identity
-                 FROM authorization_native_replay_history
-                 WHERE native_replay_identity=?1",
-                params![record.native_replay_identity.as_str()],
-                |r| Ok((
-                    r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?,
-                    r.get(4)?, r.get(5)?, r.get(6)?,
-                    r.get(7)?, r.get(8)?, r.get(9)?,
-                )),
-            )
-            .optional()?;
-        let replay_owner = replay_owner.ok_or_else(|| {
-            AuthorizationStoreError::InvalidState(
-                "dispatch record has no native replay history".into()
-            )
-        })?;
-        if replay_owner.0 != record.authorization_instance
-            || replay_owner.1 != record.attempt_id
-            || replay_owner.2 != record.operation_id
-            || replay_owner.3 != self.relying_party_id
-            || replay_owner.4.as_deref() != Some(record.native_authority_namespace.as_str())
-            || replay_owner.5.as_deref() != Some(record.native_authorization_id.as_str())
-            || replay_owner.6.as_deref() != Some(record.native_replay_derivation_digest.as_str())
-            || replay_owner.7.as_deref() != Some(record.boundary_id.as_str())
-            || replay_owner.8.as_deref() != Some(record.action_digest.as_str())
-            || replay_owner.9.as_deref() != Some(record.target_identity.as_str())
-        {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
 
@@ -4715,6 +4735,7 @@ fn validate_native_authority_pin_set(
         }
 
         let persisted_state = self.validate_persisted_dispatch_record(tx, record)?;
+        self.validate_persisted_native_replay_history(tx, record)?;
         self.validate_persisted_provider_verifier_configuration(tx, &verified.configuration)?;
 
         let row = tx.query_row(
@@ -5110,6 +5131,7 @@ fn validate_native_authority_pin_set(
                     return Err(AuthorizationConsumptionError::InvalidBinding.into());
                 }
                 self.validate_persisted_dispatch_record(&tx, &record)?;
+                self.validate_persisted_native_replay_history(&tx, &record)?;
                 Some(record)
             } else {
                 None
@@ -13667,6 +13689,138 @@ mod tests {
         assert_eq!(states,("indeterminate".into(),"dispatch_pending".into()));
 
         let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn recovery_rejects_mismatched_native_replay_history() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-recovery-mismatched-native-history-{}.db",
+            std::process::id()
+        ));
+        let store = SqliteAuthorizationStore::open_with_relying_party(
+            &path,
+            "rp-recovery-mismatched-history",
+        )
+        .unwrap();
+        let effect = ActionEffectBinding::new(
+            "target-recovery-mismatched-history",
+            "prod",
+            "adapter-recovery-mismatched-history",
+        );
+        let action = EpistemicAction::new(
+            "recovery-mismatched-history",
+            "intervention",
+            super::super::ActionRisk::Critical,
+        )
+        .with_effect_binding(effect.clone());
+        let digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            operation_id: Some("operation:recovery-mismatched-history".into()),
+            authorization_instance: "recovery-mismatched-history".into(),
+            action_id: action.id.clone(),
+            action_digest: digest.clone(),
+            frame: "frame@1".into(),
+            support_digest: "sha256:support-recovery-mismatched-history".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:00:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+        store
+            .pin_native_authority_namespace(
+                "test-explicit-issuer",
+                "recovery-mismatched-history-authority",
+            )
+            .unwrap();
+        store
+            .pin_provider_status_source_digest("sha256:test-status-source")
+            .unwrap();
+        store
+            .pin_provider_status_verifier_configuration(
+                &TestProviderStatusVerifier.configuration(),
+            )
+            .unwrap();
+        store
+            .pin_provider_adapter_configuration(&ProviderAdapterConfiguration::new(
+                effect.adapter.clone(),
+                "test-adapter/v1",
+                "sha256:test-adapter-implementation",
+            ))
+            .unwrap();
+        store
+            .register_lease(&AuthorizationLease::new_with_instance(
+                witness.authorization_instance.clone(),
+                action.id.clone(),
+                digest,
+                witness.support_digest.clone(),
+                witness.policy.clone(),
+                1,
+                1,
+            ))
+            .unwrap();
+
+        let record = mark_dispatch_pending_bound_from_pinned_native_authority_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt:recovery-mismatched-history",
+            &action,
+            &effect,
+            "boundary:recovery-mismatched-history",
+            "operation:recovery-mismatched-history",
+            "recovery-mismatched-history-authority",
+            "native-grant:recovery-mismatched-history",
+        )
+        .unwrap();
+
+        let connection = store.connection().unwrap();
+        connection
+            .execute(
+                "UPDATE authorization_native_replay_history
+                 SET target_identity=?2
+                 WHERE native_replay_identity=?1",
+                params![
+                    record.native_replay_identity.as_str(),
+                    "forged-target",
+                ],
+            )
+            .unwrap();
+
+        let err = store
+            .recover_incomplete_attempt_for_boundary(
+                "boundary:recovery-mismatched-history",
+                "attempt:recovery-mismatched-history",
+            )
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
+        ));
+
+        let states: (String, String) = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT
+                    (SELECT state FROM authorization_leases
+                     WHERE authorization_instance=?1),
+                    (SELECT state FROM authorization_dispatches
+                     WHERE authorization_instance=?1 AND attempt_id=?2)",
+                params![
+                    witness.authorization_instance.as_str(),
+                    "attempt:recovery-mismatched-history",
+                ],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            states,
+            ("dispatch_pending".into(), "dispatch_pending".into())
+        );
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
