@@ -944,7 +944,10 @@ impl MorphophonologicalRuleSet {
                 }
             }
 
-            let canonical = canonical_morphology(&rule.morphology);
+            let canonical = (
+                rule.lemma.as_deref().unwrap_or_default().to_string(),
+                canonical_morphology(&rule.morphology),
+            );
             if !feature_signatures.insert(canonical) {
                 return Err(MorphophonologicalRuleSetError::AmbiguousFeatureMatch);
             }
@@ -2760,6 +2763,53 @@ mod tests {
         );
     }
 
+    #[test]
+    fn morphophonological_rule_set_rejects_duplicate_lemma_and_feature_scope() {
+        let error = MorphophonologicalRuleSet::new(
+            "en",
+            "fixture:duplicate-lemma-scope",
+            "en-US",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "fixture:duplicate-lemma-scope",
+                "fixture-v2",
+            )
+            .unwrap(),
+            "fixture:duplicate-scope:v2",
+            "fixture:rules:v2",
+            vec![
+                MorphophonologicalRule {
+                    rule_id: "fixture:walk-one".into(),
+                    lemma: Some("walk".into()),
+                    morphology: vec![MorphologicalFeature {
+                        category: "tense".into(),
+                        value: "past".into(),
+                    }],
+                    operation: MorphophonologicalRuleOperation::AppendSuffix {
+                        suffix: "ed".into(),
+                    },
+                },
+                MorphophonologicalRule {
+                    rule_id: "fixture:walk-two".into(),
+                    lemma: Some("walk".into()),
+                    morphology: vec![MorphologicalFeature {
+                        category: "tense".into(),
+                        value: "past".into(),
+                    }],
+                    operation: MorphophonologicalRuleOperation::AppendSuffix {
+                        suffix: "t".into(),
+                    },
+                },
+            ],
+        )
+        .expect_err("duplicate exact lemma and feature scope must fail closed");
+
+        assert_eq!(
+            error,
+            MorphophonologicalRuleSetError::AmbiguousFeatureMatch
+        );
+    }
+
+    #[test]
     #[test]
     fn morphophonological_rule_set_rejects_ambiguous_exact_feature_rules() {
         let error = MorphophonologicalRuleSet::new(
