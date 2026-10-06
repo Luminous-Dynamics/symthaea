@@ -132,6 +132,13 @@ codeword-enumeration method. The qualification first requires the production and
 independent codeword sets to agree exactly, then uses the independently reconstructed
 set for nearest-distance and multiplicity checks.
 
+The randomized surface additionally checks translation equivariance. Translating an
+observation by any codeword must leave its syndrome and minimum-weight error
+representatives unchanged while translating every returned nearest codeword by the
+same codeword. Scalar uniqueness/ambiguity/no-match classification and list
+completeness must remain unchanged. This probes the linear coset structure rather
+than only isolated observations.
+
 For each generated code, the probe bound is one above the guaranteed unique-decoding
 radius. When the independent nearest-codeword oracle places the observation within
 that bound, every minimum-syndrome error and corresponding nearest codeword must be

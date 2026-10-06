@@ -857,6 +857,80 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
                         "list surface was not deterministic: regime={dimension}x{rank} seed=0x{seed:X} mask={mask:#x}"
                     );
 
+                    let shift = &codewords[(seed as usize) % codewords.len()];
+                    let mut shifted_observation = observation.clone();
+                    shifted_observation.xor_assign(shift);
+                    let shifted =
+                        decoder.decode_with_minimum_list(&shifted_observation, bound, 32);
+                    assert_eq!(
+                        shifted.minimum_errors,
+                        listed_a.minimum_errors,
+                        "codeword translation changed minimum error representatives: regime={dimension}x{rank} seed=0x{seed:X} mask={mask:#x}"
+                    );
+                    assert_eq!(
+                        shifted.list_complete, listed_a.list_complete,
+                        "codeword translation changed list completeness: regime={dimension}x{rank} seed=0x{seed:X} mask={mask:#x}"
+                    );
+                    assert_eq!(
+                        shifted.nearest_codewords.len(),
+                        listed_a.nearest_codewords.len(),
+                        "codeword translation changed nearest-list cardinality: regime={dimension}x{rank} seed=0x{seed:X} mask={mask:#x}"
+                    );
+                    for (original, translated) in listed_a
+                        .nearest_codewords
+                        .iter()
+                        .zip(&shifted.nearest_codewords)
+                    {
+                        let mut expected = original.clone();
+                        expected.xor_assign(shift);
+                        assert_eq!(
+                            *translated, expected,
+                            "codeword translation did not translate nearest codeword: regime={dimension}x{rank} seed=0x{seed:X} mask={mask:#x}"
+                        );
+                    }
+
+                    match (&listed_a.outcome, &shifted.outcome) {
+                        (
+                            BoundedDistanceDecode::Unique {
+                                error: original_error,
+                                distance: original_distance,
+                                ..
+                            },
+                            BoundedDistanceDecode::Unique {
+                                error: shifted_error,
+                                distance: shifted_distance,
+                                ..
+                            },
+                        ) => {
+                            assert_eq!(shifted_error, original_error);
+                            assert_eq!(shifted_distance, original_distance);
+                        }
+                        (
+                            BoundedDistanceDecode::Ambiguous {
+                                distance: original_distance,
+                                matching_error_patterns: original_matches,
+                            },
+                            BoundedDistanceDecode::Ambiguous {
+                                distance: shifted_distance,
+                                matching_error_patterns: shifted_matches,
+                            },
+                        ) => {
+                            assert_eq!(shifted_distance, original_distance);
+                            assert_eq!(shifted_matches, original_matches);
+                        }
+                        (
+                            BoundedDistanceDecode::NoMatchWithinBound {
+                                max_error_weight: original_bound,
+                            },
+                            BoundedDistanceDecode::NoMatchWithinBound {
+                                max_error_weight: shifted_bound,
+                            },
+                        ) => assert_eq!(shifted_bound, original_bound),
+                        (original, shifted) => panic!(
+                            "codeword translation changed scalar outcome: original={original:?} shifted={shifted:?}"
+                        ),
+                    }
+
                     if nearest_distance > bound {
                         assert!(matches!(
                             listed_a.outcome,
@@ -939,7 +1013,7 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
             .collect::<Vec<_>>()
             .join(",");
         println!(
-            "RANDOM_LIST_ORACLE=dimension={dimension};rank={rank};observations={observations};no_match={no_match};max_multiplicity={max_multiplicity};histogram={histogram_serialized};deterministic=true;independent_syndrome_oracle=true;independent_codeword_oracle=true",
+            "RANDOM_LIST_ORACLE=dimension={dimension};rank={rank};observations={observations};no_match={no_match};max_multiplicity={max_multiplicity};histogram={histogram_serialized};deterministic=true;independent_syndrome_oracle=true;independent_codeword_oracle=true;translation_equivariant=true",
         );
     }
 }
