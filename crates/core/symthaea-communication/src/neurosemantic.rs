@@ -1923,7 +1923,7 @@ mod tests {
         ] {
             assert_eq!(
                 serde_json::to_string(&status).unwrap(),
-                format!(""{expected}"")
+                format!("\"{expected}\"")
             );
         }
     }
