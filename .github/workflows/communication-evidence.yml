@@ -134,6 +134,7 @@ jobs:
           assert report["wrong_authority_resolution_context_blocked"] is True
           assert report["authority_resolution_signature_blocked"] is True
           assert report["authority_resolution_expiry_blocked"] is True
+          assert report["mutated_consent_lease_blocked"] is True
 
           codec_report = json.loads(Path("target/communication-evidence/neurosemantic_hdc_codec_n0.json").read_text())
           assert codec_report["binary_frame_roundtrip_exact"] is True
