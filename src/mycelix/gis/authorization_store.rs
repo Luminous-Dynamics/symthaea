@@ -3024,15 +3024,27 @@ fn validate_native_authority_pin_set(
             return Err(AuthorizationConsumptionError::ActionAlreadyInFlight.into());
         }
 
-        // Native replay identity is a one-time authority unit. Preflight the
-        // durable uniqueness constraint so a collision is reported as a
-        // semantic binding refusal rather than leaking a raw SQLite error.
-        // The UNIQUE index remains authoritative for races between callers.
+        // Native replay identity is a one-time authority unit. History may
+        // survive after the live dispatch row is compacted or otherwise removed,
+        // so the terminal-evidence ledger is part of the authoritative fence too.
+        // The dispatch UNIQUE index remains authoritative for races between
+        // concurrent live callers.
         let replay_owner: Option<(String, String, String)> = tx
             .query_row(
-                "SELECT authorization_instance,attempt_id,boundary_id
-                 FROM authorization_dispatches
-                 WHERE native_replay_identity=?1
+                "SELECT source,authorization_instance,attempt_id
+                 FROM (
+                     SELECT 'authorization_dispatches' AS source,
+                            authorization_instance,attempt_id
+                     FROM authorization_dispatches
+                     WHERE native_replay_identity=?1
+                       AND native_replay_identity <> ''
+                     UNION ALL
+                     SELECT 'authorization_terminal_evidence' AS source,
+                            authorization_instance,attempt_id
+                     FROM authorization_terminal_evidence
+                     WHERE native_replay_identity=?1
+                       AND native_replay_identity <> ''
+                 )
                  LIMIT 1",
                 params![native_replay_identity],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
@@ -11326,6 +11338,204 @@ mod tests {
 
             let _ = std::fs::remove_file(path);
         }
+    }
+
+    #[test]
+    fn terminal_history_fences_native_replay_after_dispatch_row_is_removed() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-terminal-replay-history-{}.db",
+            std::process::id()
+        ));
+        let store = SqliteAuthorizationStore::open(&path).unwrap();
+        let effect_a = ActionEffectBinding::new(
+            "target-terminal-history-a",
+            "prod",
+            "adapter-terminal-history",
+        );
+        let action_a = EpistemicAction::new(
+            "terminal-history-a",
+            "intervention",
+            super::super::ActionRisk::Critical,
+        )
+        .with_effect_binding(effect_a.clone());
+        let digest_a = action_a.canonical_action_digest();
+        let witness_a = ActionAuthorizationWitness {
+            operation_id: Some("operation:terminal-history-a".into()),
+            authorization_instance: "terminal-history-a".into(),
+            action_id: action_a.id.clone(),
+            action_digest: digest_a.clone(),
+            frame: "frame@1".into(),
+            support_digest: "sha256:support-a".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:00:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+        store
+            .register_lease(&AuthorizationLease::new_with_instance(
+                witness_a.authorization_instance.clone(),
+                action_a.id.clone(),
+                digest_a.clone(),
+                witness_a.support_digest.clone(),
+                witness_a.policy.clone(),
+                1,
+                1,
+            ))
+            .unwrap();
+        store
+            .prepare_for_execution_bound_with_operation(
+                &witness_a,
+                &action_a,
+                "frame@1",
+                "attempt:terminal-history-a",
+                "boundary:terminal-history-a",
+                "operation:terminal-history-a",
+            )
+            .unwrap();
+        let first = mark_dispatch_pending_bound_from_native_authority_for_test(
+            &store,
+            &witness_a.authorization_instance,
+            "attempt:terminal-history-a",
+            &action_a,
+            &effect_a,
+            "boundary:terminal-history-a",
+            "operation:terminal-history-a",
+            "issuer.terminal-history",
+            "native-grant:spent",
+        )
+        .unwrap();
+        store
+            .mark_invoked_bound(&first, &TestProviderStatusVerifier)
+            .unwrap();
+        store
+            .commit_bound_verified(
+                &first,
+                &verified_evidence(&first, ExecutionOutcome::Succeeded),
+                &TestProviderVerifier,
+            )
+            .unwrap();
+
+        let terminal_native_identity: String = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT native_replay_identity
+                 FROM authorization_terminal_evidence
+                 WHERE authorization_instance=?1 AND attempt_id=?2",
+                params![
+                    witness_a.authorization_instance.as_str(),
+                    "attempt:terminal-history-a"
+                ],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        // Simulate history compaction / live-record deletion: terminal evidence
+        // remains the durable historical authority for the spent native grant.
+        store
+            .connection()
+            .unwrap()
+            .execute(
+                "DELETE FROM authorization_dispatches
+                 WHERE authorization_instance=?1 AND attempt_id=?2",
+                params![
+                    witness_a.authorization_instance.as_str(),
+                    "attempt:terminal-history-a"
+                ],
+            )
+            .unwrap();
+
+        let effect_b = ActionEffectBinding::new(
+            "target-terminal-history-b",
+            "prod",
+            "adapter-terminal-history",
+        );
+        let action_b = EpistemicAction::new(
+            "terminal-history-b",
+            "intervention",
+            super::super::ActionRisk::Critical,
+        )
+        .with_effect_binding(effect_b.clone());
+        let digest_b = action_b.canonical_action_digest();
+        let witness_b = ActionAuthorizationWitness {
+            operation_id: Some("operation:terminal-history-b".into()),
+            authorization_instance: "terminal-history-b".into(),
+            action_id: action_b.id.clone(),
+            action_digest: digest_b.clone(),
+            frame: "frame@1".into(),
+            support_digest: "sha256:support-b".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T07:00:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+        store
+            .register_lease(&AuthorizationLease::new_with_instance(
+                witness_b.authorization_instance.clone(),
+                action_b.id.clone(),
+                digest_b,
+                witness_b.support_digest.clone(),
+                witness_b.policy.clone(),
+                1,
+                1,
+            ))
+            .unwrap();
+        store
+            .prepare_for_execution_bound_with_operation(
+                &witness_b,
+                &action_b,
+                "frame@1",
+                "attempt:terminal-history-b",
+                "boundary:terminal-history-b",
+                "operation:terminal-history-b",
+            )
+            .unwrap();
+
+        let second = mark_dispatch_pending_bound_from_native_authority_for_test(
+            &store,
+            &witness_b.authorization_instance,
+            "attempt:terminal-history-b",
+            &action_b,
+            &effect_b,
+            "boundary:terminal-history-b",
+            "operation:terminal-history-b",
+            "issuer.terminal-history",
+            "native-grant:spent",
+        );
+        assert!(matches!(
+            second,
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+
+        let dispatch_count: i64 = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM authorization_dispatches
+                 WHERE native_replay_identity=?1",
+                params![terminal_native_identity.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(dispatch_count, 0);
+
+        let terminal_count: i64 = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM authorization_terminal_evidence
+                 WHERE native_replay_identity=?1",
+                params![terminal_native_identity.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(terminal_count, 1);
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
