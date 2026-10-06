@@ -160,7 +160,9 @@ jobs:
           assert report["remediation_fairness_evidence_verified"] is True
           assert report["remediation_residual_evidence_verified"] is True
           assert report["remediation_effect_evidence_substitution_blocked"] is True
+          assert report["remediation_lifecycle_execution_revision_mismatch_blocked"] is True
           assert report["remediation_model_substitution_blocked"] is True
+          assert report["remediation_lineage_execution_revision_mismatch_blocked"] is True
           assert report["remediation_lineage_substitution_blocked"] is True
           assert report["remediation_protocol_substitution_blocked"] is True
           assert report["remediation_split_substitution_blocked"] is True
