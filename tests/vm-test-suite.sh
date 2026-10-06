@@ -471,6 +471,18 @@ asyncio.run(test())
 PYEOF
     then
         pass "LUKS encrypted install completed"
+
+        if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null             -p "$SSH_PORT" root@localhost             "cryptsetup isLuks /dev/vda2 && [ \"\$(blkid -s PARTLABEL -o value /dev/vda2)\" = cryptroot ]"             >/dev/null 2>&1; then
+            pass "LUKS partition is real and labeled cryptroot"
+        else
+            fail "LUKS partition metadata verification failed"
+        fi
+
+        if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null             -p "$SSH_PORT" root@localhost             "grep -q 'boot.initrd.luks.devices.*cryptroot' /mnt/etc/nixos/configuration.nix &&              grep -q 'stateVersion = \\"26.05\\"' /mnt/etc/nixos/configuration.nix"             >/dev/null 2>&1; then
+            pass "Installed config binds cryptroot and NixOS 26.05"
+        else
+            fail "Installed config is missing the expected LUKS/NixOS binding"
+        fi
     else
         fail "LUKS install failed"
     fi
