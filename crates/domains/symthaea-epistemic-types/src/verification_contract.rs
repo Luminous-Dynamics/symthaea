@@ -2788,6 +2788,13 @@ mod tests {
     }
 
     #[test]
+    fn timestamp_parser_maps_end_of_day_with_offsets_to_next_day() {
+        let end_of_day = parse_timestamp("timestamp", "2026-10-05T24:00:00+02:00").unwrap();
+        let next_day = parse_timestamp("timestamp", "2026-10-06T00:00:00+02:00").unwrap();
+        assert_eq!(end_of_day, next_day);
+    }
+
+    #[test]
     fn timestamp_parser_applies_xsd_whitespace_collapse() {
         let padded = " \t2026-10-05T00:00:00Z\r\n";
         let parsed = parse_timestamp("timestamp", padded).unwrap();
