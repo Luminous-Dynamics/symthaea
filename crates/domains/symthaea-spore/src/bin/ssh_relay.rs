@@ -2491,10 +2491,29 @@ async fn admit_mutation_transaction<S>(
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
+    let target_machine_digest = match target_machine_digest {
+        Some(digest) => Some(digest.to_string()),
+        None => match machine_binding_digest_hex() {
+            Ok(digest) => Some(digest),
+            Err(error) => {
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::error(&format!(
+                            "Unable to establish authoritative target identity: {}",
+                            error
+                        ))
+                        .to_json(),
+                    ))
+                    .await;
+                return None;
+            }
+        },
+    };
+
     let transaction = match SystemTransaction::begin(
         mutation,
         request_id,
-        target_machine_digest,
+        target_machine_digest.as_deref(),
         payload,
     ) {
         Ok(transaction) => transaction,
