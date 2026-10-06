@@ -135,6 +135,7 @@ jobs:
           assert report["authority_resolution_signature_blocked"] is True
           assert report["authority_resolution_expiry_blocked"] is True
           assert report["authority_resolution_predating_attestation_blocked"] is True
+          assert report["policy_freshness_expired_before_resolution_expiry"] is True
           assert report["mutated_consent_lease_blocked"] is True
           assert report["authority_proof_substitution_blocked"] is True
 
