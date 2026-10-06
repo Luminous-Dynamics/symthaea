@@ -765,19 +765,69 @@ fn parse_timestamp(
     // YYYY-MM-DDT24:00:00(.0+)?timezone. Chrono deliberately rejects 24:00:00,
     // so normalize only that standards-defined spelling to the equivalent next-day
     // instant while retaining the caller's original lexical representation.
-    let parse_value = if end_of_day {
-        let t = value.find('T').ok_or_else(|| VerificationFailure::InvalidTimestamp {
+    // Chrono's RFC3339 parser is intentionally limited to a four-digit,
+    // unsigned year. XSD 1.1 permits year zero, negative years, and more than
+    // four digits. Validate the XSD lexical form first, then adapt a positive
+    // expanded year to Chrono's signed-expanded-year syntax without changing
+    // the represented instant.
+    let mut parse_value = value.to_owned();
+
+    if end_of_day {
+        let t = parse_value.find('T').ok_or_else(|| VerificationFailure::InvalidTimestamp {
             field,
             value: value.to_owned(),
         })?;
-        let mut normalized = value.to_owned();
-        normalized.replace_range(t + 1..t + 3, "00");
-        normalized
-    } else {
-        value.to_owned()
-    };
+        parse_value.replace_range(t + 1..t + 3, "00");
+    }
 
-    let parsed = DateTime::parse_from_rfc3339(&parse_value).map_err(|_| {
+    let year_start = usize::from(parse_value.starts_with('-'));
+    let year_end = parse_value[year_start..]
+        .find('-')
+        .map(|offset| year_start + offset)
+        .ok_or_else(|| VerificationFailure::InvalidTimestamp {
+            field,
+            value: value.to_owned(),
+        })?;
+    let year_len = year_end - year_start;
+    if year_len > 4 && year_start == 0 {
+        parse_value.insert(0, '+');
+    }
+
+    // XSD dateTimeStamp has arbitrary decimal precision for seconds, while
+    // Chrono stores nanoseconds. Never silently collapse distinct instants:
+    // fractional digits beyond nanoseconds are accepted only when they are all
+    // zero, so the value remains exactly representable.
+    if let Some(dot) = parse_value[parse_value.find('T').ok_or_else(|| {
+        VerificationFailure::InvalidTimestamp {
+            field,
+            value: value.to_owned(),
+        }
+    })?..]
+        .find('.')
+        .map(|offset| offset + parse_value.find('T').unwrap())
+    {
+        let fraction_start = dot + 1;
+        let timezone_start = parse_value[fraction_start..]
+            .find(|ch| ch == 'Z' || ch == '+' || ch == '-')
+            .map(|offset| fraction_start + offset)
+            .ok_or_else(|| VerificationFailure::InvalidTimestamp {
+                field,
+                value: value.to_owned(),
+            })?;
+        let fraction = &parse_value[fraction_start..timezone_start];
+        if fraction.len() > 9 && fraction[9..].bytes().any(|byte| byte != b'0') {
+            return Err(VerificationFailure::InvalidTimestamp {
+                field,
+                value: value.to_owned(),
+            });
+        }
+    }
+
+    let parsed = DateTime::parse_from_str(
+        &parse_value,
+        "%Y-%m-%dT%H:%M:%S%.f%:z",
+    )
+    .map_err(|_| {
         VerificationFailure::InvalidTimestamp {
             field,
             value: value.to_owned(),
@@ -2698,6 +2748,23 @@ mod tests {
         let resolution = resolved_method(&weaker_request);
         assert!(resolution.matches_request(&weaker_request));
         assert!(!resolution.matches_request(&request));
+    }
+
+    #[test]
+    fn timestamp_parser_supports_xsd_expanded_years_without_precision_loss() {
+        assert!(parse_timestamp("timestamp", "0000-01-01T00:00:00Z").is_ok());
+        assert!(parse_timestamp("timestamp", "-0001-01-01T00:00:00Z").is_ok());
+        assert!(parse_timestamp("timestamp", "12345-01-01T00:00:00Z").is_ok());
+
+        assert!(parse_timestamp(
+            "timestamp",
+            "2026-10-05T00:00:00.123456789000Z"
+        )
+        .is_ok());
+        assert!(matches!(
+            parse_timestamp("timestamp", "2026-10-05T00:00:00.1234567891Z"),
+            Err(VerificationFailure::InvalidTimestamp { .. })
+        ));
     }
 
     #[test]
