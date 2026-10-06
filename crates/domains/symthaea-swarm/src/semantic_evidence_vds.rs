@@ -876,7 +876,8 @@ impl Rfc9942ReceiptEnvelope {
         let vdp=vdp.ok_or(Rfc9942VdpError::InvalidStructure)?;
         let payload=match reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)?{
             2=>{
-                let raw=reader.read_bstr_bounded(32).map_err(|error|match error {
+                let raw=reader.read_bstr_bounded_with_resource_chunk_limits(32).map_err(|error|match error {
+                    Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
                     Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidPayloadLength,
                     _=>Rfc9942VdpError::InvalidEncoding,
                 })?;
