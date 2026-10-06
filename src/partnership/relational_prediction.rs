@@ -739,7 +739,7 @@ mod tests {
     #[test]
     fn temporal_leakage_is_rejected_by_outcome_horizon() {
         let result =
-            HeldOutRelationalPredictionSummary::compute(&build_samples(2.0), config());
+            HeldOutRelationalPredictionSummary::compute(&build_samples(5.0), config());
 
         assert_eq!(result, Err(RelationalPredictionError::TemporalLeakage));
     }
