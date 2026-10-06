@@ -26,6 +26,9 @@ use zbus::{Connection, Message, Proxy};
 const SYSTEMD_DESTINATION: &str = "org.freedesktop.systemd1";
 const SYSTEMD_MANAGER_PATH: &str = "/org/freedesktop/systemd1";
 const SYSTEMD_MANAGER_INTERFACE: &str = "org.freedesktop.systemd1.Manager";
+const DBUS_DESTINATION: &str = "org.freedesktop.DBus";
+const DBUS_PATH: &str = "/org/freedesktop/DBus";
+const DBUS_INTERFACE: &str = "org.freedesktop.DBus";
 const SYSTEMD_UNIT_INTERFACE: &str = "org.freedesktop.systemd1.Unit";
 const SYSTEMD_SERVICE_INTERFACE: &str = "org.freedesktop.systemd1.Service";
 const SYSTEMD_JOB_INTERFACE: &str = "org.freedesktop.systemd1.Job";
@@ -218,6 +221,7 @@ impl NixSystemdReadOnlyObserverV1 {
         let expected_unit = canonical_unit(expected_unit)?;
         validate_job_object_path(job_object_path)?;
 
+        let manager_owner = self.systemd_manager_owner().await?;
         let properties = self
             .get_all_properties(job_object_path, SYSTEMD_JOB_INTERFACE)
             .await?;
@@ -260,6 +264,7 @@ impl NixSystemdReadOnlyObserverV1 {
             unit: canonical_job_unit,
             object_path: job_object_path.clone(),
             unit_object_path: job_unit_path,
+            manager_owner,
         })
     }
 
@@ -287,6 +292,7 @@ impl NixSystemdReadOnlyObserverV1 {
         let result = tokio::time::timeout(timeout, async {
             while let Some(message) = stream.next().await {
                 let message = message?;
+                validate_manager_signal_sender(&message, &expected.manager_owner)?;
                 let removed = decode_job_removed(&message)?;
                 if removed.id == expected.id
                     && removed.object_path.as_str() == expected.object_path.as_str()
@@ -406,6 +412,21 @@ impl NixSystemdReadOnlyObserverV1 {
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))
     }
 
+    async fn systemd_manager_owner(&self) -> Result<String, NixSystemdObserverErrorV1> {
+        let bus = Proxy::new(
+            &self.connection,
+            DBUS_DESTINATION,
+            DBUS_PATH,
+            DBUS_INTERFACE,
+        )
+        .await?;
+        let owner: String = bus
+            .call("GetNameOwner", &(SYSTEMD_DESTINATION,))
+            .await?;
+        validate_unique_owner(&owner)?;
+        Ok(owner)
+    }
+
     async fn get_all_properties(
         &self,
         object_path: &OwnedObjectPath,
@@ -429,6 +450,7 @@ pub struct NixSystemdJobHandleV1 {
     unit: String,
     object_path: OwnedObjectPath,
     unit_object_path: OwnedObjectPath,
+    manager_owner: String,
 }
 
 impl std::fmt::Debug for NixSystemdJobHandleV1 {
@@ -439,6 +461,7 @@ impl std::fmt::Debug for NixSystemdJobHandleV1 {
             .field("unit", &self.unit)
             .field("object_path", &self.object_path)
             .field("unit_object_path", &self.unit_object_path)
+            .field("manager_owner", &self.manager_owner)
             .finish()
     }
 }
@@ -464,6 +487,10 @@ impl NixSystemdJobHandleV1 {
         self.unit_object_path.as_str()
     }
 
+    pub fn manager_owner(&self) -> &str {
+        &self.manager_owner
+    }
+
     fn validate(&self) -> Result<(), NixSystemdObserverErrorV1> {
         if self.id == 0 {
             return Err(NixSystemdObserverErrorV1::InvalidJobIdentity(
@@ -478,6 +505,7 @@ impl NixSystemdJobHandleV1 {
         }
         validate_job_object_path(&self.object_path)?;
         validate_unit_object_path(&self.unit_object_path)?;
+        validate_unique_owner(&self.manager_owner)?;
         if !self.object_path.as_str().ends_with(&format!("/{}", self.id)) {
             return Err(NixSystemdObserverErrorV1::InvalidJobIdentity(
                 "job object path/Id mismatch".to_string(),
@@ -485,6 +513,32 @@ impl NixSystemdJobHandleV1 {
         }
         Ok(())
     }
+}
+
+fn validate_unique_owner(owner: &str) -> Result<(), NixSystemdObserverErrorV1> {
+    if owner.is_empty() || owner.len() > 255 || !owner.starts_with(':') {
+        return Err(NixSystemdObserverErrorV1::InvalidJobIdentity(
+            "invalid systemd unique bus owner".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_manager_signal_sender(
+    message: &Message,
+    expected_owner: &str,
+) -> Result<(), NixSystemdObserverErrorV1> {
+    let actual = message
+        .header()
+        .sender()
+        .ok_or_else(|| NixSystemdObserverErrorV1::InvalidJobIdentity(
+            "JobRemoved signal has no sender".to_string(),
+        ))?
+        .to_string();
+    if actual != expected_owner {
+        return Err(NixSystemdObserverErrorV1::JobCorrelationMismatch);
+    }
+    Ok(())
 }
 
 fn canonical_unit(unit: &str) -> Result<String, NixSystemdObserverErrorV1> {
