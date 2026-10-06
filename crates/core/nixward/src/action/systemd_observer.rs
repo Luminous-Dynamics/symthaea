@@ -550,6 +550,7 @@ impl NixSystemdReadOnlyObserverV1 {
         validate_job_object_path(job_object_path)?;
 
         let manager_owner = self.systemd_manager_owner().await?;
+        let bus_id = self.dbus_bus_id().await?;
         let properties = self
             .get_all_properties(job_object_path, SYSTEMD_JOB_INTERFACE)
             .await?;
@@ -587,7 +588,8 @@ impl NixSystemdReadOnlyObserverV1 {
         }
 
         let post_capture_owner = self.systemd_manager_owner().await?;
-        if post_capture_owner != manager_owner {
+        let post_capture_bus_id = self.dbus_bus_id().await?;
+        if post_capture_owner != manager_owner || post_capture_bus_id != bus_id {
             return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
         }
 
@@ -598,6 +600,7 @@ impl NixSystemdReadOnlyObserverV1 {
             object_path: job_object_path.clone(),
             unit_object_path: job_unit_path,
             manager_owner,
+            bus_id,
         })
     }
 
