@@ -1387,6 +1387,19 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_reference_preserves_lexical_timestamp_provenance() {
+        let mut a = snapshot();
+        a.state_at = "2026-10-05T00:00:00Z".into();
+
+        let mut b = a.clone();
+        b.state_at = "2026-10-05T01:00:00+01:00".into();
+
+        assert_ne!(a.snapshot_reference().unwrap(), b.snapshot_reference().unwrap());
+        assert!(a.validate_structure().is_ok());
+        assert!(b.validate_structure().is_ok());
+    }
+
+    #[test]
     fn snapshot_timestamp_validation_matches_verification_contract() {
         let mut snapshot = snapshot();
         snapshot.state_at = "2026-10-05T24:00:00Z".into();
