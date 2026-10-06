@@ -2790,6 +2790,21 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                         continue;
                     }
                 };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
 
                 // Bind the authenticated request to a typed transaction identity. Passwords and
                 // LUKS secrets are represented only by the surrounding secure session, never in this digest.
@@ -4410,6 +4425,21 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                         continue;
                     }
                 };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
                 let transaction = match SystemTransaction::begin(MutationKind::Rollback, None, b"nixos-rebuild switch --rollback") {
                     Ok(tx) => tx,
                     Err(error) => {
@@ -4450,6 +4480,21 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                     Err(_) => {
                         let _ = ws_tx
                             .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
                             .await;
                         continue;
                     }
@@ -4519,6 +4564,21 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                     Err(_) => {
                         let _ = ws_tx
                             .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
                             .await;
                         continue;
                     }
@@ -4606,6 +4666,21 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                     Err(_) => {
                         let _ = ws_tx
                             .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
                             .await;
                         continue;
                     }
@@ -4760,6 +4835,21 @@ echo '}'
                     Err(_) => {
                         let _ = ws_tx
                             .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
                             .await;
                         continue;
                     }
