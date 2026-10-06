@@ -68,6 +68,27 @@ async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
     );
     command.env_remove("NIX_CONFIG");
     command.env_remove("NIX_USER_CONF_FILES");
+    // Do not allow a caller-controlled environment to redirect privileged Nix
+    // state, store, logs, configuration, daemon socket, or user directories.
+    for variable in [
+        "NIX_REMOTE",
+        "NIX_DAEMON_SOCKET_PATH",
+        "NIX_STORE_DIR",
+        "NIX_DATA_DIR",
+        "NIX_LOG_DIR",
+        "NIX_STATE_DIR",
+        "NIX_CONF_DIR",
+        "NIX_CONFIG_HOME",
+        "NIX_STATE_HOME",
+        "NIX_CACHE_HOME",
+        "XDG_CONFIG_HOME",
+        "XDG_STATE_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_CONFIG_DIRS",
+        "NIX_IGNORE_SYMLINK_STORE",
+    ] {
+        command.env_remove(variable);
+    }
     let output = command.output().await?;
     Ok(CmdResult {
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
