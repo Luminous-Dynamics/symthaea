@@ -13,9 +13,38 @@
 
 use leptos::prelude::*;
 use std::net::IpAddr;
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
 
 use crate::components::glass_panel::GlassPanel;
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = ["globalThis", "crypto"], js_name = getRandomValues, catch)]
+    fn crypto_get_random_values(buf: &mut [u8]) -> Result<(), JsValue>;
+}
+
+fn new_request_id() -> Option<String> {
+    let mut bytes = [0u8; 16];
+    crypto_get_random_values(&mut bytes).ok()?;
+    Some(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+fn action_requires_request_id(action: &str) -> bool {
+    matches!(
+        action,
+        "install"
+            | "rollback"
+            | "switch_generation"
+            | "service_action"
+            | "gc_collect"
+            | "write_config"
+            | "create_image"
+            | "restore_image"
+            | "preserve_data"
+            | "connect_wifi"
+    )
+}
+
 
 // ═══════════════════════════════════════════════════════
 // Storage helpers — localStorage for non-sensitive data,
@@ -787,6 +816,25 @@ pub fn RemoteInstallPanel(
     }
     fn send_msg(msg: &serde_json::Value) {
         let window = web_sys::window().unwrap();
+        let mut msg = msg.clone();
+        if let Some(action) = msg.get("action").and_then(|value| value.as_str()) {
+            if action_requires_request_id(action)
+                && msg.get("request_id").and_then(|value| value.as_str()).is_none()
+            {
+                let request_id = if action == "install" {
+                    load_from_storage("si_install_request_id").or_else(new_request_id)
+                } else {
+                    new_request_id()
+                };
+                let Some(request_id) = request_id else {
+                    return;
+                };
+                if action == "install" {
+                    save_to_storage("si_install_request_id", &request_id);
+                }
+                msg["request_id"] = serde_json::json!(request_id);
+            }
+        }
         if let Ok(ws_val) = js_sys::Reflect::get(&window, &"__sovereign_ws".into()) {
             if let Ok(ws) = ws_val.dyn_into::<web_sys::WebSocket>() {
                 let _ = ws.send_with_str(&msg.to_string());
@@ -1098,6 +1146,7 @@ pub fn RemoteInstallPanel(
                             });
                             // Clear in-progress flag (Phase 4.3)
                             remove_from_storage("si_install_in_progress");
+                             remove_from_storage("si_install_request_id");
                             previous_install_in_progress.set(false);
                         } else {
                             relay_state.set(RelayState::Failed(format!(
@@ -1107,9 +1156,25 @@ pub fn RemoteInstallPanel(
                                 l.push(format!("Installation failed (exit code {code})"))
                             });
                             remove_from_storage("si_install_in_progress");
+                             remove_from_storage("si_install_request_id");
                             previous_install_in_progress.set(false);
                         }
                         persist_log_force();
+                    }
+
+                    "transaction_replay" => {
+                        set_install_log.update(|l| {
+                            l.push("Request already completed; relay did not repeat the system mutation.".into())
+                        });
+                    }
+
+                    "transaction_indeterminate" => {
+                        relay_state.set(RelayState::Failed(
+                            "The previous mutation has uncertain completion; relay refused to re-execute it.".into(),
+                        ));
+                        set_install_log.update(|l| {
+                            l.push("Mutation outcome is uncertain; no duplicate execution was attempted.".into())
+                        });
                     }
 
                     "data_preserved" => {
