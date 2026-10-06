@@ -705,6 +705,20 @@ impl MorphophonologicalCompilationWitness {
                 return Err(MorphophonologicalCompilationWitnessError::EmptyMetadata);
             }
         }
+        if self.compiler_id == UNIMORPH_TSV_COMPILER_ID {
+            for value in [
+                self.compiler_implementation_revision.as_deref(),
+                self.source_parser_revision.as_deref(),
+                self.compiler_build_context_revision.as_deref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                if !is_canonical_blake3_digest(value) {
+                    return Err(MorphophonologicalCompilationWitnessError::MalformedCompilerIdentity);
+                }
+            }
+        }
         if !is_canonical_blake3_digest(&self.source_artifact_blake3)
             || !is_canonical_blake3_digest(&self.source_selection_blake3)
             || !is_canonical_blake3_digest(&self.output_rule_set_blake3)
@@ -938,6 +952,7 @@ pub enum MorphophonologicalCompilationWitnessError {
     TransformationMismatch,
     UnsupportedCompiler,
     MissingCompilerIdentity,
+    MalformedCompilerIdentity,
     CompilerImplementationRevisionMismatch,
     SourceParserRevisionMismatch,
     CompilerBuildContextRevisionMismatch,
@@ -969,6 +984,7 @@ impl std::fmt::Display for MorphophonologicalCompilationWitnessError {
             Self::TransformationMismatch => write!(f, "morphophonological compilation witness transformation digest does not match its declared inputs"),
             Self::UnsupportedCompiler => write!(f, "morphophonological compilation witness compiler implementation is not supported for replay"),
             Self::MissingCompilerIdentity => write!(f, "morphophonological compilation witness is missing the implementation identity required for its declared UniMorph compiler"),
+            Self::MalformedCompilerIdentity => write!(f, "morphophonological compilation witness contains a malformed UniMorph compiler identity"),
             Self::CompilerImplementationRevisionMismatch => write!(f, "morphophonological compilation witness compiler implementation revision does not match the current compiler"),
             Self::SourceParserRevisionMismatch => write!(f, "morphophonological compilation witness source parser revision does not match the current parser"),
             Self::CompilerBuildContextRevisionMismatch => write!(f, "morphophonological compilation witness compiler build-context revision does not match the current build context"),
@@ -3294,6 +3310,35 @@ mod tests {
     }
 
     #[test]
+    fn compilation_witness_rejects_malformed_unimorph_identity_encoding() {
+        let rule_set = morphophonological_fixture_rule_set();
+        let artifact = b"row0\n";
+        let witness = MorphophonologicalCompilationWitness::new(
+            UNIMORPH_TSV_COMPILER_ID,
+            UNIMORPH_TSV_COMPILER_VERSION,
+            "fixture-normalization-v1",
+            artifact,
+            vec![MorphophonologicalSourceSlice {
+                record_id: "row0".into(),
+                byte_offset: 0,
+                byte_length: artifact.len(),
+                record_blake3: blake3::hash(artifact).to_hex().to_string(),
+            }],
+            &rule_set,
+        )
+        .expect("known UniMorph compiler witness");
+
+        let mut tampered = witness;
+        tampered.compiler_implementation_revision = Some("not-a-digest".into());
+        assert_eq!(
+            tampered
+                .validate_shape()
+                .expect_err("UniMorph compiler identity must be canonical BLAKE3"),
+            MorphophonologicalCompilationWitnessError::MalformedCompilerIdentity
+        );
+    }
+
+    #[test]
     fn unimorph_tsv_compiler_replays_supported_rows_and_normalization() {
         let artifact = b"walk\twalked\tV;PST\ncat\tcat\tN;SG\n";
         let walk_len = b"walk\twalked\tV;PST\n".len();
@@ -3360,7 +3405,7 @@ mod tests {
 
         let mut compiler_revision_tampered = witness.clone();
         compiler_revision_tampered.compiler_implementation_revision =
-            Some("tampered-compiler-revision".into());
+            Some("0".repeat(64));
         assert_eq!(
             compiler_revision_tampered
                 .replay_unimorph_tsv_compilation(artifact, &rule_set)
@@ -3370,7 +3415,7 @@ mod tests {
 
         let mut parser_revision_tampered = witness.clone();
         parser_revision_tampered.source_parser_revision =
-            Some("tampered-parser-revision".into());
+            Some("1".repeat(64));
         assert_eq!(
             parser_revision_tampered
                 .replay_unimorph_tsv_compilation(artifact, &rule_set)
@@ -3380,7 +3425,7 @@ mod tests {
 
         let mut build_context_tampered = witness.clone();
         build_context_tampered.compiler_build_context_revision =
-            Some("tampered-build-context-revision".into());
+            Some("2".repeat(64));
         assert_eq!(
             build_context_tampered
                 .replay_unimorph_tsv_compilation(artifact, &rule_set)
@@ -3426,7 +3471,7 @@ mod tests {
 
         let mut historical_revision = witness.clone();
         historical_revision.compiler_implementation_revision =
-            Some("historical-compiler-revision".into());
+            Some("3".repeat(64));
         historical_revision.transformation_blake3 =
             historical_revision.compute_transformation_blake3();
         historical_revision
