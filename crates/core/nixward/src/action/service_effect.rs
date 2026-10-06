@@ -27,6 +27,7 @@ pub struct NixSystemdUnitDefinitionContentFileV1 {
     pub path: String,
     /// Canonical filesystem path actually opened when path resolution involved links.
     /// `None` means the reported path itself was opened without canonical relocation.
+    #[serde(default)]
     pub resolved_path: Option<String>,
     /// Byte length observed while hashing the open file descriptor.
     pub byte_len: u64,
@@ -77,6 +78,14 @@ impl NixSystemdUnitDefinitionContentEvidenceV1 {
         for file in &self.files {
             if file.path.is_empty() || file.path.len() > MAX_STRING_BYTES || !file.path.starts_with('/') {
                 return Err(NixServiceEffectContextErrorV1::InvalidDefinitionFilePath);
+            }
+            if let Some(resolved_path) = &file.resolved_path {
+                if resolved_path.is_empty()
+                    || resolved_path.len() > MAX_STRING_BYTES
+                    || !resolved_path.starts_with("/nix/store/")
+                {
+                    return Err(NixServiceEffectContextErrorV1::InvalidDefinitionFilePath);
+                }
             }
             if !seen.insert(file.path.clone()) {
                 return Err(NixServiceEffectContextErrorV1::DuplicateDefinitionFile);
@@ -408,6 +417,10 @@ mod tests {
 
         let mut changed = base;
         changed.files[1].path = "/nix/store/other.conf".into();
+        assert_ne!(baseline, changed.digest().unwrap());
+
+        let mut changed = content_evidence();
+        changed.files[0].resolved_path = Some("/nix/store/other.service".into());
         assert_ne!(baseline, changed.digest().unwrap());
     }
 
