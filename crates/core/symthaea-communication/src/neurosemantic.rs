@@ -327,6 +327,13 @@ impl NeurosemanticRemediationImpactArtifact {
 
     pub fn verify_lifecycle_binding(&self, lifecycle_receipt: &NeurosemanticArtifactLifecycleReceipt) -> Result<(), String> {
         self.validate()?;
+        lifecycle_receipt.validate()?;
+        if lifecycle_receipt.state != NeurosemanticArtifactLifecycleState::IndependentlyVerified {
+            return Err("neurosemantic remediation impact evidence requires an independently-verified lifecycle receipt".into());
+        }
+        if lifecycle_receipt.action != self.remediation_action {
+            return Err("neurosemantic remediation impact action does not match the lifecycle receipt action".into());
+        }
         let fingerprint = lifecycle_receipt.fingerprint()?;
         if fingerprint != self.lifecycle_receipt_hash {
             return Err("neurosemantic remediation impact artifact is bound to a different lifecycle receipt".into());
@@ -2718,6 +2725,10 @@ mod tests {
         };
         assert!(impact.validate().is_ok());
         assert!(impact.verify_lifecycle_binding(&lifecycle).is_ok());
+        let (requested, _, _, _, _, _, _, _, _) = synthetic_lifecycle_receipt_chain();
+        let mut pending_impact = impact.clone();
+        pending_impact.lifecycle_receipt_hash = requested.fingerprint().unwrap();
+        assert!(pending_impact.verify_lifecycle_binding(&requested).is_err());
         assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PreRemediation, &pre_bytes).is_ok());
         assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PostRemediation, &post_bytes).is_ok());
         assert!(impact.verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::Forgetfulness, b"forget").is_ok());
