@@ -23,7 +23,7 @@ use tokio_tungstenite::accept_hdr_async;
 use tokio_tungstenite::tungstenite::Message;
 
 mod system_transaction;
-use system_transaction::{MutationKind, SystemTransaction};
+use system_transaction::{MutationKind, MutationLease, SystemTransaction, TransactionOutcome};
 
 // Security validators from the library (shared with fuzz targets)
 use symthaea_spore::security::{
@@ -3297,7 +3297,11 @@ echo "  User password set."
                 }
 
                 let exit_code = if complete { 0 } else { 1 };
-                let outcome = if exit_code == 0 { "observed_success" } else { "failed" };
+                let outcome = if exit_code == 0 {
+                    TransactionOutcome::ObservedSuccess
+                } else {
+                    TransactionOutcome::Failed
+                };
                 let _ = ws_tx
                     .send(Message::Text(
                         serde_json::json!({
@@ -4452,7 +4456,11 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                 eprintln!("[{}] {} Rolling back...", peer_addr, transaction.log_line());
                 match run_cmd("nixos-rebuild switch --rollback 2>&1").await {
                     Ok(r) => {
-                        let outcome = if r.exit_status == 0 { "observed_success" } else { "failed" };
+                        let outcome = if r.exit_status == 0 {
+                            TransactionOutcome::ObservedSuccess
+                        } else {
+                            TransactionOutcome::Failed
+                        };
                         let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
@@ -4515,7 +4523,11 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                 );
                 match run_cmd(&cmd).await {
                     Ok(r) => {
-                        let outcome = if r.exit_status == 0 { "observed_success" } else { "failed" };
+                        let outcome = if r.exit_status == 0 {
+                            TransactionOutcome::ObservedSuccess
+                        } else {
+                            TransactionOutcome::Failed
+                        };
                         let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
@@ -4597,7 +4609,11 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                 let cmd = format!("systemctl {} {}.service 2>&1", action, service);
                 match run_cmd(&cmd).await {
                     Ok(r) => {
-                        let outcome = if r.exit_status == 0 { "observed_success" } else { "failed" };
+                        let outcome = if r.exit_status == 0 {
+                            TransactionOutcome::ObservedSuccess
+                        } else {
+                            TransactionOutcome::Failed
+                        };
                         let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout,"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
                     Err(e) => {
@@ -4760,11 +4776,11 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                     _ => 1,
                 };
                 let outcome = if gc_exit_code == 0 {
-                    "observed_success"
+                    TransactionOutcome::ObservedSuccess
                 } else if gc_exit_code == 1 {
-                    "failed"
+                    TransactionOutcome::Failed
                 } else {
-                    "indeterminate"
+                    TransactionOutcome::Indeterminate
                 };
                 let _ = ws_tx
                     .send(Message::Text(
@@ -5041,7 +5057,11 @@ echo "REBUILD_COMPLETE"
                 let exit_code = if complete { 0 } else { 1 };
                 let _ = ws_tx
                     .send(Message::Text(
-                        serde_json::json!({"type":"exit","code":exit_code,"transaction":transaction.receipt(if exit_code == 0 { "observed_success" } else { "failed" })}).to_string(),
+                        serde_json::json!({"type":"exit","code":exit_code,"transaction": transaction.receipt(if exit_code == 0 {
+                                TransactionOutcome::ObservedSuccess
+                            } else {
+                                TransactionOutcome::Failed
+                            })}).to_string(),
                     ))
                     .await;
             }
