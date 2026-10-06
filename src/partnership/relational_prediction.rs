@@ -29,8 +29,8 @@
 
 use super::relational_harmonics::EvidenceStatus;
 
-const EVIDENCE_SCHEMA: &str = "relational-prediction-evidence/v2";
-const ROLLING_EVIDENCE_SCHEMA: &str = "relational-prediction-rolling-evidence/v2";
+const EVIDENCE_SCHEMA: &str = "relational-prediction-evidence/v3";
+const ROLLING_EVIDENCE_SCHEMA: &str = "relational-prediction-rolling-evidence/v3";
 const FEATURE_SCHEMA: &str = "relational-prediction-features/v1";
 const MODEL_SCHEMA: &str = "linear-ridge-standardized-v1";
 
@@ -128,6 +128,7 @@ pub enum RelationalPredictionError {
     InvalidRidgeLambda,
     InvalidSurrogateCount,
     InvalidEvidenceProvenance(&'static str),
+    InvalidEvidenceInputDigest,
     ModelFitFailed,
 }
 
@@ -149,6 +150,9 @@ impl std::fmt::Display for RelationalPredictionError {
             Self::InvalidSurrogateCount => write!(f, "surrogate_count must be greater than zero"),
             Self::InvalidEvidenceProvenance(name) => {
                 write!(f, "evidence provenance field {name} is invalid")
+            }
+            Self::InvalidEvidenceInputDigest => {
+                write!(f, "evidence input digest does not match supplied evaluation data")
             }
             Self::ModelFitFailed => write!(f, "deterministic linear model fit failed"),
         }
@@ -307,6 +311,9 @@ pub struct PredictionEvidenceRecord {
     pub outcome_times: Vec<f64>,
     pub observed_outcomes: Vec<f64>,
     pub predictions: Vec<f64>,
+    /// Computed commitment over the exact samples and split configuration
+    /// supplied to the evaluator.
+    pub evaluation_input_blake3: String,
     /// Held-out feature rows retained so fitted-model predictions can be
     /// independently recomputed from retained coefficients and frozen
     /// training preprocessing parameters.
@@ -333,6 +340,10 @@ impl PredictionEvidenceRecord {
     }
 
     pub fn validate_trace(&self) -> Result<(), RelationalPredictionError> {
+        if !is_hex_digest(&self.evaluation_input_blake3, 64) {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
         if self.predictions.len() != self.test_samples
             || self.observed_outcomes.len() != self.test_samples
             || self.feature_times.len() != self.test_samples
@@ -472,6 +483,9 @@ pub struct HeldOutRelationalPredictionEvidence {
 pub struct RollingOriginRelationalPredictionEvidence {
     pub provenance: RelationalPredictionProvenance,
     pub config: RollingOriginRelationalPredictionConfig,
+    /// Computed commitment over the exact sample sequence and rolling
+    /// configuration supplied to the evaluator.
+    pub evaluation_input_blake3: String,
     /// Exact source-slice start for each retained origin, in source sample
     /// indices. This binds the realized rolling schedule to the declared
     /// first_origin and step_samples.
@@ -506,6 +520,13 @@ pub struct HeldOutRelationalPredictionSummary {
 impl HeldOutRelationalPredictionEvidence {
     pub fn validate(&self) -> Result<(), RelationalPredictionError> {
         validate_evidence_provenance(&self.provenance)?;
+        if self.records.is_empty()
+            || self.records
+                .iter()
+                .any(|record| record.evaluation_input_blake3 != self.records[0].evaluation_input_blake3)
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
         if self.records.len() != PredictionFeatureSet::all().len() {
             return Err(RelationalPredictionError::InvalidSplit);
         }
@@ -563,6 +584,26 @@ impl HeldOutRelationalPredictionEvidence {
         Ok(())
     }
 
+    pub fn verify_against_samples(
+        &self,
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+    ) -> Result<(), RelationalPredictionError> {
+        if evaluation_input_digest(samples, config) != self.records
+            .first()
+            .map(|record| record.evaluation_input_blake3.as_str())
+            .unwrap_or("")
+        {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        let recomputed = Self::compute_evidence(samples, config, self.provenance.clone())?;
+        if recomputed != *self {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
+    }
+
     pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
         self.validate()?;
 
@@ -596,6 +637,9 @@ impl HeldOutRelationalPredictionEvidence {
                 "source_data_sha256": &self.provenance.source_data_sha256,
                 "software_commit_sha": &self.provenance.software_commit_sha
             },
+            "evaluation_input_blake3": &self.records.first()
+                .map(|record| record.evaluation_input_blake3.as_str())
+                .unwrap_or(""),
             "split": {
                 "train_samples": self.summary.train_samples,
                 "test_samples": self.summary.test_samples,
@@ -621,9 +665,15 @@ impl HeldOutRelationalPredictionSummary {
         provenance: RelationalPredictionProvenance,
     ) -> Result<HeldOutRelationalPredictionEvidence, RelationalPredictionError> {
         let summary = Self::compute(samples, config)?;
-        let records = PredictionFeatureSet::all()
+        let evaluation_input_blake3 = evaluation_input_digest(samples, config);
+        let mut records = PredictionFeatureSet::all()
             .into_iter()
-            .map(|feature_set| fit_prediction_record(samples, &config, feature_set))
+            .map(|feature_set| fit_prediction_record(
+                samples,
+                &config,
+                feature_set,
+                evaluation_input_blake3.clone(),
+            ))
             .collect::<Result<Vec<_>, _>>()?;
 
         let evidence = HeldOutRelationalPredictionEvidence {
@@ -781,7 +831,8 @@ pub struct RollingOriginRelationalPredictionSummary {
 impl RollingOriginRelationalPredictionEvidence {
     pub fn validate(&self) -> Result<(), RelationalPredictionError> {
         validate_evidence_provenance(&self.provenance)?;
-        if self.config.origin_count == 0
+        if !is_hex_digest(&self.evaluation_input_blake3, 64)
+            || self.config.origin_count == 0
             || self.config.step_samples < self.config.test_samples
             || !self.config.forecast_horizon.is_finite()
             || self.config.forecast_horizon <= 0.0
@@ -836,6 +887,25 @@ impl RollingOriginRelationalPredictionEvidence {
         Ok(())
     }
 
+    pub fn verify_against_samples(
+        &self,
+        samples: &[RelationalPredictionSample],
+    ) -> Result<(), RelationalPredictionError> {
+        if rolling_evaluation_input_digest(samples, self.config) != self.evaluation_input_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        let recomputed = Self::compute_evidence(
+            samples,
+            self.config,
+            self.provenance.clone(),
+        )?;
+        if recomputed != *self {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
+    }
+
     pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
         self.validate()?;
 
@@ -858,6 +928,7 @@ impl RollingOriginRelationalPredictionEvidence {
                 "source_data_sha256": &self.provenance.source_data_sha256,
                 "software_commit_sha": &self.provenance.software_commit_sha
             },
+            "evaluation_input_blake3": &self.evaluation_input_blake3,
             "rolling_config": {
                 "first_origin": self.config.first_origin,
                 "train_samples": self.config.train_samples,
@@ -895,6 +966,7 @@ impl RollingOriginRelationalPredictionSummary {
         provenance: RelationalPredictionProvenance,
     ) -> Result<RollingOriginRelationalPredictionEvidence, RelationalPredictionError> {
         let observed = Self::compute(samples, config)?;
+        let evaluation_input_blake3 = rolling_evaluation_input_digest(samples, config);
         let segment_total = config
             .train_samples
             .checked_add(config.gap_samples)
@@ -932,6 +1004,7 @@ impl RollingOriginRelationalPredictionSummary {
         let evidence = RollingOriginRelationalPredictionEvidence {
             provenance,
             config,
+            evaluation_input_blake3,
             origin_starts,
             observed,
             origins,
@@ -1397,6 +1470,7 @@ fn prediction_evidence_record_json(record: &PredictionEvidenceRecord) -> serde_j
         "outcome_times": &record.outcome_times,
         "observed_outcomes": &record.observed_outcomes,
         "predictions": &record.predictions,
+        "evaluation_input_blake3": &record.evaluation_input_blake3,
         "test_features": &record.test_features,
         "baseline_prediction": record.baseline_prediction,
         "fit_coefficients": &record.fit_coefficients,
@@ -1468,6 +1542,7 @@ fn fit_prediction_record(
     samples: &[RelationalPredictionSample],
     config: &HeldOutRelationalPredictionConfig,
     feature_set: PredictionFeatureSet,
+    evaluation_input_blake3: String,
 ) -> Result<PredictionEvidenceRecord, RelationalPredictionError> {
     validate_samples(samples)?;
     config.validate(samples.len())?;
@@ -1544,6 +1619,7 @@ fn fit_prediction_record(
         outcome_times,
         observed_outcomes,
         predictions,
+        evaluation_input_blake3,
         test_features,
         baseline_prediction: baseline,
         fit_coefficients,
@@ -1632,6 +1708,65 @@ fn score_persistence_baseline(
         mean_absolute_error: absolute_error / n,
         mean_squared_error: squared_error / n,
     })
+}
+
+fn evaluation_input_digest(
+    samples: &[RelationalPredictionSample],
+    config: HeldOutRelationalPredictionConfig,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-input/v1");
+    update_samples_digest(&mut hasher, samples);
+    update_usize(&mut hasher, config.train_samples);
+    update_usize(&mut hasher, config.test_samples);
+    update_usize(&mut hasher, config.gap_samples);
+    update_f64(&mut hasher, config.ridge_lambda);
+    hasher.finalize().to_hex().to_string()
+}
+
+fn rolling_evaluation_input_digest(
+    samples: &[RelationalPredictionSample],
+    config: RollingOriginRelationalPredictionConfig,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-rolling-input/v1");
+    update_samples_digest(&mut hasher, samples);
+    update_usize(&mut hasher, config.first_origin);
+    update_usize(&mut hasher, config.train_samples);
+    update_usize(&mut hasher, config.test_samples);
+    update_usize(&mut hasher, config.gap_samples);
+    update_usize(&mut hasher, config.origin_count);
+    update_usize(&mut hasher, config.step_samples);
+    update_f64(&mut hasher, config.forecast_horizon);
+    update_f64(&mut hasher, config.ridge_lambda);
+    hasher.finalize().to_hex().to_string()
+}
+
+fn update_samples_digest(
+    hasher: &mut blake3::Hasher,
+    samples: &[RelationalPredictionSample],
+) {
+    update_usize(hasher, samples.len());
+    for sample in samples {
+        update_f64(hasher, sample.feature_time);
+        update_f64(hasher, sample.outcome_time);
+        update_f64(hasher, sample.agent_a);
+        update_f64(hasher, sample.agent_b);
+        update_f64(hasher, sample.alignment);
+        update_f64(hasher, sample.a_to_b);
+        update_f64(hasher, sample.b_to_a);
+        update_f64(hasher, sample.turn_taking);
+        update_f64(hasher, sample.common_driver);
+        update_f64(hasher, sample.future_outcome);
+    }
+}
+
+fn update_usize(hasher: &mut blake3::Hasher, value: usize) {
+    hasher.update(&(value as u64).to_le_bytes());
+}
+
+fn update_f64(hasher: &mut blake3::Hasher, value: f64) {
+    hasher.update(&value.to_bits().to_le_bytes());
 }
 
 fn feature_count(feature_set: PredictionFeatureSet) -> usize {
@@ -2038,6 +2173,73 @@ mod tests {
     }
 
     #[test]
+    fn evidence_replay_verifier_binds_exact_training_input() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        let mut altered_samples = samples.clone();
+        altered_samples[0].agent_a += 0.01;
+
+        assert_eq!(
+            evidence.verify_against_samples(&samples, config()),
+            Ok(())
+        );
+        assert_eq!(
+            evidence.verify_against_samples(&altered_samples, config()),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        evidence.records[1].fit_coefficients.as_mut().unwrap()[0] += 0.01;
+        assert_eq!(
+            evidence.verify_against_samples(&samples, config()),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
+    fn rolling_evidence_replay_verifier_binds_exact_input_sequence() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 2,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let evidence = RollingOriginRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config,
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(evidence.verify_against_samples(&samples), Ok(()));
+        let mut altered_samples = samples.clone();
+        altered_samples[40].future_outcome += 0.01;
+        assert_eq!(
+            evidence.verify_against_samples(&altered_samples),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
     fn evidence_packet_validates_and_serializes() {
         let samples = build_samples(0.5);
         let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
@@ -2060,6 +2262,7 @@ mod tests {
         assert!(json.contains("RelationalAugmented"));
         assert!(json.contains("predictions"));
         assert!(json.contains("test_features"));
+        assert!(json.contains("evaluation_input_blake3"));
         assert_eq!(evidence.records.len(), 7);
         assert_eq!(
             evidence.records[0].score(),
@@ -2125,7 +2328,7 @@ mod tests {
 
         evidence.validate().unwrap();
         let json = evidence.to_json().unwrap();
-        assert!(json.contains("relational-prediction-rolling-evidence/v2"));
+        assert!(json.contains("relational-prediction-rolling-evidence/v3"));
         assert!(json.contains("per_origin_improvement"));
         assert_eq!(evidence.origins.len(), 2);
     }
