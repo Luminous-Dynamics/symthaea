@@ -376,8 +376,10 @@ source reference, and checked-at/expiry timestamps.
 
 Only a fresh `Active` resolution can be combined with the policy attestation to create the
 handling capability. The resolution has a protocol-enforced maximum lifetime of 24 hours,
-and it cannot outlive the authority attestation it resolves. Deployments can and should use
-shorter status freshness windows for higher-risk data.
+and it cannot outlive the authority attestation it resolves. The handling policy also declares
+its own `max_authority_resolution_age_s`, so a higher-risk policy can require a materially
+shorter freshness window independent of the resolver's advertised expiry. Deployments should
+choose that bound according to the risk of the protected data and inference class.
 
 The resulting capability retains the exact resolution fingerprint and context, including
 a content hash of the complete consent lease and the exact authority-attestation fingerprint
@@ -386,6 +388,8 @@ resolution is expired or otherwise belongs to a different consent context, when 
 lease contents differ from the resolved lease, or when a different authority-proof artifact
 is substituted. The resolver signature authenticates the snapshot to the configured resolver
 key; trust in that resolver key remains an external identity/governance decision.
+
+The handling-policy schema is now v6. Older policy artifacts fail closed instead of silently acquiring the new freshness requirement.
 
 ### External policy provenance hardening
 
