@@ -26,6 +26,7 @@ rustfmt --edition 2024 --check \
   crates/core/nixward/src/action/config_writer.rs \
   crates/core/nixward/src/action/post_state.rs \
   crates/core/nixward/src/action/generation_observer.rs \
+  crates/core/nixward/src/action/generation_observer.rs \
   crates/core/nixward/src/action/service_effect_admission.rs \
   crates/core/nixward/src/action/systemd_definition.rs \
   crates/core/nixward/src/action/systemd_lifecycle.rs \
