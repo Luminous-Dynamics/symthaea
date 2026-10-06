@@ -212,6 +212,96 @@ pub fn transition(state: MicroWorldObservation, action: MicroAction) -> MicroWor
     next.clamp()
 }
 
+/// A deterministic benchmark scenario with a distinct initial state and action schedule.
+#[derive(Debug, Clone)]
+pub struct MicroWorldScenario {
+    pub name: &'static str,
+    pub initial: MicroWorldObservation,
+    pub schedule: &'static [MicroAction],
+}
+
+static NOMINAL_SCHEDULE: [MicroAction; 6] = [
+    MicroAction::Observe,
+    MicroAction::Explore,
+    MicroAction::Harvest,
+    MicroAction::Repair,
+    MicroAction::Rest,
+    MicroAction::Retreat,
+];
+
+static STRESSED_SCHEDULE: [MicroAction; 6] = [
+    MicroAction::Harvest,
+    MicroAction::Rest,
+    MicroAction::Repair,
+    MicroAction::Retreat,
+    MicroAction::Observe,
+    MicroAction::Harvest,
+];
+
+static DAMAGED_SCHEDULE: [MicroAction; 6] = [
+    MicroAction::Repair,
+    MicroAction::Rest,
+    MicroAction::Harvest,
+    MicroAction::Explore,
+    MicroAction::Observe,
+    MicroAction::Retreat,
+];
+
+static KNOWLEDGE_RICH_SCHEDULE: [MicroAction; 6] = [
+    MicroAction::Explore,
+    MicroAction::Explore,
+    MicroAction::Harvest,
+    MicroAction::Rest,
+    MicroAction::Observe,
+    MicroAction::Retreat,
+];
+
+pub fn benchmark_scenarios() -> Vec<MicroWorldScenario> {
+    vec![
+        MicroWorldScenario {
+            name: "nominal",
+            initial: MicroWorld::default().observe(),
+            schedule: &NOMINAL_SCHEDULE,
+        },
+        MicroWorldScenario {
+            name: "stressed",
+            initial: MicroWorldObservation {
+                cycle: 0,
+                energy: 0.30,
+                integrity: 0.35,
+                knowledge: 0.25,
+                threat: 0.65,
+                progress: 0.05,
+            },
+            schedule: &STRESSED_SCHEDULE,
+        },
+        MicroWorldScenario {
+            name: "damaged",
+            initial: MicroWorldObservation {
+                cycle: 0,
+                energy: 0.50,
+                integrity: 0.20,
+                knowledge: 0.40,
+                threat: 0.35,
+                progress: 0.10,
+            },
+            schedule: &DAMAGED_SCHEDULE,
+        },
+        MicroWorldScenario {
+            name: "knowledge_rich",
+            initial: MicroWorldObservation {
+                cycle: 0,
+                energy: 0.80,
+                integrity: 0.90,
+                knowledge: 0.80,
+                threat: 0.10,
+                progress: 0.40,
+            },
+            schedule: &KNOWLEDGE_RICH_SCHEDULE,
+        },
+    ]
+}
+
 /// Predictor interface for the benchmark harness.
 ///
 /// A production predictor can later be backed by WorldModelBridge, a learned latent
@@ -331,7 +421,7 @@ pub fn run_homeostatic_agent<P: MicroWorldPredictor>(
     predictor: &mut P,
     max_cycles: u64,
 ) -> HomeostaticRunReport {
-    let mut world = MicroWorld::default();
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
     let policy = HomeostaticPolicy;
     let mut fabric = ViabilityFabric::new(max_cycles as usize + 1);
     let mut cumulative_error = 0.0;
@@ -437,6 +527,22 @@ pub fn evaluate_predictor<P: MicroWorldPredictor>(
     predictor: &mut P,
     max_cycles: u64,
 ) -> MicroWorldReport {
+    evaluate_predictor_scenario(
+        predictor,
+        &MicroWorldScenario {
+            name: "nominal",
+            initial: MicroWorld::default().observe(),
+            schedule: &NOMINAL_SCHEDULE,
+        },
+        max_cycles,
+    )
+}
+
+fn evaluate_predictor_scenario<P: MicroWorldPredictor>(
+    predictor: &mut P,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+) -> MicroWorldReport {
     let mut world = MicroWorld::default();
     let mut fabric = ViabilityFabric::new(max_cycles as usize + 1);
     let mut baseline_error = 0.0;
@@ -445,7 +551,7 @@ pub fn evaluate_predictor<P: MicroWorldPredictor>(
 
     while !world.done() && steps < max_cycles {
         let before = world.observe();
-        let action = MicroAction::ALL[steps as usize % MicroAction::ALL.len()];
+        let action = scenario.schedule[steps as usize % scenario.schedule.len()];
 
         let predicted = predictor.predict(before, action);
         let predicted_world_delta = signed_delta(before, predicted);
@@ -518,6 +624,57 @@ pub fn evaluate_predictor<P: MicroWorldPredictor>(
         final_integrity: final_state.integrity,
         final_progress: final_state.progress,
         ledger_outcomes: fabric.outcomes().len(),
+    }
+}
+
+/// Aggregate report across several deterministic worlds.
+///
+/// The suite prevents a future predictor from qualifying by memorizing one initial
+/// trajectory. Every predictor sees the same scenarios and schedules.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MicroWorldSuiteReport {
+    pub episodes: usize,
+    pub total_steps: u64,
+    pub mean_baseline_mae: f64,
+    pub mean_predictor_mae: f64,
+    pub mean_improvement: f64,
+    pub survival_rate: f64,
+}
+
+impl MicroWorldSuiteReport {
+    pub fn suite_improvement(&self) -> f64 {
+        if self.mean_baseline_mae <= f64::EPSILON {
+            0.0
+        } else {
+            (self.mean_baseline_mae - self.mean_predictor_mae) / self.mean_baseline_mae
+        }
+    }
+}
+
+pub fn evaluate_predictor_suite<P: MicroWorldPredictor>(
+    predictor: &mut P,
+    max_cycles: u64,
+) -> MicroWorldSuiteReport {
+    let scenarios = benchmark_scenarios();
+    let mut reports = Vec::with_capacity(scenarios.len());
+
+    for scenario in &scenarios {
+        reports.push(evaluate_predictor_scenario(predictor, scenario, max_cycles));
+    }
+
+    let episodes = reports.len();
+    let denom = episodes.max(1) as f64;
+    MicroWorldSuiteReport {
+        episodes,
+        total_steps: reports.iter().map(|r| r.steps).sum(),
+        mean_baseline_mae: reports.iter().map(|r| r.baseline_mae).sum::<f64>() / denom,
+        mean_predictor_mae: reports.iter().map(|r| r.predictor_mae).sum::<f64>() / denom,
+        mean_improvement: reports
+            .iter()
+            .map(MicroWorldReport::improvement_over_baseline)
+            .sum::<f64>()
+            / denom,
+        survival_rate: reports.iter().map(|r| r.survival_ratio).sum::<f64>() / denom,
     }
 }
 
@@ -602,6 +759,29 @@ mod tests {
         let mut a = PersistencePredictor;
         let mut b = PersistencePredictor;
         assert_eq!(run_homeostatic_agent(&mut a, 32), run_homeostatic_agent(&mut b, 32));
+    }
+
+    #[test]
+    fn suite_has_multiple_distinct_scenarios() {
+        let scenarios = benchmark_scenarios();
+        assert!(scenarios.len() >= 4);
+        assert!(scenarios.windows(2).any(|w| w[0].initial != w[1].initial));
+    }
+
+    #[test]
+    fn oracle_suite_is_zero_error() {
+        struct Oracle;
+        impl MicroWorldPredictor for Oracle {
+            fn predict(&mut self, state: MicroWorldObservation, action: MicroAction) -> MicroWorldObservation {
+                transition(state, action)
+            }
+        }
+
+        let mut predictor = Oracle;
+        let report = evaluate_predictor_suite(&mut predictor, 24);
+        assert_eq!(report.episodes, 4);
+        assert!(report.mean_predictor_mae.abs() < 1e-12);
+        assert!((report.survival_rate - 1.0).abs() < 1e-12);
     }
 
     #[test]
