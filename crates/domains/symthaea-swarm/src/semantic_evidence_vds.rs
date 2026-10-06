@@ -1366,7 +1366,7 @@ impl Rfc9942SignatureWithReceipts {
                 unprotected_receipts=Some(Rfc9942ReceiptCollection::from_reader(&mut value_reader)?);
             } else {
                 unprotected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
-                value_reader.skip_value_with_bstr_resource_limits(0, MAX_RFC9942_RECEIPT_BYTES)
+                value_reader.skip_value_with_resource_limits(0, MAX_RFC9942_RECEIPT_BYTES, 64, usize::MAX)
                     .map_err(|error|match error {
                         Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
                         _=>Rfc9942VdpError::InvalidEncoding,
