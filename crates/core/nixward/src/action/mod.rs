@@ -51,10 +51,11 @@ pub use authorization::{
 };
 pub use post_state::{
     NixPostStateClaimV1, NixPostStateErrorV1, NixPostStateReceiptV1,
-    NixPostStateStabilityEvidenceV1, NixPostconditionAssessmentV1,
-    NixServicePostStateExpectationV1, NixServicePostStateObservationV1,
-    NixSystemdJobEvidenceV1, NixSystemdJobTypeV1,
+    NixPostStateStabilityEvidenceV1, NixPostStateStabilitySampleV1,
+    NixPostconditionAssessmentV1, NixServicePostStateExpectationV1,
+    NixServicePostStateObservationV1, NixSystemdJobEvidenceV1, NixSystemdJobTypeV1,
     NixSystemdUnitDefinitionIdentityV1, NixVerifiedPostStateObservationV1,
+    NixVerifiedPostStateStabilityEvidenceV1,
 };
 pub use config_writer::{ConfigPatch, ConfigWriter, WriteResult};
 pub use daemon_incarnation::{DaemonApprovalContextErrorV1, LiveDaemonIncarnationV1};
