@@ -8,6 +8,8 @@ use symthaea_communication::{
     NeurosemanticDataClass, NeurosemanticDataPolicy, NeurosemanticInferenceClass,
     NeurosemanticHandlingPolicy, NeurosemanticRetentionPolicy, ReplayDecision,
     NeurosemanticPolicyAuthorityAttestation, NeurosemanticPolicyProvenanceBinding,
+    NeurosemanticAuthorityResolutionAttestation, NeurosemanticAuthorityStatus,
+    NeurosemanticConsentBindingContext,
 };
 
 fn main() -> Result<(), String> {
@@ -117,7 +119,8 @@ fn main() -> Result<(), String> {
     message.validate(&lease, 1_500)?;
     use ed25519_dalek::Signer;
     let signing_key = ed25519_dalek::SigningKey::from_bytes(&[7u8; 32]);
-    let policy_fingerprint = message.packet.data_policy.handling.fingerprint_for_attestation();
+    let policy_fingerprint =
+        message.packet.data_policy.handling.fingerprint_for_attestation()?;
     let authority_message = NeurosemanticPolicyAuthorityAttestation::message_bytes(
         "mycelix-policy-authority",
         "test-key-1",
@@ -136,14 +139,55 @@ fn main() -> Result<(), String> {
         expires_at_unix_s: 2_000,
         signature: signing_key.sign(&authority_message).to_bytes().to_vec(),
     };
+    let resolution_context = NeurosemanticConsentBindingContext {
+        subject_ref: lease.subject_id.clone(),
+        peer_ref: lease.peer_id.clone(),
+        lease_id: lease.lease_id.clone(),
+        consent_epoch: lease.consent_epoch,
+        purpose: message.packet.purpose,
+        channel: message.packet.channel,
+        direction: message.packet.direction,
+    };
+    let resolver_signing_key = ed25519_dalek::SigningKey::from_bytes(&[9u8; 32]);
+    let mut authority_resolution = NeurosemanticAuthorityResolutionAttestation {
+        schema_version: symthaea_communication::NEUROSEMANTIC_AUTHORITY_RESOLUTION_SCHEMA_VERSION,
+        resolver_ref: "mycelix-identity-policy-bridge".into(),
+        resolver_key_ref: "resolver-key-1".into(),
+        authority_ref: authority_attestation.authority_ref.clone(),
+        authority_key_ref: authority_attestation.key_ref.clone(),
+        handling_policy_fingerprint: policy_fingerprint.clone(),
+        policy_provenance_ref: message.packet.data_policy.handling.policy_provenance_ref.clone(),
+        policy_provenance_hash: message.packet.data_policy.handling.policy_provenance_hash.clone(),
+        subject_ref: resolution_context.subject_ref.clone(),
+        peer_ref: resolution_context.peer_ref.clone(),
+        lease_id: resolution_context.lease_id.clone(),
+        consent_epoch: resolution_context.consent_epoch,
+        purpose: resolution_context.purpose,
+        channel: resolution_context.channel,
+        direction: resolution_context.direction,
+        status: NeurosemanticAuthorityStatus::Active,
+        status_source_ref: "mycelix-status:synthetic-1".into(),
+        checked_at_unix_s: 1_200,
+        expires_at_unix_s: 1_800,
+        signature: Vec::new(),
+    };
+    let resolution_message = authority_resolution.message_bytes()?;
+    authority_resolution.signature =
+        ed25519_dalek::Signer::sign(&resolver_signing_key, &resolution_message)
+            .to_bytes()
+            .to_vec();
+
     let policy_provenance_binding: NeurosemanticPolicyProvenanceBinding = message
         .packet
         .data_policy
         .handling
-        .bind_policy_provenance_with_attestation(
+        .bind_policy_provenance_with_attestation_and_resolution(
             b"synthetic-policy-record-1",
             &authority_attestation,
             &signing_key.verifying_key(),
+            &authority_resolution,
+            &resolver_signing_key.verifying_key(),
+            &resolution_context,
             1_500,
         )?;
     let handling_policy_provenance_present = !message
@@ -225,6 +269,7 @@ fn main() -> Result<(), String> {
     let inference_escalation_blocked = inference_escalation
         .validate_for_handling(
             &inference_aware_lease,
+            &policy_provenance_binding,
             "ZA",
             symthaea_communication::NeurosemanticHandlingAction::SecondaryUse(
                 symthaea_communication::NeurosemanticSecondaryUse::AffectiveInference,
@@ -300,9 +345,97 @@ fn main() -> Result<(), String> {
         ExpressionDecision::Block(_)
     );
 
-    let report = BTreeMap::from([
-        ("exact_graph_roundtrip", exact_roundtrip),
-        ("authorization_valid", true),
+    let execution_revision = std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|revision| revision.trim().to_string())
+        .filter(|revision| revision.len() == 40 || revision.len() == 64)
+        .filter(|revision| revision.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        .filter(|revision| revision.bytes().any(|byte| byte != b'0'))
+        .ok_or_else(|| "unable to resolve exact execution revision".to_string())?;
+
+    let mut forged_resolution = authority_resolution.clone();
+    forged_resolution.status = NeurosemanticAuthorityStatus::Revoked;
+    forged_resolution.signature =
+        ed25519_dalek::Signer::sign(&resolver_signing_key, &forged_resolution.message_bytes()?)
+            .to_bytes()
+            .to_vec();
+    let revoked_resolution_blocked = message
+        .packet
+        .data_policy
+        .handling
+        .bind_policy_provenance_with_attestation_and_resolution(
+            b"synthetic-policy-record-1",
+            &authority_attestation,
+            &signing_key.verifying_key(),
+            &forged_resolution,
+            &resolver_signing_key.verifying_key(),
+            &resolution_context,
+            1_500,
+        )
+        .is_err();
+
+    let mut wrong_context = resolution_context.clone();
+    wrong_context.subject_ref = "other-subject".into();
+    let wrong_context_resolution = {
+        let mut candidate = authority_resolution.clone();
+        candidate.subject_ref = wrong_context.subject_ref.clone();
+        candidate.signature =
+            ed25519_dalek::Signer::sign(&resolver_signing_key, &candidate.message_bytes()?)
+                .to_bytes()
+                .to_vec();
+        candidate
+    };
+    let wrong_resolution_context_blocked = message
+        .packet
+        .data_policy
+        .handling
+        .bind_policy_provenance_with_attestation_and_resolution(
+            b"synthetic-policy-record-1",
+            &authority_attestation,
+            &signing_key.verifying_key(),
+            &wrong_context_resolution,
+            &resolver_signing_key.verifying_key(),
+            &resolution_context,
+            1_500,
+        )
+        .is_err();
+
+    let mut tampered_resolution = authority_resolution.clone();
+    tampered_resolution.signature[0] ^= 1;
+    let resolution_signature_blocked = message
+        .packet
+        .data_policy
+        .handling
+        .bind_policy_provenance_with_attestation_and_resolution(
+            b"synthetic-policy-record-1",
+            &authority_attestation,
+            &signing_key.verifying_key(),
+            &tampered_resolution,
+            &resolver_signing_key.verifying_key(),
+            &resolution_context,
+            1_500,
+        )
+        .is_err();
+
+    let authority_resolution_fresh_until = authority_resolution.expires_at_unix_s;
+    let authority_resolution_expiry_blocked = message
+        .validate_for_handling(
+            &lease,
+            &policy_provenance_binding,
+            "ZA",
+            symthaea_communication::NeurosemanticHandlingAction::Transmit,
+            authority_resolution_fresh_until,
+        )
+        .is_err();
+
+    let report = serde_json::json!({
+        "execution_revision": execution_revision,
+        "exact_graph_roundtrip": exact_roundtrip,
+        "authorization_valid": true,
         ("handling_policy_provenance_present", handling_policy_provenance_present),
         ("handling_policy_provenance_hash_valid", handling_policy_provenance_hash_valid),
         (
@@ -323,8 +456,12 @@ fn main() -> Result<(), String> {
         ("persistence_after_expiry_blocked", persistence_after_expiry_blocked),
         ("secondary_research_blocked", secondary_research_blocked),
         ("sensitivity_escalation_blocked", sensitivity_blocked),
-        ("insufficient_capability_blocked", expression_blocked),
-    ]);
+        "insufficient_capability_blocked": expression_blocked,
+        "revoked_authority_resolution_blocked": revoked_resolution_blocked,
+        "wrong_authority_resolution_context_blocked": wrong_resolution_context_blocked,
+        "authority_resolution_signature_blocked": resolution_signature_blocked,
+        "authority_resolution_expiry_blocked": authority_resolution_expiry_blocked
+    });
 
     println!("{}", serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?);
     Ok(())
