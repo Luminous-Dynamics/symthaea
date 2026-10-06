@@ -32,9 +32,8 @@ impl NixServiceEffectAdmissionV1 {
     /// Admit one exact Service action using only an observer-sealed definition
     /// content commitment.
     ///
-    /// The caller must provide the independently observed pre-state digest and
-    /// generation. The admission layer never reads the filesystem and never
-    /// contacts systemd itself.
+    /// The caller must provide an observer-sealed pre-state token. The
+    /// admission layer never reads the filesystem and never contacts systemd itself.
     pub(crate) fn from_observed_definition_content(
         subject_identity: impl Into<String>,
         operation: NixServiceOperationKindV1,
@@ -214,16 +213,33 @@ mod tests {
         let pre_state =
             NixVerifiedServicePreStateV1::from_observer(&state, 42).unwrap();
 
+        let other_state =
+            super::super::service_state::NixServiceObservedStateV1::from_observer_snapshot(
+                "sshd.service",
+                "sshd.service",
+                vec!["sshd.service".into()],
+                super::super::service_state::ServiceLoadStateV1::Loaded,
+                super::super::service_state::ServiceActiveStateV1::Active,
+                super::super::service_state::ServiceUnitFileStateV1::Enabled,
+                "running",
+            )
+            .unwrap();
+        let other_pre_state =
+            NixVerifiedServicePreStateV1::from_observer(&other_state, 42).unwrap();
+
         let result = NixServiceEffectAdmissionV1::from_observed_definition_content(
             "host:test",
             NixServiceOperationKindV1::Start,
             None,
             0,
-            &pre_state,
+            &other_pre_state,
             &commitment,
         );
 
-        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            NixServiceEffectAdmissionErrorV1::PreStateMismatch
+        ));
     }
 
     #[test]
