@@ -15,6 +15,7 @@ use super::post_state::{
     NixSystemdUnitDefinitionIdentityV1, NixVerifiedPostStateObservationV1,
     NixVerifiedPostStateStabilityEvidenceV1,
 };
+use super::systemd_definition::NixVerifiedSystemdDefinitionContentCommitmentV1;
 use super::systemd_definition::{
     NixSystemdDefinitionContentCommitmentV1, NixSystemdDefinitionContentErrorV1,
     NixVerifiedSystemdDefinitionContentCommitmentV1,
@@ -113,6 +114,9 @@ pub enum NixSystemdObserverErrorV1 {
 
     #[error("invalid verified post-state observation: {0}")]
     InvalidPostState(String),
+
+    #[error("invalid systemd definition-content observation: {0}")]
+    InvalidDefinitionContent(String),
 
     #[error("invalid systemd definition-content observation: {0}")]
     InvalidDefinitionContent(String),
@@ -340,6 +344,55 @@ impl NixSystemdReadOnlyObserverV1 {
         }
 
         let _ = NixSystemdDefinitionContentCommitmentV1::digest(commitment.as_ref())
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidDefinitionContent(error.to_string()))?;
+
+        Ok(commitment)
+    }
+
+    /// Hash the exact FragmentPath/DropInPaths reported by systemd.
+    ///
+    /// The public API accepts only a canonical service unit, not filesystem
+    /// paths. The systemd observer selects the source paths, hashes them
+    /// through the observer-sealed content module, then re-reads systemd's
+    /// source identity to detect path replacement during the observation.
+    pub async fn observe_service_definition_content(
+        &self,
+        unit: &str,
+    ) -> Result<NixVerifiedSystemdDefinitionContentCommitmentV1, NixSystemdObserverErrorV1> {
+        let expected_unit = canonical_unit(unit)?;
+        let manager_owner = self.systemd_manager_owner().await?;
+        let object_path = self.resolve_service_unit(&expected_unit).await?;
+
+        let before_properties = self
+            .get_all_properties(&object_path, SYSTEMD_UNIT_INTERFACE)
+            .await?;
+        let before_identity = definition_identity_from_properties(&before_properties)?;
+
+        let commitment = NixVerifiedSystemdDefinitionContentCommitmentV1::from_observer(
+            &expected_unit,
+            &before_identity,
+            &manager_owner,
+        )
+        .map_err(|error| NixSystemdObserverErrorV1::InvalidDefinitionContent(error.to_string()))?;
+
+        let after_properties = self
+            .get_all_properties(&object_path, SYSTEMD_UNIT_INTERFACE)
+            .await?;
+        let after_identity = definition_identity_from_properties(&after_properties)?;
+        let post_manager_owner = self.systemd_manager_owner().await?;
+
+        if post_manager_owner != manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if after_identity != before_identity {
+            return Err(NixSystemdObserverErrorV1::InvalidDefinitionContent(
+                "systemd source identity changed during content observation".to_string(),
+            ));
+        }
+
+        commitment
+            .as_ref()
+            .digest()
             .map_err(|error| NixSystemdObserverErrorV1::InvalidDefinitionContent(error.to_string()))?;
 
         Ok(commitment)
