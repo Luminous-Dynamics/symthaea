@@ -79,7 +79,7 @@ The resolution lifetime is bounded to 24 hours by the Symthaea protocol as a def
 
 The resolver signature authenticates the exact snapshot to the configured resolver key. The snapshot also commits to the exact authority-attestation fingerprint, preventing an otherwise valid but different attestation from being substituted after resolution. The integration must still establish that the resolver key is trusted and authorized; signature verification is not itself a governance decision.
 
-A resolution cannot outlive the authority attestation that it resolves. This prevents a freshness snapshot from extending an older issuer proof beyond its cryptographic validity window.
+A resolution cannot outlive the authority attestation that it resolves. This prevents a freshness snapshot from extending an older issuer proof beyond its cryptographic validity window. The status-check timestamp must also not predate the attestation issuance time; a resolver cannot use a later-discovered authority proof to retroactively justify an earlier resolution.
 
 The resulting capability retains the exact resolution fingerprint and its context. Because the resolution also commits to the complete consent-lease fingerprint, changing scopes, sensitivity ceilings, data/inference permissions, validity, revocation state, or other lease fields invalidates an older capability even when an implementation accidentally reuses the same lease ID and epoch. Subsequent handling therefore fails closed when the resolution is expired, non-active, or bound to a different subject, peer, lease, consent state, purpose, channel, or direction.
 
