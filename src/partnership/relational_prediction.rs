@@ -33,6 +33,7 @@ use super::relational_harmonics::EvidenceStatus;
 
 const EVIDENCE_SCHEMA: &str = "relational-prediction-evidence/v4";
 const ROLLING_EVIDENCE_SCHEMA: &str = "relational-prediction-rolling-evidence/v4";
+const NULL_EVIDENCE_SCHEMA: &str = "relational-prediction-null-evidence/v1";
 const FEATURE_SCHEMA: &str = "relational-prediction-features/v1";
 const MODEL_SCHEMA: &str = "linear-ridge-standardized-v1";
 
@@ -1450,6 +1451,32 @@ impl PredictionNullSummary {
         })
     }
 
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate_trace()?;
+        Ok(serde_json::json!({
+            "schema": NULL_EVIDENCE_SCHEMA,
+            "feature_schema": FEATURE_SCHEMA,
+            "model_schema": MODEL_SCHEMA,
+            "family": null_family_name(self.family),
+            "feature_set": feature_set_name(self.feature_set),
+            "config": {
+                "train_samples": self.config.train_samples,
+                "test_samples": self.config.test_samples,
+                "gap_samples": self.config.gap_samples,
+                "ridge_lambda": self.config.ridge_lambda
+            },
+            "requested_surrogate_count": self.requested_surrogate_count,
+            "surrogate_count": self.surrogate_count,
+            "observed_relational_mse": self.observed_relational_mse,
+            "surrogate_shifts": &self.surrogate_shifts,
+            "surrogate_mse": &self.surrogate_mse,
+            "minimum_surrogate_mse": self.minimum_surrogate_mse,
+            "exceedance_count": self.exceedance_count,
+            "exceedance_fraction": self.exceedance_fraction,
+            "evaluation_input_blake3": &self.evaluation_input_blake3
+        }).to_string())
+    }
+
     /// Reject malformed or tampered surrogate traces before interpretation.
     pub fn validate_trace(&self) -> Result<(), RelationalPredictionError> {
         validate_held_out_config_shape(&self.config)?;
@@ -1614,26 +1641,6 @@ fn feature_set_name(feature_set: PredictionFeatureSet) -> &'static str {
         PredictionFeatureSet::RelationalAugmented => "RelationalAugmented",
         PredictionFeatureSet::RelationalProfile => "RelationalProfile",
     }
-}
-
-fn prediction_null_summary_json(summary: &PredictionNullSummary) -> serde_json::Value {
-    serde_json::json!({
-        "family": null_family_name(summary.family),
-        "feature_set": feature_set_name(summary.feature_set),
-        "train_samples": summary.config.train_samples,
-        "test_samples": summary.config.test_samples,
-        "gap_samples": summary.config.gap_samples,
-        "ridge_lambda": summary.config.ridge_lambda,
-        "requested_surrogate_count": summary.requested_surrogate_count,
-        "surrogate_count": summary.surrogate_count,
-        "observed_relational_mse": summary.observed_relational_mse,
-        "surrogate_shifts": &summary.surrogate_shifts,
-        "surrogate_mse": &summary.surrogate_mse,
-        "minimum_surrogate_mse": summary.minimum_surrogate_mse,
-        "exceedance_count": summary.exceedance_count,
-        "exceedance_fraction": summary.exceedance_fraction,
-        "evaluation_input_blake3": &summary.evaluation_input_blake3
-    })
 }
 
 fn prediction_evidence_record_json(record: &PredictionEvidenceRecord) -> serde_json::Value {
@@ -2851,6 +2858,24 @@ mod tests {
         first.circular_shift_null.validate_trace().unwrap();
         first.feature_decoupling_null.validate_trace().unwrap();
         first.incremental_relational_null.validate_trace().unwrap();
+    }
+
+    #[test]
+    fn null_trace_serializes_with_explicit_schema() {
+        let summary = PredictionNullSummary::compute_for_feature_set(
+            &build_samples(0.5),
+            config(),
+            PredictionNullFamily::IncrementalRelationalShift,
+            PredictionFeatureSet::RelationalAugmented,
+            12,
+        )
+        .unwrap();
+
+        let json = summary.to_json().unwrap();
+        assert!(json.contains(NULL_EVIDENCE_SCHEMA));
+        assert!(json.contains("surrogate_shifts"));
+        assert!(json.contains("surrogate_mse"));
+        assert!(json.contains("evaluation_input_blake3"));
     }
 
     #[test]
