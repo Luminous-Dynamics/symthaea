@@ -25,7 +25,8 @@ rustfmt --edition 2024 --check \
   crates/core/nixward/src/action/executor.rs \
   crates/core/nixward/src/action/config_writer.rs \
   crates/core/nixward/src/action/post_state.rs \
-  crates/core/nixward/src/action/systemd_observer.rs
+  crates/core/nixward/src/action/systemd_observer.rs \
+  crates/core/nixward/src/action/systemd_mutation.rs
 
 echo "-- source boundary --"
 bash scripts/check-nixward-observation-boundary.sh
@@ -57,7 +58,10 @@ cargo test -p nixward --lib action::post_state::tests
 echo "-- read-only systemd D-Bus observer tests --"
 cargo test -p nixward --features systemd-observer --lib action::systemd_observer::tests
 
-echo "-- executor typed-service tests --"
+echo "-- typed systemd lifecycle mutation transport tests --"
+cargo test -p nixward --features systemd-mutation --lib action::systemd_mutation::tests
+
+echo "-- executor typed-service tests --
 cargo test -p nixward --lib action::executor::tests
 
 echo "-- config-writer currentness tests --"
