@@ -163,7 +163,7 @@ pub enum NeurosemanticArtifactLifecycleState {
     Rejected,
 }
 
-pub const NEUROSEMANTIC_ARTIFACT_LIFECYCLE_RECEIPT_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_ARTIFACT_LIFECYCLE_RECEIPT_SCHEMA_VERSION: u16 = 2;
 
 /// Content-addressed evidence that a downstream lifecycle effect was observed.
 /// Validation establishes exact binding of the receipt to the artifact, lineage,
@@ -176,6 +176,10 @@ pub struct NeurosemanticArtifactLifecycleReceipt {
     pub artifact_hash: String,
     pub derivation_provenance_ref: String,
     pub derivation_provenance_hash: String,
+    /// Monotonic event sequence when receipts are chained. Sequence zero is the first event.
+    pub event_sequence: u64,
+    /// Content hash of the immediately preceding lifecycle receipt, when chained.
+    pub previous_receipt_hash: Option<String>,
     pub action: NeurosemanticArtifactLifecycleAction,
     pub state: NeurosemanticArtifactLifecycleState,
     pub effect_evidence_ref: String,
@@ -185,6 +189,9 @@ pub struct NeurosemanticArtifactLifecycleReceipt {
     pub observed_at_unix_s: u64,
     /// Replacement/superseding artifact identity for rectification or supersession.
     pub resulting_artifact_hash: Option<String>,
+    /// Lineage identity for the replacement/superseding artifact.
+    pub resulting_derivation_provenance_ref: Option<String>,
+    pub resulting_derivation_provenance_hash: Option<String>,
 }
 
 impl NeurosemanticArtifactLifecycleReceipt {
@@ -201,26 +208,48 @@ impl NeurosemanticArtifactLifecycleReceipt {
             return Err("neurosemantic lifecycle receipt fields are invalid".into());
         }
 
-        if let Some(resulting_artifact_hash) = &self.resulting_artifact_hash {
-            if !valid_blake3_digest(resulting_artifact_hash)
-                || resulting_artifact_hash == &self.artifact_hash
-            {
-                return Err("neurosemantic lifecycle replacement artifact identity is invalid".into());
+        match (self.event_sequence, &self.previous_receipt_hash) {
+            (0, None) => {}
+            (0, Some(_)) => {
+                return Err("neurosemantic lifecycle sequence zero cannot reference a previous receipt".into());
             }
+            (_, None) => {
+                return Err("neurosemantic lifecycle nonzero sequence requires a previous receipt hash".into());
+            }
+            (_, Some(previous_hash)) if !valid_blake3_digest(previous_hash) => {
+                return Err("neurosemantic lifecycle previous receipt hash is invalid".into());
+            }
+            _ => {}
         }
 
         match self.action {
             NeurosemanticArtifactLifecycleAction::Rectification
             | NeurosemanticArtifactLifecycleAction::Supersession => {
-                if self.resulting_artifact_hash.is_none() {
-                    return Err("neurosemantic lifecycle replacement action requires a resulting artifact hash".into());
+                match (
+                    &self.resulting_artifact_hash,
+                    &self.resulting_derivation_provenance_ref,
+                    &self.resulting_derivation_provenance_hash,
+                ) {
+                    (Some(artifact_hash), Some(lineage_ref), Some(lineage_hash))
+                        if valid_blake3_digest(artifact_hash)
+                            && artifact_hash != &self.artifact_hash
+                            && valid_identifier(lineage_ref)
+                            && valid_blake3_digest(lineage_hash)
+                            && lineage_ref != &self.derivation_provenance_ref
+                            && lineage_hash != &self.derivation_provenance_hash => {}
+                    _ => {
+                        return Err("neurosemantic lifecycle replacement action requires distinct resulting artifact and lineage identities".into());
+                    }
                 }
             }
             NeurosemanticArtifactLifecycleAction::AccessRevocation
             | NeurosemanticArtifactLifecycleAction::Retention
             | NeurosemanticArtifactLifecycleAction::Erasure => {
-                if self.resulting_artifact_hash.is_some() {
-                    return Err("neurosemantic lifecycle non-replacement action cannot carry a resulting artifact hash".into());
+                if self.resulting_artifact_hash.is_some()
+                    || self.resulting_derivation_provenance_ref.is_some()
+                    || self.resulting_derivation_provenance_hash.is_some()
+                {
+                    return Err("neurosemantic lifecycle non-replacement action cannot carry replacement artifact lineage".into());
                 }
             }
         }
@@ -247,6 +276,67 @@ impl NeurosemanticArtifactLifecycleReceipt {
         self.validate().is_ok()
             && evidence_bytes.len() <= MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
             && content_hash(evidence_bytes) == self.effect_evidence_hash
+    }
+
+    /// Content-address the exact receipt, including lifecycle state and chain linkage.
+    pub fn fingerprint(&self) -> Result<String, String> {
+        self.validate()?;
+        let bytes = serde_json::to_vec(self)
+            .map_err(|error| format!("neurosemantic lifecycle receipt serialization: {error}"))?;
+        Ok(content_hash(&bytes))
+    }
+
+    /// Verify the append-only state transition from one receipt to this receipt.
+    /// This prevents sequence gaps, predecessor substitution, and impossible state regressions.
+    pub fn verify_transition(&self, previous: &Self) -> Result<(), String> {
+        self.validate()?;
+        previous.validate()?;
+        let previous_fingerprint = previous.fingerprint()?;
+        let expected_sequence = previous.event_sequence.checked_add(1)
+            .ok_or_else(|| "neurosemantic lifecycle event sequence overflow".to_string())?;
+        if self.event_sequence != expected_sequence
+            || self.previous_receipt_hash.as_deref() != Some(previous_fingerprint.as_str())
+            || self.artifact_hash != previous.artifact_hash
+            || self.derivation_provenance_ref != previous.derivation_provenance_ref
+            || self.derivation_provenance_hash != previous.derivation_provenance_hash
+            || self.action != previous.action
+            || self.observed_at_unix_s < previous.observed_at_unix_s
+        {
+            return Err("neurosemantic lifecycle receipt transition is not a valid append-only continuation".into());
+        }
+        match (previous.state, self.state) {
+            (NeurosemanticArtifactLifecycleState::Requested, NeurosemanticArtifactLifecycleState::Applied)
+            | (NeurosemanticArtifactLifecycleState::Requested, NeurosemanticArtifactLifecycleState::Rejected)
+            | (NeurosemanticArtifactLifecycleState::Applied, NeurosemanticArtifactLifecycleState::Verified)
+            | (NeurosemanticArtifactLifecycleState::Applied, NeurosemanticArtifactLifecycleState::Rejected) => Ok(()),
+            _ => Err("neurosemantic lifecycle state transition is invalid".into()),
+        }
+    }
+
+    /// Verify the concrete replacement lineage record when a replacement action is declared.
+    pub fn verify_resulting_lineage_binding_bytes(
+        &self,
+        lineage_record_bytes: &[u8],
+    ) -> Result<NeurosemanticDerivationLineageRecord, String> {
+        self.validate()?;
+        let expected_artifact_hash = self.resulting_artifact_hash.as_deref().ok_or_else(||
+            "neurosemantic lifecycle receipt has no resulting artifact for lineage verification".to_string())?;
+        let expected_lineage_ref = self.resulting_derivation_provenance_ref.as_deref().ok_or_else(||
+            "neurosemantic lifecycle receipt has no resulting lineage reference".to_string())?;
+        let expected_lineage_hash = self.resulting_derivation_provenance_hash.as_deref().ok_or_else(||
+            "neurosemantic lifecycle receipt has no resulting lineage hash".to_string())?;
+        if lineage_record_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err("neurosemantic replacement lineage record exceeds the serialized artifact limit".into());
+        }
+        let record = NeurosemanticDerivationLineageRecord::from_json_bytes(lineage_record_bytes)?;
+        if record.lineage_ref != expected_lineage_ref
+            || record.output_artifact_hash != expected_artifact_hash
+            || compute_derivation_provenance_hash(expected_lineage_ref, lineage_record_bytes)
+                != expected_lineage_hash
+        {
+            return Err("neurosemantic lifecycle replacement lineage binding mismatch".into());
+        }
+        Ok(record)
     }
 
     /// Bind a lifecycle receipt to the exact derived artifact and lineage record
@@ -1917,102 +2007,134 @@ mod tests {
             .unwrap()
     }
 
-    fn synthetic_lifecycle_receipt() -> (NeurosemanticArtifactLifecycleReceipt, Vec<u8>) {
+    fn synthetic_lifecycle_receipt_chain() -> (
+        NeurosemanticArtifactLifecycleReceipt,
+        NeurosemanticArtifactLifecycleReceipt,
+        NeurosemanticArtifactLifecycleReceipt,
+        Vec<u8>,
+        NeurosemanticDerivationLineageRecord,
+        Vec<u8>,
+    ) {
         let evidence = b"synthetic-lifecycle-effect-v1".to_vec();
-        (
-            NeurosemanticArtifactLifecycleReceipt {
-                schema_version: NEUROSEMANTIC_ARTIFACT_LIFECYCLE_RECEIPT_SCHEMA_VERSION,
-                receipt_ref: "synthetic-lifecycle-receipt-1".into(),
-                artifact_hash: synthetic_output_artifact_hash(),
-                derivation_provenance_ref: "synthetic-derivation-record-1".into(),
-                derivation_provenance_hash: compute_derivation_provenance_hash(
-                    "synthetic-derivation-record-1",
-                    &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
-                ),
-                action: NeurosemanticArtifactLifecycleAction::Erasure,
-                state: NeurosemanticArtifactLifecycleState::Verified,
-                effect_evidence_ref: "synthetic-lifecycle-effect-1".into(),
-                effect_evidence_hash: content_hash(&evidence),
-                execution_revision: "2".repeat(40),
-                observed_at_unix_s: 160,
-                resulting_artifact_hash: None,
-            },
-            evidence,
-        )
+        let lineage = synthetic_derivation_lineage_record();
+        let derivation_hash = compute_derivation_provenance_hash(
+            &lineage.lineage_ref,
+            &serde_json::to_vec(&lineage).unwrap(),
+        );
+        let base = NeurosemanticArtifactLifecycleReceipt {
+            schema_version: NEUROSEMANTIC_ARTIFACT_LIFECYCLE_RECEIPT_SCHEMA_VERSION,
+            receipt_ref: "synthetic-lifecycle-receipt-1".into(),
+            artifact_hash: lineage.output_artifact_hash.clone(),
+            derivation_provenance_ref: lineage.lineage_ref.clone(),
+            derivation_provenance_hash: derivation_hash.clone(),
+            event_sequence: 0,
+            previous_receipt_hash: None,
+            action: NeurosemanticArtifactLifecycleAction::Erasure,
+            state: NeurosemanticArtifactLifecycleState::Requested,
+            effect_evidence_ref: "synthetic-lifecycle-effect-1".into(),
+            effect_evidence_hash: content_hash(&evidence),
+            execution_revision: "2".repeat(40),
+            observed_at_unix_s: 158,
+            resulting_artifact_hash: None,
+            resulting_derivation_provenance_ref: None,
+            resulting_derivation_provenance_hash: None,
+        };
+        let applied = NeurosemanticArtifactLifecycleReceipt {
+            receipt_ref: "synthetic-lifecycle-receipt-2".into(),
+            event_sequence: 1,
+            previous_receipt_hash: Some(base.fingerprint().unwrap()),
+            state: NeurosemanticArtifactLifecycleState::Applied,
+            observed_at_unix_s: 159,
+            ..base.clone()
+        };
+        let verified = NeurosemanticArtifactLifecycleReceipt {
+            receipt_ref: "synthetic-lifecycle-receipt-3".into(),
+            event_sequence: 2,
+            previous_receipt_hash: Some(applied.fingerprint().unwrap()),
+            state: NeurosemanticArtifactLifecycleState::Verified,
+            observed_at_unix_s: 160,
+            ..applied.clone()
+        };
+        let replacement_hash = content_hash(b"replacement-artifact");
+        let replacement_lineage = NeurosemanticDerivationLineageRecord {
+            lineage_ref: "synthetic-replacement-lineage".into(),
+            output_artifact_hash: replacement_hash,
+            ..lineage.clone()
+        };
+        let replacement_bytes = serde_json::to_vec(&replacement_lineage).unwrap();
+        (base, applied, verified, evidence, replacement_lineage, replacement_bytes)
     }
 
     #[test]
     fn lifecycle_receipt_binds_artifact_lineage_and_effect_evidence() {
-        let (receipt, evidence) = synthetic_lifecycle_receipt();
+        let (requested, applied, verified, evidence, _, _) = synthetic_lifecycle_receipt_chain();
         let lineage = synthetic_derivation_lineage_record();
         let lineage_bytes = serde_json::to_vec(&lineage).unwrap();
-        assert!(receipt.validate().is_ok());
+        assert!(verified.validate().is_ok());
         assert_eq!(
             NeurosemanticArtifactLifecycleReceipt::from_json_bytes(
-                &serde_json::to_vec(&receipt).unwrap()
-            )
-            .unwrap(),
-            receipt
+                &serde_json::to_vec(&verified).unwrap()
+            ).unwrap(),
+            verified
         );
-        assert!(receipt.verify_effect_evidence_bytes(&evidence));
-        assert!(receipt
-            .verify_binding(
-                &lineage.output_artifact_hash,
-                &lineage.lineage_ref,
-                &compute_derivation_provenance_hash(&lineage.lineage_ref, &lineage_bytes),
-                &evidence,
-                170
-            )
-            .is_ok());
-
-        assert!(!receipt.verify_effect_evidence_bytes(
-            b"synthetic-lifecycle-effect-tampered"
-        ));
-        assert!(receipt
-            .verify_binding(
-                &content_hash(b"wrong-artifact"),
-                &lineage.lineage_ref,
-                &compute_derivation_provenance_hash(&lineage.lineage_ref, &lineage_bytes),
-                &evidence,
-                170
-            )
-            .is_err());
-        assert!(receipt
-            .verify_binding(
-                &lineage.output_artifact_hash,
-                "synthetic-derivation-record-2",
-                &compute_derivation_provenance_hash(&lineage.lineage_ref, &lineage_bytes),
-                &evidence,
-                170
-            )
-            .is_err());
+        assert!(verified.verify_effect_evidence_bytes(&evidence));
+        assert!(verified.verify_binding(
+            &lineage.output_artifact_hash,
+            &lineage.lineage_ref,
+            &compute_derivation_provenance_hash(&lineage.lineage_ref, &lineage_bytes),
+            &evidence,
+            170,
+        ).is_ok());
+        assert!(applied.verify_transition(&requested).is_ok());
+        assert!(verified.verify_transition(&applied).is_ok());
+        assert!(!verified.verify_effect_evidence_bytes(b"synthetic-lifecycle-effect-tampered"));
+        let mut forged = verified.clone();
+        forged.previous_receipt_hash = Some(content_hash(b"wrong-previous-receipt"));
+        assert!(forged.verify_transition(&applied).is_err());
     }
 
     #[test]
     fn lifecycle_receipt_rejects_future_and_ambiguous_replacement_claims() {
-        let (mut receipt, evidence) = synthetic_lifecycle_receipt();
+        let (requested, applied, mut receipt, evidence, replacement_lineage, replacement_bytes) =
+            synthetic_lifecycle_receipt_chain();
         assert!(receipt.verify_binding(
             &receipt.artifact_hash,
             &receipt.derivation_provenance_ref,
             &receipt.derivation_provenance_hash,
             &evidence,
-            159
+            159,
         ).is_err());
+        assert!(receipt.verify_transition(&applied).is_ok());
+        assert!(applied.verify_transition(&requested).is_ok());
 
         receipt.action = NeurosemanticArtifactLifecycleAction::Rectification;
         receipt.resulting_artifact_hash = None;
+        receipt.resulting_derivation_provenance_ref = None;
+        receipt.resulting_derivation_provenance_hash = None;
         assert!(receipt.validate().is_err());
 
         receipt.resulting_artifact_hash = Some(receipt.artifact_hash.clone());
+        receipt.resulting_derivation_provenance_ref = Some(replacement_lineage.lineage_ref.clone());
+        receipt.resulting_derivation_provenance_hash = Some(content_hash(&replacement_bytes));
         assert!(receipt.validate().is_err());
 
-        receipt.resulting_artifact_hash = Some(content_hash(b"replacement-artifact"));
+        receipt.resulting_artifact_hash = Some(replacement_lineage.output_artifact_hash.clone());
+        receipt.resulting_derivation_provenance_ref = Some(replacement_lineage.lineage_ref.clone());
+        receipt.resulting_derivation_provenance_hash = Some(
+            compute_derivation_provenance_hash(&replacement_lineage.lineage_ref, &replacement_bytes)
+        );
         assert!(receipt.validate().is_ok());
+        assert!(receipt.verify_resulting_lineage_binding_bytes(&replacement_bytes).is_ok());
+
+        let mut forged_lineage = replacement_lineage.clone();
+        forged_lineage.output_artifact_hash = content_hash(b"other-artifact");
+        let forged_bytes = serde_json::to_vec(&forged_lineage).unwrap();
+        assert!(receipt.verify_resulting_lineage_binding_bytes(&forged_bytes).is_err());
     }
 
     #[test]
     fn lifecycle_receipt_bounded_parser_and_schema_are_fail_closed() {
-        let (receipt, _) = synthetic_lifecycle_receipt();
+        let (_, _, receipt, _, _, _) = synthetic_lifecycle_receipt_chain();
         let mut value = serde_json::to_value(&receipt).unwrap();
         value.as_object_mut()
             .unwrap()
