@@ -174,7 +174,8 @@ pub use rhyme_hdc::{RhymeEncoder, RhymeScheme, RhymeScore, RhymeType};
 
 // Re-export REPL voice types
 pub use repl_voice::{
-    AnalyzedWord, PhraseBoundary, ReplVoiceConfig, ReplVoiceOutput, SimpleG2P, TextAnalyzer,
+    AnalyzedWord, PhraseBoundary, PronunciationLexiconEvidence, ReplVoiceConfig, ReplVoiceOutput,
+    SimpleG2P, TextAnalyzer,
 };
 
 // Re-export Kokoro TTS types
