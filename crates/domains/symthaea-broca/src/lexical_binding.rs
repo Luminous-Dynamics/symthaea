@@ -319,6 +319,10 @@ pub const UNIMORPH_TSV_SOURCE_FORMAT_VERSION: &str =
     "unimorph-tsv-lemma-form-features-v1";
 pub const UNIMORPH_TSV_COMPILER_ID: &str = "symthaea-unimorph-tsv-compiler";
 pub const UNIMORPH_TSV_COMPILER_VERSION: &str = "broca-unimorph-tsv-compiler-v1";
+pub const UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION: &str =
+    env!("SYMTHAEA_UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION");
+pub const UNIMORPH_TSV_SOURCE_PARSER_REVISION: &str =
+    env!("SYMTHAEA_UNIMORPH_TSV_SOURCE_PARSER_REVISION");
 pub const UNIMORPH_TSV_NORMALIZATION_POLICY: &str =
     "trim-one-line-ending-sort-feature-tokens-sort-output-rules-v1";
 pub const UNIMORPH_TSV_FEATURE_BUNDLE_CATEGORY: &str = "unimorph-bundle";
@@ -371,6 +375,7 @@ impl std::fmt::Display for MorphophonologicalUnimorphCompilerError {
 
 impl std::error::Error for MorphophonologicalUnimorphCompilerError {}
 
+// BEGIN UNIMORPH_TSV_SOURCE_PARSER_SURFACE_V1
 pub fn normalize_unimorph_feature_bundle(
     feature_bundle: &str,
 ) -> Result<MorphologicalFeature, MorphophonologicalUnimorphCompilerError> {
@@ -425,6 +430,7 @@ fn parse_unimorph_source_record(
         feature_bundle: normalized.value,
     })
 }
+// END UNIMORPH_TSV_SOURCE_PARSER_SURFACE_V1
 
 fn infer_simple_unimorph_operation(
     lemma: &str,
@@ -590,6 +596,12 @@ pub struct MorphophonologicalCompilationWitness {
     pub version: String,
     pub compiler_id: String,
     pub compiler_version: String,
+    /// Exact content identity of the current UniMorph compiler source module and its build-time
+    /// identity mechanism.
+    pub compiler_implementation_revision: String,
+    /// Exact content identity of the accepted source-format parser surface and its build-time
+    /// identity mechanism.
+    pub source_parser_revision: String,
     pub normalization_policy: String,
     pub source_artifact_blake3: String,
     pub source_selection_blake3: String,
@@ -615,6 +627,8 @@ impl MorphophonologicalCompilationWitness {
             version: MORPHOPHONOLOGICAL_COMPILATION_WITNESS_VERSION.to_string(),
             compiler_id: compiler_id.into(),
             compiler_version: compiler_version.into(),
+            compiler_implementation_revision: UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION.to_string(),
+            source_parser_revision: UNIMORPH_TSV_SOURCE_PARSER_REVISION.to_string(),
             normalization_policy: normalization_policy.into(),
             source_artifact_blake3: blake3::hash(source_artifact).to_hex().to_string(),
             source_selection_blake3: String::new(),
@@ -638,11 +652,21 @@ impl MorphophonologicalCompilationWitness {
         for value in [
             self.compiler_id.as_str(),
             self.compiler_version.as_str(),
+            self.compiler_implementation_revision.as_str(),
+            self.source_parser_revision.as_str(),
             self.normalization_policy.as_str(),
         ] {
             if value.trim().is_empty() {
                 return Err(MorphophonologicalCompilationWitnessError::EmptyMetadata);
             }
+        }
+        if self.compiler_implementation_revision != UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION {
+            return Err(
+                MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch,
+            );
+        }
+        if self.source_parser_revision != UNIMORPH_TSV_SOURCE_PARSER_REVISION {
+            return Err(MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch);
         }
         if !is_canonical_blake3_digest(&self.source_artifact_blake3)
             || !is_canonical_blake3_digest(&self.source_selection_blake3)
@@ -697,6 +721,8 @@ impl MorphophonologicalCompilationWitness {
         let surface = (
             &self.compiler_id,
             &self.compiler_version,
+            &self.compiler_implementation_revision,
+            &self.source_parser_revision,
             &self.normalization_policy,
             &self.source_selection_blake3,
             &self.output_rule_set_blake3,
@@ -726,6 +752,14 @@ impl MorphophonologicalCompilationWitness {
         {
             return Err(MorphophonologicalCompilationWitnessError::UnsupportedCompiler);
         }
+        if self.compiler_implementation_revision != UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION {
+            return Err(
+                MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch,
+            );
+        }
+        if self.source_parser_revision != UNIMORPH_TSV_SOURCE_PARSER_REVISION {
+            return Err(MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch);
+        }
 
         let (recompiled_rule_set, recompiled_witness) =
             MorphophonologicalRuleSet::compile_unimorph_tsv_source(
@@ -754,6 +788,14 @@ impl MorphophonologicalCompilationWitness {
         output_rule_set: &MorphophonologicalRuleSet,
     ) -> Result<(), MorphophonologicalCompilationWitnessError> {
         self.validate_shape()?;
+        if self.compiler_implementation_revision != UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION {
+            return Err(
+                MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch,
+            );
+        }
+        if self.source_parser_revision != UNIMORPH_TSV_SOURCE_PARSER_REVISION {
+            return Err(MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch);
+        }
         output_rule_set
             .validate()
             .map_err(|_| MorphophonologicalCompilationWitnessError::InvalidRuleSet)?;
@@ -844,6 +886,8 @@ pub enum MorphophonologicalCompilationWitnessError {
     OutputRuleSetMismatch,
     TransformationMismatch,
     UnsupportedCompiler,
+    CompilerImplementationRevisionMismatch,
+    SourceParserRevisionMismatch,
     CompilerReplayFailed,
     CompilerReplayMismatch,
     WitnessReplayMismatch,
@@ -870,6 +914,8 @@ impl std::fmt::Display for MorphophonologicalCompilationWitnessError {
             Self::OutputRuleSetMismatch => write!(f, "morphophonological compilation witness output rule-set identity does not match"),
             Self::TransformationMismatch => write!(f, "morphophonological compilation witness transformation digest does not match its declared inputs"),
             Self::UnsupportedCompiler => write!(f, "morphophonological compilation witness compiler implementation is not supported for replay"),
+            Self::CompilerImplementationRevisionMismatch => write!(f, "morphophonological compilation witness compiler implementation revision does not match the current compiler"),
+            Self::SourceParserRevisionMismatch => write!(f, "morphophonological compilation witness source parser revision does not match the current parser"),
             Self::CompilerReplayFailed => write!(f, "morphophonological compilation witness compiler replay failed"),
             Self::CompilerReplayMismatch => write!(f, "morphophonological compilation witness compiler replay did not reproduce the exact output rule set"),
             Self::WitnessReplayMismatch => write!(f, "morphophonological compilation witness compiler replay did not reproduce the exact witness"),
@@ -3224,6 +3270,24 @@ mod tests {
         witness
             .replay_unimorph_tsv_compilation(artifact, &rule_set)
             .expect("current UniMorph compiler must reproduce the exact rule set and witness");
+
+        let mut compiler_revision_tampered = witness.clone();
+        compiler_revision_tampered.compiler_implementation_revision = "tampered-compiler-revision".into();
+        assert_eq!(
+            compiler_revision_tampered
+                .replay_unimorph_tsv_compilation(artifact, &rule_set)
+                .expect_err("compiler implementation revision tampering must fail closed"),
+            MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch
+        );
+
+        let mut parser_revision_tampered = witness.clone();
+        parser_revision_tampered.source_parser_revision = "tampered-parser-revision".into();
+        assert_eq!(
+            parser_revision_tampered
+                .replay_unimorph_tsv_compilation(artifact, &rule_set)
+                .expect_err("source parser revision tampering must fail closed"),
+            MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch
+        );
 
         let mut replay_tampered = witness.clone();
         replay_tampered.normalization_policy = "different-normalization-v0".into();
