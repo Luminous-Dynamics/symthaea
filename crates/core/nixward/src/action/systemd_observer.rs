@@ -783,7 +783,8 @@ fn build_observation_from_properties(
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
 
     if let Some(ref job) = job {
-        let expected_job_type = NixSystemdJobTypeV1::for_operation(operation);
+        let expected_job_type = NixSystemdJobTypeV1::for_operation(operation)
+            .ok_or(NixSystemdObserverErrorV1::JobCorrelationMismatch)?;
         if job.job_type != expected_job_type || job.unit != expected_unit {
             return Err(NixSystemdObserverErrorV1::JobCorrelationMismatch);
         }
@@ -916,6 +917,30 @@ mod tests {
         let bad = OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42").unwrap();
         validate_unit_object_path(&valid).unwrap();
         assert!(validate_unit_object_path(&bad).is_err());
+    }
+
+    #[test]
+    fn unique_systemd_manager_owner_is_strict() {
+        assert!(validate_unique_owner(":1.42").is_ok());
+        assert!(validate_unique_owner(":").is_ok());
+        assert!(validate_unique_owner("org.freedesktop.systemd1").is_err());
+        assert!(validate_unique_owner("").is_err());
+        assert!(validate_unique_owner(&"x".repeat(256)).is_err());
+    }
+
+    #[test]
+    fn manager_signal_sender_mismatch_is_rejected() {
+        let message = Message::signal(
+            "/org/freedesktop/systemd1",
+            "org.freedesktop.systemd1.Manager",
+            "JobRemoved",
+        )
+        .unwrap()
+        .build(&(42u32, "/org/freedesktop/systemd1/job/42", "nginx.service", "done"))
+        .unwrap();
+        // The sender field is absent on a locally constructed message. The
+        // verifier must fail closed rather than treating absence as trusted.
+        assert!(validate_manager_signal_sender(&message, ":1.42").is_err());
     }
 
     #[test]
