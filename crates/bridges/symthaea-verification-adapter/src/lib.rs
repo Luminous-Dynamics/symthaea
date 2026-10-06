@@ -207,7 +207,7 @@ impl JsonControllerDocumentSnapshotAdapter {
             .is_some_and(is_lower_hex_digest)
         {
             return Err(SnapshotError::Malformed(
-                "expected snapshot reference must be sha256:<64 hex characters>".into(),
+                "expected snapshot reference must be sha256:<64 lowercase hex characters>".into(),
             ));
         }
 
@@ -822,7 +822,10 @@ fn validate_multikey_encoding(value: &str) -> Result<(), SnapshotError> {
 }
 
 fn is_lower_hex_digest(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 fn validate_snapshot_reference(value: &str) -> Result<(), SnapshotError> {
@@ -833,7 +836,7 @@ fn validate_snapshot_reference(value: &str) -> Result<(), SnapshotError> {
     })?;
     if !is_lower_hex_digest(digest) {
         return Err(SnapshotError::Malformed(
-            "snapshot reference must contain a 64-character hexadecimal SHA-256 digest".into(),
+            "snapshot reference must contain a 64-character lowercase hexadecimal SHA-256 digest".into(),
         ));
     }
     Ok(())
@@ -1438,30 +1441,24 @@ mod tests {
     }
 
     #[test]
-    fn relationship_lifecycle_timestamp_comparison_accepts_xsd_equivalence() {
-        let mut snapshot = snapshot();
-        snapshot.document = r##"{
-            "id": "https://example.test/controller",
-            "verificationMethod": [{
-                "id": "https://example.test/controller#key-1",
-                "type": "Multikey",
-                "controller": "https://example.test/controller",
-                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
-                "expires": "2026-10-05T24:00:00Z"
-            }],
-            "assertionMethod": [{
-                "id": "https://example.test/controller#key-1",
-                "type": "Multikey",
-                "controller": "https://example.test/controller",
-                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
-                "expires": "2026-10-06T00:00:00Z"
-            }]
-        }"##.into();
+    fn relationship_lifecycle_timestamp_comparison_uses_xsd_value_equality() {
+        assert!(timestamps_equal(
+            "2026-10-05T24:00:00Z",
+            "2026-10-06T00:00:00Z",
+        )
+        .unwrap());
 
-        let reference = snapshot.snapshot_reference().unwrap();
-        let adapter =
-            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
-        assert!(adapter.resolve_snapshot(&request(), snapshot).is_ok());
+        assert!(timestamps_equal(
+            "2026-10-06T02:00:00+02:00",
+            "2026-10-06T00:00:00Z",
+        )
+        .unwrap());
+
+        assert!(!timestamps_equal(
+            "2026-10-06T02:00:00+02:00",
+            "2026-10-06T00:00:01Z",
+        )
+        .unwrap());
     }
 
     #[test]
