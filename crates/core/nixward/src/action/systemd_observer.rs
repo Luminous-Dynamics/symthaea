@@ -671,6 +671,7 @@ impl NixSystemdReadOnlyObserverV1 {
             .digest()
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
         let definition_content_files = definition_content.as_ref().files.clone();
+        let definition_bus_id = definition_content.as_ref().bus_id.clone();
 
         let observation = build_observation_from_properties(
             operation,
@@ -678,6 +679,7 @@ impl NixSystemdReadOnlyObserverV1 {
             generation,
             &object_path,
             &manager_owner,
+            &definition_bus_id,
             &service_result,
             &unit_properties,
             &definition_content_digest,
@@ -1177,6 +1179,7 @@ fn build_observation_from_properties(
     generation: u64,
     unit_object_path: &OwnedObjectPath,
     manager_owner: &str,
+    systemd_bus_id: &str,
     service_result: &str,
     properties: &HashMap<String, OwnedValue>,
     definition_content_digest: &str,
@@ -1283,6 +1286,7 @@ fn build_observation_from_properties(
         service_result,
         systemd_job: job,
         systemd_manager_owner: Some(manager_owner.to_string()),
+        systemd_bus_id: systemd_bus_id.to_string(),
         invocation_id,
         state_change_at_monotonic_us,
         observed_at_monotonic_us,
