@@ -874,7 +874,18 @@ impl RollingOriginRelationalPredictionSummary {
         }
 
         let mean = |select: fn(&HeldOutRelationalPredictionSummary) -> f64| {
-            segments.iter().map(select).sum::<f64>() / segments.len() as f64
+            let mut total = 0.0;
+            for segment in &segments {
+                total += select(segment);
+                if !total.is_finite() {
+                    return Err(RelationalPredictionError::ModelFitFailed);
+                }
+            }
+            let result = total / segments.len() as f64;
+            if !result.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+            Ok(result)
         };
 
         Ok(Self {
@@ -885,13 +896,13 @@ impl RollingOriginRelationalPredictionSummary {
             origin_count: config.origin_count,
             step_samples: config.step_samples,
             forecast_horizon: config.forecast_horizon,
-            mean_persistence_mse: mean(|s| s.persistence_baseline.mean_squared_error),
-            mean_isolated_agents_mse: mean(|s| s.isolated_agents.mean_squared_error),
-            mean_common_driver_mse: mean(|s| s.common_driver.mean_squared_error),
-            mean_synchrony_only_mse: mean(|s| s.synchrony_only.mean_squared_error),
-            mean_non_relational_context_mse: mean(|s| s.non_relational_context.mean_squared_error),
-            mean_relational_augmented_mse: mean(|s| s.relational_augmented.mean_squared_error),
-            mean_relational_profile_mse: mean(|s| s.relational_profile.mean_squared_error),
+            mean_persistence_mse: mean(|s| s.persistence_baseline.mean_squared_error)?,
+            mean_isolated_agents_mse: mean(|s| s.isolated_agents.mean_squared_error)?,
+            mean_common_driver_mse: mean(|s| s.common_driver.mean_squared_error)?,
+            mean_synchrony_only_mse: mean(|s| s.synchrony_only.mean_squared_error)?,
+            mean_non_relational_context_mse: mean(|s| s.non_relational_context.mean_squared_error)?,
+            mean_relational_augmented_mse: mean(|s| s.relational_augmented.mean_squared_error)?,
+            mean_relational_profile_mse: mean(|s| s.relational_profile.mean_squared_error)?,
             segments,
             status: EvidenceStatus::Measured,
         })
