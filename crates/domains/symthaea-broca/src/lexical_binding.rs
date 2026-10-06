@@ -345,6 +345,7 @@ pub enum MorphophonologicalUnimorphCompilerError {
     EmptyForm,
     EmptyFeatureBundle,
     EmptyFeatureToken,
+    DuplicateFeatureToken,
     UnsupportedDerivation,
     AmbiguousSimpleDerivation,
     DuplicateLemmaAndFeatureBundle,
@@ -363,6 +364,7 @@ impl std::fmt::Display for MorphophonologicalUnimorphCompilerError {
             Self::EmptyForm => write!(f, "UniMorph source record surface form must be non-empty"),
             Self::EmptyFeatureBundle => write!(f, "UniMorph source record feature bundle must be non-empty"),
             Self::EmptyFeatureToken => write!(f, "UniMorph source feature bundle contains an empty token"),
+            Self::DuplicateFeatureToken => write!(f, "UniMorph source feature bundle contains a duplicate token"),
             Self::UnsupportedDerivation => write!(f, "UniMorph source record cannot be represented by the supported deterministic rule operations"),
             Self::AmbiguousSimpleDerivation => write!(f, "UniMorph source record admits multiple supported simple derivations"),
             Self::DuplicateLemmaAndFeatureBundle => write!(f, "UniMorph source compilation contains duplicate lemma and feature-bundle identities"),
@@ -387,6 +389,11 @@ pub fn normalize_unimorph_feature_bundle(
         return Err(MorphophonologicalUnimorphCompilerError::EmptyFeatureToken);
     }
     tokens.sort_unstable();
+    for window in tokens.windows(2) {
+        if window[0] == window[1] {
+            return Err(MorphophonologicalUnimorphCompilerError::DuplicateFeatureToken);
+        }
+    }
     Ok(MorphologicalFeature {
         category: UNIMORPH_TSV_FEATURE_BUNDLE_CATEGORY.to_string(),
         value: tokens.join(";"),
@@ -3323,6 +3330,15 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn unimorph_tsv_compiler_rejects_duplicate_feature_tokens() {
+        assert_eq!(
+            normalize_unimorph_feature_bundle("V;PST;V")
+                .expect_err("duplicate feature token must fail closed"),
+            MorphophonologicalUnimorphCompilerError::DuplicateFeatureToken
+        );
+    }
+
     fn unimorph_tsv_compiler_rejects_duplicate_lemma_feature_identity() {
         let artifact = b"walk\twalked\tV;PST\nwalk\twalkt\tV;PST\n";
         let first_len = b"walk\twalked\tV;PST\n".len();
