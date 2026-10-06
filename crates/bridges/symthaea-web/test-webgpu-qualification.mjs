@@ -2138,7 +2138,7 @@ try {
   }
 
   const artifact = {
-    schema: 'symthaea-ui-webgpu-qualification-v14',
+    schema: 'symthaea-ui-webgpu-qualification-v15',
     harness_self_tests_passed: true,
     url: URL,
     chromium: CHROMIUM,
