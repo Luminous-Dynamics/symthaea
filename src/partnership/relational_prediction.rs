@@ -532,6 +532,9 @@ impl HeldOutRelationalPredictionEvidence {
     pub fn validate(&self) -> Result<(), RelationalPredictionError> {
         validate_evidence_provenance(&self.provenance)?;
         validate_held_out_config_shape(&self.config)?;
+        if self.summary.status != EvidenceStatus::Measured {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
         if self.summary.train_samples != self.config.train_samples
             || self.summary.test_samples != self.config.test_samples
             || self.summary.gap_samples != self.config.gap_samples
@@ -860,6 +863,7 @@ impl RollingOriginRelationalPredictionEvidence {
             || self.config.forecast_horizon <= 0.0
             || !self.config.ridge_lambda.is_finite()
             || self.config.ridge_lambda < 0.0
+            || self.observed.status != EvidenceStatus::Measured
             || self.origins.len() != self.config.origin_count
             || self.observed.segments.len() != self.config.origin_count
             || self.origin_starts.len() != self.config.origin_count
@@ -880,6 +884,7 @@ impl RollingOriginRelationalPredictionEvidence {
 
             origin.validate()?;
             if origin.provenance != self.provenance
+                || origin.summary.status != EvidenceStatus::Measured
                 || origin.summary != self.observed.segments[index]
                 || origin.summary.train_samples != self.config.train_samples
                 || origin.summary.test_samples != self.config.test_samples
@@ -1507,6 +1512,7 @@ impl PredictionNullSummary {
             || !self.minimum_surrogate_mse.is_finite()
             || self.minimum_surrogate_mse < 0.0
             || !self.exceedance_fraction.is_finite()
+            || self.status != EvidenceStatus::Proxy
         {
             return Err(RelationalPredictionError::InvalidSurrogateCount);
         }
@@ -2955,6 +2961,36 @@ mod tests {
         assert_eq!(
             summary.verify_against_samples(&samples, altered),
             Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_and_null_traces_reject_tampered_status() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            provenance(),
+        )
+        .unwrap();
+        evidence.summary.status = EvidenceStatus::Proxy;
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
+        let mut null_trace = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config(),
+            PredictionNullFamily::CircularShift,
+            PredictionFeatureSet::RelationalAugmented,
+            12,
+        )
+        .unwrap();
+        null_trace.status = EvidenceStatus::Measured;
+        assert_eq!(
+            null_trace.validate_trace(),
+            Err(RelationalPredictionError::InvalidSurrogateCount)
         );
     }
 
