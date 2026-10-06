@@ -902,7 +902,7 @@ nixos-generate-config --root /mnt
                  \x20 users.users.{hostname} = {{\n\
                  \x20   isNormalUser = true;\n\
                  \x20   extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];\n\
-                 \x20   initialPassword = \"changeme\";\n\
+                 \x20   \n\
                  \x20 }};\n\
                  \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs ];\n\
                  \x20 system.stateVersion = \"25.05\";\n\
@@ -1092,7 +1092,7 @@ nixos-generate-config --root /mnt || echo "WARNING: nixos-generate-config failed
                  \x20 users.users.{hostname} = {{\n\
                  \x20   isNormalUser = true;\n\
                  \x20   extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];\n\
-                 \x20   initialPassword = \"changeme\";\n\
+                 \x20   \n\
                  \x20 }};\n\
                  \n\
                  \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs ];\n\
@@ -1264,7 +1264,7 @@ echo '  networking.hostId = "deadbeef";' >> /mnt/etc/nixos/hardware-configuratio
             );
 
             let fallback_zfs = format!(
-                "{{ config, pkgs, ... }}:\n{{\n  imports = [ ./hardware-configuration.nix ];\n  networking.hostName = \"{hostname}\";\n  boot.loader.systemd-boot.enable = true;\n  boot.loader.efi.canTouchEfiVariables = true;\n  boot.supportedFilesystems = [ \"zfs\" ];\n  boot.zfs.devNodes = \"/dev/disk/by-id\";\n  networking.hostId = \"deadbeef\";\n  services.zfs.autoScrub.enable = true;\n  services.zfs.trim.enable = true;\n  users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ]; initialPassword = \"changeme\"; }};\n  environment.systemPackages = with pkgs; [ vim git curl wget htop ];\n  system.stateVersion = \"25.05\";\n}}",
+                "{{ config, pkgs, ... }}:\n{{\n  imports = [ ./hardware-configuration.nix ];\n  networking.hostName = \"{hostname}\";\n  boot.loader.systemd-boot.enable = true;\n  boot.loader.efi.canTouchEfiVariables = true;\n  boot.supportedFilesystems = [ \"zfs\" ];\n  boot.zfs.devNodes = \"/dev/disk/by-id\";\n  networking.hostId = \"deadbeef\";\n  services.zfs.autoScrub.enable = true;\n  services.zfs.trim.enable = true;\n  users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];  }};\n  environment.systemPackages = with pkgs; [ vim git curl wget htop ];\n  system.stateVersion = \"25.05\";\n}}",
                 hostname = hostname,
             );
             script.push_str(&config_write_commands(
@@ -1426,7 +1426,7 @@ nixos-generate-config --root /mnt
                      \x20 users.users.{hostname} = {{\n\
                      \x20   isNormalUser = true;\n\
                      \x20   extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];\n\
-                     \x20   initialPassword = \"changeme\";\n\
+                     \x20   \n\
                      \x20 }};\n\
                      \n\
                      \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs cryptsetup ];\n\
@@ -1604,7 +1604,7 @@ nixos-generate-config --root /mnt
                  \x20 users.users.{hostname} = {{\n\
                  \x20   isNormalUser = true;\n\
                  \x20   extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];\n\
-                 \x20   initialPassword = \"changeme\";\n\
+                 \x20   \n\
                  \x20 }};\n\
                  \n\
                  \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs ];\n\
@@ -1742,7 +1742,7 @@ nixos-generate-config --root /mnt
                  \x20 users.users.{hostname} = {{\n\
                  \x20   isNormalUser = true;\n\
                  \x20   extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];\n\
-                 \x20   initialPassword = \"changeme\";\n\
+                 \x20   \n\
                  \x20 }};\n\
                  \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs ];\n\
                  \x20 system.stateVersion = \"25.05\";\n\
@@ -1877,7 +1877,7 @@ mdadm --detail --scan >> /mnt/etc/mdadm.conf
                  \x20 users.users.{hostname} = {{\n\
                  \x20   isNormalUser = true;\n\
                  \x20   extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];\n\
-                 \x20   initialPassword = \"changeme\";\n\
+                 \x20   \n\
                  \x20 }};\n\
                  \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs mdadm ];\n\
                  \x20 system.stateVersion = \"25.05\";\n\
@@ -2020,7 +2020,7 @@ mdadm --detail --scan >> /mnt/etc/mdadm.conf 2>/dev/null || true
                  boot.loader.efi.canTouchEfiVariables = true;\n  \
                  boot.swraid.enable = true;\n  \
                  services.openssh.enable = true;\n  \
-                 users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" ]; initialPassword = \"changeme\"; }};\n  \
+                 users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" ];  }};\n  \
                  system.stateVersion = \"25.05\";\n}}",
                 hostname = hostname
             );
@@ -2145,7 +2145,7 @@ nixos-generate-config --root /mnt
                  boot.supportedFilesystems = [ \"zfs\" ];\n  \
                  services.zfs.autoScrub.enable = true;\n  \
                  services.openssh.enable = true;\n  \
-                 users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" ]; initialPassword = \"changeme\"; }};\n  \
+                 users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" ];  }};\n  \
                  system.stateVersion = \"25.05\";\n}}",
                 hostname = hostname
             );
@@ -2765,13 +2765,27 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                         continue;
                     }
                     // Escape single quotes in password for safe shell embedding
-                    let escaped_pw = client_msg.user_password.replace('\'', "'\\''");
                     let pw_file = format!("/tmp/sovereign-user-pw-{}", session_id);
-                    let _ = run_cmd(&format!(
-                        "printf '%s' '{}' > {} && chmod 600 {}",
-                        escaped_pw, pw_file, pw_file
-                    ))
-                    .await;
+                    // Write the secret through the filesystem API instead of
+                    // embedding it in a shell command. This keeps the password
+                    // out of the relay child-process argument list.
+                    if let Err(error) = tokio::fs::write(&pw_file, client_msg.user_password.as_bytes()).await {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Failed to stage password: {}", error)).to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                    if let Err(error) = run_cmd(&format!("chmod 600 {}", pw_file)).await {
+                        let _ = tokio::fs::remove_file(&pw_file).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Failed to protect staged password: {}", error)).to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
                     let username = if client_msg.username.is_empty() {
                         "user"
                     } else {
@@ -5490,6 +5504,61 @@ mod tests {
     fn hostname_rejects_too_long() {
         let long = "a".repeat(64);
         assert!(validate_hostname_relay(&long).is_err());
+    }
+
+    // ── Generated config secret hygiene ──
+
+    #[test]
+    fn fallback_install_configs_do_not_embed_placeholder_passwords() {
+        let layouts = [
+            "alongside",
+            "single",
+            "single-zfs",
+            "single-luks",
+            "dual",
+            "raid1-btrfs",
+            "raid1-mdadm",
+            "raid5-mdadm",
+            "zfs-mirror",
+        ];
+        for layout in layouts {
+            let message = ClientMessage {
+                action: "install".into(),
+                token: String::new(),
+                host: String::new(),
+                port: 22,
+                username: "testuser".into(),
+                password: String::new(),
+                command: String::new(),
+                disk: "/dev/vda".into(),
+                layout: layout.into(),
+                fast_disk: String::new(),
+                standard_disk: String::new(),
+                hostname: "test-nixos".into(),
+                configuration_nix: String::new(),
+                flake_nix: String::new(),
+                disko_nix: String::new(),
+                hardware_nix: String::new(),
+                secure_boot: false,
+                tpm2_unlock: false,
+                fido2_unlock: false,
+                desktop: "none".into(),
+                gpu_driver: "none".into(),
+                timezone: "UTC".into(),
+                keyboard: "us".into(),
+                user_password: String::new(),
+                extra_disks: Vec::new(),
+            };
+            let script = generate_install_script(&message, 42);
+            assert!(
+                !script.contains("initialPassword"),
+                "layout {layout} embedded an initialPassword in generated config"
+            );
+            assert!(
+                !script.contains("changeme"),
+                "layout {layout} retained a placeholder secret"
+            );
+        }
     }
 
     // ── config_write_commands (heredoc safety) ──
