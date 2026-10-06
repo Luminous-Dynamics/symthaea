@@ -814,6 +814,30 @@ fn main() -> Result<(), String> {
             .verify_measurement_artifact_bytes(&measurement_bytes)
             .is_err()
     };
+    let remediation_metric_definition_substitution_blocked = {
+        let mut forged = measurement.clone();
+        forged.metric_definitions[0].unit_ref = "other-unit".into();
+        let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        remediation_impact.verify_measurement_artifact_bytes(&bytes).is_err()
+    };
+    let remediation_metric_definition_kind_mismatch_blocked = {
+        let mut forged = measurement.clone();
+        forged.metric_definitions[0].kind = NeurosemanticRemediationMeasurementKind::UtilityImpact;
+        let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        remediation_impact.verify_measurement_artifact_bytes(&bytes).is_err()
+    };
+    let remediation_metric_uncertainty_substitution_blocked = {
+        let mut forged = measurement.clone();
+        forged.measurements[0].uncertainty =
+            NeurosemanticRemediationUncertainty::Interval {
+                lower_numerator: 2,
+                upper_numerator: 1,
+                scale: 4,
+                confidence_level_bps: 9_500,
+            };
+        let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        remediation_impact.verify_measurement_artifact_bytes(&bytes).is_err()
+    };
     let remediation_pre_lineage_verified = remediation_impact
         .verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PreRemediation, &pre_model_lineage_bytes)
         .is_ok();
@@ -1436,6 +1460,9 @@ fn main() -> Result<(), String> {
         "remediation_evaluation_manifest_verified": remediation_evaluation_manifest_verified,
         "remediation_measurement_verified": remediation_measurement_verified,
         "remediation_measurement_worst_case_binding_blocked": remediation_measurement_worst_case_binding_blocked,
+        "remediation_metric_definition_substitution_blocked": remediation_metric_definition_substitution_blocked,
+        "remediation_metric_definition_kind_mismatch_blocked": remediation_metric_definition_kind_mismatch_blocked,
+        "remediation_metric_uncertainty_substitution_blocked": remediation_metric_uncertainty_substitution_blocked,
         "remediation_pre_lineage_verified": remediation_pre_lineage_verified,
         "remediation_post_lineage_verified": remediation_post_lineage_verified,
         "remediation_forget_evidence_verified": remediation_forget_evidence_verified,
