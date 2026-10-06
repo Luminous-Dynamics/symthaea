@@ -436,6 +436,11 @@ impl NixSystemdReadOnlyObserverV1 {
             ));
         }
 
+        let post_capture_owner = self.systemd_manager_owner().await?;
+        if post_capture_owner != manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+
         Ok(NixSystemdJobHandleV1 {
             id,
             job_type,
