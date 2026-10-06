@@ -33,6 +33,8 @@ pub mod service_domain;
 pub mod service_state;
 #[cfg(feature = "systemd-observer")]
 pub mod systemd_observer;
+#[cfg(feature = "systemd-mutation")]
+pub mod systemd_mutation;
 pub(crate) mod systemd_transport;
 pub mod temporal;
 
@@ -102,6 +104,10 @@ pub use service_domain::{NixServiceOperationErrorV1, NixServiceOperationKindV1, 
 pub use systemd_observer::{
     NixSystemdJobHandleV1, NixSystemdJobRemovedWatcherV1, NixSystemdObserverErrorV1,
     NixSystemdReadOnlyObserverV1,
+};
+#[cfg(feature = "systemd-mutation")]
+pub use systemd_mutation::{
+    NixSystemdLifecycleMutationTransportV1, NixSystemdMutationTransportErrorV1,
 };
 pub use service_state::{
     NixServiceEnablementEvidenceV1,
