@@ -99,3 +99,6 @@ ExperimentalDesignProvenance carries both the stable requirement ID and a canoni
 
 
 Design-bound observations also have to match the target surface's declared unit, scope, and comparison basis. A correct design/target identity is therefore insufficient on its own: the observed evidence must be comparable to the exact requirement surface it purports to resolve.
+
+
+The heuristic next-measurement result also uses typed discrimination targets. Each target explicitly names the two frontier candidates and the burden dimension whose intervals overlap; the heuristic does not invent an experimental decision rule or protocol.
