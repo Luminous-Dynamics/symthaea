@@ -2259,10 +2259,10 @@ impl<'a> CborReader<'a> {
         let count=match ai {
             31 => None,
             0..=23 => Some(ai as usize),
-            24 => Some(usize::try_from(self.read_uint_bounded(1,header_limit_end)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
-            25 => Some(usize::try_from(self.read_uint_bounded(2,header_limit_end)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
-            26 => Some(usize::try_from(self.read_uint_bounded(4,header_limit_end)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
-            27 => Some(usize::try_from(self.read_uint_bounded(8,header_limit_end)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
+            24 => Some(usize::try_from(self.read_uint_bounded(1,header_limit_end,resource_limits)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
+            25 => Some(usize::try_from(self.read_uint_bounded(2,header_limit_end,resource_limits)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
+            26 => Some(usize::try_from(self.read_uint_bounded(4,header_limit_end,resource_limits)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
+            27 => Some(usize::try_from(self.read_uint_bounded(8,header_limit_end,resource_limits)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
             _ => return Err(Rfc9162ProofDecodeError::InvalidEncoding),
         };
 
@@ -2285,7 +2285,7 @@ impl<'a> CborReader<'a> {
                 // fit within the aggregate byte budget.
                 let consumed = self.offset.saturating_sub(map_start);
                 if consumed >= max_total_bytes {
-                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    return Err(self.bounded_limit_error(header_limit_end, resource_limits));
                 }
                 self.offset+=1;
                 return Ok(entries);
@@ -2591,10 +2591,23 @@ impl<'a> CborReader<'a> {
         Ok(())
     }
 
+    fn bounded_limit_error(
+        &self,
+        limit_end: usize,
+        resource_limits: bool,
+    ) -> Rfc9162ProofDecodeError {
+        if resource_limits && limit_end < self.bytes.len() {
+            Rfc9162ProofDecodeError::ResourceLimitExceeded
+        } else {
+            Rfc9162ProofDecodeError::InvalidStructure
+        }
+    }
+
     fn take_bounded(
         &mut self,
         n: usize,
         limit_end: usize,
+        resource_limits: bool,
     ) -> Result<&[u8], Rfc9162ProofDecodeError> {
         let end = self
             .offset
@@ -2604,7 +2617,7 @@ impl<'a> CborReader<'a> {
             return Err(Rfc9162ProofDecodeError::UnexpectedEof);
         }
         if end > limit_end {
-            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+            return Err(self.bounded_limit_error(limit_end, resource_limits));
         }
         self.take(n)
     }
@@ -2613,6 +2626,7 @@ impl<'a> CborReader<'a> {
         &mut self,
         n: usize,
         limit_end: usize,
+        resource_limits: bool,
     ) -> Result<u64, Rfc9162ProofDecodeError> {
         let end = self
             .offset
@@ -2622,7 +2636,7 @@ impl<'a> CborReader<'a> {
             return Err(Rfc9162ProofDecodeError::UnexpectedEof);
         }
         if end > limit_end {
-            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+            return Err(self.bounded_limit_error(limit_end, resource_limits));
         }
         self.read_uint(n, n as u64)
     }
@@ -2630,6 +2644,7 @@ impl<'a> CborReader<'a> {
     fn skip_integer_bounded(
         &mut self,
         limit_end: usize,
+        resource_limits: bool,
     ) -> Result<(), Rfc9162ProofDecodeError> {
         let initial = *self
             .bytes
@@ -2642,19 +2657,19 @@ impl<'a> CborReader<'a> {
         match initial & 0x1f {
             0..=23 => Ok(()),
             24 => {
-                self.read_uint_bounded(1, limit_end)?;
+                self.read_uint_bounded(1, limit_end, resource_limits)?;
                 Ok(())
             }
             25 => {
-                self.read_uint_bounded(2, limit_end)?;
+                self.read_uint_bounded(2, limit_end, resource_limits)?;
                 Ok(())
             }
             26 => {
-                self.read_uint_bounded(4, limit_end)?;
+                self.read_uint_bounded(4, limit_end, resource_limits)?;
                 Ok(())
             }
             27 => {
-                self.read_uint_bounded(8, limit_end)?;
+                self.read_uint_bounded(8, limit_end, resource_limits)?;
                 Ok(())
             }
             _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
@@ -2664,6 +2679,7 @@ impl<'a> CborReader<'a> {
     fn read_array_len_bounded(
         &mut self,
         limit_end: usize,
+        resource_limits: bool,
     ) -> Result<usize, Rfc9162ProofDecodeError> {
         let initial = *self
             .bytes
@@ -2678,10 +2694,10 @@ impl<'a> CborReader<'a> {
         }
         let value = match initial & 0x1f {
             0..=23 => (initial & 0x1f) as u64,
-            24 => self.read_uint_bounded(1, limit_end)?,
-            25 => self.read_uint_bounded(2, limit_end)?,
-            26 => self.read_uint_bounded(4, limit_end)?,
-            27 => self.read_uint_bounded(8, limit_end)?,
+            24 => self.read_uint_bounded(1, limit_end, resource_limits)?,
+            25 => self.read_uint_bounded(2, limit_end, resource_limits)?,
+            26 => self.read_uint_bounded(4, limit_end, resource_limits)?,
+            27 => self.read_uint_bounded(8, limit_end, resource_limits)?,
             _ => return Err(Rfc9162ProofDecodeError::InvalidEncoding),
         };
         usize::try_from(value).map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)
@@ -2690,6 +2706,7 @@ impl<'a> CborReader<'a> {
     fn read_map_len_bounded(
         &mut self,
         limit_end: usize,
+        resource_limits: bool,
     ) -> Result<usize, Rfc9162ProofDecodeError> {
         let initial = *self
             .bytes
@@ -2716,6 +2733,7 @@ impl<'a> CborReader<'a> {
     fn read_tag_bounded(
         &mut self,
         limit_end: usize,
+        resource_limits: bool,
     ) -> Result<u64, Rfc9162ProofDecodeError> {
         let initial = *self
             .bytes
@@ -2754,15 +2772,11 @@ impl<'a> CborReader<'a> {
             });
         }
         if self.offset >= limit_end {
-            return Err(if resource_limits && limit_end < self.bytes.len() {
-                Rfc9162ProofDecodeError::ResourceLimitExceeded
-            } else {
-                Rfc9162ProofDecodeError::InvalidStructure
-            });
+            return Err(self.bounded_limit_error(limit_end, resource_limits));
         }
         let major = self.peek_major_type()?;
         match major {
-            0 | 1 => self.skip_integer_bounded(limit_end),
+            0 | 1 => self.skip_integer_bounded(limit_end, resource_limits),
             2 => self.skip_bstr_value_with_mode(
                 max_bstr_len,
                 limit_end,
@@ -2801,7 +2815,7 @@ impl<'a> CborReader<'a> {
                         items += 1;
                     }
                 }
-                let n = self.read_array_len_bounded(limit_end)?;
+                let n = self.read_array_len_bounded(limit_end, resource_limits)?;
                 if self.offset > limit_end || n > max_array_items {
                     return Err(if resource_limits {
                         Rfc9162ProofDecodeError::ResourceLimitExceeded
@@ -2811,7 +2825,7 @@ impl<'a> CborReader<'a> {
                 }
                 for _ in 0..n {
                     if self.offset >= limit_end {
-                        return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                        return Err(self.bounded_limit_error(limit_end, resource_limits));
                     }
                     self.skip_value_inner(
                         depth + 1,
@@ -2846,7 +2860,7 @@ impl<'a> CborReader<'a> {
                             });
                         }
                         if self.offset >= limit_end {
-                            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                            return Err(self.bounded_limit_error(limit_end, resource_limits));
                         }
                         self.skip_value_inner(
                             depth + 1,
@@ -2868,7 +2882,7 @@ impl<'a> CborReader<'a> {
                         entries += 1;
                     }
                 }
-                let n = self.read_map_len_bounded(limit_end)?;
+                let n = self.read_map_len_bounded(limit_end, resource_limits)?;
                 if self.offset > limit_end || n > 64 {
                     return Err(if resource_limits {
                         Rfc9162ProofDecodeError::ResourceLimitExceeded
@@ -2901,7 +2915,7 @@ impl<'a> CborReader<'a> {
                 Ok(())
             }
             6 => {
-                self.read_tag_bounded(limit_end)?;
+                self.read_tag_bounded(limit_end, resource_limits)?;
                 self.skip_value_inner(
                     depth + 1,
                     max_bstr_len,
@@ -2922,22 +2936,22 @@ impl<'a> CborReader<'a> {
                     }
                     0xf8 => {
                         self.offset += 1;
-                        let value = self.take_bounded(1, limit_end)?[0];
+                        let value = self.take_bounded(1, limit_end, resource_limits)?[0];
                         if value < 0x20 {
                             return Err(Rfc9162ProofDecodeError::InvalidEncoding);
                         }
                         Ok(())
                     }
                     0xf9 => {
-                        self.take_bounded(3, limit_end)?;
+                        self.take_bounded(3, limit_end, resource_limits)?;
                         Ok(())
                     }
                     0xfa => {
-                        self.take_bounded(5, limit_end)?;
+                        self.take_bounded(5, limit_end, resource_limits)?;
                         Ok(())
                     }
                     0xfb => {
-                        self.take_bounded(9, limit_end)?;
+                        self.take_bounded(9, limit_end, resource_limits)?;
                         Ok(())
                     }
                     _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
@@ -2966,8 +2980,11 @@ impl<'a> CborReader<'a> {
             .get(self.offset)
             .ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
         self.offset += 1;
-        if initial >> 5 != 2 || self.offset > limit_end {
+        if initial >> 5 != 2 {
             return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        if self.offset > limit_end {
+            return Err(self.bounded_limit_error(limit_end, resource_limits));
         }
         let ai = initial & 0x1f;
         let mut total_len = 0usize;
@@ -2976,7 +2993,7 @@ impl<'a> CborReader<'a> {
             loop {
                 if self.offset >= limit_end {
                     return Err(if limit_end < self.bytes.len() {
-                        Rfc9162ProofDecodeError::InvalidStructure
+                        self.bounded_limit_error(limit_end, resource_limits)
                     } else {
                         Rfc9162ProofDecodeError::UnexpectedEof
                     });
@@ -3010,7 +3027,7 @@ impl<'a> CborReader<'a> {
                     _ => return Err(Rfc9162ProofDecodeError::InvalidEncoding),
                 };
                 if self.offset > limit_end {
-                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    return Err(self.bounded_limit_error(limit_end, resource_limits));
                 }
                 let n = usize::try_from(n)
                     .map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)?;
@@ -3050,7 +3067,7 @@ impl<'a> CborReader<'a> {
             _ => return Err(Rfc9162ProofDecodeError::InvalidEncoding),
         };
         if self.offset > limit_end {
-            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+            return Err(self.bounded_limit_error(limit_end, resource_limits));
         }
         let n = usize::try_from(n)
             .map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)?;
@@ -4700,7 +4717,53 @@ mod tests {
     }
 
     #[test]
-    fn cbor_resource_aware_skip_value_types_text_bound_as_resource_limit() {
+    fn cbor_resource_aware_exact_boundaries_preserve_resource_taxonomy() {
+        // Exact exhaustion before an indefinite-map break is a resource
+        // boundary, because the break byte itself lies beyond the configured
+        // aggregate envelope.
+        let map = vec![0xbf, 0x01, 0x02, 0xff];
+        let mut resource_map = CborReader::new(&map);
+        assert_eq!(
+            resource_map.read_map_entries_bounded_with_resource_limits_and_bytes(1, 64, 64, 3),
+            Err(Rfc9162ProofDecodeError::ResourceLimitExceeded)
+        );
+        let mut generic_map = CborReader::new(&map);
+        assert_eq!(
+            generic_map.read_map_entries_bounded_with_limits_and_bytes(1, 64, 64, 3),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+
+        // Exact exhaustion after an indefinite bstr chunk but before its break
+        // must retain the same resource-vs-structure distinction.
+        let bstr = vec![0x5f, 0x41, 0xaa, 0xff];
+        let mut resource_bstr = CborReader::new(&bstr);
+        assert_eq!(
+            resource_bstr.skip_value_with_resource_limits(0, 64, 64, 3),
+            Err(Rfc9162ProofDecodeError::ResourceLimitExceeded)
+        );
+        let mut generic_bstr = CborReader::new(&bstr);
+        assert_eq!(
+            generic_bstr.skip_value_with_limits(0, 64, 64, 3),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+
+        // The same distinction applies when an integer's argument bytes cross
+        // an aggregate envelope after the initial integer byte.
+        let integer = [0x1b, 0, 0, 0, 0, 0, 0, 0, 0];
+        let mut resource_integer = CborReader::new(&integer);
+        assert_eq!(
+            resource_integer.skip_value_with_resource_limits(0, 64, 64, 1),
+            Err(Rfc9162ProofDecodeError::ResourceLimitExceeded)
+        );
+        let mut generic_integer = CborReader::new(&integer);
+        assert_eq!(
+            generic_integer.skip_value_with_limits(0, 64, 64, 1),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+    }
+
+#[test]
+fn cbor_resource_aware_skip_value_types_text_bound_as_resource_limit() {
         // The resource-aware opaque-value scanner treats its 4096-byte text
         // ceiling as a resource boundary, not as malformed CBOR.
         let mut wire = vec![0x7a, 0x00, 0x00, 0x10, 0x01];
