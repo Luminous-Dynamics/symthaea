@@ -15,6 +15,10 @@
 //! can populate these observations from a read-only D-Bus observer without
 //! changing the receipt or proof semantics.
 
+use super::authorization::{
+    NixActionDescriptorV1, NixActionIntentV1, NixAuthorizationDecisionV1,
+    NixExecutionAuthorizationRecordV1,
+};
 use super::service_domain::NixServiceOperationKindV1;
 use super::service_state::{
     ServiceActiveStateV1, ServiceUnitFileStateV1,
@@ -306,24 +310,32 @@ pub struct NixPostStateReceiptV1 {
 
 impl NixPostStateReceiptV1 {
     pub fn build(
-        action_intent_digest: impl Into<String>,
-        authorization_record_digest: impl Into<String>,
+        intent: &NixActionIntentV1,
+        authorization: &NixExecutionAuthorizationRecordV1,
         expectation: &NixServicePostStateExpectationV1,
         observation: &NixServicePostStateObservationV1,
         stability: Option<NixPostStateStabilityEvidenceV1>,
         observer_identity: impl Into<String>,
         observer_version: impl Into<String>,
     ) -> Result<Self, NixPostStateErrorV1> {
-        let action_intent_digest = action_intent_digest.into();
-        let authorization_record_digest = authorization_record_digest.into();
-        let observer_identity = observer_identity.into();
-        let observer_version = observer_version.into();
+        let action_intent_digest = intent
+            .digest()
+            .map_err(|_| NixPostStateErrorV1::InvalidBoundIntent)?;
+        let authorization_record_digest = authorization
+            .digest()
+            .map_err(|_| NixPostStateErrorV1::InvalidBoundAuthorization)?;
 
-        validate_digest(&action_intent_digest, "action intent digest")?;
-        validate_digest(
-            &authorization_record_digest,
-            "authorization record digest",
-        )?;
+        if authorization.decision != NixAuthorizationDecisionV1::Approved {
+            return Err(NixPostStateErrorV1::AuthorizationNotApproved);
+        }
+        if authorization.action_intent_digest != action_intent_digest {
+            return Err(NixPostStateErrorV1::AuthorizationIntentMismatch);
+        }
+        match &intent.action {
+            NixActionDescriptorV1::Service { operation, unit }
+                if *operation == expectation.operation && unit == &expectation.unit => {}
+            _ => return Err(NixPostStateErrorV1::IntentEffectMismatch),
+        }
         expectation.validate_shape()?;
         observation.validate_shape()?;
         require_nonempty(&observer_identity, "observer identity")?;
@@ -762,6 +774,16 @@ pub enum NixPostStateErrorV1 {
     PathTooLong,
     #[error("invalid post-state claim")]
     InvalidClaim,
+    #[error("bound action intent is invalid")]
+    InvalidBoundIntent,
+    #[error("bound authorization record is invalid")]
+    InvalidBoundAuthorization,
+    #[error("authorization record is not approved")]
+    AuthorizationNotApproved,
+    #[error("authorization record is bound to a different action intent")]
+    AuthorizationIntentMismatch,
+    #[error("action intent does not describe the expected service effect")]
+    IntentEffectMismatch,
 }
 
 #[cfg(test)]
@@ -792,6 +814,46 @@ mod tests {
         }
     }
 
+
+    fn build_receipt(
+        exp: &NixServicePostStateExpectationV1,
+        obs: &NixServicePostStateObservationV1,
+        stability: Option<NixPostStateStabilityEvidenceV1>,
+    ) -> Result<NixPostStateReceiptV1, NixPostStateErrorV1> {
+        use super::super::authorization::{
+            NixActionIntentV1, NixAuthorizationProfileV1, NixActionScopeV1,
+        };
+        let intent = NixActionIntentV1 {
+            subject_identity: "host:test".to_string(),
+            pre_state_identity: Some(format!("generation:{}", exp.authorized_generation)),
+            action: NixActionDescriptorV1::Service {
+                operation: exp.operation,
+                unit: exp.unit.clone(),
+            },
+            maximum_scope: NixActionScopeV1::SystemModify,
+            preconditions: Vec::new(),
+            required_postconditions: Vec::new(),
+            rollback_or_recovery_ref: None,
+        };
+        let authorization = NixExecutionAuthorizationRecordV1 {
+            action_intent_digest: intent.digest().unwrap(),
+            profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
+            authority_ref: "approval:test".to_string(),
+            issued_at_unix_ms: 1,
+            expires_at_unix_ms: None,
+            decision: NixAuthorizationDecisionV1::Approved,
+        };
+        NixPostStateReceiptV1::build(
+            &intent,
+            &authorization,
+            exp,
+            obs,
+            stability,
+            "systemd-observer-v1",
+            "1",
+        )
+    }
+
     fn observation(
         operation: NixServiceOperationKindV1,
         active_state: ServiceActiveStateV1,
@@ -820,9 +882,7 @@ mod tests {
 
     #[test]
     fn start_success_is_observed_without_stability_claim() {
-        let receipt = NixPostStateReceiptV1::build(
-            DIGEST,
-            DIGEST,
+        let receipt = build_receipt(
             &expectation(NixServiceOperationKindV1::Start),
             &observation(
                 NixServiceOperationKindV1::Start,
@@ -830,8 +890,6 @@ mod tests {
                 ServiceUnitFileStateV1::Enabled,
             ),
             None,
-            "systemd-observer-v1",
-            "1",
         )
         .unwrap();
 
@@ -850,14 +908,10 @@ mod tests {
         );
 
         obs.invocation_id = exp.pre_invocation_id.clone();
-        let receipt = NixPostStateReceiptV1::build(
-            DIGEST,
-            DIGEST,
+        let receipt = build_receipt(
             &exp,
             &obs,
             None,
-            "systemd-observer-v1",
-            "1",
         )
         .unwrap();
 
@@ -866,9 +920,7 @@ mod tests {
 
     #[test]
     fn restart_with_new_invocation_is_satisfied() {
-        let receipt = NixPostStateReceiptV1::build(
-            DIGEST,
-            DIGEST,
+        let receipt = build_receipt(
             &expectation(NixServiceOperationKindV1::Restart),
             &observation(
                 NixServiceOperationKindV1::Restart,
@@ -876,8 +928,6 @@ mod tests {
                 ServiceUnitFileStateV1::Enabled,
             ),
             None,
-            "systemd-observer-v1",
-            "1",
         )
         .unwrap();
 
@@ -886,9 +936,7 @@ mod tests {
 
     #[test]
     fn job_success_does_not_prove_wrong_post_state() {
-        let receipt = NixPostStateReceiptV1::build(
-            DIGEST,
-            DIGEST,
+        let receipt = build_receipt(
             &expectation(NixServiceOperationKindV1::Start),
             &observation(
                 NixServiceOperationKindV1::Start,
@@ -896,8 +944,6 @@ mod tests {
                 ServiceUnitFileStateV1::Enabled,
             ),
             None,
-            "systemd-observer-v1",
-            "1",
         )
         .unwrap();
 
@@ -913,14 +959,10 @@ mod tests {
         );
         obs.systemd_job.as_mut().unwrap().job_type = NixSystemdJobTypeV1::Start;
 
-        let receipt = NixPostStateReceiptV1::build(
-            DIGEST,
-            DIGEST,
+        let receipt = build_receipt(
             &expectation(NixServiceOperationKindV1::Restart),
             &obs,
             None,
-            "systemd-observer-v1",
-            "1",
         )
         .unwrap();
 
@@ -939,9 +981,7 @@ mod tests {
             ServiceUnitFileStateV1::Enabled,
         );
 
-        let receipt = NixPostStateReceiptV1::build(
-            DIGEST,
-            DIGEST,
+        let receipt = build_receipt(
             &exp,
             &obs,
             Some(NixPostStateStabilityEvidenceV1 {
@@ -951,8 +991,6 @@ mod tests {
                 last_state_change_at_unix_us: 900,
                 sample_count: 2,
             }),
-            "systemd-observer-v1",
-            "1",
         )
         .unwrap();
 
@@ -964,9 +1002,7 @@ mod tests {
         let mut exp = expectation(NixServiceOperationKindV1::Start);
         exp.required_stability_us = 1_000;
 
-        let result = NixPostStateReceiptV1::build(
-            DIGEST,
-            DIGEST,
+        let result = build_receipt(
             &exp,
             &observation(
                 NixServiceOperationKindV1::Start,
@@ -980,8 +1016,6 @@ mod tests {
                 last_state_change_at_unix_us: 900,
                 sample_count: 2,
             }),
-            "systemd-observer-v1",
-            "1",
         );
 
         assert_eq!(
@@ -999,14 +1033,10 @@ mod tests {
         );
         obs.observed_generation = 43;
 
-        let result = NixPostStateReceiptV1::build(
-            DIGEST,
-            DIGEST,
+        let result = build_receipt(
             &expectation(NixServiceOperationKindV1::Start),
             &obs,
             None,
-            "systemd-observer-v1",
-            "1",
         );
 
         assert_eq!(result.unwrap_err(), NixPostStateErrorV1::GenerationMismatch);
@@ -1020,14 +1050,10 @@ mod tests {
             NixSystemdUnitDefinitionIdentityV1::new("/nix/store/different.service", vec![])
                 .unwrap();
 
-        let result = NixPostStateReceiptV1::build(
-            DIGEST,
-            DIGEST,
+        let result = build_receipt(
             &expectation(NixServiceOperationKindV1::Start),
             &obs,
             None,
-            "systemd-observer-v1",
-            "1",
         );
 
         assert_eq!(result.unwrap_err(), NixPostStateErrorV1::DefinitionMismatch);
@@ -1035,9 +1061,7 @@ mod tests {
 
     #[test]
     fn receipt_digest_changes_on_intent_authority_target_generation_job_invocation_and_observer_mutation() {
-        let receipt = NixPostStateReceiptV1::build(
-            DIGEST,
-            DIGEST,
+        let receipt = build_receipt(
             &expectation(NixServiceOperationKindV1::Restart),
             &observation(
                 NixServiceOperationKindV1::Restart,
@@ -1045,8 +1069,6 @@ mod tests {
                 ServiceUnitFileStateV1::Enabled,
             ),
             None,
-            "systemd-observer-v1",
-            "1",
         )
         .unwrap();
 
@@ -1118,9 +1140,7 @@ mod tests {
             ServiceActiveStateV1::Active,
             ServiceUnitFileStateV1::Enabled,
         );
-        let mut receipt = NixPostStateReceiptV1::build(
-            DIGEST,
-            DIGEST,
+        let mut receipt = build_receipt(
             &exp,
             &obs,
             Some(NixPostStateStabilityEvidenceV1 {
@@ -1130,8 +1150,6 @@ mod tests {
                 last_state_change_at_unix_us: 900,
                 sample_count: 2,
             }),
-            "systemd-observer-v1",
-            "1",
         )
         .unwrap();
         assert_eq!(receipt.claim, NixPostStateClaimV1::Proven);
@@ -1158,9 +1176,7 @@ mod tests {
             ServiceUnitFileStateV1::Enabled,
         );
         obs.systemd_job.as_mut().unwrap().result = "running".to_string();
-        let result = NixPostStateReceiptV1::build(
-            DIGEST,
-            DIGEST,
+        let result = build_receipt(
             &exp,
             &obs,
             Some(NixPostStateStabilityEvidenceV1 {
@@ -1170,17 +1186,13 @@ mod tests {
                 last_state_change_at_unix_us: 900,
                 sample_count: 2,
             }),
-            "systemd-observer-v1",
-            "1",
         );
         assert_eq!(result.unwrap_err(), NixPostStateErrorV1::InvalidClaim);
     }
 
     #[test]
     fn enable_and_disable_use_unit_file_state_not_lifecycle_state() {
-        let enable = NixPostStateReceiptV1::build(
-            DIGEST,
-            DIGEST,
+        let enable = build_receipt(
             &expectation(NixServiceOperationKindV1::Enable),
             &observation(
                 NixServiceOperationKindV1::Enable,
@@ -1188,15 +1200,11 @@ mod tests {
                 ServiceUnitFileStateV1::Enabled,
             ),
             None,
-            "systemd-observer-v1",
-            "1",
         )
         .unwrap();
         assert_eq!(enable.postcondition, NixPostconditionAssessmentV1::Satisfied);
 
-        let disable = NixPostStateReceiptV1::build(
-            DIGEST,
-            DIGEST,
+        let disable = build_receipt(
             &expectation(NixServiceOperationKindV1::Disable),
             &observation(
                 NixServiceOperationKindV1::Disable,
@@ -1204,8 +1212,6 @@ mod tests {
                 ServiceUnitFileStateV1::Disabled,
             ),
             None,
-            "systemd-observer-v1",
-            "1",
         )
         .unwrap();
         assert_eq!(disable.postcondition, NixPostconditionAssessmentV1::Satisfied);
