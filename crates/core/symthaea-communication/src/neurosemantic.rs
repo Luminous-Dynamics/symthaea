@@ -1813,9 +1813,10 @@ mod tests {
         resolution.expires_at_unix_s = resolution.checked_at_unix_s;
         assert!(resolution.message_bytes().is_err());
 
-        let mut resolution, = (authority_resolution(&policy, &attestation, &context, 100, 2_000),);
-        resolution.0.resolver_ref.clear();
-        assert!(resolution.0.message_bytes().is_err());
+        let (mut resolution, _) =
+            authority_resolution(&policy, &attestation, &context, 100, 2_000);
+        resolution.resolver_ref.clear();
+        assert!(resolution.message_bytes().is_err());
     }
 
     #[test]
