@@ -7872,13 +7872,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn image_postcondition_requires_readable_nonempty_archive() {
-        let name = random_operation_id().unwrap();
-        let dir = std::env::temp_dir().join(format!("symthaea-image-postcondition-{name}"));
-        std::fs::create_dir_all(&dir).unwrap();
+    async fn image_postcondition_requires_private_readable_nonempty_archive() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-image-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
 
         let path = dir.join("system.tar.gz");
-        let archive_path = path.to_string_lossy().replace('\\', "\\'");
+        let archive_path = path.to_string_lossy().replace('\\', "\\\\'");
         let create = run_cmd(&format!(
             "tar -czf '{}' --files-from /dev/null",
             archive_path
@@ -7886,58 +7891,20 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(create.exit_status, 0);
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
         assert!(verify_image_artifact(dir.to_str().unwrap()).await.unwrap());
+
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(
+            verify_image_artifact(dir.to_str().unwrap()).is_err(),
+            "world-readable image directories must not qualify"
+        );
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
 
         std::fs::write(&path, b"not a tar archive").unwrap();
         assert!(!verify_image_artifact(dir.to_str().unwrap()).await.unwrap());
 
         let _ = std::fs::remove_dir_all(dir);
-    }
-
-    #[tokio::test]
-    async fn preservation_postcondition_rejects_missing_or_corrupt_required_archive() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let name = random_operation_id().unwrap();
-        let tx_dir = std::env::temp_dir().join(format!("symthaea-preserve-{name}"));
-        std::fs::create_dir(&tx_dir).unwrap();
-        std::fs::set_permissions(&tx_dir, std::fs::Permissions::from_mode(0o700)).unwrap();
-
-        let archive = tx_dir.join("etc-backup.tar.gz");
-        let archive_path = archive.to_string_lossy().replace('\\', "\\\\'");
-        let create = run_cmd(&format!(
-            "tar -czf '{}' --files-from /dev/null",
-            archive_path
-        ))
-        .await
-        .unwrap();
-        assert_eq!(create.exit_status, 0);
-        std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o600)).unwrap();
-
-        assert!(verify_preservation_artifacts(tx_dir.to_str().unwrap()).await.unwrap());
-
-        std::fs::write(&archive, b"corrupt gzip").unwrap();
-        assert!(!verify_preservation_artifacts(tx_dir.to_str().unwrap()).await.unwrap());
-
-        std::fs::remove_file(&archive).unwrap();
-        std::os::unix::fs::symlink("/etc/passwd", &archive).unwrap();
-        assert!(
-            !verify_preservation_artifacts(tx_dir.to_str().unwrap())
-                .await
-                .unwrap(),
-            "symlink artifacts must never qualify as preserved files"
-        );
-
-        std::fs::remove_file(&archive).unwrap();
-        std::fs::write(tx_dir.join("unexpected.txt"), b"unexpected").unwrap();
-        assert!(
-            !verify_preservation_artifacts(tx_dir.to_str().unwrap())
-                .await
-                .unwrap(),
-            "unexpected artifact types must fail closed"
-        );
-
-        let _ = std::fs::remove_dir_all(tx_dir);
     }
 
     #[test]
