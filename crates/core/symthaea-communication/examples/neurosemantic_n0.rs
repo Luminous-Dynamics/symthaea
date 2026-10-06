@@ -14,6 +14,9 @@ use symthaea_communication::{
     NeurosemanticArtifactLifecycleState, NeurosemanticArtifactLifecycleVerificationTargetSet,
     NeurosemanticRemediationImpactArtifact, NeurosemanticRemediationImpactDisposition,
     NeurosemanticRemediationImpactEvidenceKind, NeurosemanticRemediationImpactLineageSide,
+    NeurosemanticRemediationEvaluationSetKind, NeurosemanticRemediationEvaluationSetManifest,
+    NeurosemanticRemediationEvaluationMethodKind, NeurosemanticRemediationEvaluationMethod,
+    NeurosemanticRemediationEvaluationManifest,
 };
 
 fn main() -> Result<(), String> {
@@ -588,6 +591,19 @@ fn main() -> Result<(), String> {
     };
     let recovery_method_bytes = serde_json::to_vec(&recovery_method).map_err(|e| e.to_string())?;
     let representation_probe_method_bytes = serde_json::to_vec(&representation_probe_method).map_err(|e| e.to_string())?;
+    let evaluation_manifest = NeurosemanticRemediationEvaluationManifest {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_EVALUATION_MANIFEST_SCHEMA_VERSION,
+        evaluation_ref: "synthetic-remediation-evaluation-v1".into(),
+        source_dataset_manifest_hash: forget_set_manifest.source_dataset_manifest_hash.clone(),
+        forget_set_manifest_hash: forget_set_manifest.fingerprint()?,
+        retain_set_manifest_hash: retain_set_manifest.fingerprint()?,
+        study_protocol_hash: study_protocol_hash.clone(),
+        evaluation_split_manifest_hash: evaluation_split_manifest_hash.clone(),
+        recovery_method_hash: recovery_method.fingerprint()?,
+        representation_probe_method_hash: representation_probe_method.fingerprint()?,
+    };
+    let evaluation_manifest_bytes =
+        serde_json::to_vec(&evaluation_manifest).map_err(|e| e.to_string())?;
 
     let remediation_impact = NeurosemanticRemediationImpactArtifact {
         schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_IMPACT_ARTIFACT_SCHEMA_VERSION,
@@ -605,6 +621,7 @@ fn main() -> Result<(), String> {
             &post_model_lineage_bytes,
         ),
         lifecycle_receipt_hash,
+        evaluation_manifest_hash: evaluation_manifest.fingerprint()?,
         remediation_action: NeurosemanticArtifactLifecycleAction::Erasure,
         study_protocol_hash,
         evaluation_split_manifest_hash,
@@ -635,6 +652,8 @@ fn main() -> Result<(), String> {
     let remediation_impact_bytes = serde_json::to_vec(&remediation_impact).map_err(|e| e.to_string())?;
     let remediation_impact_structured = NeurosemanticRemediationImpactArtifact::from_json_bytes(&remediation_impact_bytes).is_ok();
     let remediation_lifecycle_binding_verified = remediation_impact.verify_lifecycle_binding(&lifecycle_receipt).is_ok();
+    let remediation_evaluation_manifest_verified =
+        remediation_impact.verify_evaluation_manifest_bytes(&evaluation_manifest_bytes).is_ok();
     let remediation_pre_lineage_verified = remediation_impact
         .verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PreRemediation, &pre_model_lineage_bytes)
         .is_ok();
@@ -662,6 +681,12 @@ fn main() -> Result<(), String> {
         .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::RecoveryRisk, recovery_evidence).is_ok();
     let remediation_representation_residual_evidence_verified = remediation_impact
         .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::RepresentationResidual, representation_residual_evidence).is_ok();
+    let remediation_evaluation_manifest_substitution_blocked = {
+        let mut forged = evaluation_manifest.clone();
+        forged.forget_set_manifest_hash = symthaea_communication::content_hash(b"other-forget-set");
+        let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        remediation_impact.verify_evaluation_manifest_bytes(&bytes).is_err()
+    };
     let remediation_set_role_substitution_blocked = {
         let mut forged = forget_set_manifest.clone();
         forged.set_kind = NeurosemanticRemediationEvaluationSetKind::Retain;
@@ -1159,6 +1184,7 @@ fn main() -> Result<(), String> {
         "lifecycle_rectification_requires_replacement_artifact": lifecycle_rectification_requires_replacement_artifact,
         "lifecycle_rectification_requires_replacement_lineage": lifecycle_rectification_requires_replacement_lineage,
         "remediation_impact_structured": remediation_impact_structured,
+        "remediation_evaluation_manifest_substitution_blocked": remediation_evaluation_manifest_substitution_blocked,
         "remediation_set_pair_verified": remediation_set_pair_verified,
         "remediation_recovery_method_verified": remediation_recovery_method_verified,
         "remediation_representation_method_verified": remediation_representation_method_verified,
@@ -1175,6 +1201,7 @@ fn main() -> Result<(), String> {
         "remediation_recovery_evidence_substitution_blocked": remediation_recovery_evidence_substitution_blocked,
         "remediation_representation_evidence_substitution_blocked": remediation_representation_evidence_substitution_blocked,
         "remediation_lifecycle_binding_verified": remediation_lifecycle_binding_verified,
+        "remediation_evaluation_manifest_verified": remediation_evaluation_manifest_verified,
         "remediation_pre_lineage_verified": remediation_pre_lineage_verified,
         "remediation_post_lineage_verified": remediation_post_lineage_verified,
         "remediation_forget_evidence_verified": remediation_forget_evidence_verified,
