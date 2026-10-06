@@ -1274,6 +1274,21 @@ function newRequestId() {
   }).join('');
 }
 
+function getInstallRequestId() {
+  var key = 'nfh_install_request_id';
+  try {
+    var existing = sessionStorage.getItem(key);
+    if (existing) return existing;
+  } catch (e) {}
+  var requestId = newRequestId();
+  try { sessionStorage.setItem(key, requestId); } catch (e) {}
+  return requestId;
+}
+
+function clearInstallRequestId() {
+  try { sessionStorage.removeItem('nfh_install_request_id'); } catch (e) {}
+}
+
       for (var i = 0; i < relayUrls.length; i++) {
         try {
           sshStatus.textContent = 'Connecting to relay at ' + relayUrls[i] + '...';
@@ -1914,7 +1929,7 @@ function newRequestId() {
 
               if (msg.type === 'connected') {
                 // SSH reconnected — now check install status
-                ws.send(JSON.stringify({ action: 'check_install_status' }));
+                ws.send(JSON.stringify({ action: 'check_install_status', request_id: getInstallRequestId() }));
               } else if (msg.type === 'install_status') {
                 var status = {};
                 try { status = JSON.parse(msg.data); } catch(e) {}
@@ -1926,11 +1941,12 @@ function newRequestId() {
                   // Keep polling
                   setTimeout(function() {
                     if (ws.readyState === WebSocket.OPEN) {
-                      ws.send(JSON.stringify({ action: 'check_install_status' }));
+                      ws.send(JSON.stringify({ action: 'check_install_status', request_id: getInstallRequestId() }));
                     }
                   }, 10000);
                 } else if (status.status === 'complete') {
                   appendTerminal('Install completed while disconnected!', 'var(--leaf-green)');
+                  clearInstallRequestId();
                   sshStatus.textContent = 'Installation complete! Reboot the target machine.';
                   sshStatus.style.color = 'var(--solar-gold)';
                   installInProgress = false;
@@ -1938,7 +1954,13 @@ function newRequestId() {
                   window.addNarration('The machine draws its first breath. It is sovereign.');
                 } else if (status.status === 'failed') {
                   appendTerminal('Install failed: ' + (status.last_line || 'unknown error'), 'var(--clay)');
+                  clearInstallRequestId();
                   sshStatus.textContent = 'Installation failed. Check the terminal output.';
+                  sshStatus.style.color = 'var(--clay)';
+                  installInProgress = false;
+                } else if (status.status === 'uncertain') {
+                  appendTerminal('Install outcome is uncertain; no duplicate install was attempted.', 'var(--clay)');
+                  sshStatus.textContent = 'Install outcome uncertain. Inspect the target before retrying.';
                   sshStatus.style.color = 'var(--clay)';
                   installInProgress = false;
                 } else {
@@ -2500,7 +2522,7 @@ function newRequestId() {
       installInProgress = true;
       ws.send(JSON.stringify({
         action: 'install',
-        request_id: newRequestId(),
+        request_id: getInstallRequestId(),
         disk: diskName,
         layout: layout,
         fast_disk: fastDisk,
