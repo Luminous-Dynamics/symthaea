@@ -1,4 +1,139 @@
 use super::*;
+use symthaea_types::{
+    ModelMaturity, PhysicalType, ScientificHypothesisHandoff,
+};
+
+fn canonical_expr(expr: &Expr, out: &mut String) {
+    match expr {
+        Expr::Var(name) => {
+            out.push_str("V:");
+            out.push_str(&name.len().to_string());
+            out.push(':');
+            out.push_str(name);
+            out.push(';');
+        }
+        Expr::Const(value) => {
+            out.push_str("C:");
+            out.push_str(&value.to_bits().to_string());
+            out.push(';');
+        }
+        Expr::BinOp(op, left, right) => {
+            out.push_str("B:");
+            out.push_str(match op {
+                BinOp::Add => "add",
+                BinOp::Sub => "sub",
+                BinOp::Mul => "mul",
+                BinOp::Div => "div",
+                BinOp::Pow => "pow",
+            });
+            out.push('(');
+            canonical_expr(left, out);
+            out.push(',');
+            canonical_expr(right, out);
+            out.push_str(");");
+        }
+        Expr::Func(func, arg) => {
+            out.push_str("F:");
+            out.push_str(match func {
+                UnaryFn::Sqrt => "sqrt",
+                UnaryFn::Log => "log",
+                UnaryFn::Exp => "exp",
+                UnaryFn::Sin => "sin",
+                UnaryFn::Cos => "cos",
+                UnaryFn::Abs => "abs",
+                UnaryFn::Floor => "floor",
+            });
+            out.push('(');
+            canonical_expr(arg, out);
+            out.push_str(");");
+        }
+        Expr::Sum(body, variable) => {
+            out.push_str("S:");
+            out.push_str(&variable.len().to_string());
+            out.push(':');
+            out.push_str(variable);
+            out.push('(');
+            canonical_expr(body, out);
+            out.push_str(");");
+        }
+    }
+}
+
+pub fn scientific_candidate_digest(conjecture: &Conjecture) -> String {
+    // Candidate identity binds the exact discovered mathematical object and
+    // source/domain identity. Mutable confidence and downstream evidence are
+    // deliberately excluded so qualification cannot retroactively mutate it.
+    let mut canonical = String::from("candidate-v1|source=");
+    canonical.push_str(&conjecture.source.len().to_string());
+    canonical.push(':');
+    canonical.push_str(&conjecture.source);
+    canonical.push_str("|domain=");
+    canonical.push_str(match conjecture.domain {
+        MathDomain::NumberTheory => "number_theory",
+        MathDomain::Combinatorics => "combinatorics",
+        MathDomain::AlgebraicComplexity => "algebraic_complexity",
+        MathDomain::DynamicalSystems => "dynamical_systems",
+        MathDomain::SpectralAnalysis => "spectral_analysis",
+        MathDomain::Chemistry => "chemistry",
+        MathDomain::Biology => "biology",
+        MathDomain::Ecology => "ecology",
+        MathDomain::Economics => "economics",
+        MathDomain::Physics => "physics",
+        MathDomain::InformationTheory => "information_theory",
+    });
+    canonical.push_str("|complexity=");
+    canonical.push_str(&conjecture.complexity.to_string());
+    canonical.push_str("|formula=");
+    canonical_expr(&conjecture.formula, &mut canonical);
+    blake3::hash(canonical.as_bytes()).to_hex().to_string()
+}
+
+
+/// Compute an order-sensitive identity for the exact hypothesis list supplied
+/// to an independent challenge. Selection order is part of the reproducibility
+/// surface because deterministic ties depend on candidate order.
+pub fn scientific_hypothesis_set_digest(conjectures: &[Conjecture]) -> String {
+    let mut canonical = String::from("hypothesis-set-v1|count=");
+    canonical.push_str(&conjectures.len().to_string());
+    canonical.push('|');
+    for (index, conjecture) in conjectures.iter().enumerate() {
+        canonical.push_str(&index.to_string());
+        canonical.push(':');
+        canonical.push_str(&scientific_candidate_digest(conjecture));
+        canonical.push(';');
+    }
+    blake3::hash(canonical.as_bytes()).to_hex().to_string()
+}
+
+impl Conjecture {
+    /// Export this conjecture as an evidence-neutral scientific hypothesis.
+    ///
+    /// EUREKA is intentionally not consulted here: this is a one-way identity
+    /// handoff, not a qualification call.
+    pub fn scientific_hypothesis_handoff(
+        &self,
+        physical_type: &PhysicalType,
+        model_maturity: ModelMaturity,
+        source_observation_digest: impl Into<String>,
+        search_configuration_digest: impl Into<String>,
+        search_seed: u64,
+        discovery_manifest_digest: impl Into<String>,
+        non_claims: Vec<String>,
+    ) -> ScientificHypothesisHandoff {
+        ScientificHypothesisHandoff::new(
+            scientific_candidate_digest(self),
+            physical_type,
+            model_maturity,
+            source_observation_digest,
+            search_configuration_digest,
+            search_seed,
+            discovery_manifest_digest,
+            self.complexity as u64,
+            "ramanujan",
+            non_claims,
+        )
+    }
+}
 
 pub fn conjecture_has_verified_eml_backend(conjecture: &Conjecture) -> bool {
     conjecture.eml_compiled.is_some()
@@ -154,6 +289,135 @@ static EML_METADATA_CACHE: Lazy<RwLock<std::collections::HashMap<String, EmlMeta
     Lazy::new(|| RwLock::new(std::collections::HashMap::new()));
 
 #[cfg(test)]
+#[cfg(test)]
+mod hypothesis_handoff_tests {
+    use super::*;
+    use symthaea_types::{PhysicalDimension, QuantityKind};
+
+    #[test]
+    fn candidate_digest_uses_exact_constant_bits() {
+        let base = Conjecture {
+            formula: Expr::Const(1.0000001),
+            formula_str: "1.000000".into(),
+            source: "test".into(),
+            domain: MathDomain::Physics,
+            training_mse: 0.0,
+            complexity: 1,
+            fitness: 0.0,
+            status: ConjectureStatus::Proposed,
+            confidence: 0.5,
+            macro_promotion_tier: MacroPromotionTier::RecurrentNumerical,
+            eml_compiled: None,
+            eml_metrics: None,
+            eml_verified_real: None,
+            eml_real_domain: None,
+            eml_verified_complex: None,
+            eml_constructive_compiled: None,
+            eml_constructive_metrics: None,
+            eml_verified_constructive_real: None,
+        };
+        let mut changed = base.clone();
+        changed.formula = Expr::Const(1.0000002);
+        assert_ne!(
+            scientific_candidate_digest(&base),
+            scientific_candidate_digest(&changed)
+        );
+    }
+
+    #[test]
+    fn hypothesis_set_digest_binds_order() {
+        let a = Conjecture {
+            formula: Expr::Var("x".into()),
+            formula_str: "x".into(),
+            source: "a".into(),
+            domain: MathDomain::Physics,
+            training_mse: 0.0,
+            complexity: 1,
+            fitness: 0.0,
+            status: ConjectureStatus::Proposed,
+            confidence: 0.5,
+            macro_promotion_tier: MacroPromotionTier::RecurrentNumerical,
+            eml_compiled: None,
+            eml_metrics: None,
+            eml_verified_real: None,
+            eml_real_domain: None,
+            eml_verified_complex: None,
+            eml_constructive_compiled: None,
+            eml_constructive_metrics: None,
+            eml_verified_constructive_real: None,
+        };
+        let mut b = a.clone();
+        b.source = "b".into();
+        let first = scientific_hypothesis_set_digest(&[a.clone(), b.clone()]);
+        let reversed = scientific_hypothesis_set_digest(&[b, a]);
+        assert_ne!(first, reversed);
+    }
+
+    #[test]
+    fn handoff_is_independent_of_mutable_confidence() {
+        let formula = Expr::Var("n".into());
+        let mut a = Conjecture {
+            formula: formula.clone(),
+            formula_str: "n".into(),
+            source: "test-seq".into(),
+            domain: MathDomain::Physics,
+            training_mse: 0.0,
+            complexity: 1,
+            fitness: 0.0,
+            status: ConjectureStatus::Proposed,
+            confidence: 0.1,
+            macro_promotion_tier: MacroPromotionTier::RecurrentNumerical,
+            eml_compiled: None,
+            eml_metrics: None,
+            eml_verified_real: None,
+            eml_real_domain: None,
+            eml_verified_complex: None,
+            eml_constructive_compiled: None,
+            eml_constructive_metrics: None,
+            eml_verified_constructive_real: None,
+        };
+        let mut b = a.clone();
+        b.confidence = 0.99;
+
+        let energy = PhysicalType::with_kind(QuantityKind::Energy, PhysicalDimension::ENERGY);
+        let ha = a.scientific_hypothesis_handoff(
+            &energy,
+            ModelMaturity::ResearchPrototype,
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            7,
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            vec!["not qualification".into()],
+        );
+        let hb = b.scientific_hypothesis_handoff(
+            &energy,
+            ModelMaturity::ResearchPrototype,
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            7,
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            vec!["not qualification".into()],
+        );
+        assert_eq!(ha.candidate_digest, hb.candidate_digest);
+        assert_eq!(ha.physical_type_digest, energy.digest_hex());
+        assert!(ha.validate().is_ok());
+        a.confidence = 0.77;
+        assert_eq!(
+            a.scientific_hypothesis_handoff(
+                &energy,
+                ModelMaturity::ResearchPrototype,
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                7,
+                "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                vec!["not qualification".into()],
+            )
+            .candidate_digest,
+            ha.candidate_digest
+        );
+    }
+}
+
 pub(crate) fn clear_eml_metadata_cache() {
     EML_METADATA_CACHE.write().clear();
 }
