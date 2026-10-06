@@ -62,6 +62,18 @@ impl ClaimVerificationRelationship {
     }
 }
 
+/// Compare URL values using the URL parser/serializer model required by CID.
+///
+/// URL equivalence is intentionally semantic rather than raw-string equality:
+/// parse both values, serialize them, then compare the serialized URLs. Raw input
+/// strings remain stored separately, so provenance/digest domains do not silently
+/// collapse merely because two inputs are URL-equivalent.
+pub fn url_values_equivalent(left: &str, right: &str) -> Result<bool, url::ParseError> {
+    let left = Url::parse(left)?.to_string();
+    let right = Url::parse(right)?.to_string();
+    Ok(left == right)
+}
+
 fn is_hex_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
@@ -465,7 +477,9 @@ impl ControllerDocumentDereferenceAttestation {
         let effective = Url::parse(&self.effective_url)
             .map_err(|_| VerificationFailure::InvalidControllerDocumentUrl)?;
 
-        if self.requested_url != expected_url || self.document_digest != expected_digest {
+        if !url_values_equivalent(&self.requested_url, expected_url).unwrap_or(false)
+            || self.document_digest != expected_digest
+        {
             return Err(VerificationFailure::ControllerDocumentDereferenceMismatch);
         }
         if self.response_media_type.trim().is_empty() {
@@ -478,7 +492,9 @@ impl ControllerDocumentDereferenceAttestation {
         {
             return Err(VerificationFailure::ControllerDocumentNetworkPolicyViolation);
         }
-        if policy.require_effective_url_match && effective.as_str() != requested.as_str() {
+        if policy.require_effective_url_match
+            && !url_values_equivalent(effective.as_str(), requested.as_str()).unwrap_or(false)
+        {
             return Err(VerificationFailure::ControllerDocumentEffectiveUrlMismatch);
         }
         if self.redirect_count > policy.max_redirects {
@@ -502,7 +518,8 @@ impl ControllerDocumentDereferenceAttestation {
     }
 
     pub fn matches_document(&self, document_url: &str, document_digest: &str) -> bool {
-        self.requested_url == document_url && self.document_digest == document_digest
+        url_values_equivalent(&self.requested_url, document_url).unwrap_or(false)
+            && self.document_digest == document_digest
     }
 }
 
@@ -986,14 +1003,21 @@ impl VerificationMethodResolution {
         expected_document_url.set_fragment(None);
         let expected_document_url = expected_document_url.to_string();
 
-        if controller_document_ref != expected_document_url {
+        if !url_values_equivalent(&controller_document_ref, &expected_document_url)
+            .unwrap_or(false)
+        {
             return Err(VerificationFailure::ControllerDocumentMismatch {
                 expected: expected_document_url,
                 actual: controller_document_ref,
             });
         }
 
-        if resolved_verification_method != request.verification_method {
+        if !url_values_equivalent(
+            resolved_verification_method.as_str(),
+            request.verification_method.as_str(),
+        )
+        .unwrap_or(false)
+        {
             return Err(VerificationFailure::VerificationMethodMismatch {
                 expected: request.verification_method.clone(),
                 actual: resolved_verification_method,
@@ -1004,7 +1028,9 @@ impl VerificationMethodResolution {
             .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
         let document_id = Url::parse(controller_document_id.as_str())
             .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
-        if document_id.as_str() != controller_document_ref {
+        if !url_values_equivalent(document_id.as_str(), &controller_document_ref)
+            .unwrap_or(false)
+        {
             return Err(VerificationFailure::ControllerDocumentMismatch {
                 expected: controller_document_ref.clone(),
                 actual: controller_document_id.as_str().to_owned(),
@@ -1016,7 +1042,9 @@ impl VerificationMethodResolution {
             .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
         let resolved_controller = Url::parse(resolved_verification_method_controller.as_str())
             .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
-        if resolved_controller.as_str() != controller_document_ref {
+        if !url_values_equivalent(resolved_controller.as_str(), &controller_document_ref)
+            .unwrap_or(false)
+        {
             return Err(VerificationFailure::ControllerMismatch {
                 expected: ClaimControllerIdentity::new(controller_document_ref.clone())
                     .expect("validated controller document URL"),
@@ -1024,7 +1052,12 @@ impl VerificationMethodResolution {
             });
         }
 
-        if request.expected_controller.as_str() != controller_document_ref {
+        if !url_values_equivalent(
+            request.expected_controller.as_str(),
+            &controller_document_ref,
+        )
+        .unwrap_or(false)
+        {
             return Err(VerificationFailure::ControllerMismatch {
                 expected: request.expected_controller.clone(),
                 actual: ClaimControllerIdentity::new(controller_document_ref.clone())
@@ -1042,7 +1075,10 @@ impl VerificationMethodResolution {
         methods.sort();
         methods.dedup();
 
-        if !methods.iter().any(|method| method == &request.verification_method) {
+        if !methods.iter().any(|method| {
+            url_values_equivalent(method.as_str(), request.verification_method.as_str())
+                .unwrap_or(false)
+        }) {
             return Err(VerificationFailure::VerificationMethodNotInRelationship);
         }
 
@@ -1134,7 +1170,9 @@ impl VerificationMethodResolution {
             Url::parse(self.verification_method.as_str())
                 .map_err(|_| VerificationFailure::InvalidVerificationMethodUrl)?;
         expected_document_url.set_fragment(None);
-        if expected_document_url.as_str() != self.controller_document_ref {
+        if !url_values_equivalent(expected_document_url.as_str(), &self.controller_document_ref)
+            .unwrap_or(false)
+        {
             return Err(VerificationFailure::ControllerDocumentMismatch {
                 expected: expected_document_url.to_string(),
                 actual: self.controller_document_ref.clone(),
@@ -1143,7 +1181,9 @@ impl VerificationMethodResolution {
 
         let document_id = Url::parse(self.controller_document_id.as_str())
             .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
-        if document_id.as_str() != self.controller_document_ref {
+        if !url_values_equivalent(document_id.as_str(), &self.controller_document_ref)
+            .unwrap_or(false)
+        {
             return Err(VerificationFailure::ControllerDocumentMismatch {
                 expected: self.controller_document_ref.clone(),
                 actual: self.controller_document_id.as_str().to_owned(),
@@ -1153,7 +1193,12 @@ impl VerificationMethodResolution {
         let resolved_controller =
             Url::parse(self.resolved_verification_method_controller.as_str())
                 .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
-        if resolved_controller.as_str() != self.controller_document_ref {
+        if !url_values_equivalent(
+            resolved_controller.as_str(),
+            &self.controller_document_ref,
+        )
+        .unwrap_or(false)
+        {
             return Err(VerificationFailure::ControllerMismatch {
                 expected: ClaimControllerIdentity::new(self.controller_document_ref.clone())
                     .expect("validated controller document URL"),
@@ -1170,6 +1215,23 @@ impl VerificationMethodResolution {
             Url::parse(method.as_str())
                 .map_err(|_| VerificationFailure::InvalidVerificationMethodUrl)?;
         }
+        let canonical_method_ids = canonical_methods
+            .iter()
+            .map(|method| {
+                Url::parse(method.as_str())
+                    .map(|url| url.to_string())
+                    .map_err(|_| VerificationFailure::InvalidVerificationMethodUrl)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut unique_canonical_method_ids = canonical_method_ids.clone();
+        unique_canonical_method_ids.sort();
+        unique_canonical_method_ids.dedup();
+        if unique_canonical_method_ids.len() != canonical_method_ids.len() {
+            return Err(VerificationFailure::Structural(
+                "relationship method set contains semantically duplicate URL values".into(),
+            ));
+        }
+
         canonical_methods.sort();
         canonical_methods.dedup();
         if canonical_methods != self.relationship_methods {
@@ -1268,8 +1330,16 @@ impl VerificationMethodResolution {
 
     pub fn matches_request(&self, request: &VerificationRequest) -> bool {
         self.validate_structure().is_ok()
-            && self.verification_method == request.verification_method
-            && self.resolved_verification_method_controller == request.expected_controller
+            && url_values_equivalent(
+                self.verification_method.as_str(),
+                request.verification_method.as_str(),
+            )
+            .unwrap_or(false)
+            && url_values_equivalent(
+                self.resolved_verification_method_controller.as_str(),
+                request.expected_controller.as_str(),
+            )
+            .unwrap_or(false)
             && self.verification_relationship == request.expected_verification_relationship
             && self.controller_document_network_policy
                 == request.controller_document_network_policy
@@ -2589,6 +2659,73 @@ mod tests {
                 Err(VerificationFailure::InvalidTimestamp { .. })
             ));
         }
+    }
+
+    #[test]
+    fn url_identity_uses_parsed_serialized_equivalence() {
+        assert!(url_values_equivalent(
+            "https://EXAMPLE.TEST:443/controller/./#key-1",
+            "https://example.test/controller/#key-1",
+        )
+        .unwrap());
+
+        assert!(!url_values_equivalent(
+            "https://example.test/controller#key-1",
+            "https://example.test/controller#key-2",
+        )
+        .unwrap());
+
+        assert!(url_values_equivalent(
+            "https://example.test/controller",
+            "https://example.test/controller",
+        )
+        .unwrap());
+    }
+
+    #[test]
+    fn resolution_accepts_equivalent_controller_document_urls_without_rewriting_provenance() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://EXAMPLE.TEST/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let resolution = VerificationMethodResolution::from_controller_document(
+            &request,
+            "https://example.test/controller/",
+            ClaimControllerDocumentIdentity::new("https://example.test/controller/").unwrap(),
+            ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
+            "Multikey",
+            &"44".repeat(32),
+            ClaimControllerIdentity::new("https://example.test/controller/").unwrap(),
+            &[ClaimVerificationMethod::new(
+                "https://example.test/controller#key-1",
+            )
+            .unwrap()],
+            &"11".repeat(32),
+            VerificationMethodLifecycle::new(None, None).unwrap(),
+            ControllerDocumentSnapshotScope::historical_at(
+                request.freshness.lifecycle_reference_time(),
+                "snapshot:verification-url-equivalence",
+                request.freshness.verification_time.as_str(),
+            )
+            .unwrap(),
+        );
+
+        assert!(resolution.is_ok(), "{resolution:?}");
+        let resolution = resolution.unwrap();
+        assert_eq!(
+            resolution.controller_document_ref,
+            "https://example.test/controller/"
+        );
+        assert_eq!(
+            request.expected_controller.as_str(),
+            "https://EXAMPLE.TEST/controller"
+        );
     }
 
     #[test]
