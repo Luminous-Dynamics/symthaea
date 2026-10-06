@@ -745,6 +745,9 @@ impl WebGpuRenderer {
             .await
             .map_err(|error| format!("failed to request WebGPU adapter: {error}"))?;
 
+        #[cfg(feature = "browser-qualification")]
+        let qualification_adapter_info = adapter.get_info();
+
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("Symthaea WebGPU Canvas"),
@@ -815,6 +818,26 @@ impl WebGpuRenderer {
         surface.configure(&device, &config);
         #[cfg(feature = "browser-qualification")]
         {
+            let _ = canvas.set_attribute(
+                "data-qualification-adapter-name",
+                &qualification_adapter_info.name,
+            );
+            let _ = canvas.set_attribute(
+                "data-qualification-adapter-device-type",
+                &format!("{:?}", qualification_adapter_info.device_type),
+            );
+            let _ = canvas.set_attribute(
+                "data-qualification-adapter-backend",
+                &format!("{:?}", qualification_adapter_info.backend),
+            );
+            let _ = canvas.set_attribute(
+                "data-qualification-adapter-vendor",
+                &qualification_adapter_info.vendor.to_string(),
+            );
+            let _ = canvas.set_attribute(
+                "data-qualification-adapter-device",
+                &qualification_adapter_info.device.to_string(),
+            );
             let _ = canvas.set_attribute("data-qualification-surface-format", &format!("{format:?}"));
             let _ = canvas.set_attribute(
                 "data-qualification-surface-formats",
@@ -1076,6 +1099,9 @@ impl WebGpuMovieRenderer {
             })
             .await
             .map_err(|error| format!("failed to request WebGPU movie adapter: {error}"))?;
+        #[cfg(feature = "browser-qualification")]
+        let qualification_adapter_info = adapter.get_info();
+
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("Symthaea WebGPU Movie"),
@@ -1143,6 +1169,26 @@ impl WebGpuMovieRenderer {
         surface.configure(&device, &config);
         #[cfg(feature = "browser-qualification")]
         {
+            let _ = canvas.set_attribute(
+                "data-qualification-adapter-name",
+                &qualification_adapter_info.name,
+            );
+            let _ = canvas.set_attribute(
+                "data-qualification-adapter-device-type",
+                &format!("{:?}", qualification_adapter_info.device_type),
+            );
+            let _ = canvas.set_attribute(
+                "data-qualification-adapter-backend",
+                &format!("{:?}", qualification_adapter_info.backend),
+            );
+            let _ = canvas.set_attribute(
+                "data-qualification-adapter-vendor",
+                &qualification_adapter_info.vendor.to_string(),
+            );
+            let _ = canvas.set_attribute(
+                "data-qualification-adapter-device",
+                &qualification_adapter_info.device.to_string(),
+            );
             let _ = canvas.set_attribute("data-qualification-surface-format", &format!("{format:?}"));
             let _ = canvas.set_attribute(
                 "data-qualification-surface-formats",
