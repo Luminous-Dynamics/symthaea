@@ -258,6 +258,96 @@ async function canvasPixelSamples(page, selector, points) {
   );
 }
 
+async function screenshotCanvasPixelStatistics(page, selector) {
+  const geometry = await page.$eval(selector, canvas => {
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      throw new Error('selected element is not a canvas');
+    }
+    const rect = canvas.getBoundingClientRect();
+    return {
+      rect: {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      },
+      width: canvas.width,
+      height: canvas.height,
+    };
+  });
+  const screenshot = await page.screenshot({
+    clip: geometry.rect,
+    type: 'png',
+  });
+  const dataUrl = screenshot.toString('base64');
+  return page.evaluate(async ({ dataUrl, width, height }) => {
+    const image = new Image();
+    image.src = 'data:image/png;base64,' + dataUrl;
+    await image.decode();
+    const probe = document.createElement('canvas');
+    probe.width = image.naturalWidth;
+    probe.height = image.naturalHeight;
+    const context = probe.getContext('2d');
+    if (!context) {
+      throw new Error('could not create screenshot compositor statistics context');
+    }
+    context.drawImage(image, 0, 0);
+    const rgba = context.getImageData(0, 0, probe.width, probe.height).data;
+    let opaqueBlack = 0;
+    let nonOpaque = 0;
+    let nonBlack = 0;
+    let minX = probe.width;
+    let minY = probe.height;
+    let maxX = -1;
+    let maxY = -1;
+    for (let y = 0; y < probe.height; y++) {
+      for (let x = 0; x < probe.width; x++) {
+        const offset = (y * probe.width + x) * 4;
+        const r = rgba[offset];
+        const g = rgba[offset + 1];
+        const b = rgba[offset + 2];
+        const a = rgba[offset + 3];
+        if (r === 0 && g === 0 && b === 0 && a === 255) {
+          opaqueBlack++;
+        }
+        if (a !== 255) {
+          nonOpaque++;
+        }
+        if (r !== 0 || g !== 0 || b !== 0) {
+          nonBlack++;
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+      }
+    }
+    return {
+      width,
+      height,
+      screenshot_width: probe.width,
+      screenshot_height: probe.height,
+      opaque_black_pixels: opaqueBlack,
+      non_opaque_pixels: nonOpaque,
+      non_black_pixels: nonBlack,
+      non_black_fraction: (probe.width * probe.height) > 0
+        ? nonBlack / (probe.width * probe.height)
+        : 0,
+      non_black_bounds: maxX >= 0
+        ? { min_x: minX, min_y: minY, max_x: maxX, max_y: maxY }
+        : null,
+      screenshot_bytes: null,
+    };
+  }, {
+    dataUrl,
+    width: geometry.width,
+    height: geometry.height,
+  }).then(stats => ({
+    ...stats,
+    screenshot_bytes: screenshot.length,
+  }));
+}
+
 async function screenshotCanvasPixelSamples(page, selector, points) {
   const geometry = await page.$eval(selector, canvas => {
     if (!(canvas instanceof HTMLCanvasElement)) {
@@ -1545,6 +1635,17 @@ async function runMode(mode) {
       ]);
       assertSemanticMovieSamples(semanticMovieSamples);
 
+      const compositorSceneStatistics = await screenshotCanvasPixelStatistics(
+        page,
+        '#webgpu-cognitive-canvas',
+      );
+      assertCanvasStatistics(
+        compositorSceneStatistics,
+        220,
+        220,
+        'WebGPU compositor scene',
+        'renderer',
+      );
       const compositorSceneSamples = await screenshotCanvasPixelSamples(
         page,
         '#webgpu-cognitive-canvas',
@@ -1561,6 +1662,17 @@ async function runMode(mode) {
         'renderer',
       );
 
+      const compositorMovieStatistics = await screenshotCanvasPixelStatistics(
+        page,
+        '#webgpu-movie-canvas',
+      );
+      assertCanvasStatistics(
+        compositorMovieStatistics,
+        192,
+        192,
+        'WebGPU compositor movie',
+        'renderer',
+      );
       const compositorMovieSamples = await screenshotCanvasPixelSamples(
         page,
         '#webgpu-movie-canvas',
@@ -1606,6 +1718,28 @@ async function runMode(mode) {
 
       const repeatSceneHash = await canvasPngHash(page, '#webgpu-cognitive-canvas');
       const repeatMovieHash = await canvasPngHash(page, '#webgpu-movie-canvas');
+      const repeatCompositorSceneStatistics = await screenshotCanvasPixelStatistics(
+        page,
+        '#webgpu-cognitive-canvas',
+      );
+      assertCanvasStatistics(
+        repeatCompositorSceneStatistics,
+        220,
+        220,
+        'WebGPU compositor repeat scene',
+        'renderer',
+      );
+      const repeatCompositorMovieStatistics = await screenshotCanvasPixelStatistics(
+        page,
+        '#webgpu-movie-canvas',
+      );
+      assertCanvasStatistics(
+        repeatCompositorMovieStatistics,
+        192,
+        192,
+        'WebGPU compositor repeat movie',
+        'renderer',
+      );
       const repeatCompositorSceneSamples = await screenshotCanvasPixelSamples(
         page,
         '#webgpu-cognitive-canvas',
@@ -1658,7 +1792,9 @@ async function runMode(mode) {
         movie_hash: firstMovieHash,
         semantic_scene_samples: semanticSceneSamples,
         semantic_movie_samples: semanticMovieSamples,
+        compositor_scene_statistics: compositorSceneStatistics,
         compositor_scene_samples: compositorSceneSamples,
+        compositor_movie_statistics: compositorMovieStatistics,
         compositor_movie_samples: compositorMovieSamples,
         deterministic_repeat: true,
         page_errors: pageErrors,
@@ -1802,7 +1938,7 @@ try {
   }
 
   const artifact = {
-    schema: 'symthaea-ui-webgpu-qualification-v6',
+    schema: 'symthaea-ui-webgpu-qualification-v7',
     harness_self_tests_passed: true,
     url: URL,
     chromium: CHROMIUM,
