@@ -3503,6 +3503,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn unimorph_tsv_compiler_rejects_duplicate_lemma_feature_identity() {
         let artifact = b"walk\twalked\tV;PST\nwalk\twalkt\tV;PST\n";
         let first_len = b"walk\twalked\tV;PST\n".len();
