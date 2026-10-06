@@ -294,6 +294,9 @@ impl RelationalPredictionProvenance {
 }
 
 /// Exact held-out prediction trace for one feature family.
+///
+/// The retained test rows make the fitted prediction path independently
+/// recomputable; the record is therefore stronger than a loss-only receipt.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PredictionEvidenceRecord {
     pub feature_set: PredictionFeatureSet,
