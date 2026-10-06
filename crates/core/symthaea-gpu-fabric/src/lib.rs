@@ -47,7 +47,7 @@ impl GpuOperation {
     }
 
     pub fn kernel_digest(self) -> String {
-        digest_bytes(self.kernel_id().as_bytes())
+        semantic_digest(self.kernel_id().as_bytes())
     }
 
     pub const fn input_count(self) -> usize {
@@ -406,7 +406,17 @@ fn stable_digest<T: Serialize>(value: &T) -> [u8; 32] {
 }
 
 fn digest_bytes(bytes: &[u8]) -> String {
-    blake3::hash(bytes).to_hex().to_string()
+    let mut hasher = Hasher::new();
+    hasher.update(b"symthaea.gpu-fabric.bytes\0");
+    hasher.update(bytes);
+    hasher.finalize().to_hex().to_string()
+}
+
+fn semantic_digest(bytes: &[u8]) -> String {
+    let mut hasher = Hasher::new();
+    hasher.update(b"symthaea.gpu-fabric.semantic-kernel\0");
+    hasher.update(bytes);
+    hasher.finalize().to_hex().to_string()
 }
 
 fn hex_digest(bytes: [u8; 32]) -> String {
