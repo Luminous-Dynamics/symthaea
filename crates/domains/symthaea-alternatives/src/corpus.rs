@@ -159,6 +159,8 @@ fn evidence(
                     &uncertainty.component_refs,
                 )
                 .unwrap();
+            uncertainty.evaluation.component_set_digest =
+                uncertainty.component_refs_digest.clone();
             uncertainty.uncertainty_budget_component_set_digest =
                 uncertainty.component_refs_digest.clone();
             uncertainty.uncertainty_budget_component_count = uncertainty.component_refs.len();
