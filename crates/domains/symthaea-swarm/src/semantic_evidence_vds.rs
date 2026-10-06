@@ -1297,7 +1297,7 @@ impl Rfc9942SignatureWithReceipts {
                 if protected_crit.is_some() {
                     return Err(Rfc9942VdpError::InvalidStructure);
                 }
-                let items=value_reader.read_array_items_bounded(16)
+                let items=value_reader.read_array_items_bounded_with_resource_limits(16)
                     .map_err(|error|match error {
                         Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
                         Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidEncoding,
