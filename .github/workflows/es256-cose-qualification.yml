@@ -223,6 +223,17 @@ jobs:
           key_label_257 = b"\xa1\x79\x01\x01" + (b"x" * 257) + b"\x00"
           key_x_33 = b"\xa1\x21\x58\x21" + (b"\x00" * 33)
 
+          # Each extension value stays within the 4 KiB per-value bound, but
+          # four entries plus framing exceed MAX_RFC9942_COSE_KEY_ENCODED_BYTES.
+          # This prevents the aggregate map budget from being bypassed by
+          # distributing attacker-controlled material across otherwise-valid
+          # individual values.
+          key_aggregate_map_limit = bytearray([0xa4])
+          for label in range(1000, 1004):
+              key_aggregate_map_limit.extend((0x19, label >> 8, label & 0xff))
+              key_aggregate_map_limit.extend(b"\x59\x10\x00")
+              key_aggregate_map_limit.extend(b"\x00" * 4096)
+
           receipt_payload_33 = (
               b"\xd2\x84"
               + b"\x58\x06\xa2\x01\x26\x19\x01\x8b"
@@ -353,6 +364,8 @@ jobs:
               "fuzz_cose_key_es256/seed-kid-257.cbor": key_kid_257,
               "fuzz_cose_key_es256/seed-label-257.cbor": key_label_257,
               "fuzz_cose_key_es256/seed-x-33.cbor": key_x_33,
+              "fuzz_cose_key_es256/seed-aggregate-map-budget.cbor":
+                  bytes(key_aggregate_map_limit),
               "fuzz_rfc9942_receipt/seed-attached-payload-33.cbor": receipt_payload_33,
               "fuzz_rfc9942_receipt/seed-payload-4097-chunks.cbor":
                   receipt_payload_chunk_limit,
