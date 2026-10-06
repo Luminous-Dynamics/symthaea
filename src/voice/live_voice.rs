@@ -38,7 +38,7 @@ use symthaea_vocal_tract::pipeline::{
 
 use super::audio_out::AudioOutput;
 use super::formant_targets::FormantDatabase;
-use super::repl_voice::SimpleG2P;
+use super::repl_voice::{PronunciationLexiconEvidence, SimpleG2P};
 use super::vocal_tract_controller::train_controller_on_phoneme_db;
 use super::vocal_tract_encoder::VoiceCognitiveState;
 use super::vocal_tract_fep::StreamingVocalTract;
@@ -194,8 +194,13 @@ impl PhonologicalPlanRealizationReceipt {
 pub struct VerifiedLexicalPhonologicalRealizationReceipt {
     /// Existing v3 realization receipt, preserving its independent plan/audio accounting.
     pub realization: PhonologicalPlanRealizationReceipt,
-    /// Embedded pronunciation resources used when deriving the witness.
-    pub pronunciation_lexicon_sources: Vec<String>,
+    /// Complete provenance for each embedded pronunciation resource used to derive the witness.
+    ///
+    /// An empty vector is intentional for a caller-supplied witness that was not derived from
+    /// Symthaea's embedded pronunciation resources.
+    pub pronunciation_lexicon_evidence: Vec<PronunciationLexiconEvidence>,
+    /// Canonical digest binding the exact pronunciation-resource evidence list to this receipt.
+    pub pronunciation_lexicon_evidence_blake3: String,
     /// Exact witness contract version.
     pub witness_version: String,
     /// Exact lexical-binding provenance carried by the witness.
@@ -222,18 +227,50 @@ impl VerifiedLexicalPhonologicalRealizationReceipt {
         if self.witness_version != witness.version {
             anyhow::bail!("verified realization receipt witness version does not match witness");
         }
-        if self
-            .pronunciation_lexicon_sources
-            .iter()
-            .any(|source| !matches!(
-                source.as_str(),
-                "symthaea-hand-lexicon-v1" | "cmudict-embedded-v1"
-            ))
-        {
+        for evidence in &self.pronunciation_lexicon_evidence {
+            if !evidence.is_well_formed() {
+                anyhow::bail!(
+                    "verified realization receipt contains malformed pronunciation evidence"
+                );
+            }
+
+            match evidence.source_id.as_str() {
+                "symthaea-hand-lexicon-v1" => {
+                    if evidence.dialect_scope != "en-unspecified"
+                        || evidence.variant_policy != "single-curated-entry"
+                        || evidence.selected_variant != "only-entry"
+                        || evidence.available_variants != 1
+                    {
+                        anyhow::bail!(
+                            "hand-lexicon pronunciation evidence has unsupported scope or variant semantics"
+                        );
+                    }
+                }
+                "cmudict-embedded-v1" => {
+                    if evidence.dialect_scope != "en-US"
+                        || evidence.variant_policy != "primary-un-suffixed-entry"
+                        || evidence.selected_variant != "primary"
+                        || evidence.available_variants == 0
+                    {
+                        anyhow::bail!(
+                            "CMUdict pronunciation evidence has unsupported scope or variant semantics"
+                        );
+                    }
+                }
+                _ => anyhow::bail!(
+                    "verified realization receipt contains an unsupported pronunciation-lexicon source"
+                ),
+            }
+        }
+
+        let expected_lexicon_evidence =
+            hash_pronunciation_lexicon_evidence(&self.pronunciation_lexicon_evidence);
+        if self.pronunciation_lexicon_evidence_blake3 != expected_lexicon_evidence {
             anyhow::bail!(
-                "verified realization receipt contains an unsupported pronunciation-lexicon source"
+                "verified realization receipt pronunciation-resource evidence digest does not match evidence"
             );
         }
+
         if self.lexical_binding_provenance != binding.provenance_token() {
             anyhow::bail!(
                 "verified realization receipt lexical-binding provenance does not match binding"
@@ -252,6 +289,48 @@ impl VerifiedLexicalPhonologicalRealizationReceipt {
     pub fn verify_samples(&self, samples: &[f32]) -> bool {
         self.realization.verify_samples(samples)
     }
+}
+
+#[cfg(feature = "ssm_language")]
+fn hash_pronunciation_lexicon_evidence(
+    evidence: &[PronunciationLexiconEvidence],
+) -> String {
+    let mut canonical = evidence.to_vec();
+    canonical.sort_by(|left, right| {
+        (
+            &left.source_id,
+            &left.dialect_scope,
+            &left.variant_policy,
+            &left.selected_variant,
+            left.available_variants,
+            &left.resource_blake3,
+        )
+            .cmp(&(
+                &right.source_id,
+                &right.dialect_scope,
+                &right.variant_policy,
+                &right.selected_variant,
+                right.available_variants,
+                &right.resource_blake3,
+            ))
+    });
+
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-pronunciation-lexicon-evidence-v1\\0");
+    for item in canonical {
+        hasher.update(&(item.source_id.len() as u64).to_le_bytes());
+        hasher.update(item.source_id.as_bytes());
+        hasher.update(&(item.dialect_scope.len() as u64).to_le_bytes());
+        hasher.update(item.dialect_scope.as_bytes());
+        hasher.update(&(item.variant_policy.len() as u64).to_le_bytes());
+        hasher.update(item.variant_policy.as_bytes());
+        hasher.update(&(item.selected_variant.len() as u64).to_le_bytes());
+        hasher.update(item.selected_variant.as_bytes());
+        hasher.update(&(item.available_variants as u64).to_le_bytes());
+        hasher.update(&(item.resource_blake3.len() as u64).to_le_bytes());
+        hasher.update(item.resource_blake3.as_bytes());
+    }
+    hasher.finalize().to_hex().to_string()
 }
 
 #[cfg(feature = "ssm_language")]
@@ -387,7 +466,7 @@ impl LiveVoice {
         &self,
         binding: &LexicalMorphosyntacticBinding,
         segments: &[symthaea_broca::PhonemeSlot],
-    ) -> Result<(LexicalPhonologicalWitness, Vec<String>)> {
+    ) -> Result<(LexicalPhonologicalWitness, Vec<PronunciationLexiconEvidence>)> {
         binding
             .validate()
             .map_err(|error| anyhow::anyhow!("invalid lexical binding: {error}"))?;
@@ -403,7 +482,7 @@ impl LiveVoice {
 
         let mut mappings = Vec::with_capacity(binding.constituents.len());
         let mut cursor = 0usize;
-        let mut sources = Vec::new();
+        let mut pronunciation_lexicon_evidence = Vec::new();
 
         for (lexical_position, constituent) in binding.constituents.iter().enumerate() {
             let form = constituent
@@ -415,15 +494,15 @@ impl LiveVoice {
                     )
                 })?;
 
-            let (expected_phones, source) = self
+            let (expected_phones, evidence) = self
                 .g2p
-                .word_to_phonemes_from_lexicon(form)
+                .word_to_phonemes_from_lexicon_with_evidence(form)
                 .ok_or_else(|| {
                     anyhow::anyhow!(
                         "lexical position {lexical_position} form {form:?} has no embedded pronunciation"
                     )
                 })?;
-            sources.push(source.to_string());
+            pronunciation_lexicon_evidence.push(evidence);
 
             while segments
                 .get(cursor)
@@ -505,10 +584,27 @@ impl LiveVoice {
 
         let witness = LexicalPhonologicalWitness::new(binding, mappings)
             .map_err(|error| anyhow::anyhow!("invalid derived lexical witness: {error}"))?;
-        sources.sort();
-        sources.dedup();
+        pronunciation_lexicon_evidence.sort_by(|left, right| {
+            (
+                &left.source_id,
+                &left.dialect_scope,
+                &left.variant_policy,
+                &left.selected_variant,
+                left.available_variants,
+                &left.resource_blake3,
+            )
+                .cmp(&(
+                    &right.source_id,
+                    &right.dialect_scope,
+                    &right.variant_policy,
+                    &right.selected_variant,
+                    right.available_variants,
+                    &right.resource_blake3,
+                ))
+        });
+        pronunciation_lexicon_evidence.dedup();
 
-        Ok((witness, sources))
+        Ok((witness, pronunciation_lexicon_evidence))
     }
 
     /// Realize a plan by deriving its lexical-to-phonological witness strictly from the
@@ -523,13 +619,15 @@ impl LiveVoice {
     ) -> Result<VerifiedLexicalPhonologicalRealizationReceipt> {
         plan.validate_against_frame(frame)
             .map_err(|error| anyhow::anyhow!("invalid phonological plan lineage: {error}"))?;
-        let (witness, sources) =
+        let (witness, pronunciation_lexicon_evidence) =
             self.derive_english_lexical_phonological_witness(binding, &plan.segments)?;
         let mut receipt = self
             .speak_verified_lexical_phonological_plan_with_receipt(
                 plan, frame, binding, &witness,
             )?;
-        receipt.pronunciation_lexicon_sources = sources;
+        receipt.pronunciation_lexicon_evidence = pronunciation_lexicon_evidence;
+        receipt.pronunciation_lexicon_evidence_blake3 =
+            hash_pronunciation_lexicon_evidence(&receipt.pronunciation_lexicon_evidence);
         Ok(receipt)
     }
 
@@ -597,9 +695,12 @@ impl LiveVoice {
             self.synthesize_phonological_plan_with_admission(plan, true)?;
         self.push_with_backpressure(&samples);
 
+        let pronunciation_lexicon_evidence = Vec::new();
         Ok(VerifiedLexicalPhonologicalRealizationReceipt {
             realization,
-            pronunciation_lexicon_sources: Vec::new(),
+            pronunciation_lexicon_evidence_blake3 =
+                hash_pronunciation_lexicon_evidence(&pronunciation_lexicon_evidence),
+            pronunciation_lexicon_evidence,
             witness_version: witness.version.clone(),
             lexical_binding_provenance: binding.provenance_token(),
             witness_blake3: blake3::hash(witness.grounding_surface().as_bytes())
@@ -1734,9 +1835,9 @@ mod tests {
         };
 
         let binding = make_binding("hello");
-        let (hello_phones, source) = voice
+        let (hello_phones, _hello_evidence) = voice
             .g2p
-            .word_to_phonemes_from_lexicon("hello")
+            .word_to_phonemes_from_lexicon_with_evidence("hello")
             .expect("hello must be in an embedded pronunciation lexicon");
 
         let mut segments = Vec::new();
@@ -1769,11 +1870,23 @@ mod tests {
             }
         }
 
-        let (witness, sources) = voice
+        let (witness, pronunciation_lexicon_evidence) = voice
             .derive_english_lexical_phonological_witness(&binding, &segments)
             .expect("embedded lexicon should derive a witness");
-        assert_eq!(source, "symthaea-hand-lexicon-v1");
-        assert_eq!(sources, vec![source.to_string()]);
+        assert_eq!(pronunciation_lexicon_evidence.len(), 1);
+        assert_eq!(
+            pronunciation_lexicon_evidence[0].source_id,
+            "symthaea-hand-lexicon-v1"
+        );
+        assert_eq!(
+            pronunciation_lexicon_evidence[0].dialect_scope,
+            "en-unspecified"
+        );
+        assert_eq!(
+            pronunciation_lexicon_evidence[0].selected_variant,
+            "only-entry"
+        );
+        assert_eq!(pronunciation_lexicon_evidence[0].available_variants, 1);
         assert!(witness.validate_against_segments(&binding, &segments).is_ok());
         assert_eq!(
             witness.mappings[0].symbols[0],
@@ -2032,12 +2145,54 @@ mod tests {
         );
 
         let mut unsupported_source_receipt = receipt.clone();
-        unsupported_source_receipt.pronunciation_lexicon_sources = vec!["invented-v1".into()];
+        unsupported_source_receipt.pronunciation_lexicon_evidence = vec![
+            PronunciationLexiconEvidence {
+                source_id: "invented-v1".into(),
+                dialect_scope: "en-US".into(),
+                variant_policy: "primary-un-suffixed-entry".into(),
+                selected_variant: "primary".into(),
+                available_variants: 1,
+                resource_blake3: "0".repeat(64),
+            },
+        ];
+        unsupported_source_receipt.pronunciation_lexicon_evidence_blake3 =
+            hash_pronunciation_lexicon_evidence(
+                &unsupported_source_receipt.pronunciation_lexicon_evidence
+            );
         assert!(
             unsupported_source_receipt
                 .verify_against_plan(&plan, &frame, &binding, &witness)
                 .is_err(),
             "unsupported lexicon source identifiers must fail verification"
+        );
+
+        let mut tampered_resource_receipt = receipt.clone();
+        tampered_resource_receipt.pronunciation_lexicon_evidence[0].resource_blake3 =
+            "1".repeat(64);
+        assert!(
+            tampered_resource_receipt
+                .verify_against_plan(&plan, &frame, &binding, &witness)
+                .is_err(),
+            "resource digest tampering must fail without recomputing the receipt evidence binding"
+        );
+
+        let mut tampered_scope_receipt = receipt.clone();
+        tampered_scope_receipt.pronunciation_lexicon_evidence[0].dialect_scope = "en-GB".into();
+        assert!(
+            tampered_scope_receipt
+                .verify_against_plan(&plan, &frame, &binding, &witness)
+                .is_err(),
+            "dialect scope tampering must fail closed"
+        );
+
+        let mut tampered_variant_receipt = receipt.clone();
+        tampered_variant_receipt.pronunciation_lexicon_evidence[0].selected_variant =
+            "alternate-1".into();
+        assert!(
+            tampered_variant_receipt
+                .verify_against_plan(&plan, &frame, &binding, &witness)
+                .is_err(),
+            "selected pronunciation variant tampering must fail closed"
         );
     }
 
