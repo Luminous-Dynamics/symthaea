@@ -398,6 +398,7 @@ impl NixSystemdReadOnlyObserverV1 {
         let evidence = NixServiceDefinitionContentEvidenceV1 {
             unit: expected_unit,
             source_identity_digest,
+            manager_owner,
             files,
             captured_at_monotonic_us: monotonic_now_us()?,
         };
