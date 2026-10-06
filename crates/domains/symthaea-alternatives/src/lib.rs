@@ -598,6 +598,8 @@ pub struct MeasurementUncertaintyEvaluationRef {
     pub degrees_of_freedom_revision: String,
     /// Digest of the exact degrees-of-freedom record.
     pub degrees_of_freedom_digest: String,
+    /// Exact coverage probability associated with expanded uncertainty, when applicable.
+    pub coverage_probability: Option<f64>,
     /// Optional provenance for the coverage-factor method; required for expanded uncertainty.
     pub coverage_method: Option<MeasurementUncertaintyCoverageMethodRef>,
 }
@@ -640,12 +642,24 @@ impl MeasurementUncertaintyEvaluationRef {
         {
             return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation);
         }
-        match (&self.coverage_method, expanded) {
-            (Some(method), _) => method.validate()?,
-            (None, true) => {
+        if let Some(probability) = self.coverage_probability {
+            if !probability.is_finite() || !(0.0..1.0).contains(&probability) {
+                return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation);
+            }
+        }
+        match (&self.coverage_method, &self.coverage_probability, expanded) {
+            (Some(method), Some(probability), true) => {
+                method.validate()?;
+                if !probability.is_finite() || !(0.0..1.0).contains(probability) {
+                    return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation);
+                }
+            }
+            (Some(method), _, false) => method.validate()?,
+            (None, Some(_), false) => {}
+            (_, None, true) => {
                 return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation)
             }
-            (None, false) => {}
+            (None, None, false) => {}
         }
         Ok(())
     }
@@ -4525,6 +4539,7 @@ mod tests {
                         degrees_of_freedom_id: "fixture-uncertainty-dof-v1".into(),
                         degrees_of_freedom_revision: "v1".into(),
                         degrees_of_freedom_digest: "fixture-uncertainty-dof-digest-v1".into(),
+                        coverage_probability: Some(0.95),
                         coverage_method: Some(MeasurementUncertaintyCoverageMethodRef {
                             method_id: "fixture-coverage-method-v1".into(),
                             method_revision: "v1".into(),
@@ -4641,6 +4656,7 @@ mod tests {
                 degrees_of_freedom_id: "dof".into(),
                 degrees_of_freedom_revision: "r1".into(),
                 degrees_of_freedom_digest: "dof-digest".into(),
+                coverage_probability: Some(0.95),
                 coverage_method: Some(MeasurementUncertaintyCoverageMethodRef {
                     method_id: "coverage".into(),
                     method_revision: "r1".into(),
@@ -5543,6 +5559,28 @@ mod tests {
     fn measurement_uncertainty_expanded_requires_coverage_method_provenance() {
         let mut uncertainty = test_uncertainty(&["component"]);
         uncertainty.evaluation.coverage_method = None;
+        let error = uncertainty.validate().unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::InvalidMeasurementUncertaintyEvaluation
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_expanded_requires_coverage_probability() {
+        let mut uncertainty = test_uncertainty(&["component"]);
+        uncertainty.evaluation.coverage_probability = None;
+        let error = uncertainty.validate().unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::InvalidMeasurementUncertaintyEvaluation
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_expanded_rejects_invalid_coverage_probability() {
+        let mut uncertainty = test_uncertainty(&["component"]);
+        uncertainty.evaluation.coverage_probability = Some(1.0);
         let error = uncertainty.validate().unwrap_err();
         assert!(matches!(
             error,
