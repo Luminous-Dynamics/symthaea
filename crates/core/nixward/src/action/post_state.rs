@@ -525,6 +525,8 @@ pub struct NixPostStateReceiptV1 {
     /// Exact systemd FragmentPath + DropInPaths identity from the observed unit.
     pub observed_definition_identity: NixSystemdUnitDefinitionIdentityV1,
     pub observed_definition_digest: String,
+    /// Observer-produced definition-content commitment bound to the effect.
+    pub observed_definition_content_digest: String,
     pub operation: NixServiceOperationKindV1,
     pub systemd_job_id: Option<u32>,
     pub systemd_job_type: Option<NixSystemdJobTypeV1>,
@@ -674,6 +676,8 @@ impl NixPostStateReceiptV1 {
             authorized_definition_digest: expectation.authorized_definition_digest.clone(),
             observed_definition_identity: observation.definition_identity.clone(),
             observed_definition_digest,
+            observed_definition_content_digest:
+                expectation.authorized_definition_content_digest.clone(),
             operation: expectation.operation,
             systemd_job_id,
             systemd_job_type,
@@ -881,6 +885,19 @@ impl NixPostStateReceiptV1 {
         {
             return Err(NixPostStateErrorV1::DefinitionMismatch);
         }
+        validate_digest(
+            &self.authorized_definition_content_digest,
+            "authorized definition content digest",
+        )?;
+        validate_digest(
+            &self.observed_definition_content_digest,
+            "observed definition content digest",
+        )?;
+        if self.authorized_definition_content_digest
+            != self.observed_definition_content_digest
+        {
+            return Err(NixPostStateErrorV1::DefinitionContentMismatch);
+        }
         if self.authorized_generation != self.observed_generation {
             return Err(NixPostStateErrorV1::GenerationMismatch);
         }
@@ -1022,6 +1039,7 @@ impl NixPostStateReceiptV1 {
         put_str(&mut h, &self.observed_definition_digest);
         put_str(&mut h, &self.observed_definition_identity.fragment_path);
         put_str_vec(&mut h, &self.observed_definition_identity.drop_in_paths);
+        put_str(&mut h, &self.observed_definition_content_digest);
         put_u8(&mut h, operation_tag(self.operation));
         put_opt_u32(&mut h, self.systemd_job_id);
         match self.systemd_job_type {
@@ -1518,6 +1536,8 @@ pub enum NixPostStateErrorV1 {
     GenerationMismatch,
     #[error("observed systemd unit-definition identity does not match authorization")]
     DefinitionMismatch,
+    #[error("definition-content commitment does not match authorization")]
+    DefinitionContentMismatch,
     #[error("systemd manager incarnation is missing")]
     MissingManagerOwner,
     #[error("systemd manager incarnation does not match the observation/job binding")]
