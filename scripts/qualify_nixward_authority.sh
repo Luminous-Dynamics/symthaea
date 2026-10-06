@@ -61,7 +61,7 @@ cargo test -p nixward --features systemd-observer --lib action::systemd_observer
 echo "-- typed systemd lifecycle mutation transport tests --"
 cargo test -p nixward --features systemd-mutation --lib action::systemd_mutation::tests
 
-echo "-- executor typed-service tests --
+echo "-- executor typed-service tests --"
 cargo test -p nixward --lib action::executor::tests
 
 echo "-- config-writer currentness tests --"

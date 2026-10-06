@@ -567,9 +567,17 @@ impl NixPostStateReceiptV1 {
         if authorization.decision != NixAuthorizationDecisionV1::Approved {
             return Err(NixPostStateErrorV1::AuthorizationNotApproved);
         }
-        if authorization.action_intent_digest != action_intent_digest {
-            return Err(NixPostStateErrorV1::AuthorizationIntentMismatch);
-        }
+        authorization
+            .validate_against_intent(intent)
+            .map_err(|error| match error {
+                super::authorization::NixAuthorizationErrorV1::MissingServiceEffectContext => {
+                    NixPostStateErrorV1::MissingServiceEffectContext
+                }
+                super::authorization::NixAuthorizationErrorV1::ServiceEffectContextMismatch => {
+                    NixPostStateErrorV1::ServiceEffectContextMismatch
+                }
+                _ => NixPostStateErrorV1::AuthorizationIntentMismatch,
+            })?;
         match &intent.action {
             NixActionDescriptorV1::Service { operation, unit }
                 if *operation == expectation.operation && unit == &expectation.unit => {}
@@ -716,6 +724,17 @@ impl NixPostStateReceiptV1 {
         if authorization.action_intent_digest != intent_digest {
             return Err(NixPostStateErrorV1::AuthorizationIntentMismatch);
         }
+        authorization
+            .validate_against_intent(intent)
+            .map_err(|error| match error {
+                super::authorization::NixAuthorizationErrorV1::MissingServiceEffectContext => {
+                    NixPostStateErrorV1::MissingServiceEffectContext
+                }
+                super::authorization::NixAuthorizationErrorV1::ServiceEffectContextMismatch => {
+                    NixPostStateErrorV1::ServiceEffectContextMismatch
+                }
+                _ => NixPostStateErrorV1::InvalidBoundAuthorization,
+            })?;
 
         let rebound_expectation = NixServicePostStateExpectationV1 {
             operation: self.operation,
@@ -1051,19 +1070,29 @@ fn validate_expectation_against_intent(
         return Err(NixPostStateErrorV1::MissingBoundPreState);
     };
 
-    if let Some(generation) = pre_state_identity.strip_prefix("generation:") {
-        let generation = generation
-            .parse::<u64>()
-            .map_err(|_| NixPostStateErrorV1::InvalidBoundPreState)?;
-        if generation != expectation.authorized_generation {
-            return Err(NixPostStateErrorV1::GenerationMismatch);
-        }
-        return Ok(());
+    let Some(context) = intent.service_effect_context.as_ref() else {
+        return Err(NixPostStateErrorV1::MissingServiceEffectContext);
+    };
+
+    if context.operation != expectation.operation || context.unit != expectation.unit {
+        return Err(NixPostStateErrorV1::ServiceEffectContextMismatch);
+    }
+    if context.authorized_generation != expectation.authorized_generation {
+        return Err(NixPostStateErrorV1::GenerationMismatch);
+    }
+    if context.authorized_definition_digest != expectation.authorized_definition_digest {
+        return Err(NixPostStateErrorV1::DefinitionMismatch);
+    }
+    if context.pre_invocation_id != expectation.pre_invocation_id {
+        return Err(NixPostStateErrorV1::InvocationMismatch);
+    }
+    if context.required_stability_us != expectation.required_stability_us {
+        return Err(NixPostStateErrorV1::StabilityContractMismatch);
     }
 
     let prefix = "nixward-service-pre-state-v1|generation=";
     let Some(rest) = pre_state_identity.strip_prefix(prefix) else {
-        return Err(NixPostStateErrorV1::InvalidBoundPreState);
+        return Err(NixPostStateErrorV1::MissingServiceEffectContext);
     };
     let (generation, rest) = rest
         .split_once("|unit=")
@@ -1071,7 +1100,7 @@ fn validate_expectation_against_intent(
     let generation = generation
         .parse::<u64>()
         .map_err(|_| NixPostStateErrorV1::InvalidBoundPreState)?;
-    let (unit, _) = rest
+    let (unit, state) = rest
         .split_once("|state=")
         .ok_or(NixPostStateErrorV1::InvalidBoundPreState)?;
 
@@ -1080,6 +1109,20 @@ fn validate_expectation_against_intent(
     }
     if unit != expectation.unit {
         return Err(NixPostStateErrorV1::UnitMismatch);
+    }
+    if state != context.pre_state_digest {
+        return Err(NixPostStateErrorV1::PreStateDigestMismatch);
+    }
+    context
+        .validate_shape()
+        .map_err(|error| NixPostStateErrorV1::InvalidServiceEffectContext(error.to_string()))?;
+    let context_digest = context
+        .digest()
+        .map_err(|error| NixPostStateErrorV1::InvalidServiceEffectContext(error.to_string()))?;
+    if context_digest.is_empty() {
+        return Err(NixPostStateErrorV1::InvalidServiceEffectContext(
+            "empty service effect context digest".to_string(),
+        ));
     }
     Ok(())
 }
@@ -1445,6 +1488,16 @@ pub enum NixPostStateErrorV1 {
     OperationMismatch,
     #[error("service unit mismatch")]
     UnitMismatch,
+    #[error("service invocation identity does not match the authorized effect")]
+    InvocationMismatch,
+    #[error("stability contract does not match the authorized effect")]
+    StabilityContractMismatch,
+    #[error("pre-state digest does not match the authorized effect context")]
+    PreStateDigestMismatch,
+    #[error("missing authority-bound service effect context")]
+    MissingServiceEffectContext,
+    #[error("invalid service effect context: {0}")]
+    InvalidServiceEffectContext(String),
     #[error("observed generation does not match authorized generation")]
     GenerationMismatch,
     #[error("observed systemd unit-definition identity does not match authorization")]
@@ -1517,6 +1570,62 @@ mod tests {
     }
 
 
+    fn contextual_intent(
+        operation: NixServiceOperationKindV1,
+        unit: &str,
+        generation: u64,
+        definition_digest: String,
+        pre_invocation_id: Option<String>,
+        required_stability_us: u64,
+    ) -> NixActionIntentV1 {
+        NixActionIntentV1 {
+            subject_identity: "host:test".to_string(),
+            pre_state_identity: Some(format!(
+                "nixward-service-pre-state-v1|generation={}|unit={}|state={}",
+                generation,
+                unit,
+                "1111111111111111111111111111111111111111111111111111111111111111"
+            )),
+            action: NixActionDescriptorV1::Service {
+                operation,
+                unit: unit.to_string(),
+            },
+            service_effect_context: Some(
+                super::authorization::NixServiceEffectContextV1::new(
+                    operation,
+                    unit.to_string(),
+                    generation,
+                    "1111111111111111111111111111111111111111111111111111111111111111",
+                    definition_digest,
+                    pre_invocation_id,
+                    required_stability_us,
+                )
+                .unwrap(),
+            ),
+            maximum_scope: NixActionScopeV1::SystemModify,
+            preconditions: Vec::new(),
+            required_postconditions: Vec::new(),
+            rollback_or_recovery_ref: None,
+        }
+    }
+
+    fn contextual_authorization(
+        intent: &NixActionIntentV1,
+    ) -> NixExecutionAuthorizationRecordV1 {
+        NixExecutionAuthorizationRecordV1 {
+            action_intent_digest: intent.digest().unwrap(),
+            service_effect_context_digest: intent
+                .service_effect_context
+                .as_ref()
+                .map(|context| context.digest().unwrap()),
+            profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
+            authority_ref: "approval:test".to_string(),
+            issued_at_unix_ms: 1,
+            expires_at_unix_ms: None,
+            decision: NixAuthorizationDecisionV1::Approved,
+        }
+    }
+
     fn build_receipt(
         exp: &NixServicePostStateExpectationV1,
         obs: &NixServicePostStateObservationV1,
@@ -1532,11 +1641,28 @@ mod tests {
         };
         let intent = NixActionIntentV1 {
             subject_identity: "host:test".to_string(),
-            pre_state_identity: Some(format!("generation:{}", exp.authorized_generation)),
+            pre_state_identity: Some(format!(
+                "nixward-service-pre-state-v1|generation={}|unit={}|state={}",
+                exp.authorized_generation,
+                exp.unit,
+                "1111111111111111111111111111111111111111111111111111111111111111"
+            )),
             action: NixActionDescriptorV1::Service {
                 operation: exp.operation,
                 unit: exp.unit.clone(),
             },
+            service_effect_context: Some(
+                super::authorization::NixServiceEffectContextV1::new(
+                    exp.operation,
+                    exp.unit.clone(),
+                    exp.authorized_generation,
+                    "1111111111111111111111111111111111111111111111111111111111111111",
+                    exp.authorized_definition_digest.clone(),
+                    exp.pre_invocation_id.clone(),
+                    exp.required_stability_us,
+                )
+                .unwrap(),
+            ),
             maximum_scope: NixActionScopeV1::SystemModify,
             preconditions: Vec::new(),
             required_postconditions: Vec::new(),
@@ -1544,6 +1670,14 @@ mod tests {
         };
         let authorization = NixExecutionAuthorizationRecordV1 {
             action_intent_digest: intent.digest().unwrap(),
+            service_effect_context_digest: Some(
+                intent
+                    .service_effect_context
+                    .as_ref()
+                    .unwrap()
+                    .digest()
+                    .unwrap(),
+            ),
             profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
             authority_ref: "approval:test".to_string(),
             issued_at_unix_ms: 1,
@@ -2319,26 +2453,15 @@ mod tests {
             ServiceActiveStateV1::Active,
             ServiceUnitFileStateV1::Enabled,
         );
-        let wrong_intent = NixActionIntentV1 {
-            subject_identity: "host:test".to_string(),
-            pre_state_identity: Some("generation:42".to_string()),
-            action: NixActionDescriptorV1::Service {
-                operation: NixServiceOperationKindV1::Restart,
-                unit: "nginx.service".to_string(),
-            },
-            maximum_scope: NixActionScopeV1::SystemModify,
-            preconditions: Vec::new(),
-            required_postconditions: Vec::new(),
-            rollback_or_recovery_ref: None,
-        };
-        let authorization = NixExecutionAuthorizationRecordV1 {
-            action_intent_digest: wrong_intent.digest().unwrap(),
-            profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
-            authority_ref: "approval:test".to_string(),
-            issued_at_unix_ms: 1,
-            expires_at_unix_ms: None,
-            decision: NixAuthorizationDecisionV1::Approved,
-        };
+        let wrong_intent = contextual_intent(
+            NixServiceOperationKindV1::Restart,
+            "nginx.service",
+            42,
+            definition().digest("nginx.service").unwrap(),
+            Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into()),
+            0,
+        );
+        let authorization = contextual_authorization(&wrong_intent);
 
         assert_eq!(
             NixPostStateReceiptV1::build(
@@ -2370,26 +2493,15 @@ mod tests {
         )
         .unwrap();
 
-        let intent = NixActionIntentV1 {
-            subject_identity: "host:test".to_string(),
-            pre_state_identity: Some("generation:42".to_string()),
-            action: NixActionDescriptorV1::Service {
-                operation: NixServiceOperationKindV1::Start,
-                unit: "nginx.service".to_string(),
-            },
-            maximum_scope: NixActionScopeV1::SystemModify,
-            preconditions: Vec::new(),
-            required_postconditions: Vec::new(),
-            rollback_or_recovery_ref: None,
-        };
-        let authorization = NixExecutionAuthorizationRecordV1 {
-            action_intent_digest: intent.digest().unwrap(),
-            profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
-            authority_ref: "approval:test".to_string(),
-            issued_at_unix_ms: 1,
-            expires_at_unix_ms: None,
-            decision: NixAuthorizationDecisionV1::Approved,
-        };
+        let intent = contextual_intent(
+            NixServiceOperationKindV1::Start,
+            "nginx.service",
+            42,
+            definition().digest("nginx.service").unwrap(),
+            Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into()),
+            0,
+        );
+        let authorization = contextual_authorization(&intent);
 
         receipt.verify_against(&intent, &authorization).unwrap();
 
@@ -2452,6 +2564,7 @@ mod tests {
         };
         let authorization = NixExecutionAuthorizationRecordV1 {
             action_intent_digest: intent.digest().unwrap(),
+            service_effect_context_digest: None,
             profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
             authority_ref: "approval:test".to_string(),
             issued_at_unix_ms: 1,
@@ -2469,7 +2582,7 @@ mod tests {
                 "1",
             )
             .unwrap_err(),
-            NixPostStateErrorV1::MissingBoundPreState
+            NixPostStateErrorV1::MissingServiceEffectContext
         );
     }
 
@@ -2487,26 +2600,15 @@ mod tests {
         );
         let receipt = build_receipt(&exp, &obs, None).unwrap();
 
-        let intent = NixActionIntentV1 {
-            subject_identity: "host:test".to_string(),
-            pre_state_identity: Some("generation:42".to_string()),
-            action: NixActionDescriptorV1::Service {
-                operation: NixServiceOperationKindV1::Start,
-                unit: "nginx.service".to_string(),
-            },
-            maximum_scope: NixActionScopeV1::SystemModify,
-            preconditions: Vec::new(),
-            required_postconditions: Vec::new(),
-            rollback_or_recovery_ref: None,
-        };
-        let authorization = NixExecutionAuthorizationRecordV1 {
-            action_intent_digest: intent.digest().unwrap(),
-            profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
-            authority_ref: "approval:test".to_string(),
-            issued_at_unix_ms: 1,
-            expires_at_unix_ms: None,
-            decision: NixAuthorizationDecisionV1::Approved,
-        };
+        let intent = contextual_intent(
+            NixServiceOperationKindV1::Start,
+            "nginx.service",
+            42,
+            definition().digest("nginx.service").unwrap(),
+            Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into()),
+            0,
+        );
+        let authorization = contextual_authorization(&intent);
 
         let mut tampered = receipt;
         tampered.authorized_generation = 43;

@@ -364,10 +364,6 @@ run_self_test() {
   # The post-state tests may construct the private wrapper directly because
   # they are child modules; the production factory remains observer-only.
 
-    echo "ERROR: CROSS-022 self-test failed to detect legacy Custom command material" >&2
-    return 1
-  fi
-
   # The validated aggregates must be rejected, while the closed enum remains
   # permitted to deserialize. This prevents the fence itself from regressing
   # into an over-broad "no Deserialize in service_domain.rs" rule.

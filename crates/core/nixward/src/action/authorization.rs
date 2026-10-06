@@ -18,6 +18,7 @@ use super::executor::{ChannelOperation, FlakeOperation, NixOSCommand, SafetyLeve
 use super::local_approval::LocalApprovalDecisionKindV1;
 use super::local_approval_store::ConsumedLocalApprovalDecisionV1;
 use super::service_domain::{NixServiceOperationKindV1, validate_canonical_service_operation_v1};
+use super::service_effect::{NixServiceEffectContextErrorV1, NixServiceEffectContextV1};
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -233,6 +234,11 @@ pub struct NixActionIntentV1 {
     pub subject_identity: String,
     pub pre_state_identity: Option<String>,
     pub action: NixActionDescriptorV1,
+    /// Explicit service-effect contract. Required before a Service intent can
+    /// become approved authorization; optional only while representing an
+    /// unqualified serializable intent.
+    #[serde(default)]
+    pub service_effect_context: Option<NixServiceEffectContextV1>,
     pub maximum_scope: NixActionScopeV1,
     #[serde(default)]
     pub preconditions: Vec<String>,
@@ -256,6 +262,7 @@ impl NixActionIntentV1 {
             subject_identity: subject_identity.into(),
             pre_state_identity,
             action,
+            service_effect_context: None,
             maximum_scope: command.safety_level().into(),
             preconditions: Vec::new(),
             required_postconditions: Vec::new(),
@@ -263,6 +270,29 @@ impl NixActionIntentV1 {
         };
         intent.validate_shape()?;
         Ok(intent)
+    }
+
+    pub fn with_service_effect_context(
+        mut self,
+        context: NixServiceEffectContextV1,
+    ) -> Result<Self, NixAuthorizationErrorV1> {
+        self.service_effect_context = Some(context);
+        self.validate_shape()?;
+        Ok(self)
+    }
+
+    pub fn from_command_with_service_effect_context(
+        subject_identity: impl Into<String>,
+        pre_state_identity: String,
+        command: &NixOSCommand,
+        context: NixServiceEffectContextV1,
+    ) -> Result<Self, NixAuthorizationErrorV1> {
+        let intent = Self::from_command(subject_identity, Some(pre_state_identity), command)?;
+        intent.with_service_effect_context(context)
+    }
+
+    pub fn service_effect_context(&self) -> Option<&NixServiceEffectContextV1> {
+        self.service_effect_context.as_ref()
     }
 
     pub fn validate_shape(&self) -> Result<(), NixAuthorizationErrorV1> {
@@ -275,6 +305,20 @@ impl NixActionIntentV1 {
         validate_list(&self.preconditions, "precondition")?;
         validate_list(&self.required_postconditions, "required postcondition")?;
         validate_action_shape(&self.action)?;
+
+        match (&self.action, &self.service_effect_context) {
+            (NixActionDescriptorV1::Service { operation, unit }, Some(context)) => {
+                validate_service_effect_context_binding(
+                    context,
+                    *operation,
+                    unit,
+                    self.pre_state_identity.as_deref(),
+                )?;
+            }
+            (NixActionDescriptorV1::Service { .. }, None) => {}
+            (_, Some(_)) => return Err(NixAuthorizationErrorV1::UnexpectedServiceEffectContext),
+            (_, None) => {}
+        }
 
         let minimum_scope = minimum_scope_for_action(&self.action);
         if self.maximum_scope < minimum_scope {
@@ -294,6 +338,13 @@ impl NixActionIntentV1 {
         put_str(&mut h, &self.subject_identity);
         put_opt_str(&mut h, self.pre_state_identity.as_deref());
         put_action(&mut h, &self.action);
+        match &self.service_effect_context {
+            Some(context) => {
+                put_u8(&mut h, 1);
+                put_str(&mut h, &context.digest()?);
+            }
+            None => put_u8(&mut h, 0),
+        }
         put_u8(&mut h, scope_tag(self.maximum_scope));
         put_str_vec(&mut h, &self.preconditions);
         put_str_vec(&mut h, &self.required_postconditions);
@@ -322,6 +373,10 @@ pub enum NixAuthorizationDecisionV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixExecutionAuthorizationRecordV1 {
     pub action_intent_digest: String,
+    /// Digest of the explicit service-effect context, when the authorized action
+    /// is a Service operation.
+    #[serde(default)]
+    pub service_effect_context_digest: Option<String>,
     pub profile: NixAuthorizationProfileV1,
     pub authority_ref: String,
     pub issued_at_unix_ms: u64,
@@ -332,6 +387,9 @@ pub struct NixExecutionAuthorizationRecordV1 {
 impl NixExecutionAuthorizationRecordV1 {
     pub fn validate_shape(&self) -> Result<(), NixAuthorizationErrorV1> {
         require_nonempty(&self.action_intent_digest, "action intent digest")?;
+        if let Some(digest) = &self.service_effect_context_digest {
+            validate_hex_digest(digest, "service effect context digest")?;
+        }
         require_nonempty(&self.authority_ref, "authority ref")?;
         if let Some(expires) = self.expires_at_unix_ms
             && expires < self.issued_at_unix_ms
@@ -341,11 +399,32 @@ impl NixExecutionAuthorizationRecordV1 {
         Ok(())
     }
 
+    pub fn validate_against_intent(
+        &self,
+        intent: &NixActionIntentV1,
+    ) -> Result<(), NixAuthorizationErrorV1> {
+        self.validate_shape()?;
+        if self.decision != NixAuthorizationDecisionV1::Approved {
+            return Err(NixAuthorizationErrorV1::NotApproved);
+        }
+        let intent_digest = intent.digest()?;
+        if self.action_intent_digest != intent_digest {
+            return Err(NixAuthorizationErrorV1::IntentMismatch);
+        }
+
+        let expected_context_digest = service_effect_context_digest_for_intent(intent)?;
+        if self.service_effect_context_digest != expected_context_digest {
+            return Err(NixAuthorizationErrorV1::ServiceEffectContextMismatch);
+        }
+        Ok(())
+    }
+
     pub fn digest(&self) -> Result<String, NixAuthorizationErrorV1> {
         self.validate_shape()?;
         let mut h = Hasher::new();
         h.update(AUTHORIZATION_RECORD_DOMAIN);
         put_str(&mut h, &self.action_intent_digest);
+        put_opt_str(&mut h, self.service_effect_context_digest.as_deref());
         put_u8(&mut h, authorization_profile_tag(self.profile));
         put_str(&mut h, &self.authority_ref);
         put_u64(&mut h, self.issued_at_unix_ms);
@@ -385,6 +464,7 @@ impl NixLocalExecutionAuthorityV1 {
         if approval.decision_evidence().action_intent_digest != digest {
             return Err(NixAuthorizationErrorV1::IntentMismatch);
         }
+        service_effect_context_digest_for_intent(&intent)?;
         Ok(Self { intent, approval })
     }
 
@@ -438,8 +518,10 @@ impl LiveNixAuthorizationV1 {
         issued_at_unix_ms: u64,
         expires_at_unix_ms: Option<u64>,
     ) -> Result<Self, NixAuthorizationErrorV1> {
+        let service_effect_context_digest = service_effect_context_digest_for_intent(intent)?;
         let record = NixExecutionAuthorizationRecordV1 {
             action_intent_digest: intent.digest()?,
+            service_effect_context_digest,
             profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
             authority_ref: authority_ref.into(),
             issued_at_unix_ms,
@@ -580,6 +662,14 @@ pub enum NixAuthorizationErrorV1 {
     NotApproved,
     #[error("authorization is bound to a different action intent")]
     IntentMismatch,
+    #[error("service action is missing its authority-bound effect context")]
+    MissingServiceEffectContext,
+    #[error("service effect context does not match the typed service action")]
+    ServiceEffectContextMismatch,
+    #[error("service effect context is present for a non-service action")]
+    UnexpectedServiceEffectContext,
+    #[error("invalid service effect context: {0}")]
+    InvalidServiceEffectContext(NixServiceEffectContextErrorV1),
     #[error("authorization is not yet valid")]
     NotYetValid,
     #[error("authorization has expired")]
@@ -590,6 +680,93 @@ pub enum NixAuthorizationErrorV1 {
     InvalidExpiryWindow,
     #[error("execution finish time precedes start time")]
     InvalidExecutionWindow,
+}
+
+fn validate_service_effect_context_binding(
+    context: &NixServiceEffectContextV1,
+    operation: NixServiceOperationKindV1,
+    unit: &str,
+    pre_state_identity: Option<&str>,
+) -> Result<(), NixAuthorizationErrorV1> {
+    context
+        .validate_shape()
+        .map_err(NixAuthorizationErrorV1::InvalidServiceEffectContext)?;
+    if context.operation != operation || context.unit != unit {
+        return Err(NixAuthorizationErrorV1::ServiceEffectContextMismatch);
+    }
+
+    let Some(pre_state_identity) = pre_state_identity else {
+        return Err(NixAuthorizationErrorV1::MissingServiceEffectContext);
+    };
+    let prefix = "nixward-service-pre-state-v1|generation=";
+    let Some(rest) = pre_state_identity.strip_prefix(prefix) else {
+        return Err(NixAuthorizationErrorV1::MissingServiceEffectContext);
+    };
+    let (generation, rest) = rest
+        .split_once("|unit=")
+        .ok_or(NixAuthorizationErrorV1::InvalidServiceEffectContext(
+            NixServiceEffectContextErrorV1::InvalidDigest("pre-state identity"),
+        ))?;
+    let generation = generation
+        .parse::<u64>()
+        .map_err(|_| NixAuthorizationErrorV1::InvalidServiceEffectContext(
+            NixServiceEffectContextErrorV1::InvalidDigest("pre-state identity"),
+        ))?;
+    let (identity_unit, state_digest) = rest
+        .split_once("|state=")
+        .ok_or(NixAuthorizationErrorV1::InvalidServiceEffectContext(
+            NixServiceEffectContextErrorV1::InvalidDigest("pre-state identity"),
+        ))?;
+    if generation != context.authorized_generation
+        || identity_unit != context.unit
+        || state_digest != context.pre_state_digest
+    {
+        return Err(NixAuthorizationErrorV1::ServiceEffectContextMismatch);
+    }
+    Ok(())
+}
+
+fn service_effect_context_digest_for_intent(
+    intent: &NixActionIntentV1,
+) -> Result<Option<String>, NixAuthorizationErrorV1> {
+    match &intent.action {
+        NixActionDescriptorV1::Service { operation, unit } => {
+            let context = intent
+                .service_effect_context
+                .as_ref()
+                .ok_or(NixAuthorizationErrorV1::MissingServiceEffectContext)?;
+            validate_service_effect_context_binding(
+                context,
+                *operation,
+                unit,
+                intent.pre_state_identity.as_deref(),
+            )?;
+            Ok(Some(
+                context
+                    .digest()
+                    .map_err(NixAuthorizationErrorV1::InvalidServiceEffectContext)?,
+            ))
+        }
+        _ => {
+            if intent.service_effect_context.is_some() {
+                Err(NixAuthorizationErrorV1::UnexpectedServiceEffectContext)
+            } else {
+                Ok(None)
+            }
+        }
+    }
+}
+
+fn validate_hex_digest(
+    value: &str,
+    field: &'static str,
+) -> Result<(), NixAuthorizationErrorV1> {
+    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(NixAuthorizationErrorV1::InvalidServiceEffectContext(
+            NixServiceEffectContextErrorV1::InvalidDigest(field),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_action_shape(action: &NixActionDescriptorV1) -> Result<(), NixAuthorizationErrorV1> {
@@ -1144,6 +1321,90 @@ mod tests {
         );
     }
 
+    fn service_context() -> NixServiceEffectContextV1 {
+        NixServiceEffectContextV1::new(
+            NixServiceOperationKindV1::Restart,
+            "nginx.service",
+            42,
+            &"11".repeat(32),
+            &"22".repeat(32),
+            Some("33".repeat(16)),
+            1_000,
+        )
+        .unwrap()
+    }
+
+    fn contextual_service_intent() -> NixActionIntentV1 {
+        NixActionIntentV1::from_command_with_service_effect_context(
+            "host:x",
+            "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=1111111111111111111111111111111111111111111111111111111111111111".into(),
+            &NixOSCommand::Service {
+                operation: NixServiceOperationKindV1::Restart,
+                unit: "nginx.service".to_string(),
+            },
+            NixServiceEffectContextV1::new(
+                NixServiceOperationKindV1::Restart,
+                "nginx.service",
+                42,
+                "1111111111111111111111111111111111111111111111111111111111111111",
+                "2222222222222222222222222222222222222222222222222222222222222222",
+                Some("3333333333333333333333333333333333".into()),
+                1_000,
+            )
+            .unwrap(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn service_effect_context_is_part_of_intent_identity() {
+        let base = contextual_service_intent();
+        let mut changed = base.clone();
+        changed.service_effect_context.as_mut().unwrap().authorized_definition_digest =
+            "4444444444444444444444444444444444444444444444444444444444444444".into();
+        changed.validate_shape().unwrap();
+        assert_ne!(base.digest().unwrap(), changed.digest().unwrap());
+    }
+
+    #[test]
+    fn service_authorization_requires_effect_context() {
+        let intent = NixActionIntentV1::from_command(
+            "host:x",
+            Some("generation:42".into()),
+            &NixOSCommand::Service {
+                operation: NixServiceOperationKindV1::Restart,
+                unit: "nginx.service".into(),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            LiveNixAuthorizationV1::local_explicit_confirmation(
+                &intent,
+                "approval:test",
+                1,
+                None,
+            )
+            .unwrap_err(),
+            NixAuthorizationErrorV1::MissingServiceEffectContext
+        );
+    }
+
+    #[test]
+    fn service_context_fields_must_match_typed_action() {
+        let command = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx.service".into(),
+        };
+        let intent = NixActionIntentV1::from_command("host:x", Some("generation:42".into()), &command)
+            .unwrap();
+        let mut context = service_context();
+        context.operation = NixServiceOperationKindV1::Stop;
+        assert_eq!(
+            intent.with_service_effect_context(context).unwrap_err(),
+            NixAuthorizationErrorV1::ServiceEffectContextMismatch
+        );
+    }
+
     #[test]
     fn typed_service_action_is_governed_and_exact() {
         let command = NixOSCommand::Service {
@@ -1268,6 +1529,49 @@ mod tests {
         )
         .unwrap();
         assert_eq!(intent.pre_state_identity.as_deref(), Some("generation:42"));
+    }
+
+    #[test]
+    fn local_service_authorization_carries_effect_context_digest() {
+        let intent = contextual_service_intent();
+        let live = LiveNixAuthorizationV1::local_explicit_confirmation(
+            &intent,
+            "approval:test",
+            1_000,
+            Some(2_000),
+        )
+        .unwrap();
+        let expected = intent
+            .service_effect_context
+            .as_ref()
+            .unwrap()
+            .digest()
+            .unwrap();
+        assert_eq!(
+            live.audit_record()
+                .service_effect_context_digest
+                .as_deref(),
+            Some(expected.as_str())
+        );
+        live.audit_record().validate_against_intent(&intent).unwrap();
+    }
+
+    #[test]
+    fn authorization_record_without_service_context_cannot_validate_service_intent() {
+        let intent = contextual_service_intent();
+        let record = NixExecutionAuthorizationRecordV1 {
+            action_intent_digest: intent.digest().unwrap(),
+            service_effect_context_digest: None,
+            profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
+            authority_ref: "approval:test".into(),
+            issued_at_unix_ms: 1,
+            expires_at_unix_ms: None,
+            decision: NixAuthorizationDecisionV1::Approved,
+        };
+        assert_eq!(
+            record.validate_against_intent(&intent).unwrap_err(),
+            NixAuthorizationErrorV1::ServiceEffectContextMismatch
+        );
     }
 
     #[test]
