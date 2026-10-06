@@ -1400,6 +1400,7 @@ impl PredictionNullSummary {
     ) -> Result<Self, RelationalPredictionError> {
         validate_samples(samples)?;
         config.validate(samples.len())?;
+        validate_null_family_shape(family, &config)?;
         validate_temporal_boundary(samples, &config)?;
 
         if surrogate_count == 0 {
@@ -3283,6 +3284,27 @@ mod tests {
         assert_eq!(
             null_trace.validate_trace(),
             Err(RelationalPredictionError::InvalidSurrogateCount)
+        );
+    }
+
+    #[test]
+    fn null_compute_rejects_family_specific_undersized_partition_early() {
+        let result = PredictionNullSummary::compute_for_feature_set(
+            &build_samples(0.5),
+            HeldOutRelationalPredictionConfig {
+                train_samples: 36,
+                test_samples: 4,
+                gap_samples: 4,
+                ridge_lambda: 1e-8,
+            },
+            PredictionNullFamily::FeatureDecoupling,
+            PredictionFeatureSet::RelationalAugmented,
+            3,
+        );
+
+        assert_eq!(
+            result,
+            Err(RelationalPredictionError::InsufficientSamples(4))
         );
     }
 
