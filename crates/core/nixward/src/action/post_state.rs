@@ -1131,7 +1131,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn serialized_proven_claim_cannot_reduce_or_remove_required_stability() {
         let mut exp = expectation(NixServiceOperationKindV1::Start);
         exp.required_stability_us = 1_000;
@@ -1188,6 +1187,71 @@ mod tests {
             }),
         );
         assert_eq!(result.unwrap_err(), NixPostStateErrorV1::InvalidClaim);
+    }
+
+    #[test]
+    fn rejected_job_result_cannot_become_a_satisfied_postcondition() {
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.systemd_job.as_mut().unwrap().result = "failed".to_string();
+        let receipt = build_receipt(
+            &expectation(NixServiceOperationKindV1::Start),
+            &obs,
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(receipt.postcondition, NixPostconditionAssessmentV1::Violated);
+        assert_eq!(receipt.claim, NixPostStateClaimV1::Violated);
+    }
+
+    #[test]
+    fn mismatched_typed_intent_is_rejected_even_when_observation_is_valid() {
+        use super::super::authorization::{NixActionIntentV1, NixActionScopeV1, NixAuthorizationProfileV1};
+
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let wrong_intent = NixActionIntentV1 {
+            subject_identity: "host:test".to_string(),
+            pre_state_identity: Some("generation:42".to_string()),
+            action: NixActionDescriptorV1::Service {
+                operation: NixServiceOperationKindV1::Restart,
+                unit: "nginx.service".to_string(),
+            },
+            maximum_scope: NixActionScopeV1::SystemModify,
+            preconditions: Vec::new(),
+            required_postconditions: Vec::new(),
+            rollback_or_recovery_ref: None,
+        };
+        let authorization = NixExecutionAuthorizationRecordV1 {
+            action_intent_digest: wrong_intent.digest().unwrap(),
+            profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
+            authority_ref: "approval:test".to_string(),
+            issued_at_unix_ms: 1,
+            expires_at_unix_ms: None,
+            decision: NixAuthorizationDecisionV1::Approved,
+        };
+
+        assert_eq!(
+            NixPostStateReceiptV1::build(
+                &wrong_intent,
+                &authorization,
+                &exp,
+                &obs,
+                None,
+                "systemd-observer-v1",
+                "1",
+            )
+            .unwrap_err(),
+            NixPostStateErrorV1::IntentEffectMismatch
+        );
     }
 
     #[test]
