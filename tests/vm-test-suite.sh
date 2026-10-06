@@ -274,6 +274,18 @@ async def test():
         target_machine_digest = hw["target_machine_digest"]
         assert len(target_machine_digest) == 64
 
+        await ws.send(json.dumps({
+            "action": "install",
+            "disk": "/dev/vda",
+            "layout": "single-luks",
+            "hostname": "identity-negative",
+            "target_machine_digest": "0" * 64,
+            "luks_passphrase": "testpassphrase123",
+        }))
+        rejected = jload(await asyncio.wait_for(ws.recv(), 15))
+        assert rejected.get("type") == "error", f"Target mismatch was not rejected: {rejected}"
+        assert "target identity" in rejected.get("message", "").lower(), f"Unexpected rejection: {rejected}"
+
         await ws.send(json.dumps({"action":"discover_disks"}))
         r = jload(await asyncio.wait_for(ws.recv(), 15))
         assert r["type"] == "disks", f"Expected disks: {r}"
@@ -332,6 +344,18 @@ async def test():
         hw = jload(probe["data"])
         target_machine_digest = hw["target_machine_digest"]
         assert len(target_machine_digest) == 64
+
+        # A mismatched target identity must be rejected before any install work.
+        await ws.send(json.dumps({
+            "action": "install",
+            "disk": "/dev/vda",
+            "layout": "single",
+            "hostname": "identity-negative",
+            "target_machine_digest": "0" * 64,
+        }))
+        rejected = jload(await asyncio.wait_for(ws.recv(), 15))
+        assert rejected.get("type") == "error", f"Target mismatch was not rejected: {rejected}"
+        assert "target identity" in rejected.get("message", "").lower(), f"Unexpected rejection: {rejected}"
 
         # Discover disks
         await ws.send(json.dumps({"action":"discover_disks"}))
