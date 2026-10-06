@@ -569,7 +569,15 @@ impl NixPostStateReceiptV1 {
         }
         authorization
             .validate_against_intent(intent)
-            .map_err(|_| NixPostStateErrorV1::AuthorizationIntentMismatch)?;
+            .map_err(|error| match error {
+                super::authorization::NixAuthorizationErrorV1::MissingServiceEffectContext => {
+                    NixPostStateErrorV1::MissingServiceEffectContext
+                }
+                super::authorization::NixAuthorizationErrorV1::ServiceEffectContextMismatch => {
+                    NixPostStateErrorV1::ServiceEffectContextMismatch
+                }
+                _ => NixPostStateErrorV1::AuthorizationIntentMismatch,
+            })?;
         match &intent.action {
             NixActionDescriptorV1::Service { operation, unit }
                 if *operation == expectation.operation && unit == &expectation.unit => {}
@@ -1566,11 +1574,28 @@ mod tests {
         };
         let intent = NixActionIntentV1 {
             subject_identity: "host:test".to_string(),
-            pre_state_identity: Some(format!("generation:{}", exp.authorized_generation)),
+            pre_state_identity: Some(format!(
+                "nixward-service-pre-state-v1|generation={}|unit={}|state={}",
+                exp.authorized_generation,
+                exp.unit,
+                "1111111111111111111111111111111111111111111111111111111111111111"
+            )),
             action: NixActionDescriptorV1::Service {
                 operation: exp.operation,
                 unit: exp.unit.clone(),
             },
+            service_effect_context: Some(
+                super::authorization::NixServiceEffectContextV1::new(
+                    exp.operation,
+                    exp.unit.clone(),
+                    exp.authorized_generation,
+                    "1111111111111111111111111111111111111111111111111111111111111111",
+                    exp.authorized_definition_digest.clone(),
+                    exp.pre_invocation_id.clone(),
+                    exp.required_stability_us,
+                )
+                .unwrap(),
+            ),
             maximum_scope: NixActionScopeV1::SystemModify,
             preconditions: Vec::new(),
             required_postconditions: Vec::new(),
@@ -1578,6 +1603,14 @@ mod tests {
         };
         let authorization = NixExecutionAuthorizationRecordV1 {
             action_intent_digest: intent.digest().unwrap(),
+            service_effect_context_digest: Some(
+                intent
+                    .service_effect_context
+                    .as_ref()
+                    .unwrap()
+                    .digest()
+                    .unwrap(),
+            ),
             profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
             authority_ref: "approval:test".to_string(),
             issued_at_unix_ms: 1,
