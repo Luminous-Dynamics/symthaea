@@ -2898,6 +2898,18 @@ mod tests {
         let mut receipt = receipt;
         receipt.compilation_witness = Some(compilation_witness.clone());
 
+        receipt
+            .verify_against_plan_and_rule_set_with_source_artifact(
+                &plan,
+                &frame,
+                &binding,
+                &lexical_witness,
+                &morph_witness,
+                &rule_set,
+                artifact,
+            )
+            .expect("non-UniMorph compilation witnesses must retain generic source-artifact verification");
+
         let tampered_artifact = b"rowX\n";
         assert!(
             receipt
