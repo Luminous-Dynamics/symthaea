@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 34;
+pub const SCHEMA_VERSION: u16 = 35;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v47";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v48";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -514,6 +514,96 @@ impl MeasurementUncertaintyComponentRef {
     }
 }
 
+/// Exact provenance for how an uncertainty result was evaluated and combined.
+///
+/// These references identify the authoritative evaluation record, uncertainty
+/// evaluation method, combination rule, covariance/dependence model, and—when
+/// an expanded statement is used—the coverage-factor method. Symthaea verifies
+/// identity completeness and binds these references into the uncertainty
+/// integrity commitment; it does not recompute or certify the scientific result.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeasurementUncertaintyEvaluationRef {
+    /// Stable identity of the exact uncertainty evaluation record.
+    pub evaluation_id: String,
+    /// Revision of the exact uncertainty evaluation record.
+    pub evaluation_revision: String,
+    /// Digest of the exact uncertainty evaluation record.
+    pub evaluation_digest: String,
+    /// Stable identity of the uncertainty evaluation method.
+    pub method_id: String,
+    /// Revision of the uncertainty evaluation method.
+    pub method_revision: String,
+    /// Digest of the exact uncertainty evaluation method.
+    pub method_digest: String,
+    /// Stable identity of the uncertainty-component combination method.
+    pub combination_method_id: String,
+    /// Revision of the exact combination method.
+    pub combination_method_revision: String,
+    /// Digest of the exact combination method.
+    pub combination_method_digest: String,
+    /// Stable identity of the covariance/dependence model.
+    pub covariance_model_id: String,
+    /// Revision of the exact covariance/dependence model.
+    pub covariance_model_revision: String,
+    /// Digest of the exact covariance/dependence model.
+    pub covariance_model_digest: String,
+    /// Optional provenance for the coverage-factor method; required for expanded uncertainty.
+    pub coverage_method: Option<MeasurementUncertaintyCoverageMethodRef>,
+}
+
+impl MeasurementUncertaintyEvaluationRef {
+    /// Validate exact evaluation-method lineage without evaluating the science.
+    pub fn validate(&self, expanded: bool) -> Result<(), AssessmentError> {
+        if self.evaluation_id.is_empty()
+            || self.evaluation_revision.is_empty()
+            || self.evaluation_digest.is_empty()
+            || self.method_id.is_empty()
+            || self.method_revision.is_empty()
+            || self.method_digest.is_empty()
+            || self.combination_method_id.is_empty()
+            || self.combination_method_revision.is_empty()
+            || self.combination_method_digest.is_empty()
+            || self.covariance_model_id.is_empty()
+            || self.covariance_model_revision.is_empty()
+            || self.covariance_model_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation);
+        }
+        match (&self.coverage_method, expanded) {
+            (Some(method), _) => method.validate()?,
+            (None, true) => {
+                return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation)
+            }
+            (None, false) => {}
+        }
+        Ok(())
+    }
+}
+
+/// Exact provenance for the coverage-factor method used by an expanded uncertainty statement.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeasurementUncertaintyCoverageMethodRef {
+    /// Stable identity of the exact coverage-factor method.
+    pub method_id: String,
+    /// Revision of the exact coverage-factor method.
+    pub method_revision: String,
+    /// Digest of the exact coverage-factor method.
+    pub method_digest: String,
+}
+
+impl MeasurementUncertaintyCoverageMethodRef {
+    /// Validate exact coverage-method provenance.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.method_id.is_empty()
+            || self.method_revision.is_empty()
+            || self.method_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation);
+        }
+        Ok(())
+    }
+}
+
 /// Machine-readable reference to the uncertainty analysis accompanying an observation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MeasurementUncertaintyRef {
@@ -541,8 +631,8 @@ pub struct MeasurementUncertaintyRef {
     pub measurement_model_digest: String,
     /// Quantitative statement reported with the observation.
     pub statement: MeasurementUncertaintyStatement,
-    /// Method used to evaluate the stated uncertainty.
-    pub method_id: String,
+    /// Exact provenance for evaluation, combination, dependence, and coverage methodology.
+    pub evaluation: MeasurementUncertaintyEvaluationRef,
     /// Exact measurand identity to which the uncertainty statement applies.
     pub measurand_id: String,
     /// Exact measurement/test procedure identity to which the uncertainty applies.
@@ -585,6 +675,8 @@ impl MeasurementUncertaintyRef {
             return Err(AssessmentError::InvalidMeasurementUncertainty);
         }
         self.statement.validate()?;
+        self.evaluation
+            .validate(matches!(self.statement, MeasurementUncertaintyStatement::Expanded { .. }))?;
 
         let mut canonical_component_refs = self.component_refs.clone();
         for component in &canonical_component_refs {
@@ -2574,6 +2666,8 @@ pub enum AssessmentError {
     MissingObservationUnit(EvidenceKind),
     /// Measurement-uncertainty reference is structurally incomplete.
     InvalidMeasurementUncertainty,
+    /// Measurement-uncertainty evaluation provenance is structurally incomplete.
+    InvalidMeasurementUncertaintyEvaluation,
     /// Stated measurement uncertainty uses a different unit from the evidence.
     MeasurementUncertaintyUnitMismatch {
         /// Evidence identifier.
@@ -4100,7 +4194,7 @@ struct CanonicalMeasurementUncertaintyBinding<'a> {
     measurement_model_revision: &'a str,
     measurement_model_digest: &'a str,
     statement: &'a MeasurementUncertaintyStatement,
-    method_id: &'a str,
+    evaluation: &'a MeasurementUncertaintyEvaluationRef,
     measurand_id: &'a str,
     procedure_id: &'a str,
     procedure_digest: &'a str,
@@ -4133,7 +4227,7 @@ fn canonical_measurement_uncertainty_binding_hash(
         measurement_model_revision: &uncertainty.measurement_model_revision,
         measurement_model_digest: &uncertainty.measurement_model_digest,
         statement: &uncertainty.statement,
-        method_id: &uncertainty.method_id,
+        evaluation: &uncertainty.evaluation,
         measurand_id: &uncertainty.measurand_id,
         procedure_id: &uncertainty.procedure_id,
         procedure_digest: &uncertainty.procedure_digest,
@@ -4281,7 +4375,25 @@ mod tests {
                         unit: "unit".into(),
                         coverage_factor: 2.0,
                     },
-                    method_id: "fixture-uncertainty-method-v1".into(),
+                    evaluation: MeasurementUncertaintyEvaluationRef {
+                        evaluation_id: "fixture-uncertainty-evaluation-v1".into(),
+                        evaluation_revision: "v1".into(),
+                        evaluation_digest: "fixture-uncertainty-evaluation-digest-v1".into(),
+                        method_id: "fixture-uncertainty-method-v1".into(),
+                        method_revision: "v1".into(),
+                        method_digest: "fixture-uncertainty-method-digest-v1".into(),
+                        combination_method_id: "fixture-uncertainty-combination-v1".into(),
+                        combination_method_revision: "v1".into(),
+                        combination_method_digest: "fixture-uncertainty-combination-digest-v1".into(),
+                        covariance_model_id: "fixture-uncertainty-covariance-v1".into(),
+                        covariance_model_revision: "v1".into(),
+                        covariance_model_digest: "fixture-uncertainty-covariance-digest-v1".into(),
+                        coverage_method: Some(MeasurementUncertaintyCoverageMethodRef {
+                            method_id: "fixture-coverage-method-v1".into(),
+                            method_revision: "v1".into(),
+                            method_digest: "fixture-coverage-method-digest-v1".into(),
+                        }),
+                    },
                     measurand_id: format!("fixture-measurand:{id}"),
                     procedure_id: "fixture-measurement-procedure-v1".into(),
                     procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
@@ -4356,7 +4468,25 @@ mod tests {
                 unit: "unit".into(),
                 coverage_factor: 2.0,
             },
-            method_id: "method".into(),
+            evaluation: MeasurementUncertaintyEvaluationRef {
+                evaluation_id: "evaluation".into(),
+                evaluation_revision: "r1".into(),
+                evaluation_digest: "evaluation-digest".into(),
+                method_id: "method".into(),
+                method_revision: "r1".into(),
+                method_digest: "method-digest".into(),
+                combination_method_id: "combination".into(),
+                combination_method_revision: "r1".into(),
+                combination_method_digest: "combination-digest".into(),
+                covariance_model_id: "covariance".into(),
+                covariance_model_revision: "r1".into(),
+                covariance_model_digest: "covariance-digest".into(),
+                coverage_method: Some(MeasurementUncertaintyCoverageMethodRef {
+                    method_id: "coverage".into(),
+                    method_revision: "r1".into(),
+                    method_digest: "coverage-digest".into(),
+                }),
+            },
             measurand_id: "measurand".into(),
             procedure_id: "procedure".into(),
             procedure_digest: "procedure-digest".into(),
@@ -5008,6 +5138,113 @@ mod tests {
         assert!(matches!(
             error,
             AssessmentError::MeasurementUncertaintyComponentModelDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_evaluation_digest_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-evaluation-digest",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "evaluation-digest",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .evaluation_digest = "different-evaluation-digest".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBindingDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_method_digest_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-method-digest",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "method-digest",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .method_digest = "different-method-digest".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBindingDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_covariance_model_digest_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-covariance-digest",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "covariance-digest",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .covariance_model_digest = "different-covariance-digest".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBindingDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_expanded_requires_coverage_method_provenance() {
+        let mut uncertainty = test_uncertainty(&["component"]);
+        uncertainty.evaluation.coverage_method = None;
+        let error = uncertainty.validate().unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::InvalidMeasurementUncertaintyEvaluation
         ));
     }
 
