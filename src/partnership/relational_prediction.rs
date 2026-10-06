@@ -609,6 +609,9 @@ impl HeldOutRelationalPredictionEvidence {
         samples: &[RelationalPredictionSample],
         config: HeldOutRelationalPredictionConfig,
     ) -> Result<(), RelationalPredictionError> {
+        if config != self.config {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
         if evaluation_input_digest(samples, config) != self.records
             .first()
             .map(|record| record.evaluation_input_blake3.as_str())
@@ -1559,6 +1562,9 @@ impl PredictionNullSummary {
         config: HeldOutRelationalPredictionConfig,
     ) -> Result<(), RelationalPredictionError> {
         self.validate_trace()?;
+        if config != self.config {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
         let expected = prediction_null_input_digest(
             samples,
             config,
@@ -2408,6 +2414,25 @@ mod tests {
     }
 
     #[test]
+    fn evidence_replay_rejects_mismatched_config() {
+        let samples = build_samples(0.5);
+        let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            provenance(),
+        )
+        .unwrap();
+
+        let mut altered = config();
+        altered.ridge_lambda = 0.25;
+
+        assert_eq!(
+            evidence.verify_against_samples(&samples, altered),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
     fn evidence_replay_verifier_binds_exact_training_input() {
         let samples = build_samples(0.5);
         let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
@@ -2876,6 +2901,27 @@ mod tests {
         assert!(json.contains("surrogate_shifts"));
         assert!(json.contains("surrogate_mse"));
         assert!(json.contains("evaluation_input_blake3"));
+    }
+
+    #[test]
+    fn null_replay_rejects_mismatched_config() {
+        let samples = build_samples(0.5);
+        let summary = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config(),
+            PredictionNullFamily::CircularShift,
+            PredictionFeatureSet::RelationalAugmented,
+            12,
+        )
+        .unwrap();
+
+        let mut altered = config();
+        altered.ridge_lambda = 0.25;
+
+        assert_eq!(
+            summary.verify_against_samples(&samples, altered),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
     }
 
     #[test]
