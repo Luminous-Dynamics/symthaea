@@ -532,7 +532,7 @@ impl MeasurementUncertaintyComponentRef {
 /// an expanded statement is used—the coverage-factor method. Symthaea verifies
 /// identity completeness and binds these references into the uncertainty
 /// integrity commitment; it does not recompute or certify the scientific result.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MeasurementUncertaintyEvaluationRef {
     /// Stable identity of the exact uncertainty evaluation record.
     pub evaluation_id: String,
