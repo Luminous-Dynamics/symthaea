@@ -140,3 +140,14 @@ The minimum hostile suite for this protocol is:
 Do not call this protocol PASS solely because a branch exists or a workflow is queued.
 
 The exact commit under test must have an executed, successful focused qualification run before the corresponding claim is promoted to PASS evidence.
+
+
+## Observation provenance hardening
+
+Receipt construction does not accept a raw post-state observation. The transport must first cross the observer-sealed `NixVerifiedPostStateObservationV1` boundary. The sealed wrapper has no public constructor and no serde implementation.
+
+This is an API-level provenance fence, not a cryptographic attestation of the host. The observer itself remains responsible for authenticating the systemd D-Bus source and correctly correlating the observation transaction.
+
+Job evidence additionally commits to the canonical unit name and systemd job object path carried by the `JobRemoved` event. A matching numeric job ID without matching unit/path identity is insufficient.
+
+CROSS-060 tracks the remaining step: bind the definition commitment itself into the authorization context rather than only into the post-state expectation.
