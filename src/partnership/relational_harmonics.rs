@@ -312,6 +312,103 @@ fn harmonic_summary(samples: &[RelationalSample]) -> HarmonicSummary {
     }
 }
 
+/// Scalar agent observations used by the existing Symthaea transfer-entropy
+/// estimator.
+///
+/// These observations are deliberately separate from RelationalSample:
+/// RH-001's alignment/coupling channels must not be fed back into themselves
+/// as the purported source and target signals.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RelationalSignalSample {
+    /// Monotone observation time in caller-defined units.
+    pub time: f64,
+    /// Normalized scalar state summary for agent A.
+    pub agent_a: f64,
+    /// Normalized scalar state summary for agent B.
+    pub agent_b: f64,
+}
+
+impl RelationalSignalSample {
+    pub fn new(
+        time: f64,
+        agent_a: f64,
+        agent_b: f64,
+    ) -> Result<Self, RelationalHarmonicError> {
+        if !time.is_finite() {
+            return Err(RelationalHarmonicError::NonFiniteTime);
+        }
+
+        for (name, value) in [("agent_a", agent_a), ("agent_b", agent_b)] {
+            if !value.is_finite() {
+                return Err(RelationalHarmonicError::NonFiniteValue(name));
+            }
+        }
+
+        Ok(Self {
+            time,
+            agent_a,
+            agent_b,
+        })
+    }
+}
+
+/// Directional information-flow estimate using the repository's existing
+/// transfer-entropy estimator.
+///
+/// These values are intentionally labeled Proxy: transfer entropy is an
+/// information-theoretic directional measure, but the current estimator is a
+/// finite-sample histogram estimator without an attached significance test.
+/// It must not be called mechanistic causality.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DirectionalInformationFlow {
+    pub samples: usize,
+    pub te_a_to_b: f64,
+    pub te_b_to_a: f64,
+    pub net_a_to_b: f64,
+    pub status: EvidenceStatus,
+}
+
+impl DirectionalInformationFlow {
+    /// Estimate directional information flow from independent agent signals.
+    ///
+    /// min_samples is an explicit caller-side stability floor. The current
+    /// estimator itself accepts much smaller windows, which is useful for
+    /// experimentation but not sufficient for a stable qualification claim.
+    pub fn compute(
+        samples: &[RelationalSignalSample],
+        min_samples: usize,
+    ) -> Result<Self, RelationalHarmonicError> {
+        if samples.len() < min_samples.max(2) {
+            return Err(RelationalHarmonicError::InsufficientSamples(samples.len()));
+        }
+
+        for pair in samples.windows(2) {
+            if pair[1].time <= pair[0].time {
+                return Err(RelationalHarmonicError::NonMonotonicTime);
+            }
+        }
+
+        let config = crate::hdc::information_theory::InformationTheoryConfig::default();
+        let mut estimator =
+            crate::hdc::information_theory::TransferEntropyEstimator::new(config, samples.len());
+
+        for sample in samples {
+            estimator.observe_scalars(sample.agent_a, sample.agent_b);
+        }
+
+        let te_a_to_b = estimator.transfer_entropy_x_to_y().unwrap_or(0.0);
+        let te_b_to_a = estimator.transfer_entropy_y_to_x().unwrap_or(0.0);
+
+        Ok(Self {
+            samples: samples.len(),
+            te_a_to_b,
+            te_b_to_a,
+            net_a_to_b: te_a_to_b - te_b_to_a,
+            status: EvidenceStatus::Proxy,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
