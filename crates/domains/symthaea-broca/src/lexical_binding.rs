@@ -123,6 +123,131 @@ pub const MORPHOPHONOLOGICAL_RULE_SET_VERSION: &str =
     "broca-morphophonological-rule-set-v1";
 pub const MORPHOPHONOLOGICAL_RULE_SELECTION_POLICY: &str =
     "exact-feature-single-rule-v1";
+pub const MORPHOPHONOLOGICAL_RESOURCE_EVIDENCE_VERSION: &str =
+    "broca-morphophonological-resource-evidence-v1";
+
+/// Whether an executable morphology resource is externally sourced or explicitly
+/// authored as a local/fixture resource.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MorphophonologicalResourceOrigin {
+    External,
+    HandAuthored,
+}
+
+/// Provenance for the linguistic/resource artifact behind an executable rule set.
+///
+/// External resources require a source URI, immutable revision identifier, and declared
+/// license. Hand-authored resources intentionally carry no fabricated external attribution.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MorphophonologicalResourceEvidence {
+    pub version: String,
+    pub origin: MorphophonologicalResourceOrigin,
+    pub source_id: String,
+    pub source_uri: Option<String>,
+    pub revision: String,
+    pub license: Option<String>,
+}
+
+impl MorphophonologicalResourceEvidence {
+    pub fn hand_authored(
+        source_id: impl Into<String>,
+        revision: impl Into<String>,
+    ) -> Result<Self, MorphophonologicalResourceEvidenceError> {
+        let evidence = Self {
+            version: MORPHOPHONOLOGICAL_RESOURCE_EVIDENCE_VERSION.to_string(),
+            origin: MorphophonologicalResourceOrigin::HandAuthored,
+            source_id: source_id.into(),
+            source_uri: None,
+            revision: revision.into(),
+            license: None,
+        };
+        evidence.validate()?;
+        Ok(evidence)
+    }
+
+    pub fn external(
+        source_id: impl Into<String>,
+        source_uri: impl Into<String>,
+        revision: impl Into<String>,
+        license: impl Into<String>,
+    ) -> Result<Self, MorphophonologicalResourceEvidenceError> {
+        let evidence = Self {
+            version: MORPHOPHONOLOGICAL_RESOURCE_EVIDENCE_VERSION.to_string(),
+            origin: MorphophonologicalResourceOrigin::External,
+            source_id: source_id.into(),
+            source_uri: Some(source_uri.into()),
+            revision: revision.into(),
+            license: Some(license.into()),
+        };
+        evidence.validate()?;
+        Ok(evidence)
+    }
+
+    pub fn validate(&self) -> Result<(), MorphophonologicalResourceEvidenceError> {
+        if self.version != MORPHOPHONOLOGICAL_RESOURCE_EVIDENCE_VERSION {
+            return Err(MorphophonologicalResourceEvidenceError::InvalidVersion);
+        }
+        if self.source_id.trim().is_empty() {
+            return Err(MorphophonologicalResourceEvidenceError::EmptySourceId);
+        }
+        if self.revision.trim().is_empty() {
+            return Err(MorphophonologicalResourceEvidenceError::EmptyRevision);
+        }
+
+        match self.origin {
+            MorphophonologicalResourceOrigin::External => {
+                let uri = self
+                    .source_uri
+                    .as_deref()
+                    .ok_or(MorphophonologicalResourceEvidenceError::ExternalMissingUri)?;
+                let license = self
+                    .license
+                    .as_deref()
+                    .ok_or(MorphophonologicalResourceEvidenceError::ExternalMissingLicense)?;
+                if uri.trim().is_empty() {
+                    return Err(MorphophonologicalResourceEvidenceError::ExternalMissingUri);
+                }
+                if license.trim().is_empty() {
+                    return Err(MorphophonologicalResourceEvidenceError::ExternalMissingLicense);
+                }
+            }
+            MorphophonologicalResourceOrigin::HandAuthored => {
+                if self.source_uri.is_some() || self.license.is_some() {
+                    return Err(
+                        MorphophonologicalResourceEvidenceError::HandAuthoredCarriesExternalMetadata,
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MorphophonologicalResourceEvidenceError {
+    InvalidVersion,
+    EmptySourceId,
+    EmptyRevision,
+    ExternalMissingUri,
+    ExternalMissingLicense,
+    HandAuthoredCarriesExternalMetadata,
+}
+
+impl std::fmt::Display for MorphophonologicalResourceEvidenceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidVersion => write!(f, "morphophonological resource-evidence version is unsupported"),
+            Self::EmptySourceId => write!(f, "morphophonological resource source id must be non-empty"),
+            Self::EmptyRevision => write!(f, "morphophonological resource revision must be non-empty"),
+            Self::ExternalMissingUri => write!(f, "external morphophonological resources require a source URI"),
+            Self::ExternalMissingLicense => write!(f, "external morphophonological resources require a declared license"),
+            Self::HandAuthoredCarriesExternalMetadata => write!(f, "hand-authored morphophonological resources must not carry fabricated external URI or license metadata"),
+        }
+    }
+}
+
+impl std::error::Error for MorphophonologicalResourceEvidenceError {}
 
 /// A deliberately small deterministic operation vocabulary for executable
 /// morphophonological derivation evidence.
@@ -159,6 +284,8 @@ pub struct MorphophonologicalRuleSet {
     pub dialect_scope: String,
     /// Exact rule-selection policy used by the executable engine.
     pub selection_policy: String,
+    /// Typed origin/provenance for the executable resource behind this rule set.
+    pub resource_evidence: MorphophonologicalResourceEvidence,
     pub rule_id: String,
     pub provenance: String,
     pub rules: Vec<MorphophonologicalRule>,
@@ -169,6 +296,7 @@ impl MorphophonologicalRuleSet {
         language_tag: impl Into<String>,
         source_id: impl Into<String>,
         dialect_scope: impl Into<String>,
+        resource_evidence: MorphophonologicalResourceEvidence,
         rule_id: impl Into<String>,
         provenance: impl Into<String>,
         rules: Vec<MorphophonologicalRule>,
@@ -179,6 +307,7 @@ impl MorphophonologicalRuleSet {
             source_id: source_id.into(),
             dialect_scope: dialect_scope.into(),
             selection_policy: MORPHOPHONOLOGICAL_RULE_SELECTION_POLICY.to_string(),
+            resource_evidence,
             rule_id: rule_id.into(),
             provenance: provenance.into(),
             rules,
@@ -203,6 +332,9 @@ impl MorphophonologicalRuleSet {
         if self.selection_policy != MORPHOPHONOLOGICAL_RULE_SELECTION_POLICY {
             return Err(MorphophonologicalRuleSetError::UnsupportedSelectionPolicy);
         }
+        self.resource_evidence
+            .validate()
+            .map_err(|_| MorphophonologicalRuleSetError::InvalidResourceEvidence)?;
         if self.rule_id.trim().is_empty() {
             return Err(MorphophonologicalRuleSetError::EmptyRuleSetId);
         }
@@ -290,6 +422,17 @@ impl MorphophonologicalRuleSet {
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea-morphophonological-rule-set-v1\\0");
         hasher.update(self.grounding_surface().as_bytes());
+        hasher.update(b"symthaea-morphophonological-resource-evidence-v1\\0");
+        hasher.update(self.resource_evidence.version.as_bytes());
+        hasher.update(&(serde_json::to_string(&self.resource_evidence)
+            .unwrap_or_else(|_| String::from("serialization-failed")))
+            .len() as u64)
+            .to_le_bytes());
+        hasher.update(
+            serde_json::to_string(&self.resource_evidence)
+                .unwrap_or_else(|_| String::from("serialization-failed"))
+                .as_bytes(),
+        );
         hasher.finalize().to_hex().to_string()
     }
 
@@ -374,6 +517,7 @@ pub enum MorphophonologicalRuleSetError {
     EmptySourceId,
     EmptyDialectScope,
     UnsupportedSelectionPolicy,
+    InvalidResourceEvidence,
     EmptyRuleSetId,
     EmptyProvenance,
     EmptyRuleSet,
@@ -396,6 +540,7 @@ impl std::fmt::Display for MorphophonologicalRuleSetError {
             Self::EmptySourceId => write!(f, "morphophonological rule-set source id must be non-empty"),
             Self::EmptyDialectScope => write!(f, "morphophonological rule-set dialect scope must be non-empty"),
             Self::UnsupportedSelectionPolicy => write!(f, "morphophonological rule-set selection policy is unsupported"),
+            Self::InvalidResourceEvidence => write!(f, "morphophonological rule-set resource evidence is invalid"),
             Self::EmptyRuleSetId => write!(f, "morphophonological rule-set id must be non-empty"),
             Self::EmptyProvenance => write!(f, "morphophonological rule-set provenance must be non-empty"),
             Self::EmptyRuleSet => write!(f, "morphophonological rule set must contain at least one rule"),
@@ -446,6 +591,9 @@ pub struct MorphophonologicalDerivationWitness {
     pub rule_set_dialect_scope: String,
     /// Exact executable rule-selection policy.
     pub rule_set_selection_policy: String,
+    /// Typed origin/provenance for the executable resource; absent for caller-supplied
+    /// historical witnesses that make no executable resource claim.
+    pub rule_set_resource_evidence: Option<MorphophonologicalResourceEvidence>,
     /// Digest of the exact serialized executable rule set used for derivation.
     pub rule_set_blake3: String,
     pub steps: Vec<MorphophonologicalDerivationStep>,
@@ -462,6 +610,7 @@ impl MorphophonologicalDerivationWitness {
             rule_set_source_id: String::new(),
             rule_set_dialect_scope: String::new(),
             rule_set_selection_policy: String::new(),
+            rule_set_resource_evidence: None,
             rule_set_blake3: String::new(),
             steps,
         };
@@ -529,6 +678,7 @@ impl MorphophonologicalDerivationWitness {
         witness.rule_set_source_id = rule_set.source_id.clone();
         witness.rule_set_dialect_scope = rule_set.dialect_scope.clone();
         witness.rule_set_selection_policy = rule_set.selection_policy.clone();
+        witness.rule_set_resource_evidence = Some(rule_set.resource_evidence.clone());
         witness.rule_set_blake3 = rule_set.resource_blake3();
         witness.validate_against_binding_and_rule_set(binding, rule_set)?;
         Ok(witness)
@@ -548,6 +698,7 @@ impl MorphophonologicalDerivationWitness {
         if self.rule_set_source_id != rule_set.source_id
             || self.rule_set_dialect_scope != rule_set.dialect_scope
             || self.rule_set_selection_policy != rule_set.selection_policy
+            || self.rule_set_resource_evidence.as_ref() != Some(&rule_set.resource_evidence)
         {
             return Err(MorphophonologicalDerivationWitnessError::RuleSetMetadataMismatch);
         }
@@ -1749,6 +1900,11 @@ mod tests {
             "en",
             "fixture:english-rules-v1",
             "en-US",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "symthaea-fixture-rule-resource",
+                "fixture-v1",
+            )
+            .unwrap(),
             "fixture:english-morphology:v1",
             "fixture:rules:v1",
             vec![MorphophonologicalRule {
@@ -1898,6 +2054,11 @@ mod tests {
             "en",
             "fixture:english-rules-v1",
             "en-US",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "symthaea-fixture-rule-resource",
+                "fixture-v1",
+            )
+            .unwrap(),
             "fixture:english-morphology:v1",
             "fixture:rules:v1",
             vec![MorphophonologicalRule {
@@ -1941,6 +2102,11 @@ mod tests {
             "en",
             "fixture:ambiguous-rules-v1",
             "en-US",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "symthaea-fixture-ambiguous-resource",
+                "fixture-v1",
+            )
+            .unwrap(),
             "fixture:ambiguous:v1",
             "fixture:rules:v1",
             vec![
@@ -2071,6 +2237,61 @@ mod tests {
                 .expect_err("unsupported selection policy must fail closed"),
             MorphophonologicalRuleSetError::UnsupportedSelectionPolicy
         );
+    }
+
+
+    #[test]
+    fn morphophonological_resource_evidence_distinguishes_external_and_hand_authored() {
+        let hand = MorphophonologicalResourceEvidence::hand_authored(
+            "symthaea-fixture",
+            "fixture-v1",
+        )
+        .expect("hand-authored evidence should validate");
+        assert_eq!(hand.origin, MorphophonologicalResourceOrigin::HandAuthored);
+        assert!(hand.source_uri.is_none());
+        assert!(hand.license.is_none());
+
+        let external = MorphophonologicalResourceEvidence::external(
+            "example-external-resource",
+            "https://example.invalid/resource",
+            "commit-or-release-1",
+            "CC-BY-SA-4.0",
+        )
+        .expect("external evidence should validate");
+        assert_eq!(external.origin, MorphophonologicalResourceOrigin::External);
+        assert!(external.source_uri.is_some());
+        assert!(external.license.is_some());
+    }
+
+    #[test]
+    fn morphophonological_resource_evidence_rejects_missing_external_metadata() {
+        let error = MorphophonologicalResourceEvidence {
+            version: MORPHOPHONOLOGICAL_RESOURCE_EVIDENCE_VERSION.into(),
+            origin: MorphophonologicalResourceOrigin::External,
+            source_id: "fixture:external".into(),
+            source_uri: None,
+            revision: "fixture-rev".into(),
+            license: None,
+        }
+        .validate()
+        .expect_err("external resource evidence must identify locator and license");
+
+        assert_eq!(
+            error,
+            MorphophonologicalResourceEvidenceError::ExternalMissingUri
+        );
+    }
+
+    #[test]
+    fn morphophonological_rule_set_digest_includes_resource_evidence() {
+        let rule_set = morphophonological_fixture_rule_set();
+        let mut tampered = rule_set.clone();
+        tampered.resource_evidence = MorphophonologicalResourceEvidence::hand_authored(
+            "symthaea-other-resource",
+            "fixture-v1",
+        )
+        .unwrap();
+        assert_ne!(rule_set.resource_blake3(), tampered.resource_blake3());
     }
 
 
