@@ -483,11 +483,26 @@ impl LiveVoice {
     /// constituent must have a pronunciation entry, and the supplied phonological stream must
     /// match it in order. CMU stress digits are checked against the plan's explicit stress field.
     #[cfg(feature = "ssm_language")]
+    /// Derive an auditable English lexical-to-phonological witness using only embedded
+    /// pronunciation lexicons.
+    ///
+    /// This method delegates to the same deterministic helper used by receipt re-verification,
+    /// keeping production and independent verification on one derivation implementation.
+    #[cfg(feature = "ssm_language")]
     pub fn derive_english_lexical_phonological_witness(
         &self,
         binding: &LexicalMorphosyntacticBinding,
         segments: &[symthaea_broca::PhonemeSlot],
     ) -> Result<(LexicalPhonologicalWitness, Vec<PronunciationLexiconEvidence>)> {
+        derive_english_lexical_phonological_witness_from_g2p(&self.g2p, binding, segments)
+    }
+
+#[cfg(feature = "ssm_language")]
+fn derive_english_lexical_phonological_witness_from_g2p(
+    g2p: &SimpleG2P,
+    binding: &LexicalMorphosyntacticBinding,
+    segments: &[symthaea_broca::PhonemeSlot],
+) -> Result<(LexicalPhonologicalWitness, Vec<PronunciationLexiconEvidence>)>
         binding
             .validate()
             .map_err(|error| anyhow::anyhow!("invalid lexical binding: {error}"))?;
@@ -627,6 +642,8 @@ impl LiveVoice {
 
         Ok((witness, pronunciation_lexicon_evidence))
     }
+
+
 
     /// Realize a plan by deriving its lexical-to-phonological witness strictly from the
     /// embedded English pronunciation resources. Unlisted forms fail closed instead of
