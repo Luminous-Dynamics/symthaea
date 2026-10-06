@@ -25,7 +25,6 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 
 const SCHEMA_VERSION: u16 = 1;
-const FINGERPRINT_VERSION: u16 = 2;
 const CROSS_PROCESS_LOCK_PATH: &str = "/run/nixforhumanity-system-mutation.lock";
 const LEDGER_PATH: &str = "/var/lib/nixforhumanity/system-transactions.jsonl";
 const FINGERPRINT_KEY_PATH: &str =
