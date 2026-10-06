@@ -663,27 +663,163 @@ fn backfill_bound_attempt_boundaries_from_dispatch(
     Ok(())
 }
 
-fn validate_terminal_native_replay_history(
-    connection: &Connection,
+fn backfill_native_replay_history(
+    connection: &mut Connection,
 ) -> Result<(), AuthorizationStoreError> {
-    let duplicate: Option<String> = connection
-        .query_row(
-            "SELECT native_replay_identity
+    fn reconcile_source(
+        connection: &Connection,
+        native_replay_identity: &str,
+        authorization_instance: &str,
+        attempt_id: &str,
+        operation_id: &str,
+        relying_party_id: &str,
+        native_authority_namespace: Option<&str>,
+        native_authorization_id: Option<&str>,
+        native_replay_derivation_digest: Option<&str>,
+        boundary_id: Option<&str>,
+        action_digest: Option<&str>,
+        target_identity: Option<&str>,
+    ) -> Result<(), AuthorizationStoreError> {
+        if native_replay_identity.is_empty()
+            || authorization_instance.is_empty()
+            || attempt_id.is_empty()
+        {
+            return Err(AuthorizationStoreError::InvalidState(
+                "invalid native replay history provenance".into(),
+            ));
+        }
+
+        let existing: Option<(
+            String, String, String, String,
+            Option<String>, Option<String>, Option<String>,
+            Option<String>, Option<String>, Option<String>,
+        )> = connection
+            .query_row(
+                "SELECT authorization_instance,attempt_id,operation_id,relying_party_id,
+                        native_authority_namespace,native_authorization_id,
+                        native_replay_derivation_digest,boundary_id,action_digest,target_identity
+                 FROM authorization_native_replay_history
+                 WHERE native_replay_identity=?1",
+                params![native_replay_identity],
+                |row| Ok((
+                    row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?,
+                    row.get(4)?, row.get(5)?, row.get(6)?,
+                    row.get(7)?, row.get(8)?, row.get(9)?,
+                )),
+            )
+            .optional()?;
+
+        if let Some((
+            stored_authorization_instance, stored_attempt_id, stored_operation_id,
+            stored_relying_party_id, stored_namespace, stored_native_id,
+            stored_derivation_digest, stored_boundary_id, stored_action_digest,
+            stored_target_identity,
+        )) = existing
+        {
+            let optional_matches = |incoming: Option<&str>, stored: &Option<String>| {
+                incoming.is_none()
+                    || incoming == stored.as_deref()
+            };
+            if stored_authorization_instance != authorization_instance
+                || stored_attempt_id != attempt_id
+                || stored_operation_id != operation_id
+                || stored_relying_party_id != relying_party_id
+                || !optional_matches(native_authority_namespace, &stored_namespace)
+                || !optional_matches(native_authorization_id, &stored_native_id)
+                || !optional_matches(
+                    native_replay_derivation_digest,
+                    &stored_derivation_digest,
+                )
+                || !optional_matches(boundary_id, &stored_boundary_id)
+                || !optional_matches(action_digest, &stored_action_digest)
+                || !optional_matches(target_identity, &stored_target_identity)
+            {
+                return Err(AuthorizationStoreError::InvalidState(
+                    "conflicting native replay history provenance".into(),
+                ));
+            }
+            return Ok(());
+        }
+
+        connection.execute(
+            "INSERT INTO authorization_native_replay_history(
+                native_replay_identity,authorization_instance,attempt_id,operation_id,
+                relying_party_id,native_authority_namespace,native_authorization_id,
+                native_replay_derivation_digest,boundary_id,action_digest,target_identity)
+             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+            params![
+                native_replay_identity,
+                authorization_instance,
+                attempt_id,
+                operation_id,
+                relying_party_id,
+                native_authority_namespace,
+                native_authorization_id,
+                native_replay_derivation_digest,
+                boundary_id,
+                action_digest,
+                target_identity,
+            ],
+        )?;
+        Ok(())
+    }
+
+    let dispatch_rows: Vec<(
+        String,String,String,String,String,
+        Option<String>,Option<String>,Option<String>,
+        String,String,String,
+    )> = {
+        let mut stmt = connection.prepare(
+            "SELECT native_replay_identity,authorization_instance,attempt_id,operation_id,
+                    COALESCE(relying_party_id,''),native_authority_namespace,native_authorization_id,
+                    native_replay_derivation_digest,boundary_id,action_digest,target_identity
+             FROM authorization_dispatches
+             WHERE native_replay_identity IS NOT NULL
+               AND native_replay_identity <> ''",
+        )?;
+        stmt.query_map([], |row| Ok((
+            row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?,
+            row.get(5)?, row.get(6)?, row.get(7)?, row.get(8)?, row.get(9)?, row.get(10)?,
+        )))?
+        .collect::<Result<_, _>>()?
+    };
+    for row in dispatch_rows {
+        reconcile_source(
+            connection,
+            &row.0,&row.1,&row.2,&row.3,&row.4,
+            row.5.as_deref(),row.6.as_deref(),row.7.as_deref(),
+            row.8.as_deref(),row.9.as_deref(),row.10.as_deref(),
+        )?;
+    }
+
+    let terminal_rows: Vec<(
+        String,String,String,String,String,
+        Option<String>,Option<String>,Option<String>,
+        String,String,String,
+    )> = {
+        let mut stmt = connection.prepare(
+            "SELECT native_replay_identity,authorization_instance,attempt_id,operation_id,
+                    COALESCE(relying_party_id,''),native_authority_namespace,native_authorization_id,
+                    native_replay_derivation_digest,boundary_id,action_digest,target_identity
              FROM authorization_terminal_evidence
              WHERE native_replay_identity IS NOT NULL
-               AND native_replay_identity <> ''
-             GROUP BY native_replay_identity
-             HAVING COUNT(*) > 1
-             LIMIT 1",
-            [],
-            |row| row.get(0),
-        )
-        .optional()?;
-    if duplicate.is_some() {
-        return Err(AuthorizationStoreError::InvalidState(
-            "duplicate native replay identity in terminal evidence history".into(),
-        ));
+               AND native_replay_identity <> ''",
+        )?;
+        stmt.query_map([], |row| Ok((
+            row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?,
+            row.get(5)?, row.get(6)?, row.get(7)?, row.get(8)?, row.get(9)?, row.get(10)?,
+        )))?
+        .collect::<Result<_, _>>()?
+    };
+    for row in terminal_rows {
+        reconcile_source(
+            connection,
+            &row.0,&row.1,&row.2,&row.3,&row.4,
+            row.5.as_deref(),row.6.as_deref(),row.7.as_deref(),
+            row.8.as_deref(),row.9.as_deref(),row.10.as_deref(),
+        )?;
     }
+
     Ok(())
 }
 
@@ -1371,6 +1507,19 @@ impl SqliteAuthorizationStore {
                verification_digest TEXT NOT NULL,
                PRIMARY KEY(authorization_instance, attempt_id)
              );
+             CREATE TABLE IF NOT EXISTS authorization_native_replay_history (
+               native_replay_identity TEXT PRIMARY KEY,
+               authorization_instance TEXT NOT NULL,
+               attempt_id TEXT NOT NULL,
+               operation_id TEXT NOT NULL,
+               relying_party_id TEXT NOT NULL,
+               native_authority_namespace TEXT,
+               native_authorization_id TEXT,
+               native_replay_derivation_digest TEXT,
+               boundary_id TEXT,
+               action_digest TEXT,
+               target_identity TEXT
+             );
              CREATE TABLE IF NOT EXISTS authorization_dispatches (
                authorization_instance TEXT NOT NULL,
                attempt_id TEXT NOT NULL,
@@ -1472,7 +1621,7 @@ impl SqliteAuthorizationStore {
         backfill_attempt_scope_digests(&mut connection)?;
         validate_attempt_boundary_consistency(&connection)?;
         validate_attempt_operation_consistency(&connection)?;
-        validate_terminal_native_replay_history(&connection)?;
+        backfill_native_replay_history(&mut connection)?;
         connection.execute_batch(
             "CREATE UNIQUE INDEX IF NOT EXISTS authorization_lease_attempt_id_uq
                ON authorization_leases(attempt_id)
@@ -1510,6 +1659,16 @@ impl SqliteAuthorizationStore {
              CREATE INDEX IF NOT EXISTS authorization_terminal_native_replay_history_idx
                ON authorization_terminal_evidence(native_replay_identity)
                WHERE native_replay_identity IS NOT NULL AND native_replay_identity <> '';
+             CREATE TRIGGER IF NOT EXISTS authorization_native_replay_history_no_update
+               BEFORE UPDATE ON authorization_native_replay_history
+               BEGIN
+                 SELECT RAISE(ABORT, 'native replay history is append-only');
+               END;
+             CREATE TRIGGER IF NOT EXISTS authorization_native_replay_history_no_delete
+               BEFORE DELETE ON authorization_native_replay_history
+               BEGIN
+                 SELECT RAISE(ABORT, 'native replay history is append-only');
+               END;
              DROP INDEX IF EXISTS authorization_dispatch_action_fence_idx;
              CREATE INDEX authorization_dispatch_action_fence_idx
                ON authorization_dispatches(relying_party_id, target_identity, action_digest, state);",
@@ -3059,21 +3218,9 @@ fn validate_native_authority_pin_set(
         // concurrent live callers.
         let replay_owner: Option<(String, String, String)> = tx
             .query_row(
-                "SELECT source,authorization_instance,attempt_id
-                 FROM (
-                     SELECT 'authorization_dispatches' AS source,
-                            authorization_instance,attempt_id
-                     FROM authorization_dispatches
-                     WHERE native_replay_identity=?1
-                       AND native_replay_identity <> ''
-                     UNION ALL
-                     SELECT 'authorization_terminal_evidence' AS source,
-                            authorization_instance,attempt_id
-                     FROM authorization_terminal_evidence
-                     WHERE native_replay_identity=?1
-                       AND native_replay_identity <> ''
-                 )
-                 LIMIT 1",
+                "SELECT authorization_instance,attempt_id,operation_id
+                 FROM authorization_native_replay_history
+                 WHERE native_replay_identity=?1",
                 params![native_replay_identity],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
@@ -3164,6 +3311,56 @@ fn validate_native_authority_pin_set(
                 params![authorization_instance, boundary_id, attempt_id],
             )?;
         }
+
+        // The native replay ledger is the durable one-time authority fact.
+        // It intentionally survives dispatch/terminal retention and is the
+        // authoritative transaction-time uniqueness boundary for this grant.
+        let inserted = tx.execute(
+            "INSERT OR IGNORE INTO authorization_native_replay_history(
+                native_replay_identity,authorization_instance,attempt_id,operation_id,
+                relying_party_id,native_authority_namespace,native_authorization_id,
+                native_replay_derivation_digest,boundary_id,action_digest,target_identity)
+             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+            params![
+                record.native_replay_identity,
+                record.authorization_instance,
+                record.attempt_id,
+                record.operation_id,
+                self.relying_party_id.as_str(),
+                record.native_authority_namespace,
+                record.native_authorization_id,
+                record.native_replay_derivation_digest,
+                record.boundary_id,
+                record.action_digest,
+                record.target_identity,
+            ],
+        )?;
+        if inserted == 0 {
+            let owner: Option<(String,String,String,String,String,String)> = tx
+                .query_row(
+                    "SELECT authorization_instance,attempt_id,operation_id,
+                            relying_party_id,boundary_id,action_digest
+                     FROM authorization_native_replay_history
+                     WHERE native_replay_identity=?1",
+                    params![record.native_replay_identity.as_str()],
+                    |row| Ok((
+                        row.get(0)?,row.get(1)?,row.get(2)?,
+                        row.get(3)?,row.get(4)?,row.get(5)?,
+                    )),
+                )
+                .optional()?;
+            if !owner.is_some_and(|owner| {
+                owner.0 == record.authorization_instance
+                    && owner.1 == record.attempt_id
+                    && owner.2 == record.operation_id
+                    && owner.3 == self.relying_party_id
+                    && owner.4 == record.boundary_id
+                    && owner.5 == record.action_digest
+            }) {
+                return Err(AuthorizationConsumptionError::InvalidBinding.into());
+            }
+        }
+
         tx.execute(
             "INSERT INTO authorization_dispatches
              (authorization_instance,attempt_id,operation_id,native_replay_identity,
@@ -11606,7 +11803,33 @@ mod tests {
             .unwrap();
         assert_eq!(dispatch_count, 0);
 
-        let terminal_count: i64 = store
+        // Delete both ordinary historical witnesses to model aggressive
+        // retention/compaction. The dedicated replay ledger must still fence
+        // the one-time native authority.
+        store
+            .connection()
+            .unwrap()
+            .execute(
+                "DELETE FROM authorization_terminal_evidence
+                 WHERE authorization_instance=?1 AND attempt_id=?2",
+                params![
+                    witness_a.authorization_instance.as_str(),
+                    "attempt:terminal-history-a"
+                ],
+            )
+            .unwrap();
+
+        let dispatch_count_after_compaction: i64 = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM authorization_dispatches
+                 WHERE native_replay_identity=?1",
+                params![terminal_native_identity.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let terminal_count_after_compaction: i64 = store
             .connection()
             .unwrap()
             .query_row(
@@ -11616,7 +11839,42 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(terminal_count, 1);
+        let ledger_count: i64 = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM authorization_native_replay_history
+                 WHERE native_replay_identity=?1",
+                params![terminal_native_identity.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(dispatch_count_after_compaction, 0);
+        assert_eq!(terminal_count_after_compaction, 0);
+        assert_eq!(ledger_count, 1);
+
+        let update_err = store
+            .connection()
+            .unwrap()
+            .execute(
+                "UPDATE authorization_native_replay_history
+                 SET operation_id='operation:tampered'
+                 WHERE native_replay_identity=?1",
+                params![terminal_native_identity.as_str()],
+            )
+            .unwrap_err();
+        assert!(update_err.to_string().contains("native replay history is append-only"));
+
+        let delete_err = store
+            .connection()
+            .unwrap()
+            .execute(
+                "DELETE FROM authorization_native_replay_history
+                 WHERE native_replay_identity=?1",
+                params![terminal_native_identity.as_str()],
+            )
+            .unwrap_err();
+        assert!(delete_err.to_string().contains("native replay history is append-only"));
 
         let _ = std::fs::remove_file(path);
     }
