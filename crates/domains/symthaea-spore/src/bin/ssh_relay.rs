@@ -7994,7 +7994,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn image_postcondition_requires_private_readable_nonempty_archive() {
+    async fn image_postcondition_requires_configuration_sidecar() {
         use std::os::unix::fs::PermissionsExt;
 
         let transaction_id = random_operation_id().unwrap();
@@ -8014,6 +8014,21 @@ mod tests {
         .unwrap();
         assert_eq!(create.exit_status, 0);
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        assert!(
+            !verify_image_artifact(dir.to_str().unwrap())
+                .await
+                .unwrap(),
+            "archive-only images must not qualify without configuration provenance"
+        );
+
+        let configuration = dir.join("configuration.nix");
+        std::fs::write(&configuration, "{ config = true; }\n").unwrap();
+        std::fs::set_permissions(
+            &configuration,
+            std::fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
         assert!(verify_image_artifact(dir.to_str().unwrap()).await.unwrap());
 
         std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
