@@ -201,10 +201,17 @@ impl MorphophonologicalRuleSet {
                 return Err(MorphophonologicalRuleSetError::DuplicateRuleId);
             }
 
-            let canonical = canonical_morphology(&rule.morphology);
-            if canonical.len() != rule.morphology.len() {
-                return Err(MorphophonologicalRuleSetError::InvalidMorphology);
+            let mut categories = HashSet::new();
+            for feature in &rule.morphology {
+                if feature.category.trim().is_empty() || feature.value.trim().is_empty() {
+                    return Err(MorphophonologicalRuleSetError::InvalidMorphology);
+                }
+                if !categories.insert(feature.category.clone()) {
+                    return Err(MorphophonologicalRuleSetError::InvalidMorphology);
+                }
             }
+
+            let canonical = canonical_morphology(&rule.morphology);
             if !feature_signatures.insert(canonical) {
                 return Err(MorphophonologicalRuleSetError::AmbiguousFeatureMatch);
             }
@@ -239,7 +246,7 @@ impl MorphophonologicalRuleSet {
 
         let rule = match matches.as_slice() {
             [] => return Err(MorphophonologicalRuleSetError::NoMatchingRule),
-            [rule] => *rule,
+            [rule] => rule,
             _ => return Err(MorphophonologicalRuleSetError::AmbiguousFeatureMatch),
         };
 
