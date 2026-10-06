@@ -749,6 +749,28 @@ fn independent_parity_check_rows(code: &RandomLinearCode) -> Vec<u64> {
     checks
 }
 
+fn independent_binary_rank(mut rows: Vec<u64>, dimension: usize) -> usize {
+    assert!(dimension <= 64);
+    let mut rank = 0usize;
+
+    for column in 0..dimension {
+        let Some(found) = (rank..rows.len()).find(|&row| ((rows[row] >> column) & 1) == 1)
+        else {
+            continue;
+        };
+
+        rows.swap(rank, found);
+        for row in 0..rows.len() {
+            if row != rank && ((rows[row] >> column) & 1) == 1 {
+                rows[row] ^= rows[rank];
+            }
+        }
+        rank += 1;
+    }
+
+    rank
+}
+
 fn independent_syndrome(mask: u64, checks: &[u64]) -> u64 {
     let mut syndrome = 0u64;
     for (index, &check) in checks.iter().enumerate() {
@@ -829,6 +851,11 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
                 let checks = independent_parity_check_rows(&code);
 
                 assert_eq!(checks.len(), dimension - rank);
+                assert_eq!(
+                    independent_binary_rank(checks.clone(), dimension),
+                    dimension - rank,
+                    "independent parity-check rows are not full rank: regime={dimension}x{rank} seed=0x{seed:X}"
+                );
                 for &codeword in &codewords {
                     let mask = codeword.words()[0];
                     assert_eq!(independent_syndrome(mask, &checks), 0);
@@ -1013,7 +1040,7 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
             .collect::<Vec<_>>()
             .join(",");
         println!(
-            "RANDOM_LIST_ORACLE=dimension={dimension};rank={rank};observations={observations};no_match={no_match};max_multiplicity={max_multiplicity};histogram={histogram_serialized};deterministic=true;independent_syndrome_oracle=true;independent_codeword_oracle=true;translation_equivariant=true",
+            "RANDOM_LIST_ORACLE=dimension={dimension};rank={rank};observations={observations};no_match={no_match};max_multiplicity={max_multiplicity};histogram={histogram_serialized};deterministic=true;independent_syndrome_oracle=true;independent_codeword_oracle=true;independent_check_rank=true;translation_equivariant=true",
         );
     }
 }
