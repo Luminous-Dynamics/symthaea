@@ -258,7 +258,7 @@ fn rfc9162_inclusion_and_consistency_path_bounds_are_tree_size_derived() {
 fn rfc9942_unprotected_text_label_resource_limit_is_typed() {
     let mut wire = Vec::new();
     wire.extend_from_slice(&[0xd2, 0x84]); // COSE_Sign1
-    wire.extend_from_slice(&[0x41, 0xa1, 0x01, 0x26]); // protected = {alg: ES256}
+    wire.extend_from_slice(&[0x41, 0xa0]); // protected = {}
     wire.extend_from_slice(&[0xb8, 0x01]); // one-entry unprotected map
     wire.push(0x79); // tstr, two-byte length
     wire.extend_from_slice(&257u16.to_be_bytes());
@@ -274,9 +274,9 @@ fn rfc9942_unprotected_text_label_resource_limit_is_typed() {
 
 #[test]
 fn rfc9942_proof_hash_chunk_resource_limit_is_typed() {
-    for (proof_prefix, label) in [
-        (vec![0x83, 0x02, 0x00, 0x81], "inclusion"),
-        (vec![0x83, 0x01, 0x02, 0x81], "consistency"),
+    for (proof_prefix, proof_label, label) in [
+        (vec![0x83, 0x02, 0x00, 0x81], 0x20, "inclusion"),
+        (vec![0x83, 0x01, 0x02, 0x81], 0x21, "consistency"),
     ] {
         let mut proof = proof_prefix;
         proof.push(0x5f);
@@ -287,7 +287,7 @@ fn rfc9942_proof_hash_chunk_resource_limit_is_typed() {
         assert!(len <= u16::MAX as usize);
 
         let mut encoded = vec![0xa1];
-        encoded.extend_from_slice(&[0x20, 0x81, 0x59, (len >> 8) as u8, len as u8]);
+        encoded.extend_from_slice(&[proof_label, 0x81, 0x59, (len >> 8) as u8, len as u8]);
         encoded.extend_from_slice(&proof);
 
         let result = Rfc9942Vdp::from_cbor(&encoded);
@@ -330,11 +330,11 @@ fn rfc9942_vdp_array_count_resource_limit_is_typed() {
 #[test]
 fn rfc9942_nested_receipt_collection_resource_limit_is_preserved() {
     let mut nested_receipt = vec![0xd2, 0x84];
-    nested_receipt.extend_from_slice(&[0x41, 0xa0]);
-    nested_receipt.push(0xa1);
-    nested_receipt.extend_from_slice(&[0x19, 0x01, 0x8a, 0x91]);
+    nested_receipt.extend_from_slice(&[0x47, 0xa2, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01]);
+    nested_receipt.extend_from_slice(&[0xa1, 0x19, 0x01, 0x8a, 0x91]);
     nested_receipt.extend(std::iter::repeat_n(0x40, 17));
-    nested_receipt.extend_from_slice(&[0xf6, 0x40]);
+    nested_receipt.extend_from_slice(&[0xf6, 0x58, 0x40]);
+    nested_receipt.extend_from_slice(&[0u8; 64]);
 
     assert!(nested_receipt.len() < 256);
 
