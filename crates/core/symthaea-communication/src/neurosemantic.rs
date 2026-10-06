@@ -278,6 +278,107 @@ pub struct NeurosemanticRemediationEvaluationEnvironment {
     pub execution_revision: String,
 }
 
+
+/// Typed structural record of what each remediation evaluation dimension actually produced.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum NeurosemanticRemediationMeasurementKind {
+    Forgetfulness,
+    UtilityImpact,
+    FairnessImpact,
+    RecoveryRisk,
+    RepresentationResidual,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationMeasurement {
+    pub kind: NeurosemanticRemediationMeasurementKind,
+    pub status: NeurosemanticRemediationImpactDisposition,
+    pub sample_count: u64,
+    pub failure_count: u64,
+}
+
+pub const NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION: u16 = 1;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationMeasurementArtifact {
+    pub schema_version: u16,
+    pub measurement_ref: String,
+    pub measurements: Vec<NeurosemanticRemediationMeasurement>,
+    pub worst_case_disposition: NeurosemanticRemediationImpactDisposition,
+}
+
+impl NeurosemanticRemediationMeasurementArtifact {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION
+            || !valid_identifier(&self.measurement_ref)
+            || self.measurements.is_empty()
+            || self.measurements.len() > 32
+        {
+            return Err("neurosemantic remediation measurement artifact fields are invalid".into());
+        }
+        let mut kinds = BTreeSet::new();
+        for measurement in &self.measurements {
+            if measurement.sample_count == 0 || measurement.failure_count > measurement.sample_count {
+                return Err("neurosemantic remediation measurement sample counts are invalid".into());
+            }
+            if !kinds.insert(measurement.kind) {
+                return Err("neurosemantic remediation measurement contains duplicate dimensions".into());
+            }
+        }
+        for required in [
+            NeurosemanticRemediationMeasurementKind::Forgetfulness,
+            NeurosemanticRemediationMeasurementKind::UtilityImpact,
+            NeurosemanticRemediationMeasurementKind::RecoveryRisk,
+            NeurosemanticRemediationMeasurementKind::RepresentationResidual,
+        ] {
+            if !kinds.contains(&required) {
+                return Err("neurosemantic remediation measurement omits a required dimension".into());
+            }
+        }
+        let recomputed = self
+            .measurements
+            .iter()
+            .map(|measurement| measurement.status)
+            .max()
+            .ok_or_else(|| "neurosemantic remediation measurement set is empty".to_string())?;
+        if recomputed != self.worst_case_disposition {
+            return Err("neurosemantic remediation worst-case disposition does not match dimensions".into());
+        }
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic remediation measurement artifact JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let artifact: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("neurosemantic remediation measurement artifact JSON: {error}"))?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn recomputed_worst_case_disposition(&self) -> Result<NeurosemanticRemediationImpactDisposition, String> {
+        self.validate()?;
+        self.measurements
+            .iter()
+            .map(|measurement| measurement.status)
+            .max()
+            .ok_or_else(|| "neurosemantic remediation measurement set is empty".into())
+    }
+
+    pub fn fingerprint(&self) -> Result<String, String> {
+        self.validate()?;
+        Ok(content_hash(
+            &serde_json::to_vec(self).map_err(|error| {
+                format!("neurosemantic remediation measurement serialization: {error}")
+            })?,
+        ))
+    }
+}
+
 impl NeurosemanticRemediationEvaluationEnvironment {
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_version != NEUROSEMANTIC_REMEDIATION_EVALUATION_ENVIRONMENT_SCHEMA_VERSION
@@ -422,6 +523,8 @@ pub struct NeurosemanticRemediationImpactArtifact {
     pub lifecycle_receipt_hash: String,
     /// Canonical identity of the full frozen evaluation design.
     pub evaluation_manifest_hash: String,
+    /// Content-addressed structural measurement record for all required evaluation dimensions.
+    pub measurement_artifact_hash: String,
     /// Identity of the agent that conducted the remediation impact evaluation.
     pub evaluation_agent_ref: String,
     /// Identity of the independent agent that verified the evaluation result.
@@ -497,6 +600,7 @@ impl NeurosemanticRemediationImpactArtifact {
             || !valid_blake3_digest(&self.post_remediation_lineage_hash)
             || !valid_blake3_digest(&self.lifecycle_receipt_hash)
             || !valid_blake3_digest(&self.evaluation_manifest_hash)
+            || !valid_blake3_digest(&self.measurement_artifact_hash)
             || !valid_identifier(&self.evaluation_agent_ref)
             || !valid_identifier(&self.evaluation_verifier_ref)
             || self.evaluation_agent_ref == self.evaluation_verifier_ref
@@ -617,6 +721,18 @@ impl NeurosemanticRemediationImpactArtifact {
             return Err("neurosemantic remediation impact artifact is bound to a different lifecycle receipt".into());
         }
         Ok(())
+    }
+
+    pub fn verify_measurement_artifact_bytes(
+        &self,
+        measurement_bytes: &[u8],
+    ) -> Result<NeurosemanticRemediationMeasurementArtifact, String> {
+        self.validate()?;
+        let measurement = NeurosemanticRemediationMeasurementArtifact::from_json_bytes(measurement_bytes)?;
+        if measurement.fingerprint()? != self.measurement_artifact_hash {
+            return Err("neurosemantic remediation measurement artifact hash mismatch".into());
+        }
+        Ok(measurement)
     }
 
     pub fn verify_evaluation_verification_evidence_bytes(
