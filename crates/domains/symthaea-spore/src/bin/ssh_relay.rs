@@ -204,6 +204,9 @@ impl SessionTracker {
 #[allow(dead_code)]
 struct ClientMessage {
     action: String,
+    /// Caller-supplied idempotency key for consequential mutation actions.
+    #[serde(default)]
+    request_id: String,
     /// Mandatory WebSocket auth token (must be sent via the `"auth"` action before any other action).
     #[serde(default)]
     token: String,
@@ -2912,6 +2915,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 };
                 let transaction = match SystemTransaction::begin(
                     MutationKind::Install,
+                    &client_msg.request_id,
                     Some(&target_machine_digest),
                     &install_payload_bytes,
                 ) {
@@ -4453,6 +4457,7 @@ echo '}'
                 };
                 let transaction = match SystemTransaction::begin(
                     MutationKind::PreserveData,
+                    &client_msg.request_id,
                     None,
                     b"preserve-data-before-wipe",
                 ) {
@@ -4648,7 +4653,7 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                         continue;
                     }
                 };
-                let transaction = match SystemTransaction::begin(MutationKind::Rollback, None, b"nixos-rebuild switch --rollback") {
+                let transaction = match SystemTransaction::begin(MutationKind::Rollback, &client_msg.request_id, None, b"nixos-rebuild switch --rollback") {
                     Ok(tx) => tx,
                     Err(error) => {
                         let _ = ws_tx
@@ -4711,7 +4716,7 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                         continue;
                     }
                 };
-                let transaction = match SystemTransaction::begin(MutationKind::SwitchGeneration, None, r#gen.as_bytes()) {
+                let transaction = match SystemTransaction::begin(MutationKind::SwitchGeneration, &client_msg.request_id, None, r#gen.as_bytes()) {
                     Ok(tx) => tx,
                     Err(error) => {
                         let _ = ws_tx
@@ -4800,7 +4805,7 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                     }
                 };
                 let transaction_payload = format!("{}:{}", action, service);
-                let transaction = match SystemTransaction::begin(MutationKind::ServiceAction, None, transaction_payload.as_bytes()) {
+                let transaction = match SystemTransaction::begin(MutationKind::ServiceAction, &client_msg.request_id, None, transaction_payload.as_bytes()) {
                     Ok(tx) => tx,
                     Err(error) => {
                         let _ = ws_tx
@@ -4905,7 +4910,7 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                         continue;
                     }
                 };
-                let transaction = match SystemTransaction::begin(MutationKind::GcCollect, None, b"nix-collect-garbage:delete-older-than-30d") {
+                let transaction = match SystemTransaction::begin(MutationKind::GcCollect, &client_msg.request_id, None, b"nix-collect-garbage:delete-older-than-30d") {
                     Ok(tx) => tx,
                     Err(error) => {
                         let _ = ws_tx
@@ -5109,6 +5114,7 @@ echo '}'
                 };
                 let transaction = match SystemTransaction::begin(
                     MutationKind::WriteConfig,
+                    &client_msg.request_id,
                     None,
                     client_msg.configuration_nix.as_bytes(),
                 ) {
@@ -5491,6 +5497,7 @@ echo "REBUILD_COMPLETE"
                 };
                 let transaction = match SystemTransaction::begin(
                     MutationKind::CreateImage,
+                    &client_msg.request_id,
                     Some(&target_machine_digest),
                     b"create-system-image",
                 ) {
@@ -5726,6 +5733,7 @@ echo "COMPLETE"
                 };
                 let transaction = match SystemTransaction::begin(
                     MutationKind::RestoreImage,
+                    &client_msg.request_id,
                     None,
                     image_path.as_bytes(),
                 ) {
@@ -5995,6 +6003,7 @@ echo '}'
                 };
                 let transaction = match SystemTransaction::begin(
                     MutationKind::ConnectWifi,
+                    &client_msg.request_id,
                     Some(&target_machine_digest),
                     format!("connect-wifi:{ssid}").as_bytes(),
                 ) {
@@ -6726,7 +6735,7 @@ mod tests {
     }
 
     fn transaction_ids_are_random_and_not_clock_derived() {
-        let first = SystemTransaction::begin(MutationKind::Rollback, None, b"rollback").unwrap();
+        let first = SystemTransaction::begin(MutationKind::Rollback, "relay-test-a-00000001", None, b"rollback").unwrap();
         let second = SystemTransaction::begin(MutationKind::Rollback, None, b"rollback").unwrap();
         assert_ne!(first.transaction_id, second.transaction_id);
         assert_eq!(first.request_digest, second.request_digest);
