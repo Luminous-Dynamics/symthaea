@@ -4256,29 +4256,6 @@ mod tests {
             .as_mut()
             .unwrap()
             .record_digest = "replacement-observation-record".into();
-
-        let mut changed = c.clone();
-        changed.evidence[0]
-            .uncertainty
-            .as_mut()
-            .unwrap()
-            .component_refs[0] = "replacement-component".into();
-        changed
-            .evidence[0]
-            .uncertainty
-            .as_mut()
-            .unwrap()
-            .component_refs
-            .push("replacement-component".into());
-        let error = AlternativesEngine
-            .assess(&fixture_requirement(), &[changed], None)
-            .unwrap_err();
-        assert_eq!(
-            error,
-            AssessmentError::DuplicateMeasurementUncertaintyComponentReference
-        );
-
-
         let error = AlternativesEngine
             .assess(&fixture_requirement(), &[changed], None)
             .unwrap_err();
@@ -4287,7 +4264,8 @@ mod tests {
             AssessmentError::MeasurementUncertaintyObservationRecordDigestMismatch {
                 evidence_id: "uncertainty-binding-evidence".into(),
                 expected_observation_record_digest: "replacement-observation-record".into(),
-                actual_observation_record_digest: "fixture-record-digest:uncertainty-binding-evidence".into(),
+                actual_observation_record_digest:
+                    "fixture-record-digest:uncertainty-binding-evidence".into(),
             }
         );
 
@@ -4304,7 +4282,8 @@ mod tests {
             error,
             AssessmentError::MeasurementUncertaintyObservationRecordDigestMismatch {
                 evidence_id: "uncertainty-binding-evidence".into(),
-                expected_observation_record_digest: "fixture-record-digest:uncertainty-binding-evidence".into(),
+                expected_observation_record_digest:
+                    "fixture-record-digest:uncertainty-binding-evidence".into(),
                 actual_observation_record_digest: "different-record".into(),
             }
         );
@@ -4322,7 +4301,8 @@ mod tests {
             error,
             AssessmentError::MeasurementUncertaintyMeasurandMismatch {
                 evidence_id: "uncertainty-binding-evidence".into(),
-                evidence_measurand_id: "fixture-measurand:uncertainty-binding-evidence".into(),
+                evidence_measurand_id:
+                    "fixture-measurand:uncertainty-binding-evidence".into(),
                 uncertainty_measurand_id: "different-measurand".into(),
             }
         );
@@ -4345,7 +4325,7 @@ mod tests {
             }
         );
 
-        let mut changed = c;
+        let mut changed = c.clone();
         changed.evidence[0]
             .uncertainty
             .as_mut()
@@ -4361,6 +4341,47 @@ mod tests {
                 expected_procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
                 actual_procedure_digest: "different-procedure-digest".into(),
             }
+        );
+
+        let mut changed = c.clone();
+        changed.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .component_refs[0] = "replacement-component".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            AssessmentError::MeasurementUncertaintyComponentRefsDigestMismatch {
+                uncertainty_id: "uncertainty:uncertainty-binding-evidence".into(),
+                expected_component_refs_digest:
+                    canonical_string_list_hash(
+                        &vec!["replacement-component".into()]
+                    )
+                    .unwrap(),
+                actual_component_refs_digest:
+                    canonical_string_list_hash(
+                        &vec!["fixture-uncertainty-component-v1".into()]
+                    )
+                    .unwrap(),
+            }
+        );
+
+        let mut changed = c;
+        changed.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .component_refs
+            .push("fixture-uncertainty-component-v1".into());
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            AssessmentError::DuplicateMeasurementUncertaintyComponentReference
         );
     }
 
