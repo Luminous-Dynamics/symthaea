@@ -66,6 +66,8 @@ async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
         "NIX_PATH",
         "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos:nixos-config=/etc/nixos/configuration.nix",
     );
+    command.env_remove("NIX_CONFIG");
+    command.env_remove("NIX_USER_CONF_FILES");
     let output = command.output().await?;
     Ok(CmdResult {
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
