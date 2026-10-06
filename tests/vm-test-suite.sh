@@ -318,6 +318,14 @@ async def test():
         r = jload(await asyncio.wait_for(ws.recv(), 15))
         assert r["type"] == "connected"
 
+        # Probe authoritative target identity before discovery/install.
+        await ws.send(json.dumps({"action":"probe_hardware"}))
+        probe = jload(await asyncio.wait_for(ws.recv(), 30))
+        assert probe.get("type") == "hardware_probe", f"Probe failed: {probe}"
+        hw = jload(probe["data"])
+        target_machine_digest = hw["target_machine_digest"]
+        assert len(target_machine_digest) == 64
+
         # Discover disks
         await ws.send(json.dumps({"action":"discover_disks"}))
         r = jload(await asyncio.wait_for(ws.recv(), 15))
@@ -334,7 +342,8 @@ async def test():
             "desktop": "none",
             "gpu_driver": "modesetting",
             "timezone": "UTC",
-            "keyboard": "us"
+            "keyboard": "us",
+            "target_machine_digest": target_machine_digest
         }))
 
         last_stage = ""
