@@ -242,6 +242,21 @@ jobs:
               + (b"\x00" * 64)
           )
 
+          protected_receipt_recursion = (
+              b"\xd2\x84"
+              + b"\x58\x1b\xa3\x01\x26\x19\x01\x8b\x01\x18\x1e"
+              + (b"\xc0" * 17)
+              + b"\xf6\xa0\xf6\x58\x40"
+              + (b"\x00" * 64)
+          )
+          protected_outer_recursion = (
+              b"\xd2\x84"
+              + b"\x58\x16\xa2\x01\x26\x18\x1e"
+              + (b"\xc0" * 17)
+              + b"\xf6\xa0\xf6\x58\x40"
+              + (b"\x00" * 64)
+          )
+
           outer_label_257 = (
               b"\xd2\x84"
               + b"\x59\x01\x06\xa1\x79\x01\x01" + (b"x" * 257) + b"\x00"
@@ -319,6 +334,10 @@ jobs:
               "fuzz_rfc9942_receipt/seed-attached-payload-33.cbor": receipt_payload_33,
               "fuzz_rfc9942_receipt/seed-payload-4097-chunks.cbor":
                   receipt_payload_chunk_limit,
+              "fuzz_rfc9942_receipt/seed-protected-recursion.cbor":
+                  protected_receipt_recursion,
+              "fuzz_rfc9942_signature_with_receipts/seed-protected-recursion.cbor":
+                  protected_outer_recursion,
               "fuzz_rfc9942_signature_with_receipts/seed-label-257.cbor": outer_label_257,
               "fuzz_rfc9942_proofs/seed-65-proof-vdp.cbor": vdp_65,
               "fuzz_rfc9942_proofs/seed-257-proof-vdp.cbor": vdp_257,
