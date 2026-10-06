@@ -48,7 +48,7 @@ echo "  Config: $CONFIG"
 echo ""
 
 python3 -c "
-import asyncio, json, sys
+import asyncio, json, sys, uuid
 
 async def install():
     import websockets
@@ -96,6 +96,7 @@ async def install():
 
         # Start install
         config['action'] = 'install'
+        config['request_id'] = uuid.uuid4().hex
         await ws.send(json.dumps(config))
         print('Install started. Streaming output...')
         print('---')
