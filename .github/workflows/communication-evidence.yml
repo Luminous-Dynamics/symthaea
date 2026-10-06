@@ -119,6 +119,8 @@ jobs:
           assert report["derivation_provenance_present"] is True
           assert report["derivation_provenance_hash_valid"] is True
           assert report["derivation_provenance_mismatch_blocked"] is True
+          assert report["derivation_lineage_structured"] is True
+          assert report["malformed_derivation_lineage_blocked"] is True
           assert report["stale_policy_provenance_binding_blocked"] is True
           assert report["inference_escalation_blocked"] is True
           assert report["first_packet_accepted"] is True
