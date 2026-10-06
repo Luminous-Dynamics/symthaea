@@ -13,7 +13,7 @@
 
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
-use std::io::{Read, Write};
+use std::io::{IsTerminal, Read, Write};
 use std::os::unix::fs::OpenOptionsExt;
 use std::sync::Arc;
 use std::time::Instant;
@@ -295,6 +295,22 @@ fn extract_explicit_nix_system(flake: &str) -> Option<&str> {
 
 fn default_port() -> u16 {
     22
+}
+
+fn auth_token_fingerprint(token: &str) -> String {
+    let hex = blake3::hash(token.as_bytes()).to_hex().to_string();
+    hex[..16].to_string()
+}
+
+fn auth_token_banner(token: &str, stderr_is_terminal: bool) -> String {
+    if stderr_is_terminal {
+        format!("  Auth token: {}", token)
+    } else {
+        format!(
+            "  Auth token: <redacted; fingerprint {}>",
+            auth_token_fingerprint(token)
+        )
+    }
 }
 
 /// Restrict restore inputs to image directories produced by this relay.
@@ -6316,7 +6332,10 @@ async fn main() {
             "disabled (use --tls to enable)"
         }
     );
-    eprintln!("  Auth token: {}", auth_token);
+    eprintln!(
+        "{}",
+        auth_token_banner(&auth_token, std::io::stderr().is_terminal())
+    );
     eprintln!("  Protocol: auth → connect → (discover_disks/install/...) → disconnect");
     eprintln!("  Session timeout: 30 minutes");
     eprintln!("  Rate limit: 1 active session per IP");
@@ -6455,6 +6474,21 @@ mod tests {
         assert!(validate_image_path("/tmp/nixforhumanity-image-0123").is_err());
         assert!(validate_image_path("/tmp/nixforhumanity-image-0123456789abcdef0123456789abcdeg").is_err());
         assert!(validate_image_path("/tmp/nixforhumanity-image-0123456789abcdef/../etc").is_err());
+    }
+
+    #[test]
+    fn noninteractive_auth_banner_redacts_token() {
+        let banner = auth_token_banner("super-secret-token", false);
+        assert!(!banner.contains("super-secret-token"));
+        assert!(banner.contains("fingerprint"));
+        assert_eq!(banner.len(), "  Auth token: <redacted; fingerprint >".len() + 16);
+    }
+
+    #[test]
+    fn interactive_auth_banner_preserves_bootstrap_token() {
+        let banner = auth_token_banner("super-secret-token", true);
+        assert!(banner.contains("super-secret-token"));
+        assert!(banner.starts_with("  Auth token: "));
     }
 
     fn transaction_ids_are_random_and_not_clock_derived() {
