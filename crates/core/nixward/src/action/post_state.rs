@@ -1601,6 +1601,8 @@ mod tests {
             unit: "nginx.service".to_string(),
             authorized_generation: 42,
             authorized_definition_digest: definition().digest("nginx.service").unwrap(),
+            authorized_definition_content_digest:
+                "4444444444444444444444444444444444444444444444444444444444444444".to_string(),
             pre_invocation_id: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string()),
             required_stability_us: 0,
         }
