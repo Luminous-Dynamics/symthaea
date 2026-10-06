@@ -73,6 +73,47 @@ pub struct NixSystemdJobEvidenceV1 {
 }
 
 impl NixSystemdJobEvidenceV1 {
+    /// Re-bind a serialized receipt to the trusted typed intent and authorization record.
+    ///
+    /// This is the verifier-side complement to `build`: self-consistency of a
+    /// receipt digest is not enough because an attacker could otherwise replace
+    /// the referenced intent/auth digests and present the mutated receipt to a
+    /// consumer that does not dereference those records.
+    pub fn verify_against(
+        &self,
+        intent: &NixActionIntentV1,
+        authorization: &NixExecutionAuthorizationRecordV1,
+    ) -> Result<(), NixPostStateErrorV1> {
+        self.validate_shape()?;
+
+        let intent_digest = intent
+            .digest()
+            .map_err(|_| NixPostStateErrorV1::InvalidBoundIntent)?;
+        let authorization_digest = authorization
+            .digest()
+            .map_err(|_| NixPostStateErrorV1::InvalidBoundAuthorization)?;
+
+        if authorization.decision != NixAuthorizationDecisionV1::Approved {
+            return Err(NixPostStateErrorV1::AuthorizationNotApproved);
+        }
+        if self.action_intent_digest != intent_digest {
+            return Err(NixPostStateErrorV1::AuthorizationIntentMismatch);
+        }
+        if self.authorization_record_digest != authorization_digest {
+            return Err(NixPostStateErrorV1::AuthorizationRecordMismatch);
+        }
+        if authorization.action_intent_digest != intent_digest {
+            return Err(NixPostStateErrorV1::AuthorizationIntentMismatch);
+        }
+
+        match &intent.action {
+            NixActionDescriptorV1::Service { operation, unit }
+                if *operation == self.operation && unit == &self.target_unit => {}
+            _ => return Err(NixPostStateErrorV1::IntentEffectMismatch),
+        }
+        Ok(())
+    }
+
     pub fn validate_shape(&self) -> Result<(), NixPostStateErrorV1> {
         if self.id == 0 {
             return Err(NixPostStateErrorV1::InvalidJobId);
@@ -812,6 +853,8 @@ pub enum NixPostStateErrorV1 {
     AuthorizationNotApproved,
     #[error("authorization record is bound to a different action intent")]
     AuthorizationIntentMismatch,
+    #[error("receipt is bound to a different authorization record")]
+    AuthorizationRecordMismatch,
     #[error("action intent does not describe the expected service effect")]
     IntentEffectMismatch,
 }
@@ -1298,6 +1341,61 @@ mod tests {
             )
             .unwrap_err(),
             NixPostStateErrorV1::IntentEffectMismatch
+        );
+    }
+
+    #[test]
+    fn serialized_receipt_requires_trusted_intent_and_authorization_rebinding() {
+        use super::super::authorization::{NixActionIntentV1, NixActionScopeV1, NixAuthorizationProfileV1};
+
+        let receipt = build_receipt(
+            &expectation(NixServiceOperationKindV1::Start),
+            &observation(
+                NixServiceOperationKindV1::Start,
+                ServiceActiveStateV1::Active,
+                ServiceUnitFileStateV1::Enabled,
+            ),
+            None,
+        )
+        .unwrap();
+
+        let intent = NixActionIntentV1 {
+            subject_identity: "host:test".to_string(),
+            pre_state_identity: Some("generation:42".to_string()),
+            action: NixActionDescriptorV1::Service {
+                operation: NixServiceOperationKindV1::Start,
+                unit: "nginx.service".to_string(),
+            },
+            maximum_scope: NixActionScopeV1::SystemModify,
+            preconditions: Vec::new(),
+            required_postconditions: Vec::new(),
+            rollback_or_recovery_ref: None,
+        };
+        let authorization = NixExecutionAuthorizationRecordV1 {
+            action_intent_digest: intent.digest().unwrap(),
+            profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
+            authority_ref: "approval:test".to_string(),
+            issued_at_unix_ms: 1,
+            expires_at_unix_ms: None,
+            decision: NixAuthorizationDecisionV1::Approved,
+        };
+
+        receipt.verify_against(&intent, &authorization).unwrap();
+
+        let mut tampered = receipt.clone();
+        tampered.action_intent_digest =
+            "1111111111111111111111111111111111111111111111111111111111111111".into();
+        assert_eq!(
+            tampered.verify_against(&intent, &authorization).unwrap_err(),
+            NixPostStateErrorV1::AuthorizationIntentMismatch
+        );
+
+        let mut tampered = receipt;
+        tampered.authorization_record_digest =
+            "2222222222222222222222222222222222222222222222222222222222222222".into();
+        assert_eq!(
+            tampered.verify_against(&intent, &authorization).unwrap_err(),
+            NixPostStateErrorV1::AuthorizationRecordMismatch
         );
     }
 
