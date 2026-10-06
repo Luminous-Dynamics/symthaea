@@ -2524,6 +2524,7 @@ impl std::fmt::Display for AssessmentError {
             Self::MissingIncumbent(id) => write!(f, "incumbent {id} not found"),
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate id {id}"),
             Self::DuplicateEvidenceId(id) => write!(f, "duplicate evidence id {id}"),
+            Self::EmptySourceIdentity => write!(f, "evidence source identity is incomplete"),
             Self::InvalidExperimentalDesign => write!(f, "experimental design provenance is incomplete"),
             Self::DuplicateExperimentalUncertaintyReference => {
                 write!(f, "duplicate experimental uncertainty reference")
