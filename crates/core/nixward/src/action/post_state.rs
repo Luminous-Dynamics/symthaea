@@ -30,8 +30,11 @@ use thiserror::Error;
 const EFFECT_DIGEST_DOMAIN_V1: &[u8] = b"nixward-service-effect-v1";
 const UNIT_DEFINITION_DOMAIN_V1: &[u8] = b"nixward-systemd-unit-definition-v1";
 const POST_STATE_RECEIPT_DOMAIN_V1: &[u8] = b"nixward-post-state-receipt-v1";
+const STABILITY_SAMPLE_DOMAIN_V1: &[u8] = b"nixward-post-state-stability-sample-v1";
+const STABILITY_SEQUENCE_DOMAIN_V1: &[u8] = b"nixward-post-state-stability-sequence-v1";
 const INVOCATION_ID_HEX_LEN: usize = 32;
 const MAX_PATH_BYTES: usize = 4096;
+const SYSTEMD_UNIT_PATH_PREFIX: &str = "/org/freedesktop/systemd1/unit/";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NixSystemdJobTypeV1 {
@@ -80,7 +83,7 @@ impl NixVerifiedPostStateObservationV1 {
         Ok(Self { observation })
     }
 
-    fn as_ref(&self) -> &NixServicePostStateObservationV1 {
+    pub(crate) fn as_ref(&self) -> &NixServicePostStateObservationV1 {
         &self.observation
     }
 }
