@@ -374,6 +374,12 @@ run_self_test() {
   fi
 
   printf '%s\n' 'NixVerifiedPostStateStabilityEvidenceV1::from_observer(evidence);' > "${tmp}/stability-factory.rs"
+  printf '%s\n' 'NixVerifiedServiceDefinitionContentV1::from_observer(evidence);' > "${tmp}/definition-content-factory.rs"
+  if scan_verified_definition_content_factory "${tmp}/definition-content-factory.rs"; then :; else
+    echo "ERROR: CROSS-068 self-test failed to detect definition-content observer-sealing factory use" >&2
+    return 1
+  fi
+
   if scan_verified_stability_factory "${tmp}/stability-factory.rs"; then :; else
     echo "ERROR: CROSS-062 self-test failed to detect stability observer-sealing factory use" >&2
     return 1
