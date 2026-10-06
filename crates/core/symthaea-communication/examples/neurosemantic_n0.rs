@@ -568,7 +568,7 @@ fn main() -> Result<(), String> {
         residual_risk_evidence_hash: symthaea_communication::content_hash(residual_evidence),
         execution_revision: execution_revision.clone(),
         observed_at_unix_s: 1_590,
-        disposition: NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds,
+        disposition: NeurosemanticRemediationImpactDisposition::Inconclusive,
         dimensions: vec![
             "forgetfulness".into(),
             "utility-impact".into(),
