@@ -3206,7 +3206,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn unimorph_tsv_compiler_replays_supported_rows_and_normalization() {
         let artifact = b"walk\twalked\tV;PST\ncat\tcat\tN;SG\n";
         let walk_len = b"walk\twalked\tV;PST\n".len();
@@ -3360,7 +3359,6 @@ mod tests {
         );
     }
 
-    #[test]
     #[test]
     fn unimorph_tsv_compiler_rejects_embedded_line_endings() {
         let error = parse_unimorph_source_record(
@@ -3533,7 +3531,6 @@ mod tests {
         );
     }
 
-    #[test]
     #[test]
     fn morphophonological_resource_evidence_verifies_exact_source_artifact_bytes() {
         let artifact = b"fixture morphology resource v2\nwalk<TAB>walked<TAB>V;PST\n";
