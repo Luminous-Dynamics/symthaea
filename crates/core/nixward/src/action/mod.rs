@@ -95,6 +95,10 @@ pub use phi_gate::{classify_command_destructiveness, get_nixos_rollback};
 pub use plan_executor::{PlanExecutionResult, PlanExecutor, PlanStep, StepStatus};
 pub use service_manager::{ServiceManager, ServiceStatus};
 pub use service_domain::{NixServiceOperationErrorV1, NixServiceOperationKindV1, NixServiceOperationV1};
+#[cfg(feature = "systemd-observer")]
+pub use systemd_observer::{
+    NixSystemdJobHandleV1, NixSystemdObserverErrorV1, NixSystemdReadOnlyObserverV1,
+};
 pub use service_state::{
     NixServiceEnablementEvidenceV1,
     NixServiceOperationCapabilitiesV1,
