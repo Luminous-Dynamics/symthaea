@@ -120,7 +120,7 @@ pub enum NeurosemanticRetentionPolicy {
     UntilUnixS(u64),
 }
 
-pub const NEUROSEMANTIC_DERIVATION_LINEAGE_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_DERIVATION_LINEAGE_SCHEMA_VERSION: u16 = 2;
 
 /// Structured external lineage evidence for a derived cognitive artifact.
 ///
@@ -133,6 +133,8 @@ pub struct NeurosemanticDerivationLineageRecord {
     pub lineage_ref: String,
     #[serde(default)]
     pub input_artifact_refs: Vec<String>,
+    #[serde(default)]
+    pub input_artifact_hashes: Vec<String>,
     pub activity_ref: String,
     pub activity_revision: String,
     pub output_artifact_hash: String,
@@ -1544,7 +1546,9 @@ impl NeurosemanticDerivationLineageRecord {
             || !valid_execution_revision(&self.execution_revision)
             || self.input_artifact_refs.is_empty()
             || self.input_artifact_refs.len() > MAX_NEUROSEMANTIC_DERIVATION_INPUT_ARTIFACTS
+            || self.input_artifact_refs.len() != self.input_artifact_hashes.len()
             || self.input_artifact_refs.iter().any(|id| !valid_identifier(id))
+            || self.input_artifact_hashes.iter().any(|hash| !valid_blake3_digest(hash))
         {
             return Err("neurosemantic derivation lineage fields are invalid".into());
         }
@@ -1641,6 +1645,10 @@ mod tests {
             schema_version: NEUROSEMANTIC_DERIVATION_LINEAGE_SCHEMA_VERSION,
             lineage_ref: "synthetic-derivation-record-1".into(),
             input_artifact_refs: vec!["input-artifact-1".into(), "input-artifact-2".into()],
+            input_artifact_hashes: vec![
+                content_hash(b"synthetic-input-artifact-1"),
+                content_hash(b"synthetic-input-artifact-2"),
+            ],
             activity_ref: "synthetic-transform".into(),
             activity_revision: "transform-v1".into(),
             output_artifact_hash: synthetic_output_artifact_hash(),
