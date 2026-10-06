@@ -16,13 +16,18 @@ The observer first captures:
 
 The existing definition-identity digest remains the source-identity commitment.
 
-The new content commitment separately hashes the bytes of each referenced source file together with:
+The content-evidence commitment separately binds:
+- target unit;
+- source-identity digest;
+- systemd manager unique connection name;
+- D-Bus daemon incarnation (GetId);
 - source path;
+- resolved path when explicit NixOS link resolution occurred;
 - byte length;
 - per-file BLAKE3 digest;
-- ordered file-set membership;
-- target unit;
-- source-identity digest.
+- ordered file-set membership.
+
+The per-file BLAKE3 remains a pure byte-content digest. Capture time is retained as temporal evidence metadata but is deliberately outside content identity so the aggregate commitment can be independently recomputed from durable source/content metadata.
 
 No raw definition bytes are placed in the portable authorization record.
 
