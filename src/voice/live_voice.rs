@@ -478,8 +478,7 @@ fn derive_english_lexical_phonological_witness_from_g2p(
                 )
             })?;
 
-        let (expected_phones, evidence) = self
-            .g2p
+        let (expected_phones, evidence) = g2p
             .word_to_phonemes_from_lexicon_with_evidence(form)
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -1989,16 +1988,37 @@ mod tests {
                 &receipt.pronunciation_lexicon_evidence
             )
         );
-
-        assert!(
-            receipt.pronunciation_lexicon_evidence.is_empty(),
-            "caller-supplied witness receipts must not fabricate lexicon provenance"
-        );
-        assert_eq!(
-            receipt.pronunciation_lexicon_evidence_blake3,
-            super::hash_pronunciation_lexicon_evidence(
-                &receipt.pronunciation_lexicon_evidence
+        receipt
+            .verify_against_plan_and_current_resources(
+                &plan,
+                &frame,
+                &binding,
+                &witness,
+                &voice.g2p,
             )
+            .expect("strict receipt must reproduce its current resource derivation");
+
+        let mut detached_resource_substitution = receipt.clone();
+        detached_resource_substitution.pronunciation_lexicon_evidence[0].resource_blake3 =
+            "f".repeat(64);
+        detached_resource_substitution.pronunciation_lexicon_evidence_blake3 =
+            super::hash_pronunciation_lexicon_evidence(
+                &detached_resource_substitution.pronunciation_lexicon_evidence,
+            );
+        detached_resource_substitution
+            .verify_against_plan(&plan, &frame, &binding, &witness)
+            .expect("detached verification should preserve historical evidence inspectability");
+        assert!(
+            detached_resource_substitution
+                .verify_against_plan_and_current_resources(
+                    &plan,
+                    &frame,
+                    &binding,
+                    &witness,
+                    &voice.g2p,
+                )
+                .is_err(),
+            "substituted resource evidence must fail current-resource re-derivation"
         );
 
         let unlisted = make_binding("zzzxxyq");
