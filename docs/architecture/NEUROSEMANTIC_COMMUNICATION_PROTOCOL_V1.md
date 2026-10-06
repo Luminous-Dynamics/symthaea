@@ -380,7 +380,7 @@ The bridge therefore defines a separate signed
 `NeurosemanticAuthorityResolutionAttestation`. It records the resolver/key reference, the
 resolved authority/key, exact policy/provenance bindings, the exact consent context, an
 explicit status (`Active`, `Suspended`, `Revoked`, `Unknown`, or `Unavailable`), a status
-source reference, and checked-at/expiry timestamps.
+source reference, a BLAKE3-256 digest over the exact status-source reference and exact status record bytes, and checked-at/expiry timestamps.
 
 Only a fresh `Active` resolution can be combined with the policy attestation to create the
 handling capability. The resolution has a protocol-enforced maximum lifetime of 24 hours,
@@ -390,19 +390,23 @@ shorter freshness window independent of the resolver's advertised expiry. Deploy
 choose that bound according to the risk of the protected data and inference class.
 
 The resulting capability retains the exact resolution fingerprint and context, including
-a content hash of the complete consent lease and the exact authority-attestation fingerprint
-that the resolver evaluated. A subsequent handling request therefore fails closed when the
+a content hash of the complete consent lease, the exact authority-attestation fingerprint
+that the resolver evaluated, and the exact status-source reference/digest. A subsequent
+handling request therefore fails closed when the resolution is expired or otherwise belongs
+to a different consent context, when the current lease contents differ from the resolved lease,
+when a different authority-proof artifact is substituted, or when the status evidence supplied
+to the resolver does not match the signed status-source digest. A subsequent handling request therefore fails closed when the
 resolution is expired or otherwise belongs to a different consent context, when the current
 lease contents differ from the resolved lease, or when a different authority-proof artifact
 is substituted. The resolver signature authenticates the snapshot to the configured resolver
 key; trust in that resolver key remains an external identity/governance decision.
 
-The handling-policy schema is now v7. Schema v5 introduced the provenance binding, v6 introduced policy-specific authority freshness, and v7 introduces the derivation-lineage binding. Older artifacts fail closed rather than silently acquiring newer authorization semantics.
+The handling-policy schema is now v7. Schema v5 introduced the provenance binding, v6 introduced policy-specific authority freshness, and v7 introduces the derivation-lineage binding. The authority-resolution schema is now v2 because status evidence is also bound to an exact source artifact rather than only an opaque status-source reference. Older artifacts fail closed rather than silently acquiring newer authorization semantics.
 
 ### External policy provenance hardening
 
 The handling policy now carries two distinct machine-readable provenance fields: a reference identifying the externally authoritative policy/consent record, and a domain-separated BLAKE3-256 digest over the exact provenance reference and exact record bytes (or a separately specified canonical form). The binding prevents a digest valid for one reference from being presented under another reference. Symthaea exposes an executable `verify_policy_record_binding_bytes(...)` check that verifies the exact supplied record bytes against the stored reference+record binding, with the same bounded-artifact ceiling used elsewhere. This validates the record binding, but it does not authenticate the issuing authority, signature, revocation status, or legal applicability; those remain responsibilities of Mycelix or another designated policy authority. Recomputing the packet or provenance digest is therefore not an authority proof.
 
-The provenance binding was introduced as schema v5, so v4 handling artifacts fail closed rather than being silently upgraded. Schema v6 adds the explicit policy-specific authority-resolution freshness bound; v5 artifacts likewise fail closed rather than silently inheriting that requirement. The provenance digest construction remains domain-separated and length-delimited to avoid ambiguous concatenation.
+The provenance binding was introduced as schema v5, schema v6 added the explicit policy-specific authority-resolution freshness bound, and schema v7 added derivation lineage. Older handling artifacts fail closed rather than being silently upgraded into newer authorization semantics. The provenance digest construction remains domain-separated and length-delimited to avoid ambiguous concatenation.
 
 Downstream handling calls should receive the resulting provenance-binding token. The token also fingerprints the complete packet handling-policy state, so mutating destination, retention, secondary-use, jurisdiction, or provenance fields after verification invalidates the token rather than allowing a stale authorization capability to survive. The token is intentionally not an issuer credential: it proves that the exact supplied record matches the packet's declared reference and digest, while the external policy/identity authority remains responsible for authenticating who issued that record and whether it is current.
