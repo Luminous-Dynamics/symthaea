@@ -453,6 +453,34 @@ fn stability_sequence_digest(
     Ok(h.finalize().to_hex().to_string())
 }
 
+fn validate_stability_against_observation(
+    stability: &NixPostStateStabilityEvidenceV1,
+    observation: &NixServicePostStateObservationV1,
+) -> Result<(), NixPostStateErrorV1> {
+    let last = stability
+        .samples
+        .last()
+        .ok_or(NixPostStateErrorV1::InsufficientStabilitySamples)?;
+
+    if last.operation != observation.operation
+        || last.unit != observation.unit
+        || last.unit_object_path != observation.unit_object_path
+        || last.observed_generation != observation.observed_generation
+        || last.definition_digest != observation.definition_digest()?
+        || last.state_digest != observation.state_digest()?
+        || last.manager_owner != observation
+            .systemd_manager_owner
+            .as_deref()
+            .ok_or(NixPostStateErrorV1::MissingManagerOwner)?
+        || last.invocation_id != observation.invocation_id
+        || last.state_change_at_monotonic_us != observation.state_change_at_monotonic_us
+        || last.captured_at_monotonic_us > observation.observed_at_monotonic_us
+    {
+        return Err(NixPostStateErrorV1::StabilityIdentityOrStateChanged);
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NixPostconditionAssessmentV1 {
     Satisfied,
@@ -841,8 +869,7 @@ impl NixPostStateReceiptV1 {
                 put_u64(&mut h, stability.required_window_us);
                 put_u64(&mut h, stability.window_start_monotonic_us);
                 put_u64(&mut h, stability.window_end_monotonic_us);
-                put_u64(&mut h, stability.last_state_change_at_monotonic_us);
-                put_u32(&mut h, stability.sample_count);
+                put_str(&mut h, &stability.sequence_digest);
             }
             None => put_u8(&mut h, 0),
         }
@@ -989,6 +1016,37 @@ fn service_effect_digest(
     put_opt_str(&mut h, pre_invocation_id);
     put_u64(&mut h, required_stability_us);
     h.finalize().to_hex().to_string()
+}
+
+fn active_state_tag(state: ServiceActiveStateV1) -> u8 {
+    match state {
+        ServiceActiveStateV1::Active => 0,
+        ServiceActiveStateV1::Reloading => 1,
+        ServiceActiveStateV1::Inactive => 2,
+        ServiceActiveStateV1::Failed => 3,
+        ServiceActiveStateV1::Activating => 4,
+        ServiceActiveStateV1::Deactivating => 5,
+        ServiceActiveStateV1::Maintenance => 6,
+        ServiceActiveStateV1::Refreshing => 7,
+    }
+}
+
+fn unit_file_state_tag(state: ServiceUnitFileStateV1) -> u8 {
+    match state {
+        ServiceUnitFileStateV1::Enabled => 0,
+        ServiceUnitFileStateV1::EnabledRuntime => 1,
+        ServiceUnitFileStateV1::Linked => 2,
+        ServiceUnitFileStateV1::LinkedRuntime => 3,
+        ServiceUnitFileStateV1::Alias => 4,
+        ServiceUnitFileStateV1::Masked => 5,
+        ServiceUnitFileStateV1::MaskedRuntime => 6,
+        ServiceUnitFileStateV1::Static => 7,
+        ServiceUnitFileStateV1::Disabled => 8,
+        ServiceUnitFileStateV1::Indirect => 9,
+        ServiceUnitFileStateV1::Generated => 10,
+        ServiceUnitFileStateV1::Transient => 11,
+        ServiceUnitFileStateV1::Bad => 12,
+    }
 }
 
 fn operation_tag(operation: NixServiceOperationKindV1) -> u8 {
