@@ -16,8 +16,70 @@
 //! as it crosses asynchronous staging/execution boundaries.
 
 use serde::Serialize;
+use std::fs::{File, OpenOptions};
+use std::os::fd::AsRawFd;
+use std::os::unix::fs::OpenOptionsExt;
+use std::path::Path;
 
 const SCHEMA_VERSION: u16 = 1;
+const CROSS_PROCESS_LOCK_PATH: &str = "/run/sovereign/system-mutation.lock";
+
+#[derive(Debug)]
+pub(crate) struct MutationLease {
+    file: File,
+}
+
+impl MutationLease {
+    pub(crate) fn acquire() -> Result<Self, String> {
+        Self::acquire_at(Path::new(CROSS_PROCESS_LOCK_PATH))
+    }
+
+    fn acquire_at(path: &Path) -> Result<Self, String> {
+        let file = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .mode(0o600)
+            .open(path)
+            .map_err(|error| {
+                format!(
+                    "unable to open cross-process mutation lock {}: {error}",
+                    path.display()
+                )
+            })?;
+
+        // SAFETY: the file descriptor is valid for the lifetime of file, and
+        // the kernel releases the lock when the descriptor closes. LOCK_NB
+        // makes admission fail closed rather than queueing.
+        let result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
+        if result == 0 {
+            Ok(Self { file })
+        } else {
+            let error = std::io::Error::last_os_error();
+            let busy = matches!(
+                error.raw_os_error(),
+                Some(code) if code == libc::EWOULDBLOCK || code == libc::EAGAIN
+            );
+            if busy {
+                Err("cross-process mutation lock is already held".into())
+            } else {
+                Err(format!(
+                    "unable to acquire cross-process mutation lock {}: {error}",
+                    path.display()
+                ))
+            }
+        }
+    }
+}
+
+impl Drop for MutationLease {
+    fn drop(&mut self) {
+        // SAFETY: self.file owns the valid descriptor and we are releasing only
+        // the lock acquired by this open file description.
+        let _ = unsafe { libc::flock(self.file.as_raw_fd(), libc::LOCK_UN) };
+    }
+}
+
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -123,6 +185,20 @@ fn random_operation_id() -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cross_process_lock_rejects_second_owner() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("mutation.lock");
+        let first = MutationLease::acquire_at(&path).unwrap();
+        let second = MutationLease::acquire_at(&path);
+        assert!(
+            matches!(second, Err(message) if message.contains("already held")),
+            "second owner must fail closed: {second:?}"
+        );
+        drop(first);
+        assert!(MutationLease::acquire_at(&path).is_ok());
+    }
 
     #[test]
     fn transaction_ids_are_random_and_unique() {
