@@ -1445,6 +1445,25 @@ mod tests {
     }
 
     #[test]
+    fn rsa_jwk_projection_matches_rfc_7638_required_member_order() {
+        let jwk = serde_json::json!({
+            "kty": "RSA",
+            "n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjH",
+            "e": "AQAB",
+            "alg": "RS256",
+            "kid": "2011-04-29"
+        });
+
+        let projection = canonical_public_jwk_material(jwk.as_object().unwrap()).unwrap();
+        let compact = serde_json::to_string(&projection).unwrap();
+
+        assert_eq!(
+            compact,
+            r#"{"e":"AQAB","kty":"RSA","n":"0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjH"}"#
+        );
+    }
+
+    #[test]
     fn standard_jwk_material_projection_uses_only_required_members() {
         let cases = [
             (
