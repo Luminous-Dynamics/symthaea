@@ -90,6 +90,12 @@ pub enum NixSystemdObserverErrorV1 {
     #[error("systemd JobRemoved correlation mismatch")]
     JobCorrelationMismatch,
 
+    #[error("systemd manager owner changed while arming JobRemoved watcher")]
+    ManagerOwnerChanged,
+
+    #[error("systemd JobRemoved watcher manager owner mismatch")]
+    WatcherManagerOwnerMismatch,
+
     #[error("systemd JobRemoved signal timed out")]
     JobRemovedTimeout,
 
@@ -101,6 +107,71 @@ pub enum NixSystemdObserverErrorV1 {
 
     #[error("invalid verified post-state observation: {0}")]
     InvalidPostState(String),
+}
+
+/// A one-shot, pre-armed watcher for the systemd Manager.JobRemoved signal.
+///
+/// Construction completes only after zbus has registered the Manager/JobRemoved
+/// match rule. Consuming this value waits for exactly one correlated terminal
+/// observation, so a caller cannot accidentally reuse the watcher for another
+/// effect. The captured systemd manager unique owner is part of the watcher
+/// epoch and must match the exact live Job handle.
+#[must_use]
+pub struct NixSystemdJobRemovedWatcherV1 {
+    manager_owner: String,
+    stream: zbus::SignalStream<'static>,
+}
+
+impl std::fmt::Debug for NixSystemdJobRemovedWatcherV1 {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("NixSystemdJobRemovedWatcherV1")
+            .field("manager_owner", &self.manager_owner)
+            .finish_non_exhaustive()
+    }
+}
+
+impl NixSystemdJobRemovedWatcherV1 {
+    pub fn manager_owner(&self) -> &str {
+        &self.manager_owner
+    }
+
+    /// Consume this one-shot watcher and accept only the exact JobRemoved
+    /// tuple belonging to the captured live Job and manager incarnation.
+    pub async fn await_job_removed(
+        mut self,
+        expected: &NixSystemdJobHandleV1,
+        timeout: Duration,
+    ) -> Result<NixSystemdJobEvidenceV1, NixSystemdObserverErrorV1> {
+        expected.validate()?;
+        if expected.manager_owner != self.manager_owner {
+            return Err(NixSystemdObserverErrorV1::WatcherManagerOwnerMismatch);
+        }
+
+        let result = tokio::time::timeout(timeout, async {
+            while let Some(message) = self.stream.next().await {
+                validate_manager_signal_sender(&message, &self.manager_owner)?;
+                let removed = decode_job_removed(&message)?;
+                if removed.id == expected.id
+                    && removed.object_path.as_str() == expected.object_path.as_str()
+                    && removed.unit == expected.unit
+                {
+                    return Ok(NixSystemdJobEvidenceV1 {
+                        id: removed.id,
+                        job_type: expected.job_type,
+                        unit: removed.unit,
+                        object_path: removed.object_path.as_str().to_string(),
+                        result: removed.result,
+                    });
+                }
+            }
+            Err(NixSystemdObserverErrorV1::JobRemovedTimeout)
+        })
+        .await
+        .map_err(|_| NixSystemdObserverErrorV1::JobRemovedTimeout)??;
+
+        Ok(result)
+    }
 }
 
 /// A read-only systemd D-Bus observer.
@@ -209,6 +280,35 @@ impl NixSystemdReadOnlyObserverV1 {
         Ok(result)
     }
 
+    /// Arm the JobRemoved observation channel before any effect is dispatched.
+    ///
+    /// zbus registers a Manager/JobRemoved match rule before this method returns.
+    /// The systemd unique owner is captured before registration and checked again
+    /// afterward; an owner transition during arming invalidates the watcher.
+    pub async fn arm_job_removed_watcher(
+        &self,
+    ) -> Result<NixSystemdJobRemovedWatcherV1, NixSystemdObserverErrorV1> {
+        let manager_owner = self.systemd_manager_owner().await?;
+        let manager = Proxy::new(
+            &self.connection,
+            SYSTEMD_DESTINATION,
+            SYSTEMD_MANAGER_PATH,
+            SYSTEMD_MANAGER_INTERFACE,
+        )
+        .await?;
+        let stream: zbus::SignalStream<'static> = manager.receive_signal("JobRemoved").await?;
+
+        let post_arm_owner = self.systemd_manager_owner().await?;
+        if post_arm_owner != manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+
+        Ok(NixSystemdJobRemovedWatcherV1 {
+            manager_owner,
+            stream,
+        })
+    }
+
     /// Capture a still-live Job identity from the exact Job object.
     ///
     /// JobType is not present in JobRemoved, so it must be captured before
@@ -268,51 +368,18 @@ impl NixSystemdReadOnlyObserverV1 {
         })
     }
 
-    /// Wait for the exact JobRemoved tuple: id + object path + unit + result.
+    /// Legacy convenience wrapper.
     ///
-    /// The proxy is fixed to systemd's Manager object/interface, and the body
-    /// is decoded against the native D-Bus uoss signature. Mismatched signals
-    /// are ignored; timeout is fail-closed.
+    /// New governed execution must call `arm_job_removed_watcher()` before
+    /// mutation dispatch. This wrapper is retained only for compatibility and
+    /// intentionally preserves the older post-hoc subscription race.
     pub async fn await_job_removed(
         &self,
         expected: &NixSystemdJobHandleV1,
         timeout: Duration,
     ) -> Result<NixSystemdJobEvidenceV1, NixSystemdObserverErrorV1> {
-        expected.validate()?;
-
-        let manager = Proxy::new(
-            &self.connection,
-            SYSTEMD_DESTINATION,
-            SYSTEMD_MANAGER_PATH,
-            SYSTEMD_MANAGER_INTERFACE,
-        )
-        .await?;
-        let mut stream = manager.receive_signal("JobRemoved").await?;
-
-        let result = tokio::time::timeout(timeout, async {
-            while let Some(message) = stream.next().await {
-                let message = message?;
-                validate_manager_signal_sender(&message, &expected.manager_owner)?;
-                let removed = decode_job_removed(&message)?;
-                if removed.id == expected.id
-                    && removed.object_path.as_str() == expected.object_path.as_str()
-                    && removed.unit == expected.unit
-                {
-                    return Ok(NixSystemdJobEvidenceV1 {
-                        id: removed.id,
-                        job_type: expected.job_type,
-                        unit: removed.unit,
-                        object_path: removed.object_path.as_str().to_string(),
-                        result: removed.result,
-                    });
-                }
-            }
-            Err(NixSystemdObserverErrorV1::JobRemovedTimeout)
-        })
-        .await
-        .map_err(|_| NixSystemdObserverErrorV1::JobRemovedTimeout)??;
-
-        Ok(result)
+        let watcher = self.arm_job_removed_watcher().await?;
+        watcher.await_job_removed(expected, timeout).await
     }
 
     /// Resolve a non-zero systemd InvocationID (D-Bus ay) to its exact unit.
