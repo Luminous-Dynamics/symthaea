@@ -1731,7 +1731,7 @@ mod tests {
         let resolution = adapter.resolve_snapshot(&request, snapshot).unwrap();
         assert_eq!(
             resolution.verification_method_lifecycle.expires.as_deref(),
-            Some("2026-10-06T00:00:00Z")
+            Some("2026-10-06T02:00:00+02:00")
         );
     }
 
