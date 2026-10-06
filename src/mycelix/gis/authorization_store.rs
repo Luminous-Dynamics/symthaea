@@ -8344,6 +8344,114 @@ mod tests {
     }
 
     #[test]
+    fn reconciliation_rejects_missing_native_replay_history_before_verifier() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-reconcile-missing-native-history-{}.db",
+            std::process::id()
+        ));
+        let (store, action, witness) = fixture(&path);
+        let effect = ActionEffectBinding::new(
+            "target-reconcile-missing-native-history",
+            "prod",
+            "adapter-reconcile-missing-native-history",
+        );
+        let action = action.with_effect_binding(effect.clone());
+        let digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            operation_id: Some("operation:reconcile-missing-native-history".into()),
+            authorization_instance: "reconcile-missing-native-history".into(),
+            action_id: action.id.clone(),
+            action_digest: digest.clone(),
+            frame: witness.frame,
+            support_digest: "sha256:support-reconcile-missing-native-history".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:00:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1,
+        )).unwrap();
+        store.prepare_for_execution_bound_with_operation(
+            &witness,
+            &action,
+            "frame@1",
+            "attempt:reconcile-missing-native-history",
+            "boundary:reconcile-missing-native-history",
+            "operation:reconcile-missing-native-history",
+        ).unwrap();
+
+        let record = mark_dispatch_pending_bound_from_native_authority_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt:reconcile-missing-native-history",
+            &action,
+            &effect,
+            "boundary:reconcile-missing-native-history",
+            "operation:reconcile-missing-native-history",
+            "test-explicit-issuer",
+            "native-grant:reconcile-missing-native-history",
+        ).unwrap();
+
+        let recovery = RecoveryAuthorizationWitness {
+            authorization_instance: witness.authorization_instance.clone(),
+            attempt_id: "attempt:reconcile-missing-native-history".into(),
+            operation_id: "operation:reconcile-missing-native-history".into(),
+            boundary_id: "boundary:reconcile-missing-native-history".into(),
+            action_digest: witness.action_digest.clone(),
+            policy: "recovery-policy-v1".into(),
+            authority_epoch: 1,
+            issued_at: "2026-10-03T10:04:00Z".into(),
+        };
+        assert_eq!(
+            store
+                .recover_incomplete_attempt_for_boundary_authorized(&recovery)
+                .unwrap(),
+            1
+        );
+
+        store
+            .connection()
+            .unwrap()
+            .execute_batch("PRAGMA recursive_triggers=OFF;")
+            .unwrap();
+        store
+            .connection()
+            .unwrap()
+            .execute(
+                "DELETE FROM authorization_native_replay_history
+                 WHERE native_replay_identity=?1",
+                params![record.native_replay_identity.as_str()],
+            )
+            .unwrap();
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        let err = store
+            .reconcile_indeterminate_bound_verified(
+                &record,
+                &verified_evidence(&record, ExecutionOutcome::Failed),
+                &CountingProviderVerifier { calls: calls.clone() },
+            )
+            .unwrap_err();
+
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::InvalidState(message)
+                if message.contains("dispatch record has no native replay history")
+        ));
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn reconciliation_verifier_pin_drift_after_external_verification_is_rejected() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-auth-reconcile-verifier-external-drift-{}.db",std::process::id()
