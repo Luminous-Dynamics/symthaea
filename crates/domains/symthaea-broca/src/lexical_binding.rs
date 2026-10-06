@@ -121,6 +121,8 @@ pub const MORPHOPHONOLOGICAL_DERIVATION_WITNESS_VERSION: &str =
 
 pub const MORPHOPHONOLOGICAL_RULE_SET_VERSION: &str =
     "broca-morphophonological-rule-set-v1";
+pub const MORPHOPHONOLOGICAL_RULE_SELECTION_POLICY: &str =
+    "exact-feature-single-rule-v1";
 
 /// A deliberately small deterministic operation vocabulary for executable
 /// morphophonological derivation evidence.
@@ -151,6 +153,12 @@ pub struct MorphophonologicalRule {
 pub struct MorphophonologicalRuleSet {
     pub version: String,
     pub language_tag: String,
+    /// Provenance identifier for the linguistic resource or hand-authored resource snapshot.
+    pub source_id: String,
+    /// Explicit dialect/scope claim; this is not inferred from the language tag.
+    pub dialect_scope: String,
+    /// Exact rule-selection policy used by the executable engine.
+    pub selection_policy: String,
     pub rule_id: String,
     pub provenance: String,
     pub rules: Vec<MorphophonologicalRule>,
@@ -159,6 +167,8 @@ pub struct MorphophonologicalRuleSet {
 impl MorphophonologicalRuleSet {
     pub fn new(
         language_tag: impl Into<String>,
+        source_id: impl Into<String>,
+        dialect_scope: impl Into<String>,
         rule_id: impl Into<String>,
         provenance: impl Into<String>,
         rules: Vec<MorphophonologicalRule>,
@@ -166,6 +176,9 @@ impl MorphophonologicalRuleSet {
         let rule_set = Self {
             version: MORPHOPHONOLOGICAL_RULE_SET_VERSION.to_string(),
             language_tag: language_tag.into(),
+            source_id: source_id.into(),
+            dialect_scope: dialect_scope.into(),
+            selection_policy: MORPHOPHONOLOGICAL_RULE_SELECTION_POLICY.to_string(),
             rule_id: rule_id.into(),
             provenance: provenance.into(),
             rules,
@@ -180,6 +193,15 @@ impl MorphophonologicalRuleSet {
         }
         if self.language_tag.trim().is_empty() {
             return Err(MorphophonologicalRuleSetError::EmptyLanguageTag);
+        }
+        if self.source_id.trim().is_empty() {
+            return Err(MorphophonologicalRuleSetError::EmptySourceId);
+        }
+        if self.dialect_scope.trim().is_empty() {
+            return Err(MorphophonologicalRuleSetError::EmptyDialectScope);
+        }
+        if self.selection_policy != MORPHOPHONOLOGICAL_RULE_SELECTION_POLICY {
+            return Err(MorphophonologicalRuleSetError::UnsupportedSelectionPolicy);
         }
         if self.rule_id.trim().is_empty() {
             return Err(MorphophonologicalRuleSetError::EmptyRuleSetId);
@@ -349,6 +371,9 @@ fn apply_rule_operation(
 pub enum MorphophonologicalRuleSetError {
     InvalidVersion,
     EmptyLanguageTag,
+    EmptySourceId,
+    EmptyDialectScope,
+    UnsupportedSelectionPolicy,
     EmptyRuleSetId,
     EmptyProvenance,
     EmptyRuleSet,
@@ -368,6 +393,9 @@ impl std::fmt::Display for MorphophonologicalRuleSetError {
         match self {
             Self::InvalidVersion => write!(f, "morphophonological rule-set version is unsupported"),
             Self::EmptyLanguageTag => write!(f, "morphophonological rule-set language tag must be non-empty"),
+            Self::EmptySourceId => write!(f, "morphophonological rule-set source id must be non-empty"),
+            Self::EmptyDialectScope => write!(f, "morphophonological rule-set dialect scope must be non-empty"),
+            Self::UnsupportedSelectionPolicy => write!(f, "morphophonological rule-set selection policy is unsupported"),
             Self::EmptyRuleSetId => write!(f, "morphophonological rule-set id must be non-empty"),
             Self::EmptyProvenance => write!(f, "morphophonological rule-set provenance must be non-empty"),
             Self::EmptyRuleSet => write!(f, "morphophonological rule set must contain at least one rule"),
@@ -412,6 +440,12 @@ pub struct MorphophonologicalDerivationStep {
 pub struct MorphophonologicalDerivationWitness {
     pub version: String,
     pub language: LanguageRuleBinding,
+    /// Stable provenance identifier for the executable rule resource.
+    pub rule_set_source_id: String,
+    /// Explicit scope claim carried by the executable rule resource.
+    pub rule_set_dialect_scope: String,
+    /// Exact executable rule-selection policy.
+    pub rule_set_selection_policy: String,
     /// Digest of the exact serialized executable rule set used for derivation.
     pub rule_set_blake3: String,
     pub steps: Vec<MorphophonologicalDerivationStep>,
@@ -425,6 +459,9 @@ impl MorphophonologicalDerivationWitness {
         let witness = Self {
             version: MORPHOPHONOLOGICAL_DERIVATION_WITNESS_VERSION.to_string(),
             language: binding.language.clone(),
+            rule_set_source_id: String::new(),
+            rule_set_dialect_scope: String::new(),
+            rule_set_selection_policy: String::new(),
             rule_set_blake3: String::new(),
             steps,
         };
@@ -489,6 +526,9 @@ impl MorphophonologicalDerivationWitness {
 
         let mut witness = Self::new(binding, steps)
             .map_err(|_| MorphophonologicalDerivationWitnessError::InvalidDerivedWitness)?;
+        witness.rule_set_source_id = rule_set.source_id.clone();
+        witness.rule_set_dialect_scope = rule_set.dialect_scope.clone();
+        witness.rule_set_selection_policy = rule_set.selection_policy.clone();
         witness.rule_set_blake3 = rule_set.resource_blake3();
         Ok(witness)
     }
@@ -503,6 +543,13 @@ impl MorphophonologicalDerivationWitness {
         rule_set
             .validate()
             .map_err(|_| MorphophonologicalDerivationWitnessError::InvalidRuleSet)?;
+
+        if self.rule_set_source_id != rule_set.source_id
+            || self.rule_set_dialect_scope != rule_set.dialect_scope
+            || self.rule_set_selection_policy != rule_set.selection_policy
+        {
+            return Err(MorphophonologicalDerivationWitnessError::RuleSetMetadataMismatch);
+        }
 
         if self.rule_set_blake3.trim().is_empty()
             || self.rule_set_blake3.len() != 64
@@ -675,6 +722,7 @@ pub enum MorphophonologicalDerivationWitnessError {
     InvalidRuleSet,
     RuleSetIdentityMismatch,
     MalformedRuleSetDigest,
+    RuleSetMetadataMismatch,
     RuleSetContentMismatch,
     RuleExecutionFailed { position: usize },
     DerivedOutputMismatch { position: usize },
@@ -704,6 +752,7 @@ impl std::fmt::Display for MorphophonologicalDerivationWitnessError {
             Self::InvalidRuleSet => write!(f, "morphophonological derivation rule set is invalid"),
             Self::RuleSetIdentityMismatch => write!(f, "morphophonological derivation rule-set identity does not match the lexical language binding"),
             Self::MalformedRuleSetDigest => write!(f, "morphophonological derivation witness rule-set digest is malformed"),
+            Self::RuleSetMetadataMismatch => write!(f, "morphophonological derivation witness rule-set metadata does not match the executable resource"),
             Self::RuleSetContentMismatch => write!(f, "morphophonological derivation witness does not match the exact executable rule-set content"),
             Self::RuleExecutionFailed { position } => write!(f, "morphophonological rule execution failed at position {position}"),
             Self::DerivedOutputMismatch { position } => write!(f, "executable morphophonological derivation does not reproduce position {position}'s retained output"),
@@ -1697,6 +1746,8 @@ mod tests {
     fn morphophonological_fixture_rule_set() -> MorphophonologicalRuleSet {
         MorphophonologicalRuleSet::new(
             "en",
+            "fixture:english-rules-v1",
+            "en-US",
             "fixture:english-morphology:v1",
             "fixture:rules:v1",
             vec![MorphophonologicalRule {
@@ -1844,6 +1895,8 @@ mod tests {
         let binding = morphophonological_fixture_binding();
         let rule_set = MorphophonologicalRuleSet::new(
             "en",
+            "fixture:english-rules-v1",
+            "en-US",
             "fixture:english-morphology:v1",
             "fixture:rules:v1",
             vec![MorphophonologicalRule {
@@ -1885,6 +1938,8 @@ mod tests {
     fn morphophonological_rule_set_rejects_ambiguous_exact_feature_rules() {
         let error = MorphophonologicalRuleSet::new(
             "en",
+            "fixture:ambiguous-rules-v1",
+            "en-US",
             "fixture:ambiguous:v1",
             "fixture:rules:v1",
             vec![
@@ -1965,6 +2020,31 @@ mod tests {
                 .validate_against_binding_and_rule_set(&binding, &rule_set)
                 .expect_err("malformed rule-set digest must fail closed"),
             MorphophonologicalDerivationWitnessError::MalformedRuleSetDigest
+        );
+    }
+
+
+    #[test]
+    fn morphophonological_rule_set_metadata_is_part_of_exact_resource_identity() {
+        let rule_set = morphophonological_fixture_rule_set();
+        let mut tampered = rule_set.clone();
+        tampered.source_id = "fixture:other-source-v1".into();
+        assert_ne!(rule_set.resource_blake3(), tampered.resource_blake3());
+
+        let mut witness = MorphophonologicalDerivationWitness::from_rule_set(
+            &morphophonological_fixture_binding(),
+            &rule_set,
+        )
+        .unwrap();
+        witness.rule_set_source_id = tampered.source_id.clone();
+        assert_eq!(
+            witness
+                .validate_against_binding_and_rule_set(
+                    &morphophonological_fixture_binding(),
+                    &tampered,
+                )
+                .expect_err("resource metadata tampering must fail closed"),
+            MorphophonologicalDerivationWitnessError::RuleSetMetadataMismatch
         );
     }
 
