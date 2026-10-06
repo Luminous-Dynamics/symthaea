@@ -112,6 +112,12 @@ fn evidence(
                     covariance_model_id: "benchmark-uncertainty-covariance-v1".into(),
                     covariance_model_revision: "v1".into(),
                     covariance_model_digest: "benchmark-uncertainty-covariance-digest-v1".into(),
+                    probability_distribution_id: "benchmark-uncertainty-distribution-v1".into(),
+                    probability_distribution_revision: "v1".into(),
+                    probability_distribution_digest: "benchmark-uncertainty-distribution-digest-v1".into(),
+                    degrees_of_freedom_id: "benchmark-uncertainty-dof-v1".into(),
+                    degrees_of_freedom_revision: "v1".into(),
+                    degrees_of_freedom_digest: "benchmark-uncertainty-dof-digest-v1".into(),
                     coverage_method: Some(MeasurementUncertaintyCoverageMethodRef {
                         method_id: "benchmark-coverage-method-v1".into(),
                         method_revision: "v1".into(),
