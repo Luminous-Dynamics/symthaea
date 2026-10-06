@@ -289,20 +289,58 @@ pub enum NeurosemanticRemediationMeasurementKind {
     RepresentationResidual,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum NeurosemanticRemediationMetricDirection {
+    HigherIsBetter,
+    LowerIsBetter,
+    DescriptiveOnly,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum NeurosemanticRemediationUncertainty {
+    NotEstimated,
+    Interval {
+        lower_numerator: i64,
+        upper_numerator: i64,
+        scale: u32,
+        confidence_level_bps: u16,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationMetricDefinition {
+    pub schema_version: u16,
+    pub metric_ref: String,
+    pub kind: NeurosemanticRemediationMeasurementKind,
+    pub estimand_ref: String,
+    pub scope_ref: String,
+    pub unit_ref: String,
+    pub aggregation_ref: String,
+    pub direction: NeurosemanticRemediationMetricDirection,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NeurosemanticRemediationMeasurement {
+    pub metric_ref: String,
     pub kind: NeurosemanticRemediationMeasurementKind,
     pub status: NeurosemanticRemediationImpactDisposition,
+    pub estimate_numerator: i64,
+    pub estimate_scale: u32,
+    pub uncertainty: NeurosemanticRemediationUncertainty,
     pub sample_count: u64,
     pub failure_count: u64,
 }
 
 pub const NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION: u16 = 1;
+const MAX_NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITIONS: usize = 32;
+const MAX_NEUROSEMANTIC_REMEDIATION_METRIC_TEXT_BYTES: usize = 256;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NeurosemanticRemediationMeasurementArtifact {
     pub schema_version: u16,
     pub measurement_ref: String,
+    pub metric_definitions: Vec<NeurosemanticRemediationMetricDefinition>,
     pub measurements: Vec<NeurosemanticRemediationMeasurement>,
     pub worst_case_disposition: NeurosemanticRemediationImpactDisposition,
 }
@@ -311,18 +349,62 @@ impl NeurosemanticRemediationMeasurementArtifact {
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_version != NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION
             || !valid_identifier(&self.measurement_ref)
+            || self.metric_definitions.is_empty()
+            || self.metric_definitions.len() > MAX_NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITIONS
             || self.measurements.is_empty()
             || self.measurements.len() > 32
         {
             return Err("neurosemantic remediation measurement artifact fields are invalid".into());
         }
+
+        let mut definition_refs = BTreeSet::new();
+        for definition in &self.metric_definitions {
+            if definition.schema_version != NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION
+                || !valid_identifier(&definition.metric_ref)
+                || !valid_identifier(&definition.estimand_ref)
+                || definition.scope_ref.is_empty()
+                || definition.scope_ref.len() > MAX_NEUROSEMANTIC_REMEDIATION_METRIC_TEXT_BYTES
+                || !valid_identifier(&definition.unit_ref)
+                || !valid_identifier(&definition.aggregation_ref)
+                || !definition_refs.insert(definition.metric_ref.as_str())
+            {
+                return Err("neurosemantic remediation metric definition fields are invalid".into());
+            }
+        }
+
+        let mut measurement_refs = BTreeSet::new();
         let mut kinds = BTreeSet::new();
         for measurement in &self.measurements {
-            if measurement.sample_count == 0 || measurement.failure_count > measurement.sample_count {
-                return Err("neurosemantic remediation measurement sample counts are invalid".into());
+            if measurement.sample_count == 0
+                || measurement.failure_count > measurement.sample_count
+                || measurement.estimate_scale > 12
+                || !measurement_refs.insert(measurement.metric_ref.as_str())
+                || !kinds.insert(measurement.kind)
+            {
+                return Err("neurosemantic remediation measurement fields are invalid".into());
             }
-            if !kinds.insert(measurement.kind) {
-                return Err("neurosemantic remediation measurement contains duplicate dimensions".into());
+            let definition = self.metric_definitions.iter().find(|definition| {
+                definition.metric_ref == measurement.metric_ref
+            }).ok_or_else(|| "neurosemantic remediation measurement references unknown metric definition".to_string())?;
+            if definition.kind != measurement.kind {
+                return Err("neurosemantic remediation measurement kind disagrees with metric definition".into());
+            }
+            match measurement.uncertainty {
+                NeurosemanticRemediationUncertainty::NotEstimated => {}
+                NeurosemanticRemediationUncertainty::Interval {
+                    lower_numerator,
+                    upper_numerator,
+                    scale,
+                    confidence_level_bps,
+                } => {
+                    if lower_numerator > upper_numerator
+                        || scale > 12
+                        || confidence_level_bps == 0
+                        || confidence_level_bps > 10_000
+                    {
+                        return Err("neurosemantic remediation measurement uncertainty is invalid".into());
+                    }
+                }
             }
         }
         for required in [
@@ -3666,6 +3748,117 @@ mod tests {
         future.implementation_revision = "0".repeat(40);
         assert!(future.validate().is_err());
     }
+    #[test]
+    fn remediation_metric_definition_and_uncertainty_are_typed() {
+        let definition = NeurosemanticRemediationMetricDefinition {
+            schema_version: NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
+            metric_ref: "metric-typed".into(),
+            kind: NeurosemanticRemediationMeasurementKind::Forgetfulness,
+            estimand_ref: "forgetfulness-on-forget-set".into(),
+            scope_ref: "forget-set-v1".into(),
+            unit_ref: "proportion".into(),
+            aggregation_ref: "per-item-rate".into(),
+            direction: NeurosemanticRemediationMetricDirection::HigherIsBetter,
+        };
+        let artifact = NeurosemanticRemediationMeasurementArtifact {
+            schema_version: NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION,
+            measurement_ref: "measurement-typed".into(),
+            metric_definitions: vec![definition],
+            measurements: vec![
+                NeurosemanticRemediationMeasurement {
+                    metric_ref: "metric-typed".into(),
+                    kind: NeurosemanticRemediationMeasurementKind::Forgetfulness,
+                    status: NeurosemanticRemediationImpactDisposition::Inconclusive,
+                    estimate_numerator: 0,
+                    estimate_scale: 4,
+                    uncertainty: NeurosemanticRemediationUncertainty::Interval {
+                        lower_numerator: -1,
+                        upper_numerator: 1,
+                        scale: 4,
+                        confidence_level_bps: 9500,
+                    },
+                    sample_count: 10,
+                    failure_count: 0,
+                },
+                NeurosemanticRemediationMeasurement {
+                    metric_ref: "metric-utility".into(),
+                    kind: NeurosemanticRemediationMeasurementKind::UtilityImpact,
+                    status: NeurosemanticRemediationImpactDisposition::Inconclusive,
+                    estimate_numerator: 0,
+                    estimate_scale: 4,
+                    uncertainty: NeurosemanticRemediationUncertainty::NotEstimated,
+                    sample_count: 10,
+                    failure_count: 0,
+                },
+                NeurosemanticRemediationMeasurement {
+                    metric_ref: "metric-recovery".into(),
+                    kind: NeurosemanticRemediationMeasurementKind::RecoveryRisk,
+                    status: NeurosemanticRemediationImpactDisposition::Inconclusive,
+                    estimate_numerator: 0,
+                    estimate_scale: 4,
+                    uncertainty: NeurosemanticRemediationUncertainty::NotEstimated,
+                    sample_count: 10,
+                    failure_count: 0,
+                },
+                NeurosemanticRemediationMeasurement {
+                    metric_ref: "metric-representation".into(),
+                    kind: NeurosemanticRemediationMeasurementKind::RepresentationResidual,
+                    status: NeurosemanticRemediationImpactDisposition::Inconclusive,
+                    estimate_numerator: 0,
+                    estimate_scale: 4,
+                    uncertainty: NeurosemanticRemediationUncertainty::NotEstimated,
+                    sample_count: 10,
+                    failure_count: 0,
+                },
+            ],
+            worst_case_disposition: NeurosemanticRemediationImpactDisposition::Inconclusive,
+        };
+        assert!(artifact.validate().is_err());
+
+        let missing_definition = NeurosemanticRemediationMetricDefinition {
+            schema_version: NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
+            metric_ref: "metric-utility".into(),
+            kind: NeurosemanticRemediationMeasurementKind::UtilityImpact,
+            estimand_ref: "utility-on-retain-set".into(),
+            scope_ref: "retain-set-v1".into(),
+            unit_ref: "proportion".into(),
+            aggregation_ref: "per-item-rate".into(),
+            direction: NeurosemanticRemediationMetricDirection::HigherIsBetter,
+        };
+        let mut valid = artifact.clone();
+        valid.metric_definitions.extend([
+            missing_definition,
+            NeurosemanticRemediationMetricDefinition {
+                schema_version: NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
+                metric_ref: "metric-recovery".into(),
+                kind: NeurosemanticRemediationMeasurementKind::RecoveryRisk,
+                estimand_ref: "recovery-risk-on-forget-set".into(),
+                scope_ref: "forget-set-v1".into(),
+                unit_ref: "proportion".into(),
+                aggregation_ref: "attack-success-rate".into(),
+                direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
+            },
+            NeurosemanticRemediationMetricDefinition {
+                schema_version: NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
+                metric_ref: "metric-representation".into(),
+                kind: NeurosemanticRemediationMeasurementKind::RepresentationResidual,
+                estimand_ref: "representation-residual-on-forget-set".into(),
+                scope_ref: "forget-set-v1".into(),
+                unit_ref: "proportion".into(),
+                aggregation_ref: "probe-detection-rate".into(),
+                direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
+            },
+        ]);
+        assert!(valid.validate().is_ok());
+        let mut bad_uncertainty = valid.clone();
+        if let NeurosemanticRemediationUncertainty::Interval { upper_numerator, .. } =
+            &mut bad_uncertainty.measurements[0].uncertainty
+        {
+            *upper_numerator = -2;
+        }
+        assert!(bad_uncertainty.validate().is_err());
+    }
+
     #[test]
     fn remediation_measurement_worst_case_is_recomputed_not_supplied() {
         let measured = NeurosemanticRemediationMeasurementArtifact {
