@@ -17,6 +17,7 @@ use symthaea_communication::{
     NeurosemanticRemediationEvaluationSetKind, NeurosemanticRemediationEvaluationSetManifest,
     NeurosemanticRemediationEvaluationMethodKind, NeurosemanticRemediationEvaluationMethod,
     NeurosemanticRemediationEvaluationManifest,
+    NeurosemanticRemediationEvaluationEnvironment,
 };
 
 fn main() -> Result<(), String> {
@@ -550,10 +551,19 @@ fn main() -> Result<(), String> {
     let study_protocol_hash = symthaea_communication::content_hash(study_protocol_bytes);
     let evaluation_split_manifest_hash = symthaea_communication::content_hash(evaluation_split_manifest_bytes);
     let lifecycle_receipt_hash = lifecycle_receipt.fingerprint()?;
+    let evaluation_environment = NeurosemanticRemediationEvaluationEnvironment {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_EVALUATION_ENVIRONMENT_SCHEMA_VERSION,
+        environment_ref: "synthetic-evaluation-environment-v1".into(),
+        platform_ref: "linux-x86_64".into(),
+        runtime_ref: "rust-runtime".into(),
+        toolchain_ref: "rust-1.96".into(),
+        dependency_lock_hash: symthaea_communication::content_hash(b"synthetic-dependency-lock-v1"),
+        configuration_hash: symthaea_communication::content_hash(b"synthetic-evaluation-config-v1"),
+        execution_revision: execution_revision.clone(),
+    };
     let evaluation_environment_bytes =
-        b"synthetic-remediation-evaluation-environment-v1:rust:test-runtime";
-    let evaluation_environment_hash =
-        symthaea_communication::content_hash(evaluation_environment_bytes);
+        serde_json::to_vec(&evaluation_environment).map_err(|e| e.to_string())?;
+    let evaluation_environment_hash = evaluation_environment.fingerprint()?;
     let evaluation_verification_evidence =
         b"synthetic-independent-evaluation-verification-v1";
     let evaluation_verification_evidence_hash =
@@ -732,6 +742,12 @@ fn main() -> Result<(), String> {
     let remediation_evaluation_environment_substitution_blocked = remediation_impact
         .verify_evaluation_environment_bytes(b"other-evaluation-environment")
         .is_err();
+    let remediation_evaluation_environment_revision_mismatch_blocked = {
+        let mut forged = evaluation_environment.clone();
+        forged.execution_revision = "4".repeat(40);
+        let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        remediation_impact.verify_evaluation_environment_bytes(&bytes).is_err()
+    };
     let remediation_evaluation_manifest_substitution_blocked = {
         let mut forged = evaluation_manifest.clone();
         forged.forget_set_manifest_hash = symthaea_communication::content_hash(b"other-forget-set");
@@ -1252,6 +1268,7 @@ fn main() -> Result<(), String> {
         "remediation_evaluation_self_verification_blocked": remediation_evaluation_self_verification_blocked,
         "remediation_evaluation_verification_evidence_substitution_blocked": remediation_evaluation_verification_evidence_substitution_blocked,
         "remediation_evaluation_environment_substitution_blocked": remediation_evaluation_environment_substitution_blocked,
+        "remediation_evaluation_environment_revision_mismatch_blocked": remediation_evaluation_environment_revision_mismatch_blocked,
         "remediation_evaluation_manifest_substitution_blocked": remediation_evaluation_manifest_substitution_blocked,
         "remediation_set_pair_verified": remediation_set_pair_verified,
         "remediation_recovery_method_verified": remediation_recovery_method_verified,
