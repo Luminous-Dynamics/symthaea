@@ -1576,25 +1576,7 @@ impl DaemonState {
                                     );
                                 }
 
-                                let intent = match NixActionIntentV1::from_command(
-                                    "nixward:daemon",
-                                    pre_state_identity.clone(),
-                                    &cmd,
-                                ) {
-                                    Ok(intent) => intent,
-                                    Err(error) => {
-                                        eprintln!(
-                                            "nixward-daemon: refusing approved action that cannot reconstruct governed intent: {error}"
-                                        );
-                                        self.local_approval_consumed = None;
-                                        self.pending_action = None;
-                                        self.pending_action_intent_digest = None;
-                                        return (
-                                            dynamic_threshold,
-                                            Some(best_action.expected_free_energy),
-                                        );
-                                    }
-                                };
+                                // Reuse the exact content-bound intent whose digest was approved.
                                 // Service authority requires a fresh observer-sealed definition
                                 // capture immediately before promotion. Capture happens while the
                                 // consumed approval token is still retained so a failed observation
