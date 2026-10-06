@@ -1056,6 +1056,54 @@ mod tests {
     }
 
 
+
+    #[test]
+    fn transfer_entropy_surrogate_calibration_is_deterministic() {
+        let samples = (0..128)
+            .map(|i| {
+                let a = (i as f64 * 0.173).sin() + 0.05 * (i as f64 * 0.041).cos();
+                let b = ((i as f64 - 2.0) * 0.173).sin();
+                RelationalSignalSample::new(i as f64, a, b)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        let first =
+            DirectionalInformationFlowSurrogateSummary::compute(&samples, 100, 10).unwrap();
+        let second =
+            DirectionalInformationFlowSurrogateSummary::compute(&samples, 100, 10).unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(first.status, EvidenceStatus::Proxy);
+        assert_eq!(first.surrogate_count, 10);
+        assert!(first.observed_te_a_to_b.is_finite());
+        assert!(first.observed_te_b_to_a.is_finite());
+        assert!(first.max_surrogate_te_a_to_b.is_finite());
+        assert!(first.max_surrogate_te_b_to_a.is_finite());
+        assert!((0.0..=1.0).contains(&first.exceedance_fraction_a_to_b));
+        assert!((0.0..=1.0).contains(&first.exceedance_fraction_b_to_a));
+    }
+
+    #[test]
+    fn transfer_entropy_surrogate_calibration_rejects_empty_request() {
+        let samples = (0..32)
+            .map(|i| {
+                RelationalSignalSample::new(
+                    i as f64,
+                    (i as f64 * 0.1).sin(),
+                    (i as f64 * 0.2).cos(),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        assert_eq!(
+            DirectionalInformationFlowSurrogateSummary::compute(&samples, 16, 0),
+            Err(RelationalHarmonicError::InsufficientSamples(0))
+        );
+    }
+
+
     #[test]
     fn common_driver_control_collapses_shared_stimulus_correlation() {
         let samples = (0..96)
