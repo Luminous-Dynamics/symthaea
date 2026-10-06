@@ -1414,6 +1414,9 @@ mod tests {
             }],
             "assertionMethod": [{
                 "id": "https://example.test/controller#key-1",
+                "type": "Multikey",
+                "controller": "https://example.test/controller",
+                "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
                 "expires": "2026-10-06T00:00:00Z"
             }]
         }"##.into();
