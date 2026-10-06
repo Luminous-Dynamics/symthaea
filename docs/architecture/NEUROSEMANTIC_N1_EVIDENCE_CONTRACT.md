@@ -201,9 +201,9 @@ Evaluation methodology is also content-addressed. `NeurosemanticRemediationEvalu
 
 The impact artifact keeps `RecoveryRisk` and `RepresentationResidual` as separate evidence kinds. This is intentional: recovery robustness and residual internal representation leakage answer related but distinct questions. A future N1 bundle should report them separately rather than allowing a single residual-risk score to conceal which failure modes were actually tested.
 
-These controls follow current unlearning verification research: output-level forget-set accuracy and retained utility can miss information preserved in internal representations, while recovery attacks can expose knowledge after apparently successful unlearning. citeturn952416academia38turn952416academia39turn952416search10
+These controls follow current unlearning verification research: output-level forget-set accuracy and retained utility can miss information preserved in internal representations, while recovery attacks can expose knowledge after apparently successful unlearning. See Cosma & Finke, “RULER: Representation-Level Verification of Machine Unlearning” (arXiv:2605.27569, 2026); Qian et al., “Leak-Resistant Unlearning” (arXiv:2608.04519, 2026); and Ebrahimpour-Boroojeny et al., “Unlearning Isn’t Forgetting” (PMLR 306, 2026).
 
-NIST's 2026 TEVV-Athlon direction likewise emphasizes customizable, system-specific evaluation and explicitly treats testing, evaluation, verification, and validation as distinct activities. citeturn952416search0
+NIST's 2026 TEVV-Athlon direction likewise emphasizes customizable, system-specific evaluation and explicitly treats testing, evaluation, verification, and validation as distinct activities. See NIST AI 200-2 draft, “The TEVV-Athlon Framework for Evaluating AI Systems” (August 2026).
 
 The N0 example uses synthetic evidence and therefore reports `Inconclusive`. Its purpose is to demonstrate identity binding and fail-closed substitution controls, not to qualify a real remediation method. Concrete verification entry points cover the lifecycle receipt, pre/post lineage records, study-protocol bytes, evaluation-split bytes, and each declared impact-evidence class.
 
