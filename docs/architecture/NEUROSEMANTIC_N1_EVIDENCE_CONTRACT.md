@@ -195,6 +195,16 @@ A lifecycle receipt and a model-remediation evaluation answer different question
 
 The implementation deliberately avoids one aggregate unlearning score. A passing lifecycle receipt or impact artifact does not establish complete erasure, legal compliance, safety, fairness, or absence of residual model influence.
 
+The evaluation population is itself first-class evidence. `NeurosemanticRemediationEvaluationSetManifest` separately identifies a `Forget` set and `Retain` set, each with a source-dataset manifest hash and unique bounded member artifact identities. The verifier rejects role substitution and any overlap between the forget and retain sets. Membership fingerprints are canonicalized so harmless member reordering does not create a different population identity.
+
+Evaluation methodology is also content-addressed. `NeurosemanticRemediationEvaluationMethod` identifies the recovery-attack method and representation-residual probe method, binds each to the exact study protocol hash, and requires the method implementation revision to match the impact artifact execution revision.
+
+The impact artifact keeps `RecoveryRisk` and `RepresentationResidual` as separate evidence kinds. This is intentional: recovery robustness and residual internal representation leakage answer related but distinct questions. A future N1 bundle should report them separately rather than allowing a single residual-risk score to conceal which failure modes were actually tested.
+
+These controls follow current unlearning verification research: output-level forget-set accuracy and retained utility can miss information preserved in internal representations, while recovery attacks can expose knowledge after apparently successful unlearning. citeturn952416academia38turn952416academia39turn952416search10
+
+NIST's 2026 TEVV-Athlon direction likewise emphasizes customizable, system-specific evaluation and explicitly treats testing, evaluation, verification, and validation as distinct activities. citeturn952416search0
+
 The N0 example uses synthetic evidence and therefore reports `Inconclusive`. Its purpose is to demonstrate identity binding and fail-closed substitution controls, not to qualify a real remediation method. Concrete verification entry points cover the lifecycle receipt, pre/post lineage records, study-protocol bytes, evaluation-split bytes, and each declared impact-evidence class.
 
 Research direction: RULER demonstrates that output-level unlearning checks can miss residual information in internal representations, while recent benchmarks show that recovery attacks can reveal knowledge after apparently successful unlearning. Accordingly, a future N1 remediation campaign should retain both output-level and representation/recovery evidence rather than selecting whichever metric is most favorable. (Cosma & Finke, RULER, arXiv:2605.27569; Qian et al., Leak-Resistant Unlearning, arXiv:2608.04519.)
