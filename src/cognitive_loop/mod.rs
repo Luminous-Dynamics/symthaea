@@ -323,7 +323,12 @@ pub mod power_budget;
 pub mod viability_fabric;
 pub use viability_fabric::{
     ActionOutcome, ActionPrediction, LifecyclePhase, PredictionErrorLedger, ViabilityBand,
-    ViabilityFabric, ViabilitySignal, ViabilityState, ViabilityVariable,
+    ViabilityDelta, ViabilityFabric, ViabilitySignal, ViabilityState, ViabilityVariable,
+};
+pub mod viability_micro_world;
+pub use viability_micro_world::{
+    evaluate_predictor, MicroAction, MicroWorldObservation, MicroWorldPredictor,
+    MicroWorldReport, PersistencePredictor,
 };
 
 // ── Imports (only what the struct definitions below require) ─────────────────
