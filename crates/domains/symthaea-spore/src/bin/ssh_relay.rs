@@ -2777,11 +2777,6 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     }
                 }
 
-                // Always: git-initialize NixOS config after install
-                if let Some(pos) = script.rfind("echo \"COMPLETE\"") {
-                    script.insert_str(pos, git_init_config());
-                }
-
                 if client_msg.secure_boot {
                     if let Some(pos) = script.rfind("echo \"COMPLETE\"") {
                         script.insert_str(pos, secure_boot_postinstall());
@@ -2802,6 +2797,13 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     } else {
                         script.push_str(fido2_postinstall());
                     }
+                }
+
+                // Version-control the final generated configuration after all optional
+                // boot/security post-install mutations have been applied. This keeps
+                // the initial config commit aligned with the actual installed state.
+                if let Some(pos) = script.rfind("echo \"COMPLETE\"") {
+                    script.insert_str(pos, git_init_config());
                 }
 
                 // Set user password via temp file (avoids shell injection)
