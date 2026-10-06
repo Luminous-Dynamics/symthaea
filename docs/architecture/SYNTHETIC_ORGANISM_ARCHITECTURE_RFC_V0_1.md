@@ -12,8 +12,7 @@ mechanisms, episodic/semantic memory, an autopoietic subsystem, interoception,
 predictive self-modeling, embodiment descriptors, a closed learning loop, and collective
 immunity.
 
-The main architectural gap is therefore **integration**, not another isolated cognition
-module.
+The main architectural gap is therefore **integration and empirical closure**, not another isolated cognition module. Symthaea already exposes a `WorldModelBridge` and ODE-based trajectory planning inside `FepModule`; this RFC does not propose replacing those systems.
 
 This RFC proposes a closed **viability loop**:
 
@@ -211,9 +210,9 @@ wrong about its own actions, or vice versa.
 
 The ledger should expose this distinction to the global workspace and the self-model.
 
-## 4. World-model organ
+## 4. World-model qualification boundary
 
-The first implementation should be deliberately small.
+The first implementation should deliberately **qualify and extend the existing `WorldModelBridge` / `FepModule` path**, rather than create a second world-model implementation.
 
 ### Input
 
@@ -261,8 +260,10 @@ shared latent
 predicted next latent
 ~~~
 
-The HDC projection is the semantic interface; the learned encoder is where high-dimensional
-perceptual competence lives.
+The HDC projection is the semantic interface; learned encoders are where high-dimensional
+perceptual competence lives. The existing ODE trajectory planner can provide the first
+action-conditioned simulator path; the next question is whether its predictions are
+actually grounded by measured environment transitions.
 
 ## 5. Homeostatic / allostatic organ
 
@@ -634,11 +635,12 @@ Add types and telemetry only.
 
 No behavioral changes.
 
-### Phase 2 — World-model adapter
+### Phase 2 — World-model qualification
 
-Create an isolated trait/interface and simulator-backed implementation.
-
-No external model dependency is required for the first tests.
+Wrap the existing `WorldModelBridge` and `FepModule` trajectory-planning path in the
+Viability Fabric. Add a deterministic simulator-backed adapter only where the current
+model lacks an observable transition oracle. No external model dependency is required
+for the first tests.
 
 ### Phase 3 — Action/outcome ledger
 
