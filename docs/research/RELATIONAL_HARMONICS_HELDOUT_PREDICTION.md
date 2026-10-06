@@ -96,11 +96,11 @@ Property intentionally destroyed:
 
 - original partner-specific time alignment.
 
-The shift is performed separately inside train and test, so surrogate construction cannot pull future test values into the training feature interval.
+The shift is performed separately inside train and test, so surrogate construction cannot pull future test values into the training feature interval. Every shifted channel is normalized to a non-zero circular offset, so an offset that would otherwise wrap exactly to the identity cannot silently produce an unchanged surrogate. The realized surrogate count is capped by the available non-zero circular shifts.
 
 ### 5.2 FeatureDecoupling
 
-The four relational channels are shifted by distinct deterministic offsets inside each partition.
+The four relational channels are shifted by channel-specific deterministic non-zero offsets inside each partition.
 
 Properties preserved:
 
