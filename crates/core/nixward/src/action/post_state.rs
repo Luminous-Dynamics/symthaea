@@ -91,6 +91,12 @@ pub struct NixSystemdJobEvidenceV1 {
     pub job_type: NixSystemdJobTypeV1,
     /// Canonical unit name carried by systemd's JobRemoved signal.
     pub unit: String,
+    /// Unique D-Bus owner of org.freedesktop.systemd1 for this job epoch.
+    ///
+    /// Unique names are connection-scoped and never change owner, so retaining
+    /// this value prevents a durable receipt from collapsing two systemd
+    /// manager incarnations that happen to reuse other job identifiers.
+    pub manager_owner: String,
     /// Job object path returned by systemd.
     pub object_path: String,
     /// systemd JobRemoved result. Only the exact `done` value is accepted as
@@ -109,6 +115,7 @@ impl NixSystemdJobEvidenceV1 {
         if self.unit != self.unit.trim() {
             return Err(NixPostStateErrorV1::InvalidJobUnit);
         }
+        validate_unique_manager_owner(&self.manager_owner)?;
         require_nonempty(&self.object_path, "systemd job object path")?;
         if !self.object_path.starts_with("/org/freedesktop/systemd1/job/") {
             return Err(NixPostStateErrorV1::InvalidJobObjectPath);
@@ -331,6 +338,10 @@ pub struct NixPostStateReceiptV1 {
     pub systemd_job_unit: Option<String>,
     pub systemd_job_object_path: Option<String>,
     pub systemd_job_result: Option<String>,
+    /// Unique D-Bus owner of systemd1 for the captured job epoch.
+    ///
+    /// Present exactly when Job evidence is present.
+    pub systemd_manager_owner: Option<String>,
     pub pre_invocation_id: Option<String>,
     pub post_invocation_id: Option<String>,
     pub postcondition: NixPostconditionAssessmentV1,
@@ -422,17 +433,24 @@ impl NixPostStateReceiptV1 {
             NixPostconditionAssessmentV1::Unproven => NixPostStateClaimV1::Unproven,
         };
 
-        let (systemd_job_id, systemd_job_type, systemd_job_unit, systemd_job_object_path, systemd_job_result) =
-            match &observation.systemd_job {
-                Some(job) => (
-                    Some(job.id),
-                    Some(job.job_type),
-                    Some(job.unit.clone()),
-                    Some(job.object_path.clone()),
-                    Some(job.result.clone()),
-                ),
-                None => (None, None, None, None, None),
-            };
+        let (
+            systemd_job_id,
+            systemd_job_type,
+            systemd_job_unit,
+            systemd_job_object_path,
+            systemd_job_result,
+            systemd_manager_owner,
+        ) = match &observation.systemd_job {
+            Some(job) => (
+                Some(job.id),
+                Some(job.job_type),
+                Some(job.unit.clone()),
+                Some(job.object_path.clone()),
+                Some(job.result.clone()),
+                Some(job.manager_owner.clone()),
+            ),
+            None => (None, None, None, None, None, None),
+        };
 
         let receipt = Self {
             action_intent_digest,
@@ -449,6 +467,7 @@ impl NixPostStateReceiptV1 {
             systemd_job_unit,
             systemd_job_object_path,
             systemd_job_result,
+            systemd_manager_owner,
             pre_invocation_id: expectation.pre_invocation_id.clone(),
             post_invocation_id: observation.invocation_id.clone(),
             postcondition: assessment,
@@ -545,6 +564,7 @@ impl NixPostStateReceiptV1 {
                 || self.systemd_job_unit.is_none()
                 || self.systemd_job_object_path.is_none()
                 || self.systemd_job_result.is_none()
+                || self.systemd_manager_owner.is_none()
             {
                 return Err(NixPostStateErrorV1::IncompleteJobEvidence);
             }
@@ -552,6 +572,7 @@ impl NixPostStateReceiptV1 {
             || self.systemd_job_unit.is_some()
             || self.systemd_job_object_path.is_some()
             || self.systemd_job_result.is_some()
+            || self.systemd_manager_owner.is_some()
         {
             return Err(NixPostStateErrorV1::IncompleteJobEvidence);
         }
@@ -564,6 +585,9 @@ impl NixPostStateReceiptV1 {
         }
         if let Some(result) = &self.systemd_job_result {
             require_nonempty(result, "systemd job result")?;
+        }
+        if let Some(owner) = &self.systemd_manager_owner {
+            validate_unique_manager_owner(owner)?;
         }
         validate_optional_invocation_id(self.pre_invocation_id.as_deref(), "pre-invocation id")?;
         validate_optional_invocation_id(self.post_invocation_id.as_deref(), "post-invocation id")?;
@@ -652,6 +676,7 @@ impl NixPostStateReceiptV1 {
         put_opt_str(&mut h, self.systemd_job_unit.as_deref());
         put_opt_str(&mut h, self.systemd_job_object_path.as_deref());
         put_opt_str(&mut h, self.systemd_job_result.as_deref());
+        put_opt_str(&mut h, self.systemd_manager_owner.as_deref());
         put_opt_str(&mut h, self.pre_invocation_id.as_deref());
         put_opt_str(&mut h, self.post_invocation_id.as_deref());
         put_u8(&mut h, assessment_tag(self.postcondition));
@@ -843,6 +868,31 @@ fn claim_tag(claim: NixPostStateClaimV1) -> u8 {
     }
 }
 
+fn validate_unique_manager_owner(value: &str) -> Result<(), NixPostStateErrorV1> {
+    // D-Bus unique connection names begin with ':' and contain at least two
+    // non-empty dot-separated elements. Their maximum name length is 255.
+    // This mirrors the wire-level identity constraint without making the
+    // always-built evidence crate depend on zbus.
+    if value.is_empty() || value.len() > 255 || !value.starts_with(':') {
+        return Err(NixPostStateErrorV1::InvalidManagerOwner);
+    }
+    let mut elements = value[1..].split('.');
+    let first = elements.next().unwrap_or_default();
+    if first.is_empty() || elements.next().is_none() {
+        return Err(NixPostStateErrorV1::InvalidManagerOwner);
+    }
+    for element in std::iter::once(first).chain(elements) {
+        if element.is_empty()
+            || !element
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+        {
+            return Err(NixPostStateErrorV1::InvalidManagerOwner);
+        }
+    }
+    Ok(())
+}
+
 fn validate_digest(value: &str, field: &'static str) -> Result<(), NixPostStateErrorV1> {
     if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(NixPostStateErrorV1::InvalidDigest(field));
@@ -942,6 +992,8 @@ pub enum NixPostStateErrorV1 {
     InvalidGeneration,
     #[error("invalid job id")]
     InvalidJobId,
+    #[error("invalid systemd manager unique owner")]
+    InvalidManagerOwner,
     #[error("invalid systemd job unit")]
     InvalidJobUnit,
     #[error("invalid systemd job object path")]
@@ -1089,6 +1141,7 @@ mod tests {
                     unit: "nginx.service".to_string(),
                     object_path: "/org/freedesktop/systemd1/job/7".to_string(),
                     result: "done".to_string(),
+                    manager_owner: ":1.123".to_string(),
                 }
             }),
             invocation_id: Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string()),
@@ -1318,12 +1371,85 @@ mod tests {
         variants.push(changed);
 
         let mut changed = receipt.clone();
+        changed.systemd_manager_owner = Some(":1.124".into());
+        variants.push(changed);
+
+        let mut changed = receipt.clone();
         changed.observer_version = "2".into();
         variants.push(changed);
 
         for variant in variants {
             assert_ne!(baseline, variant.digest().unwrap());
         }
+    }
+
+    #[test]
+    fn malformed_systemd_manager_owner_fails_closed() {
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.systemd_job.as_mut().unwrap().manager_owner = ":not-valid".to_string();
+        assert_eq!(
+            obs.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::InvalidManagerOwner
+        );
+
+        obs.systemd_job.as_mut().unwrap().manager_owner = "org.example".to_string();
+        assert_eq!(
+            obs.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::InvalidManagerOwner
+        );
+
+        obs.systemd_job.as_mut().unwrap().manager_owner = ":1".to_string();
+        assert_eq!(
+            obs.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::InvalidManagerOwner
+        );
+
+        obs.systemd_job.as_mut().unwrap().manager_owner = ":1.2.3".to_string();
+        obs.validate_shape().unwrap();
+    }
+
+    #[test]
+    fn receipt_cannot_have_job_evidence_without_manager_incarnation() {
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let verified = NixVerifiedPostStateObservationV1::from_observer(obs.clone()).unwrap();
+        let receipt = build_receipt(
+            &expectation(NixServiceOperationKindV1::Start),
+            &obs,
+            None,
+        )
+        .unwrap();
+        let mut tampered = receipt;
+        tampered.systemd_manager_owner = None;
+        assert_eq!(
+            tampered.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::IncompleteJobEvidence
+        );
+        let _ = verified;
+    }
+
+    #[test]
+    fn receipt_without_job_evidence_cannot_carry_manager_incarnation() {
+        let exp = expectation(NixServiceOperationKindV1::Enable);
+        let obs = observation(
+            NixServiceOperationKindV1::Enable,
+            ServiceActiveStateV1::Inactive,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let receipt = build_receipt(&exp, &obs, None).unwrap();
+        let mut tampered = receipt;
+        tampered.systemd_manager_owner = Some(":1.124".into());
+        assert_eq!(
+            tampered.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::IncompleteJobEvidence
+        );
     }
 
     #[test]
