@@ -371,10 +371,10 @@ impl MorphophonologicalCompilationWitness {
             transformation_blake3: String::new(),
         };
 
-        witness.validate_shape()?;
         let mut witness = witness;
         witness.source_selection_blake3 = witness.compute_source_selection_blake3();
         witness.transformation_blake3 = witness.compute_transformation_blake3();
+        witness.validate_shape()?;
         witness.validate_against_source_artifact_and_rule_set(source_artifact, output_rule_set)?;
         Ok(witness)
     }
@@ -433,40 +433,27 @@ impl MorphophonologicalCompilationWitness {
     }
 
     fn compute_source_selection_blake3(&self) -> String {
-        let surface = self
-            .source_slices
-            .iter()
-            .map(|slice| {
-                format!(
-                    "{}:{}:{}:{}",
-                    slice.record_id, slice.byte_offset, slice.byte_length, slice.record_blake3
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("
-");
+        let serialized = serde_json::to_vec(&self.source_slices)
+            .unwrap_or_else(|_| b"serialization-failed".to_vec());
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea-morphophonological-source-selection-v1 ");
-        hasher.update(surface.as_bytes());
+        hasher.update(b"symthaea-morphophonological-source-selection-v1\\0");
+        hasher.update(&serialized);
         hasher.finalize().to_hex().to_string()
     }
 
     fn compute_transformation_blake3(&self) -> String {
-        let surface = format!(
-            "{}
-{}
-{}
-{}
-{}",
-            self.compiler_id,
-            self.compiler_version,
-            self.normalization_policy,
-            self.source_selection_blake3,
-            self.output_rule_set_blake3,
+        let surface = (
+            &self.compiler_id,
+            &self.compiler_version,
+            &self.normalization_policy,
+            &self.source_selection_blake3,
+            &self.output_rule_set_blake3,
         );
+        let serialized = serde_json::to_vec(&surface)
+            .unwrap_or_else(|_| b"serialization-failed".to_vec());
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea-morphophonological-compilation-v1 ");
-        hasher.update(surface.as_bytes());
+        hasher.update(b"symthaea-morphophonological-compilation-v1\\0");
+        hasher.update(&serialized);
         hasher.finalize().to_hex().to_string()
     }
 
