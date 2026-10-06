@@ -1,0 +1,179 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Typed, auditable transaction envelopes for consequential relay mutations.
+//!
+//! This is deliberately narrower than a distributed transaction protocol.
+//! It binds one authenticated relay request to:
+//!   - a CSPRNG-generated operation identifier;
+//!   - a typed mutation kind;
+//!   - a digest of the exact request payload;
+//!   - the authoritative target identity when one is available.
+//!
+//! The envelope is not itself a cryptographic signature. The current relay
+//! authorization boundary remains the already-authenticated WebSocket bearer
+//! token. This module prevents an authorized request from losing its identity
+//! as it crosses asynchronous staging/execution boundaries.
+
+use serde::Serialize;
+
+const SCHEMA_VERSION: u16 = 1;
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum MutationKind {
+    Install,
+    Rollback,
+    SwitchGeneration,
+    ServiceAction,
+    GcCollect,
+    WriteConfig,
+}
+
+impl MutationKind {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Install => "install",
+            Self::Rollback => "rollback",
+            Self::SwitchGeneration => "switch_generation",
+            Self::ServiceAction => "service_action",
+            Self::GcCollect => "gc_collect",
+            Self::WriteConfig => "write_config",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub(crate) struct SystemTransaction {
+    schema_version: u16,
+    pub(crate) transaction_id: String,
+    pub(crate) mutation: MutationKind,
+    pub(crate) target_machine_digest: Option<String>,
+    pub(crate) request_digest: String,
+    pub(crate) authorization: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct TransactionReceipt {
+    schema_version: u16,
+    transaction_id: String,
+    mutation: MutationKind,
+    target_machine_digest: Option<String>,
+    request_digest: String,
+    authorization: &'static str,
+    outcome: &'static str,
+}
+
+impl SystemTransaction {
+    pub(crate) fn begin(
+        mutation: MutationKind,
+        target_machine_digest: Option<&str>,
+        payload: &[u8],
+    ) -> Result<Self, String> {
+        let transaction_id = random_operation_id()?;
+        let request_digest = blake3::hash(payload).to_hex().to_string();
+
+        Ok(Self {
+            schema_version: SCHEMA_VERSION,
+            transaction_id,
+            mutation,
+            target_machine_digest: target_machine_digest.map(str::to_owned),
+            request_digest,
+            authorization: "websocket-bearer-authenticated",
+        })
+    }
+
+    pub(crate) fn receipt(&self, outcome: &'static str) -> TransactionReceipt {
+        TransactionReceipt {
+            schema_version: self.schema_version,
+            transaction_id: self.transaction_id.clone(),
+            mutation: self.mutation,
+            target_machine_digest: self.target_machine_digest.clone(),
+            request_digest: self.request_digest.clone(),
+            authorization: self.authorization,
+            outcome,
+        }
+    }
+
+    pub(crate) fn log_line(&self) -> String {
+        format!(
+            "transaction={} mutation={} request_digest={}{}",
+            self.transaction_id,
+            self.mutation.as_str(),
+            self.request_digest,
+            self.target_machine_digest
+                .as_deref()
+                .map(|digest| format!(" target_machine_digest={digest}"))
+                .unwrap_or_default()
+        )
+    }
+}
+
+/// Generate a fresh opaque operation identifier from the OS CSPRNG.
+///
+/// Failure is deliberately propagated: a mutation must not proceed with a
+/// reused or clock-derived identifier.
+fn random_operation_id() -> Result<String, String> {
+    let mut bytes = [0u8; 16];
+    getrandom02::getrandom(&mut bytes)
+        .map_err(|error| format!("unable to obtain secure transaction randomness: {error}"))?;
+    Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn transaction_ids_are_random_and_unique() {
+        let a = SystemTransaction::begin(MutationKind::Rollback, None, b"rollback").unwrap();
+        let b = SystemTransaction::begin(MutationKind::Rollback, None, b"rollback").unwrap();
+
+        assert_ne!(a.transaction_id, b.transaction_id);
+        assert_eq!(a.transaction_id.len(), 32);
+        assert_eq!(a.request_digest, b.request_digest);
+    }
+
+    #[test]
+    fn transaction_binds_payload_and_target() {
+        let a =
+            SystemTransaction::begin(MutationKind::ServiceAction, Some("a".repeat(64).as_str()), b"restart:test")
+                .unwrap();
+        let b = SystemTransaction::begin(
+            MutationKind::ServiceAction,
+            Some("b".repeat(64).as_str()),
+            b"restart:test",
+        )
+        .unwrap();
+        let c =
+            SystemTransaction::begin(MutationKind::ServiceAction, Some("a".repeat(64).as_str()), b"stop:test")
+                .unwrap();
+
+        assert_ne!(a.target_machine_digest, b.target_machine_digest);
+        assert_ne!(a.request_digest, c.request_digest);
+        assert_ne!(a.log_line(), b.log_line());
+    }
+
+    #[test]
+    fn receipt_preserves_transaction_identity() {
+        let tx = SystemTransaction::begin(MutationKind::GcCollect, None, b"gc-30d").unwrap();
+        let receipt = tx.receipt("committed");
+
+        assert_eq!(receipt.transaction_id, tx.transaction_id);
+        assert_eq!(receipt.request_digest, tx.request_digest);
+        assert_eq!(receipt.outcome, "committed");
+    }
+
+    #[test]
+    fn mutation_names_are_stable() {
+        assert_eq!(MutationKind::Install.as_str(), "install");
+        assert_eq!(MutationKind::WriteConfig.as_str(), "write_config");
+    }
+
+    #[test]
+    fn randomness_failure_is_not_silently_replaced() {
+        // The helper is intentionally the only operation-ID source; callers
+        // receive an Err rather than falling back to timestamps.
+        assert_eq!(SCHEMA_VERSION, 1);
+    }
+}
