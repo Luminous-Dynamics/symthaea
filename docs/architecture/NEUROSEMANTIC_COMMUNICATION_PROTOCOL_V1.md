@@ -276,6 +276,14 @@ semantic-understanding evidence, or evidence of preserving subjective intent.
 
 ## Machine-readable data and inference policy
 
+### Derivation provenance boundary
+
+The policy now also binds a separate external derivation/data-lineage reference and BLAKE3-256 digest. This is deliberately distinct from policy provenance: one answers "which policy/consent record governs this handling?", while the other answers "which external lineage record describes how this cognitive artifact was produced?".
+
+The exact derivation record can be checked with `verify_derivation_provenance_binding_bytes(...)`, and capability minting requires the exact record bytes. Because the derivation fields are included in the handling-policy fingerprint, the external authority attestation also commits to the declared lineage identity rather than merely to the downstream handling rules.
+
+This matters for derived cognitive data: an otherwise valid current consent/handling lease must not become a blanket authorization for an unrelated decoded artifact. Current iBCI governance work identifies raw recordings, processed features, decoded inferences, and personalized model parameters as distinct lifecycle products and notes that derivative artifacts can move across custodians, making end-to-end access, deletion, and transfer difficult. Traceable data lineage and machine-unlearning readiness are therefore complementary future boundaries rather than optional bookkeeping. citeturn317941search3turn453588search9
+
 The protocol now separates three different properties that must not be conflated:
 
 - **data class** — what kind of cognitive artifact exists (raw neural recording, derived neural feature, semantic representation, decoded claim, personalized decoder/model state);
@@ -389,7 +397,7 @@ lease contents differ from the resolved lease, or when a different authority-pro
 is substituted. The resolver signature authenticates the snapshot to the configured resolver
 key; trust in that resolver key remains an external identity/governance decision.
 
-The handling-policy schema is now v6. Older policy artifacts fail closed instead of silently acquiring the new freshness requirement.
+The handling-policy schema is now v7. Schema v5 introduced the provenance binding, v6 introduced policy-specific authority freshness, and v7 introduces the derivation-lineage binding. Older artifacts fail closed rather than silently acquiring newer authorization semantics.
 
 ### External policy provenance hardening
 
