@@ -3297,7 +3297,7 @@ echo "  User password set."
                 }
 
                 let exit_code = if complete { 0 } else { 1 };
-                let outcome = if exit_code == 0 { "committed" } else { "failed" };
+                let outcome = if exit_code == 0 { "observed_success" } else { "failed" };
                 let _ = ws_tx
                     .send(Message::Text(
                         serde_json::json!({
@@ -4696,10 +4696,18 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                 };
                 eprintln!("[{}] {} Starting garbage collection...", peer_addr, transaction.log_line());
                 let gc_log = format!("/tmp/symthaea-gc-{}.log", transaction.transaction_id);
-                let _ = run_cmd(&format!("touch {} && chmod 600 {}", gc_log, gc_log)).await;
+                let gc_status = format!("/tmp/symthaea-gc-{}.status", transaction.transaction_id);
+                let gc_pid = format!("/tmp/symthaea-gc-{}.pid", transaction.transaction_id);
                 let _ = run_cmd(&format!(
-                    "nix-collect-garbage -d --delete-older-than 30d > {} 2>&1 &",
-                    gc_log
+                    "rm -f -- {} {} {} && touch {} {} {} && chmod 600 {} {} {}",
+                    gc_log, gc_status, gc_pid,
+                    gc_log, gc_status, gc_pid,
+                    gc_log, gc_status, gc_pid
+                ))
+                .await;
+                let _ = run_cmd(&format!(
+                    "(nix-collect-garbage -d --delete-older-than 30d > {} 2>&1; rc=$?; printf '%s\\n' "$rc" > {}) & printf '%s\\n' "$!" > {}",
+                    gc_log, gc_status, gc_pid
                 ))
                 .await;
                 let _ = ws_tx
@@ -4736,17 +4744,42 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                             }
                         }
                     }
-                    if let Ok(check) = run_cmd("pgrep -f nix-collect-garbage").await {
-                        if check.exit_status != 0 && last_lines > 0 {
+                    if let Ok(check) = run_cmd(&format!(
+                        "test -s {} || ! kill -0 \"$(cat {} 2>/dev/null)\" 2>/dev/null",
+                        gc_status, gc_pid
+                    ))
+                    .await
+                    {
+                        if check.exit_status == 0 {
                             break;
                         }
                     }
                 }
+                let gc_exit_code = match run_cmd(&format!("cat {} 2>/dev/null", gc_status)).await {
+                    Ok(result) if result.exit_status == 0 => result.stdout.trim().parse::<u32>().unwrap_or(1),
+                    _ => 1,
+                };
+                let outcome = if gc_exit_code == 0 {
+                    "observed_success"
+                } else if gc_exit_code == 1 {
+                    "failed"
+                } else {
+                    "indeterminate"
+                };
                 let _ = ws_tx
                     .send(Message::Text(
-                        serde_json::json!({"type":"exit","code":0,"transaction":transaction.receipt("committed")}).to_string(),
+                        serde_json::json!({
+                            "type":"exit",
+                            "code":gc_exit_code,
+                            "transaction":transaction.receipt(outcome)
+                        }).to_string(),
                     ))
                     .await;
+                let _ = run_cmd(&format!(
+                    "rm -f -- {} {} {}",
+                    gc_log, gc_status, gc_pid
+                ))
+                .await;
             }
 
             "diagnose" => {
