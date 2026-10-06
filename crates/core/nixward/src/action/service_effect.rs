@@ -406,6 +406,27 @@ mod tests {
     }
 
     #[test]
+    fn context_from_verified_definition_content_binds_both_provenance_layers() {
+        let evidence = content_evidence();
+        let sealed = NixVerifiedServiceDefinitionContentV1::from_observer(evidence.clone()).unwrap();
+        let content_digest = sealed.digest().unwrap();
+
+        let context = NixServiceEffectContextV1::from_verified_definition_content(
+            NixServiceOperationKindV1::Restart,
+            "nginx.service",
+            42,
+            "aa".repeat(32),
+            Some("cc".repeat(16)),
+            1_000,
+            &sealed,
+        )
+        .unwrap();
+
+        assert_eq!(context.authorized_definition_digest, evidence.source_identity_digest);
+        assert_eq!(context.authorized_definition_content_digest, content_digest);
+    }
+
+    #[test]
     fn malformed_definition_content_is_rejected() {
         let mut evidence = content_evidence();
         evidence.files[0].content_digest = "short".into();
