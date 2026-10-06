@@ -1767,6 +1767,8 @@ function clearInstallRequestId() {
             break;
 
           case 'exit':
+            // A terminal relay result consumes the request key; a later install gets a fresh key.
+            clearInstallRequestId();
             if (msg.code === 0) {
               appendTerminal('Installation complete!', 'var(--leaf-green)');
               updateProgress('Complete', 100, 'FirstBreath');
