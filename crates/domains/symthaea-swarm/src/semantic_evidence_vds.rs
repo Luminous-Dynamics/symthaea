@@ -5367,6 +5367,27 @@ mod tests {
             Rfc9942SignatureWithReceipts::from_cbor(&outer),
             Err(Rfc9942VdpError::ResourceLimitExceeded)
         );
+
+        let mut outer_unprotected = Vec::new();
+        cbor_tag(&mut outer_unprotected, COSE_SIGN1_TAG);
+        cbor_array_len(&mut outer_unprotected, 4);
+
+        let mut protected_unprotected_case = Vec::new();
+        cbor_map_len(&mut protected_unprotected_case, 1);
+        cbor_int(&mut protected_unprotected_case, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected_unprotected_case, -7);
+        cbor_bytes(&mut outer_unprotected, &protected_unprotected_case);
+
+        cbor_map_len(&mut outer_unprotected, 1);
+        cbor_text(&mut outer_unprotected, &vec![b'x'; 257]);
+        cbor_uint(&mut outer_unprotected, 0);
+        outer_unprotected.push(0xf6);
+        cbor_bytes(&mut outer_unprotected, &[0; 64]);
+
+        assert_eq!(
+            Rfc9942SignatureWithReceipts::from_cbor(&outer_unprotected),
+            Err(Rfc9942VdpError::ResourceLimitExceeded)
+        );
     }
 
     #[test]
