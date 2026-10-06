@@ -603,7 +603,6 @@ async function rawWebGpuExecutionCanary(page) {
           reason: info?.reason || null,
           message: info?.message || null,
         };
-        globalThis[statusKey] = deviceLost;
       });
 
       const width = 4;
