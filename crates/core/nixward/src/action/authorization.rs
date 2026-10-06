@@ -1501,6 +1501,64 @@ mod tests {
     }
 
     #[test]
+    fn service_definition_capture_binding_matches_unit_and_context_commitments() {
+        let evidence = NixSystemdUnitDefinitionContentEvidenceV1 {
+            unit: "nginx.service".into(),
+            source_identity_digest: "11".repeat(32),
+            manager_owner: ":1.42".into(),
+            bus_id: "0123456789abcdef0123456789abcdef".into(),
+            files: vec![NixSystemdUnitDefinitionContentFileV1 {
+                path: "/nix/store/nginx.service".into(),
+                resolved_path: None,
+                byte_len: 3,
+                content_digest: "22".repeat(32),
+            }],
+            captured_at_monotonic_us: 1,
+        };
+        let sealed =
+            NixVerifiedServiceDefinitionContentV1::from_observer(evidence.clone()).unwrap();
+
+        let bare_intent = NixActionIntentV1::from_command(
+            "host:x",
+            Some("generation:42".into()),
+            &NixOSCommand::Service {
+                operation: NixServiceOperationKindV1::Restart,
+                unit: "nginx.service".into(),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            validate_service_definition_capture_binding(&bare_intent, &sealed).unwrap(),
+            sealed.digest().unwrap()
+        );
+
+        let context = NixServiceEffectContextV1::from_verified_definition_content(
+            NixServiceOperationKindV1::Restart,
+            "nginx.service",
+            42,
+            "aa".repeat(32),
+            Some("bb".repeat(16)),
+            1_000,
+            &sealed,
+        )
+        .unwrap();
+        let contextual = bare_intent.with_service_effect_context(context).unwrap();
+        assert_eq!(
+            validate_service_definition_capture_binding(&contextual, &sealed).unwrap(),
+            sealed.digest().unwrap()
+        );
+
+        let mut altered_evidence = evidence;
+        altered_evidence.files[0].content_digest = "33".repeat(32);
+        let altered =
+            NixVerifiedServiceDefinitionContentV1::from_observer(altered_evidence).unwrap();
+        assert_eq!(
+            validate_service_definition_capture_binding(&contextual, &altered).unwrap_err(),
+            NixAuthorizationErrorV1::DefinitionContentCaptureMismatch
+        );
+    }
+
+    #[test]
     fn service_authorization_requires_effect_context() {
         let intent = NixActionIntentV1::from_command(
             "host:x",
