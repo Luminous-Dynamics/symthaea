@@ -851,6 +851,7 @@ fn backfill_native_replay_history(
         )?;
     }
 
+    mark_native_replay_history_established(&tx)?;
     tx.commit()?;
     Ok(())
 }
@@ -858,6 +859,47 @@ fn backfill_native_replay_history(
 const NATIVE_REPLAY_HISTORY_BACKFILL_KEY: &str =
     "authorization_native_replay_history_backfill_version";
 const NATIVE_REPLAY_HISTORY_BACKFILL_VERSION: &str = "v1";
+
+fn mark_native_replay_history_established(
+    connection: &Connection,
+) -> Result<(), AuthorizationStoreError> {
+    let replay_history_count: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM authorization_native_replay_history",
+        [],
+        |row| row.get(0),
+    )?;
+    if replay_history_count == 0 {
+        return Ok(());
+    }
+
+    let existing: Option<String> = connection
+        .query_row(
+            "SELECT value
+             FROM authorization_store_metadata
+             WHERE key=?1",
+            params![NATIVE_REPLAY_HISTORY_BACKFILL_KEY],
+            |row| row.get(0),
+        )
+        .optional()?;
+
+    match existing.as_deref() {
+        Some(NATIVE_REPLAY_HISTORY_BACKFILL_VERSION) => Ok(()),
+        Some(other) => Err(AuthorizationStoreError::InvalidState(format!(
+            "unsupported native replay history backfill version: {other}"
+        ))),
+        None => {
+            connection.execute(
+                "INSERT INTO authorization_store_metadata(key,value)
+                 VALUES(?1,?2)",
+                params![
+                    NATIVE_REPLAY_HISTORY_BACKFILL_KEY,
+                    NATIVE_REPLAY_HISTORY_BACKFILL_VERSION,
+                ],
+            )?;
+            Ok(())
+        }
+    }
+}
 
 fn validate_native_replay_history_references(
     connection: &Connection,
@@ -1907,28 +1949,44 @@ impl SqliteAuthorizationStore {
             }
             None => {
                 // Backfill only after legacy relying-party fields have been
-                // normalized. The replay ledger is then a stable historical
-                // authority even when those source rows are later compacted.
+                // normalized. Empty stores remain pre-establishment; once
+                // replay history exists, backfill records that state atomically.
                 backfill_native_replay_history(&mut connection)?;
                 validate_native_replay_history_references(&connection)?;
                 validate_native_replay_history_records(&connection)?;
-                connection.execute(
-                    "INSERT INTO authorization_store_metadata(key,value)
-                     VALUES(?1,?2)",
-                    params![
-                        NATIVE_REPLAY_HISTORY_BACKFILL_KEY,
-                        NATIVE_REPLAY_HISTORY_BACKFILL_VERSION,
-                    ],
-                )?;
             }
         }
 
         // Install replay-owner guards only after legacy normalization and replay
         // history backfill, so migration itself cannot trip the new invariant.
         connection.execute_batch(
-            r#"             CREATE TRIGGER IF NOT EXISTS authorization_dispatch_replay_owner_insert
+            r#"             CREATE TRIGGER IF NOT EXISTS authorization_native_replay_history_marker_insert
+               BEFORE INSERT ON authorization_store_metadata
+               WHEN NEW.key='authorization_native_replay_history_backfill_version'
+                 AND NEW.value<>'v1'
+               BEGIN
+                 SELECT RAISE(ABORT, 'invalid native replay history backfill marker');
+               END;
+             CREATE TRIGGER IF NOT EXISTS authorization_native_replay_history_marker_update
+               BEFORE UPDATE OF key,value ON authorization_store_metadata
+               WHEN OLD.key='authorization_native_replay_history_backfill_version'
+               BEGIN
+                 SELECT RAISE(ABORT, 'native replay history backfill marker is write-once');
+               END;
+             CREATE TRIGGER IF NOT EXISTS authorization_native_replay_history_marker_delete
+               BEFORE DELETE ON authorization_store_metadata
+               WHEN OLD.key='authorization_native_replay_history_backfill_version'
+               BEGIN
+                 SELECT RAISE(ABORT, 'native replay history backfill marker is write-once');
+               END;
+             CREATE TRIGGER IF NOT EXISTS authorization_dispatch_replay_owner_insert
                BEFORE INSERT ON authorization_dispatches
                WHEN NEW.native_replay_identity <> ''
+                 AND EXISTS(
+                   SELECT 1 FROM authorization_store_metadata
+                   WHERE key='authorization_native_replay_history_backfill_version'
+                     AND value='v1'
+                 )
                BEGIN
                  SELECT CASE
                    WHEN NOT EXISTS(
@@ -1954,6 +2012,11 @@ impl SqliteAuthorizationStore {
                  native_replay_derivation_digest,boundary_id,action_digest,target_identity
                ON authorization_dispatches
                WHEN NEW.native_replay_identity <> ''
+                 AND EXISTS(
+                   SELECT 1 FROM authorization_store_metadata
+                   WHERE key='authorization_native_replay_history_backfill_version'
+                     AND value='v1'
+                 )
                BEGIN
                  SELECT CASE
                    WHEN NOT EXISTS(
@@ -1976,6 +2039,11 @@ impl SqliteAuthorizationStore {
              CREATE TRIGGER IF NOT EXISTS authorization_terminal_replay_owner_insert
                BEFORE INSERT ON authorization_terminal_evidence
                WHEN NEW.native_replay_identity <> ''
+                 AND EXISTS(
+                   SELECT 1 FROM authorization_store_metadata
+                   WHERE key='authorization_native_replay_history_backfill_version'
+                     AND value='v1'
+                 )
                BEGIN
                  SELECT CASE
                    WHEN NOT EXISTS(
@@ -2001,6 +2069,11 @@ impl SqliteAuthorizationStore {
                  native_replay_derivation_digest,boundary_id,action_digest,target_identity
                ON authorization_terminal_evidence
                WHEN NEW.native_replay_identity <> ''
+                 AND EXISTS(
+                   SELECT 1 FROM authorization_store_metadata
+                   WHERE key='authorization_native_replay_history_backfill_version'
+                     AND value='v1'
+                 )
                BEGIN
                  SELECT CASE
                    WHEN NOT EXISTS(
@@ -3627,6 +3700,8 @@ fn validate_native_authority_pin_set(
             }
             return Err(error.into());
         }
+
+        mark_native_replay_history_established(&tx)?;
 
         tx.execute(
             "INSERT INTO authorization_dispatches
