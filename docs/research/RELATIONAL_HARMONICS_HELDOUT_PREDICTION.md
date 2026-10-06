@@ -118,6 +118,16 @@ Property intentionally destroyed:
 
 This tests whether an apparent relational advantage depends on the channels working as a coherent bundle rather than merely adding four predictive degrees of freedom.
 
+### 5.3 IncrementalRelationalShift
+
+Synchrony and all non-relational context are held fixed while only the directional and turn-taking relational channels are shifted inside each train and test partition.
+
+This is the targeted null for the critical RelationalAugmented vs NonRelationalContext comparison. It asks whether any incremental gain depends on the temporal organization of the added relational channels rather than merely on the presence of extra model capacity.
+
+All three null families retain their exact deterministic shift schedule, per-surrogate MSE vector, configuration, and input commitment. The trace is replayable against the supplied source samples.
+
+These deterministic circular shifts are deliberately treated as **calibration diagnostics, not general-purpose significance tests**. Surrogate validity depends on the null hypothesis and the temporal properties of the data; circular shifting is not universally valid for nonstationary series. Classical surrogate-data work stresses that a surrogate result is meaningful only relative to a specified null hypothesis, and modern time-series work likewise shows that naive permutation assumptions can fail under temporal dependence. citeturn919765search0turn919765search9
+
 ## 6. Interpretation boundary
 
 The null output reports:
@@ -125,9 +135,12 @@ The null output reports:
 - requested surrogate count;
 - realized surrogate count;
 - observed relational-model MSE;
+- exact deterministic surrogate shifts;
+- complete per-surrogate MSE vector;
 - minimum surrogate MSE;
 - exceedance count;
-- exceedance fraction.
+- exceedance fraction;
+- replay input commitment.
 
 The exceedance fraction is the fraction of surrogates that perform at least as well as the observed relational model under the same holdout. It is **not** named a p-value and must not be used as one.
 
