@@ -13,6 +13,12 @@ use crate::action::authorization::NixLocalExecutionAuthorityV1;
 use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use crate::action::service_manager::ServiceManager;
 use crate::action::service_state::NixServiceObservedStateV1;
+#[cfg(all(feature = "systemd-observer", feature = "systemd-mutation"))]
+use crate::action::systemd_lifecycle::NixSystemdLifecycleTransactionV1;
+#[cfg(all(feature = "systemd-observer", feature = "systemd-mutation"))]
+use crate::action::systemd_mutation::NixSystemdLifecycleMutationTransportV1;
+#[cfg(all(feature = "systemd-observer", feature = "systemd-mutation"))]
+use crate::action::systemd_observer::NixSystemdReadOnlyObserverV1;
 use crate::traits::{ActionType, ConsciousnessThresholds, PhiAwareScoring};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -818,6 +824,14 @@ impl NixOSExecutor {
             };
         }
 
+        if matches!(command, NixOSCommand::Service { .. }) {
+            return ExecutionResult::Blocked {
+                reason: "typed service execution must use the governed systemd transaction path"
+                    .to_string(),
+                safety_level: safety,
+            };
+        }
+
         let start = std::time::Instant::now();
 
         let result = Command::new(&cmd)
@@ -925,6 +939,23 @@ impl NixOSExecutor {
                 safety_level: safety,
             };
         }
+        if let NixOSCommand::Service { .. } = &command {
+            #[cfg(all(feature = "systemd-observer", feature = "systemd-mutation"))]
+            {
+                return self
+                    .execute_authorized_systemd_service(command, authority)
+                    .await;
+            }
+
+            #[cfg(not(all(feature = "systemd-observer", feature = "systemd-mutation")))]
+            {
+                return ExecutionResult::Blocked {
+                    reason: "live typed service execution requires the systemd-observer and systemd-mutation features; legacy systemctl dispatch is disabled".to_string(),
+                    safety_level: safety,
+                };
+            }
+        }
+
         if let Err(reason) = self
             .validate_authorized_pre_state_identity(&authority, &command)
             .await
@@ -988,6 +1019,133 @@ impl NixOSExecutor {
         );
         result
     }
+    #[cfg(all(feature = "systemd-observer", feature = "systemd-mutation"))]
+    async fn execute_authorized_systemd_service(
+        &mut self,
+        command: NixOSCommand,
+        authority: NixLocalExecutionAuthorityV1,
+    ) -> ExecutionResult {
+        let safety = command.safety_level();
+        let NixOSCommand::Service { operation, unit } = &command else {
+            return ExecutionResult::Blocked {
+                reason: "internal error: systemd service executor received a non-service command"
+                    .to_string(),
+                safety_level: safety,
+            };
+        };
+
+        let expected_pre_state = match authority.pre_state_identity() {
+            Some(identity) => identity.to_string(),
+            None => {
+                return ExecutionResult::Blocked {
+                    reason: "execution authority has no bound service pre-state identity".to_string(),
+                    safety_level: safety,
+                };
+            }
+        };
+
+        let intent_digest = match authority.action_intent_digest() {
+            Ok(digest) => digest,
+            Err(error) => {
+                return ExecutionResult::Blocked {
+                    reason: format!("execution authority intent is invalid: {error}"),
+                    safety_level: safety,
+                };
+            }
+        };
+        let approval_request_id = authority.approval_request_id().to_string();
+        let projection_digest = authority.projection_digest().to_string();
+
+        if self.dry_run {
+            let (cmd, args) = command.to_command();
+            return ExecutionResult::Success {
+                stdout: format!(
+                    "[DRY-RUN] Would execute governed systemd service: {} {}",
+                    cmd,
+                    args.join(" ")
+                ),
+                stderr: String::new(),
+                execution_time_ms: 0,
+            };
+        }
+
+        let observer = match NixSystemdReadOnlyObserverV1::connect_system().await {
+            Ok(observer) => observer,
+            Err(error) => {
+                let result = ExecutionResult::FailedNoRollback {
+                    error: format!("could not connect to read-only systemd observer: {error}"),
+                    rollback_error: None,
+                };
+                self.record_authorized_execution(
+                    command,
+                    intent_digest,
+                    approval_request_id,
+                    projection_digest,
+                    Some(expected_pre_state),
+                    &result,
+                );
+                return result;
+            }
+        };
+        let mutation = match NixSystemdLifecycleMutationTransportV1::connect_system().await {
+            Ok(mutation) => mutation,
+            Err(error) => {
+                let result = ExecutionResult::FailedNoRollback {
+                    error: format!("could not connect to systemd mutation transport: {error}"),
+                    rollback_error: None,
+                };
+                self.record_authorized_execution(
+                    command,
+                    intent_digest,
+                    approval_request_id,
+                    projection_digest,
+                    Some(expected_pre_state),
+                    &result,
+                );
+                return result;
+            }
+        };
+
+        let transaction = NixSystemdLifecycleTransactionV1::new(observer, mutation);
+        let started = std::time::Instant::now();
+
+        let result = match transaction
+            .dispatch_and_observe_with_expected_pre_state(
+                *operation,
+                unit,
+                &expected_pre_state,
+                std::time::Duration::from_secs(30),
+            )
+            .await
+        {
+            Ok(evidence) => ExecutionResult::Success {
+                stdout: format!(
+                    "governed systemd lifecycle completed: operation={:?} unit={} job={} owner={}",
+                    evidence.operation,
+                    evidence.unit,
+                    evidence.job.id,
+                    evidence.manager_owner
+                ),
+                stderr: String::new(),
+                execution_time_ms: started.elapsed().as_millis() as u64,
+            },
+            Err(error) => ExecutionResult::FailedNoRollback {
+                error: format!("governed systemd lifecycle failed closed: {error}"),
+                rollback_error: None,
+            },
+        };
+
+        self.record_authorized_execution(
+            command,
+            intent_digest,
+            approval_request_id,
+            projection_digest,
+            Some(expected_pre_state),
+            &result,
+        );
+        result
+    }
+
     /// Revalidate the state identity bound into live authority immediately before dispatch.
     ///
     /// Ordinary commands retain the existing NixOS-generation binding. Typed service
