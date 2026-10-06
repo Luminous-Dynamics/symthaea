@@ -139,6 +139,7 @@ jobs:
           assert report["lifecycle_verifier_target_mismatch_blocked"] is True
           assert report["lifecycle_verifier_identity_required"] is True
           assert report["lifecycle_verifier_independence_required"] is True
+          assert report["lifecycle_effect_binding_mutation_blocked"] is True
           assert report["lifecycle_verification_scope_mismatch_blocked"] is True
           assert report["lifecycle_verification_scope_root_mismatch_blocked"] is True
           assert report["lifecycle_verification_scope_duplicate_blocked"] is True
