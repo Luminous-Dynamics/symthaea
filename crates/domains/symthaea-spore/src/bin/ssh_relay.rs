@@ -5115,36 +5115,96 @@ echo "REBUILD_COMPLETE"
             // Tier 3: Disk cloning & Machine inventory
             // ═══════════════════════════════════════════════════════
             "create_image" => {
-                eprintln!("[{}] Creating system image...", peer_addr);
-                let script = r#"
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let target_machine_digest = match machine_binding_digest_hex() {
+                    Ok(digest) => digest,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to establish target machine identity: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let transaction = match SystemTransaction::begin(
+                    MutationKind::CreateImage,
+                    Some(&target_machine_digest),
+                    b"create-system-image",
+                ) {
+                    Ok(tx) => tx,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to establish secure system transaction: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let image_dest = format!("/tmp/nixforhumanity-image-{}", transaction.transaction_id);
+                eprintln!(
+                    "[{}] {} Creating system image at {}...",
+                    peer_addr,
+                    transaction.log_line(),
+                    image_dest
+                );
+
+                let script_template = r#"
 set -eo pipefail
 echo "STAGE: Creating system image..."
-DEST="/tmp/nixforhumanity-image-$(date +%Y%m%d-%H%M%S)"
+DEST="__IMAGE_DEST__"
 mkdir -p "$DEST"
 
 # Snapshot current btrfs root
 if btrfs subvolume snapshot -r / "$DEST/root-snapshot" 2>/dev/null; then
     echo "Created btrfs read-only snapshot"
-    # Send snapshot with btrfs send
     btrfs send "$DEST/root-snapshot" | zstd -3 -T0 > "$DEST/system.btrfs.zst"
     SIZE=$(du -sh "$DEST/system.btrfs.zst" | awk '{print $1}')
     echo "Image size: $SIZE"
     btrfs subvolume delete "$DEST/root-snapshot" 2>/dev/null
 else
-    # Fallback: tar the root filesystem
     echo "btrfs snapshot not available, using tar..."
     tar -czf "$DEST/system.tar.gz" --one-file-system --exclude=/tmp --exclude=/proc --exclude=/sys --exclude=/dev --exclude=/run / 2>/dev/null
     SIZE=$(du -sh "$DEST/system.tar.gz" | awk '{print $1}')
     echo "Image size: $SIZE"
 fi
 
-# Save config
 cp /etc/nixos/configuration.nix "$DEST/" 2>/dev/null || true
 cp /etc/nixos/hardware-configuration.nix "$DEST/" 2>/dev/null || true
 cp /etc/nixos/flake.nix "$DEST/" 2>/dev/null || true
 cp /etc/nixos/flake.lock "$DEST/" 2>/dev/null || true
-
-# Save package list
 nix-env -qa --installed 2>/dev/null > "$DEST/installed-packages.txt" || true
 
 echo "STAGE: Image complete"
@@ -5152,27 +5212,74 @@ echo "Image saved to: $DEST"
 ls -la "$DEST/"
 echo "COMPLETE"
 "#;
-                let img_session_id: u64 = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_millis() as u64)
-                    .unwrap_or(0);
-                let img_log = format!("/tmp/symthaea-image-{}.log", img_session_id);
-                let _ = run_cmd(&format!("touch {} && chmod 600 {}", img_log, img_log)).await;
-                let _ = run_cmd(&format!(
-                    "bash -c '{}' > {} 2>&1 &",
-                    script.replace('\'', "'\\''"),
-                    img_log
+                let script = script_template.replace("__IMAGE_DEST__", &image_dest);
+                let img_log = format!("/tmp/symthaea-image-{}.log", transaction.transaction_id);
+                let img_status = format!("/tmp/symthaea-image-{}.status", transaction.transaction_id);
+                let img_pid = format!("/tmp/symthaea-image-{}.pid", transaction.transaction_id);
+
+                let setup = run_cmd(&format!(
+                    "rm -f -- {} {} {} && touch {} {} {} && chmod 600 {} {} {}",
+                    img_log, img_status, img_pid,
+                    img_log, img_status, img_pid,
+                    img_log, img_status, img_pid
                 ))
                 .await;
-                let _ = ws_tx
-                    .send(Message::Text(
-                        RelayMessage::output("Creating system image...", "stdout").to_json(),
+                if let Err(error) = setup {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Image transaction staging failed: {}",
+                                error
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                if let Err(error) = run_cmd(&format!(
+                    "(bash -c '{}' > {} 2>&1; rc=$?; printf '%s\\n' \"$rc\" > {}) & printf '%s\\n' \"$!\" > {}",
+                    script.replace('\'', "'\\''"),
+                    img_log,
+                    img_status,
+                    img_pid
+                ))
+                .await
+                {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Image creation launch failed: {}",
+                                error
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    let _ = run_cmd(&format!(
+                        "rm -f -- {} {} {}",
+                        img_log, img_status, img_pid
                     ))
                     .await;
-                // Stream output (same polling pattern as install)
+                    continue;
+                }
+
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::output(
+                            &format!(
+                                "Creating system image (transaction {})...",
+                                transaction.transaction_id
+                            ),
+                            "stdout",
+                        )
+                        .to_json(),
+                    ))
+                    .await;
+
                 let mut last_lines = 0u64;
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
                     if let Ok(result) = run_cmd(&format!(
                         "wc -l < {} 2>/dev/null && tail -n +{} {} 2>/dev/null",
                         img_log,
@@ -5199,18 +5306,51 @@ echo "COMPLETE"
                             }
                         }
                     }
-                    if let Ok(check) = run_cmd("pgrep -f 'btrfs send' || pgrep -f 'tar -czf'").await
+
+                    if let Ok(check) = run_cmd(&format!(
+                        "test -s {} || ! kill -0 \\"$(cat {} 2>/dev/null)\\" 2>/dev/null",
+                        img_status, img_pid
+                    ))
+                    .await
                     {
-                        if check.exit_status != 0 && last_lines > 0 {
+                        if check.exit_status == 0 {
                             break;
                         }
                     }
                 }
+
+                let image_exit_code = match run_cmd(&format!(
+                    "cat {} 2>/dev/null",
+                    img_status
+                ))
+                .await
+                {
+                    Ok(result) if result.exit_status == 0 => {
+                        result.stdout.trim().parse::<u32>().ok()
+                    }
+                    _ => None,
+                };
+                let (response_code, outcome) = match image_exit_code {
+                    Some(0) => (0, TransactionOutcome::ObservedSuccess),
+                    Some(code) => (code, TransactionOutcome::Failed),
+                    None => (1, TransactionOutcome::Indeterminate),
+                };
+
                 let _ = ws_tx
                     .send(Message::Text(
-                        serde_json::json!({"type":"exit","code":0}).to_string(),
+                        serde_json::json!({
+                            "type": "exit",
+                            "code": response_code,
+                            "transaction": transaction.receipt(outcome)
+                        })
+                        .to_string(),
                     ))
                     .await;
+                let _ = run_cmd(&format!(
+                    "rm -f -- {} {} {}",
+                    img_log, img_status, img_pid
+                ))
+                .await;
             }
 
             "restore_image" => {
@@ -5223,9 +5363,56 @@ echo "COMPLETE"
                         continue;
                     }
                 };
+
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let transaction = match SystemTransaction::begin(
+                    MutationKind::RestoreImage,
+                    None,
+                    image_path.as_bytes(),
+                ) {
+                    Ok(tx) => tx,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to establish secure system transaction: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
                 eprintln!(
-                    "[{}] Restoring system image from {}...",
-                    peer_addr, image_path
+                    "[{}] {} Restoring system image from {}...",
+                    peer_addr,
+                    transaction.log_line(),
+                    image_path
                 );
                 let script = format!(
                     r#"
@@ -5241,7 +5428,6 @@ else
     echo "ERROR: No image found at {path}"
     exit 1
 fi
-# Restore config
 cp "{path}/configuration.nix" /mnt/etc/nixos/ 2>/dev/null || true
 cp "{path}/hardware-configuration.nix" /mnt/etc/nixos/ 2>/dev/null || true
 echo "STAGE: Image restored"
@@ -5249,14 +5435,35 @@ echo "COMPLETE"
 "#,
                     path = image_path
                 );
+
                 match run_cmd(&script).await {
                     Ok(r) => {
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":r.exit_status,"data":r.stdout}).to_string())).await;
+                        let outcome = if r.exit_status == 0 {
+                            TransactionOutcome::ObservedSuccess
+                        } else {
+                            TransactionOutcome::Failed
+                        };
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code":r.exit_status,
+                                    "data":r.stdout,
+                                    "transaction":transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
                     }
                     Err(e) => {
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!("Restore failed: {}", e)).to_json(),
+                                serde_json::json!({
+                                    "type": "error",
+                                    "message": format!("Restore failed: {}", e),
+                                    "transaction": transaction.receipt(TransactionOutcome::Indeterminate)
+                                })
+                                .to_string(),
                             ))
                             .await;
                     }
