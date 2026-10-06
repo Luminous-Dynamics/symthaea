@@ -41,7 +41,29 @@ pub enum NixSystemdJobTypeV1 {
     Reload,
 }
 
-impl NixSystemdJobTypeV1 {
+/// Unforgeable-at-API-boundary observation token.
+///
+/// The underlying observation remains data, but receipt construction accepts only
+/// this observer-produced wrapper. There is intentionally no public constructor
+/// or serde implementation; the checked-in transport layer is responsible for
+/// producing it.
+pub struct NixVerifiedPostStateObservationV1 {
+    observation: NixServicePostStateObservationV1,
+}
+
+impl NixVerifiedPostStateObservationV1 {
+    pub(crate) fn from_observer(
+        observation: NixServicePostStateObservationV1,
+    ) -> Result<Self, NixPostStateErrorV1> {
+        observation.as_ref().validate_shape()?;
+        Ok(Self { observation })
+    }
+
+    fn as_ref(&self) -> &NixServicePostStateObservationV1 {
+        &self.observation
+    }
+}
+
     pub fn for_operation(operation: NixServiceOperationKindV1) -> Option<Self> {
         match operation {
             NixServiceOperationKindV1::Start => Some(Self::Start),
@@ -66,6 +88,10 @@ impl NixSystemdJobTypeV1 {
 pub struct NixSystemdJobEvidenceV1 {
     pub id: u32,
     pub job_type: NixSystemdJobTypeV1,
+    /// Canonical unit name carried by systemd's JobRemoved signal.
+    pub unit: String,
+    /// Job object path returned by systemd.
+    pub object_path: String,
     /// systemd JobRemoved result. Only the exact `done` value is accepted as
     /// successful evidence; unknown future vocabulary remains recordable but
     /// cannot satisfy the proof predicate.
@@ -117,6 +143,18 @@ impl NixSystemdJobEvidenceV1 {
     pub fn validate_shape(&self) -> Result<(), NixPostStateErrorV1> {
         if self.id == 0 {
             return Err(NixPostStateErrorV1::InvalidJobId);
+        }
+        NixServiceOperationV1::new(self.unit.clone(), NixServiceOperationKindV1::Start)
+            .map_err(|_| NixPostStateErrorV1::InvalidJobUnit)?;
+        if self.unit != self.unit.trim() {
+            return Err(NixPostStateErrorV1::InvalidJobUnit);
+        }
+        require_nonempty(&self.object_path, "systemd job object path")?;
+        if !self.object_path.starts_with("/org/freedesktop/systemd1/job/") {
+            return Err(NixPostStateErrorV1::InvalidJobObjectPath);
+        }
+        if !self.object_path.ends_with(&format!("/{}", self.id)) {
+            return Err(NixPostStateErrorV1::InvalidJobObjectPath);
         }
         require_nonempty(&self.result, "systemd job result")?;
         Ok(())
@@ -330,6 +368,8 @@ pub struct NixPostStateReceiptV1 {
     pub operation: NixServiceOperationKindV1,
     pub systemd_job_id: Option<u32>,
     pub systemd_job_type: Option<NixSystemdJobTypeV1>,
+    pub systemd_job_unit: Option<String>,
+    pub systemd_job_object_path: Option<String>,
     pub systemd_job_result: Option<String>,
     pub pre_invocation_id: Option<String>,
     pub post_invocation_id: Option<String>,
@@ -350,7 +390,7 @@ impl NixPostStateReceiptV1 {
         intent: &NixActionIntentV1,
         authorization: &NixExecutionAuthorizationRecordV1,
         expectation: &NixServicePostStateExpectationV1,
-        observation: &NixServicePostStateObservationV1,
+        observation: &NixVerifiedPostStateObservationV1,
         stability: Option<NixPostStateStabilityEvidenceV1>,
         observer_identity: impl Into<String>,
         observer_version: impl Into<String>,
@@ -378,6 +418,7 @@ impl NixPostStateReceiptV1 {
         require_nonempty(&observer_identity, "observer identity")?;
         require_nonempty(&observer_version, "observer version")?;
 
+        let observation = observation.as_ref();
         if expectation.operation != observation.operation {
             return Err(NixPostStateErrorV1::OperationMismatch);
         }
@@ -420,10 +461,17 @@ impl NixPostStateReceiptV1 {
             NixPostconditionAssessmentV1::Unproven => NixPostStateClaimV1::Unproven,
         };
 
-        let (systemd_job_id, systemd_job_type, systemd_job_result) = match &observation.systemd_job {
-            Some(job) => (Some(job.id), Some(job.job_type), Some(job.result.clone())),
-            None => (None, None, None),
-        };
+        let (systemd_job_id, systemd_job_type, systemd_job_unit, systemd_job_object_path, systemd_job_result) =
+            match &observation.systemd_job {
+                Some(job) => (
+                    Some(job.id),
+                    Some(job.job_type),
+                    Some(job.unit.clone()),
+                    Some(job.object_path.clone()),
+                    Some(job.result.clone()),
+                ),
+                None => (None, None, None, None, None),
+            };
 
         let receipt = Self {
             action_intent_digest,
@@ -437,6 +485,8 @@ impl NixPostStateReceiptV1 {
             operation: expectation.operation,
             systemd_job_id,
             systemd_job_type,
+            systemd_job_unit,
+            systemd_job_object_path,
             systemd_job_result,
             pre_invocation_id: expectation.pre_invocation_id.clone(),
             post_invocation_id: observation.invocation_id.clone(),
@@ -487,11 +537,26 @@ impl NixPostStateReceiptV1 {
             if id == 0 {
                 return Err(NixPostStateErrorV1::InvalidJobId);
             }
-            if self.systemd_job_type.is_none() || self.systemd_job_result.is_none() {
+            if self.systemd_job_type.is_none()
+                || self.systemd_job_unit.is_none()
+                || self.systemd_job_object_path.is_none()
+                || self.systemd_job_result.is_none()
+            {
                 return Err(NixPostStateErrorV1::IncompleteJobEvidence);
             }
-        } else if self.systemd_job_type.is_some() || self.systemd_job_result.is_some() {
+        } else if self.systemd_job_type.is_some()
+            || self.systemd_job_unit.is_some()
+            || self.systemd_job_object_path.is_some()
+            || self.systemd_job_result.is_some()
+        {
             return Err(NixPostStateErrorV1::IncompleteJobEvidence);
+        }
+        if let Some(unit) = &self.systemd_job_unit {
+            NixServiceOperationV1::new(unit.clone(), NixServiceOperationKindV1::Start)
+                .map_err(|_| NixPostStateErrorV1::InvalidJobUnit)?;
+        }
+        if let Some(path) = &self.systemd_job_object_path {
+            require_nonempty(path, "systemd job object path")?;
         }
         if let Some(result) = &self.systemd_job_result {
             require_nonempty(result, "systemd job result")?;
@@ -527,6 +592,19 @@ impl NixPostStateReceiptV1 {
                     {
                         return Err(NixPostStateErrorV1::InvalidClaim);
                     }
+                }
+                if let (Some(job_unit), Some(job_object_path), Some(job_id)) = (
+                    self.systemd_job_unit.as_deref(),
+                    self.systemd_job_object_path.as_deref(),
+                    self.systemd_job_id,
+                ) {
+                    if job_unit != self.target_unit
+                        || !job_object_path.ends_with(&format!("/{job_id}"))
+                    {
+                        return Err(NixPostStateErrorV1::InvalidClaim);
+                    }
+                } else {
+                    return Err(NixPostStateErrorV1::InvalidClaim);
                 }
                 if matches!(
                     self.operation,
@@ -567,6 +645,8 @@ impl NixPostStateReceiptV1 {
             }
             None => put_u8(&mut h, 0),
         }
+        put_opt_str(&mut h, self.systemd_job_unit.as_deref());
+        put_opt_str(&mut h, self.systemd_job_object_path.as_deref());
         put_opt_str(&mut h, self.systemd_job_result.as_deref());
         put_opt_str(&mut h, self.pre_invocation_id.as_deref());
         put_opt_str(&mut h, self.post_invocation_id.as_deref());
@@ -607,6 +687,9 @@ fn evaluate_postcondition(
                 return Ok(NixPostconditionAssessmentV1::Unproven);
             };
             job.validate_shape()?;
+            if job.unit != expectation.unit {
+                return Ok(NixPostconditionAssessmentV1::Violated);
+            }
             if Some(job.job_type) != expected_job_type {
                 return Ok(NixPostconditionAssessmentV1::Violated);
             }
@@ -808,6 +891,10 @@ pub enum NixPostStateErrorV1 {
     InvalidGeneration,
     #[error("invalid job id")]
     InvalidJobId,
+    #[error("invalid systemd job unit")]
+    InvalidJobUnit,
+    #[error("invalid systemd job object path")]
+    InvalidJobObjectPath,
     #[error("invalid stability window")]
     InvalidStabilityWindow,
     #[error("stability window is too short")]
@@ -891,6 +978,8 @@ mod tests {
         obs: &NixServicePostStateObservationV1,
         stability: Option<NixPostStateStabilityEvidenceV1>,
     ) -> Result<NixPostStateReceiptV1, NixPostStateErrorV1> {
+        let verified = NixVerifiedPostStateObservationV1::from_observer(obs.clone())?;
+
         use super::super::authorization::{
             NixActionIntentV1, NixAuthorizationProfileV1, NixActionScopeV1,
         };
@@ -918,7 +1007,7 @@ mod tests {
             &intent,
             &authorization,
             exp,
-            obs,
+            &verified,
             stability,
             "systemd-observer-v1",
             "1",
@@ -942,6 +1031,8 @@ mod tests {
                 NixSystemdJobEvidenceV1 {
                     id: 7,
                     job_type,
+                    unit: "nginx.service".to_string(),
+                    object_path: "/org/freedesktop/systemd1/job/7".to_string(),
                     result: "done".to_string(),
                 }
             }),
