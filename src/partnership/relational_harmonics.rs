@@ -423,6 +423,125 @@ impl DirectionalInformationFlow {
 }
 
 
+
+/// Deterministic pseudo-partner calibration for the existing transfer-entropy
+/// wrapper. The output remains a proxy because the surrogate family is fixed
+/// and finite rather than a complete inferential protocol.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DirectionalInformationFlowSurrogateSummary {
+    pub samples: usize,
+    pub surrogate_count: usize,
+    pub observed_te_a_to_b: f64,
+    pub observed_te_b_to_a: f64,
+    pub max_surrogate_te_a_to_b: f64,
+    pub max_surrogate_te_b_to_a: f64,
+    pub exceedance_a_to_b: usize,
+    pub exceedance_b_to_a: usize,
+    pub exceedance_fraction_a_to_b: f64,
+    pub exceedance_fraction_b_to_a: f64,
+    pub status: EvidenceStatus,
+}
+
+impl DirectionalInformationFlowSurrogateSummary {
+    pub fn compute(
+        samples: &[RelationalSignalSample],
+        min_samples: usize,
+        surrogate_count: usize,
+    ) -> Result<Self, RelationalHarmonicError> {
+        if samples.len() < min_samples.max(2) {
+            return Err(RelationalHarmonicError::InsufficientSamples(samples.len()));
+        }
+
+        if surrogate_count == 0 {
+            return Err(RelationalHarmonicError::InsufficientSamples(0));
+        }
+
+        validate_uniform_sampling(samples)?;
+
+        let (observed_a_to_b, observed_b_to_a) = transfer_entropy_pair(samples);
+        let count = surrogate_count.min(samples.len() - 1);
+
+        let mut max_a_to_b = 0.0_f64;
+        let mut max_b_to_a = 0.0_f64;
+        let mut exceedance_a_to_b = 0usize;
+        let mut exceedance_b_to_a = 0usize;
+
+        for index in 0..count {
+            let shift = 1 + (index * (samples.len() - 1) / count);
+            let shifted = samples
+                .iter()
+                .enumerate()
+                .map(|(i, sample)| RelationalSignalSample {
+                    time: sample.time,
+                    agent_a: sample.agent_a,
+                    agent_b: samples[(i + shift) % samples.len()].agent_b,
+                })
+                .collect::<Vec<_>>();
+
+            let (te_a_to_b, te_b_to_a) = transfer_entropy_pair(&shifted);
+            max_a_to_b = max_a_to_b.max(te_a_to_b);
+            max_b_to_a = max_b_to_a.max(te_b_to_a);
+
+            if te_a_to_b >= observed_a_to_b - 1e-12 {
+                exceedance_a_to_b += 1;
+            }
+            if te_b_to_a >= observed_b_to_a - 1e-12 {
+                exceedance_b_to_a += 1;
+            }
+        }
+
+        Ok(Self {
+            samples: samples.len(),
+            surrogate_count: count,
+            observed_te_a_to_b: observed_a_to_b,
+            observed_te_b_to_a: observed_b_to_a,
+            max_surrogate_te_a_to_b: max_a_to_b,
+            max_surrogate_te_b_to_a: max_b_to_a,
+            exceedance_a_to_b,
+            exceedance_b_to_a,
+            exceedance_fraction_a_to_b: exceedance_a_to_b as f64 / count as f64,
+            exceedance_fraction_b_to_a: exceedance_b_to_a as f64 / count as f64,
+            status: EvidenceStatus::Proxy,
+        })
+    }
+}
+
+fn validate_uniform_sampling(
+    samples: &[RelationalSignalSample],
+) -> Result<(), RelationalHarmonicError> {
+    for pair in samples.windows(2) {
+        if pair[1].time <= pair[0].time {
+            return Err(RelationalHarmonicError::NonMonotonicTime);
+        }
+    }
+
+    let dt0 = samples[1].time - samples[0].time;
+    let tolerance = 1e-6 * dt0.abs().max(1.0);
+    if !samples
+        .windows(2)
+        .all(|w| ((w[1].time - w[0].time) - dt0).abs() <= tolerance)
+    {
+        return Err(RelationalHarmonicError::NonUniformSampling);
+    }
+
+    Ok(())
+}
+
+fn transfer_entropy_pair(samples: &[RelationalSignalSample]) -> (f64, f64) {
+    let config = crate::hdc::information_theory::InformationTheoryConfig::default();
+    let mut estimator =
+        crate::hdc::information_theory::TransferEntropyEstimator::new(config, samples.len());
+
+    for sample in samples {
+        estimator.observe_scalars(sample.agent_a, sample.agent_b);
+    }
+
+    (
+        estimator.transfer_entropy_x_to_y().unwrap_or(0.0),
+        estimator.transfer_entropy_y_to_x().unwrap_or(0.0),
+    )
+}
+
 /// A paired signal plus an explicitly observed common driver.
 ///
 /// The controlled statistic removes only the supplied driver and is intended
