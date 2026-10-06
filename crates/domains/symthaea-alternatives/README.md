@@ -96,3 +96,6 @@ Experimental observations are now bound to the exact documented procedure prescr
 ### Requirement-semantic binding
 
 ExperimentalDesignProvenance carries both the stable requirement ID and a canonical BLAKE3 digest of the complete FunctionalRequirement payload. The assessment recomputes that digest before accepting the design. This prevents a design from being replayed under the same requirement identifier after the underlying requirement semantics have changed.
+
+
+Design-bound observations also have to match the target surface's declared unit, scope, and comparison basis. A correct design/target identity is therefore insufficient on its own: the observed evidence must be comparable to the exact requirement surface it purports to resolve.
