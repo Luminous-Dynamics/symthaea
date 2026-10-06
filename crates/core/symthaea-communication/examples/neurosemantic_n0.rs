@@ -389,6 +389,7 @@ fn main() -> Result<(), String> {
         forged.event_sequence = 1;
         forged.previous_receipt_hash = Some(lifecycle_base.fingerprint()?);
         forged.state = NeurosemanticArtifactLifecycleState::Applied;
+        forged.effect_agent_ref = Some("synthetic-effect-worker-1".into());
         forged.effect_evidence_ref = Some("synthetic-lifecycle-effect-1".into());
         forged.effect_evidence_hash = Some(symthaea_communication::content_hash(lifecycle_effect_evidence));
         forged.verify_transition(&lifecycle_base).is_err()
@@ -427,6 +428,13 @@ fn main() -> Result<(), String> {
     let lifecycle_verification_scope_root_mismatch_blocked = {
         let mut forged_set = lifecycle_verification_target_set.clone();
         forged_set.root_artifact_hash = symthaea_communication::content_hash(b"wrong-root");
+        let forged_bytes = serde_json::to_vec(&forged_set).map_err(|e| e.to_string())?;
+        lifecycle_receipt.verify_verification_scope_bytes(&forged_bytes).is_err()
+    };
+    let lifecycle_verification_scope_duplicate_blocked = {
+        let mut forged_set = lifecycle_verification_target_set.clone();
+        let duplicate = forged_set.target_artifact_hashes[0].clone();
+        forged_set.target_artifact_hashes.push(duplicate);
         let forged_bytes = serde_json::to_vec(&forged_set).map_err(|e| e.to_string())?;
         lifecycle_receipt.verify_verification_scope_bytes(&forged_bytes).is_err()
     };
@@ -899,6 +907,7 @@ fn main() -> Result<(), String> {
         "lifecycle_verifier_independence_required": lifecycle_verifier_independence_required,
         "lifecycle_verification_scope_mismatch_blocked": lifecycle_verification_scope_mismatch_blocked,
         "lifecycle_verification_scope_root_mismatch_blocked": lifecycle_verification_scope_root_mismatch_blocked,
+        "lifecycle_verification_scope_duplicate_blocked": lifecycle_verification_scope_duplicate_blocked,
         "lifecycle_verification_scope_tamper_blocked": lifecycle_verification_scope_tamper_blocked,
         "lifecycle_artifact_mismatch_blocked": lifecycle_artifact_mismatch_blocked,
         "lifecycle_lineage_mismatch_blocked": lifecycle_lineage_mismatch_blocked,
