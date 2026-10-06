@@ -18,7 +18,7 @@ use ed25519_dalek::{Signature, VerifyingKey};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use symthaea_epistemic_types::{
-    ClaimVerificationMethod, CryptographicVerificationReceipt, VerificationEvidence,
+    url_values_equivalent, ClaimVerificationMethod, CryptographicVerificationReceipt, VerificationEvidence,
     VerificationFailure, VerificationMethodResolution, VerificationRequest,
 };
 
@@ -81,8 +81,16 @@ pub fn verify_eddsa_jcs_2022(
         ));
     }
 
-    if resolved_method.method != resolution.verification_method
-        || resolved_method.method != request.verification_method
+    if !url_values_equivalent(
+        resolved_method.method.as_str(),
+        resolution.verification_method.as_str(),
+    )
+    .unwrap_or(false)
+        || !url_values_equivalent(
+            resolved_method.method.as_str(),
+            request.verification_method.as_str(),
+        )
+        .unwrap_or(false)
         || resolved_method.method_type() != resolution.verification_method_type
         || resolved_method.material_digest != resolution.verification_method_material_digest
         || resolved_method.controller != resolution.resolved_verification_method_controller
@@ -170,7 +178,9 @@ pub fn verify_eddsa_jcs_2022(
     }
 
     let verification_method = required_string(proof, "verificationMethod")?;
-    if verification_method != request.verification_method.as_str() {
+    if !url_values_equivalent(verification_method, request.verification_method.as_str())
+        .unwrap_or(false)
+    {
         return Err(SnapshotError::Verification(
             VerificationFailure::VerificationMethodMismatch {
                 expected: request.verification_method.clone(),
