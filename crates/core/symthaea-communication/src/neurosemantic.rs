@@ -546,8 +546,15 @@ impl NeurosemanticRemediationImpactArtifact {
         }
         if Some(self.evaluation_agent_ref.as_str()) == lifecycle_receipt.effect_agent_ref.as_deref()
             || Some(self.evaluation_verifier_ref.as_str()) == lifecycle_receipt.effect_agent_ref.as_deref()
+            || Some(self.evaluation_agent_ref.as_str())
+                == lifecycle_receipt.verification_agent_ref.as_deref()
+            || Some(self.evaluation_verifier_ref.as_str())
+                == lifecycle_receipt.verification_agent_ref.as_deref()
         {
-            return Err("neurosemantic remediation evaluation agents must be independent from the remediation effect agent".into());
+            return Err(
+                "neurosemantic remediation evaluation roles must be independent from lifecycle roles"
+                    .into(),
+            );
         }
         if lifecycle_receipt.execution_revision != self.execution_revision {
             return Err("neurosemantic remediation impact execution revision does not match the lifecycle receipt".into());
@@ -3198,6 +3205,9 @@ mod tests {
         assert!(impact.validate().is_ok());
         assert!(impact.verify_lifecycle_binding(&lifecycle).is_ok());
         assert!(impact.verify_evaluation_manifest_bytes(&evaluation_manifest_bytes).is_ok());
+        let mut role_collision = impact.clone();
+        role_collision.evaluation_verifier_ref = lifecycle.verification_agent_ref.clone().unwrap();
+        assert!(role_collision.verify_lifecycle_binding(&lifecycle).is_err());
         assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PreRemediation, &pre_bytes).is_ok());
         assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PostRemediation, &post_bytes).is_ok());
         assert!(impact.verify_evaluation_set_pair_bytes(&forget_bytes, &retain_bytes).is_ok());
