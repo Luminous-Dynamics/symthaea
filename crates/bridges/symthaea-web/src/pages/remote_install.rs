@@ -605,6 +605,10 @@ fn PartitionBar(
 }
 
 // ═══════════════════════════════════════════════════════
+fn layout_requires_luks(layout: &str, filesystem: &str) -> bool {
+    layout == "single-luks" || (filesystem == "zfs" && layout == "single-luks")
+}
+
 // Relay connection component
 // ═══════════════════════════════════════════════════════
 
@@ -674,6 +678,11 @@ pub fn RemoteInstallPanel(
     // any XSS or malicious extension with page access could read it for
     // as long as the tab stays open.
     let (ssh_password, set_ssh_password) = signal(String::new());
+    // Disk-unlock passphrase is separate from the login password and is
+    // never persisted. It remains in memory only until this install attempt.
+    let luks_passphrase = RwSignal::new(String::new());
+    let luks_passphrase_confirm = RwSignal::new(String::new());
+
     // Advanced mode: allow custom relay URL (hidden by default)
     let show_advanced = RwSignal::new(false);
     let saved_relay_url = load_from_storage("si_relay_url").unwrap_or_default();
@@ -1277,16 +1286,6 @@ pub fn RemoteInstallPanel(
         relay_state.set(RelayState::Installing);
         reconnect_attempts.set(0);
 
-        // Clear old log and start fresh (Phase 4.2)
-        set_install_log.update(|l| {
-            l.clear();
-            l.push(format!("Starting install on {}...", disk));
-        });
-        persist_log_force();
-
-        // Mark install as in-progress for resume detection (Phase 4.3)
-        save_to_storage("si_install_in_progress", "true");
-
         // When ZFS is selected and layout is "single", use "single-zfs"
         let layout = {
             let base = disk_layout.get();
@@ -1296,6 +1295,48 @@ pub fn RemoteInstallPanel(
                 base
             }
         };
+
+        // Clear old log and start fresh (Phase 4.2)
+        set_install_log.update(|l| {
+            l.clear();
+            l.push(format!("Starting install on {}...", disk));
+        });
+        persist_log_force();
+
+        // Encryption uses a dedicated passphrase. It is never inferred from
+        // the SSH password or any generic command field.
+        if layout_requires_luks(disk_layout.get(), filesystem.get()) {
+            let passphrase = luks_passphrase.get();
+            let confirmation = luks_passphrase_confirm.get();
+            if passphrase.len() < 12 {
+                relay_state.set(RelayState::Failed(
+                    "Disk encryption passphrase must be at least 12 characters.".into(),
+                ));
+                set_install_log.update(|l| {
+                    l.push("Install blocked: disk encryption passphrase is too short.".into())
+                });
+                return;
+            }
+            if passphrase != confirmation {
+                relay_state.set(RelayState::Failed(
+                    "Disk encryption passphrases do not match.".into(),
+                ));
+                set_install_log.update(|l| {
+                    l.push("Install blocked: disk encryption passphrases do not match.".into())
+                });
+                return;
+            }
+            if passphrase.contains('\0') {
+                relay_state.set(RelayState::Failed(
+                    "Disk encryption passphrase contains an unsupported character.".into(),
+                ));
+                return;
+            }
+        }
+
+        // Mark install as in-progress for resume detection (Phase 4.3)
+        save_to_storage("si_install_in_progress", "true");
+
         let msg = serde_json::json!({
             "action": "install",
             "disk": disk,
@@ -1311,9 +1352,15 @@ pub fn RemoteInstallPanel(
             "configuration_nix": config_nix.get().unwrap_or_default(),
             "flake_nix": flake_nix.get().unwrap_or_default(),
             "user_password": user_password.get(),
+            "luks_passphrase": luks_passphrase.get(),
         });
         send_msg(&msg);
         user_password.set(String::new());
+        // The relay receives the disk-unlock secret once for this install attempt.
+        // Clear it immediately after transmission; the relay stages it in a 0600
+        // target-local file and removes it when the install script exits.
+        luks_passphrase.set(String::new());
+        luks_passphrase_confirm.set(String::new());
     };
 
     // Auto-detect removed: previous design probed a relay running on the target ISO via mDNS.
@@ -1341,6 +1388,48 @@ pub fn RemoteInstallPanel(
                             <a href="https://github.com/Luminous-Dynamics/nixforhumanity/releases" target="_blank">"NixForHumanity USB"</a>
                             ", then enter the address, one-time password, and per-run relay token shown on its console."
                         </p>
+                        {move || layout_requires_luks(disk_layout.get(), filesystem.get()).then(|| view! {
+                            <div class="encryption-passphrase-panel" style="margin-bottom: 1rem; padding: 0.9rem; border: 1px solid var(--glass-border); border-radius: 8px;">
+                                <strong style="display:block; margin-bottom:0.35rem;">"Disk encryption passphrase"</strong>
+                                <p class="field-hint" style="margin-bottom:0.7rem;">
+                                    "This unlocks the LUKS2 disk. It is separate from your login password, is never saved in browser storage, and remains your recovery fallback even when TPM2 or FIDO2 is enabled."
+                                </p>
+                                <div class="connect-form">
+                                    <div class="field">
+                                        <label class="field-label">"Passphrase"</label>
+                                        <input type="password" class="field-input"
+                                            aria-label="Disk encryption passphrase"
+                                            autocomplete="new-password"
+                                            placeholder="At least 12 characters"
+                                            prop:value=move || luks_passphrase.get()
+                                            on:input=move |ev| luks_passphrase.set(event_target_value(&ev))
+                                        />
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label">"Confirm passphrase"</label>
+                                        <input type="password" class="field-input"
+                                            aria-label="Confirm disk encryption passphrase"
+                                            autocomplete="new-password"
+                                            placeholder="Repeat passphrase"
+                                            prop:value=move || luks_passphrase_confirm.get()
+                                            on:input=move |ev| luks_passphrase_confirm.set(event_target_value(&ev))
+                                        />
+                                    </div>
+                                </div>
+                                {move || {
+                                    let p = luks_passphrase.get();
+                                    let c = luks_passphrase_confirm.get();
+                                    if !p.is_empty() && p.len() < 12 {
+                                        Some(view! { <p class="warning-msg">"Use at least 12 characters for the disk-unlock passphrase."</p> })
+                                    } else if !c.is_empty() && p != c {
+                                        Some(view! { <p class="error-msg">"Passphrases do not match."</p> })
+                                    } else {
+                                        None
+                                    }
+                                }}
+                            </div>
+                        })}
+
                         <div class="connect-form">
                             <div class="field" style="flex: 2;">
                                 <label class="field-label">"Target Address"</label>
