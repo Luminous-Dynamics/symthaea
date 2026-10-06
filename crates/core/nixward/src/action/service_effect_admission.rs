@@ -143,8 +143,10 @@ mod tests {
             )
             .unwrap();
 
-        let state = super::super::service_state::NixServiceObservedStateV1::new_for_test(
+        let state = super::super::service_state::NixServiceObservedStateV1::from_observer_snapshot(
             "nginx.service",
+            "nginx.service",
+            vec!["nginx.service".into()],
             super::super::service_state::ServiceLoadStateV1::Loaded,
             super::super::service_state::ServiceActiveStateV1::Active,
             super::super::service_state::ServiceUnitFileStateV1::Enabled,
@@ -199,14 +201,25 @@ mod tests {
             )
             .unwrap();
 
+        let state = super::super::service_state::NixServiceObservedStateV1::from_observer_snapshot(
+            "nginx.service",
+            "nginx.service",
+            vec!["nginx.service".into()],
+            super::super::service_state::ServiceLoadStateV1::Loaded,
+            super::super::service_state::ServiceActiveStateV1::Active,
+            super::super::service_state::ServiceUnitFileStateV1::Enabled,
+            "running",
+        )
+        .unwrap();
+        let pre_state =
+            NixVerifiedServicePreStateV1::from_observer(&state, 42).unwrap();
+
         let result = NixServiceEffectAdmissionV1::from_observed_definition_content(
             "host:test",
-            "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
             NixServiceOperationKindV1::Start,
-            42,
-            "1111111111111111111111111111111111111111111111111111111111111111",
             None,
             0,
+            &pre_state,
             &commitment,
         );
 
