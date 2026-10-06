@@ -2685,7 +2685,7 @@ mod tests {
     #[test]
     fn resolution_accepts_equivalent_controller_document_urls_without_rewriting_provenance() {
         let claim = fixture_claim();
-        let request = VerificationRequest::from_claim(
+        let mut request = VerificationRequest::from_claim(
             &claim,
             ClaimProofPurpose::new("assertionMethod").unwrap(),
             ClaimControllerIdentity::new("https://EXAMPLE.TEST/controller").unwrap(),
@@ -2693,15 +2693,17 @@ mod tests {
             default_freshness(),
         )
         .unwrap();
+        request.verification_method =
+            ClaimVerificationMethod::new("https://EXAMPLE.TEST:443/controller/./#key-1").unwrap();
 
         let resolution = VerificationMethodResolution::from_controller_document(
             &request,
-            "https://example.test/controller/",
-            ClaimControllerDocumentIdentity::new("https://example.test/controller/").unwrap(),
+            "https://example.test/controller",
+            ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
             ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
             "Multikey",
             &"44".repeat(32),
-            ClaimControllerIdentity::new("https://example.test/controller/").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             &[ClaimVerificationMethod::new(
                 "https://example.test/controller#key-1",
             )
