@@ -1002,13 +1002,6 @@ impl NeurosemanticReplayTracker {
         before - self.latest.len()
     }
 
-    pub fn observe(
-        &mut self,
-        message: &AuthorizedNeurosemanticMessage,
-    ) -> Result<ReplayDecision, String> {
-        self.observe_with_expiry(message, u64::MAX)
-    }
-
     fn observe_with_expiry(
         &mut self,
         message: &AuthorizedNeurosemanticMessage,
