@@ -180,6 +180,121 @@ pub const NEUROSEMANTIC_ARTIFACT_LIFECYCLE_RECEIPT_SCHEMA_VERSION: u16 = 3;
 pub const NEUROSEMANTIC_ARTIFACT_LIFECYCLE_VERIFICATION_SCOPE_SCHEMA_VERSION: u16 = 1;
 pub const NEUROSEMANTIC_REMEDIATION_IMPACT_ARTIFACT_SCHEMA_VERSION: u16 = 1;
 const MAX_NEUROSEMANTIC_IMPACT_DIMENSION_REFS: usize = 32;
+const MAX_NEUROSEMANTIC_REMEDIATION_EVALUATION_MEMBERS: usize = 4096;
+const MAX_NEUROSEMANTIC_REMEDIATION_METHOD_REF_BYTES: usize = 4096;
+
+
+/// Frozen membership manifest for a remediation evaluation population.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum NeurosemanticRemediationEvaluationSetKind {
+    Forget,
+    Retain,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationEvaluationSetManifest {
+    pub schema_version: u16,
+    pub set_ref: String,
+    pub set_kind: NeurosemanticRemediationEvaluationSetKind,
+    pub source_dataset_manifest_hash: String,
+    pub member_artifact_hashes: Vec<String>,
+}
+
+pub const NEUROSEMANTIC_REMEDIATION_EVALUATION_SET_SCHEMA_VERSION: u16 = 1;
+
+impl NeurosemanticRemediationEvaluationSetManifest {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != NEUROSEMANTIC_REMEDIATION_EVALUATION_SET_SCHEMA_VERSION
+            || !valid_identifier(&self.set_ref)
+            || !valid_blake3_digest(&self.source_dataset_manifest_hash)
+            || self.member_artifact_hashes.is_empty()
+            || self.member_artifact_hashes.len() > MAX_NEUROSEMANTIC_REMEDIATION_EVALUATION_MEMBERS
+            || self.member_artifact_hashes.iter().any(|hash| !valid_blake3_digest(hash))
+        {
+            return Err("neurosemantic remediation evaluation set manifest fields are invalid".into());
+        }
+        let unique_members: BTreeSet<&str> =
+            self.member_artifact_hashes.iter().map(String::as_str).collect();
+        if unique_members.len() != self.member_artifact_hashes.len() {
+            return Err("neurosemantic remediation evaluation set manifest contains duplicate members".into());
+        }
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic remediation evaluation set manifest JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let manifest: Self = serde_json::from_slice(bytes).map_err(|error| {
+            format!("neurosemantic remediation evaluation set manifest JSON: {error}")
+        })?;
+        manifest.validate()?;
+        Ok(manifest)
+    }
+
+    pub fn fingerprint(&self) -> Result<String, String> {
+        self.validate()?;
+        Ok(content_hash(
+            &serde_json::to_vec(self)
+                .map_err(|error| format!("neurosemantic remediation evaluation set serialization: {error}"))?,
+        ))
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum NeurosemanticRemediationEvaluationMethodKind {
+    RecoveryAttack,
+    RepresentationResidualProbe,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationEvaluationMethod {
+    pub schema_version: u16,
+    pub method_ref: String,
+    pub kind: NeurosemanticRemediationEvaluationMethodKind,
+    pub protocol_hash: String,
+    pub implementation_revision: String,
+}
+
+pub const NEUROSEMANTIC_REMEDIATION_EVALUATION_METHOD_SCHEMA_VERSION: u16 = 1;
+
+impl NeurosemanticRemediationEvaluationMethod {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != NEUROSEMANTIC_REMEDIATION_EVALUATION_METHOD_SCHEMA_VERSION
+            || self.method_ref.is_empty()
+            || self.method_ref.len() > MAX_NEUROSEMANTIC_REMEDIATION_METHOD_REF_BYTES
+            || !valid_blake3_digest(&self.protocol_hash)
+            || !valid_execution_revision(&self.implementation_revision)
+        {
+            return Err("neurosemantic remediation evaluation method fields are invalid".into());
+        }
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic remediation evaluation method JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let method: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("neurosemantic remediation evaluation method JSON: {error}"))?;
+        method.validate()?;
+        Ok(method)
+    }
+
+    pub fn fingerprint(&self) -> Result<String, String> {
+        self.validate()?;
+        Ok(content_hash(
+            &serde_json::to_vec(self)
+                .map_err(|error| format!("neurosemantic remediation evaluation method serialization: {error}"))?,
+        ))
+    }
+}
 
 /// Content-addressed evidence that a remediation was evaluated for its declared impact dimensions.
 /// This is an evidence binding, not a theorem that the model forgot information or is safe.
@@ -198,10 +313,21 @@ pub struct NeurosemanticRemediationImpactArtifact {
     pub remediation_action: NeurosemanticArtifactLifecycleAction,
     pub study_protocol_hash: String,
     pub evaluation_split_manifest_hash: String,
+    /// Frozen forget/retain population identities used by the evaluation.
+    pub forget_set_manifest_hash: String,
+    pub retain_set_manifest_hash: String,
+    /// Content-addressed identity of the recovery-attack methodology.
+    pub recovery_method_hash: String,
+    /// Content-addressed identity of the representation-level residual probe methodology.
+    pub representation_probe_method_hash: String,
     /// Evidence over the intended forget/removal target.
     pub forget_evidence_hash: String,
     /// Evidence over retained-task utility/behavior.
     pub utility_impact_evidence_hash: String,
+    /// Evidence produced by recovery-attack evaluation.
+    pub recovery_evidence_hash: String,
+    /// Evidence produced by representation-level residual probing.
+    pub representation_residual_evidence_hash: String,
     /// Optional subgroup/fairness impact evidence; absence means it was not evaluated.
     pub fairness_impact_evidence_hash: Option<String>,
     /// Evidence over recovery or residual-influence checks.
@@ -252,8 +378,14 @@ impl NeurosemanticRemediationImpactArtifact {
             || self.pre_remediation_lineage_hash == self.post_remediation_lineage_hash
             || !valid_blake3_digest(&self.study_protocol_hash)
             || !valid_blake3_digest(&self.evaluation_split_manifest_hash)
+            || !valid_blake3_digest(&self.forget_set_manifest_hash)
+            || !valid_blake3_digest(&self.retain_set_manifest_hash)
+            || !valid_blake3_digest(&self.recovery_method_hash)
+            || !valid_blake3_digest(&self.representation_probe_method_hash)
             || !valid_blake3_digest(&self.forget_evidence_hash)
             || !valid_blake3_digest(&self.utility_impact_evidence_hash)
+            || !valid_blake3_digest(&self.recovery_evidence_hash)
+            || !valid_blake3_digest(&self.representation_residual_evidence_hash)
             || self.fairness_impact_evidence_hash.as_ref().is_some_and(|hash| !valid_blake3_digest(hash))
             || !valid_blake3_digest(&self.residual_risk_evidence_hash)
             || !valid_execution_revision(&self.execution_revision)
@@ -267,7 +399,7 @@ impl NeurosemanticRemediationImpactArtifact {
         if unique_dimensions.len() != self.dimensions.len() {
             return Err("neurosemantic remediation impact artifact contains duplicate dimensions".into());
         }
-        for required in ["forgetfulness", "utility-impact", "residual-risk"] {
+        for required in ["forgetfulness", "utility-impact", "residual-risk", "recovery-attack", "representation-residual"] {
             if !unique_dimensions.contains(required) {
                 return Err(format!("neurosemantic remediation impact artifact omits required dimension: {required}"));
             }
@@ -340,6 +472,48 @@ impl NeurosemanticRemediationImpactArtifact {
         let fingerprint = lifecycle_receipt.fingerprint()?;
         if fingerprint != self.lifecycle_receipt_hash {
             return Err("neurosemantic remediation impact artifact is bound to a different lifecycle receipt".into());
+        }
+        Ok(())
+    }
+
+    pub fn verify_evaluation_set_manifest_bytes(
+        &self,
+        kind: NeurosemanticRemediationEvaluationSetKind,
+        manifest_bytes: &[u8],
+    ) -> Result<(), String> {
+        self.validate()?;
+        let manifest = NeurosemanticRemediationEvaluationSetManifest::from_json_bytes(manifest_bytes)?;
+        if manifest.set_kind != kind {
+            return Err("neurosemantic remediation evaluation set kind mismatch".into());
+        }
+        let expected_hash = match kind {
+            NeurosemanticRemediationEvaluationSetKind::Forget => &self.forget_set_manifest_hash,
+            NeurosemanticRemediationEvaluationSetKind::Retain => &self.retain_set_manifest_hash,
+        };
+        if manifest.fingerprint()? != *expected_hash {
+            return Err("neurosemantic remediation evaluation set manifest hash mismatch".into());
+        }
+        Ok(())
+    }
+
+    pub fn verify_evaluation_method_bytes(
+        &self,
+        kind: NeurosemanticRemediationEvaluationMethodKind,
+        method_bytes: &[u8],
+    ) -> Result<(), String> {
+        self.validate()?;
+        let method = NeurosemanticRemediationEvaluationMethod::from_json_bytes(method_bytes)?;
+        if method.kind != kind {
+            return Err("neurosemantic remediation evaluation method kind mismatch".into());
+        }
+        let expected_hash = match kind {
+            NeurosemanticRemediationEvaluationMethodKind::RecoveryAttack =>
+                &self.recovery_method_hash,
+            NeurosemanticRemediationEvaluationMethodKind::RepresentationResidualProbe =>
+                &self.representation_probe_method_hash,
+        };
+        if method.fingerprint()? != *expected_hash {
+            return Err("neurosemantic remediation evaluation method hash mismatch".into());
         }
         Ok(())
     }
