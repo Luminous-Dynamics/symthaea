@@ -669,10 +669,29 @@ impl MorphophonologicalCompilationWitness {
         for value in [
             self.compiler_id.as_str(),
             self.compiler_version.as_str(),
-            self.compiler_implementation_revision.as_str(),
-            self.source_parser_revision.as_str(),
             self.normalization_policy.as_str(),
         ] {
+            if value.trim().is_empty() {
+                return Err(MorphophonologicalCompilationWitnessError::EmptyMetadata);
+            }
+        }
+        if self.compiler_id == UNIMORPH_TSV_COMPILER_ID {
+            if self.compiler_version != UNIMORPH_TSV_COMPILER_VERSION
+                || self.compiler_implementation_revision.is_none()
+                || self.source_parser_revision.is_none()
+            {
+                return Err(
+                    MorphophonologicalCompilationWitnessError::MissingCompilerIdentity,
+                );
+            }
+        }
+        for value in [
+            self.compiler_implementation_revision.as_deref(),
+            self.source_parser_revision.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
             if value.trim().is_empty() {
                 return Err(MorphophonologicalCompilationWitnessError::EmptyMetadata);
             }
@@ -754,12 +773,14 @@ impl MorphophonologicalCompilationWitness {
     fn validate_current_unimorph_implementation(
         &self,
     ) -> Result<(), MorphophonologicalCompilationWitnessError> {
-        if self.compiler_implementation_revision != UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION {
+        if self.compiler_implementation_revision.as_deref()
+            != Some(UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION)
+        {
             return Err(
                 MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch,
             );
         }
-        if self.source_parser_revision != UNIMORPH_TSV_SOURCE_PARSER_REVISION {
+        if self.source_parser_revision.as_deref() != Some(UNIMORPH_TSV_SOURCE_PARSER_REVISION) {
             return Err(MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch);
         }
         Ok(())
@@ -895,6 +916,7 @@ pub enum MorphophonologicalCompilationWitnessError {
     OutputRuleSetMismatch,
     TransformationMismatch,
     UnsupportedCompiler,
+    MissingCompilerIdentity,
     CompilerImplementationRevisionMismatch,
     SourceParserRevisionMismatch,
     CompilerReplayFailed,
@@ -923,6 +945,7 @@ impl std::fmt::Display for MorphophonologicalCompilationWitnessError {
             Self::OutputRuleSetMismatch => write!(f, "morphophonological compilation witness output rule-set identity does not match"),
             Self::TransformationMismatch => write!(f, "morphophonological compilation witness transformation digest does not match its declared inputs"),
             Self::UnsupportedCompiler => write!(f, "morphophonological compilation witness compiler implementation is not supported for replay"),
+            Self::MissingCompilerIdentity => write!(f, "morphophonological compilation witness is missing the implementation identity required for its declared UniMorph compiler"),
             Self::CompilerImplementationRevisionMismatch => write!(f, "morphophonological compilation witness compiler implementation revision does not match the current compiler"),
             Self::SourceParserRevisionMismatch => write!(f, "morphophonological compilation witness source parser revision does not match the current parser"),
             Self::CompilerReplayFailed => write!(f, "morphophonological compilation witness compiler replay failed"),
