@@ -724,6 +724,17 @@ impl NixPostStateReceiptV1 {
         if authorization.action_intent_digest != intent_digest {
             return Err(NixPostStateErrorV1::AuthorizationIntentMismatch);
         }
+        authorization
+            .validate_against_intent(intent)
+            .map_err(|error| match error {
+                super::authorization::NixAuthorizationErrorV1::MissingServiceEffectContext => {
+                    NixPostStateErrorV1::MissingServiceEffectContext
+                }
+                super::authorization::NixAuthorizationErrorV1::ServiceEffectContextMismatch => {
+                    NixPostStateErrorV1::ServiceEffectContextMismatch
+                }
+                _ => NixPostStateErrorV1::InvalidBoundAuthorization,
+            })?;
 
         let rebound_expectation = NixServicePostStateExpectationV1 {
             operation: self.operation,
