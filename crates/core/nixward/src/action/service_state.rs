@@ -411,6 +411,34 @@ impl NixServiceObservedStateV1 {
         )?;
         Ok((state, capabilities))
     }
+    pub(crate) fn from_observer_snapshot(
+        requested_unit: impl Into<String>,
+        resolved_id: impl Into<String>,
+        observed_names: Vec<String>,
+        load_state: ServiceLoadStateV1,
+        active_state: ServiceActiveStateV1,
+        unit_file_state: ServiceUnitFileStateV1,
+        sub_state: impl Into<String>,
+    ) -> Result<Self, NixServiceStateErrorV1> {
+        let requested_unit = canonical_service_unit(requested_unit.into())?;
+        let resolved_id = canonical_observed_service_unit(resolved_id.into())?;
+        let observed_names = normalize_observed_names_from_vec(&observed_names)?;
+        validate_observed_identity(&requested_unit, &resolved_id, &observed_names)?;
+
+        let sub_state = sub_state.into();
+        validate_sub_state(&sub_state)?;
+
+        Ok(Self {
+            unit: requested_unit,
+            resolved_id,
+            observed_names,
+            load_state,
+            active_state,
+            unit_file_state,
+            sub_state,
+        })
+    }
+
     /// Build the canonical execution-bound pre-state identity for one exact
     /// service observation. This is evidence/identity binding only; it does not
     /// authorize the operation.
@@ -424,6 +452,65 @@ impl NixServiceObservedStateV1 {
             self.unit
         ))
     }
+
+/// Observer-sealed exact service pre-state identity.
+///
+/// The token is intentionally non-serializable and non-cloneable. The
+/// filesystem/systemd observation layer is the only production constructor.
+pub struct NixVerifiedServicePreStateV1 {
+    unit: String,
+    generation: u64,
+    state_digest: String,
+    identity: String,
+}
+
+impl std::fmt::Debug for NixVerifiedServicePreStateV1 {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("NixVerifiedServicePreStateV1")
+            .field("unit", &self.unit)
+            .field("generation", &self.generation)
+            .field("state_digest", &self.state_digest)
+            .finish_non_exhaustive()
+    }
+}
+
+impl NixVerifiedServicePreStateV1 {
+    pub(crate) fn from_observer(
+        state: &NixServiceObservedStateV1,
+        generation: u64,
+    ) -> Result<Self, NixServiceStateErrorV1> {
+        if generation == 0 {
+            return Err(NixServiceStateErrorV1::InvalidGeneration);
+        }
+        state.validate_shape()?;
+        let state_digest = state.digest()?;
+        let identity = state.execution_pre_state_identity(generation)?;
+        Ok(Self {
+            unit: state.unit.clone(),
+            generation,
+            state_digest,
+            identity,
+        })
+    }
+
+    pub fn unit(&self) -> &str {
+        &self.unit
+    }
+
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    pub fn state_digest(&self) -> &str {
+        &self.state_digest
+    }
+
+    pub fn identity(&self) -> &str {
+        &self.identity
+    }
+}
+
     pub fn unit(&self) -> &str {
         &self.unit
     }
