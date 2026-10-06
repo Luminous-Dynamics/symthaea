@@ -266,6 +266,8 @@ pub const NEUROSEMANTIC_AUTHORITY_RESOLUTION_SCHEMA_VERSION: u16 = 1;
 pub struct NeurosemanticPolicyProvenanceBinding {
     policy_provenance_ref: String,
     policy_provenance_hash: String,
+    derivation_provenance_ref: String,
+    derivation_provenance_hash: String,
     handling_policy_fingerprint: String,
     authority_ref: String,
     key_ref: String,
@@ -516,6 +518,14 @@ impl NeurosemanticPolicyProvenanceBinding {
         &self.handling_policy_fingerprint
     }
 
+    pub fn derivation_provenance_ref(&self) -> &str {
+        &self.derivation_provenance_ref
+    }
+
+    pub fn derivation_provenance_hash(&self) -> &str {
+        &self.derivation_provenance_hash
+    }
+
     pub fn authority_ref(&self) -> &str {
         &self.authority_ref
     }
@@ -693,6 +703,8 @@ impl NeurosemanticHandlingPolicy {
         Ok(NeurosemanticPolicyProvenanceBinding {
             policy_provenance_ref: self.policy_provenance_ref.clone(),
             policy_provenance_hash: self.policy_provenance_hash.clone(),
+            derivation_provenance_ref: self.derivation_provenance_ref.clone(),
+            derivation_provenance_hash: self.derivation_provenance_hash.clone(),
             handling_policy_fingerprint: policy_fingerprint,
             authority_ref: attestation.authority_ref.clone(),
             key_ref: attestation.key_ref.clone(),
