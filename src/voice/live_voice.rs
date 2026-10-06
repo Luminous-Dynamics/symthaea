@@ -194,6 +194,10 @@ impl PhonologicalPlanRealizationReceipt {
 pub struct VerifiedLexicalPhonologicalRealizationReceipt {
     /// Existing v3 realization receipt, preserving its independent plan/audio accounting.
     pub realization: PhonologicalPlanRealizationReceipt,
+    /// Exact witness contract version.
+    pub witness_version: String,
+    /// Exact lexical-binding provenance carried by the witness.
+    pub lexical_binding_provenance: String,
     /// Canonical witness identity used to authorize the lexical realization.
     pub witness_blake3: String,
 }
@@ -212,6 +216,15 @@ impl VerifiedLexicalPhonologicalRealizationReceipt {
             .map_err(|_| anyhow::anyhow!("invalid lexical binding"))?;
         plan.validate_against_lexical_binding_and_witness(frame, binding, witness)
             .map_err(|error| anyhow::anyhow!("invalid lexical realization witness: {error}"))?;
+
+        if self.witness_version != witness.version {
+            anyhow::bail!("verified realization receipt witness version does not match witness");
+        }
+        if self.lexical_binding_provenance != binding.provenance_token() {
+            anyhow::bail!(
+                "verified realization receipt lexical-binding provenance does not match binding"
+            );
+        }
 
         let expected_witness =
             blake3::hash(witness.grounding_surface().as_bytes()).to_hex().to_string();
@@ -415,6 +428,8 @@ impl LiveVoice {
 
         Ok(VerifiedLexicalPhonologicalRealizationReceipt {
             realization,
+            witness_version: witness.version.clone(),
+            lexical_binding_provenance: binding.provenance_token(),
             witness_blake3: blake3::hash(witness.grounding_surface().as_bytes())
                 .to_hex()
                 .to_string(),
@@ -1695,6 +1710,16 @@ mod tests {
         receipt
             .verify_against_plan(&plan, &frame, &binding, &witness)
             .expect("verified receipt should independently revalidate");
+        assert_eq!(
+            receipt.witness_version,
+            witness.version,
+            "receipt must retain the exact witness version"
+        );
+        assert_eq!(
+            receipt.lexical_binding_provenance,
+            binding.provenance_token(),
+            "receipt must retain the exact lexical-binding provenance"
+        );
         assert_eq!(
             receipt.witness_blake3,
             witness.provenance_token(),
