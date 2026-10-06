@@ -6240,8 +6240,8 @@ mod tests {
             protocol_id: "protocol".into(),
             protocol_revision: "v1".into(),
             protocol_digest: "protocol-digest".into(),
-            procedure_id "procedure".into(),
-            procedure_digest "procedure-digest".into(),
+            procedure_id: "procedure".into(),
+            procedure_digest: "procedure-digest".into(),
             basis: fixture_basis(),
         };
 
