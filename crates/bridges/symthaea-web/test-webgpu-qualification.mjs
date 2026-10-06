@@ -1371,7 +1371,7 @@ async function runMode(mode) {
       }
 
       await page.screenshot({
-        path: path.join(SCREENSHOT_DIR, \`${mode}-preassert.png\`),
+        path: path.join(SCREENSHOT_DIR, `${mode}-preassert.png`),
         fullPage: false,
       });
 
