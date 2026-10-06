@@ -5001,8 +5001,49 @@ echo '}'
                 };
                 eprintln!("[{}] {} Writing config + rebuilding...", peer_addr, transaction.log_line());
                 let wc_config_path = format!("/tmp/symthaea-newconfig-{}.nix", transaction.transaction_id);
+                let wc_preimage_path = format!("/tmp/symthaea-config-preimage-{}.nix", transaction.transaction_id);
                 let wc_script_path = format!("/tmp/symthaea-rebuild-{}.sh", transaction.transaction_id);
                 let wc_log_path = format!("/tmp/symthaea-rebuild-{}.log", transaction.transaction_id);
+                let wc_status_path = format!("/tmp/symthaea-rebuild-{}.status", transaction.transaction_id);
+                let wc_pid_path = format!("/tmp/symthaea-rebuild-{}.pid", transaction.transaction_id);
+                // Snapshot the exact active configuration before staging.
+                // The apply step refuses stale overwrites if another actor changes it.
+                if let Err(error) = tokio::fs::copy(
+                    "/etc/nixos/configuration.nix",
+                    &wc_preimage_path,
+                )
+                .await
+                {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Unable to snapshot active configuration: {}",
+                                error
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+                if let Err(error) = tokio::fs::set_permissions(
+                    &wc_preimage_path,
+                    std::os::unix::fs::PermissionsExt::from_mode(0o600),
+                )
+                .await
+                {
+                    let _ = tokio::fs::remove_file(&wc_preimage_path).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Unable to protect active configuration snapshot: {}",
+                                error
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
                 // Stage browser-supplied configuration through the filesystem API.
                 // Never interpolate it into a shell heredoc: a user-controlled
                 // delimiter must not become a command-injection boundary.
@@ -5032,12 +5073,22 @@ echo '}'
 
                 let rebuild_script = format!(
                     r#"set -o pipefail
-cp -- /etc/nixos/configuration.nix /etc/nixos/configuration.nix.bak
+if ! cmp -s {preimage} /etc/nixos/configuration.nix; then
+    echo "ERROR: Active configuration changed after this transaction was prepared. Refusing stale overwrite."
+    rm -f -- {config} {preimage}
+    exit 2
+fi
 if ! nix-instantiate --parse {config} > /dev/null 2>&1; then
     echo "ERROR: Invalid Nix syntax. Keeping the active configuration unchanged."
-    rm -f -- {config}
+    rm -f -- {config} {preimage}
     exit 1
 fi
+if ! cmp -s {preimage} /etc/nixos/configuration.nix; then
+    echo "ERROR: Active configuration changed during validation. Refusing stale overwrite."
+    rm -f -- {config} {preimage}
+    exit 2
+fi
+cp -- /etc/nixos/configuration.nix /etc/nixos/configuration.nix.bak
 cp -- {config} /etc/nixos/configuration.nix
 rm -f -- {config}
 echo "Config validated. Rebuilding..."
@@ -5048,12 +5099,16 @@ set -e
 if [ $REBUILD_EXIT -ne 0 ]; then
     echo "ERROR: Rebuild failed. Restoring the previous configuration."
     cp -- /etc/nixos/configuration.nix.bak /etc/nixos/configuration.nix
+    rm -f -- {preimage}
     exit $REBUILD_EXIT
 fi
+rm -f -- {preimage}
 echo "REBUILD_COMPLETE"
 "#,
-                    config = wc_config_path
+                    config = wc_config_path,
+                    preimage = wc_preimage_path
                 );
+
                 if let Err(e) = tokio::fs::write(&wc_script_path, rebuild_script.as_bytes()).await {
                     let _ = tokio::fs::remove_file(&wc_config_path).await;
                     let _ = ws_tx
@@ -5080,12 +5135,58 @@ echo "REBUILD_COMPLETE"
                         .await;
                     continue;
                 }
-                let _ = tokio::fs::remove_file(&wc_config_path).await;
-                let _ = run_cmd(&format!(
-                    "touch {} && chmod 600 {} && bash {} > {} 2>&1 &",
-                    wc_log_path, wc_log_path, wc_script_path, wc_log_path
+                let launch_setup = run_cmd(&format!(
+                    "rm -f -- {} {} && touch {} {} && chmod 600 {} {}",
+                    wc_status_path,
+                    wc_pid_path,
+                    wc_status_path,
+                    wc_pid_path,
+                    wc_status_path,
+                    wc_pid_path
                 ))
                 .await;
+                if let Err(error) = launch_setup {
+                    let _ = tokio::fs::remove_file(&wc_config_path).await;
+                    let _ = tokio::fs::remove_file(&wc_preimage_path).await;
+                    let _ = tokio::fs::remove_file(&wc_script_path).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Rebuild status staging failed: {}",
+                                error
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                if let Err(error) = run_cmd(&format!(
+                    "(bash {} > {} 2>&1; rc=$?; printf '%s\\n' \\"$rc\\" > {}) & printf '%s\\n' \\"$!\\" > {}",
+                    wc_script_path,
+                    wc_log_path,
+                    wc_status_path,
+                    wc_pid_path
+                ))
+                .await
+                {
+                    let _ = tokio::fs::remove_file(&wc_config_path).await;
+                    let _ = tokio::fs::remove_file(&wc_preimage_path).await;
+                    let _ = tokio::fs::remove_file(&wc_script_path).await;
+                    let _ = tokio::fs::remove_file(&wc_log_path).await;
+                    let _ = tokio::fs::remove_file(&wc_status_path).await;
+                    let _ = tokio::fs::remove_file(&wc_pid_path).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Rebuild launch failed: {}",
+                                error
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
                 let _ = ws_tx
                     .send(Message::Text(
                         RelayMessage::output(
@@ -5096,7 +5197,6 @@ echo "REBUILD_COMPLETE"
                     ))
                     .await;
                 let mut last_lines = 0u64;
-                let mut complete = false;
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
                     if let Ok(result) = run_cmd(&format!(
@@ -5131,22 +5231,50 @@ echo "REBUILD_COMPLETE"
                     if complete {
                         break;
                     }
-                    if let Ok(check) = run_cmd(&format!("pgrep -f {}", wc_script_path)).await {
-                        if check.exit_status != 0 && last_lines > 0 {
+                    if let Ok(check) = run_cmd(&format!(
+                        "test -s {} || ! kill -0 \"$(cat {} 2>/dev/null)\" 2>/dev/null",
+                        wc_status_path,
+                        wc_pid_path
+                    ))
+                    .await
+                    {
+                        if check.exit_status == 0 {
                             break;
                         }
                     }
                 }
-                let exit_code = if complete { 0 } else { 1 };
+                let rebuild_exit_code = match run_cmd(&format!(
+                    "cat {} 2>/dev/null",
+                    wc_status_path
+                ))
+                .await
+                {
+                    Ok(result) if result.exit_status == 0 => {
+                        result.stdout.trim().parse::<u32>().ok()
+                    }
+                    _ => None,
+                };
+                let (exit_code, outcome) = match rebuild_exit_code {
+                    Some(0) => (0, TransactionOutcome::ObservedSuccess),
+                    Some(code) => (code, TransactionOutcome::Failed),
+                    None => (1, TransactionOutcome::Indeterminate),
+                };
                 let _ = ws_tx
                     .send(Message::Text(
-                        serde_json::json!({"type":"exit","code":exit_code,"transaction": transaction.receipt(if exit_code == 0 {
-                                TransactionOutcome::ObservedSuccess
-                            } else {
-                                TransactionOutcome::Failed
-                            })}).to_string(),
+                        serde_json::json!({
+                            "type":"exit",
+                            "code":exit_code,
+                            "transaction": transaction.receipt(outcome)
+                        })
+                        .to_string(),
                     ))
                     .await;
+                let _ = tokio::fs::remove_file(&wc_config_path).await;
+                let _ = tokio::fs::remove_file(&wc_preimage_path).await;
+                let _ = tokio::fs::remove_file(&wc_script_path).await;
+                let _ = tokio::fs::remove_file(&wc_log_path).await;
+                let _ = tokio::fs::remove_file(&wc_status_path).await;
+                let _ = tokio::fs::remove_file(&wc_pid_path).await;
             }
 
             // ── PXE / Network Boot ──
