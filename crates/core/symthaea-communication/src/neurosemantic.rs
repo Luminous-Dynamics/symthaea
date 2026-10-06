@@ -335,12 +335,7 @@ impl NeurosemanticRemediationMeasurementArtifact {
                 return Err("neurosemantic remediation measurement omits a required dimension".into());
             }
         }
-        let recomputed = self
-            .measurements
-            .iter()
-            .map(|measurement| measurement.status)
-            .max()
-            .ok_or_else(|| "neurosemantic remediation measurement set is empty".to_string())?;
+        let recomputed = self.recompute_worst_case_unchecked()?;
         if recomputed != self.worst_case_disposition {
             return Err("neurosemantic remediation worst-case disposition does not match dimensions".into());
         }
@@ -360,13 +355,32 @@ impl NeurosemanticRemediationMeasurementArtifact {
         Ok(artifact)
     }
 
+    fn recompute_worst_case_unchecked(
+        &self,
+    ) -> Result<NeurosemanticRemediationImpactDisposition, String> {
+        if self.measurements.is_empty() {
+            return Err("neurosemantic remediation measurement set is empty".into());
+        }
+        if self
+            .measurements
+            .iter()
+            .any(|measurement| measurement.status == NeurosemanticRemediationImpactDisposition::Inconclusive)
+        {
+            return Ok(NeurosemanticRemediationImpactDisposition::Inconclusive);
+        }
+        if self
+            .measurements
+            .iter()
+            .any(|measurement| measurement.status == NeurosemanticRemediationImpactDisposition::OutsideDeclaredBounds)
+        {
+            return Ok(NeurosemanticRemediationImpactDisposition::OutsideDeclaredBounds);
+        }
+        Ok(NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds)
+    }
+
     pub fn recomputed_worst_case_disposition(&self) -> Result<NeurosemanticRemediationImpactDisposition, String> {
         self.validate()?;
-        self.measurements
-            .iter()
-            .map(|measurement| measurement.status)
-            .max()
-            .ok_or_else(|| "neurosemantic remediation measurement set is empty".into())
+        self.recompute_worst_case_unchecked()
     }
 
     pub fn fingerprint(&self) -> Result<String, String> {
@@ -731,6 +745,21 @@ impl NeurosemanticRemediationImpactArtifact {
         let measurement = NeurosemanticRemediationMeasurementArtifact::from_json_bytes(measurement_bytes)?;
         if measurement.fingerprint()? != self.measurement_artifact_hash {
             return Err("neurosemantic remediation measurement artifact hash mismatch".into());
+        }
+        for declared in &self.dimensions {
+            let required_kind = match declared.as_str() {
+                "forgetfulness" => Some(NeurosemanticRemediationMeasurementKind::Forgetfulness),
+                "utility-impact" => Some(NeurosemanticRemediationMeasurementKind::UtilityImpact),
+                "fairness-impact" => Some(NeurosemanticRemediationMeasurementKind::FairnessImpact),
+                "recovery-attack" => Some(NeurosemanticRemediationMeasurementKind::RecoveryRisk),
+                "representation-residual" => Some(NeurosemanticRemediationMeasurementKind::RepresentationResidual),
+                _ => None,
+            };
+            if let Some(required_kind) = required_kind
+                && !measurement.measurements.iter().any(|item| item.kind == required_kind)
+            {
+                return Err("neurosemantic remediation measurement artifact omits a declared impact dimension".into());
+            }
         }
         Ok(measurement)
     }
@@ -3543,6 +3572,56 @@ mod tests {
         let mut future = method.clone();
         future.implementation_revision = "0".repeat(40);
         assert!(future.validate().is_err());
+    }
+    #[test]
+    fn remediation_measurement_worst_case_is_recomputed_not_supplied() {
+        let measured = NeurosemanticRemediationMeasurementArtifact {
+            schema_version: NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION,
+            measurement_ref: "measurement-worst-case".into(),
+            measurements: vec![
+                NeurosemanticRemediationMeasurement {
+                    kind: NeurosemanticRemediationMeasurementKind::Forgetfulness,
+                    status: NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds,
+                    sample_count: 10,
+                    failure_count: 0,
+                },
+                NeurosemanticRemediationMeasurement {
+                    kind: NeurosemanticRemediationMeasurementKind::UtilityImpact,
+                    status: NeurosemanticRemediationImpactDisposition::OutsideDeclaredBounds,
+                    sample_count: 10,
+                    failure_count: 1,
+                },
+                NeurosemanticRemediationMeasurement {
+                    kind: NeurosemanticRemediationMeasurementKind::RecoveryRisk,
+                    status: NeurosemanticRemediationImpactDisposition::Inconclusive,
+                    sample_count: 10,
+                    failure_count: 0,
+                },
+                NeurosemanticRemediationMeasurement {
+                    kind: NeurosemanticRemediationMeasurementKind::RepresentationResidual,
+                    status: NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds,
+                    sample_count: 10,
+                    failure_count: 0,
+                },
+            ],
+            worst_case_disposition: NeurosemanticRemediationImpactDisposition::Inconclusive,
+        };
+        assert!(measured.validate().is_ok());
+        let mut forged = measured.clone();
+        forged.worst_case_disposition = NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds;
+        assert!(forged.validate().is_err());
+        assert_eq!(measured.recomputed_worst_case_disposition().unwrap(), NeurosemanticRemediationImpactDisposition::Inconclusive);
+        let mut outside_only = measured.clone();
+        for item in &mut outside_only.measurements {
+            if item.status == NeurosemanticRemediationImpactDisposition::Inconclusive {
+                item.status = NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds;
+            }
+        }
+        outside_only.worst_case_disposition = NeurosemanticRemediationImpactDisposition::OutsideDeclaredBounds;
+        assert!(outside_only.validate().is_ok());
+        let mut invalid_counts = measured.clone();
+        invalid_counts.measurements[0].failure_count = 11;
+        assert!(invalid_counts.validate().is_err());
     }
     #[test]
     fn lifecycle_receipt_action_schema_is_stable() {
