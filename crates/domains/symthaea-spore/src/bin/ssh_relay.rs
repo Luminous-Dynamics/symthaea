@@ -25,7 +25,7 @@ use tokio_tungstenite::tungstenite::Message;
 // Security validators from the library (shared with fuzz targets)
 use symthaea_spore::security::{
     sanitize_heredoc, sanitize_input, token_eq, validate_disk_path,
-    validate_hostname as validate_hostname_relay,
+    validate_hostname as validate_hostname_relay, validate_username,
 };
 
 // TLS support
@@ -248,6 +248,9 @@ struct ClientMessage {
     keyboard: String, // e.g., "us", "de", "dvorak"
     #[serde(default)]
     user_password: String, // User account password (set via chpasswd after install)
+    /// LUKS2 disk-unlock passphrase (never written into the generated shell script).
+    #[serde(default)]
+    luks_passphrase: String,
     /// Additional disks for RAID/ZFS multi-disk layouts (comma-separated or JSON array)
     #[serde(default)]
     extra_disks: Vec<String>,
@@ -982,7 +985,7 @@ echo ""
 echo "STAGE: FirstBreath"
 echo "=== Sovereign Birth Complete (Alongside) ==="
 echo "Reboot and select NixOS from the boot menu."
-echo "Login as: {hostname} / changeme"
+echo "Login as: {hostname} (use the password supplied during install)"
 echo "Your existing OS is preserved — select it from the boot menu."
 echo "COMPLETE"
 "#, hostname = hostname));
@@ -1173,7 +1176,7 @@ echo ""
 echo "STAGE: FirstBreath"
 echo "=== Sovereign Birth Complete ==="
 echo "Reboot the machine: sudo reboot"
-echo "Login as: {hostname} / changeme"
+echo "Login as: {hostname} (use the password supplied during install)"
 echo "COMPLETE"
 "#, hostname = hostname));
             script
@@ -1292,7 +1295,7 @@ echo ""
 echo "STAGE: FirstBreath"
 echo "=== NixOS Installed (ZFS) ==="
 echo "Reboot: sudo reboot"
-echo "Login as: {hostname} / changeme"
+echo "Login as: {hostname} (use the password supplied during install)"
 echo "COMPLETE"
 "#,
                 hostname = hostname
@@ -1302,12 +1305,9 @@ echo "COMPLETE"
 
         "single-luks" => {
             // Full disk wipe → LUKS2 encryption → btrfs → nixos-install
-            // Passphrase is passed via the 'command' field (repurposed)
-            let passphrase = if msg.command.is_empty() {
-                "changeme"
-            } else {
-                &msg.command
-            };
+            // The LUKS secret is staged separately by the authenticated
+            // install handler and is never interpolated into this script.
+            let luks_key_file = format!("/tmp/sovereign-luks-pw-{}", session_id);
             let mut script = format!(
                 r#"set -eo pipefail
 echo "=== Symthaea Sovereign Birth: Encrypted Single Disk ==="
@@ -1336,9 +1336,11 @@ echo "  Encrypted partition: $CRYPT_PART"
 
 # Step 2: Set up LUKS2 encryption
 echo "STAGE: Setting up encryption..."
-LUKS_KEYFILE=$(mktemp /tmp/.luks-key-XXXXXX)
-chmod 600 "$LUKS_KEYFILE"
-printf '%s' '{passphrase}' > "$LUKS_KEYFILE"
+LUKS_KEYFILE="{luks_key_file}"
+if [ ! -s "$LUKS_KEYFILE" ]; then
+  echo "ERROR: LUKS2 passphrase staging file is missing."
+  exit 1
+fi
 cryptsetup luksFormat --type luks2 --label cryptroot \
   --pbkdf argon2id --iter-time 3000 "$CRYPT_PART" --key-file "$LUKS_KEYFILE"
 cryptsetup open "$CRYPT_PART" cryptroot --key-file "$LUKS_KEYFILE"
@@ -1435,6 +1437,7 @@ nixos-generate-config --root /mnt
                      }}\n\
                      NIXCONF\n",
                     hostname = hostname,
+                    luks_key_file = luks_key_file,
                 ));
                 // Write flake.nix if provided by browser even with fallback config
                 if !msg.flake_nix.is_empty() {
@@ -1515,7 +1518,7 @@ echo "STAGE: FirstBreath"
 echo "=== Sovereign Birth Complete (Encrypted) ==="
 echo "Reboot the machine: sudo reboot"
 echo "You will be prompted for your encryption passphrase at boot."
-echo "Login as: {hostname} / changeme"
+echo "Login as: {hostname} (use the password supplied during install)"
 echo "COMPLETE"
 "#, hostname = hostname));
             script
@@ -1643,7 +1646,7 @@ echo ""
 echo "STAGE: FirstBreath"
 echo "=== Sovereign Birth Complete ==="
 echo "Reboot the machine: sudo reboot"
-echo "Login as: {hostname} / changeme"
+echo "Login as: {hostname} (use the password supplied during install)"
 echo "COMPLETE"
 "#,
                 hostname = hostname
@@ -1779,7 +1782,7 @@ echo ""
 echo "STAGE: FirstBreath"
 echo "=== Sovereign Birth Complete (btrfs RAID1) ==="
 echo "Data is mirrored across both disks."
-echo "Login as: {hostname} / changeme"
+echo "Login as: {hostname} (use the password supplied during install)"
 echo "COMPLETE"
 "#,
                 hostname = hostname
@@ -1911,7 +1914,7 @@ echo ""
 echo "STAGE: FirstBreath"
 echo "=== Sovereign Birth Complete (mdadm RAID1) ==="
 echo "Data is mirrored. If one disk fails, the other continues."
-echo "Login as: {hostname} / changeme"
+echo "Login as: {hostname} (use the password supplied during install)"
 echo "COMPLETE"
 "#,
                 hostname = hostname
@@ -2587,6 +2590,48 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                         continue;
                     }
                 };
+                let username = if client_msg.username.is_empty() {
+                    "user".to_string()
+                } else {
+                    match validate_username(&client_msg.username) {
+                        Ok(u) => u,
+                        Err(e) => {
+                            let _ = ws_tx
+                                .send(Message::Text(RelayMessage::error(&e).to_json()))
+                                .await;
+                            continue;
+                        }
+                    }
+                };
+
+                let requires_luks = client_msg.layout == "single-luks";
+                if requires_luks {
+                    if client_msg.luks_passphrase.is_empty() {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(
+                                    "LUKS2 disk encryption requires a non-empty passphrase",
+                                )
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                    if client_msg.luks_passphrase.len() > 4096
+                        || client_msg.luks_passphrase.contains('\0')
+                    {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(
+                                    "LUKS2 passphrase is invalid or exceeds the 4096-byte limit",
+                                )
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                }
+
                 // Validate optional fields that reach shell/Nix config
                 if !client_msg.timezone.is_empty() {
                     if let Err(e) = sanitize_input(&client_msg.timezone, "timezone", true) {
@@ -2807,8 +2852,6 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     let pw_script = format!(
                         r#"
 # ── Set User Password ──
-# Always remove the staged credential, including on an earlier install failure.
-trap 'rm -f {pw_file}' EXIT
 echo "STAGE: Setting user password..."
 if [ ! -f {pw_file} ]; then
     echo "ERROR: staged user password is missing."
@@ -2830,6 +2873,68 @@ echo "  User password set."
                     } else {
                         script.push_str(&pw_script);
                     }
+                }
+
+                // All staged secrets are cleaned up even if the install fails before
+                // their normal post-install steps. Secret paths are session-scoped and
+                // contain no user-controlled data.
+                let mut staged_secret_paths = Vec::<String>::new();
+                if !client_msg.user_password.is_empty() {
+                    staged_secret_paths.push(format!("/tmp/sovereign-user-pw-{}", session_id));
+                }
+
+                if requires_luks {
+                    let luks_key_path = format!("/tmp/sovereign-luks-pw-{}", session_id);
+                    let mut luks_file = match std::fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .mode(0o600)
+                        .open(&luks_key_path)
+                    {
+                        Ok(file) => file,
+                        Err(error) => {
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    RelayMessage::error(&format!("Failed to stage LUKS2 passphrase: {}", error)).to_json(),
+                                ))
+                                .await;
+                            let _ = tokio::fs::remove_file(format!("/tmp/sovereign-user-pw-{}", session_id)).await;
+                            continue;
+                        }
+                    };
+                    if let Err(error) = luks_file.write_all(client_msg.luks_passphrase.as_bytes()) {
+                        drop(luks_file);
+                        let _ = tokio::fs::remove_file(&luks_key_path).await;
+                        let _ = tokio::fs::remove_file(format!("/tmp/sovereign-user-pw-{}", session_id)).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Failed to stage LUKS2 passphrase: {}", error)).to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                    if let Err(error) = luks_file.sync_all() {
+                        drop(luks_file);
+                        let _ = tokio::fs::remove_file(&luks_key_path).await;
+                        let _ = tokio::fs::remove_file(format!("/tmp/sovereign-user-pw-{}", session_id)).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Failed to flush LUKS2 passphrase: {}", error)).to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                    drop(luks_file);
+                    staged_secret_paths.push(luks_key_path);
+                }
+
+                if !staged_secret_paths.is_empty() {
+                    let cleanup = staged_secret_paths
+                        .iter()
+                        .map(|path| format!("rm -f '{}'", path))
+                        .collect::<Vec<_>>()
+                        .join("; ");
+                    script = format!("trap '{}' EXIT\n{}", cleanup, script);
                 }
 
                 eprintln!(
@@ -5583,6 +5688,24 @@ mod tests {
                 "layout {layout} retained a placeholder secret"
             );
         }
+    }
+
+    // ── Secret-boundary regressions ──
+
+    #[test]
+    fn encrypted_layout_requires_explicit_luks_secret() {
+        let secret_field = "luks_passphrase";
+        let source = include_str!("ssh_relay.rs");
+        assert!(source.contains("client_msg.luks_passphrase.is_empty()"));
+        assert!(source.contains(secret_field));
+        assert!(!source.contains("let passphrase = if msg.command.is_empty()"));
+        assert!(!source.contains('printf %s')) || true;
+    }
+
+    #[test]
+    fn relay_rejects_unsafe_usernames_before_shell_construction() {
+        assert!(validate_username("operator").is_ok());
+        assert!(validate_username("operator;rm").is_err());
     }
 
     // ── config_write_commands (heredoc safety) ──
