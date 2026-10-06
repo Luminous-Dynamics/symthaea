@@ -6886,13 +6886,21 @@ echo "COMPLETE"
                 let transaction_dir = match create_transaction_artifact_dir(&transaction.transaction_id) {
                     Ok(path) => path,
                     Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!(
-                                    "Unable to create image transaction artifact namespace: {}",
-                                    error
-                                ))
-                                .to_json(),
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Image artifact namespace unavailable: {}", error),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
                             ))
                             .await;
                         continue;
@@ -6910,15 +6918,24 @@ echo "COMPLETE"
                 ))
                 .await;
                 if let Err(error) = setup {
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
                     let _ = ws_tx
                         .send(Message::Text(
-                            RelayMessage::error(&format!(
-                                "Image transaction staging failed: {}",
-                                error
-                            ))
-                            .to_json(),
+                            serde_json::json!({
+                                "type":"exit",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!("Image artifact setup could not be observed: {}", error),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
                         ))
                         .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
 
@@ -6931,20 +6948,24 @@ echo "COMPLETE"
                 ))
                 .await
                 {
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
                     let _ = ws_tx
                         .send(Message::Text(
-                            RelayMessage::error(&format!(
-                                "Image creation launch failed: {}",
-                                error
-                            ))
-                            .to_json(),
+                            serde_json::json!({
+                                "type":"exit",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!("Image creation launch could not be observed: {}", error),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
                         ))
                         .await;
-                    let _ = run_cmd(&format!(
-                        "rm -f -- {} {} {}",
-                        img_log, img_status, img_pid
-                    ))
-                    .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
 
