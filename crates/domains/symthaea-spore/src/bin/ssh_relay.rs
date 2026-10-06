@@ -2749,7 +2749,7 @@ async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
         let check_command = if artifact.ends_with(".zst") {
             format!("zstd -t -- '{}'", safe_path)
         } else {
-            format!("tar -tzf -- '{}'", safe_path)
+            format!("tar -tzf '{}'", safe_path)
         };
         let check = run_cmd(&check_command)
             .await
@@ -5217,14 +5217,17 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
 
             "switch_generation" => {
                 let r#gen = &client_msg.command;
-                if r#gen.is_empty() || !r#gen.chars().all(|c| c.is_ascii_digit()) {
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            RelayMessage::error("Invalid generation number").to_json(),
-                        ))
-                        .await;
-                    continue;
-                }
+                let requested_generation = match r#gen.parse::<u64>() {
+                    Ok(generation) => generation,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error("Generation number is out of range").to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
                 let _mutation_guard = match mutation_lock.try_lock() {
                     Ok(guard) => guard,
                     Err(_) => {
@@ -5268,7 +5271,7 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                     Ok(r) => {
                         let observed_outcome = if r.exit_status == 0 {
                             match current_system_generation().await {
-                                Ok(generation) if generation == r#gen.parse::<u64>().unwrap_or(0) => {
+                                Ok(generation) if generation == requested_generation => {
                                     TransactionOutcome::ObservedSuccess
                                 }
                                 Ok(generation) => {
@@ -7587,6 +7590,12 @@ mod tests {
         let banner = auth_token_banner("super-secret-token", true);
         assert!(banner.contains("super-secret-token"));
         assert!(banner.starts_with("  Auth token: "));
+    }
+
+    #[test]
+    fn generation_link_parser_preserves_u64_boundary() {
+        assert_eq!(parse_generation_link("system-18446744073709551615-link"), Some(u64::MAX));
+        assert_eq!(parse_generation_link("system-18446744073709551616-link"), None);
     }
 
     #[test]
