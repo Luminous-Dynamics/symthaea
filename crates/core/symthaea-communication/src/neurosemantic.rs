@@ -336,10 +336,185 @@ pub struct NeurosemanticRemediationMeasurement {
     pub failure_count: u64,
 }
 
-pub const NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION: u16 = 2;
+/// One observed case contributing to a declared remediation metric.
+///
+/// This protocol boundary records a binary metric-defined failure event for one concrete
+/// subject artifact. Scientific meaning remains bounded by the metric definition and study protocol.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationObservationRecord {
+    pub observation_ref: String,
+    pub subject_artifact_hash: String,
+    pub failure_observed: bool,
+    /// Required for subgroup-gap metrics so subgroup membership is itself auditable.
+    #[serde(default)]
+    pub group_ref: Option<String>,
+}
+
+impl NeurosemanticRemediationObservationRecord {
+    fn validate(&self, require_group: bool) -> Result<(), String> {
+        if !valid_identifier(&self.observation_ref)
+            || !valid_blake3_digest(&self.subject_artifact_hash)
+            || (require_group
+                && self
+                    .group_ref
+                    .as_deref()
+                    .is_none_or(|group| !valid_identifier(group)))
+            || self
+                .group_ref
+                .as_deref()
+                .is_some_and(|group| !valid_identifier(group))
+        {
+            return Err("neurosemantic remediation observation record fields are invalid".into());
+        }
+        Ok(())
+    }
+}
+
+/// Frozen eligible population plus the exact observations actually evaluated.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationObservationSetArtifact {
+    pub schema_version: u16,
+    pub observation_set_ref: String,
+    pub metric_ref: String,
+    pub kind: NeurosemanticRemediationMeasurementKind,
+    pub scope_ref: String,
+    pub eligible_subject_artifact_hashes: Vec<String>,
+    pub observations: Vec<NeurosemanticRemediationObservationRecord>,
+}
+
+impl NeurosemanticRemediationObservationSetArtifact {
+    pub fn validate(&self, aggregation_ref: &str) -> Result<(), String> {
+        let require_group = aggregation_ref == "worst-subgroup-gap";
+        if self.schema_version != NEUROSEMANTIC_REMEDIATION_OBSERVATION_SET_SCHEMA_VERSION
+            || !valid_identifier(&self.observation_set_ref)
+            || !valid_identifier(&self.metric_ref)
+            || self.scope_ref.is_empty()
+            || self.scope_ref.len() > MAX_NEUROSEMANTIC_REMEDIATION_METRIC_TEXT_BYTES
+            || self.eligible_subject_artifact_hashes.is_empty()
+            || self.eligible_subject_artifact_hashes.len() > MAX_NEUROSEMANTIC_REMEDIATION_OBSERVATIONS
+            || self.observations.len() > MAX_NEUROSEMANTIC_REMEDIATION_OBSERVATIONS
+            || self
+                .eligible_subject_artifact_hashes
+                .iter()
+                .any(|hash| !valid_blake3_digest(hash))
+        {
+            return Err("neurosemantic remediation observation set fields are invalid".into());
+        }
+
+        let eligible: BTreeSet<&str> = self
+            .eligible_subject_artifact_hashes
+            .iter()
+            .map(String::as_str)
+            .collect();
+        if eligible.len() != self.eligible_subject_artifact_hashes.len() {
+            return Err("neurosemantic remediation observation set contains duplicate eligible subjects".into());
+        }
+
+        let mut observed_subjects = BTreeSet::new();
+        let mut observation_refs = BTreeSet::new();
+        for observation in &self.observations {
+            observation.validate(require_group)?;
+            if !eligible.contains(observation.subject_artifact_hash.as_str())
+                || !observed_subjects.insert(observation.subject_artifact_hash.as_str())
+                || !observation_refs.insert(observation.observation_ref.as_str())
+            {
+                return Err("neurosemantic remediation observation set contains an invalid or duplicate observation".into());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8], aggregation_ref: &str) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic remediation observation set JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let artifact: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("neurosemantic remediation observation set JSON: {error}"))?;
+        artifact.validate(aggregation_ref)?;
+        Ok(artifact)
+    }
+
+    pub fn fingerprint(&self, aggregation_ref: &str) -> Result<String, String> {
+        self.validate(aggregation_ref)?;
+        let mut canonical = self.clone();
+        canonical.eligible_subject_artifact_hashes.sort();
+        canonical.observations.sort_by(|left, right| {
+            left.subject_artifact_hash
+                .cmp(&right.subject_artifact_hash)
+                .then_with(|| left.observation_ref.cmp(&right.observation_ref))
+        });
+        Ok(content_hash(&serde_json::to_vec(&canonical).map_err(|error| {
+            format!("neurosemantic remediation observation set serialization: {error}")
+        })?))
+    }
+}
+
+/// Independently reproducible point-estimate computation over one observation set.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationMetricComputationArtifact {
+    pub schema_version: u16,
+    pub computation_ref: String,
+    pub metric_ref: String,
+    pub kind: NeurosemanticRemediationMeasurementKind,
+    pub metric_definition_hash: String,
+    pub observation_set_hash: String,
+    pub aggregation_ref: String,
+    pub execution_revision: String,
+    /// Fixed-point result: estimate_numerator / 10^estimate_scale.
+    pub estimate_numerator: i64,
+    pub estimate_scale: u32,
+    pub eligible_sample_count: u64,
+    pub observed_sample_count: u64,
+    pub failure_count: u64,
+}
+
+impl NeurosemanticRemediationMetricComputationArtifact {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != NEUROSEMANTIC_REMEDIATION_METRIC_COMPUTATION_SCHEMA_VERSION
+            || !valid_identifier(&self.computation_ref)
+            || !valid_identifier(&self.metric_ref)
+            || !valid_blake3_digest(&self.metric_definition_hash)
+            || !valid_blake3_digest(&self.observation_set_hash)
+            || !valid_identifier(&self.aggregation_ref)
+            || !valid_execution_revision(&self.execution_revision)
+            || self.estimate_scale > 12
+        {
+            return Err("neurosemantic remediation metric computation fields are invalid".into());
+        }
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic remediation metric computation JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let artifact: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("neurosemantic remediation metric computation JSON: {error}"))?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn fingerprint(&self) -> Result<String, String> {
+        self.validate()?;
+        Ok(content_hash(&serde_json::to_vec(self).map_err(|error| {
+            format!("neurosemantic remediation metric computation serialization: {error}")
+        })?))
+    }
+}
+
+pub const NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION: u16 = 3;
 pub const NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_REMEDIATION_OBSERVATION_SET_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_REMEDIATION_METRIC_COMPUTATION_SCHEMA_VERSION: u16 = 1;
 const MAX_NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITIONS: usize = 32;
 const MAX_NEUROSEMANTIC_REMEDIATION_METRIC_TEXT_BYTES: usize = 256;
+const MAX_NEUROSEMANTIC_REMEDIATION_OBSERVATIONS: usize = 4096;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NeurosemanticRemediationMeasurementArtifact {
@@ -347,6 +522,8 @@ pub struct NeurosemanticRemediationMeasurementArtifact {
     pub measurement_ref: String,
     pub metric_definitions: Vec<NeurosemanticRemediationMetricDefinition>,
     pub measurements: Vec<NeurosemanticRemediationMeasurement>,
+    /// Exact point-estimate computation artifacts, one per measurement metric.
+    pub metric_computation_artifact_hashes: Vec<String>,
     pub worst_case_disposition: NeurosemanticRemediationImpactDisposition,
 }
 
@@ -358,6 +535,8 @@ impl NeurosemanticRemediationMeasurementArtifact {
             || self.metric_definitions.len() > MAX_NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITIONS
             || self.measurements.is_empty()
             || self.measurements.len() > 32
+            || self.metric_computation_artifact_hashes.len() != self.measurements.len()
+            || self.metric_computation_artifact_hashes.iter().any(|hash| !valid_blake3_digest(hash))
         {
             return Err("neurosemantic remediation measurement artifact fields are invalid".into());
         }
@@ -375,6 +554,15 @@ impl NeurosemanticRemediationMeasurementArtifact {
             {
                 return Err("neurosemantic remediation metric definition fields are invalid".into());
             }
+        }
+
+        let computation_hashes: BTreeSet<&str> = self
+            .metric_computation_artifact_hashes
+            .iter()
+            .map(String::as_str)
+            .collect();
+        if computation_hashes.len() != self.metric_computation_artifact_hashes.len() {
+            return Err("neurosemantic remediation measurement contains duplicate computation artifact hashes".into());
         }
 
         let mut measurement_refs = BTreeSet::new();
@@ -491,6 +679,29 @@ impl NeurosemanticRemediationMeasurementArtifact {
                 format!("neurosemantic remediation measurement serialization: {error}")
             })?,
         ))
+    }
+}
+
+impl NeurosemanticRemediationMetricDefinition {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION
+            || !valid_identifier(&self.metric_ref)
+            || !valid_identifier(&self.estimand_ref)
+            || self.scope_ref.is_empty()
+            || self.scope_ref.len() > MAX_NEUROSEMANTIC_REMEDIATION_METRIC_TEXT_BYTES
+            || !valid_identifier(&self.unit_ref)
+            || !valid_identifier(&self.aggregation_ref)
+        {
+            return Err("neurosemantic remediation metric definition fields are invalid".into());
+        }
+        Ok(())
+    }
+
+    pub fn fingerprint(&self) -> Result<String, String> {
+        self.validate()?;
+        Ok(content_hash(&serde_json::to_vec(self).map_err(|error| {
+            format!("neurosemantic remediation metric definition serialization: {error}")
+        })?))
     }
 }
 
@@ -869,6 +1080,106 @@ impl NeurosemanticRemediationImpactArtifact {
             }
         }
         Ok(measurement)
+    }
+
+    /// Verify every reported point estimate against explicit, content-addressed observations.
+    ///
+    /// The caller supplies the exact observation-set bytes; no ambient repository/global
+    /// resolver is consulted.
+    pub fn verify_measurement_computation_bundle_bytes(
+        &self,
+        measurement_bytes: &[u8],
+        computation_bytes: &[&[u8]],
+        observation_set_bytes: &[&[u8]],
+    ) -> Result<(), String> {
+        self.validate()?;
+        let measurement = self.verify_measurement_artifact_bytes(measurement_bytes)?;
+        if computation_bytes.len() != measurement.metric_computation_artifact_hashes.len() {
+            return Err("neurosemantic remediation computation bundle cardinality mismatch".into());
+        }
+
+        let mut seen_computation_hashes = BTreeSet::new();
+        let mut seen_metric_refs = BTreeSet::new();
+        for bytes in computation_bytes {
+            let computation = NeurosemanticRemediationMetricComputationArtifact::from_json_bytes(bytes)?;
+            let computation_hash = computation.fingerprint()?;
+            if !measurement
+                .metric_computation_artifact_hashes
+                .iter()
+                .any(|expected| expected == &computation_hash)
+                || !seen_computation_hashes.insert(computation_hash)
+                || !seen_metric_refs.insert(computation.metric_ref.clone())
+            {
+                return Err("neurosemantic remediation computation bundle contains an unexpected or duplicate computation".into());
+            }
+
+            let definition = measurement
+                .metric_definitions
+                .iter()
+                .find(|definition| definition.metric_ref == computation.metric_ref)
+                .ok_or_else(|| "neurosemantic remediation computation references an unknown metric".to_string())?;
+            if definition.kind != computation.kind
+                || definition.aggregation_ref != computation.aggregation_ref
+                || definition.fingerprint()? != computation.metric_definition_hash
+            {
+                return Err("neurosemantic remediation metric computation definition binding mismatch".into());
+            }
+
+            let observation_set_bytes = observation_set_bytes
+                .iter()
+                .copied()
+                .find(|candidate| content_hash(candidate) == computation.observation_set_hash)
+                .ok_or_else(|| "neurosemantic remediation computation observation set is missing".to_string())?;
+            let observation_set = NeurosemanticRemediationObservationSetArtifact::from_json_bytes(
+                observation_set_bytes,
+                computation.aggregation_ref.as_str(),
+            )?;
+            if observation_set.metric_ref != computation.metric_ref
+                || observation_set.kind != computation.kind
+                || observation_set.fingerprint(computation.aggregation_ref.as_str())? != computation.observation_set_hash
+                || observation_set.scope_ref != definition.scope_ref
+            {
+                return Err("neurosemantic remediation observation set binding mismatch".into());
+            }
+
+            let (eligible_count, observed_count, failure_count, ratio_numerator, ratio_denominator) =
+                recompute_metric_ratio(&observation_set, computation.aggregation_ref.as_str())?;
+            if computation.execution_revision != self.execution_revision
+                || computation.eligible_sample_count != eligible_count
+                || computation.observed_sample_count != observed_count
+                || computation.failure_count != failure_count
+                || !fixed_point_equals_ratio(
+                    computation.estimate_numerator,
+                    computation.estimate_scale,
+                    ratio_numerator,
+                    ratio_denominator,
+                )
+            {
+                return Err("neurosemantic remediation metric computation does not reproduce its observations".into());
+            }
+
+            let measurement_item = measurement
+                .measurements
+                .iter()
+                .find(|item| item.metric_ref == computation.metric_ref)
+                .ok_or_else(|| "neurosemantic remediation computation lacks a measurement".to_string())?;
+            if measurement_item.kind != computation.kind
+                || measurement_item.eligible_sample_count != computation.eligible_sample_count
+                || measurement_item.observed_sample_count != computation.observed_sample_count
+                || measurement_item.failure_count != computation.failure_count
+                || measurement_item.estimate_numerator != computation.estimate_numerator
+                || measurement_item.estimate_scale != computation.estimate_scale
+            {
+                return Err("neurosemantic remediation measurement does not match independent computation".into());
+            }
+        }
+
+        if seen_computation_hashes.len() != measurement.metric_computation_artifact_hashes.len()
+            || seen_metric_refs.len() != measurement.measurements.len()
+        {
+            return Err("neurosemantic remediation computation bundle is incomplete".into());
+        }
+        Ok(())
     }
 
     pub fn verify_evaluation_verification_evidence_bytes(
@@ -3018,6 +3329,87 @@ fn validate_payload(payload: &NeurosemanticPayload) -> Result<(), String> {
     }
 }
 
+fn recompute_metric_ratio(
+    observation_set: &NeurosemanticRemediationObservationSetArtifact,
+    aggregation_ref: &str,
+) -> Result<(u64, u64, u64, i128, i128), String> {
+    let eligible_count = observation_set.eligible_subject_artifact_hashes.len() as u64;
+    let observed_count = observation_set.observations.len() as u64;
+    let failure_count = observation_set
+        .observations
+        .iter()
+        .filter(|observation| observation.failure_observed)
+        .count() as u64;
+
+    match aggregation_ref {
+        "per-item-rate" | "attack-success-rate" | "probe-detection-rate" => {
+            if observed_count == 0 {
+                return Err("neurosemantic remediation point-estimate computation has no observations".into());
+            }
+            Ok((
+                eligible_count,
+                observed_count,
+                failure_count,
+                failure_count as i128,
+                observed_count as i128,
+            ))
+        }
+        "worst-subgroup-gap" => {
+            let mut groups: BTreeMap<String, (u64, u64)> = BTreeMap::new();
+            for observation in &observation_set.observations {
+                let group = observation.group_ref.as_ref().ok_or_else(|| {
+                    "neurosemantic remediation subgroup computation requires group identities".to_string()
+                })?;
+                let entry = groups.entry(group.clone()).or_default();
+                entry.0 += u64::from(observation.failure_observed);
+                entry.1 += 1;
+            }
+            if groups.len() < 2 {
+                return Err("neurosemantic remediation subgroup gap requires at least two groups".into());
+            }
+            let mut rates: Vec<(u64, u64)> = groups.values().copied().collect();
+            rates.sort_by(|left, right| {
+                (left.0 as u128 * right.1 as u128)
+                    .cmp(&(right.0 as u128 * left.1 as u128))
+            });
+            let (min_numerator, min_denominator) = rates
+                .first()
+                .copied()
+                .ok_or_else(|| "neurosemantic remediation subgroup rates are empty".to_string())?;
+            let (max_numerator, max_denominator) = rates
+                .last()
+                .copied()
+                .ok_or_else(|| "neurosemantic remediation subgroup rates are empty".to_string())?;
+            let gap_numerator =
+                max_numerator as i128 * min_denominator as i128
+                    - min_numerator as i128 * max_denominator as i128;
+            let gap_denominator = max_denominator as i128 * min_denominator as i128;
+            Ok((
+                eligible_count,
+                observed_count,
+                failure_count,
+                gap_numerator,
+                gap_denominator,
+            ))
+        }
+        _ => Err("neurosemantic remediation aggregation is not reproducibly computable at this protocol boundary".into()),
+    }
+}
+
+fn fixed_point_equals_ratio(
+    estimate_numerator: i64,
+    estimate_scale: u32,
+    ratio_numerator: i128,
+    ratio_denominator: i128,
+) -> bool {
+    if ratio_denominator <= 0 || estimate_numerator < 0 {
+        return false;
+    }
+    let scale_factor = 10_i128.checked_pow(estimate_scale).unwrap_or(0);
+    scale_factor > 0
+        && estimate_numerator as i128 * ratio_denominator == ratio_numerator * scale_factor
+}
+
 fn payload_hash(payload: &NeurosemanticPayload) -> Result<String, String> {
     let bytes = serde_json::to_vec(payload)
         .map_err(|error| format!("payload serialization: {error}"))?;
@@ -3860,6 +4252,12 @@ mod tests {
             schema_version: NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION,
             measurement_ref: "measurement-typed".into(),
             metric_definitions: vec![definition],
+            metric_computation_artifact_hashes: vec![
+                content_hash(b"typed-computation-forgetfulness"),
+                content_hash(b"typed-computation-utility"),
+                content_hash(b"typed-computation-recovery"),
+                content_hash(b"typed-computation-representation"),
+            ],
             measurements: vec![
                 NeurosemanticRemediationMeasurement {
                     metric_ref: "metric-typed".into(),
@@ -4016,6 +4414,12 @@ mod tests {
             schema_version: NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION,
             measurement_ref: "measurement-worst-case".into(),
             metric_definitions,
+            metric_computation_artifact_hashes: vec![
+                content_hash(b"worst-case-computation-1"),
+                content_hash(b"worst-case-computation-2"),
+                content_hash(b"worst-case-computation-3"),
+                content_hash(b"worst-case-computation-4"),
+            ],
             measurements: vec![
                 NeurosemanticRemediationMeasurement {
                     metric_ref: "metric-forgetfulness".into(),
