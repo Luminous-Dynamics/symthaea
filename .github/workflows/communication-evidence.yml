@@ -141,6 +141,7 @@ jobs:
           assert report["lifecycle_verifier_independence_required"] is True
           assert report["lifecycle_verification_scope_mismatch_blocked"] is True
           assert report["lifecycle_verification_scope_root_mismatch_blocked"] is True
+          assert report["lifecycle_verification_scope_duplicate_blocked"] is True
           assert report["lifecycle_verification_scope_tamper_blocked"] is True
           assert report["lifecycle_artifact_mismatch_blocked"] is True
           assert report["lifecycle_lineage_mismatch_blocked"] is True
