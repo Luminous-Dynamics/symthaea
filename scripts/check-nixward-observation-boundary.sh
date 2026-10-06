@@ -59,6 +59,7 @@ SYSTEMD_OBSERVER_PROXY_MUTATION_PATTERN='\.set_property\(|\.set\(|\.into_inner\(
 SYSTEMD_OBSERVER_AUTHORITY_IMPORT_PATTERN='\bsuper::(?:executor|authorization|systemd_mutation)\b'
 VERIFIED_STABILITY_FACTORY_PATTERN='\bNixVerifiedPostStateStabilityEvidenceV1::from_observer[[:space:]]*\('
 VERIFIED_DEFINITION_CONTENT_FACTORY_PATTERN='\bNixVerifiedServiceDefinitionContentV1::from_observer[[:space:]]*\('
+DBUS_BUS_ID_OBSERVATION_PATTERN='\.call\([[:space:]]*"GetId"[[:space:]]*,'
 SYSTEMD_TRANSPORT_PUBLIC_API_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(observe_service_properties|observe_service_state_properties)[[:space:]]*\('
 
 scan_diagnostic_boundary() {
@@ -109,6 +110,11 @@ scan_verified_stability_factory() {
 scan_verified_definition_content_factory() {
   local file="$1"
   rg -n --pcre2 "${VERIFIED_DEFINITION_CONTENT_FACTORY_PATTERN}" "$file"
+}
+
+scan_dbus_bus_id_observation() {
+  local file="$1"
+  rg -n --pcre2 "${DBUS_BUS_ID_OBSERVATION_PATTERN}" "$file"
 }
 
 scan_public_systemd_transport_api() {
@@ -275,6 +281,16 @@ run_boundary_check() {
     fi
   done
 
+  # CROSS-068: only the read-only observer may observe the D-Bus daemon incarnation.
+  for file in "${AUTHORITY_FILES[@]}"; do
+    [[ "${file}" == "crates/core/nixward/src/action/systemd_observer.rs" ]] && continue
+    if matches="$(scan_dbus_bus_id_observation "${ROOT}/${file}")"; then
+      echo "ERROR: D-Bus GetId provenance observation crossed the observer-only boundary: ${file}" >&2
+      echo "${matches}" >&2
+      failed=1
+    fi
+  done
+
   if matches="$(scan_public_systemd_transport_api "${ROOT}/crates/core/nixward/src/action/systemd_transport.rs")"; then
     echo "ERROR: raw systemd transport entry point must remain crate-private" >&2
     echo "${matches}" >&2
@@ -376,6 +392,11 @@ run_self_test() {
 
   printf '%s\n' 'NixVerifiedPostStateStabilityEvidenceV1::from_observer(evidence);' > "${tmp}/stability-factory.rs"
   printf '%s\n' 'NixVerifiedServiceDefinitionContentV1::from_observer(evidence);' > "${tmp}/definition-content-factory.rs"
+  printf '%s\n' 'proxy.call("GetId", &());' > "${tmp}/dbus-get-id.rs"
+  if scan_dbus_bus_id_observation "${tmp}/dbus-get-id.rs"; then :; else
+    echo "ERROR: CROSS-068 self-test failed to detect D-Bus GetId provenance observation" >&2
+    return 1
+  fi
   if scan_verified_definition_content_factory "${tmp}/definition-content-factory.rs"; then :; else
     echo "ERROR: CROSS-068 self-test failed to detect definition-content observer-sealing factory use" >&2
     return 1
