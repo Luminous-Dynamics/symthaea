@@ -2794,6 +2794,7 @@ mod tests {
             "fixture:rules:v1",
             vec![MorphophonologicalRule {
                 rule_id: "fixture:identity".into(),
+                source_record_id: None,
                 lemma: None,
                 morphology: Vec::new(),
                 operation: MorphophonologicalRuleOperation::Identity,
