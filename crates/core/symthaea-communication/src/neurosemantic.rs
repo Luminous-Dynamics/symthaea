@@ -509,6 +509,39 @@ impl NeurosemanticPolicyProvenanceBinding {
     pub fn attestation_expires_at_unix_s(&self) -> u64 {
         self.attestation_expires_at_unix_s
     }
+
+    /// Exact content hash of the signed external authority-resolution snapshot.
+    pub fn authority_resolution_fingerprint(&self) -> &str {
+        &self.authority_resolution_fingerprint
+    }
+
+    pub fn authority_resolution_checked_at_unix_s(&self) -> u64 {
+        self.authority_resolution_checked_at_unix_s
+    }
+
+    pub fn authority_resolution_expires_at_unix_s(&self) -> u64 {
+        self.authority_resolution_expires_at_unix_s
+    }
+
+    pub fn authority_resolution_status(&self) -> NeurosemanticAuthorityStatus {
+        self.authority_resolution_status
+    }
+
+    pub fn authority_resolution_subject_ref(&self) -> &str {
+        &self.authority_resolution_subject_ref
+    }
+
+    pub fn authority_resolution_peer_ref(&self) -> &str {
+        &self.authority_resolution_peer_ref
+    }
+
+    pub fn authority_resolution_lease_id(&self) -> &str {
+        &self.authority_resolution_lease_id
+    }
+
+    pub fn authority_resolution_consent_epoch(&self) -> u64 {
+        self.authority_resolution_consent_epoch
+    }
 }
 
 impl NeurosemanticHandlingPolicy {
