@@ -3932,6 +3932,13 @@ mod tests {
                     direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
                 },
             ],
+            metric_computation_artifact_hashes: vec![
+                content_hash(b"integration-computation-forgetfulness"),
+                content_hash(b"integration-computation-utility"),
+                content_hash(b"integration-computation-recovery"),
+                content_hash(b"integration-computation-representation"),
+                content_hash(b"integration-computation-fairness"),
+            ],
             measurements: vec![
                 NeurosemanticRemediationMeasurement {
                     metric_ref: "metric-forgetfulness".into(),
