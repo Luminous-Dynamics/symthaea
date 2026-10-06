@@ -83,6 +83,14 @@ impl Drop for MutationLease {
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+pub(crate) enum TransactionOutcome {
+    ObservedSuccess,
+    Failed,
+    Indeterminate,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub(crate) enum MutationKind {
     Install,
     Rollback,
@@ -123,7 +131,7 @@ pub(crate) struct TransactionReceipt {
     target_machine_digest: Option<String>,
     request_digest: String,
     authorization: &'static str,
-    outcome: &'static str,
+    outcome: TransactionOutcome,
 }
 
 impl SystemTransaction {
@@ -145,7 +153,7 @@ impl SystemTransaction {
         })
     }
 
-    pub(crate) fn receipt(&self, outcome: &'static str) -> TransactionReceipt {
+    pub(crate) fn receipt(&self, outcome: TransactionOutcome) -> TransactionReceipt {
         TransactionReceipt {
             schema_version: self.schema_version,
             transaction_id: self.transaction_id.clone(),
@@ -234,11 +242,11 @@ mod tests {
     #[test]
     fn receipt_preserves_transaction_identity() {
         let tx = SystemTransaction::begin(MutationKind::GcCollect, None, b"gc-30d").unwrap();
-        let receipt = tx.receipt("committed");
+        let receipt = tx.receipt(TransactionOutcome::ObservedSuccess);
 
         assert_eq!(receipt.transaction_id, tx.transaction_id);
         assert_eq!(receipt.request_digest, tx.request_digest);
-        assert_eq!(receipt.outcome, "committed");
+        assert_eq!(receipt.outcome, TransactionOutcome::ObservedSuccess);
     }
 
     #[test]
