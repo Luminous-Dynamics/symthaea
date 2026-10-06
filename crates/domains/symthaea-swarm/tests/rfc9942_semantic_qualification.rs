@@ -273,6 +273,33 @@ fn rfc9942_unprotected_text_label_resource_limit_is_typed() {
 }
 
 #[test]
+fn rfc9942_proof_hash_chunk_resource_limit_is_typed() {
+    for (proof_prefix, label) in [
+        (vec![0x83, 0x02, 0x00, 0x81], "inclusion"),
+        (vec![0x83, 0x01, 0x02, 0x81], "consistency"),
+    ] {
+        let mut proof = proof_prefix;
+        proof.push(0x5f);
+        proof.extend(std::iter::repeat_n(0x40, 4097));
+        proof.push(0xff);
+
+        let len = proof.len();
+        assert!(len <= u16::MAX as usize);
+
+        let mut encoded = vec![0xa1];
+        encoded.extend_from_slice(&[0x20, 0x81, 0x59, (len >> 8) as u8, len as u8]);
+        encoded.extend_from_slice(&proof);
+
+        let result = Rfc9942Vdp::from_cbor(&encoded);
+        assert_eq!(
+            result,
+            Err(Rfc9942VdpError::ResourceLimitExceeded),
+            "{label} proof hash chunk exhaustion must remain a resource failure"
+        );
+    }
+}
+
+#[test]
 fn rfc9942_vdp_resource_limit_is_not_collapsed_into_encoding_error() {
     let mut encoded = vec![0xa1, 0x20];
     encoded.extend(std::iter::repeat_n(0xc0, 17));
