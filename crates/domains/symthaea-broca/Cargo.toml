@@ -203,6 +203,9 @@ path = "src/bin/broca_production_contract_audit.rs"
 name = "broca-poetry-eval"
 path = "src/bin/broca_poetry_eval.rs"
 
+[build-dependencies]
+blake3 = { workspace = true }
+
 [features]
 default = ["simd", "parallel"]
 # GPU tensor acceleration via candle CUDA (auto-detects at runtime)
