@@ -40,8 +40,10 @@ pub struct NixSystemdUnitDefinitionContentEvidenceV1 {
     pub unit: String,
     /// CROSS-067 source identity commitment. Content is intentionally separate.
     pub source_identity_digest: String,
-    /// systemd manager incarnation observed for this capture epoch.
+    /// systemd manager connection unique name for this capture epoch.
     pub manager_owner: String,
+    /// D-Bus daemon incarnation returned by org.freedesktop.DBus.GetId().
+    pub bus_id: String,
     pub files: Vec<NixSystemdUnitDefinitionContentFileV1>,
     pub captured_at_monotonic_us: u64,
 }
@@ -77,6 +79,7 @@ impl NixSystemdUnitDefinitionContentEvidenceV1 {
         }
         validate_digest(&self.source_identity_digest, "source identity digest")?;
         validate_unique_manager_owner(&self.manager_owner)?;
+        validate_bus_id(&self.bus_id)?;
         let mut seen = std::collections::BTreeSet::new();
         for file in &self.files {
             if file.path.is_empty() || file.path.len() > MAX_STRING_BYTES || !file.path.starts_with('/') {
@@ -111,6 +114,7 @@ impl NixSystemdUnitDefinitionContentEvidenceV1 {
         put_str(&mut h, &self.unit);
         put_str(&mut h, &self.source_identity_digest);
         put_str(&mut h, &self.manager_owner);
+        put_str(&mut h, &self.bus_id);
         put_u64(&mut h, self.files.len() as u64);
         for file in &self.files {
             put_str(&mut h, &file.path);
@@ -231,6 +235,13 @@ impl NixServiceEffectContextV1 {
     }
 }
 
+fn validate_bus_id(value: &str) -> Result<(), NixServiceEffectContextErrorV1> {
+    if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(NixServiceEffectContextErrorV1::InvalidBusId);
+    }
+    Ok(())
+}
+
 fn validate_unique_manager_owner(value: &str) -> Result<(), NixServiceEffectContextErrorV1> {
     if value.is_empty() || value.len() > 255 || !value.starts_with(':') {
         return Err(NixServiceEffectContextErrorV1::InvalidManagerOwner);
@@ -337,6 +348,8 @@ pub enum NixServiceEffectContextErrorV1 {
     DefinitionContentUnitMismatch,
     #[error("invalid systemd manager unique owner")]
     InvalidManagerOwner,
+    #[error("invalid D-Bus daemon incarnation identifier")]
+    InvalidBusId,
 }
 
 #[cfg(test)]
@@ -362,6 +375,7 @@ mod tests {
             unit: "nginx.service".into(),
             source_identity_digest: "11".repeat(32),
             manager_owner: ":1.42".into(),
+            bus_id: "0123456789abcdef0123456789abcdef".into(),
             files: vec![
                 NixSystemdUnitDefinitionContentFileV1 {
                     path: "/nix/store/nginx.service".into(),
@@ -441,6 +455,10 @@ mod tests {
 
         let mut changed = base.clone();
         changed.manager_owner = ":1.43".into();
+        assert_ne!(baseline, changed.digest().unwrap());
+
+        let mut changed = base.clone();
+        changed.bus_id = "fedcba9876543210fedcba9876543210".into();
         assert_ne!(baseline, changed.digest().unwrap());
 
         let mut changed = base.clone();
