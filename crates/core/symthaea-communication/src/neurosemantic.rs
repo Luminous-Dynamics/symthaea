@@ -746,6 +746,12 @@ impl NeurosemanticRemediationImpactArtifact {
         if measurement.fingerprint()? != self.measurement_artifact_hash {
             return Err("neurosemantic remediation measurement artifact hash mismatch".into());
         }
+        if measurement.recomputed_worst_case_disposition()? != self.disposition {
+            return Err(
+                "neurosemantic remediation impact disposition does not match measurement worst case"
+                    .into(),
+            );
+        }
         for declared in &self.dimensions {
             let required_kind = match declared.as_str() {
                 "forgetfulness" => Some(NeurosemanticRemediationMeasurementKind::Forgetfulness),
@@ -3466,6 +3472,12 @@ mod tests {
             impact.verify_measurement_artifact_bytes(&measurement_bytes).unwrap(),
             measurement
         );
+        let mut impact_status_forged = impact.clone();
+        impact_status_forged.disposition =
+            NeurosemanticRemediationImpactDisposition::WithinDeclaredBounds;
+        assert!(impact_status_forged
+            .verify_measurement_artifact_bytes(&measurement_bytes)
+            .is_err());
         let mut measurement_subset = measurement.clone();
         measurement_subset.measurements.retain(|item| {
             item.kind != NeurosemanticRemediationMeasurementKind::RepresentationResidual
