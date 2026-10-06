@@ -24,7 +24,7 @@ rustfmt --edition 2024 --check \
   crates/core/nixward/src/action/authorization.rs \
   crates/core/nixward/src/action/executor.rs \
   crates/core/nixward/src/action/config_writer.rs \
-  crates/core/nixward/src/action/post_state.rs
+  crates/core/nixward/src/action/post_state.rs \
   crates/core/nixward/src/action/systemd_observer.rs
 
 echo "-- source boundary --"
