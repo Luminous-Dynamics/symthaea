@@ -41,7 +41,28 @@ pub enum NixSystemdJobTypeV1 {
     Reload,
 }
 
-/// Unforgeable-at-API-boundary observation token.
+impl NixSystemdJobTypeV1 {
+    pub fn for_operation(operation: NixServiceOperationKindV1) -> Option<Self> {
+        match operation {
+            NixServiceOperationKindV1::Start => Some(Self::Start),
+            NixServiceOperationKindV1::Stop => Some(Self::Stop),
+            NixServiceOperationKindV1::Restart => Some(Self::Restart),
+            NixServiceOperationKindV1::Reload => Some(Self::Reload),
+            NixServiceOperationKindV1::Enable | NixServiceOperationKindV1::Disable => None,
+        }
+    }
+
+    fn discriminant(self) -> u8 {
+        match self {
+            Self::Start => 0,
+            Self::Stop => 1,
+            Self::Restart => 2,
+            Self::Reload => 3,
+        }
+    }
+}
+
+/// Observer-sealed post-state observation token.
 ///
 /// The underlying observation remains data, but receipt construction accepts only
 /// this observer-produced wrapper. There is intentionally no public constructor
@@ -61,26 +82,6 @@ impl NixVerifiedPostStateObservationV1 {
 
     fn as_ref(&self) -> &NixServicePostStateObservationV1 {
         &self.observation
-    }
-}
-
-    pub fn for_operation(operation: NixServiceOperationKindV1) -> Option<Self> {
-        match operation {
-            NixServiceOperationKindV1::Start => Some(Self::Start),
-            NixServiceOperationKindV1::Stop => Some(Self::Stop),
-            NixServiceOperationKindV1::Restart => Some(Self::Restart),
-            NixServiceOperationKindV1::Reload => Some(Self::Reload),
-            NixServiceOperationKindV1::Enable | NixServiceOperationKindV1::Disable => None,
-        }
-    }
-
-    fn discriminant(self) -> u8 {
-        match self {
-            Self::Start => 0,
-            Self::Stop => 1,
-            Self::Restart => 2,
-            Self::Reload => 3,
-        }
     }
 }
 
