@@ -122,6 +122,7 @@ pub enum RelationalPredictionError {
     TemporalLeakage,
     InvalidRidgeLambda,
     InvalidSurrogateCount,
+    InvalidEvidenceProvenance(&'static str),
     ModelFitFailed,
 }
 
@@ -141,6 +142,9 @@ impl std::fmt::Display for RelationalPredictionError {
             }
             Self::InvalidRidgeLambda => write!(f, "ridge_lambda must be finite and non-negative"),
             Self::InvalidSurrogateCount => write!(f, "surrogate_count must be greater than zero"),
+            Self::InvalidEvidenceProvenance(name) => {
+                write!(f, "evidence provenance field {name} is invalid")
+            }
             Self::ModelFitFailed => write!(f, "deterministic linear model fit failed"),
         }
     }
@@ -168,6 +172,21 @@ pub enum PredictionFeatureSet {
     /// Alignment plus directional and turn-taking relational channels.
     RelationalProfile,
 }
+
+impl PredictionFeatureSet {
+    fn all() -> [Self; 7] {
+        [
+            Self::PersistenceBaseline,
+            Self::IsolatedAgents,
+            Self::CommonDriver,
+            Self::SynchronyOnly,
+            Self::NonRelationalContext,
+            Self::RelationalAugmented,
+            Self::RelationalProfile,
+        ]
+    }
+}
+
 
 /// A fixed temporal train/test configuration.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -241,6 +260,156 @@ impl PredictionScore {
         self.mean_absolute_error.is_finite() && self.mean_squared_error.is_finite()
     }
 }
+
+/// Caller-attested provenance for an empirical qualification run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RelationalPredictionProvenance {
+    pub protocol_id: String,
+    pub source_data_sha256: String,
+    pub software_commit_sha: String,
+}
+
+impl RelationalPredictionProvenance {
+    pub fn new(
+        protocol_id: impl Into<String>,
+        source_data_sha256: impl Into<String>,
+        software_commit_sha: impl Into<String>,
+    ) -> Result<Self, RelationalPredictionError> {
+        let provenance = Self {
+            protocol_id: protocol_id.into(),
+            source_data_sha256: source_data_sha256.into(),
+            software_commit_sha: software_commit_sha.into(),
+        };
+        validate_evidence_provenance(&provenance)?;
+        Ok(provenance)
+    }
+}
+
+/// Exact held-out prediction trace for one feature family.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PredictionEvidenceRecord {
+    pub feature_set: PredictionFeatureSet,
+    pub train_samples: usize,
+    pub test_samples: usize,
+    pub feature_times: Vec<f64>,
+    pub outcome_times: Vec<f64>,
+    pub observed_outcomes: Vec<f64>,
+    pub predictions: Vec<f64>,
+    pub fit_coefficients: Option<Vec<f64>>,
+    pub feature_means: Vec<f64>,
+    pub feature_scales: Vec<f64>,
+    pub mean_absolute_error: f64,
+    pub mean_squared_error: f64,
+}
+
+impl PredictionEvidenceRecord {
+    pub fn score(&self) -> PredictionScore {
+        PredictionScore {
+            feature_set: self.feature_set,
+            parameter_count: self.fit_coefficients.as_ref().map_or(0, Vec::len),
+            train_samples: self.train_samples,
+            test_samples: self.test_samples,
+            mean_absolute_error: self.mean_absolute_error,
+            mean_squared_error: self.mean_squared_error,
+        }
+    }
+
+    pub fn validate_trace(&self) -> Result<(), RelationalPredictionError> {
+        if self.predictions.len() != self.test_samples
+            || self.observed_outcomes.len() != self.test_samples
+            || self.feature_times.len() != self.test_samples
+            || self.outcome_times.len() != self.test_samples
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        if let Some(coefficients) = &self.fit_coefficients {
+            if coefficients.len() != self.feature_means.len() + 1
+                || coefficients.len() != self.feature_scales.len() + 1
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+            if coefficients.iter().any(|value| !value.is_finite())
+                || self.feature_means.iter().any(|value| !value.is_finite())
+                || self
+                    .feature_scales
+                    .iter()
+                    .any(|value| !value.is_finite() || *value <= 0.0)
+            {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+        } else if !self.feature_means.is_empty() || !self.feature_scales.is_empty() {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        if self.feature_times.iter().any(|value| !value.is_finite())
+            || self.outcome_times.iter().any(|value| !value.is_finite())
+            || self.observed_outcomes.iter().any(|value| !value.is_finite())
+            || self.predictions.iter().any(|value| !value.is_finite())
+        {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        for pair in self.feature_times.windows(2) {
+            if pair[1] <= pair[0] {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+        for (feature_time, outcome_time) in
+            self.feature_times.iter().zip(&self.outcome_times)
+        {
+            if *outcome_time <= *feature_time {
+                return Err(RelationalPredictionError::OutcomeNotAfterFeatures);
+            }
+        }
+
+        let mut absolute_error = 0.0;
+        let mut squared_error = 0.0;
+        for (prediction, outcome) in self.predictions.iter().zip(&self.observed_outcomes) {
+            let error = *prediction - *outcome;
+            absolute_error += error.abs();
+            squared_error += error * error;
+            if !absolute_error.is_finite() || !squared_error.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+        }
+
+        let n = self.test_samples as f64;
+        if n <= 0.0 {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        let mean_absolute_error = absolute_error / n;
+        let mean_squared_error = squared_error / n;
+        if !mean_absolute_error.is_finite() || !mean_squared_error.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+        if (mean_absolute_error - self.mean_absolute_error).abs() > 1e-12
+            || (mean_squared_error - self.mean_squared_error).abs() > 1e-12
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        Ok(())
+    }
+}
+
+/// One complete held-out evidence packet.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeldOutRelationalPredictionEvidence {
+    pub provenance: RelationalPredictionProvenance,
+    pub summary: HeldOutRelationalPredictionSummary,
+    pub records: Vec<PredictionEvidenceRecord>,
+}
+
+/// Rolling-origin packet retaining a complete trace at each origin.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RollingOriginRelationalPredictionEvidence {
+    pub provenance: RelationalPredictionProvenance,
+    pub config: RollingOriginRelationalPredictionConfig,
+    pub observed: RollingOriginRelationalPredictionSummary,
+    pub origins: Vec<HeldOutRelationalPredictionEvidence>,
+}
+
 
 /// Held-out comparison across the required baselines and the relational model.
 ///
