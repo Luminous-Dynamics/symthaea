@@ -7064,6 +7064,7 @@ mod tests {
         assert!(banner.starts_with("  Auth token: "));
     }
 
+    #[test]
     fn transaction_ids_are_random_and_not_clock_derived() {
         let first = SystemTransaction::begin(MutationKind::Rollback, "relay-test-a-00000001", None, b"rollback").unwrap();
         let second = SystemTransaction::begin(MutationKind::Rollback, "relay-test-b-00000001", None, b"rollback").unwrap();
