@@ -2853,8 +2853,7 @@ async fn verify_preservation_artifacts(backup_dir: &str) -> Result<bool, String>
         .map_err(|error| format!("preservation directory enumeration failed: {error}"))?
     {
         let entry = entry.map_err(|error| format!("preservation directory entry failed: {error}"))?;
-        let metadata = entry
-            .metadata()
+        let metadata = std::fs::symlink_metadata(entry.path())
             .map_err(|error| format!("preservation artifact metadata failed: {error}"))?;
         if !metadata.file_type().is_file() {
             return Ok(false);
@@ -7838,21 +7837,12 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
 
         let name = random_operation_id().unwrap();
-        let dir = std::env::temp_dir().join(format!("symthaea-preserve-postcondition-{name}"));
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
-
-        // validate_preservation_path is intentionally strict, so use the
-        // relay's exact transaction-scoped namespace for the fixture.
-        let tx_dir = std::env::temp_dir().join(format!(
-            "symthaea-preserve-0123456789abcdef0123456789abcdef"
-        ));
-        let _ = std::fs::remove_dir_all(&tx_dir);
+        let tx_dir = std::env::temp_dir().join(format!("symthaea-preserve-{name}"));
         std::fs::create_dir(&tx_dir).unwrap();
         std::fs::set_permissions(&tx_dir, std::fs::Permissions::from_mode(0o700)).unwrap();
 
         let archive = tx_dir.join("etc-backup.tar.gz");
-        let archive_path = archive.to_string_lossy().replace('\', "\\'");
+        let archive_path = archive.to_string_lossy().replace('\\', "\\\\'");
         let create = run_cmd(&format!(
             "tar -czf '{}' --files-from /dev/null",
             archive_path
@@ -7867,7 +7857,24 @@ mod tests {
         std::fs::write(&archive, b"corrupt gzip").unwrap();
         assert!(!verify_preservation_artifacts(tx_dir.to_str().unwrap()).await.unwrap());
 
-        let _ = std::fs::remove_dir_all(dir);
+        std::fs::remove_file(&archive).unwrap();
+        std::os::unix::fs::symlink("/etc/passwd", &archive).unwrap();
+        assert!(
+            !verify_preservation_artifacts(tx_dir.to_str().unwrap())
+                .await
+                .unwrap(),
+            "symlink artifacts must never qualify as preserved files"
+        );
+
+        std::fs::remove_file(&archive).unwrap();
+        std::fs::write(tx_dir.join("unexpected.txt"), b"unexpected").unwrap();
+        assert!(
+            !verify_preservation_artifacts(tx_dir.to_str().unwrap())
+                .await
+                .unwrap(),
+            "unexpected artifact types must fail closed"
+        );
+
         let _ = std::fs::remove_dir_all(tx_dir);
     }
 
