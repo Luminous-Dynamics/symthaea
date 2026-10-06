@@ -12812,6 +12812,198 @@ mod tests {
     }
 
     #[test]
+    fn recovery_promotes_dispatch_pending_to_indeterminate_after_restart() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-dispatch-pending-recovery-{}.db",
+            std::process::id()
+        ));
+        let fixed_now = "2026-10-03T12:00:00Z".parse::<DateTime<Utc>>().unwrap();
+        let store = SqliteAuthorizationStore::open_with_relying_party_clock_and_policy(
+            &path,
+            "rp-dispatch-pending-recovery",
+            Arc::new(FixedClock {
+                now: fixed_now,
+                source_id: AuthorizationClockPolicy::CLOCK_SOURCE_ID,
+            }),
+            AuthorizationClockPolicy::default(),
+        )
+        .unwrap();
+
+        let effect = ActionEffectBinding::new(
+            "target-dispatch-pending-recovery",
+            "prod",
+            "adapter-dispatch-pending-recovery",
+        );
+        let action = EpistemicAction::new(
+            "dispatch-pending-recovery",
+            "intervention",
+            super::super::ActionRisk::Critical,
+        )
+        .with_effect_binding(effect.clone());
+        let digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            operation_id: Some("operation:dispatch-pending-recovery".into()),
+            authorization_instance: "dispatch-pending-recovery".into(),
+            action_id: action.id.clone(),
+            action_digest: digest.clone(),
+            frame: "frame@1".into(),
+            support_digest: "sha256:support-dispatch-pending-recovery".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:00:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+
+        store
+            .pin_provider_status_source_digest("sha256:test-status-source")
+            .unwrap();
+        store
+            .pin_provider_status_verifier_configuration(
+                &TestProviderStatusVerifier.configuration(),
+            )
+            .unwrap();
+        store
+            .pin_provider_adapter_configuration(&ProviderAdapterConfiguration::new(
+                effect.adapter.clone(),
+                "test-adapter/v1",
+                "sha256:test-adapter-implementation",
+            ))
+            .unwrap();
+        store
+            .pin_native_authority_namespace(
+                "test-explicit-issuer",
+                "dispatch-pending-recovery-authority",
+            )
+            .unwrap();
+        store
+            .register_lease(&AuthorizationLease::new_with_instance(
+                witness.authorization_instance.clone(),
+                action.id.clone(),
+                digest.clone(),
+                witness.support_digest.clone(),
+                witness.policy.clone(),
+                1,
+                1,
+            ))
+            .unwrap();
+        store
+            .prepare_for_execution_bound_with_operation(
+                &witness,
+                &action,
+                "frame@1",
+                "attempt:dispatch-pending-recovery",
+                "boundary:dispatch-pending-recovery",
+                "operation:dispatch-pending-recovery",
+            )
+            .unwrap();
+
+        let record = mark_dispatch_pending_bound_from_pinned_native_authority_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt:dispatch-pending-recovery",
+            &action,
+            &effect,
+            "boundary:dispatch-pending-recovery",
+            "operation:dispatch-pending-recovery",
+            "dispatch-pending-recovery-authority",
+            "native-grant:dispatch-pending-recovery",
+        )
+        .unwrap();
+        assert_eq!(
+            store
+                .connection()
+                .unwrap()
+                .query_row::<String, _, _>(
+                    "SELECT state FROM authorization_dispatches
+                     WHERE authorization_instance=?1 AND attempt_id=?2",
+                    params![
+                        record.authorization_instance.as_str(),
+                        record.attempt_id.as_str()
+                    ],
+                    |row| row.get(0),
+                )
+                .unwrap(),
+            "dispatch_pending"
+        );
+
+        drop(store);
+
+        let reopened = SqliteAuthorizationStore::open_with_relying_party_clock_and_policy(
+            &path,
+            "rp-dispatch-pending-recovery",
+            Arc::new(FixedClock {
+                now: fixed_now,
+                source_id: AuthorizationClockPolicy::CLOCK_SOURCE_ID,
+            }),
+            AuthorizationClockPolicy::default(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            reopened
+                .recover_incomplete_attempt_for_boundary(
+                    "boundary:dispatch-pending-recovery",
+                    "attempt:dispatch-pending-recovery",
+                )
+                .unwrap(),
+            1
+        );
+
+        let states: (String, String) = reopened
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT
+                    (SELECT state FROM authorization_leases
+                     WHERE authorization_instance=?1),
+                    (SELECT state FROM authorization_dispatches
+                     WHERE authorization_instance=?1 AND attempt_id=?2)",
+                params![
+                    witness.authorization_instance.as_str(),
+                    "attempt:dispatch-pending-recovery"
+                ],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(states, ("indeterminate".into(), "indeterminate".into()));
+
+        // The native replay identity remains permanently consumed.
+        let replay_count: i64 = reopened
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM authorization_native_replay_history
+                 WHERE native_replay_identity=?1",
+                params![record.native_replay_identity.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(replay_count, 1);
+
+        // Even a fresh native grant cannot bypass the held same-action fence
+        // until authenticated reconciliation resolves the indeterminate attempt.
+        let fresh_attempt = reopened.prepare_for_execution_bound_with_operation(
+            &witness,
+            &action,
+            "frame@1",
+            "attempt:dispatch-pending-retry",
+            "boundary:dispatch-pending-retry",
+            "operation:dispatch-pending-retry",
+        );
+        assert!(matches!(
+            fresh_attempt,
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ActionAlreadyInFlight
+            )) | Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ActionAlreadyClosed
+            ))
+        ));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn recovery_treats_invoked_as_indeterminate() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-invoked-recovery-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
