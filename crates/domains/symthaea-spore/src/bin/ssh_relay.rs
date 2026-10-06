@@ -347,6 +347,63 @@ fn validate_extra_disks(extra_disks: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_install_disk_topology(message: &ClientMessage) -> Result<(), String> {
+    let require_distinct = |left_name: &str, left: &str, right_name: &str, right: &str| {
+        let left = validate_disk_path(left)
+            .map_err(|error| format!("{left_name} is invalid: {error}"))?;
+        let right = validate_disk_path(right)
+            .map_err(|error| format!("{right_name} is invalid: {error}"))?;
+        if left == right {
+            return Err(format!(
+                "{left_name} and {right_name} must refer to distinct disks"
+            ));
+        }
+        Ok(())
+    };
+
+    match message.layout.as_str() {
+        "dual" | "raid1-btrfs" | "raid1-mdadm" => {
+            if message.fast_disk.trim().is_empty() || message.standard_disk.trim().is_empty() {
+                return Err(format!(
+                    "{} requires both fast_disk and standard_disk",
+                    message.layout
+                ));
+            }
+            require_distinct("fast_disk", &message.fast_disk, "standard_disk", &message.standard_disk)
+        }
+        "raid5-mdadm" | "raid6-mdadm" | "raid10-mdadm" | "zfs-mirror" | "zfs-raidz"
+        | "zfs-raidz2" => {
+            let mut disks = Vec::with_capacity(1 + message.extra_disks.len());
+            disks.push(
+                validate_disk_path(&message.disk)
+                    .map_err(|error| format!("primary disk is invalid: {error}"))?,
+            );
+            for extra_disk in &message.extra_disks {
+                disks.push(
+                    validate_disk_path(extra_disk)
+                        .map_err(|error| format!("extra disk is invalid: {error}"))?,
+                );
+            }
+            for (index, disk) in disks.iter().enumerate() {
+                if let Some((previous, _)) = disks[..index]
+                    .iter()
+                    .enumerate()
+                    .find(|(_, previous)| *previous == disk)
+                {
+                    return Err(format!(
+                        "storage topology reuses disk {} ({}) already assigned at position {}",
+                        disk,
+                        index + 1,
+                        previous + 1
+                    ));
+                }
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
 fn default_port() -> u16 {
     22
 }
@@ -3557,6 +3614,12 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 // An invalid member rejects the entire request rather than
                 // being skipped by an inner-loop continue.
                 if let Err(error) = validate_extra_disks(&client_msg.extra_disks) {
+                    let _ = ws_tx
+                        .send(Message::Text(RelayMessage::error(&error).to_json()))
+                        .await;
+                    continue;
+                }
+                if let Err(error) = validate_install_disk_topology(&client_msg) {
                     let _ = ws_tx
                         .send(Message::Text(RelayMessage::error(&error).to_json()))
                         .await;
@@ -8425,6 +8488,80 @@ mod tests {
         let error = validate_extra_disks(&extra_disks)
             .expect_err("an invalid extra disk must reject the entire collection");
         assert!(error.contains("Invalid extra disk"));
+    }
+
+    #[test]
+    fn install_disk_topology_rejects_duplicate_primary_and_extra_disk() {
+        let message = ClientMessage {
+            action: "install".into(),
+            request_id: String::new(),
+            token: String::new(),
+            host: String::new(),
+            port: 22,
+            username: "testuser".into(),
+            password: String::new(),
+            command: String::new(),
+            disk: "/dev/sda".into(),
+            layout: "raid5-mdadm".into(),
+            fast_disk: String::new(),
+            standard_disk: String::new(),
+            hostname: "test".into(),
+            configuration_nix: String::new(),
+            flake_nix: String::new(),
+            disko_nix: String::new(),
+            hardware_nix: String::new(),
+            secure_boot: false,
+            tpm2_unlock: false,
+            fido2_unlock: false,
+            desktop: "none".into(),
+            gpu_driver: "none".into(),
+            timezone: "UTC".into(),
+            keyboard: "us".into(),
+            user_password: String::new(),
+            luks_passphrase: String::new(),
+            target_machine_digest: String::new(),
+            extra_disks: vec!["/dev/sda".into(), "/dev/sdb".into()],
+        };
+        let error = validate_install_disk_topology(&message)
+            .expect_err("duplicate physical disk assignments must fail closed");
+        assert!(error.contains("reuses disk"));
+    }
+
+    #[test]
+    fn install_disk_topology_requires_distinct_dual_disks() {
+        let message = ClientMessage {
+            action: "install".into(),
+            request_id: String::new(),
+            token: String::new(),
+            host: String::new(),
+            port: 22,
+            username: "testuser".into(),
+            password: String::new(),
+            command: String::new(),
+            disk: "/dev/sda".into(),
+            layout: "dual".into(),
+            fast_disk: "/dev/nvme0n1".into(),
+            standard_disk: "/dev/nvme0n1".into(),
+            hostname: "test".into(),
+            configuration_nix: String::new(),
+            flake_nix: String::new(),
+            disko_nix: String::new(),
+            hardware_nix: String::new(),
+            secure_boot: false,
+            tpm2_unlock: false,
+            fido2_unlock: false,
+            desktop: "none".into(),
+            gpu_driver: "none".into(),
+            timezone: "UTC".into(),
+            keyboard: "us".into(),
+            user_password: String::new(),
+            luks_passphrase: String::new(),
+            target_machine_digest: String::new(),
+            extra_disks: Vec::new(),
+        };
+        let error = validate_install_disk_topology(&message)
+            .expect_err("dual layout must not reuse one disk for both roles");
+        assert!(error.contains("distinct disks"));
     }
 
     #[test]
