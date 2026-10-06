@@ -27,6 +27,10 @@ pub const LEXICAL_PHONOLOGICAL_WITNESS_VERSION: &str =
 pub struct LexicalPhonologicalMapping {
     /// Zero-based position in the final lexical constituent stream.
     pub lexical_position: usize,
+    /// Exact lexical entry identity claimed to be realized.
+    pub lexeme_id: String,
+    /// Exact morphophonological form retained by the lexical binding.
+    pub morphophonological_form: Option<String>,
     /// Exact zero-based indices into the phonological segment stream.
     pub segment_indices: Vec<usize>,
     /// Exact phoneme symbols asserted for those segment indices, in the same order.
@@ -78,6 +82,18 @@ impl LexicalPhonologicalWitness {
         for (expected_position, mapping) in self.mappings.iter().enumerate() {
             if mapping.lexical_position != expected_position {
                 return Err(LexicalPhonologicalWitnessError::NonContiguousLexicalPositions);
+            }
+            if mapping.lexeme_id.trim().is_empty() {
+                return Err(LexicalPhonologicalWitnessError::EmptyLexemeId {
+                    lexical_position: mapping.lexical_position,
+                });
+            }
+            if let Some(form) = mapping.morphophonological_form.as_deref() {
+                if form.trim().is_empty() {
+                    return Err(LexicalPhonologicalWitnessError::EmptyMorphophonologicalForm {
+                        lexical_position: mapping.lexical_position,
+                    });
+                }
             }
             if mapping.segment_indices.is_empty() {
                 return Err(LexicalPhonologicalWitnessError::EmptySegmentMapping {
@@ -150,6 +166,20 @@ impl LexicalPhonologicalWitness {
         }
         if self.mappings.len() != binding.constituents.len() {
             return Err(LexicalPhonologicalWitnessError::LexicalCoverageMismatch);
+        }
+
+        for (position, mapping) in self.mappings.iter().enumerate() {
+            let constituent = binding
+                .constituents
+                .get(position)
+                .ok_or(LexicalPhonologicalWitnessError::LexicalCoverageMismatch)?;
+            if mapping.lexeme_id != constituent.lexeme_id
+                || mapping.morphophonological_form != constituent.morphophonological_form
+            {
+                return Err(LexicalPhonologicalWitnessError::LexicalIdentityMismatch {
+                    lexical_position: position,
+                });
+            }
         }
 
         Ok(())
@@ -228,6 +258,9 @@ pub enum LexicalPhonologicalWitnessError {
     EmptyMappings,
     NonContiguousLexicalPositions,
     EmptySegmentMapping { lexical_position: usize },
+    EmptyLexemeId { lexical_position: usize },
+    EmptyMorphophonologicalForm { lexical_position: usize },
+    LexicalIdentityMismatch { lexical_position: usize },
     SymbolCountMismatch { lexical_position: usize },
     EmptySymbol { lexical_position: usize, symbol_offset: usize },
     SilenceMappedAsLexical { lexical_position: usize, segment_index: usize },
@@ -250,6 +283,9 @@ impl std::fmt::Display for LexicalPhonologicalWitnessError {
             Self::EmptyMappings => write!(f, "lexical-to-phonological witness mappings must be non-empty"),
             Self::NonContiguousLexicalPositions => write!(f, "lexical-to-phonological mappings must cover contiguous lexical positions from zero"),
             Self::EmptySegmentMapping { lexical_position } => write!(f, "lexical position {lexical_position} must map to at least one phonological segment"),
+            Self::EmptyLexemeId { lexical_position } => write!(f, "lexical position {lexical_position} requires an exact lexeme id"),
+            Self::EmptyMorphophonologicalForm { lexical_position } => write!(f, "lexical position {lexical_position} carries an empty morphophonological form"),
+            Self::LexicalIdentityMismatch { lexical_position } => write!(f, "lexical position {lexical_position} does not match the exact lexical binding identity"),
             Self::SymbolCountMismatch { lexical_position } => write!(f, "lexical position {lexical_position} has mismatched segment-index and symbol counts"),
             Self::EmptySymbol { lexical_position, symbol_offset } => write!(f, "lexical position {lexical_position} has an empty phoneme symbol at offset {symbol_offset}"),
             Self::SilenceMappedAsLexical { lexical_position, segment_index } => write!(f, "SIL segment {segment_index} cannot be claimed as lexical realization for position {lexical_position}"),
@@ -505,8 +541,20 @@ mod tests {
             version: LEXICAL_PHONOLOGICAL_WITNESS_VERSION.into(),
             lexical_binding_provenance: binding.provenance_token(),
             mappings: vec![
-                LexicalPhonologicalMapping { lexical_position: 0, segment_indices: vec![0], symbols: vec!["AY".into()] },
-                LexicalPhonologicalMapping { lexical_position: 1, segment_indices: vec![1], symbols: vec!["DH".into()] },
+                LexicalPhonologicalMapping {
+                    lexical_position: 0,
+                    lexeme_id: binding.constituents[0].lexeme_id.clone(),
+                    morphophonological_form: binding.constituents[0].morphophonological_form.clone(),
+                    segment_indices: vec![0],
+                    symbols: vec!["AY".into()],
+                },
+                LexicalPhonologicalMapping {
+                    lexical_position: 1,
+                    lexeme_id: binding.constituents[1].lexeme_id.clone(),
+                    morphophonological_form: binding.constituents[1].morphophonological_form.clone(),
+                    segment_indices: vec![1],
+                    symbols: vec!["DH".into()],
+                },
             ],
         };
 
@@ -534,6 +582,22 @@ mod tests {
         ));
 
         assert!(witness.validate_against_segments(&binding, &segments).is_ok());
+    }
+
+    #[test]
+    fn lexical_identity_tampering_fails_closed() {
+        let binding = binding();
+        let mut witness = witness_for_segments(&binding);
+        witness.mappings[0].lexeme_id = "different-lexeme".into();
+
+        assert_eq!(
+            witness
+                .validate_against_binding(&binding)
+                .expect_err("lexeme identity tampering must fail"),
+            LexicalPhonologicalWitnessError::LexicalIdentityMismatch {
+                lexical_position: 0,
+            }
+        );
     }
 
     #[test]
