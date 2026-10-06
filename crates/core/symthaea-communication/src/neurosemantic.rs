@@ -3175,6 +3175,10 @@ mod tests {
             post_remediation_lineage_hash: compute_derivation_provenance_hash(&post_lineage.lineage_ref, &post_bytes),
             lifecycle_receipt_hash: lifecycle.fingerprint().unwrap(),
             evaluation_manifest_hash: evaluation_manifest.fingerprint().unwrap(),
+            evaluation_agent_ref: "evaluation-agent-1".into(),
+            evaluation_verifier_ref: "evaluation-verifier-1".into(),
+            evaluation_verification_evidence_hash: content_hash(b"evaluation-verification"),
+            evaluation_environment_hash: content_hash(b"evaluation-environment"),
             remediation_action: NeurosemanticArtifactLifecycleAction::Erasure,
             study_protocol_hash: content_hash(protocol_bytes),
             evaluation_split_manifest_hash: content_hash(b"split-1"),
@@ -3205,9 +3209,36 @@ mod tests {
         assert!(impact.validate().is_ok());
         assert!(impact.verify_lifecycle_binding(&lifecycle).is_ok());
         assert!(impact.verify_evaluation_manifest_bytes(&evaluation_manifest_bytes).is_ok());
+        assert!(impact
+            .verify_evaluation_verification_evidence_bytes(
+                "evaluation-verifier-1",
+                b"evaluation-verification",
+            )
+            .is_ok());
+        assert!(impact
+            .verify_evaluation_environment_bytes(b"evaluation-environment")
+            .is_ok());
         let mut role_collision = impact.clone();
         role_collision.evaluation_verifier_ref = lifecycle.verification_agent_ref.clone().unwrap();
         assert!(role_collision.verify_lifecycle_binding(&lifecycle).is_err());
+        let mut evaluator_collision = impact.clone();
+        evaluator_collision.evaluation_agent_ref = lifecycle.effect_agent_ref.clone().unwrap();
+        assert!(evaluator_collision.verify_lifecycle_binding(&lifecycle).is_err());
+        assert!(impact
+            .verify_evaluation_verification_evidence_bytes(
+                "evaluation-agent-1",
+                b"evaluation-verification",
+            )
+            .is_err());
+        assert!(impact
+            .verify_evaluation_verification_evidence_bytes(
+                "evaluation-verifier-1",
+                b"tampered-evaluation-verification",
+            )
+            .is_err());
+        assert!(impact
+            .verify_evaluation_environment_bytes(b"other-environment")
+            .is_err());
         assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PreRemediation, &pre_bytes).is_ok());
         assert!(impact.verify_lineage_bytes(NeurosemanticRemediationImpactLineageSide::PostRemediation, &post_bytes).is_ok());
         assert!(impact.verify_evaluation_set_pair_bytes(&forget_bytes, &retain_bytes).is_ok());
@@ -3261,6 +3292,10 @@ mod tests {
         let mut legacy = impact.clone();
         legacy.schema_version = 0;
         assert!(NeurosemanticRemediationImpactArtifact::from_json_bytes(&serde_json::to_vec(&legacy).unwrap()).is_err());
+
+        let mut invalid_roles = impact.clone();
+        invalid_roles.evaluation_agent_ref.clear();
+        assert!(invalid_roles.validate().is_err());
     }
     #[test]
     fn remediation_evaluation_manifest_schema_is_fail_closed() {
