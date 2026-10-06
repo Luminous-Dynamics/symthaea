@@ -2518,6 +2518,14 @@ mod tests {
         duplicate.input_artifact_refs.push("input-artifact-1".into());
         assert!(duplicate.validate().is_err());
 
+        let mut missing_hash = record.clone();
+        missing_hash.input_artifact_hashes.pop();
+        assert!(missing_hash.validate().is_err());
+
+        let mut bad_hash = record.clone();
+        bad_hash.input_artifact_hashes[0] = "not-a-blake3-digest".into();
+        assert!(bad_hash.validate().is_err());
+
         let mut bad_revision = record.clone();
         bad_revision.execution_revision = "placeholder".into();
         assert!(bad_revision.validate().is_err());
