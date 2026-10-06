@@ -1627,6 +1627,26 @@ impl HeldOutRelationalPredictionQualification {
             return Err(RelationalPredictionError::InvalidSplit);
         }
 
+        let observed_scores = [
+            self.observed.persistence_baseline,
+            self.observed.isolated_agents,
+            self.observed.common_driver,
+            self.observed.synchrony_only,
+            self.observed.non_relational_context,
+            self.observed.relational_augmented,
+            self.observed.relational_profile,
+        ];
+        if observed_scores.iter().any(|score| {
+            score.train_samples != self.config.train_samples
+                || score.test_samples != self.config.test_samples
+                || !score.mean_absolute_error.is_finite()
+                || score.mean_absolute_error < 0.0
+                || !score.mean_squared_error.is_finite()
+                || score.mean_squared_error < 0.0
+        }) {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
         let expected_mse = self.observed.relational_augmented.mean_squared_error;
         let nulls = [
             (
@@ -1686,13 +1706,15 @@ impl HeldOutRelationalPredictionQualification {
             surrogate_count,
         )?;
 
-        Ok(Self {
+        let qualification = Self {
             config,
             observed,
             circular_shift_null,
             feature_decoupling_null,
             incremental_relational_null,
-        })
+        };
+        qualification.validate()?;
+        Ok(qualification)
     }
 }
 
@@ -2929,6 +2951,13 @@ mod tests {
         config_tampered.config.ridge_lambda = 0.25;
         assert_eq!(
             config_tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
+        let mut observed_tampered = qualification.clone();
+        observed_tampered.observed.relational_augmented.mean_squared_error = f64::NAN;
+        assert_eq!(
+            observed_tampered.validate(),
             Err(RelationalPredictionError::InvalidSplit)
         );
 
