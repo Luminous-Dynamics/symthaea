@@ -30,6 +30,7 @@ pub mod phi_gate;
 pub mod plan_executor;
 pub mod service_manager;
 pub mod service_domain;
+pub mod service_effect;
 pub mod service_state;
 #[cfg(feature = "systemd-observer")]
 pub mod systemd_observer;
@@ -99,6 +100,9 @@ pub use local_approval_submission::{
 pub use phi_gate::{classify_command_destructiveness, get_nixos_rollback};
 pub use plan_executor::{PlanExecutionResult, PlanExecutor, PlanStep, StepStatus};
 pub use service_manager::{ServiceManager, ServiceStatus};
+pub use service_effect::{
+    NixServiceEffectContextErrorV1, NixServiceEffectContextV1,
+};
 pub use service_domain::{NixServiceOperationErrorV1, NixServiceOperationKindV1, NixServiceOperationV1};
 #[cfg(feature = "systemd-observer")]
 pub use systemd_observer::{
