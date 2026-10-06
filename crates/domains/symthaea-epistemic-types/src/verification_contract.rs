@@ -2756,6 +2756,16 @@ mod tests {
         assert!(parse_timestamp("timestamp", "0000-01-01T00:00:00Z").is_ok());
         assert!(parse_timestamp("timestamp", "-0001-01-01T00:00:00Z").is_ok());
         assert!(parse_timestamp("timestamp", "12345-01-01T00:00:00Z").is_ok());
+        assert!(parse_timestamp("timestamp", "262143-12-31T23:59:59Z").is_ok());
+        assert!(parse_timestamp("timestamp", "-262144-01-01T00:00:00Z").is_ok());
+        assert!(matches!(
+            parse_timestamp("timestamp", "262144-01-01T00:00:00Z"),
+            Err(VerificationFailure::InvalidTimestamp { .. })
+        ));
+        assert!(matches!(
+            parse_timestamp("timestamp", "-262145-01-01T00:00:00Z"),
+            Err(VerificationFailure::InvalidTimestamp { .. })
+        ));
 
         assert!(parse_timestamp(
             "timestamp",
