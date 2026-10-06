@@ -298,6 +298,60 @@ impl NixActionIntentV1 {
         self.service_effect_context.as_ref()
     }
 
+    /// Bind an observer-sealed systemd definition-content capture into this exact Service intent.
+    ///
+    /// The capture itself is produced only by the read-only observer. This public
+    /// bridge exposes the minimum composition surface needed by binary targets
+    /// without exposing the sealed token's constructor or raw evidence internals.
+    pub fn with_verified_service_definition_content(
+        self,
+        authorized_generation: u64,
+        content: &NixVerifiedServiceDefinitionContentV1,
+    ) -> Result<Self, NixAuthorizationErrorV1> {
+        let NixActionDescriptorV1::Service { operation, unit } = &self.action else {
+            return Err(NixAuthorizationErrorV1::UnexpectedServiceEffectContext);
+        };
+        let pre_state_identity = self
+            .pre_state_identity
+            .as_deref()
+            .ok_or(NixAuthorizationErrorV1::MissingServiceEffectContext)?;
+        let prefix = "nixward-service-pre-state-v1|generation=";
+        let rest = pre_state_identity
+            .strip_prefix(prefix)
+            .ok_or(NixAuthorizationErrorV1::ServiceEffectContextMismatch)?;
+        let (generation, rest) = rest
+            .split_once("|unit=")
+            .ok_or(NixAuthorizationErrorV1::ServiceEffectContextMismatch)?;
+        let generation = generation
+            .parse::<u64>()
+            .map_err(|_| NixAuthorizationErrorV1::ServiceEffectContextMismatch)?;
+        let (identity_unit, state_digest) = rest
+            .split_once("|state=")
+            .ok_or(NixAuthorizationErrorV1::ServiceEffectContextMismatch)?;
+        if generation != authorized_generation || identity_unit != unit {
+            return Err(NixAuthorizationErrorV1::ServiceEffectContextMismatch);
+        }
+
+        let evidence = content.as_ref();
+        if evidence.unit != *unit {
+            return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
+        }
+        let context = NixServiceEffectContextV1::new(
+            *operation,
+            unit.clone(),
+            authorized_generation,
+            state_digest.to_string(),
+            evidence.source_identity_digest.clone(),
+            content
+                .digest()
+                .map_err(NixAuthorizationErrorV1::InvalidServiceEffectContext)?,
+            None,
+            0,
+        )
+        .map_err(NixAuthorizationErrorV1::InvalidServiceEffectContext)?;
+        self.with_service_effect_context(context)
+    }
+
     pub fn validate_shape(&self) -> Result<(), NixAuthorizationErrorV1> {
         require_nonempty(&self.subject_identity, "subject identity")?;
         validate_optional_nonempty(self.pre_state_identity.as_deref(), "pre-state identity")?;
