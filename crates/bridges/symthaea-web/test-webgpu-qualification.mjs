@@ -1471,6 +1471,7 @@ async function runMode(mode) {
         const { webgpu_rect: webgpuRect, control_rect: controlRect } =
           diagnostics.raw_webgpu_compositor_canary;
         const cleanupKey = diagnostics.raw_webgpu_compositor_canary.cleanup_key;
+        const statusKey = diagnostics.raw_webgpu_compositor_canary.status_key;
         try {
           const webgpuShot = await page.screenshot({
             clip: webgpuRect,
