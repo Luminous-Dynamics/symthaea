@@ -104,7 +104,7 @@ The shift is performed separately inside train and test, so surrogate constructi
 
 ### 5.2 FeatureDecoupling
 
-The four relational channels are shifted by channel-specific deterministic non-zero offsets inside each partition.
+The four relational channels are shifted by channel-specific deterministic non-zero offsets inside each partition. The evaluator requires at least five observations in a partition for this null, because four channels need four distinct non-zero circular offsets; undersized partitions fail closed instead of silently weakening the null.
 
 Properties preserved:
 
