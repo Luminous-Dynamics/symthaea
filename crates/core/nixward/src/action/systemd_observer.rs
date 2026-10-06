@@ -128,6 +128,9 @@ pub enum NixSystemdObserverErrorV1 {
     #[error("definition content source uses a trailing symbolic link")]
     DefinitionContentSymlink,
 
+    #[error("systemd definition identity changed during content capture")]
+    DefinitionIdentityChanged,
+
     #[error("definition content exceeds capture size limit")]
     DefinitionContentTooLarge,
 }
@@ -373,11 +376,13 @@ impl NixSystemdReadOnlyObserverV1 {
             .digest(&expected_unit)
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
 
-        if post_owner != manager_owner
-            || post_object_path.as_str() != object_path.as_str()
+        if post_owner != manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if post_object_path.as_str() != object_path.as_str()
             || post_identity_digest != source_identity_digest
         {
-            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+            return Err(NixSystemdObserverErrorV1::DefinitionIdentityChanged);
         }
 
         let evidence = NixServiceDefinitionContentEvidenceV1 {
@@ -1018,7 +1023,7 @@ fn read_definition_content_file(
 
     let mut options = OpenOptions::new();
     options.read(true);
-    let file = options
+    let mut file = options
         .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
         .open(path)
         .map_err(|error| {
@@ -1030,9 +1035,9 @@ fn read_definition_content_file(
         })?;
 
     let before = definition_file_identity(&file)?;
-    let (first_len, first_digest) = hash_open_definition_file(&mut { &file })?;
+    let (first_len, first_digest) = hash_open_definition_file(&mut file)?;
     let middle = definition_file_identity(&file)?;
-    let (second_len, second_digest) = hash_open_definition_file(&mut { &file })?;
+    let (second_len, second_digest) = hash_open_definition_file(&mut file)?;
     let after = definition_file_identity(&file)?;
 
     if before != middle || middle != after || first_len != second_len || first_digest != second_digest {
