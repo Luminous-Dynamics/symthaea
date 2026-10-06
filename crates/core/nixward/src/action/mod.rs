@@ -16,6 +16,7 @@ pub mod executor;
 pub mod flake_ops;
 pub mod gc_manager;
 pub mod generation_manager;
+pub mod generation_observer;
 pub mod local_approval;
 pub mod local_approval_ipc;
 pub mod local_approval_projection;
@@ -75,6 +76,7 @@ pub use executor::{
 pub use flake_ops::{FlakeCheckResult, FlakeMetadata, FlakeOps};
 pub use gc_manager::{GcAnalysis, GcManager, GcRecommendation};
 pub use generation_manager::{Generation, GenerationDiff, GenerationManager};
+pub use generation_observer::{NixOSGenerationObserverErrorV1, NixVerifiedNixOSGenerationV1};
 pub use local_approval::{
     LocalApprovalDecisionKindV1, LocalApprovalErrorV1, LocalNixApprovalDecisionV1,
     PendingNixApprovalRequestV1, digest_display, operator_visible_action_for_command,
