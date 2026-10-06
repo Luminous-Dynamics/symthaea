@@ -1298,7 +1298,6 @@ impl RollingOriginRelationalPredictionQualification {
         &self,
         samples: &[RelationalPredictionSample],
         config: RollingOriginRelationalPredictionConfig,
-        surrogate_count: usize,
     ) -> Result<(), RelationalPredictionError> {
         self.validate()?;
         if config != self.config {
@@ -1875,7 +1874,6 @@ impl HeldOutRelationalPredictionQualification {
         &self,
         samples: &[RelationalPredictionSample],
         config: HeldOutRelationalPredictionConfig,
-        surrogate_count: usize,
     ) -> Result<(), RelationalPredictionError> {
         self.validate()?;
         if config != self.config {
@@ -3236,21 +3234,21 @@ mod tests {
             HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
 
         assert_eq!(
-            qualification.verify_against_samples(&samples, config(), 12),
+            qualification.verify_against_samples(&samples, config()),
             Ok(())
         );
 
         let mut altered_samples = samples.clone();
         altered_samples[15].future_outcome += 0.01;
         assert_eq!(
-            qualification.verify_against_samples(&altered_samples, config(), 12),
+            qualification.verify_against_samples(&altered_samples, config()),
             Err(RelationalPredictionError::InvalidEvidenceInputDigest)
         );
 
         let mut altered_config = config();
         altered_config.gap_samples += 1;
         assert_eq!(
-            qualification.verify_against_samples(&samples, altered_config, 12),
+            qualification.verify_against_samples(&samples, altered_config),
             Err(RelationalPredictionError::InvalidSplit)
         );
     }
@@ -3726,14 +3724,14 @@ mod tests {
         qualification.validate().unwrap();
         assert_eq!(qualification.origin_starts, vec![0, 8, 16, 24]);
         assert_eq!(
-            qualification.verify_against_samples(&samples, config, 8),
+            qualification.verify_against_samples(&samples, config),
             Ok(())
         );
 
         let mut altered_samples = samples.clone();
         altered_samples[40].future_outcome += 0.01;
         assert_eq!(
-            qualification.verify_against_samples(&altered_samples, config, 8),
+            qualification.verify_against_samples(&altered_samples, config),
             Err(RelationalPredictionError::InvalidEvidenceInputDigest)
         );
 
