@@ -25,6 +25,7 @@ pub mod local_approval_runtime;
 pub mod local_approval_socket;
 pub mod local_approval_store;
 pub mod local_approval_submission;
+pub mod post_state;
 pub mod phi_gate;
 pub mod plan_executor;
 pub mod service_manager;
@@ -45,6 +46,13 @@ pub use authorization::{
     NixExecutionAuthorizationRecordV1, NixExecutionReceiptV1, NixLocalExecutionAuthorityV1,
     NixMechanicalResultV1,
     NixPostconditionStatusV1,
+};
+pub use post_state::{
+    NixPostStateClaimV1, NixPostStateErrorV1, NixPostStateReceiptV1,
+    NixPostStateStabilityEvidenceV1, NixPostconditionAssessmentV1,
+    NixServicePostStateExpectationV1, NixServicePostStateObservationV1,
+    NixSystemdJobEvidenceV1, NixSystemdJobTypeV1,
+    NixSystemdUnitDefinitionIdentityV1,
 };
 pub use config_writer::{ConfigPatch, ConfigWriter, WriteResult};
 pub use daemon_incarnation::{DaemonApprovalContextErrorV1, LiveDaemonIncarnationV1};
