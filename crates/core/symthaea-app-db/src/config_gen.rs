@@ -410,7 +410,7 @@ fn build_configuration_nix(
     }
 
     // ── System version ──
-    writeln!(out, "  system.stateVersion = \"25.05\";").unwrap();
+    writeln!(out, "  system.stateVersion = \"26.05\";").unwrap();
 
     writeln!(out, "}}").unwrap();
     out
@@ -835,7 +835,7 @@ fn write_home_manager(out: &mut String, choices: &UserChoices) {
     writeln!(out, "  home-manager.useGlobalPkgs = true;").unwrap();
     writeln!(out, "  home-manager.useUserPackages = true;").unwrap();
     writeln!(out, "  home-manager.users.{} = {{ pkgs, ... }}: {{", name).unwrap();
-    writeln!(out, "    home.stateVersion = \"25.05\";").unwrap();
+    writeln!(out, "    home.stateVersion = \"26.05\";").unwrap();
     writeln!(out, "    programs.git.enable = true;").unwrap();
     if choices.shell == "zsh" {
         writeln!(out, "    programs.zsh = {{ enable = true; oh-my-zsh = {{ enable = true; theme = \"robbyrussell\"; }}; }};").unwrap();
@@ -900,7 +900,7 @@ fn build_flake_nix(choices: &UserChoices) -> String {
     writeln!(out, "  inputs = {{").unwrap();
     writeln!(
         out,
-        "    nixpkgs.url = \"github:NixOS/nixpkgs/nixos-25.05\";"
+        "    nixpkgs.url = \"github:NixOS/nixpkgs/nixos-26.05\";"
     )
     .unwrap();
     if choices.secure_boot {
@@ -917,7 +917,7 @@ fn build_flake_nix(choices: &UserChoices) -> String {
         writeln!(out, "    home-manager = {{").unwrap();
         writeln!(
             out,
-            "      url = \"github:nix-community/home-manager/release-25.05\";"
+            "      url = \"github:nix-community/home-manager/release-26.05\";"
         )
         .unwrap();
         writeln!(out, "      inputs.nixpkgs.follows = \"nixpkgs\";").unwrap();
@@ -1168,7 +1168,7 @@ mod tests {
         let result = generate(&test_hw(), &test_choices(), &[]);
         let flake = &result.flake_nix;
         assert!(flake.contains("nixosConfigurations.\"sovereign\""));
-        assert!(flake.contains("nixos-25.05"));
+        assert!(flake.contains("nixos-26.05"));
         assert!(flake.contains("lanzaboote"));
     }
 
