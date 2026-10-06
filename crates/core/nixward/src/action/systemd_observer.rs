@@ -762,6 +762,7 @@ pub struct NixSystemdJobHandleV1 {
     object_path: OwnedObjectPath,
     unit_object_path: OwnedObjectPath,
     manager_owner: String,
+    bus_id: String,
 }
 
 impl std::fmt::Debug for NixSystemdJobHandleV1 {
@@ -773,6 +774,7 @@ impl std::fmt::Debug for NixSystemdJobHandleV1 {
             .field("object_path", &self.object_path)
             .field("unit_object_path", &self.unit_object_path)
             .field("manager_owner", &self.manager_owner)
+            .field("bus_id", &self.bus_id)
             .finish()
     }
 }
@@ -802,6 +804,10 @@ impl NixSystemdJobHandleV1 {
         &self.manager_owner
     }
 
+    pub fn bus_id(&self) -> &str {
+        &self.bus_id
+    }
+
     fn validate(&self) -> Result<(), NixSystemdObserverErrorV1> {
         if self.id == 0 {
             return Err(NixSystemdObserverErrorV1::InvalidJobIdentity(
@@ -817,6 +823,7 @@ impl NixSystemdJobHandleV1 {
         validate_job_object_path(&self.object_path)?;
         validate_unit_object_path(&self.unit_object_path)?;
         validate_unique_owner(&self.manager_owner)?;
+        validate_bus_id_shape(&self.bus_id)?;
         if !self.object_path.as_str().ends_with(&format!("/{}", self.id)) {
             return Err(NixSystemdObserverErrorV1::InvalidJobIdentity(
                 "job object path/Id mismatch".to_string(),
@@ -824,6 +831,15 @@ impl NixSystemdJobHandleV1 {
         }
         Ok(())
     }
+}
+
+fn validate_bus_id_shape(value: &str) -> Result<(), NixSystemdObserverErrorV1> {
+    if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(NixSystemdObserverErrorV1::InvalidJobIdentity(
+            "invalid D-Bus bus incarnation identifier".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_unique_owner(owner: &str) -> Result<(), NixSystemdObserverErrorV1> {
