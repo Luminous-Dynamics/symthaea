@@ -234,17 +234,18 @@ impl NixSystemdReadOnlyObserverV1 {
             .await
     }
 
-    /// Observe a completed effect while binding the exact captured JobRemoved
-    /// evidence into the returned observer-sealed post-state observation.
+    /// Observe a completed effect using a watcher that was armed before
+    /// mutation dispatch.
     ///
-    /// This is the preferred lifecycle path: the job object must have been
-    /// captured while live, and completion is accepted only for the exact
-    /// JobRemoved tuple.
-    pub async fn observe_service_post_state_for_completed_job(
+    /// This is the governed lifecycle path. The caller must arm the watcher
+    /// before dispatching the effect, then capture the exact live Job handle,
+    /// then pass both here.
+    pub async fn observe_service_post_state_for_prearmed_job(
         &self,
         operation: NixServiceOperationKindV1,
         unit: &str,
         generation: u64,
+        watcher: NixSystemdJobRemovedWatcherV1,
         job: &NixSystemdJobHandleV1,
         timeout: Duration,
     ) -> Result<NixVerifiedPostStateObservationV1, NixSystemdObserverErrorV1> {
@@ -254,12 +255,38 @@ impl NixSystemdReadOnlyObserverV1 {
         if job.job_type != expected_job_type {
             return Err(NixSystemdObserverErrorV1::JobCorrelationMismatch);
         }
-        let completed_job = self.await_job_removed(job, timeout).await?;
+        let completed_job = watcher.await_job_removed(job, timeout).await?;
         self.observe_service_post_state_internal(
             operation,
             unit,
             generation,
             Some(completed_job),
+        )
+        .await
+    }
+
+    /// Legacy convenience method.
+    ///
+    /// The watcher is armed only after the live Job handle is already known, so
+    /// a sufficiently fast job can still emit JobRemoved before subscription.
+    /// Governed callers must use arm_job_removed_watcher() before dispatch and
+    /// observe_service_post_state_for_prearmed_job() afterward.
+    pub async fn observe_service_post_state_for_completed_job(
+        &self,
+        operation: NixServiceOperationKindV1,
+        unit: &str,
+        generation: u64,
+        job: &NixSystemdJobHandleV1,
+        timeout: Duration,
+    ) -> Result<NixVerifiedPostStateObservationV1, NixSystemdObserverErrorV1> {
+        let watcher = self.arm_job_removed_watcher().await?;
+        self.observe_service_post_state_for_prearmed_job(
+            operation,
+            unit,
+            generation,
+            watcher,
+            job,
+            timeout,
         )
         .await
     }
@@ -310,6 +337,53 @@ impl NixSystemdReadOnlyObserverV1 {
             manager_owner,
             stream,
         })
+    }
+
+    /// Observe the service at least twice across a real monotonic window.
+    ///
+    /// The returned stability token is observer-sealed, so callers cannot
+    /// construct proof evidence by merely populating matching timestamps.
+    pub async fn observe_service_stability_window(
+        &self,
+        operation: NixServiceOperationKindV1,
+        unit: &str,
+        generation: u64,
+        required_window_us: u64,
+    ) -> Result<NixVerifiedPostStateStabilityEvidenceV1, NixSystemdObserverErrorV1> {
+        if required_window_us == 0 {
+            return Err(NixSystemdObserverErrorV1::InvalidPostState(
+                "required stability window must be non-zero".to_string(),
+            ));
+        }
+
+        let first = self
+            .observe_service_post_state(operation, unit, generation)
+            .await?;
+        let first_at = first.as_ref().observed_at_monotonic_us;
+
+        tokio::time::sleep(Duration::from_micros(required_window_us)).await;
+
+        let second = self
+            .observe_service_post_state(operation, unit, generation)
+            .await?;
+        let second_at = second.as_ref().observed_at_monotonic_us;
+
+        let samples = vec![
+            stability_sample_from_observation(first.as_ref())?,
+            stability_sample_from_observation(second.as_ref())?,
+        ];
+        let sequence_digest = stability_sequence_digest_for_observer(&samples)?;
+
+        let evidence = NixPostStateStabilityEvidenceV1 {
+            required_window_us,
+            window_start_monotonic_us: first_at,
+            window_end_monotonic_us: second_at,
+            samples,
+            sequence_digest,
+        };
+
+        NixVerifiedPostStateStabilityEvidenceV1::from_observer(evidence)
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))
     }
 
     /// Capture a still-live Job identity from the exact Job object.
@@ -453,6 +527,7 @@ impl NixSystemdReadOnlyObserverV1 {
         }
 
         let expected_unit = canonical_unit(unit)?;
+        let manager_owner = self.systemd_manager_owner().await?;
         let object_path = self.resolve_service_unit(&expected_unit).await?;
         let unit_properties = self
             .get_all_properties(&object_path, SYSTEMD_UNIT_INTERFACE)
@@ -460,6 +535,10 @@ impl NixSystemdReadOnlyObserverV1 {
         let service_properties = self
             .get_all_properties(&object_path, SYSTEMD_SERVICE_INTERFACE)
             .await?;
+        let post_manager_owner = self.systemd_manager_owner().await?;
+        if post_manager_owner != manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
 
         let service_result =
             required_string(&service_properties, SYSTEMD_SERVICE_INTERFACE, "Result")?;
@@ -474,6 +553,8 @@ impl NixSystemdReadOnlyObserverV1 {
             operation,
             &expected_unit,
             generation,
+            &object_path,
+            &manager_owner,
             &unit_properties,
             job,
         )?;
