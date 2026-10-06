@@ -939,6 +939,64 @@ fn validate_native_replay_history_references(
     Ok(())
 }
 
+fn validate_native_replay_history_owners(
+    connection: &Connection,
+) -> Result<(), AuthorizationStoreError> {
+    let mismatch: Option<String> = connection
+        .query_row(
+            "SELECT native_replay_identity
+             FROM authorization_dispatches d
+             WHERE d.native_replay_identity IS NOT NULL
+               AND d.native_replay_identity <> ''
+               AND NOT EXISTS(
+                   SELECT 1
+                   FROM authorization_native_replay_history h
+                   WHERE h.native_replay_identity=d.native_replay_identity
+                     AND h.authorization_instance=d.authorization_instance
+                     AND h.attempt_id=d.attempt_id
+                     AND h.operation_id=d.operation_id
+                     AND h.relying_party_id=COALESCE(d.relying_party_id,'')
+                     AND h.native_authority_namespace IS d.native_authority_namespace
+                     AND h.native_authorization_id IS d.native_authorization_id
+                     AND h.native_replay_derivation_digest IS d.native_replay_derivation_digest
+                     AND h.boundary_id IS d.boundary_id
+                     AND h.action_digest IS d.action_digest
+                     AND h.target_identity IS d.target_identity
+               )
+             UNION ALL
+             SELECT native_replay_identity
+             FROM authorization_terminal_evidence t
+             WHERE t.native_replay_identity IS NOT NULL
+               AND t.native_replay_identity <> ''
+               AND NOT EXISTS(
+                   SELECT 1
+                   FROM authorization_native_replay_history h
+                   WHERE h.native_replay_identity=t.native_replay_identity
+                     AND h.authorization_instance=t.authorization_instance
+                     AND h.attempt_id=t.attempt_id
+                     AND h.operation_id=t.operation_id
+                     AND h.relying_party_id=COALESCE(t.relying_party_id,'')
+                     AND h.native_authority_namespace IS t.native_authority_namespace
+                     AND h.native_authorization_id IS t.native_authorization_id
+                     AND h.native_replay_derivation_digest IS t.native_replay_derivation_digest
+                     AND h.boundary_id IS t.boundary_id
+                     AND h.action_digest IS t.action_digest
+                     AND h.target_identity IS t.target_identity
+               )
+             LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+
+    if let Some(native_replay_identity) = mismatch {
+        return Err(AuthorizationStoreError::InvalidState(format!(
+            "native replay history owner mismatch for persisted lifecycle record: {native_replay_identity}"
+        )));
+    }
+    Ok(())
+}
+
 fn validate_native_replay_history_records(
     connection: &Connection,
 ) -> Result<(), AuthorizationStoreError> {
@@ -1940,6 +1998,7 @@ impl SqliteAuthorizationStore {
         match replay_history_backfill_version.as_deref() {
             Some(NATIVE_REPLAY_HISTORY_BACKFILL_VERSION) => {
                 validate_native_replay_history_references(&connection)?;
+                validate_native_replay_history_owners(&connection)?;
                 validate_native_replay_history_records(&connection)?;
             }
             Some(other) => {
@@ -1953,6 +2012,7 @@ impl SqliteAuthorizationStore {
                 // replay history exists, backfill records that state atomically.
                 backfill_native_replay_history(&mut connection)?;
                 validate_native_replay_history_references(&connection)?;
+                validate_native_replay_history_owners(&connection)?;
                 validate_native_replay_history_records(&connection)?;
             }
         }
@@ -7922,6 +7982,79 @@ mod tests {
         );
         assert!(dangling_terminal.unwrap_err().to_string().contains(
             "terminal native replay history owner mismatch"
+        ));
+
+        let marker_delete = store
+            .connection()
+            .unwrap()
+            .execute(
+                "DELETE FROM authorization_store_metadata
+                 WHERE key=?1",
+                params![NATIVE_REPLAY_HISTORY_BACKFILL_KEY],
+            )
+            .unwrap_err();
+        assert!(marker_delete
+            .to_string()
+            .contains("native replay history backfill marker is write-once"));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn reopen_rejects_native_replay_owner_splice() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-replay-owner-reopen-{}.db",
+            std::process::id()
+        ));
+        {
+            let store = fixture(&path).0;
+            let conn = store.connection().unwrap();
+
+            conn.execute(
+                "INSERT INTO authorization_native_replay_history(
+                    native_replay_identity,authorization_instance,attempt_id,operation_id,
+                    relying_party_id,boundary_id,action_digest,target_identity)
+                 VALUES(
+                    'legacy-replay-owner','auth-owner','attempt-owner','operation-owner',
+                    'legacy-local','boundary-owner','sha256:owner-action','target-owner'
+                 )",
+                [],
+            )
+            .unwrap();
+
+            // The first lifecycle record is deliberately spliced to a different
+            // attempt while retaining the same replay identity.
+            conn.execute(
+                "INSERT INTO authorization_dispatches(
+                    authorization_instance,attempt_id,operation_id,native_replay_identity,
+                    action_id,action_digest,provider_idempotency_key,target_identity,
+                    audience,adapter,adapter_revision,adapter_implementation_digest,
+                    boundary_id,attempt_binding_digest,state)
+                 VALUES(
+                    'auth-owner','attempt-spliced','operation-owner','legacy-replay-owner',
+                    'action-owner','sha256:owner-action','provider-owner','target-owner',
+                    'audience-owner','adapter-owner','adapter-v1','sha256:adapter-owner',
+                    'boundary-owner','sha256:binding-owner','dispatch_pending'
+                 )",
+                [],
+            )
+            .unwrap();
+
+            conn.execute(
+                "INSERT INTO authorization_store_metadata(key,value)
+                 VALUES(?1,?2)",
+                params![
+                    NATIVE_REPLAY_HISTORY_BACKFILL_KEY,
+                    NATIVE_REPLAY_HISTORY_BACKFILL_VERSION
+                ],
+            )
+            .unwrap();
+        }
+
+        assert!(matches!(
+            SqliteAuthorizationStore::open(&path),
+            Err(AuthorizationStoreError::InvalidState(message))
+                if message.contains("native replay history owner mismatch for persisted lifecycle record")
         ));
 
         let _ = std::fs::remove_file(path);
