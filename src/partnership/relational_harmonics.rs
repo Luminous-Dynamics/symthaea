@@ -386,31 +386,9 @@ impl DirectionalInformationFlow {
             return Err(RelationalHarmonicError::InsufficientSamples(samples.len()));
         }
 
-        for pair in samples.windows(2) {
-            if pair[1].time <= pair[0].time {
-                return Err(RelationalHarmonicError::NonMonotonicTime);
-            }
-        }
+        validate_uniform_sampling(samples)?;
 
-        let dt0 = samples[1].time - samples[0].time;
-        let tolerance = 1e-6 * dt0.abs().max(1.0);
-        if !samples
-            .windows(2)
-            .all(|w| ((w[1].time - w[0].time) - dt0).abs() <= tolerance)
-        {
-            return Err(RelationalHarmonicError::NonUniformSampling);
-        }
-
-        let config = crate::hdc::information_theory::InformationTheoryConfig::default();
-        let mut estimator =
-            crate::hdc::information_theory::TransferEntropyEstimator::new(config, samples.len());
-
-        for sample in samples {
-            estimator.observe_scalars(sample.agent_a, sample.agent_b);
-        }
-
-        let te_a_to_b = estimator.transfer_entropy_x_to_y().unwrap_or(0.0);
-        let te_b_to_a = estimator.transfer_entropy_y_to_x().unwrap_or(0.0);
+        let (te_a_to_b, te_b_to_a) = transfer_entropy_pair(samples);
 
         Ok(Self {
             samples: samples.len(),
