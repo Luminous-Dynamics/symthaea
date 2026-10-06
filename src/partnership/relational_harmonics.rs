@@ -422,6 +422,110 @@ impl DirectionalInformationFlow {
     }
 }
 
+/// Lagged correlation structure computed directly from the independent
+/// agent signals.
+///
+/// A positive lag means B follows A by that many samples:
+/// corr(A[t-lag], B[t]). This is temporal association, not causality.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LagCorrelationSummary {
+    pub status: EvidenceStatus,
+    pub best_lag: Option<usize>,
+    pub best_signed_correlation: f64,
+    pub best_absolute_correlation: f64,
+    pub zero_lag_correlation: Option<f64>,
+}
+
+impl LagCorrelationSummary {
+    pub fn compute(
+        samples: &[RelationalSignalSample],
+        max_lag: usize,
+    ) -> Result<Self, RelationalHarmonicError> {
+        if samples.len() < 16 {
+            return Err(RelationalHarmonicError::InsufficientSamples(samples.len()));
+        }
+
+        for pair in samples.windows(2) {
+            if pair[1].time <= pair[0].time {
+                return Err(RelationalHarmonicError::NonMonotonicTime);
+            }
+        }
+
+        let dt0 = samples[1].time - samples[0].time;
+        let tolerance = 1e-6 * dt0.abs().max(1.0);
+        if !samples
+            .windows(2)
+            .all(|w| ((w[1].time - w[0].time) - dt0).abs() <= tolerance)
+        {
+            return Err(RelationalHarmonicError::NonUniformSampling);
+        }
+
+        let max_lag = max_lag.min(samples.len() - 2);
+        let mut best_lag = None;
+        let mut best_signed = 0.0;
+        let mut best_abs = -1.0;
+
+        for lag in 0..=max_lag {
+            let start = lag;
+            let n = samples.len() - lag;
+            if n < 16 {
+                continue;
+            }
+
+            let a = samples[..n].iter().map(|s| s.agent_a).collect::<Vec<_>>();
+            let b = samples[start..].iter().map(|s| s.agent_b).collect::<Vec<_>>();
+            let corr = pearson_correlation(&a, &b);
+            let magnitude = corr.abs();
+            if magnitude > best_abs {
+                best_abs = magnitude;
+                best_signed = corr;
+                best_lag = Some(lag);
+            }
+        }
+
+        let zero_lag = pearson_correlation(
+            &samples.iter().map(|s| s.agent_a).collect::<Vec<_>>(),
+            &samples.iter().map(|s| s.agent_b).collect::<Vec<_>>(),
+        );
+
+        Ok(Self {
+            status: EvidenceStatus::Measured,
+            best_lag,
+            best_signed_correlation: best_signed.clamp(-1.0, 1.0),
+            best_absolute_correlation: best_abs.clamp(0.0, 1.0),
+            zero_lag_correlation: Some(zero_lag),
+        })
+    }
+}
+
+fn pearson_correlation(a: &[f64], b: &[f64]) -> f64 {
+    let n = a.len().min(b.len());
+    if n < 2 {
+        return 0.0;
+    }
+
+    let mean_a = a[..n].iter().sum::<f64>() / n as f64;
+    let mean_b = b[..n].iter().sum::<f64>() / n as f64;
+    let mut num = 0.0;
+    let mut var_a = 0.0;
+    let mut var_b = 0.0;
+
+    for i in 0..n {
+        let da = a[i] - mean_a;
+        let db = b[i] - mean_b;
+        num += da * db;
+        var_a += da * da;
+        var_b += db * db;
+    }
+
+    let denom = (var_a * var_b).sqrt();
+    if denom <= 1e-20 {
+        0.0
+    } else {
+        (num / denom).clamp(-1.0, 1.0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -546,6 +650,50 @@ mod tests {
             HarmonicStatus::NonUniformSampling
         );
         assert_eq!(profile.harmonic.dominant_bin, None);
+    }
+
+    #[test]
+    fn lag_correlation_recovers_known_delay() {
+        let source = (0..96)
+            .map(|i| {
+                let x = ((i as f64) * 0.173).sin() + 0.2 * ((i as f64) * 0.071).cos();
+                x
+            })
+            .collect::<Vec<_>>();
+
+        let samples = (0..96)
+            .map(|i| {
+                let b = if i >= 3 { source[i - 3] } else { 0.0 };
+                RelationalSignalSample::new(i as f64, source[i], b)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        let lag = LagCorrelationSummary::compute(&samples, 8).unwrap();
+
+        assert_eq!(lag.status, EvidenceStatus::Measured);
+        assert_eq!(lag.best_lag, Some(3));
+        assert!(lag.best_absolute_correlation > 0.95);
+    }
+
+    #[test]
+    fn lag_correlation_marks_temporal_association_not_causality() {
+        let samples = (0..64)
+            .map(|i| {
+                RelationalSignalSample::new(
+                    i as f64,
+                    (i as f64 * 0.11).sin(),
+                    (i as f64 * 0.11).sin(),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        let lag = LagCorrelationSummary::compute(&samples, 4).unwrap();
+
+        assert_eq!(lag.status, EvidenceStatus::Measured);
+        assert!(lag.best_absolute_correlation > 0.9);
+        assert_eq!(lag.best_lag, Some(0));
     }
 
     #[test]
