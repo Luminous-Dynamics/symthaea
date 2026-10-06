@@ -98,11 +98,9 @@ pub struct NixSystemdJobEvidenceV1 {
     /// Canonical unit name carried by systemd's JobRemoved signal.
     pub unit: String,
     /// Unique D-Bus owner of org.freedesktop.systemd1 for this job epoch.
-    ///
-    /// Unique names are connection-scoped and never change owner, so retaining
-    /// this value prevents a durable receipt from collapsing two systemd
-    /// manager incarnations that happen to reuse other job identifiers.
     pub manager_owner: String,
+    /// D-Bus daemon incarnation returned by org.freedesktop.DBus.GetId().
+    pub bus_id: String,
     /// Job object path returned by systemd.
     pub object_path: String,
     /// systemd JobRemoved result. Only the exact `done` value is accepted as
@@ -122,6 +120,7 @@ impl NixSystemdJobEvidenceV1 {
             return Err(NixPostStateErrorV1::InvalidJobUnit);
         }
         validate_unique_manager_owner(&self.manager_owner)?;
+        validate_bus_id(&self.bus_id)?;
         require_nonempty(&self.object_path, "systemd job object path")?;
         if !self.object_path.starts_with("/org/freedesktop/systemd1/job/") {
             return Err(NixPostStateErrorV1::InvalidJobObjectPath);
@@ -1885,6 +1884,7 @@ mod tests {
                     object_path: "/org/freedesktop/systemd1/job/7".to_string(),
                     result: "done".to_string(),
                     manager_owner: ":1.123".to_string(),
+                    bus_id: "0123456789abcdef0123456789abcdef".to_string(),
                 }
             }),
             systemd_manager_owner: Some(":1.123".to_string()),
