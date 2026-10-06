@@ -348,33 +348,14 @@ impl NeurosemanticHandlingPolicy {
             )
     }
 
-    /// Bind the exact supplied policy record to the packet's declared provenance
-    /// reference and digest. The returned token proves only this cryptographic
-    /// binding; it is not an issuer/authority credential.
-    pub fn bind_policy_provenance_bytes(
-        &self,
-        record_bytes: &[u8],
-    ) -> Result<NeurosemanticPolicyProvenanceBinding, String> {
-        if !self.validates() {
-            return Err("neurosemantic policy provenance state is invalid".into());
-        }
-        if record_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
-            return Err("neurosemantic policy provenance record exceeds the serialized artifact limit".into());
-        }
-        if compute_policy_provenance_hash(&self.policy_provenance_ref, record_bytes)
-            != self.policy_provenance_hash
-        {
-            return Err("neurosemantic policy provenance reference/record binding mismatch".into());
-        }
-        Ok(NeurosemanticPolicyProvenanceBinding {
-            policy_provenance_ref: self.policy_provenance_ref.clone(),
-            policy_provenance_hash: self.policy_provenance_hash.clone(),
-            handling_policy_fingerprint: self.fingerprint_for_attestation()?,
-            authority_ref: String::new(),
-            key_ref: String::new(),
-            attestation_fingerprint: String::new(),
-            attestation_expires_at_unix_s: u64::MAX,
-        })
+    /// Verify that the exact external policy/consent record is bound to the
+    /// declared provenance reference and digest. This does not produce a
+    /// handling capability or authenticate the issuing authority.
+    pub fn verify_policy_record_binding_bytes(&self, record_bytes: &[u8]) -> bool {
+        self.validates()
+            && record_bytes.len() <= MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            && compute_policy_provenance_hash(&self.policy_provenance_ref, record_bytes)
+                == self.policy_provenance_hash
     }
 
     /// Produce a handling capability only after both external-record binding and
@@ -412,7 +393,7 @@ impl NeurosemanticHandlingPolicy {
 
     /// Convenience predicate for callers that only need a boolean result.
     pub fn verify_policy_provenance_bytes(&self, record_bytes: &[u8]) -> bool {
-        self.bind_policy_provenance_bytes(record_bytes).is_ok()
+        self.verify_policy_record_binding_bytes(record_bytes)
     }
 
     pub fn allows_destination(&self, destination_jurisdiction: &str) -> bool {
@@ -1452,7 +1433,7 @@ mod tests {
     fn handling_rejects_stale_or_unattested_provenance_capability() {
         let policy = semantic_policy();
         let (attestation, verifying_key) = authority_attestation(&policy);
-        let binding = policy
+        let original_binding = policy
             .handling
             .bind_policy_provenance_with_attestation(
                 b"synthetic-policy-record-1",
@@ -1461,6 +1442,7 @@ mod tests {
                 150,
             )
             .unwrap();
+
         let packet = NeurosemanticPacket::new_with_policy(
             19,
             "peer",
@@ -1483,14 +1465,14 @@ mod tests {
         assert!(message
             .validate_for_handling(
                 &lease(),
-                &binding,
+                &original_binding,
                 "ZA",
                 NeurosemanticHandlingAction::Transmit,
                 150,
             )
             .is_ok());
 
-        let mut expired = binding.clone();
+        let mut expired = original_binding.clone();
         expired.attestation_expires_at_unix_s = 150;
         assert!(message
             .validate_for_handling(
@@ -1570,9 +1552,9 @@ mod tests {
     #[test]
     fn handling_policy_provenance_reference_cannot_be_swapped_under_existing_digest() {
         let mut policy = semantic_policy().handling;
-        assert!(policy.verify_policy_provenance_bytes(b"synthetic-policy-record-1"));
+        assert!(policy.verify_policy_record_binding_bytes(b"synthetic-policy-record-1"));
         policy.policy_provenance_ref = "synthetic-policy-record-2".into();
-        assert!(!policy.verify_policy_provenance_bytes(b"synthetic-policy-record-1"));
+        assert!(!policy.verify_policy_record_binding_bytes(b"synthetic-policy-record-1"));
     }
 
     #[test]

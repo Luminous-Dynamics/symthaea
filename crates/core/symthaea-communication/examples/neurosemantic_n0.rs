@@ -156,7 +156,7 @@ fn main() -> Result<(), String> {
         .packet
         .data_policy
         .handling
-        .verify_policy_provenance_bytes(b"synthetic-policy-record-1");
+        .verify_policy_record_binding_bytes(b"synthetic-policy-record-1");
 
     let mut reference_mismatch = message.clone();
     reference_mismatch
@@ -169,7 +169,7 @@ fn main() -> Result<(), String> {
         .packet
         .data_policy
         .handling
-        .verify_policy_provenance_bytes(b"synthetic-policy-record-1");
+        .verify_policy_record_binding_bytes(b"synthetic-policy-record-1");
     let mut provenance_mismatch = message.clone();
     provenance_mismatch.packet.data_policy.handling.policy_provenance_hash =
         symthaea_communication::compute_policy_provenance_hash(
@@ -181,7 +181,7 @@ fn main() -> Result<(), String> {
         .packet
         .data_policy
         .handling
-        .verify_policy_provenance_bytes(b"synthetic-policy-record-1");
+        .verify_policy_record_binding_bytes(b"synthetic-policy-record-1");
     message.validate_for_handling(
         &lease,
         &policy_provenance_binding,
