@@ -403,6 +403,10 @@ impl NixExecutionAuthorizationRecordV1 {
         &self,
         intent: &NixActionIntentV1,
     ) -> Result<(), NixAuthorizationErrorV1> {
+        self.validate_shape()?;
+        if self.decision != NixAuthorizationDecisionV1::Approved {
+            return Err(NixAuthorizationErrorV1::NotApproved);
+        }
         let intent_digest = intent.digest()?;
         if self.action_intent_digest != intent_digest {
             return Err(NixAuthorizationErrorV1::IntentMismatch);
@@ -460,6 +464,7 @@ impl NixLocalExecutionAuthorityV1 {
         if approval.decision_evidence().action_intent_digest != digest {
             return Err(NixAuthorizationErrorV1::IntentMismatch);
         }
+        service_effect_context_digest_for_intent(&intent)?;
         Ok(Self { intent, approval })
     }
 
