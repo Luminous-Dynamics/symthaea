@@ -155,6 +155,7 @@ jobs:
           assert report["remediation_evaluation_environment_verified"] is True
           assert report["remediation_evaluation_manifest_verified"] is True
           assert report["remediation_measurement_verified"] is True
+          assert report["remediation_measurement_worst_case_binding_blocked"] is True
           assert report["remediation_evaluation_bundle_verified"] is True
           assert report["remediation_pre_lineage_verified"] is True
           assert report["remediation_post_lineage_verified"] is True
