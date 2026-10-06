@@ -319,6 +319,13 @@ pub mod threat_memory;
 pub mod life_support;
 pub mod power_budget;
 
+/// Typed causal state contracts for persistence, prediction, homeostasis, and recovery.
+pub mod viability_fabric;
+pub use viability_fabric::{
+    ActionOutcome, ActionPrediction, LifecyclePhase, PredictionErrorLedger, ViabilityBand,
+    ViabilityFabric, ViabilitySignal, ViabilityState, ViabilityVariable,
+};
+
 // ── Imports (only what the struct definitions below require) ─────────────────
 // AffectiveBridge now owned by ConsciousnessStateManager
 use crate::brain::prefrontal::PrefrontalCortex;
