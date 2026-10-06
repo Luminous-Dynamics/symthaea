@@ -736,6 +736,33 @@ mod tests {
     }
 
     #[test]
+    fn sealed_pre_state_binds_exact_generation_and_state_digest() {
+        let state = state("active", "enabled", "running");
+        let sealed = NixVerifiedServicePreStateV1::from_observer(&state, 42).unwrap();
+        assert_eq!(sealed.unit(), "nginx.service");
+        assert_eq!(sealed.generation(), 42);
+        assert_eq!(sealed.state_digest(), state.digest().unwrap());
+        assert!(sealed.identity().contains("generation=42|unit=nginx.service|state="));
+    }
+
+    #[test]
+    fn sealed_pre_state_rejects_zero_generation() {
+        let state = state("active", "enabled", "running");
+        assert_eq!(
+            NixVerifiedServicePreStateV1::from_observer(&state, 0).unwrap_err(),
+            NixServiceStateErrorV1::InvalidGeneration
+        );
+    }
+
+    #[test]
+    fn sealed_pre_state_identity_is_deterministic() {
+        let state = state("active", "enabled", "running");
+        let first = NixVerifiedServicePreStateV1::from_observer(&state, 42).unwrap();
+        let second = NixVerifiedServicePreStateV1::from_observer(&state, 42).unwrap();
+        assert_eq!(first.identity(), second.identity());
+    }
+
+    #[test]
     fn parses_complete_current_unit_file_state_vocabulary() {
         for value in [
             "enabled",
