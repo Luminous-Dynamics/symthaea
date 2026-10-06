@@ -1603,6 +1603,13 @@ async function runMode(mode) {
             .filter(Boolean);
           const alphaMode = canvas?.getAttribute('data-qualification-alpha-mode') || null;
           const presentMode = canvas?.getAttribute('data-qualification-present-mode') || null;
+          const context = canvas instanceof HTMLCanvasElement
+            ? canvas.getContext('webgpu')
+            : null;
+          const browserConfiguration =
+            context && typeof context.getConfiguration === 'function'
+              ? context.getConfiguration()
+              : null;
           return {
             format,
             formats,
@@ -1612,6 +1619,18 @@ async function runMode(mode) {
             selected_format_preferred: !!format && formats[0] === format,
             selected_alpha_advertised: !!alphaMode,
             selected_present_mode_advertised: !!presentMode,
+            browser_configuration: browserConfiguration ? {
+              format: browserConfiguration.format || null,
+              usage: browserConfiguration.usage || null,
+              alpha_mode: browserConfiguration.alphaMode || null,
+              color_space: browserConfiguration.colorSpace || null,
+              tone_mapping: browserConfiguration.toneMapping || null,
+              view_formats: browserConfiguration.viewFormats
+                ? [...browserConfiguration.viewFormats]
+                : [],
+              desired_maximum_frame_latency:
+                browserConfiguration.desiredMaximumFrameLatency || null,
+            } : null,
           };
         };
         return {
@@ -1627,7 +1646,9 @@ async function runMode(mode) {
           || !configuration.selected_format_preferred
           || !configuration.selected_alpha_advertised
           || !configuration.selected_present_mode_advertised
-          || configuration.format !== expectedRendererFormat) {
+          || configuration.format !== expectedRendererFormat
+          || configuration.browser_configuration?.format !== diagnostics.browser_preferred_canvas_format
+          || configuration.browser_configuration?.alpha_mode !== 'opaque') {
           throw new QualificationError(
             `WebGPU ${canvas} surface configuration is inconsistent with the browser-preferred format/capabilities: ${JSON.stringify({
               configuration,
@@ -2013,7 +2034,7 @@ try {
   }
 
   const artifact = {
-    schema: 'symthaea-ui-webgpu-qualification-v9',
+    schema: 'symthaea-ui-webgpu-qualification-v10',
     harness_self_tests_passed: true,
     url: URL,
     chromium: CHROMIUM,
