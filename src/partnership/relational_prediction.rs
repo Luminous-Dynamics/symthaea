@@ -1225,6 +1225,39 @@ mod tests {
     }
 
     #[test]
+    fn rolling_origin_rejects_overlapping_test_windows_or_wrong_horizon() {
+        let samples = build_samples(0.5);
+
+        let overlapping = RollingOriginRelationalPredictionSummary::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                train_samples: 32,
+                test_samples: 8,
+                gap_samples: 2,
+                origin_count: 4,
+                step_samples: 4,
+                forecast_horizon: 0.5,
+                ..Default::default()
+            },
+        );
+        assert_eq!(overlapping, Err(RelationalPredictionError::InvalidSplit));
+
+        let wrong_horizon = RollingOriginRelationalPredictionSummary::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                train_samples: 32,
+                test_samples: 8,
+                gap_samples: 2,
+                origin_count: 4,
+                step_samples: 8,
+                forecast_horizon: 1.0,
+                ..Default::default()
+            },
+        );
+        assert_eq!(wrong_horizon, Err(RelationalPredictionError::InvalidSplit));
+    }
+
+    #[test]
     fn rolling_origin_repeats_the_temporal_boundary() {
         let samples = build_samples(0.5);
         let summary = RollingOriginRelationalPredictionSummary::compute(
@@ -1323,6 +1356,23 @@ mod tests {
         let second = RollingOriginRelationalPredictionSummary::compute(&samples, config).unwrap();
 
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn rolling_null_qualification_rejects_arithmetic_overflow() {
+        let samples = build_samples(0.5);
+
+        let result = RollingOriginRelationalPredictionQualification::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                first_origin: usize::MAX,
+                forecast_horizon: 0.5,
+                ..Default::default()
+            },
+            4,
+        );
+
+        assert_eq!(result, Err(RelationalPredictionError::InvalidSplit));
     }
 
     #[test]
