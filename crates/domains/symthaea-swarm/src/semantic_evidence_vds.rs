@@ -2459,14 +2459,6 @@ impl<'a> CborReader<'a> {
         self.skip_value_with_limits(depth, 4096, 64, usize::MAX)
     }
 
-    fn skip_value_with_bstr_limit(
-        &mut self,
-        depth: usize,
-        max_bstr_len: usize,
-    ) -> Result<(), Rfc9162ProofDecodeError> {
-        self.skip_value_with_limits(depth, max_bstr_len, 64, usize::MAX)
-    }
-
     fn skip_value_with_bstr_resource_limits(
         &mut self,
         depth: usize,
