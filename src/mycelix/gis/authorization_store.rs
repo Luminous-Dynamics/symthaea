@@ -1724,7 +1724,101 @@ impl SqliteAuthorizationStore {
                BEGIN
                  SELECT RAISE(ABORT, 'native replay history is append-only');
                END;
-             CREATE TRIGGER IF NOT EXISTS authorization_dispatch_replay_owner_insert
+             DROP INDEX IF EXISTS authorization_dispatch_action_fence_idx;
+             CREATE INDEX authorization_dispatch_action_fence_idx
+               ON authorization_dispatches(relying_party_id, target_identity, action_digest, state);",
+        )?;
+
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        Self::validate_native_authority_pin_set(&tx)?;
+        let clock_policy_digest = store.clock_policy.digest_for_clock(store.clock.source_id());
+        let configured_clock_source: Option<String> = tx
+            .query_row(
+                "SELECT value FROM authorization_store_metadata
+                 WHERE key='authorization_clock_source_id'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match configured_clock_source {
+            Some(existing) if existing != store.clock.source_id() => {
+                return Err(AuthorizationStoreError::InvalidState(format!(
+                    "authorization clock source mismatch: store is pinned to {existing}"
+                )));
+            }
+            Some(_) => {}
+            None => {
+                tx.execute(
+                    "INSERT INTO authorization_store_metadata(key,value) VALUES('authorization_clock_source_id',?1)",
+                    params![store.clock.source_id()],
+                )?;
+            }
+        }
+        let configured_policy: Option<String> = tx
+            .query_row(
+                "SELECT value FROM authorization_store_metadata WHERE key='authorization_clock_policy_digest'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match configured_policy {
+            Some(existing) if existing != clock_policy_digest => {
+                return Err(AuthorizationStoreError::InvalidState(format!(
+                    "authorization clock policy mismatch: store is pinned to {existing}"
+                )));
+            }
+            Some(_) => {}
+            None => {
+                tx.execute(
+                    "INSERT INTO authorization_store_metadata(key,value) VALUES('authorization_clock_policy_digest',?1)",
+                    params![clock_policy_digest.as_str()],
+                )?;
+            }
+        }
+
+        let configured: Option<String> = tx
+            .query_row(
+                "SELECT value FROM authorization_store_metadata WHERE key='relying_party_id'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match configured {
+            Some(existing) if existing != store.relying_party_id => {
+                return Err(AuthorizationStoreError::InvalidState(format!(
+                    "relying party mismatch: store is pinned to {existing}"
+                )));
+            }
+            Some(_) => {}
+            None => {
+                tx.execute(
+                    "INSERT INTO authorization_store_metadata(key,value) VALUES('relying_party_id',?1)",
+                    params![store.relying_party_id.as_str()],
+                )?;
+                tx.execute(
+                    "UPDATE authorization_dispatches
+                     SET relying_party_id=?1
+                     WHERE relying_party_id IS NULL OR relying_party_id=''",
+                    params![store.relying_party_id.as_str()],
+                )?;
+                tx.execute(
+                    "UPDATE authorization_terminal_evidence
+                     SET relying_party_id=?1
+                     WHERE relying_party_id IS NULL OR relying_party_id=''",
+                    params![store.relying_party_id.as_str()],
+                )?;
+            }
+        }
+        tx.commit()?;
+        // Backfill only after legacy relying-party fields have been normalized.
+        // The replay ledger is then a stable historical authority even when
+        // those source rows are later compacted.
+        backfill_native_replay_history(&mut connection)?;
+        validate_native_replay_history_records(&connection)?;
+        // Install replay-owner database guards only after legacy rows have
+        // been normalized and the durable replay ledger has been backfilled.
+        connection.execute_batch(
+            r#"             CREATE TRIGGER IF NOT EXISTS authorization_dispatch_replay_owner_insert
                BEFORE INSERT ON authorization_dispatches
                WHEN NEW.native_replay_identity <> ''
                BEGIN
@@ -1817,98 +1911,8 @@ impl SqliteAuthorizationStore {
                    )
                    THEN RAISE(ABORT, 'terminal native replay history owner mismatch')
                  END;
-               END;
-             DROP INDEX IF EXISTS authorization_dispatch_action_fence_idx;
-             CREATE INDEX authorization_dispatch_action_fence_idx
-               ON authorization_dispatches(relying_party_id, target_identity, action_digest, state);",
+               END;"#,
         )?;
-
-        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        Self::validate_native_authority_pin_set(&tx)?;
-        let clock_policy_digest = store.clock_policy.digest_for_clock(store.clock.source_id());
-        let configured_clock_source: Option<String> = tx
-            .query_row(
-                "SELECT value FROM authorization_store_metadata
-                 WHERE key='authorization_clock_source_id'",
-                [],
-                |row| row.get(0),
-            )
-            .optional()?;
-        match configured_clock_source {
-            Some(existing) if existing != store.clock.source_id() => {
-                return Err(AuthorizationStoreError::InvalidState(format!(
-                    "authorization clock source mismatch: store is pinned to {existing}"
-                )));
-            }
-            Some(_) => {}
-            None => {
-                tx.execute(
-                    "INSERT INTO authorization_store_metadata(key,value) VALUES('authorization_clock_source_id',?1)",
-                    params![store.clock.source_id()],
-                )?;
-            }
-        }
-        let configured_policy: Option<String> = tx
-            .query_row(
-                "SELECT value FROM authorization_store_metadata WHERE key='authorization_clock_policy_digest'",
-                [],
-                |row| row.get(0),
-            )
-            .optional()?;
-        match configured_policy {
-            Some(existing) if existing != clock_policy_digest => {
-                return Err(AuthorizationStoreError::InvalidState(format!(
-                    "authorization clock policy mismatch: store is pinned to {existing}"
-                )));
-            }
-            Some(_) => {}
-            None => {
-                tx.execute(
-                    "INSERT INTO authorization_store_metadata(key,value) VALUES('authorization_clock_policy_digest',?1)",
-                    params![clock_policy_digest.as_str()],
-                )?;
-            }
-        }
-
-        let configured: Option<String> = tx
-            .query_row(
-                "SELECT value FROM authorization_store_metadata WHERE key='relying_party_id'",
-                [],
-                |row| row.get(0),
-            )
-            .optional()?;
-        match configured {
-            Some(existing) if existing != store.relying_party_id => {
-                return Err(AuthorizationStoreError::InvalidState(format!(
-                    "relying party mismatch: store is pinned to {existing}"
-                )));
-            }
-            Some(_) => {}
-            None => {
-                tx.execute(
-                    "INSERT INTO authorization_store_metadata(key,value) VALUES('relying_party_id',?1)",
-                    params![store.relying_party_id.as_str()],
-                )?;
-                tx.execute(
-                    "UPDATE authorization_dispatches
-                     SET relying_party_id=?1
-                     WHERE relying_party_id IS NULL OR relying_party_id=''",
-                    params![store.relying_party_id.as_str()],
-                )?;
-                tx.execute(
-                    "UPDATE authorization_terminal_evidence
-                     SET relying_party_id=?1
-                     WHERE relying_party_id IS NULL OR relying_party_id=''",
-                    params![store.relying_party_id.as_str()],
-                )?;
-            }
-        }
-        tx.commit()?;
-        // Backfill only after legacy relying-party fields have been normalized.
-        // The replay ledger is then a stable historical authority even when
-        // those source rows are later compacted.
-        backfill_native_replay_history(&mut connection)?;
-        validate_native_replay_history_records(&connection)?;
         Ok(store)
     }
 
