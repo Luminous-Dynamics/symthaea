@@ -2230,6 +2230,9 @@ mod tests {
         NeurosemanticArtifactLifecycleReceipt,
         NeurosemanticArtifactLifecycleReceipt,
         NeurosemanticArtifactLifecycleReceipt,
+        NeurosemanticArtifactLifecycleReceipt,
+        NeurosemanticArtifactLifecycleReceipt,
+        Vec<u8>,
         Vec<u8>,
         NeurosemanticDerivationLineageRecord,
         Vec<u8>,
@@ -2287,6 +2290,7 @@ mod tests {
             event_sequence: 3,
             previous_receipt_hash: Some(processing.fingerprint().unwrap()),
             state: NeurosemanticArtifactLifecycleState::Applied,
+            effect_agent_ref: Some("synthetic-effect-worker-1".into()),
             effect_evidence_ref: Some("synthetic-lifecycle-effect-1".into()),
             effect_evidence_hash: Some(effect_evidence_hash.clone()),
             observed_at_unix_s: 161,
@@ -2378,6 +2382,10 @@ mod tests {
         missing_verifier.verification_agent_ref = None;
         assert!(missing_verifier.validate().is_err());
 
+        let mut same_agent = receipt.clone();
+        same_agent.verification_agent_ref = same_agent.effect_agent_ref.clone();
+        assert!(same_agent.validate().is_err());
+
         receipt.action = NeurosemanticArtifactLifecycleAction::Rectification;
         receipt.resulting_artifact_hash = None;
         receipt.resulting_derivation_provenance_ref = None;
@@ -2421,6 +2429,35 @@ mod tests {
         ).is_err());
         let oversized = vec![b' '; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1];
         assert!(NeurosemanticArtifactLifecycleReceipt::from_json_bytes(&oversized).is_err());
+    }
+
+    #[test]
+    fn lifecycle_verification_target_set_is_machine_validated() {
+        let root = content_hash(b"root-artifact");
+        let target = content_hash(b"descendant-artifact");
+        let target_set = NeurosemanticArtifactLifecycleVerificationTargetSet {
+            schema_version: NEUROSEMANTIC_ARTIFACT_LIFECYCLE_VERIFICATION_SCOPE_SCHEMA_VERSION,
+            scope_ref: "synthetic-scope-1".into(),
+            root_artifact_hash: root.clone(),
+            target_artifact_hashes: vec![root.clone(), target],
+        };
+        let encoded = serde_json::to_vec(&target_set).unwrap();
+        assert!(NeurosemanticArtifactLifecycleVerificationTargetSet::from_json_bytes(&encoded).is_ok());
+
+        let mut duplicate = target_set.clone();
+        duplicate.target_artifact_hashes.push(root);
+        assert!(duplicate.validate().is_err());
+
+        let mut missing_root = target_set.clone();
+        missing_root.target_artifact_hashes = vec![content_hash(b"other")];
+        assert!(missing_root.validate().is_err());
+
+        let mut wrong_schema = target_set.clone();
+        wrong_schema.schema_version = 0;
+        assert!(wrong_schema.validate().is_err());
+
+        let oversized = vec![b' '; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1];
+        assert!(NeurosemanticArtifactLifecycleVerificationTargetSet::from_json_bytes(&oversized).is_err());
     }
 
     #[test]
