@@ -1187,7 +1187,7 @@ mod tests {
 
         assert_eq!(
             PartnerShuffleSurrogateSummary::compute(&samples, 4, 0),
-            Err(RelationalHarmonicError::InsufficientSamples(0))
+            Err(RelationalHarmonicError::InvalidSurrogateCount)
         );
     }
 
