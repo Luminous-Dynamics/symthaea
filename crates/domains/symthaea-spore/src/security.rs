@@ -102,6 +102,35 @@ pub fn validate_hostname(h: &str) -> Result<String, String> {
     Ok(h)
 }
 
+/// Validate a Linux-style local username before it is interpolated into
+/// installer command input. The relay intentionally permits only a conservative
+/// portable subset: lowercase letters, digits, underscore, and hyphen; max 32
+/// bytes; first character must be a lowercase letter or underscore.
+pub fn validate_username(value: &str) -> Result<String, String> {
+    let username = value.trim();
+    if username.is_empty() {
+        return Err("Username cannot be empty".into());
+    }
+    if username.len() > 32 {
+        return Err("Username is too long (max 32 characters)".into());
+    }
+    let mut chars = username.chars();
+    let Some(first) = chars.next() else {
+        return Err("Username cannot be empty".into());
+    };
+    if !(first.is_ascii_lowercase() || first == '_') {
+        return Err(
+            "Username must start with a lowercase letter or underscore".into(),
+        );
+    }
+    if !chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-') {
+        return Err(
+            "Username may contain only lowercase letters, digits, underscores, and hyphens".into(),
+        );
+    }
+    Ok(username.to_string())
+}
+
 /// Constant-time token comparison — prevents timing side-channel attacks.
 pub fn token_eq(a: &str, b: &str) -> bool {
     if a.len() != b.len() {
@@ -230,6 +259,27 @@ mod tests {
     fn sanitize_slash_gating() {
         assert!(sanitize_input("America/Chicago", "tz", false).is_err());
         assert!(sanitize_input("America/Chicago", "tz", true).is_ok());
+    }
+
+    // ── validate_username ──
+
+    #[test]
+    fn username_valid() {
+        assert_eq!(validate_username("tristan-1").unwrap(), "tristan-1");
+        assert_eq!(validate_username("_worker").unwrap(), "_worker");
+    }
+
+    #[test]
+    fn username_rejects_shell_metacharacters() {
+        assert!(validate_username("tristan;rm").is_err());
+        assert!(validate_username("tristan$(id)").is_err());
+        assert!(validate_username("tristan'").is_err());
+    }
+
+    #[test]
+    fn username_rejects_uppercase_and_bad_first_character() {
+        assert!(validate_username("Tristan").is_err());
+        assert!(validate_username("1tristan").is_err());
     }
 
     // ── validate_hostname ──
