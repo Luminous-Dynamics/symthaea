@@ -268,6 +268,18 @@ fn default_port() -> u16 {
     22
 }
 
+/// Generate a collision-resistant session identifier from the OS CSPRNG.
+///
+/// Session IDs are used in temporary filenames and log paths. They must not
+/// depend only on wall-clock time, because distinct clients can connect in
+/// the same millisecond and otherwise collide across isolation boundaries.
+fn new_session_id() -> Result<u64, String> {
+    let mut bytes = [0u8; 8];
+    getrandom02::getrandom(&mut bytes)
+        .map_err(|error| format!("unable to obtain secure session randomness: {error}"))?;
+    Ok(u64::from_le_bytes(bytes))
+}
+
 /// Generate Secure Boot setup commands (appended to install script when enabled).
 /// Git-initialize the NixOS config (always appended to install scripts).
 fn git_init_config() -> &'static str {
@@ -2703,10 +2715,21 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 }
 
                 // Generate session-isolated log path (CRITICAL-4: prevents cross-session log tampering)
-                let session_id: u64 = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_millis() as u64)
-                    .unwrap_or(0);
+                let session_id = match new_session_id() {
+                    Ok(id) => id,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to establish a secure install session: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
                 let log_path = format!("/tmp/symthaea-install-{}.log", session_id);
                 let script_path = format!("/tmp/symthaea-install-{}.sh", session_id);
 
@@ -5692,6 +5715,13 @@ mod tests {
     }
 
     // ── Generated config secret hygiene ──
+
+    #[test]
+    fn session_ids_are_non_deterministic() {
+        let first = new_session_id().expect("OS CSPRNG should be available");
+        let second = new_session_id().expect("OS CSPRNG should be available");
+        assert_ne!(first, second);
+    }
 
     #[test]
     fn cleanup_trap_contains_no_nested_shell_quotes() {
