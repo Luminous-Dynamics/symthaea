@@ -7968,6 +7968,37 @@ mod tests {
             "dispatch native replay history owner mismatch"
         ));
 
+        let dangling_dispatch_insert = store.connection().unwrap().execute(
+            "INSERT INTO authorization_dispatches(
+                authorization_instance,attempt_id,operation_id,native_replay_identity,
+                native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
+                relying_party_id,action_id,action_digest,provider_idempotency_key,target_identity,
+                audience,adapter,adapter_revision,adapter_implementation_digest,
+                boundary_id,attempt_binding_digest,state
+             ) VALUES(
+                ?1,'attempt:replay-owner-trigger-forged',?2,?3,?4,?5,?6,?7,?8,?9,?10,
+                'forged-target','prod','adapter-replay-owner-trigger','adapter-v1',
+                'sha256:adapter-replay-owner-trigger',?11,?12,'dispatch_pending'
+             )",
+            params![
+                record.authorization_instance.as_str(),
+                record.operation_id.as_str(),
+                record.native_replay_identity.as_str(),
+                record.native_authority_namespace.as_str(),
+                record.native_authorization_id.as_str(),
+                record.native_replay_derivation_digest.as_str(),
+                store.relying_party_id(),
+                record.action_id.as_str(),
+                record.action_digest.as_str(),
+                record.provider_idempotency_key.as_str(),
+                record.boundary_id.as_str(),
+                record.attempt_binding_digest.as_str(),
+            ],
+        );
+        assert!(dangling_dispatch_insert.unwrap_err().to_string().contains(
+            "dispatch native replay history owner mismatch"
+        ));
+
         store.mark_invoked_bound(&record, &TestProviderStatusVerifier).unwrap();
         store.commit_bound_verified(
             &record,
