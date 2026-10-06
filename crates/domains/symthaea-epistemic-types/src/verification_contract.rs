@@ -769,7 +769,8 @@ impl ClaimControllerDocumentIdentity {
 /// * the method identifier's primary resource is the controller document URL;
 /// * the controller document's `id` is that URL;
 /// * the resolved method identifier is exactly the requested method;
-/// * the method's declared controller is exactly that controller-document URL; and
+/// * the method's declared controller exactly matches the controller requested for
+///   verification; and
 /// * the exact method is a member of the requested verification relationship.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerificationMethodResolution {
@@ -2163,10 +2164,8 @@ mod tests {
         let mut wrong_controller = resolution.clone();
         wrong_controller.resolved_verification_method_controller =
             ClaimControllerIdentity::new("https://other.example").unwrap();
-        assert!(matches!(
-            wrong_controller.validate_structure(),
-            Err(VerificationFailure::ControllerMismatch { .. })
-        ));
+        assert!(wrong_controller.validate_structure().is_ok());
+        assert!(!wrong_controller.matches_request(&request));
 
         let mut missing_method = resolution.clone();
         missing_method.relationship_methods.clear();
