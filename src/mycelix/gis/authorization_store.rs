@@ -14026,6 +14026,109 @@ mod tests {
     }
 
     #[test]
+    fn reopen_rejects_missing_native_replay_history_instead_of_rebuilding() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-replay-history-reopen-missing-{}.db",
+            std::process::id()
+        ));
+        let store = fixture(&path).0;
+        let action = EpistemicAction::new(
+            "reopen-missing-native-history",
+            "intervention",
+            super::super::ActionRisk::Critical,
+        )
+        .with_effect_binding(super::ActionEffectBinding::new(
+            "target-reopen-missing-native-history",
+            "prod",
+            "adapter-reopen-missing-native-history",
+        ));
+        let digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            operation_id: Some("operation:reopen-missing-native-history".into()),
+            authorization_instance: "reopen-missing-native-history".into(),
+            action_id: action.id.clone(),
+            action_digest: digest.clone(),
+            frame: "frame@1".into(),
+            support_digest: "sha256:support-reopen-missing-native-history".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:00:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1,
+        )).unwrap();
+        store.prepare_for_execution_bound_with_operation(
+            &witness,
+            &action,
+            "frame@1",
+            "attempt:reopen-missing-native-history",
+            "boundary:reopen-missing-native-history",
+            "operation:reopen-missing-native-history",
+        ).unwrap();
+
+        let record = mark_dispatch_pending_bound_from_native_authority_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt:reopen-missing-native-history",
+            &action,
+            action.effect_binding().unwrap(),
+            "boundary:reopen-missing-native-history",
+            "operation:reopen-missing-native-history",
+            "test-explicit-issuer",
+            "native-grant:reopen-missing-native-history",
+        ).unwrap();
+        let replay_identity = record.native_replay_identity.clone();
+
+        // Simulate storage corruption after the migration/backfill has already
+        // completed. Normal application SQL cannot remove the append-only ledger;
+        // recursive triggers are disabled only here to model external corruption.
+        store
+            .connection()
+            .unwrap()
+            .execute_batch("PRAGMA recursive_triggers=OFF;")
+            .unwrap();
+        store
+            .connection()
+            .unwrap()
+            .execute(
+                "DELETE FROM authorization_native_replay_history
+                 WHERE native_replay_identity=?1",
+                params![replay_identity.as_str()],
+            )
+            .unwrap();
+
+        drop(store);
+
+        let reopened = SqliteAuthorizationStore::open(&path);
+        assert!(matches!(
+            reopened,
+            Err(AuthorizationStoreError::InvalidState(message))
+                if message.contains("native replay history missing for persisted lifecycle record")
+        ));
+
+        let ledger_count: i64 = Connection::open(&path)
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM authorization_native_replay_history
+                 WHERE native_replay_identity=?1",
+                params![replay_identity.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(ledger_count, 0);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn admission_rejects_missing_replay_history_after_terminal_evidence() {
         let path = std::env::temp_dir().join(format!(
             "symthaea-gis-auth-admission-missing-native-history-{}.db",
