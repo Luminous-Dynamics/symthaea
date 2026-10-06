@@ -188,6 +188,37 @@ pub struct NeurosemanticPolicyProvenanceBinding {
 }
 
 impl NeurosemanticPolicyAuthorityAttestation {
+    /// Deserialize an untrusted authority attestation only after enforcing the
+    /// serialized byte ceiling and structural bounds.
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic authority attestation JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let attestation: Self = serde_json::from_slice(bytes)
+            .map_err(|error| format!("neurosemantic authority attestation JSON: {error}"))?;
+        attestation.validate()?;
+        Ok(attestation)
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != NEUROSEMANTIC_POLICY_ATTESTATION_SCHEMA_VERSION
+            || !valid_identifier(&self.authority_ref)
+            || !valid_identifier(&self.key_ref)
+            || self.authority_ref.len() > MAX_NEUROSEMANTIC_AUTHORITY_REF_BYTES
+            || self.key_ref.len() > MAX_NEUROSEMANTIC_AUTHORITY_KEY_REF_BYTES
+            || !valid_blake3_digest(&self.handling_policy_fingerprint)
+            || !valid_blake3_digest(&self.policy_provenance_hash)
+            || self.issued_at_unix_s >= self.expires_at_unix_s
+            || self.signature.len() != MAX_NEUROSEMANTIC_AUTHORITY_SIGNATURE_BYTES
+        {
+            return Err("neurosemantic authority attestation fields are invalid".into());
+        }
+        Ok(())
+    }
+
     pub fn message_bytes(
         authority_ref: &str,
         key_ref: &str,
@@ -224,12 +255,9 @@ impl NeurosemanticPolicyAuthorityAttestation {
         verifying_key: &VerifyingKey,
         now_unix_s: u64,
     ) -> Result<(), String> {
-        if self.schema_version != NEUROSEMANTIC_POLICY_ATTESTATION_SCHEMA_VERSION
-            || self.handling_policy_fingerprint != expected_policy_fingerprint
+        self.validate()?;
+        if self.handling_policy_fingerprint != expected_policy_fingerprint
             || self.policy_provenance_hash != expected_policy_provenance_hash
-            || !valid_identifier(&self.authority_ref)
-            || !valid_identifier(&self.key_ref)
-            || self.signature.len() != MAX_NEUROSEMANTIC_AUTHORITY_SIGNATURE_BYTES
             || now_unix_s < self.issued_at_unix_s
             || now_unix_s >= self.expires_at_unix_s
         {
@@ -1346,6 +1374,25 @@ mod tests {
                 150
             )
             .is_err());
+    }
+
+    #[test]
+    fn authority_attestation_bounded_json_parser_fails_closed() {
+        let policy = semantic_policy();
+        let (attestation, _) = authority_attestation(&policy);
+        let encoded = serde_json::to_vec(&attestation).unwrap();
+        assert_eq!(
+            NeurosemanticPolicyAuthorityAttestation::from_json_bytes(&encoded).unwrap(),
+            attestation
+        );
+
+        let mut malformed = attestation.clone();
+        malformed.signature = vec![0u8; MAX_NEUROSEMANTIC_AUTHORITY_SIGNATURE_BYTES - 1];
+        let malformed_bytes = serde_json::to_vec(&malformed).unwrap();
+        assert!(NeurosemanticPolicyAuthorityAttestation::from_json_bytes(&malformed_bytes).is_err());
+
+        let oversized = vec![b' '; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1];
+        assert!(NeurosemanticPolicyAuthorityAttestation::from_json_bytes(&oversized).is_err());
     }
 
     #[test]
