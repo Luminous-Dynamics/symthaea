@@ -161,6 +161,24 @@ claim requires its own evaluation design and sufficient data rather than an
 unstated interpretation of the same threshold.
 
 
+## Post-generation lifecycle evidence
+
+Lifecycle status is a separate provenance/evidence layer from derivation lineage and from authorization. The receipt schema v3 distinguishes:
+
+- Requested
+- Accepted
+- Processing
+- Applied
+- IndependentlyVerified
+- Rejected
+
+Only Applied may carry effect evidence. IndependentlyVerified additionally binds an effect-agent identity, a distinct verifier identity, separate verification evidence, the exact effect-evidence hash inspected, and an explicit verification scope.
+
+The N0 implementation uses a schema-validated, content-addressed target-set record for EnumeratedTargetSet. The record contains the root artifact and a unique bounded set of target artifact hashes. This establishes exactly which identities the verification artifact claims to cover; it does not prove the enumeration is globally complete.
+
+The word independent is deliberately narrow: the protocol enforces that the verifier identity differs from the recorded effect agent. It does not establish that either identity is trustworthy or that the verifier followed its claimed procedure. A future deployment bridge must supply the relevant identity/key trust and audit semantics.
+
+For model-derived remediation, an IndependentlyVerified lifecycle receipt is still insufficient to claim preservation of utility, safety, or fairness. Any such claim requires a separate preregistered impact-evaluation artifact binding the exact pre/post model identities, derivation lineage, evaluation split/protocol, subgroup metrics, and observed behavior.
 ## Privacy requirements
 
 Consent must specify the permitted data class and inference class separately. A participant agreeing to communication assistance does not automatically authorize unrelated secondary inference, model training, affective inference, or commercial analytics.
