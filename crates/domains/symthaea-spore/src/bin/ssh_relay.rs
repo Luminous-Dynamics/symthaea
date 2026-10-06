@@ -5921,40 +5921,200 @@ echo '}'
             }
 
             "connect_wifi" => {
-                // Reuse hostname field for SSID, command field for WiFi password
+                // Wi-Fi connection is a consequential NetworkManager mutation.
                 let ssid = client_msg.hostname.trim().to_string();
-                let wifi_pw = &client_msg.command;
+                let wifi_pw = client_msg.command.as_str();
                 if ssid.is_empty() {
                     let _ = ws_tx
                         .send(Message::Text(
-                            RelayMessage::error("WiFi SSID is required").to_json(),
+                            RelayMessage::error("Wi-Fi SSID is required").to_json(),
                         ))
                         .await;
-                } else {
-                    eprintln!("[{}] Connecting to WiFi: {}", peer_addr, ssid);
-                    let cmd = format!(
-                        "nmcli device wifi connect '{}' password '{}'",
-                        ssid.replace('\'', "'\\''"),
-                        wifi_pw.replace('\'', "'\\''")
-                    );
-                    match run_cmd(&cmd).await {
-                        Ok(r) => {
-                            let _ = ws_tx.send(Message::Text(serde_json::json!({
-                                "type": "wifi_result",
-                                "code": r.exit_status,
-                                "data": if r.exit_status == 0 { "WiFi connected".to_string() } else { r.stderr }
-                            }).to_string())).await;
-                        }
-                        Err(e) => {
-                            let _ = ws_tx
-                                .send(Message::Text(
-                                    RelayMessage::error(&format!("WiFi connection failed: {}", e))
-                                        .to_json(),
-                                ))
-                                .await;
-                        }
-                    }
+                    continue;
                 }
+                if wifi_pw.contains('\n') || wifi_pw.contains('\r') || wifi_pw.contains('\0') {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error("Wi-Fi password contains unsupported control characters")
+                                .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+                let ssid = match sanitize_input(&ssid, "Wi-Fi SSID", true) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&error).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(mutation_lock_busy_message()).to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let target_machine_digest = match machine_binding_digest_hex() {
+                    Ok(digest) => digest,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to establish target machine identity: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let transaction = match SystemTransaction::begin(
+                    MutationKind::ConnectWifi,
+                    Some(&target_machine_digest),
+                    format!("connect-wifi:{ssid}").as_bytes(),
+                ) {
+                    Ok(tx) => tx,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to establish secure system transaction: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let secret_path =
+                    format!("/tmp/symthaea-wifi-{}.passwd", transaction.transaction_id);
+                let profile_name =
+                    format!("symthaea-relay-{}", transaction.transaction_id);
+                let secret = format!("802-11-wireless-security.psk:{wifi_pw}\n");
+                if let Err(error) = tokio::fs::write(&secret_path, secret.as_bytes()).await {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Failed to stage Wi-Fi credential: {}",
+                                error
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+                if let Err(error) = tokio::fs::set_permissions(
+                    &secret_path,
+                    std::os::unix::fs::PermissionsExt::from_mode(0o600),
+                )
+                .await
+                {
+                    let _ = tokio::fs::remove_file(&secret_path).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Failed to protect Wi-Fi credential: {}",
+                                error
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                eprintln!(
+                    "[{}] {} Connecting to Wi-Fi SSID {}",
+                    peer_addr,
+                    transaction.log_line(),
+                    ssid
+                );
+
+                // Create a non-persistent profile without putting the PSK in argv.
+                let add_result = run_cmd(&format!(
+                    "nmcli connection add save no type wifi ifname '*' con-name '{}' ssid '{}' wifi-sec.key-mgmt wpa-psk connection.autoconnect no",
+                    profile_name.replace('\'', "'\\''"),
+                    ssid.replace('\'', "'\\''")
+                ))
+                .await;
+
+                if let Err(error) = add_result {
+                    let _ = tokio::fs::remove_file(&secret_path).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type": "wifi_result",
+                                "code": 1,
+                                "data": format!("Wi-Fi profile creation failed: {}", error),
+                                "transaction": transaction.receipt(TransactionOutcome::Indeterminate)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                let result = run_cmd(&format!(
+                    "nmcli connection up '{}' passwd-file '{}'",
+                    profile_name.replace('\'', "'\\''"),
+                    secret_path.replace('\'', "'\\''")
+                ))
+                .await;
+
+                let response = match result {
+                    Ok(r) => {
+                        let outcome = if r.exit_status == 0 {
+                            TransactionOutcome::ObservedSuccess
+                        } else {
+                            TransactionOutcome::Failed
+                        };
+                        serde_json::json!({
+                            "type": "wifi_result",
+                            "code": r.exit_status,
+                            "data": if r.exit_status == 0 {
+                                "WiFi connected".to_string()
+                            } else {
+                                r.stderr.chars().take(400).collect::<String>()
+                            },
+                            "transaction": transaction.receipt(outcome)
+                        })
+                    }
+                    Err(error) => serde_json::json!({
+                        "type": "wifi_result",
+                        "code": 1,
+                        "data": format!("Wi-Fi connection failed: {}", error),
+                        "transaction": transaction.receipt(TransactionOutcome::Indeterminate)
+                    }),
+                };
+
+                let _ = tokio::fs::remove_file(&secret_path).await;
+                let _ = ws_tx.send(Message::Text(response.to_string())).await;
             }
 
             "search_packages" => {
