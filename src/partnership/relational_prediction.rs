@@ -3898,6 +3898,33 @@ mod tests {
     }
 
     #[test]
+    fn rolling_qualification_rejects_tampered_summary_aggregate_mse() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+
+        let qualification =
+            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8)
+                .unwrap();
+
+        let mut tampered = qualification.clone();
+        tampered.observed.mean_relational_augmented_mse += 0.01;
+
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
     fn rolling_qualification_binds_surrogate_count() {
         let samples = build_samples(0.5);
         let config = RollingOriginRelationalPredictionConfig {
