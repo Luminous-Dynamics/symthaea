@@ -18,6 +18,116 @@ const INVOCATION_ID_HEX_LEN: usize = 32;
 const DIGEST_HEX_LEN: usize = 64;
 const MAX_STABILITY_WINDOW_US: u64 = 86_400_000_000;
 const MAX_STRING_BYTES: usize = 4096;
+const MAX_DEFINITION_FILES: usize = 64;
+const MAX_DEFINITION_FILE_BYTES: u64 = 8 * 1024 * 1024;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NixSystemdUnitDefinitionContentFileV1 {
+    /// Exact systemd-reported source path whose bytes were captured.
+    pub path: String,
+    /// Canonical filesystem path actually opened when path resolution involved links.
+    /// `None` means the reported path itself was opened without canonical relocation.
+    #[serde(default)]
+    pub resolved_path: Option<String>,
+    /// Byte length observed while hashing the open file descriptor.
+    pub byte_len: u64,
+    /// BLAKE3 commitment to the exact bytes read from that descriptor.
+    pub content_digest: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NixSystemdUnitDefinitionContentEvidenceV1 {
+    pub unit: String,
+    /// CROSS-067 source identity commitment. Content is intentionally separate.
+    pub source_identity_digest: String,
+    /// systemd manager connection unique name for this capture epoch.
+    pub manager_owner: String,
+    /// D-Bus daemon incarnation returned by org.freedesktop.DBus.GetId().
+    pub bus_id: String,
+    pub files: Vec<NixSystemdUnitDefinitionContentFileV1>,
+    pub captured_at_monotonic_us: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NixVerifiedServiceDefinitionContentV1 {
+    evidence: NixSystemdUnitDefinitionContentEvidenceV1,
+}
+
+impl NixVerifiedServiceDefinitionContentV1 {
+    pub(crate) fn from_observer(
+        evidence: NixSystemdUnitDefinitionContentEvidenceV1,
+    ) -> Result<Self, NixServiceEffectContextErrorV1> {
+        evidence.validate_shape()?;
+        Ok(Self { evidence })
+    }
+
+    pub(crate) fn as_ref(&self) -> &NixSystemdUnitDefinitionContentEvidenceV1 {
+        &self.evidence
+    }
+
+    pub(crate) fn digest(&self) -> Result<String, NixServiceEffectContextErrorV1> {
+        self.evidence.digest()
+    }
+}
+
+impl NixSystemdUnitDefinitionContentEvidenceV1 {
+    pub fn validate_shape(&self) -> Result<(), NixServiceEffectContextErrorV1> {
+        NixServiceOperationV1::new(self.unit.clone(), NixServiceOperationKindV1::Start)
+            .map_err(|error| NixServiceEffectContextErrorV1::InvalidServiceUnit(error.to_string()))?;
+        if self.files.is_empty() || self.files.len() > MAX_DEFINITION_FILES {
+            return Err(NixServiceEffectContextErrorV1::InvalidDefinitionFileSet);
+        }
+        validate_digest(&self.source_identity_digest, "source identity digest")?;
+        validate_unique_manager_owner(&self.manager_owner)?;
+        validate_bus_id(&self.bus_id)?;
+        let mut seen = std::collections::BTreeSet::new();
+        for file in &self.files {
+            if file.path.is_empty() || file.path.len() > MAX_STRING_BYTES || !file.path.starts_with('/') {
+                return Err(NixServiceEffectContextErrorV1::InvalidDefinitionFilePath);
+            }
+            if let Some(resolved_path) = &file.resolved_path {
+                if resolved_path.is_empty()
+                    || resolved_path.len() > MAX_STRING_BYTES
+                    || !resolved_path.starts_with("/nix/store/")
+                {
+                    return Err(NixServiceEffectContextErrorV1::InvalidDefinitionFilePath);
+                }
+            }
+            if !seen.insert(file.path.clone()) {
+                return Err(NixServiceEffectContextErrorV1::DuplicateDefinitionFile);
+            }
+            if file.byte_len > MAX_DEFINITION_FILE_BYTES {
+                return Err(NixServiceEffectContextErrorV1::DefinitionFileTooLarge);
+            }
+            validate_digest(&file.content_digest, "definition content digest")?;
+        }
+        if self.captured_at_monotonic_us == 0 {
+            return Err(NixServiceEffectContextErrorV1::InvalidCaptureTimestamp);
+        }
+        Ok(())
+    }
+
+    pub fn digest(&self) -> Result<String, NixServiceEffectContextErrorV1> {
+        self.validate_shape()?;
+        let mut h = Hasher::new();
+        h.update(b"nixward-systemd-unit-definition-content-v1");
+        put_str(&mut h, &self.unit);
+        put_str(&mut h, &self.source_identity_digest);
+        put_str(&mut h, &self.manager_owner);
+        put_str(&mut h, &self.bus_id);
+        put_u64(&mut h, self.files.len() as u64);
+        for file in &self.files {
+            put_str(&mut h, &file.path);
+            put_opt_str(&mut h, file.resolved_path.as_deref());
+            put_u64(&mut h, file.byte_len);
+            put_str(&mut h, &file.content_digest);
+        }
+        // Capture time is evidence metadata, not content identity. Keeping it
+        // outside the commitment makes the content digest independently
+        // recomputable from durable file metadata.
+        Ok(h.finalize().to_hex().to_string())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixServiceEffectContextV1 {
@@ -25,7 +135,11 @@ pub struct NixServiceEffectContextV1 {
     pub unit: String,
     pub authorized_generation: u64,
     pub pre_state_digest: String,
+    /// CROSS-067 source identity digest (FragmentPath + DropInPaths).
     pub authorized_definition_digest: String,
+    /// Byte-level content commitment captured by the observer boundary.
+    #[serde(default)]
+    pub authorized_definition_content_digest: String,
     pub pre_invocation_id: Option<String>,
     pub required_stability_us: u64,
 }
@@ -37,6 +151,7 @@ impl NixServiceEffectContextV1 {
         authorized_generation: u64,
         pre_state_digest: impl Into<String>,
         authorized_definition_digest: impl Into<String>,
+        authorized_definition_content_digest: impl Into<String>,
         pre_invocation_id: Option<String>,
         required_stability_us: u64,
     ) -> Result<Self, NixServiceEffectContextErrorV1> {
@@ -46,6 +161,7 @@ impl NixServiceEffectContextV1 {
             authorized_generation,
             pre_state_digest: pre_state_digest.into(),
             authorized_definition_digest: authorized_definition_digest.into(),
+            authorized_definition_content_digest: authorized_definition_content_digest.into(),
             pre_invocation_id,
             required_stability_us,
         };
@@ -68,11 +184,42 @@ impl NixServiceEffectContextV1 {
             &self.authorized_definition_digest,
             "authorized definition digest",
         )?;
+        validate_digest(
+            &self.authorized_definition_content_digest,
+            "authorized definition content digest",
+        )?;
         validate_invocation_id(self.pre_invocation_id.as_deref())?;
         if self.required_stability_us > MAX_STABILITY_WINDOW_US {
             return Err(NixServiceEffectContextErrorV1::StabilityWindowTooLarge);
         }
         Ok(())
+    }
+
+    pub(crate) fn from_verified_definition_content(
+        operation: NixServiceOperationKindV1,
+        unit: impl Into<String>,
+        authorized_generation: u64,
+        pre_state_digest: impl Into<String>,
+        pre_invocation_id: Option<String>,
+        required_stability_us: u64,
+        content: &NixVerifiedServiceDefinitionContentV1,
+    ) -> Result<Self, NixServiceEffectContextErrorV1> {
+        let unit = unit.into();
+        let evidence = content.as_ref();
+        if evidence.unit != unit {
+            return Err(NixServiceEffectContextErrorV1::DefinitionContentUnitMismatch);
+        }
+        let content_digest = content.digest()?;
+        Self::new(
+            operation,
+            unit,
+            authorized_generation,
+            pre_state_digest,
+            evidence.source_identity_digest.clone(),
+            content_digest,
+            pre_invocation_id,
+            required_stability_us,
+        )
     }
 
     pub fn digest(&self) -> Result<String, NixServiceEffectContextErrorV1> {
@@ -84,10 +231,39 @@ impl NixServiceEffectContextV1 {
         put_u64(&mut hasher, self.authorized_generation);
         put_str(&mut hasher, &self.pre_state_digest);
         put_str(&mut hasher, &self.authorized_definition_digest);
+        put_str(&mut hasher, &self.authorized_definition_content_digest);
         put_opt_str(&mut hasher, self.pre_invocation_id.as_deref());
         put_u64(&mut hasher, self.required_stability_us);
         Ok(hasher.finalize().to_hex().to_string())
     }
+}
+
+fn validate_bus_id(value: &str) -> Result<(), NixServiceEffectContextErrorV1> {
+    if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(NixServiceEffectContextErrorV1::InvalidBusId);
+    }
+    Ok(())
+}
+
+fn validate_unique_manager_owner(value: &str) -> Result<(), NixServiceEffectContextErrorV1> {
+    if value.is_empty() || value.len() > 255 || !value.starts_with(':') {
+        return Err(NixServiceEffectContextErrorV1::InvalidManagerOwner);
+    }
+    let mut elements = value[1..].split('.');
+    let first = elements.next().unwrap_or_default();
+    if first.is_empty() || elements.next().is_none() {
+        return Err(NixServiceEffectContextErrorV1::InvalidManagerOwner);
+    }
+    for element in std::iter::once(first).chain(elements) {
+        if element.is_empty()
+            || !element.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-'
+            })
+        {
+            return Err(NixServiceEffectContextErrorV1::InvalidManagerOwner);
+        }
+    }
+    Ok(())
 }
 
 fn validate_digest(
@@ -161,6 +337,22 @@ pub enum NixServiceEffectContextErrorV1 {
     InvalidInvocationId,
     #[error("required stability window is too large")]
     StabilityWindowTooLarge,
+    #[error("service definition content file set is invalid")]
+    InvalidDefinitionFileSet,
+    #[error("invalid service definition content file path")]
+    InvalidDefinitionFilePath,
+    #[error("duplicate service definition content file")]
+    DuplicateDefinitionFile,
+    #[error("service definition content file is too large")]
+    DefinitionFileTooLarge,
+    #[error("invalid content capture timestamp")]
+    InvalidCaptureTimestamp,
+    #[error("definition content unit does not match the service intent")]
+    DefinitionContentUnitMismatch,
+    #[error("invalid systemd manager unique owner")]
+    InvalidManagerOwner,
+    #[error("invalid D-Bus daemon incarnation identifier")]
+    InvalidBusId,
 }
 
 #[cfg(test)]
@@ -174,10 +366,35 @@ mod tests {
             42,
             &"aa".repeat(32),
             &"bb".repeat(32),
+            &"dd".repeat(32),
             Some("cc".repeat(16)),
             1_000,
         )
         .unwrap()
+    }
+
+    fn content_evidence() -> NixSystemdUnitDefinitionContentEvidenceV1 {
+        NixSystemdUnitDefinitionContentEvidenceV1 {
+            unit: "nginx.service".into(),
+            source_identity_digest: "11".repeat(32),
+            manager_owner: ":1.42".into(),
+            bus_id: "0123456789abcdef0123456789abcdef".into(),
+            files: vec![
+                NixSystemdUnitDefinitionContentFileV1 {
+                    path: "/nix/store/nginx.service".into(),
+                    resolved_path: None,
+                    byte_len: 10,
+                    content_digest: "22".repeat(32),
+                },
+                NixSystemdUnitDefinitionContentFileV1 {
+                    path: "/nix/store/nginx-dropin.conf".into(),
+                    resolved_path: None,
+                    byte_len: 20,
+                    content_digest: "33".repeat(32),
+                },
+            ],
+            captured_at_monotonic_us: 1,
+        }
     }
 
     #[test]
@@ -212,6 +429,10 @@ mod tests {
                 ..base.clone()
             },
             NixServiceEffectContextV1 {
+                authorized_definition_content_digest: "gg".repeat(32),
+                ..base.clone()
+            },
+            NixServiceEffectContextV1 {
                 pre_invocation_id: Some("ff".repeat(16)),
                 ..base.clone()
             },
@@ -224,6 +445,80 @@ mod tests {
         for mutation in mutations {
             assert_ne!(baseline, mutation.digest().unwrap());
         }
+    }
+
+    #[test]
+    fn definition_content_evidence_digest_commits_every_file_field() {
+        let base = content_evidence();
+        let baseline = base.digest().unwrap();
+
+        let mut changed = base.clone();
+        changed.files[0].content_digest = "44".repeat(32);
+        assert_ne!(baseline, changed.digest().unwrap());
+
+        let mut changed = base.clone();
+        changed.manager_owner = ":1.43".into();
+        assert_ne!(baseline, changed.digest().unwrap());
+
+        let mut changed = base.clone();
+        changed.bus_id = "fedcba9876543210fedcba9876543210".into();
+        assert_ne!(baseline, changed.digest().unwrap());
+
+        let mut changed = base.clone();
+        changed.files[0].byte_len += 1;
+        assert_ne!(baseline, changed.digest().unwrap());
+
+        let mut changed = base;
+        changed.files[1].path = "/nix/store/other.conf".into();
+        assert_ne!(baseline, changed.digest().unwrap());
+
+        let mut changed = content_evidence();
+        changed.files[0].resolved_path = Some("/nix/store/other.service".into());
+        assert_ne!(baseline, changed.digest().unwrap());
+
+        let mut unchanged = content_evidence();
+        unchanged.captured_at_monotonic_us = 2;
+        assert_eq!(baseline, unchanged.digest().unwrap());
+    }
+
+    #[test]
+    fn definition_content_commitment_changes_across_systemd_manager_incarnation() {
+        let mut first = content_evidence();
+        let first_digest = first.digest().unwrap();
+        first.manager_owner = ":1.43".into();
+        let second_digest = first.digest().unwrap();
+        assert_ne!(first_digest, second_digest);
+    }
+
+    #[test]
+    fn context_from_verified_definition_content_binds_both_provenance_layers() {
+        let evidence = content_evidence();
+        let sealed = NixVerifiedServiceDefinitionContentV1::from_observer(evidence.clone()).unwrap();
+        let content_digest = sealed.digest().unwrap();
+
+        let context = NixServiceEffectContextV1::from_verified_definition_content(
+            NixServiceOperationKindV1::Restart,
+            "nginx.service",
+            42,
+            "aa".repeat(32),
+            Some("cc".repeat(16)),
+            1_000,
+            &sealed,
+        )
+        .unwrap();
+
+        assert_eq!(context.authorized_definition_digest, evidence.source_identity_digest);
+        assert_eq!(context.authorized_definition_content_digest, content_digest);
+    }
+
+    #[test]
+    fn malformed_definition_content_is_rejected() {
+        let mut evidence = content_evidence();
+        evidence.files[0].content_digest = "short".into();
+        assert!(matches!(
+            evidence.validate_shape().unwrap_err(),
+            NixServiceEffectContextErrorV1::InvalidDigest("definition content digest")
+        ));
     }
 
     #[test]

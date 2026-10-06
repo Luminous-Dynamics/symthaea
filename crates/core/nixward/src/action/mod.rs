@@ -102,6 +102,10 @@ pub use plan_executor::{PlanExecutionResult, PlanExecutor, PlanStep, StepStatus}
 pub use service_manager::{ServiceManager, ServiceStatus};
 pub use service_effect::{
     NixServiceEffectContextErrorV1, NixServiceEffectContextV1,
+    NixServiceDefinitionContentEvidenceV1,
+    NixSystemdUnitDefinitionContentFileV1,
+    NixSystemdUnitDefinitionContentEvidenceV1,
+    NixVerifiedServiceDefinitionContentV1,
 };
 pub use service_domain::{NixServiceOperationErrorV1, NixServiceOperationKindV1, NixServiceOperationV1};
 #[cfg(feature = "systemd-observer")]

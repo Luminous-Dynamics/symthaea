@@ -18,7 +18,10 @@ use super::executor::{ChannelOperation, FlakeOperation, NixOSCommand, SafetyLeve
 use super::local_approval::LocalApprovalDecisionKindV1;
 use super::local_approval_store::ConsumedLocalApprovalDecisionV1;
 use super::service_domain::{NixServiceOperationKindV1, validate_canonical_service_operation_v1};
-use super::service_effect::{NixServiceEffectContextErrorV1, NixServiceEffectContextV1};
+use super::service_effect::{
+    NixServiceEffectContextErrorV1, NixServiceEffectContextV1,
+    NixVerifiedServiceDefinitionContentV1,
+};
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -464,6 +467,9 @@ impl NixLocalExecutionAuthorityV1 {
         if approval.decision_evidence().action_intent_digest != digest {
             return Err(NixAuthorizationErrorV1::IntentMismatch);
         }
+        if matches!(intent.action, NixActionDescriptorV1::Service { .. }) {
+            return Err(NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture);
+        }
         service_effect_context_digest_for_intent(&intent)?;
         Ok(Self { intent, approval })
     }
@@ -518,6 +524,9 @@ impl LiveNixAuthorizationV1 {
         issued_at_unix_ms: u64,
         expires_at_unix_ms: Option<u64>,
     ) -> Result<Self, NixAuthorizationErrorV1> {
+        if matches!(intent.action, NixActionDescriptorV1::Service { .. }) {
+            return Err(NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture);
+        }
         let service_effect_context_digest = service_effect_context_digest_for_intent(intent)?;
         let record = NixExecutionAuthorizationRecordV1 {
             action_intent_digest: intent.digest()?,
@@ -533,6 +542,28 @@ impl LiveNixAuthorizationV1 {
             record,
             consumed: false,
         })
+    }
+
+    pub(crate) fn local_explicit_confirmation_with_definition_capture(
+        intent: &NixActionIntentV1,
+        authority_ref: impl Into<String>,
+        issued_at_unix_ms: u64,
+        expires_at_unix_ms: Option<u64>,
+        content: &NixVerifiedServiceDefinitionContentV1,
+    ) -> Result<Self, NixAuthorizationErrorV1> {
+        validate_service_definition_capture(intent, content)?;
+        let service_effect_context_digest = service_effect_context_digest_for_intent(intent)?;
+        let record = NixExecutionAuthorizationRecordV1 {
+            action_intent_digest: intent.digest()?,
+            service_effect_context_digest,
+            profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
+            authority_ref: authority_ref.into(),
+            issued_at_unix_ms,
+            expires_at_unix_ms,
+            decision: NixAuthorizationDecisionV1::Approved,
+        };
+        record.validate_shape()?;
+        Ok(Self { record, consumed: false })
     }
 
     pub(crate) fn audit_record(&self) -> &NixExecutionAuthorizationRecordV1 {
@@ -668,6 +699,10 @@ pub enum NixAuthorizationErrorV1 {
     ServiceEffectContextMismatch,
     #[error("service effect context is present for a non-service action")]
     UnexpectedServiceEffectContext,
+    #[error("service authorization requires an observer-sealed definition content capture")]
+    MissingServiceDefinitionContentCapture,
+    #[error("observer-sealed definition content does not match the service intent")]
+    DefinitionContentCaptureMismatch,
     #[error("invalid service effect context: {0}")]
     InvalidServiceEffectContext(NixServiceEffectContextErrorV1),
     #[error("authorization is not yet valid")]
@@ -722,6 +757,31 @@ fn validate_service_effect_context_binding(
         || state_digest != context.pre_state_digest
     {
         return Err(NixAuthorizationErrorV1::ServiceEffectContextMismatch);
+    }
+    Ok(())
+}
+
+fn validate_service_definition_capture(
+    intent: &NixActionIntentV1,
+    content: &NixVerifiedServiceDefinitionContentV1,
+) -> Result<(), NixAuthorizationErrorV1> {
+    let NixActionDescriptorV1::Service { operation, unit } = &intent.action else {
+        return Err(NixAuthorizationErrorV1::UnexpectedServiceEffectContext);
+    };
+    let context = intent.service_effect_context.as_ref()
+        .ok_or(NixAuthorizationErrorV1::MissingServiceEffectContext)?;
+    let evidence = content.as_ref();
+    if evidence.unit != *unit
+        || context.operation != *operation
+        || context.unit != *unit
+        || context.authorized_definition_digest != evidence.source_identity_digest
+    {
+        return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
+    }
+    let content_digest = content.digest()
+        .map_err(NixAuthorizationErrorV1::InvalidServiceEffectContext)?;
+    if context.authorized_definition_content_digest != content_digest {
+        return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
     }
     Ok(())
 }
@@ -1328,6 +1388,7 @@ mod tests {
             42,
             &"11".repeat(32),
             &"22".repeat(32),
+            &"44".repeat(32),
             Some("33".repeat(16)),
             1_000,
         )
@@ -1348,6 +1409,7 @@ mod tests {
                 42,
                 "1111111111111111111111111111111111111111111111111111111111111111",
                 "2222222222222222222222222222222222222222222222222222222222222222",
+                "4444444444444444444444444444444444444444444444444444444444444444",
                 Some("3333333333333333333333333333333333".into()),
                 1_000,
             )
@@ -1385,7 +1447,22 @@ mod tests {
                 None,
             )
             .unwrap_err(),
-            NixAuthorizationErrorV1::MissingServiceEffectContext
+            NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture
+        );
+    }
+
+    #[test]
+    fn service_authorization_with_unsealed_context_still_fails_closed() {
+        let intent = contextual_service_intent();
+        assert_eq!(
+            LiveNixAuthorizationV1::local_explicit_confirmation(
+                &intent,
+                "approval:test",
+                1,
+                None,
+            )
+            .unwrap_err(),
+            NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture
         );
     }
 

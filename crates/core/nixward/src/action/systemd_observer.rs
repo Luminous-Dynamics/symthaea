@@ -16,8 +16,15 @@ use super::post_state::{
     NixVerifiedPostStateStabilityEvidenceV1,
 };
 use super::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
+use super::service_effect::{
+    NixServiceDefinitionContentEvidenceV1, NixSystemdUnitDefinitionContentFileV1,
+    NixVerifiedServiceDefinitionContentV1,
+};
 use super::service_state::{ServiceActiveStateV1, ServiceLoadStateV1, ServiceUnitFileStateV1};
 use std::collections::HashMap;
+use std::fs::OpenOptions;
+use std::io::{Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use thiserror::Error;
 use zbus::export::futures_util::StreamExt;
@@ -98,6 +105,9 @@ pub enum NixSystemdObserverErrorV1 {
     #[error("systemd JobRemoved watcher manager owner mismatch")]
     WatcherManagerOwnerMismatch,
 
+    #[error("systemd JobRemoved watcher D-Bus bus incarnation mismatch")]
+    WatcherBusIncarnationMismatch,
+
     #[error("systemd JobRemoved signal timed out")]
     JobRemovedTimeout,
 
@@ -109,6 +119,27 @@ pub enum NixSystemdObserverErrorV1 {
 
     #[error("invalid verified post-state observation: {0}")]
     InvalidPostState(String),
+
+    #[error("definition content capture I/O error: {0}")]
+    DefinitionContentIo(String),
+
+    #[error("definition content changed while being captured")]
+    DefinitionContentMutationDetected,
+
+    #[error("definition content source is not a regular file")]
+    DefinitionContentNotRegular,
+
+    #[error("definition content source uses a trailing symbolic link")]
+    DefinitionContentSymlink,
+
+    #[error("systemd definition identity changed during content capture")]
+    DefinitionIdentityChanged,
+
+    #[error("definition content exceeds capture size limit")]
+    DefinitionContentTooLarge,
+
+    #[error("systemd reports that this unit needs daemon reload")]
+    DefinitionNeedsDaemonReload,
 }
 
 /// A one-shot, pre-armed watcher for the systemd Manager.JobRemoved signal.
@@ -121,6 +152,7 @@ pub enum NixSystemdObserverErrorV1 {
 #[must_use]
 pub struct NixSystemdJobRemovedWatcherV1 {
     manager_owner: String,
+    bus_id: String,
     stream: zbus::SignalStream<'static>,
 }
 
@@ -129,6 +161,7 @@ impl std::fmt::Debug for NixSystemdJobRemovedWatcherV1 {
         formatter
             .debug_struct("NixSystemdJobRemovedWatcherV1")
             .field("manager_owner", &self.manager_owner)
+            .field("bus_id", &self.bus_id)
             .finish_non_exhaustive()
     }
 }
@@ -136,6 +169,10 @@ impl std::fmt::Debug for NixSystemdJobRemovedWatcherV1 {
 impl NixSystemdJobRemovedWatcherV1 {
     pub fn manager_owner(&self) -> &str {
         &self.manager_owner
+    }
+
+    pub fn bus_id(&self) -> &str {
+        &self.bus_id
     }
 
     /// Consume this one-shot watcher and accept only the exact JobRemoved
@@ -148,6 +185,9 @@ impl NixSystemdJobRemovedWatcherV1 {
         expected.validate()?;
         if expected.manager_owner != self.manager_owner {
             return Err(NixSystemdObserverErrorV1::WatcherManagerOwnerMismatch);
+        }
+        if expected.bus_id != self.bus_id {
+            return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
         }
 
         let result = tokio::time::timeout(timeout, async {
@@ -310,6 +350,114 @@ impl NixSystemdReadOnlyObserverV1 {
         Ok(result)
     }
 
+    /// Capture the exact bytes referenced by the current systemd definition identity.
+    ///
+    /// The result is observer-sealed and therefore suitable for construction of
+    /// an authority-bound service-effect context. The capture deliberately does
+    /// not persist raw bytes; it persists only per-file byte lengths and BLAKE3
+    /// commitments.
+    ///
+    /// Each file is opened read-only with O_NOFOLLOW on Linux, hashed twice from
+    /// the same descriptor, and checked with descriptor metadata before/after.
+    /// The systemd definition identity and manager incarnation are re-read after
+    /// capture. Any detected mutation or identity rollover fails closed.
+    pub async fn capture_service_definition_content(
+        &self,
+        unit: &str,
+    ) -> Result<NixVerifiedServiceDefinitionContentV1, NixSystemdObserverErrorV1> {
+        let expected_unit = canonical_unit(unit)?;
+        let manager_owner = self.systemd_manager_owner().await?;
+        let bus_id = self.dbus_bus_id().await?;
+        let object_path = self.resolve_service_unit(&expected_unit).await?;
+        let (identity, need_daemon_reload) = self
+            .read_definition_identity(&object_path, &expected_unit)
+            .await?;
+        if need_daemon_reload {
+            return Err(NixSystemdObserverErrorV1::DefinitionNeedsDaemonReload);
+        }
+
+        let source_identity_digest = identity
+            .digest(&expected_unit)
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
+
+        let files = read_definition_content_files(&identity)?;
+        if files.is_empty() {
+            return Err(NixSystemdObserverErrorV1::DefinitionContentIo(
+                "systemd definition has no readable source files".into(),
+            ));
+        }
+
+        let post_owner = self.systemd_manager_owner().await?;
+        let post_bus_id = self.dbus_bus_id().await?;
+        let post_object_path = self.resolve_service_unit(&expected_unit).await?;
+        let (post_identity, post_need_daemon_reload) = self
+            .read_definition_identity(&post_object_path, &expected_unit)
+            .await?;
+        if post_need_daemon_reload {
+            return Err(NixSystemdObserverErrorV1::DefinitionNeedsDaemonReload);
+        }
+        let post_identity_digest = post_identity
+            .digest(&expected_unit)
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
+        let final_owner = self.systemd_manager_owner().await?;
+
+        if post_bus_id != bus_id {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if post_owner != manager_owner || final_owner != manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if post_object_path.as_str() != object_path.as_str()
+            || post_identity_digest != source_identity_digest
+        {
+            return Err(NixSystemdObserverErrorV1::DefinitionIdentityChanged);
+        }
+
+        let evidence = NixServiceDefinitionContentEvidenceV1 {
+            unit: expected_unit,
+            source_identity_digest,
+            manager_owner,
+            bus_id,
+            files,
+            captured_at_monotonic_us: monotonic_now_us()?,
+        };
+
+        NixVerifiedServiceDefinitionContentV1::from_observer(evidence)
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))
+    }
+
+    async fn dbus_bus_id(&self) -> Result<String, NixSystemdObserverErrorV1> {
+        let bus = Proxy::new(
+            &self.connection,
+            DBUS_DESTINATION,
+            DBUS_PATH,
+            DBUS_INTERFACE,
+        )
+        .await?;
+        let id: String = bus.call("GetId", &()).await?;
+        if id.len() != 32 || !id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(NixSystemdObserverErrorV1::InvalidPostState(
+                "D-Bus GetId returned an invalid bus identifier".into(),
+            ));
+        }
+        Ok(id)
+    }
+
+    async fn read_definition_identity(
+        &self,
+        object_path: &OwnedObjectPath,
+        expected_unit: &str,
+    ) -> Result<(NixSystemdUnitDefinitionIdentityV1, bool), NixSystemdObserverErrorV1> {
+        validate_unit_object_path(object_path)?;
+        let properties = self
+            .get_all_properties(object_path, SYSTEMD_UNIT_INTERFACE)
+            .await?;
+        let identity = build_definition_identity_from_properties(&properties, expected_unit)?;
+        let need_daemon_reload =
+            required_bool(&properties, SYSTEMD_UNIT_INTERFACE, "NeedDaemonReload")?;
+        Ok((identity, need_daemon_reload))
+    }
+
     /// Arm the JobRemoved observation channel before any effect is dispatched.
     ///
     /// zbus registers a Manager/JobRemoved match rule before this method returns.
@@ -319,6 +467,7 @@ impl NixSystemdReadOnlyObserverV1 {
         &self,
     ) -> Result<NixSystemdJobRemovedWatcherV1, NixSystemdObserverErrorV1> {
         let manager_owner = self.systemd_manager_owner().await?;
+        let bus_id = self.dbus_bus_id().await?;
         let manager = Proxy::new(
             &self.connection,
             SYSTEMD_DESTINATION,
@@ -329,12 +478,14 @@ impl NixSystemdReadOnlyObserverV1 {
         let stream: zbus::SignalStream<'static> = manager.receive_signal("JobRemoved").await?;
 
         let post_arm_owner = self.systemd_manager_owner().await?;
-        if post_arm_owner != manager_owner {
+        let post_arm_bus_id = self.dbus_bus_id().await?;
+        if post_arm_owner != manager_owner || post_arm_bus_id != bus_id {
             return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
         }
 
         Ok(NixSystemdJobRemovedWatcherV1 {
             manager_owner,
+            bus_id,
             stream,
         })
     }
@@ -400,6 +551,7 @@ impl NixSystemdReadOnlyObserverV1 {
         validate_job_object_path(job_object_path)?;
 
         let manager_owner = self.systemd_manager_owner().await?;
+        let bus_id = self.dbus_bus_id().await?;
         let properties = self
             .get_all_properties(job_object_path, SYSTEMD_JOB_INTERFACE)
             .await?;
@@ -437,7 +589,8 @@ impl NixSystemdReadOnlyObserverV1 {
         }
 
         let post_capture_owner = self.systemd_manager_owner().await?;
-        if post_capture_owner != manager_owner {
+        let post_capture_bus_id = self.dbus_bus_id().await?;
+        if post_capture_owner != manager_owner || post_capture_bus_id != bus_id {
             return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
         }
 
@@ -448,6 +601,7 @@ impl NixSystemdReadOnlyObserverV1 {
             object_path: job_object_path.clone(),
             unit_object_path: job_unit_path,
             manager_owner,
+            bus_id,
         })
     }
 
@@ -609,6 +763,7 @@ pub struct NixSystemdJobHandleV1 {
     object_path: OwnedObjectPath,
     unit_object_path: OwnedObjectPath,
     manager_owner: String,
+    bus_id: String,
 }
 
 impl std::fmt::Debug for NixSystemdJobHandleV1 {
@@ -620,6 +775,7 @@ impl std::fmt::Debug for NixSystemdJobHandleV1 {
             .field("object_path", &self.object_path)
             .field("unit_object_path", &self.unit_object_path)
             .field("manager_owner", &self.manager_owner)
+            .field("bus_id", &self.bus_id)
             .finish()
     }
 }
@@ -649,6 +805,10 @@ impl NixSystemdJobHandleV1 {
         &self.manager_owner
     }
 
+    pub fn bus_id(&self) -> &str {
+        &self.bus_id
+    }
+
     fn validate(&self) -> Result<(), NixSystemdObserverErrorV1> {
         if self.id == 0 {
             return Err(NixSystemdObserverErrorV1::InvalidJobIdentity(
@@ -664,6 +824,7 @@ impl NixSystemdJobHandleV1 {
         validate_job_object_path(&self.object_path)?;
         validate_unit_object_path(&self.unit_object_path)?;
         validate_unique_owner(&self.manager_owner)?;
+        validate_bus_id_shape(&self.bus_id)?;
         if !self.object_path.as_str().ends_with(&format!("/{}", self.id)) {
             return Err(NixSystemdObserverErrorV1::InvalidJobIdentity(
                 "job object path/Id mismatch".to_string(),
@@ -671,6 +832,15 @@ impl NixSystemdJobHandleV1 {
         }
         Ok(())
     }
+}
+
+fn validate_bus_id_shape(value: &str) -> Result<(), NixSystemdObserverErrorV1> {
+    if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(NixSystemdObserverErrorV1::InvalidJobIdentity(
+            "invalid D-Bus bus incarnation identifier".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_unique_owner(owner: &str) -> Result<(), NixSystemdObserverErrorV1> {
@@ -745,6 +915,20 @@ fn required_string(
     interface: &'static str,
     property: &'static str,
 ) -> Result<String, NixSystemdObserverErrorV1> {
+    required_value(properties, interface, property)?
+        .clone()
+        .try_into()
+        .map_err(|_| NixSystemdObserverErrorV1::InvalidPropertyType {
+            interface,
+            property,
+        })
+}
+
+fn required_bool(
+    properties: &HashMap<String, OwnedValue>,
+    interface: &'static str,
+    property: &'static str,
+) -> Result<bool, NixSystemdObserverErrorV1> {
     required_value(properties, interface, property)?
         .clone()
         .try_into()
@@ -855,6 +1039,187 @@ fn parse_job_type(value: String) -> Result<NixSystemdJobTypeV1, NixSystemdObserv
             other.to_string(),
         )),
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DefinitionFileObjectIdentity {
+    dev: u64,
+    ino: u64,
+    mode: u32,
+    size: u64,
+    mtime_sec: i64,
+    mtime_nsec: i64,
+    ctime_sec: i64,
+    ctime_nsec: i64,
+}
+
+#[cfg(unix)]
+fn definition_file_identity(file: &std::fs::File) -> Result<DefinitionFileObjectIdentity, NixSystemdObserverErrorV1> {
+    use std::os::unix::fs::MetadataExt;
+    let metadata = file
+        .metadata()
+        .map_err(|error| NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string()))?;
+    if !metadata.is_file() {
+        return Err(NixSystemdObserverErrorV1::DefinitionContentNotRegular);
+    }
+    Ok(DefinitionFileObjectIdentity {
+        dev: metadata.dev(),
+        ino: metadata.ino(),
+        mode: metadata.mode(),
+        size: metadata.size(),
+        mtime_sec: metadata.mtime(),
+        mtime_nsec: metadata.mtime_nsec(),
+        ctime_sec: metadata.ctime(),
+        ctime_nsec: metadata.ctime_nsec(),
+    })
+}
+
+#[cfg(unix)]
+fn hash_open_definition_file(
+    file: &mut std::fs::File,
+) -> Result<(u64, String), NixSystemdObserverErrorV1> {
+    file.seek(SeekFrom::Start(0))
+        .map_err(|error| NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string()))?;
+    let mut hasher = blake3::Hasher::new();
+    let mut buffer = [0u8; 64 * 1024];
+    let mut length = 0u64;
+    loop {
+        let read = file
+            .read(&mut buffer)
+            .map_err(|error| NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string()))?;
+        if read == 0 {
+            break;
+        }
+        length = length
+            .checked_add(read as u64)
+            .ok_or(NixSystemdObserverErrorV1::DefinitionContentTooLarge)?;
+        if length > 8 * 1024 * 1024 {
+            return Err(NixSystemdObserverErrorV1::DefinitionContentTooLarge);
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok((length, hasher.finalize().to_hex().to_string()))
+}
+
+fn resolve_definition_content_open_path(
+    path: &str,
+) -> Result<(PathBuf, Option<String>), NixSystemdObserverErrorV1> {
+    let source = Path::new(path);
+    let resolved = source.canonicalize().map_err(|error| {
+        NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string())
+    })?;
+
+    if resolved != source {
+        let store_root = Path::new("/nix/store/");
+        if !resolved.starts_with(store_root) {
+            return Err(NixSystemdObserverErrorV1::DefinitionContentSymlink);
+        }
+        let resolved_path = resolved.to_str().ok_or_else(|| {
+            NixSystemdObserverErrorV1::DefinitionContentIo(
+                "resolved definition path is not valid UTF-8".into(),
+            )
+        })?;
+        return Ok((resolved, Some(resolved_path.to_string())));
+    }
+
+    Ok((source.to_path_buf(), None))
+}
+
+#[cfg(unix)]
+fn read_definition_content_file(
+    path: &str,
+) -> Result<NixSystemdUnitDefinitionContentFileV1, NixSystemdObserverErrorV1> {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let (open_path, resolved_path) = resolve_definition_content_open_path(path)?;
+
+    let mut options = OpenOptions::new();
+    options.read(true);
+    let mut file = options
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
+        .open(&open_path)
+        .map_err(|error| {
+            if error.raw_os_error() == Some(libc::ELOOP) {
+                NixSystemdObserverErrorV1::DefinitionContentSymlink
+            } else {
+                NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string())
+            }
+        })?;
+
+    let before = definition_file_identity(&file)?;
+    let (first_len, first_digest) = hash_open_definition_file(&mut file)?;
+    let middle = definition_file_identity(&file)?;
+    let (second_len, second_digest) = hash_open_definition_file(&mut file)?;
+    let after = definition_file_identity(&file)?;
+
+    if before != middle || middle != after || first_len != second_len || first_digest != second_digest {
+        return Err(NixSystemdObserverErrorV1::DefinitionContentMutationDetected);
+    }
+
+    Ok(NixSystemdUnitDefinitionContentFileV1 {
+        path: path.to_string(),
+        resolved_path,
+        byte_len: second_len,
+        content_digest: second_digest,
+    })
+}
+
+#[cfg(not(unix))]
+fn read_definition_content_file(
+    _path: &str,
+) -> Result<NixSystemdUnitDefinitionContentFileV1, NixSystemdObserverErrorV1> {
+    Err(NixSystemdObserverErrorV1::DefinitionContentIo(
+        "definition content capture requires a Unix file-descriptor API".into(),
+    ))
+}
+
+fn read_definition_content_files(
+    identity: &NixSystemdUnitDefinitionIdentityV1,
+) -> Result<Vec<NixSystemdUnitDefinitionContentFileV1>, NixSystemdObserverErrorV1> {
+    let mut paths = Vec::with_capacity(1 + identity.drop_in_paths.len());
+    paths.push(identity.fragment_path.clone());
+    paths.extend(identity.drop_in_paths.iter().cloned());
+
+    let mut total = 0u64;
+    let mut files = Vec::with_capacity(paths.len());
+    for path in paths {
+        let file = read_definition_content_file(&path)?;
+        total = total
+            .checked_add(file.byte_len)
+            .ok_or(NixSystemdObserverErrorV1::DefinitionContentTooLarge)?;
+        if total > 64 * 1024 * 1024 {
+            return Err(NixSystemdObserverErrorV1::DefinitionContentTooLarge);
+        }
+        files.push(file);
+    }
+    Ok(files)
+}
+
+fn build_definition_identity_from_properties(
+    properties: &HashMap<String, OwnedValue>,
+    expected_unit: &str,
+) -> Result<NixSystemdUnitDefinitionIdentityV1, NixSystemdObserverErrorV1> {
+    let observed_id = canonical_unit(&required_string(
+        properties,
+        SYSTEMD_UNIT_INTERFACE,
+        "Id",
+    )?)?;
+    let names = required_strings(properties, SYSTEMD_UNIT_INTERFACE, "Names")?;
+    let canonical_names = names
+        .iter()
+        .map(|name| canonical_unit(name))
+        .collect::<Result<Vec<_>, _>>()?;
+    if observed_id != expected_unit && !canonical_names.iter().any(|name| name == expected_unit) {
+        return Err(NixSystemdObserverErrorV1::UnitIdentityMismatch {
+            requested: expected_unit.to_string(),
+            observed: observed_id,
+        });
+    }
+
+    let fragment_path = required_string(properties, SYSTEMD_UNIT_INTERFACE, "FragmentPath")?;
+    let drop_in_paths = required_strings(properties, SYSTEMD_UNIT_INTERFACE, "DropInPaths")?;
+    NixSystemdUnitDefinitionIdentityV1::new(fragment_path, drop_in_paths)
+        .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))
 }
 
 fn stability_sample_from_observation(
@@ -1058,6 +1423,40 @@ fn monotonic_now_us() -> Result<u64, NixSystemdObserverErrorV1> {
 mod tests {
     use super::*;
 
+    #[cfg(unix)]
+    #[test]
+    fn definition_content_reader_hashes_exact_file_bytes() {
+        use std::io::Write;
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("nginx.service");
+        let mut file = std::fs::File::create(&path).unwrap();
+        let bytes = b"[Service]\nExecStart=/usr/bin/nginx\n";
+        file.write_all(bytes).unwrap();
+        file.sync_all().unwrap();
+
+        let captured = read_definition_content_file(path.to_str().unwrap()).unwrap();
+        assert_eq!(captured.byte_len, bytes.len() as u64);
+        assert_eq!(
+            captured.content_digest,
+            blake3::hash(bytes).to_hex().to_string()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn definition_content_reader_rejects_trailing_symlink() {
+        let directory = tempfile::tempdir().unwrap();
+        let target = directory.path().join("real.service");
+        let link = directory.path().join("linked.service");
+        std::fs::write(&target, b"[Service]\n").unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        assert!(matches!(
+            read_definition_content_file(link.to_str().unwrap()),
+            Err(NixSystemdObserverErrorV1::DefinitionContentSymlink)
+        ));
+    }
+
     #[test]
     fn invocation_id_is_exactly_16_bytes() {
         assert_eq!(invocation_id_to_string(vec![0; 16]).unwrap(), None);
@@ -1122,6 +1521,39 @@ mod tests {
     }
 
     #[test]
+    fn bus_incarnation_identifier_is_strict() {
+        assert!(validate_bus_id_shape("0123456789abcdef0123456789abcdef").is_ok());
+        assert!(validate_bus_id_shape("").is_err());
+        assert!(validate_bus_id_shape("0123456789abcdef").is_err());
+        assert!(validate_bus_id_shape("0123456789abcdef0123456789abcdeg").is_err());
+    }
+
+    #[test]
+    fn job_handle_bus_incarnation_is_part_of_its_identity() {
+        let object_path =
+            OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42").unwrap();
+        let unit_object_path =
+            OwnedObjectPath::try_from("/org/freedesktop/systemd1/unit/nginx_2eservice").unwrap();
+
+        let valid = NixSystemdJobHandleV1 {
+            id: 42,
+            job_type: NixSystemdJobTypeV1::Start,
+            unit: "nginx.service".to_string(),
+            object_path: object_path.clone(),
+            unit_object_path: unit_object_path.clone(),
+            manager_owner: ":1.42".to_string(),
+            bus_id: "0123456789abcdef0123456789abcdef".to_string(),
+        };
+        valid.validate().unwrap();
+
+        let invalid = NixSystemdJobHandleV1 {
+            bus_id: "0123456789abcdef".to_string(),
+            ..valid
+        };
+        assert!(invalid.validate().is_err());
+    }
+
+    #[test]
     fn job_handle_manager_owner_is_part_of_its_identity() {
         let object_path =
             OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42").unwrap();
@@ -1135,6 +1567,7 @@ mod tests {
             object_path: object_path.clone(),
             unit_object_path: unit_object_path.clone(),
             manager_owner: ":1.42".to_string(),
+            bus_id: "0123456789abcdef0123456789abcdef".to_string(),
         };
         valid.validate().unwrap();
 
