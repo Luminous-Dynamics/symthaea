@@ -39,12 +39,48 @@ pub struct ViabilitySignal {
 
 impl ViabilitySignal {
     pub fn new(value: f64, confidence: f64, cycle: u64, producer: impl Into<String>) -> Self {
+        debug_assert!(value.is_finite(), "ViabilitySignal value must be finite");
+        debug_assert!(confidence.is_finite(), "ViabilitySignal confidence must be finite");
         Self {
             value: value.clamp(0.0, 1.0),
             confidence: confidence.clamp(0.0, 1.0),
             cycle,
             producer: producer.into(),
         }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.value.is_finite()
+            && self.confidence.is_finite()
+            && self.confidence >= 0.0
+            && self.confidence <= 1.0
+            && !self.producer.is_empty()
+    }
+}
+
+/// A signed consequence of an action. Unlike a viability signal, this is intentionally
+/// not clamped to [0,1]: negative outcomes must remain observable.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ViabilityDelta {
+    pub value: f64,
+    pub confidence: f64,
+}
+
+impl ViabilityDelta {
+    pub fn new(value: f64, confidence: f64) -> Self {
+        debug_assert!(value.is_finite(), "ViabilityDelta value must be finite");
+        debug_assert!(confidence.is_finite(), "ViabilityDelta confidence must be finite");
+        Self {
+            value,
+            confidence: confidence.clamp(0.0, 1.0),
+        }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.value.is_finite()
+            && self.confidence.is_finite()
+            && self.confidence >= 0.0
+            && self.confidence <= 1.0
     }
 }
 
@@ -70,11 +106,19 @@ impl ViabilityBand {
     }
 
     pub fn validate(&self) -> bool {
-        self.critical.0 <= self.tolerated.0
+        self.critical.0.is_finite()
+            && self.critical.1.is_finite()
+            && self.tolerated.0.is_finite()
+            && self.tolerated.1.is_finite()
+            && self.preferred.0.is_finite()
+            && self.preferred.1.is_finite()
+            && self.critical.0 <= self.critical.1
+            && self.critical.0 <= self.tolerated.0
+            && self.tolerated.0 <= self.tolerated.1
             && self.tolerated.0 <= self.preferred.0
+            && self.preferred.0 <= self.preferred.1
             && self.preferred.1 <= self.tolerated.1
             && self.tolerated.1 <= self.critical.1
-            && self.critical.0 <= self.critical.1
     }
 }
 
@@ -150,9 +194,9 @@ pub struct ActionPrediction {
     pub action_id: u64,
     pub action_label: String,
     pub cycle: u64,
-    pub predicted_world_delta: Option<ViabilitySignal>,
-    pub predicted_self_delta: Option<ViabilitySignal>,
-    pub predicted_goal_delta: Option<ViabilitySignal>,
+    pub predicted_world_delta: Option<ViabilityDelta>,
+    pub predicted_self_delta: Option<ViabilityDelta>,
+    pub predicted_goal_delta: Option<ViabilityDelta>,
     pub authority_granted: bool,
 }
 
@@ -169,6 +213,9 @@ pub struct ActionOutcome {
     pub prediction: Option<ActionPrediction>,
     pub observed_effect: Option<ViabilitySignal>,
     pub prediction_error: PredictionErrorLedger,
+    /// Evidence/provenance references supporting the observed outcome.
+    #[serde(default)]
+    pub evidence_refs: Vec<String>,
 }
 
 /// State snapshot used by the viability fabric.
@@ -212,7 +259,8 @@ impl ViabilityState {
         }
     }
 
-    /// Conservative pressure signal: invalid/missing state never produces a lower pressure.
+    /// Conservative pressure signal: prediction error or resource pressure can only increase
+    /// regulation pressure. Missing optional signals are not treated as healthy evidence.
     pub fn regulation_pressure(&self) -> f64 {
         let resource = self.aggregate_pressure();
         let prediction = {
@@ -309,21 +357,42 @@ impl ViabilityFabric {
     /// A caller cannot inject a prediction at observation time: this is deliberately
     /// fail-closed against post-hoc rationalization.
     pub fn observe_action(&mut self, mut outcome: ActionOutcome) -> Result<(), &'static str> {
-        let Some(prediction) = self.pending_predictions.remove(&outcome.action_id) else {
-            return Err("missing pre-action prediction");
-        };
-
+        // Validate caller-supplied outcome metadata before consuming the pending prediction.
+        // This preserves the pending record after rejected/tampered observations.
         if outcome.prediction.is_some() {
             return Err("outcome already contains a prediction");
         }
-
-        if prediction.action_id != outcome.action_id {
-            return Err("prediction/action identity mismatch");
+        if !outcome.prediction_error.world.is_finite()
+            || !outcome.prediction_error.self_model.is_finite()
+            || !outcome.prediction_error.interoceptive.is_finite()
+            || !outcome.prediction_error.goal.is_finite()
+            || !outcome.prediction_error.model_confidence.is_finite()
+            || !outcome.prediction_error.execution.is_finite()
+        {
+            return Err("non-finite prediction error");
         }
 
+        let Some(prediction) = self.pending_predictions.get(&outcome.action_id) else {
+            return Err("missing pre-action prediction");
+        };
+
+        if prediction.action_label != outcome.action_label {
+            return Err("action label mismatch");
+        }
+        if prediction.authority_granted != outcome.authority_granted {
+            return Err("authority mismatch");
+        }
         if outcome.cycle < prediction.cycle {
             return Err("outcome predates prediction");
         }
+        if !outcome.evidence_refs.iter().all(|r| !r.trim().is_empty()) {
+            return Err("invalid evidence reference");
+        }
+
+        let prediction = self
+            .pending_predictions
+            .remove(&outcome.action_id)
+            .expect("pending prediction validated immediately before removal");
 
         outcome.prediction = Some(prediction);
         outcome.prediction_error = outcome.prediction_error.bounded();
@@ -397,9 +466,27 @@ mod tests {
             prediction: None,
             observed_effect: None,
             prediction_error: PredictionErrorLedger::default(),
+            evidence_refs: Vec::new(),
         };
 
         assert_eq!(fabric.observe_action(outcome), Err("missing pre-action prediction"));
+    }
+
+    #[test]
+    fn signed_delta_preserves_negative_consequences() {
+        let delta = ViabilityDelta::new(-0.4, 0.9);
+        assert_eq!(delta.value, -0.4);
+        assert!(delta.is_valid());
+    }
+
+    #[test]
+    fn invalid_band_is_rejected() {
+        let invalid = ViabilityBand {
+            preferred: (0.8, 0.2),
+            tolerated: (0.1, 0.9),
+            critical: (0.0, 1.0),
+        };
+        assert!(!invalid.validate());
     }
 
     #[test]
@@ -432,6 +519,58 @@ mod tests {
 
         assert_eq!(fabric.observe_action(outcome), Err("missing pre-action prediction"));
         assert!(fabric.outcomes().is_empty());
+    }
+
+    #[test]
+    fn rejected_tampered_outcome_does_not_consume_prediction() {
+        let mut fabric = ViabilityFabric::new(4);
+        fabric.begin_cycle(9);
+
+        let prediction = ActionPrediction {
+            action_id: 10,
+            action_label: "test".to_string(),
+            cycle: 9,
+            predicted_world_delta: Some(ViabilityDelta::new(-0.2, 1.0)),
+            predicted_self_delta: None,
+            predicted_goal_delta: None,
+            authority_granted: true,
+        };
+        fabric.predict_action(prediction).unwrap();
+
+        let tampered = ActionOutcome {
+            action_id: 10,
+            action_label: "tampered".to_string(),
+            cycle: 9,
+            pre_state_digest: 1,
+            post_state_digest: 2,
+            authority_granted: true,
+            safety_gate_passed: true,
+            prediction: None,
+            observed_effect: None,
+            prediction_error: PredictionErrorLedger::default(),
+            evidence_refs: vec![],
+        };
+
+        assert_eq!(fabric.observe_action(tampered), Err("action label mismatch"));
+
+        let good = ActionOutcome {
+            action_id: 10,
+            action_label: "test".to_string(),
+            cycle: 9,
+            pre_state_digest: 1,
+            post_state_digest: 2,
+            authority_granted: true,
+            safety_gate_passed: true,
+            prediction: None,
+            observed_effect: None,
+            prediction_error: PredictionErrorLedger {
+                world: 0.2,
+                ..Default::default()
+            },
+            evidence_refs: vec!["sim://micro-world/episode-1".to_string()],
+        };
+
+        assert!(fabric.observe_action(good).is_ok());
     }
 
     #[test]
