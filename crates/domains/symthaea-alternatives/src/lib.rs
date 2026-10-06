@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 25;
+pub const SCHEMA_VERSION: u16 = 26;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-v34";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-v35";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -2034,6 +2034,30 @@ impl ExperimentalDesignProvenance {
 /// This is explicitly a heuristic rather than a formal expected-value-of-
 —information calculation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MeasurementDiscriminationTarget {
+    /// Left-hand frontier candidate identity.
+    pub left_candidate_id: String,
+    /// Right-hand frontier candidate identity.
+    pub right_candidate_id: String,
+    /// Burden dimension whose intervals overlap and motivate the measurement.
+    pub dimension: Dimension,
+}
+
+impl MeasurementDiscriminationTarget {
+    /// Validate candidate identities and dimension.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.left_candidate_id.is_empty()
+            || self.right_candidate_id.is_empty()
+            || self.left_candidate_id == self.right_candidate_id
+        {
+            return Err(AssessmentError::InvalidMeasurementDiscriminationTarget);
+        }
+        Ok(())
+    }
+}
+
+/// Conservative next-measurement target.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MeasurementPriority {
     /// Dimension to investigate next.
     pub dimension: Dimension,
@@ -2045,8 +2069,8 @@ pub struct MeasurementPriority {
     pub unresolved_uncertainty_refs: Vec<String>,
     /// Candidate IDs that the measurement is intended to discriminate.
     pub candidate_ids: Vec<String>,
-    /// Candidate-pair discrimination targets whose current intervals are not clearly ordered.
-    pub expected_discrimination: Vec<String>,
+    /// Typed candidate-pair discrimination targets whose current intervals are not clearly ordered.
+    pub expected_discrimination: Vec<MeasurementDiscriminationTarget>,
     /// Rationale.
     pub rationale: String,
 }
@@ -2273,6 +2297,8 @@ pub enum AssessmentError {
     MissingEvidenceReference(String),
     /// Explicit experimental-design provenance is structurally incomplete.
     InvalidExperimentalDesign,
+    /// A heuristic measurement target has an invalid candidate relationship.
+    InvalidMeasurementDiscriminationTarget,
     /// An experimental design is bound to a different functional requirement.
     ExperimentalDesignRequirementMismatch {
         /// Requirement identity expected by the assessment.
@@ -2528,6 +2554,9 @@ impl std::fmt::Display for AssessmentError {
             Self::InvalidExperimentalDesign => write!(f, "experimental design provenance is incomplete"),
             Self::DuplicateExperimentalUncertaintyReference => {
                 write!(f, "duplicate experimental uncertainty reference")
+            }
+            Self::InvalidMeasurementDiscriminationTarget => {
+                write!(f, "measurement discrimination target is invalid")
             }
             Self::ExperimentalDesignRequirementMismatch {
                 expected_requirement_id,
@@ -3450,10 +3479,11 @@ impl AlternativesEngine {
                             if !(a_burden.interval.upper < b_burden.interval.lower
                                 || b_burden.interval.upper < a_burden.interval.lower)
                             {
-                                expected_discrimination.push(format!(
-                                    "{}<->{}:{dimension:?}",
-                                    candidate_ids[left], candidate_ids[right]
-                                ));
+                                expected_discrimination.push(MeasurementDiscriminationTarget {
+                                    left_candidate_id: candidate_ids[left].clone(),
+                                    right_candidate_id: candidate_ids[right].clone(),
+                                    dimension: *dimension,
+                                });
                             }
                         }
                     }
@@ -3465,6 +3495,9 @@ impl AlternativesEngine {
                 .map(|candidate_id| format!("uncertainty:{candidate_id}:{dimension:?}"))
                 .collect();
 
+            for target in &expected_discrimination {
+                target.validate()?;
+            }
             MeasurementPriority {
                 dimension: *dimension,
                 unresolved_candidate_count: *unresolved_count,
