@@ -2247,6 +2247,7 @@ mod tests {
             "fixture:rules:v1",
             vec![MorphophonologicalRule {
                 rule_id: "fixture:past-tense".into(),
+                lemma: None,
                 morphology: vec![MorphologicalFeature {
                     category: "tense".into(),
                     value: "past".into(),
@@ -2461,6 +2462,7 @@ mod tests {
             "fixture:rules:v1",
             vec![MorphophonologicalRule {
                 rule_id: "fixture:past-tense".into(),
+                lemma: None,
                 morphology: vec![MorphologicalFeature {
                     category: "tense".into(),
                     value: "past".into(),
@@ -2510,6 +2512,7 @@ mod tests {
             vec![
                 MorphophonologicalRule {
                     rule_id: "fixture:one".into(),
+                    lemma: None,
                     morphology: vec![MorphologicalFeature {
                         category: "tense".into(),
                         value: "past".into(),
@@ -2520,6 +2523,7 @@ mod tests {
                 },
                 MorphophonologicalRule {
                     rule_id: "fixture:two".into(),
+                    lemma: None,
                     morphology: vec![MorphologicalFeature {
                         category: "tense".into(),
                         value: "past".into(),
