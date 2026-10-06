@@ -1786,9 +1786,9 @@ mod tests {
     #[test]
     fn test_strict_english_lexicon_derivation_uses_only_embedded_pronunciation() {
         use symthaea_broca::{
-            GrammaticalFunction, LanguageRuleBinding, LanguageRuleStatus, LexemeBinding,
-            LexicalSource, LinguisticFrame, PhonemeSlot, SpeechPlan, StructuredDecoder,
-            SyllableStress, ThoughtChannels, LexicalMorphosyntacticBinding,
+            ContentBindingStatus, GrammaticalFunction, LanguageRuleBinding, LanguageRuleStatus,
+            LexemeBinding, LexicalSource, LinguisticFrame, PhonemeSlot, SpeechPlan,
+            StructuredDecoder, SyllableStress, ThoughtChannels, LexicalMorphosyntacticBinding,
         };
 
         let genesis = GenesisSeed::from_phrase("strict-lexicon-witness-test");
@@ -1796,7 +1796,7 @@ mod tests {
         let channels = ThoughtChannels::with_intent(2);
         let readout = decoder.decode(&channels);
         let frame = LinguisticFrame::from_speech_plan(&SpeechPlan::from_readout(&channels, &readout));
-        let voice = LiveVoice::new_headless(&genesis);
+        let mut voice = LiveVoice::new_headless(&genesis);
 
         let make_binding = |form: &str| {
             let constituents = frame
@@ -1891,6 +1891,62 @@ mod tests {
         assert_eq!(
             witness.mappings[0].symbols[0],
             hello_phones[0].trim_end_matches(|c: char| c.is_ascii_digit())
+        );
+
+        let mut plan = symthaea_broca::PhonologicalPlan::from_linguistic_frame(&frame);
+        plan.bind_lexical_segments_from_binding_with_witness(
+            &frame,
+            &binding,
+            &witness,
+            segments.clone(),
+        )
+        .expect("strict witness should bind into a realization-ready plan");
+        assert_eq!(plan.content_binding, ContentBindingStatus::LexicallyBound);
+
+        let receipt = voice
+            .speak_english_lexicon_verified_lexical_phonological_plan_with_receipt(
+                &plan, &frame, &binding,
+            )
+            .expect("strict lexicon-backed plan should realize");
+        receipt
+            .verify_against_plan(&plan, &frame, &binding, &witness)
+            .expect("strict receipt should independently revalidate");
+
+        assert_eq!(receipt.pronunciation_lexicon_evidence.len(), 1);
+        assert_eq!(
+            receipt.pronunciation_lexicon_evidence[0].source_id,
+            "symthaea-hand-lexicon-v1"
+        );
+        assert_eq!(
+            receipt.pronunciation_lexicon_evidence[0].dialect_scope,
+            "en-unspecified"
+        );
+        assert_eq!(
+            receipt.pronunciation_lexicon_evidence[0].variant_policy,
+            "single-curated-entry"
+        );
+        assert_eq!(
+            receipt.pronunciation_lexicon_evidence[0].selected_variant,
+            "only-entry"
+        );
+        assert_eq!(receipt.pronunciation_lexicon_evidence[0].available_variants, 1);
+        assert!(receipt.pronunciation_lexicon_evidence[0].is_well_formed());
+        assert_eq!(
+            receipt.pronunciation_lexicon_evidence_blake3,
+            super::hash_pronunciation_lexicon_evidence(
+                &receipt.pronunciation_lexicon_evidence
+            )
+        );
+
+        assert!(
+            receipt.pronunciation_lexicon_evidence.is_empty(),
+            "caller-supplied witness receipts must not fabricate lexicon provenance"
+        );
+        assert_eq!(
+            receipt.pronunciation_lexicon_evidence_blake3,
+            super::hash_pronunciation_lexicon_evidence(
+                &receipt.pronunciation_lexicon_evidence
+            )
         );
 
         let unlisted = make_binding("zzzxxyq");
