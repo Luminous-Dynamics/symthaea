@@ -1813,10 +1813,10 @@ impl SqliteAuthorizationStore {
         // Backfill only after legacy relying-party fields have been normalized.
         // The replay ledger is then a stable historical authority even when
         // those source rows are later compacted.
-        backfill_native_replay_history(&mut connection)?;
+                backfill_native_replay_history(&mut connection)?;
         validate_native_replay_history_records(&connection)?;
-        // Install replay-owner database guards only after legacy rows have
-        // been normalized and the durable replay ledger has been backfilled.
+        // Install replay-owner guards only after legacy normalization and replay
+        // history backfill, so migration itself cannot trip the new invariant.
         connection.execute_batch(
             r#"             CREATE TRIGGER IF NOT EXISTS authorization_dispatch_replay_owner_insert
                BEFORE INSERT ON authorization_dispatches
@@ -1910,10 +1910,8 @@ impl SqliteAuthorizationStore {
                        AND h.target_identity=NEW.target_identity
                    )
                    THEN RAISE(ABORT, 'terminal native replay history owner mismatch')
-                 END;
-               END;"#,
+                 END;"#,
         )?;
-        Ok(store)
     }
 
     fn trusted_utc_now(&self) -> Result<DateTime<Utc>, AuthorizationStoreError> {
