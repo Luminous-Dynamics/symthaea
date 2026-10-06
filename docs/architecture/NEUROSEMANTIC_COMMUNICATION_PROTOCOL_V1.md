@@ -416,30 +416,31 @@ Lineage answers **where a derived artifact came from**; lifecycle evidence answe
 downstream system claims happened to that artifact afterward**. These are deliberately
 separate boundaries.
 
-The protocol now defines a versioned NeurosemanticArtifactLifecycleReceipt containing:
+The protocol defines lifecycle-receipt schema v2 with:
 
-- the exact derived artifact hash;
-- the exact derivation provenance reference and digest;
-- a lifecycle action (AccessRevocation, Retention, Erasure, Rectification, or Supersession);
-- an externally reported state (Requested, Applied, Verified, or Rejected);
-- a content-addressed effect-evidence reference and digest;
+- the exact derived artifact hash and derivation provenance identity;
+- an explicit lifecycle action and reported state;
+- content-addressed effect-evidence identity;
 - the execution revision and observation time;
-- an optional resulting-artifact hash for rectification/supersession.
+- a monotonic event sequence plus the hash of the immediately preceding receipt when chained;
+- a distinct replacement artifact hash **and its own derivation provenance identity** for
+  rectification/supersession.
 
-verify_binding(...) independently checks the receipt against the expected output artifact and
-lineage identities, recomputes the supplied effect-evidence hash, and rejects future-dated
-receipts. Replacement actions require a distinct resulting artifact identity.
+verify_binding(...) checks the receipt against the expected output artifact and lineage identities,
+recomputes the supplied effect-evidence hash, and rejects future-dated receipts.
+verify_transition(...) additionally enforces contiguous sequence numbers, exact predecessor identity,
+non-decreasing observation time, stable target lineage, and the allowed state machine
+(Requested -> Applied -> Verified, with rejection as a terminal branch).
+
+For replacement actions, verify_resulting_lineage_binding_bytes(...) checks the concrete replacement
+lineage record against the receipt's resulting artifact hash, lineage reference, and derivation
+provenance digest. A replacement content hash alone is therefore insufficient.
 
 This is intentionally **effect evidence, not authority**. A valid receipt proves that the exact
-receipt and the exact supplied evidence bytes agree with the declared identities. It does not
-prove that an external erasure, revocation, rectification, or supersession actually occurred,
-nor that every replica, backup, derived model, or downstream cache was changed. Authorization
-remains the responsibility of the policy/identity layer.
-
-This separation is important for future correction and erasure workflows. Recent 2026 BCI
-privacy research highlights the need for traceable data lineage alongside machine unlearning,
-while other 2026 work emphasizes auditable evidence, prospective evaluation, and rollback rather
-than treating a system's own explanation or status flag as sufficient evidence.
+receipt and supplied evidence bytes agree with their declared identities. It does not prove that
+an external erasure, revocation, rectification, or supersession actually occurred, nor that every
+replica, backup, derived model, or downstream cache was changed. Authorization remains the
+responsibility of the policy/identity layer.
 
 For this reason, any future unlearning/rectification receipt should carry the relevant effect
 evidence and, where safety or fairness is material, post-change evaluation evidence rather than
