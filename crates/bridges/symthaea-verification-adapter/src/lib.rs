@@ -440,6 +440,97 @@ fn sha256_multibase(hex_digest: &str) -> Result<String, SnapshotError> {
     Ok(format!("z{}", bs58::encode(multihash).into_string()))
 }
 
+fn decode_base64url(value: &str, field: &str) -> Result<Vec<u8>, SnapshotError> {
+    if value.is_empty() {
+        return Err(SnapshotError::Malformed(format!(
+            "public JWK {field} must not be empty"
+        )));
+    }
+    if value.contains('=') || value.bytes().any(|byte| {
+        !matches!(
+            byte,
+            b'A'..=b'Z'
+                | b'a'..=b'z'
+                | b'0'..=b'9'
+                | b'-'
+                | b'_'
+        )
+    }) {
+        return Err(SnapshotError::Malformed(format!(
+            "public JWK {field} must use unpadded base64url encoding"
+        )));
+    }
+    if value.len() % 4 == 1 {
+        return Err(SnapshotError::Malformed(format!(
+            "public JWK {field} has an invalid base64url length"
+        )));
+    }
+
+    let mut decoded = Vec::with_capacity(value.len().saturating_mul(3) / 4 + 1);
+    let mut accumulator = 0u32;
+    let mut bits = 0u8;
+
+    for byte in value.bytes() {
+        let sextet = match byte {
+            b'A'..=b'Z' => byte - b'A',
+            b'a'..=b'z' => byte - b'a' + 26,
+            b'0'..=b'9' => byte - b'0' + 52,
+            b'-' => 62,
+            b'_' => 63,
+            _ => unreachable!("base64url alphabet was validated above"),
+        } as u32;
+
+        accumulator = (accumulator << 6) | sextet;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            decoded.push((accumulator >> bits) as u8);
+            accumulator = if bits == 0 {
+                0
+            } else {
+                accumulator & ((1u32 << bits) - 1)
+            };
+        }
+    }
+
+    if bits > 0 && accumulator != 0 {
+        return Err(SnapshotError::Malformed(format!(
+            "public JWK {field} uses non-canonical base64url padding bits"
+        )));
+    }
+
+    Ok(decoded)
+}
+
+fn validate_base64url_field(
+    public_object: &serde_json::Map<String, Value>,
+    field: &str,
+) -> Result<Vec<u8>, SnapshotError> {
+    let value = public_object
+        .get(field)
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            SnapshotError::Malformed(format!(
+                "public JWK verification material field {field} must be a non-empty string"
+            ))
+        })?;
+    decode_base64url(value, field)
+}
+
+fn validate_base64url_uint(
+    public_object: &serde_json::Map<String, Value>,
+    field: &str,
+) -> Result<(), SnapshotError> {
+    let decoded = validate_base64url_field(public_object, field)?;
+    if decoded.len() > 1 && decoded[0] == 0 {
+        return Err(SnapshotError::Malformed(format!(
+            "public JWK RSA {field} must use the minimum octets for Base64urlUInt"
+        )));
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_public_jwk_shape(
     public_object: &serde_json::Map<String, Value>,
 ) -> Result<(), SnapshotError> {
@@ -463,17 +554,46 @@ pub(crate) fn validate_public_jwk_shape(
 
     match kty {
         "EC" => {
-            require_string("crv")?;
-            require_string("x")?;
-            require_string("y")?;
+            let curve = require_string("crv")?;
+            let x = validate_base64url_field(public_object, "x")?;
+            let y = validate_base64url_field(public_object, "y")?;
+
+            let expected_coordinate_len = match curve {
+                "P-256" => Some(32),
+                "P-384" => Some(48),
+                "P-521" => Some(66),
+                _ => None,
+            };
+            if let Some(expected_len) = expected_coordinate_len {
+                if x.len() != expected_len || y.len() != expected_len {
+                    return Err(SnapshotError::Malformed(format!(
+                        "public JWK EC coordinates for {curve} must decode to exactly {expected_len} bytes"
+                    )));
+                }
+            }
         }
         "OKP" => {
-            require_string("crv")?;
-            require_string("x")?;
+            let curve = require_string("crv")?;
+            let x = validate_base64url_field(public_object, "x")?;
+            let expected_key_len = match curve {
+                "Ed25519" | "X25519" => Some(32),
+                "Ed448" => Some(57),
+                "X448" => Some(56),
+                _ => None,
+            };
+            if let Some(expected_len) = expected_key_len {
+                if x.len() != expected_len {
+                    return Err(SnapshotError::Malformed(format!(
+                        "public JWK OKP key {curve} must decode to exactly {expected_len} bytes"
+                    )));
+                }
+            }
         }
         "RSA" => {
             require_string("n")?;
             require_string("e")?;
+            validate_base64url_uint(public_object, "n")?;
+            validate_base64url_uint(public_object, "e")?;
         }
         "oct" => {
             return Err(SnapshotError::Malformed(
@@ -497,8 +617,7 @@ fn verification_method_material_digest(
         ));
     }
 
-    let material_bytes = match method_type {
-        "Multikey" => {
+    let material_bytes = match method_type {        "Multikey" => {
             let public = object
                 .get("publicKeyMultibase")
                 .and_then(Value::as_str)
@@ -997,8 +1116,7 @@ mod tests {
             symthaea_epistemic_types::ClaimAuthorship::new(
                 ClaimAuthorIdentity::new("author:verification").unwrap(),
                 ClaimProofPurpose::new("assertionMethod").unwrap(),
-                Some(ClaimVerificationMethod::new(
-                    "https://example.test/controller#key-1",
+                Some(ClaimVerificationMethod::new(                    "https://example.test/controller#key-1",
                 ).unwrap()),
             )
             .unwrap()
@@ -1431,6 +1549,127 @@ mod tests {
     }
 
     #[test]
+    fn public_jwk_rejects_invalid_base64url_encoding() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "verificationMethod": [{
+                "id": "https://example.test/controller#jwk-1",
+                "type": "JsonWebKey",
+                "controller": "https://example.test/controller",
+                "publicKeyJwk": {
+                    "kty": "OKP",
+                    "crv": "Ed25519",
+                    "x": "not!base64url"
+                }
+            }],
+            "assertionMethod": ["https://example.test/controller#jwk-1"]
+        }"##.into();
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter = JsonControllerDocumentSnapshotAdapter::new(
+            "/tmp/does-not-matter",
+            reference,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("unpadded base64url")
+        ));
+    }
+
+    #[test]
+    fn public_jwk_enforces_standard_coordinate_and_key_lengths() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "verificationMethod": [{
+                "id": "https://example.test/controller#jwk-1",
+                "type": "JsonWebKey",
+                "controller": "https://example.test/controller",
+                "publicKeyJwk": {
+                    "kty": "EC",
+                    "crv": "P-256",
+                    "x": "AQ",
+                    "y": "AQ"
+                }
+            }],
+            "assertionMethod": ["https://example.test/controller#jwk-1"]
+        }"##.into();
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter = JsonControllerDocumentSnapshotAdapter::new(
+            "/tmp/does-not-matter",
+            reference,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("exactly 32 bytes")
+        ));
+
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "verificationMethod": [{
+                "id": "https://example.test/controller#jwk-1",
+                "type": "JsonWebKey",
+                "controller": "https://example.test/controller",
+                "publicKeyJwk": {
+                    "kty": "OKP",
+                    "crv": "Ed25519",
+                    "x": "AQ"
+                }
+            }],
+            "assertionMethod": ["https://example.test/controller#jwk-1"]
+        }"##.into();
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter = JsonControllerDocumentSnapshotAdapter::new(
+            "/tmp/does-not-matter",
+            reference,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("exactly 32 bytes")
+        ));
+
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "verificationMethod": [{
+                "id": "https://example.test/controller#jwk-1",
+                "type": "JsonWebKey",
+                "controller": "https://example.test/controller",
+                "publicKeyJwk": {
+                    "kty": "RSA",
+                    "n": "AAE",
+                    "e": "AQAB"
+                }
+            }],
+            "assertionMethod": ["https://example.test/controller#jwk-1"]
+        }"##.into();
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter = JsonControllerDocumentSnapshotAdapter::new(
+            "/tmp/does-not-matter",
+            reference,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("minimum octets")
+        ));
+    }
+
+    #[test]
     fn embedded_relationship_method_can_supply_the_definition() {
         let request = request();
         let mut snapshot = snapshot();
@@ -1497,8 +1736,7 @@ mod tests {
                     "id": "#key-1",
                     "type": "Multikey",
                     "controller": "https://example.test/controller",
-                    "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
-                },
+                    "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"                },
                 {
                     "id": "https://example.test/controller#key-1",
                     "type": "Multikey",
