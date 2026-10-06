@@ -8,7 +8,7 @@ use blake3::Hasher;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-const BENCHMARK_MANIFEST_SCHEMA_VERSION: u16 = 21;
+const BENCHMARK_MANIFEST_SCHEMA_VERSION: u16 = 22;
 
 /// One frozen benchmark scenario.
 #[derive(Debug, Clone)]
@@ -70,7 +70,11 @@ fn evidence(
             procedure_digest: "benchmark-measurement-procedure-v1-digest".into(),
             record_digest: format!("benchmark-record-digest:{id}"),
             measurement_system_id: Some("benchmark-measurement-system-v1".into()),
-            calibration_chain_refs: vec!["benchmark-calibration-chain-v1".into()],
+            calibration_chain_refs: vec![CalibrationTraceabilityRef {
+                calibration_id: "benchmark-calibration-chain-v1".into(),
+                calibration_revision: "v1".into(),
+                calibration_record_digest: format!("benchmark-calibration-chain-record-digest:{id}"),
+            }],
             experimental_design_id: None,
             experimental_target_id: None,
         }),
