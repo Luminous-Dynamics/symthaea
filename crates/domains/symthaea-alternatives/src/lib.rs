@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 28;
+pub const SCHEMA_VERSION: u16 = 29;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v40";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-v41";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -480,6 +480,12 @@ pub struct MeasurementUncertaintyRef {
     pub statement: MeasurementUncertaintyStatement,
     /// Method used to evaluate the stated uncertainty.
     pub method_id: String,
+    /// Exact measurand identity to which the uncertainty statement applies.
+    pub measurand_id: String,
+    /// Exact measurement/test procedure identity to which the uncertainty applies.
+    pub procedure_id: String,
+    /// Digest of the exact measurement/test procedure or canonical procedure payload.
+    pub procedure_digest: String,
     /// References to the uncertainty components or source records considered.
     pub component_refs: Vec<String>,
     /// Digest of the canonical uncertainty statement/record.
@@ -491,6 +497,9 @@ impl MeasurementUncertaintyRef {
     pub fn validate(&self) -> Result<(), AssessmentError> {
         if self.uncertainty_id.is_empty()
             || self.method_id.is_empty()
+            || self.measurand_id.is_empty()
+            || self.procedure_id.is_empty()
+            || self.procedure_digest.is_empty()
             || self.record_digest.is_empty()
             || self.component_refs.is_empty()
             || self.component_refs.iter().any(String::is_empty)
@@ -575,6 +584,31 @@ impl EvidenceRecord {
                             evidence_unit: unit.clone(),
                             uncertainty_unit: uncertainty.statement.unit().to_string(),
                         });
+                    }
+                }
+                if let Some(observation) = &self.observation {
+                    if uncertainty.measurand_id != observation.measurand_id {
+                        return Err(AssessmentError::MeasurementUncertaintyMeasurandMismatch {
+                            evidence_id: self.id.clone(),
+                            evidence_measurand_id: observation.measurand_id.clone(),
+                            uncertainty_measurand_id: uncertainty.measurand_id.clone(),
+                        });
+                    }
+                    if uncertainty.procedure_id != observation.procedure_id {
+                        return Err(AssessmentError::MeasurementUncertaintyProcedureMismatch {
+                            evidence_id: self.id.clone(),
+                            expected_procedure_id: observation.procedure_id.clone(),
+                            actual_procedure_id: uncertainty.procedure_id.clone(),
+                        });
+                    }
+                    if uncertainty.procedure_digest != observation.procedure_digest {
+                        return Err(
+                            AssessmentError::MeasurementUncertaintyProcedureDigestMismatch {
+                                evidence_id: self.id.clone(),
+                                expected_procedure_digest: observation.procedure_digest.clone(),
+                                actual_procedure_digest: uncertainty.procedure_digest.clone(),
+                            },
+                        );
                     }
                 }
             }
@@ -2355,6 +2389,33 @@ pub enum AssessmentError {
         /// Stated uncertainty unit.
         uncertainty_unit: String,
     },
+    /// Stated measurement uncertainty applies to a different measurand than the observation.
+    MeasurementUncertaintyMeasurandMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Measurand identity carried by the observation.
+        evidence_measurand_id: String,
+        /// Measurand identity carried by the uncertainty analysis.
+        uncertainty_measurand_id: String,
+    },
+    /// Stated measurement uncertainty uses a different procedure identity than the observation.
+    MeasurementUncertaintyProcedureMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Procedure identity expected from the observation.
+        expected_procedure_id: String,
+        /// Procedure identity carried by the uncertainty analysis.
+        actual_procedure_id: String,
+    },
+    /// Stated measurement uncertainty uses a different procedure payload than the observation.
+    MeasurementUncertaintyProcedureDigestMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Procedure digest expected from the observation.
+        expected_procedure_digest: String,
+        /// Procedure digest carried by the uncertainty analysis.
+        actual_procedure_digest: String,
+    },
     /// A burden references unknown evidence.
     MissingEvidenceReference(String),
     /// Explicit experimental-design provenance is structurally incomplete.
@@ -2625,6 +2686,30 @@ impl std::fmt::Display for AssessmentError {
             } => write!(
                 f,
                 "evidence {evidence_id} unit {evidence_unit} does not match uncertainty unit {uncertainty_unit}"
+            ),
+            Self::MeasurementUncertaintyMeasurandMismatch {
+                evidence_id,
+                evidence_measurand_id,
+                uncertainty_measurand_id,
+            } => write!(
+                f,
+                "evidence {evidence_id} measurand {evidence_measurand_id} does not match uncertainty measurand {uncertainty_measurand_id}"
+            ),
+            Self::MeasurementUncertaintyProcedureMismatch {
+                evidence_id,
+                expected_procedure_id,
+                actual_procedure_id,
+            } => write!(
+                f,
+                "evidence {evidence_id} procedure {actual_procedure_id} does not match uncertainty procedure {expected_procedure_id}"
+            ),
+            Self::MeasurementUncertaintyProcedureDigestMismatch {
+                evidence_id,
+                expected_procedure_digest,
+                actual_procedure_digest,
+            } => write!(
+                f,
+                "evidence {evidence_id} procedure digest {actual_procedure_digest} does not match uncertainty procedure digest {expected_procedure_digest}"
             ),
             Self::MissingEvidenceReference(id) => {
                 write!(f, "missing evidence reference {id}")
@@ -3712,7 +3797,8 @@ mod tests {
                 record_digest: format!("fixture-record-digest:{id}"),
                 measurement_system_id: Some("fixture-measurement-system-v1".into()),
                 calibration_chain_refs: vec!["fixture-calibration-chain-v1".into()],
-            experimental_design_id: None
+                experimental_design_id: None,
+                experimental_target_id: None,
             }),
             uncertainty: matches!(
                 kind,
@@ -3729,6 +3815,9 @@ mod tests {
                     coverage_factor: 2.0,
                 },
                 method_id: "fixture-uncertainty-method-v1".into(),
+                measurand_id: format!("fixture-measurand:{id}"),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
                 component_refs: vec!["fixture-uncertainty-component-v1".into()],
                 record_digest: format!("fixture-uncertainty-digest:{id}"),
             }),
@@ -4027,6 +4116,77 @@ mod tests {
             e.validate().unwrap_err(),
             AssessmentError::MeasurementUncertaintyUnitMismatch { .. }
         ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_must_bind_to_observation_identity() {
+        let c = candidate(
+            "uncertainty-binding",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "uncertainty-binding-evidence",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+
+        let mut changed = c.clone();
+        changed.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .measurand_id = "different-measurand".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            AssessmentError::MeasurementUncertaintyMeasurandMismatch {
+                evidence_id: "uncertainty-binding-evidence".into(),
+                evidence_measurand_id: "fixture-measurand:uncertainty-binding-evidence".into(),
+                uncertainty_measurand_id: "different-measurand".into(),
+            }
+        );
+
+        let mut changed = c.clone();
+        changed.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .procedure_id = "different-procedure".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            AssessmentError::MeasurementUncertaintyProcedureMismatch {
+                evidence_id: "uncertainty-binding-evidence".into(),
+                expected_procedure_id: "fixture-measurement-procedure-v1".into(),
+                actual_procedure_id: "different-procedure".into(),
+            }
+        );
+
+        let mut changed = c;
+        changed.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .procedure_digest = "different-procedure-digest".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            AssessmentError::MeasurementUncertaintyProcedureDigestMismatch {
+                evidence_id: "uncertainty-binding-evidence".into(),
+                expected_procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                actual_procedure_digest: "different-procedure-digest".into(),
+            }
+        );
     }
 
     #[test]
@@ -5267,6 +5427,9 @@ mod tests {
                 coverage_factor: 2.0,
             },
             method_id: "method".into(),
+            measurand_id: "measurand".into(),
+            procedure_id: "procedure".into(),
+            procedure_digest: "procedure-digest".into(),
             component_refs: vec!["component".into()],
             record_digest: "digest".into(),
         };
