@@ -515,6 +515,8 @@ pub struct NixPostStateReceiptV1 {
     pub authorized_generation: u64,
     pub observed_generation: u64,
     pub authorized_definition_digest: String,
+    /// Exact systemd FragmentPath + DropInPaths identity from the observed unit.
+    pub observed_definition_identity: NixSystemdUnitDefinitionIdentityV1,
     pub observed_definition_digest: String,
     pub operation: NixServiceOperationKindV1,
     pub systemd_job_id: Option<u32>,
@@ -655,6 +657,7 @@ impl NixPostStateReceiptV1 {
             authorized_generation: expectation.authorized_generation,
             observed_generation: observation.observed_generation,
             authorized_definition_digest: expectation.authorized_definition_digest.clone(),
+            observed_definition_identity: observation.definition_identity.clone(),
             observed_definition_digest,
             operation: expectation.operation,
             systemd_job_id,
@@ -841,7 +844,13 @@ impl NixPostStateReceiptV1 {
             "authorized definition digest",
         )?;
         validate_digest(&self.observed_definition_digest, "observed definition digest")?;
-        if self.authorized_definition_digest != self.observed_definition_digest {
+        self.observed_definition_identity.validate_shape()?;
+        let recomputed_definition_digest = self
+            .observed_definition_identity
+            .digest(&self.target_unit)?;
+        if self.observed_definition_digest != recomputed_definition_digest
+            || self.authorized_definition_digest != self.observed_definition_digest
+        {
             return Err(NixPostStateErrorV1::DefinitionMismatch);
         }
         if self.authorized_generation != self.observed_generation {
@@ -983,6 +992,8 @@ impl NixPostStateReceiptV1 {
         put_u64(&mut h, self.observed_generation);
         put_str(&mut h, &self.authorized_definition_digest);
         put_str(&mut h, &self.observed_definition_digest);
+        put_str(&mut h, &self.observed_definition_identity.fragment_path);
+        put_str_vec(&mut h, &self.observed_definition_identity.drop_in_paths);
         put_u8(&mut h, operation_tag(self.operation));
         put_opt_u32(&mut h, self.systemd_job_id);
         match self.systemd_job_type {
