@@ -252,8 +252,30 @@ struct ClientMessage {
     #[serde(default)]
     luks_passphrase: String,
     /// Additional disks for RAID/ZFS multi-disk layouts (comma-separated or JSON array)
+    /// Digest of the authoritative target identity observed during probe.
+    /// Uses the same machine-binding construction as standalone Nixward.
+    #[serde(default)]
+    target_machine_digest: String,
     #[serde(default)]
     extra_disks: Vec<String>,
+}
+
+fn machine_binding_digest_hex() -> Result<String, String> {
+    let machine_id = std::fs::read_to_string("/etc/machine-id")
+        .map_err(|error| format!("unable to read target machine identity: {error}"))?;
+    let machine_id = machine_id.trim();
+    if machine_id.is_empty() || machine_id.len() > 256 || machine_id.chars().any(char::is_control) {
+        return Err("target machine identity is missing or invalid".into());
+    }
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"nixward-machine-binding-v1\0");
+    hasher.update(machine_id.as_bytes());
+    Ok(hasher
+        .finalize()
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
 }
 
 fn extract_explicit_nix_system(flake: &str) -> Option<&str> {
@@ -2714,6 +2736,35 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     }
                 }
 
+                // Bind the request to the authoritative target identity observed by the
+                // browser. The raw machine-id never crosses the relay boundary.
+                let target_machine_digest = match machine_binding_digest_hex() {
+                    Ok(digest) => digest,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to establish target machine identity: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                if client_msg.target_machine_digest != target_machine_digest {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(
+                                "Target identity changed or was not established by the hardware probe; re-probe before installing.",
+                            )
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
                 // Generate session-isolated log path (CRITICAL-4: prevents cross-session log tampering)
                 let session_id = match new_session_id() {
                     Ok(id) => id,
@@ -3702,12 +3753,67 @@ echo '}'
                 match run_cmd(probe_script).await {
                     Ok(result) if result.exit_status == 0 => {
                         eprintln!("[{}] Hardware probe complete", peer_addr);
-                        // Strip ANSI escape codes and control chars that corrupt JSON
+                        // Strip ANSI escape codes and control chars that corrupt JSON,
+                        // then inject the non-secret target identity digest using the exact
+                        // machine-binding domain shared with standalone Nixward.
                         let clean: String = result
                             .stdout
                             .chars()
                             .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
                             .collect();
+                        let clean = match serde_json::from_str::<serde_json::Value>(&clean) {
+                            Ok(mut value) => {
+                                if let Some(object) = value.as_object_mut() {
+                                    match machine_binding_digest_hex() {
+                                        Ok(digest) => {
+                                            object.insert(
+                                                "target_machine_digest".to_string(),
+                                                serde_json::Value::String(digest),
+                                            );
+                                        }
+                                        Err(error) => {
+                                            let _ = ws_tx
+                                                .send(Message::Text(
+                                                    RelayMessage::error(&format!(
+                                                        "Unable to establish target machine identity: {}",
+                                                        error
+                                                    ))
+                                                    .to_json(),
+                                                ))
+                                                .await;
+                                            continue;
+                                        }
+                                    }
+                                }
+                                match serde_json::to_string(&value) {
+                                    Ok(value) => value,
+                                    Err(error) => {
+                                        let _ = ws_tx
+                                            .send(Message::Text(
+                                                RelayMessage::error(&format!(
+                                                    "Unable to serialize hardware evidence: {}",
+                                                    error
+                                                ))
+                                                .to_json(),
+                                            ))
+                                            .await;
+                                        continue;
+                                    }
+                                }
+                            }
+                            Err(error) => {
+                                let _ = ws_tx
+                                    .send(Message::Text(
+                                        RelayMessage::error(&format!(
+                                            "Hardware probe produced invalid JSON: {}",
+                                            error
+                                        ))
+                                        .to_json(),
+                                    ))
+                                    .await;
+                                continue;
+                            }
+                        };
                         let _ = ws_tx
                             .send(Message::Text(
                                 serde_json::json!({
