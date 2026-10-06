@@ -331,6 +331,46 @@ impl PredictionEvidenceRecord {
             mean_squared_error: self.mean_squared_error,
         }
     }
+
+    /// Recompute the stored loss metrics from the retained held-out trace.
+    pub fn validate_trace(&self) -> Result<(), RelationalPredictionError> {
+        if self.predictions.len() != self.test_samples
+            || self.observed_outcomes.len() != self.test_samples
+            || self.feature_times.len() != self.test_samples
+            || self.outcome_times.len() != self.test_samples
+            || self.predictions.len() != self.observed_outcomes.len()
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        let mut absolute_error = 0.0;
+        let mut squared_error = 0.0;
+        for (prediction, outcome) in self.predictions.iter().zip(&self.observed_outcomes) {
+            let error = *prediction - *outcome;
+            absolute_error += error.abs();
+            squared_error += error * error;
+            if !absolute_error.is_finite() || !squared_error.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+        }
+
+        let n = self.test_samples as f64;
+        if n <= 0.0 {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        let mean_absolute_error = absolute_error / n;
+        let mean_squared_error = squared_error / n;
+        let tolerance = 1e-12;
+
+        if (mean_absolute_error - self.mean_absolute_error).abs() > tolerance
+            || (mean_squared_error - self.mean_squared_error).abs() > tolerance
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        Ok(())
+    }
 }
 
 /// One complete held-out evidence packet.
@@ -1643,7 +1683,32 @@ mod tests {
             assert_eq!(record.feature_times.len(), record.test_samples);
             assert_eq!(record.outcome_times.len(), record.test_samples);
             assert_eq!(record.score(), evidence.summary.score(record.feature_set));
+            record.validate_trace().unwrap();
         }
+    }
+
+    #[test]
+    fn evidence_trace_rejects_tampered_loss() {
+        let samples = build_samples(0.5);
+        let provenance = RelationalPredictionProvenance::new(
+            "RH-006-v1",
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "0123456789abcdef0123456789abcdef01234567",
+        )
+        .unwrap();
+
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            provenance,
+        )
+        .unwrap();
+        evidence.records[0].mean_squared_error += 0.1;
+
+        assert_eq!(
+            evidence.records[0].validate_trace(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
     }
 
     #[test]
