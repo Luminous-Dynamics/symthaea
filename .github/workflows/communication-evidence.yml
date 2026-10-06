@@ -141,6 +141,7 @@ jobs:
           assert report["policy_freshness_expired_before_resolution_expiry"] is True
           assert report["mutated_consent_lease_blocked"] is True
           assert report["authority_proof_substitution_blocked"] is True
+          assert report["authority_status_source_mismatch_blocked"] is True
 
           codec_report = json.loads(Path("target/communication-evidence/neurosemantic_hdc_codec_n0.json").read_text())
           assert codec_report["binary_frame_roundtrip_exact"] is True
