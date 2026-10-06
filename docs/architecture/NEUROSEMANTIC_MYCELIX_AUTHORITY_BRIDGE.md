@@ -57,7 +57,7 @@ A successful cryptographic signature check is evidence of signer control of a ke
 
 ## Concrete signed resolution contract
 
-The communication crate now materializes the recommended resolution as `NeurosemanticAuthorityResolutionAttestation`. The handling-policy schema is version 7: v5 introduced policy provenance, v6 introduced policy-specific authority-resolution freshness, and v7 introduced derivation/data-lineage binding. The resolution schema is version 2 because its status evidence is now content-addressed rather than represented only by an opaque source reference.
+The communication crate now materializes the recommended resolution as `NeurosemanticAuthorityResolutionAttestation`. The handling-policy schema is version 8: v5 introduced policy provenance, v6 introduced policy-specific authority-resolution freshness, v7 introduced derivation/data-lineage identity, and v8 binds the lineage output artifact to the packet payload identity. The resolution schema is version 2 because its status evidence is now content-addressed rather than represented only by an opaque source reference.
 
 The resolution is signed by the configured external resolver and binds, in one immutable snapshot:
 
@@ -83,6 +83,22 @@ The resolver signature authenticates the exact snapshot to the configured resolv
 A resolution cannot outlive the authority attestation that it resolves. The capability-minting boundary also requires the exact status-source record bytes to match the signed status-source digest; a mutable URI, database key, or status-list location alone is not treated as stable evidence. This prevents a freshness snapshot from extending an older issuer proof beyond its cryptographic validity window. The status-check timestamp must also not predate the attestation issuance time; a resolver cannot use a later-discovered authority proof to retroactively justify an earlier resolution.
 
 The resulting capability retains the exact resolution fingerprint, status-source reference/digest, and its context. Because the resolution also commits to the complete consent-lease fingerprint, changing scopes, sensitivity ceilings, data/inference permissions, validity, revocation state, or other lease fields invalidates an older capability even when an implementation accidentally reuses the same lease ID and epoch. Subsequent handling therefore fails closed when the resolution is expired, non-active, or bound to a different subject, peer, lease, consent state, purpose, channel, or direction.
+
+## Structured derivation lineage contract
+
+The external lineage record should be machine-readable and independently verifiable. Symthaea's compact `NeurosemanticDerivationLineageRecord` models a minimum useful subset of provenance concepts:
+
+- bounded input artifact references;
+- transformation/activity reference and revision;
+- exact output artifact BLAKE3 hash;
+- exact execution Git revision;
+- generation timestamp.
+
+The policy binds the exact serialized lineage record and its output-artifact hash. Packet construction then requires that declared output hash to equal the actual packet payload hash. This prevents a valid lineage record for one cognitive artifact from being attached to another merely by reusing its policy/provenance identity.
+
+This is intentionally compatible in concept with W3C PROV's entity/activity/agent model without importing a large ontology into the transport crate. W3C PROV describes provenance in terms of entities, activities, agents, and derivations between entities. (W3C PROV Model Primer, https://www.w3.org/TR/prov-primer/.)
+
+2026 iBCI governance work identifies traceable data lineage as an emerging safeguard because successive processing stages can create derivative artifacts under different custodians, complicating access, deletion, and transfer. (Sandbrink & Young, *Communications Medicine* 6, 413, 2026, doi:10.1038/s43856-026-01797-y.)
 
 ## Recommended resolution object
 
