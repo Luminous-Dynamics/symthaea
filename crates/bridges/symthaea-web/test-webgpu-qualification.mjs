@@ -1493,6 +1493,16 @@ async function runMode(mode) {
           'capability',
         );
       }
+      if (hardwareMode) {
+        for (const [canvas, configuration] of Object.entries(diagnostics.surface_configuration)) {
+          if (configuration.adapter_device_type === 'Cpu') {
+            throw new QualificationError(
+              `WebGPU hardware qualification renderer selected a software adapter for ${canvas}: ${JSON.stringify(configuration)}`,
+              'capability',
+            );
+          }
+        }
+      }
       if (!diagnostics.raw_webgpu_execution_canary?.executed_red) {
         throw new QualificationError(
           `Raw WebGPU execution canary failed: ${JSON.stringify(diagnostics.raw_webgpu_execution_canary)}`,
@@ -1603,6 +1613,12 @@ async function runMode(mode) {
             .filter(Boolean);
           const alphaMode = canvas?.getAttribute('data-qualification-alpha-mode') || null;
           const presentMode = canvas?.getAttribute('data-qualification-present-mode') || null;
+          const adapterName = canvas?.getAttribute('data-qualification-adapter-name') || null;
+          const adapterDeviceType =
+            canvas?.getAttribute('data-qualification-adapter-device-type') || null;
+          const adapterBackend = canvas?.getAttribute('data-qualification-adapter-backend') || null;
+          const adapterVendor = canvas?.getAttribute('data-qualification-adapter-vendor') || null;
+          const adapterDevice = canvas?.getAttribute('data-qualification-adapter-device') || null;
           const context = canvas instanceof HTMLCanvasElement
             ? canvas.getContext('webgpu')
             : null;
@@ -1619,6 +1635,11 @@ async function runMode(mode) {
             selected_format_preferred: !!format && formats[0] === format,
             selected_alpha_advertised: !!alphaMode,
             selected_present_mode_advertised: !!presentMode,
+            adapter_name: adapterName,
+            adapter_device_type: adapterDeviceType,
+            adapter_backend: adapterBackend,
+            adapter_vendor: adapterVendor,
+            adapter_device: adapterDevice,
             browser_configuration: browserConfiguration ? {
               format: browserConfiguration.format || null,
               usage: browserConfiguration.usage || null,
@@ -1648,7 +1669,9 @@ async function runMode(mode) {
           || !configuration.selected_present_mode_advertised
           || configuration.format !== expectedRendererFormat
           || configuration.browser_configuration?.format !== diagnostics.browser_preferred_canvas_format
-          || configuration.browser_configuration?.alpha_mode !== 'opaque') {
+          || configuration.browser_configuration?.alpha_mode !== 'opaque'
+          || !configuration.adapter_name
+          || !configuration.adapter_device_type) {
           throw new QualificationError(
             `WebGPU ${canvas} surface configuration is inconsistent with the browser-preferred format/capabilities: ${JSON.stringify({
               configuration,
@@ -2034,7 +2057,7 @@ try {
   }
 
   const artifact = {
-    schema: 'symthaea-ui-webgpu-qualification-v10',
+    schema: 'symthaea-ui-webgpu-qualification-v11',
     harness_self_tests_passed: true,
     url: URL,
     chromium: CHROMIUM,
