@@ -31,6 +31,8 @@ pub enum NixSystemdMutationTransportErrorV1 {
     InvalidServiceOperation(String),
     #[error("unsupported lifecycle operation for native D-Bus dispatch: {0}")]
     UnsupportedOperation(&'static str),
+    #[error("invalid systemd manager unique D-Bus owner")]
+    InvalidManagerOwner,
     #[error("systemd returned an invalid Job object path")]
     InvalidJobObjectPath,
 }
@@ -156,6 +158,14 @@ fn method_and_job_type(
     Ok(value)
 }
 
+fn validate_manager_owner(
+    owner: &str,
+) -> Result<(), NixSystemdMutationTransportErrorV1> {
+    zbus::names::UniqueName::try_from(owner).map(|_| ()).map_err(|_| {
+        NixSystemdMutationTransportErrorV1::InvalidManagerOwner
+    })
+}
+
 fn validate_job_object_path(
     path: &OwnedObjectPath,
 ) -> Result<(), NixSystemdMutationTransportErrorV1> {
@@ -184,6 +194,20 @@ mod tests {
     fn lifecycle_job_types_are_exact() {
         assert_eq!(NixSystemdLifecycleMutationTransportV1::job_type_name(NixServiceOperationKindV1::Restart).unwrap(), "restart");
         assert_eq!(NixSystemdLifecycleMutationTransportV1::job_type_name(NixServiceOperationKindV1::Reload).unwrap(), "reload");
+    }
+
+    #[test]
+    fn manager_owner_must_be_a_unique_dbus_name() {
+        assert!(validate_manager_owner(":1.42").is_ok());
+        assert!(validate_manager_owner("org.freedesktop.systemd1").is_err());
+        assert!(validate_manager_owner(":").is_err());
+        assert!(validate_manager_owner("").is_err());
+    }
+
+    #[test]
+    fn bound_dispatch_api_requires_an_explicit_manager_owner() {
+        let _method = NixSystemdLifecycleMutationTransportV1::dispatch_lifecycle_for_manager_owner;
+        assert!(validate_manager_owner(":1.42").is_ok());
     }
 
     #[test]
