@@ -1100,7 +1100,9 @@ fn extract_relationship_methods(
             ));
         }
 
-        if method == request.verification_method {
+        if url_values_equivalent(method.as_str(), request.verification_method.as_str())
+            .unwrap_or(false)
+        {
             if let Some(controller) = relationship_controller {
                 let controller = resolve_document_url(
                     &base,
