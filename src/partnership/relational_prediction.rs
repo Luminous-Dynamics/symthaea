@@ -1330,16 +1330,24 @@ pub enum PredictionNullFamily {
 /// The exceedance fraction is the fraction of surrogates whose relational model
 /// MSE is no worse than the observed relational model MSE. It is deliberately
 /// not named or exposed as a formal p-value.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PredictionNullSummary {
     pub family: PredictionNullFamily,
     pub feature_set: PredictionFeatureSet,
     pub requested_surrogate_count: usize,
     pub surrogate_count: usize,
     pub observed_relational_mse: f64,
+    /// Exact deterministic circular offsets realized for each surrogate.
+    pub surrogate_shifts: Vec<usize>,
+    /// Held-out MSE for each retained surrogate, in the same order as
+    /// surrogate_shifts.
+    pub surrogate_mse: Vec<f64>,
     pub minimum_surrogate_mse: f64,
     pub exceedance_count: usize,
     pub exceedance_fraction: f64,
+    /// Commitment over the exact samples, holdout configuration, null family,
+    /// feature family, and requested surrogate count.
+    pub evaluation_input_blake3: String,
     pub status: EvidenceStatus,
 }
 
@@ -1375,6 +1383,8 @@ impl PredictionNullSummary {
         }
 
         let observed = fit_and_score(samples, &config, feature_set)?;
+        let evaluation_input_blake3 =
+            prediction_null_input_digest(samples, config, family, feature_set, surrogate_count);
 
         let capacity = config
             .train_samples
@@ -1387,7 +1397,8 @@ impl PredictionNullSummary {
         }
         let count = surrogate_count.min(capacity);
 
-        let mut minimum_surrogate_mse = f64::INFINITY;
+        let mut surrogate_shifts = Vec::with_capacity(count);
+        let mut surrogate_mse = Vec::with_capacity(count);
         let mut exceedance_count = 0usize;
 
         for index in 0..count {
@@ -1399,10 +1410,19 @@ impl PredictionNullSummary {
             let surrogate = make_surrogate(samples, &config, family, shift)?;
             let score = fit_and_score(&surrogate, &config, feature_set)?;
 
-            minimum_surrogate_mse = minimum_surrogate_mse.min(score.mean_squared_error);
+            surrogate_shifts.push(shift);
+            surrogate_mse.push(score.mean_squared_error);
             if score.mean_squared_error <= observed.mean_squared_error + 1e-12 {
                 exceedance_count += 1;
             }
+        }
+
+        let minimum_surrogate_mse = surrogate_mse
+            .iter()
+            .copied()
+            .fold(f64::INFINITY, f64::min);
+        if !minimum_surrogate_mse.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
         }
 
         Ok(Self {
@@ -1411,11 +1431,98 @@ impl PredictionNullSummary {
             requested_surrogate_count: surrogate_count,
             surrogate_count: count,
             observed_relational_mse: observed.mean_squared_error,
+            surrogate_shifts,
+            surrogate_mse,
             minimum_surrogate_mse,
             exceedance_count,
             exceedance_fraction: exceedance_count as f64 / count as f64,
+            evaluation_input_blake3,
             status: EvidenceStatus::Proxy,
         })
+    }
+
+    /// Reject malformed or tampered surrogate traces before interpretation.
+    pub fn validate_trace(&self) -> Result<(), RelationalPredictionError> {
+        if !is_hex_digest(&self.evaluation_input_blake3, 64)
+            || self.requested_surrogate_count == 0
+            || self.surrogate_count == 0
+            || self.surrogate_count > self.requested_surrogate_count
+            || self.surrogate_shifts.len() != self.surrogate_count
+            || self.surrogate_mse.len() != self.surrogate_count
+            || !self.observed_relational_mse.is_finite()
+            || !self.minimum_surrogate_mse.is_finite()
+            || !self.exceedance_fraction.is_finite()
+        {
+            return Err(RelationalPredictionError::InvalidSurrogateCount);
+        }
+
+        let mut shifts = self.surrogate_shifts.clone();
+        if shifts.iter().any(|shift| *shift == 0) {
+            return Err(RelationalPredictionError::InvalidSurrogateCount);
+        }
+        shifts.sort_unstable();
+        if shifts.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(RelationalPredictionError::InvalidSurrogateCount);
+        }
+
+        if self.surrogate_mse.iter().any(|mse| !mse.is_finite()) {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let minimum = self
+            .surrogate_mse
+            .iter()
+            .copied()
+            .fold(f64::INFINITY, f64::min);
+        if (minimum - self.minimum_surrogate_mse).abs() > 1e-12 {
+            return Err(RelationalPredictionError::InvalidSurrogateCount);
+        }
+
+        let exceedance_count = self
+            .surrogate_mse
+            .iter()
+            .filter(|mse| **mse <= self.observed_relational_mse + 1e-12)
+            .count();
+        if exceedance_count != self.exceedance_count {
+            return Err(RelationalPredictionError::InvalidSurrogateCount);
+        }
+
+        let exceedance_fraction = exceedance_count as f64 / self.surrogate_count as f64;
+        if (exceedance_fraction - self.exceedance_fraction).abs() > 1e-12 {
+            return Err(RelationalPredictionError::InvalidSurrogateCount);
+        }
+
+        Ok(())
+    }
+
+    pub fn verify_against_samples(
+        &self,
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+    ) -> Result<(), RelationalPredictionError> {
+        self.validate_trace()?;
+        let expected = prediction_null_input_digest(
+            samples,
+            config,
+            self.family,
+            self.feature_set,
+            self.requested_surrogate_count,
+        );
+        if expected != self.evaluation_input_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        let recomputed = Self::compute_for_feature_set(
+            samples,
+            config,
+            self.family,
+            self.feature_set,
+            self.requested_surrogate_count,
+        )?;
+        if recomputed != *self {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
     }
 }
 
@@ -1721,6 +1828,34 @@ fn score_persistence_baseline(
 
 // Deterministic commitment over evaluator inputs: raw IEEE-754 bit patterns
 // and explicit field order avoid serialization-format drift.
+fn prediction_null_input_digest(
+    samples: &[RelationalPredictionSample],
+    config: HeldOutRelationalPredictionConfig,
+    family: PredictionNullFamily,
+    feature_set: PredictionFeatureSet,
+    requested_surrogate_count: usize,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-null-input/v1");
+    update_samples_digest(&mut hasher, samples);
+    update_usize(&mut hasher, config.train_samples);
+    update_usize(&mut hasher, config.test_samples);
+    update_usize(&mut hasher, config.gap_samples);
+    update_f64(&mut hasher, config.ridge_lambda);
+    hasher.update(null_family_name(family).as_bytes());
+    hasher.update(feature_set_name(feature_set).as_bytes());
+    update_usize(&mut hasher, requested_surrogate_count);
+    hasher.finalize().to_hex().to_string()
+}
+
+fn null_family_name(family: PredictionNullFamily) -> &'static str {
+    match family {
+        PredictionNullFamily::CircularShift => "CircularShift",
+        PredictionNullFamily::FeatureDecoupling => "FeatureDecoupling",
+        PredictionNullFamily::IncrementalRelationalShift => "IncrementalRelationalShift",
+    }
+}
+
 fn evaluation_input_digest(
     samples: &[RelationalPredictionSample],
     config: HeldOutRelationalPredictionConfig,
@@ -2611,6 +2746,37 @@ mod tests {
         );
         assert!(
             (0.0..=1.0).contains(&first.feature_decoupling_null.exceedance_fraction)
+        );
+        first.circular_shift_null.validate_trace().unwrap();
+        first.feature_decoupling_null.validate_trace().unwrap();
+    }
+
+    #[test]
+    fn null_evidence_replay_binds_exact_surrogate_trace() {
+        let samples = build_samples(0.5);
+        let summary = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config(),
+            PredictionNullFamily::IncrementalRelationalShift,
+            PredictionFeatureSet::RelationalAugmented,
+            12,
+        )
+        .unwrap();
+
+        assert_eq!(summary.verify_against_samples(&samples, config()), Ok(()));
+
+        let mut altered_samples = samples.clone();
+        altered_samples[10].turn_taking += 0.01;
+        assert_eq!(
+            summary.verify_against_samples(&altered_samples, config()),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut tampered = summary.clone();
+        tampered.surrogate_mse[0] += 0.01;
+        assert_eq!(
+            tampered.validate_trace(),
+            Err(RelationalPredictionError::InvalidSurrogateCount)
         );
     }
 
