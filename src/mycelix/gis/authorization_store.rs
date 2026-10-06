@@ -5081,10 +5081,6 @@ fn validate_native_authority_pin_set(
             drop(stmt);
         }
 
-        if recovery.is_some() && recovered.len() != 1 {
-            return Err(AuthorizationConsumptionError::InvalidBinding.into());
-        }
-
         for (instance, action_id, attempt_id, action_digest, authority_epoch, lease_boundary, lease_state) in &recovered {
             if let Some(recovery) = recovery {
                 if recovery.authorization_instance != *instance
@@ -13594,8 +13590,8 @@ mod tests {
             (&witness_b.authorization_instance,&action_b,&digest_b,&witness_b.support_digest,&witness_b),
         ] {
             store.register_lease(&AuthorizationLease::new_with_instance(
-                instance.clone(),action.id.clone(),digest.clone(),
-                support.clone(),witness.policy.clone(),1,1
+                (*instance).clone(),action.id.clone(),digest.clone(),
+                (*support).clone(),witness.policy.clone(),1,1
             )).unwrap();
             store.prepare_for_execution_bound_with_operation(
                 witness,
@@ -13643,6 +13639,12 @@ mod tests {
                 .recover_incomplete_attempt_for_boundary_authorized(&recovery_a)
                 .unwrap(),
             1
+        );
+        assert_eq!(
+            store
+                .recover_incomplete_attempt_for_boundary_authorized(&recovery_a)
+                .unwrap(),
+            0
         );
 
         let states:(String,String)=store.connection().unwrap().query_row(
