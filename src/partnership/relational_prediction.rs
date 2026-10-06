@@ -1678,6 +1678,23 @@ impl HeldOutRelationalPredictionQualification {
         Ok(())
     }
 
+    pub fn verify_against_samples(
+        &self,
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+        surrogate_count: usize,
+    ) -> Result<(), RelationalPredictionError> {
+        self.validate()?;
+        if config != self.config {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        let recomputed = Self::compute(samples, config, surrogate_count)?;
+        if recomputed != *self {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
+    }
+
     pub fn compute(
         samples: &[RelationalPredictionSample],
         config: HeldOutRelationalPredictionConfig,
@@ -2939,6 +2956,32 @@ mod tests {
             HeldOutRelationalPredictionSummary::compute(&build_samples(5.0), config());
 
         assert_eq!(result, Err(RelationalPredictionError::TemporalLeakage));
+    }
+
+    #[test]
+    fn qualification_replay_binds_whole_bundle_to_exact_input() {
+        let samples = build_samples(0.5);
+        let qualification =
+            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
+
+        assert_eq!(
+            qualification.verify_against_samples(&samples, config(), 12),
+            Ok(())
+        );
+
+        let mut altered_samples = samples.clone();
+        altered_samples[15].future_outcome += 0.01;
+        assert_eq!(
+            qualification.verify_against_samples(&altered_samples, config(), 12),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut altered_config = config();
+        altered_config.gap_samples += 1;
+        assert_eq!(
+            qualification.verify_against_samples(&samples, altered_config, 12),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
     }
 
     #[test]
