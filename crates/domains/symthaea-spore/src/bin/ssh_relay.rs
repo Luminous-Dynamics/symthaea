@@ -4306,12 +4306,64 @@ echo '}'
 
             // ── Data preservation before wipe ──
             "preserve_data" => {
-                eprintln!("[{}] Preserving data before wipe...", peer_addr);
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let transaction = match SystemTransaction::begin(
+                    MutationKind::PreserveData,
+                    None,
+                    b"preserve-data-before-wipe",
+                ) {
+                    Ok(tx) => tx,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to establish secure system transaction: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                eprintln!(
+                    "[{}] {} Preserving data before wipe...",
+                    peer_addr,
+                    transaction.log_line()
+                );
 
-                let preserve_script = r#"
+                let backup_dir = format!("/tmp/symthaea-preserve-{}", transaction.transaction_id);
+                let preserve_script = format!(
+                    r#"
 set -eo pipefail
-BACKUP_DIR="/tmp/symthaea-preserve-$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$BACKUP_DIR"
+umask 077
+BACKUP_DIR="{backup_dir}"
+mkdir -m 700 -p "$BACKUP_DIR""#,
+                    backup_dir = backup_dir
+                );
 echo '{"backup_dir":"'"$BACKUP_DIR"'","items":['
 FIRST=true
 
@@ -4398,16 +4450,24 @@ printf '{"type":"home_dirs","name":"/home (%s)","size":"%s","path":"not backed u
 # Summary
 TOTAL_SIZE=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1)
 echo '],"total_size":"'"$TOTAL_SIZE"'"}'
-"#;
-
-                match run_cmd(preserve_script).await {
+"#,
+                );
+                
+                match run_cmd(&preserve_script).await {
                     Ok(result) => {
                         eprintln!("[{}] Data preservation complete", peer_addr);
                         let _ = ws_tx
                             .send(Message::Text(
                                 serde_json::json!({
                                     "type": "data_preserved",
-                                    "data": result.stdout
+                                    "data": result.stdout,
+                                    "transaction": transaction.receipt(
+                                        if result.exit_status == 0 {
+                                            TransactionOutcome::ObservedSuccess
+                                        } else {
+                                            TransactionOutcome::Failed
+                                        }
+                                    )
                                 })
                                 .to_string(),
                             ))
@@ -4416,7 +4476,13 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                     Err(e) => {
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!("Data preservation failed: {}", e))
+                                serde_json::json!({
+                                    "type": "error",
+                                    "message": format!("Data preservation failed: {}", e),
+                                    "transaction": transaction.receipt(
+                                        TransactionOutcome::Indeterminate
+                                    )
+                                })
                                     .to_json(),
                             ))
                             .await;
