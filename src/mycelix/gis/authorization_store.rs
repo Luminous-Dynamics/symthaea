@@ -1625,7 +1625,6 @@ impl SqliteAuthorizationStore {
         backfill_attempt_scope_digests(&mut connection)?;
         validate_attempt_boundary_consistency(&connection)?;
         validate_attempt_operation_consistency(&connection)?;
-        backfill_native_replay_history(&mut connection)?;
         connection.execute_batch(
             "CREATE UNIQUE INDEX IF NOT EXISTS authorization_lease_attempt_id_uq
                ON authorization_leases(attempt_id)
@@ -1759,6 +1758,10 @@ impl SqliteAuthorizationStore {
             }
         }
         tx.commit()?;
+        // Backfill only after legacy relying-party fields have been normalized.
+        // The replay ledger is then a stable historical authority even when
+        // those source rows are later compacted.
+        backfill_native_replay_history(&mut connection)?;
         Ok(store)
     }
 
