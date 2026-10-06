@@ -682,7 +682,8 @@ fn write_nix_settings(out: &mut String) {
         "    experimental-features = [ \"nix-command\" \"flakes\" ];"
     )
     .unwrap();
-    // Least privilege: wheel members can use sudo when they need elevated Nix access;\n    // do not grant the Nix daemon blanket trusted-user authority to every wheel member.\n    writeln!(out, "    trusted-users = [ \"root\" ];").unwrap();
+    // Least privilege: wheel members can use sudo when they need elevated Nix access;
+    // do not grant the Nix daemon blanket trusted-user authority to every wheel member.\n    writeln!(out, "    trusted-users = [ \"root\" ];").unwrap();
     writeln!(out, "  }};\n").unwrap();
 }
 
