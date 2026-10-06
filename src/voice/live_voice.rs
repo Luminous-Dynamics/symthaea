@@ -225,10 +225,13 @@ impl VerifiedLexicalPhonologicalRealizationReceipt {
         if self
             .pronunciation_lexicon_sources
             .iter()
-            .any(|source| source.trim().is_empty())
+            .any(|source| !matches!(
+                source.as_str(),
+                "symthaea-hand-lexicon-v1" | "cmudict-embedded-v1"
+            ))
         {
             anyhow::bail!(
-                "verified realization receipt contains an empty pronunciation-lexicon source"
+                "verified realization receipt contains an unsupported pronunciation-lexicon source"
             );
         }
         if self.lexical_binding_provenance != binding.provenance_token() {
@@ -2020,6 +2023,15 @@ mod tests {
                 .verify_against_plan(&plan, &frame, &binding, &witness)
                 .is_err(),
             "changing only the receipt witness digest must fail verification"
+        );
+
+        let mut unsupported_source_receipt = receipt.clone();
+        unsupported_source_receipt.pronunciation_lexicon_sources = vec!["invented-v1".into()];
+        assert!(
+            unsupported_source_receipt
+                .verify_against_plan(&plan, &frame, &binding, &witness)
+                .is_err(),
+            "unsupported lexicon source identifiers must fail verification"
         );
     }
 
