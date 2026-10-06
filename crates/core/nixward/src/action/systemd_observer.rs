@@ -162,6 +162,7 @@ impl NixSystemdJobRemovedWatcherV1 {
                         unit: removed.unit,
                         object_path: removed.object_path.as_str().to_string(),
                         result: removed.result,
+                        manager_owner: self.manager_owner.clone(),
                     });
                 }
             }
