@@ -127,7 +127,7 @@ pub const MORPHOPHONOLOGICAL_RESOURCE_EVIDENCE_VERSION: &str =
     "broca-morphophonological-resource-evidence-v2";
 
 pub const MORPHOPHONOLOGICAL_COMPILATION_WITNESS_VERSION: &str =
-    "broca-morphophonological-compilation-witness-v2";
+    "broca-morphophonological-compilation-witness-v3";
 
 /// Whether an executable morphology resource is externally sourced or explicitly
 /// authored as a local/fixture resource.
@@ -3274,6 +3274,7 @@ mod tests {
             compiler_version: "wrong-version".into(),
             compiler_implementation_revision: None,
             source_parser_revision: None,
+            compiler_build_context_revision: None,
             normalization_policy: "fixture-normalization-v1".into(),
             source_artifact_blake3: blake3::hash(artifact).to_hex().to_string(),
             source_selection_blake3: String::new(),
