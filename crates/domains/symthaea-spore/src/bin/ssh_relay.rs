@@ -3133,13 +3133,11 @@ fn install_process_command_matches(transaction_id: &str, cmdline: &[u8]) -> bool
     {
         return false;
     }
-    let expected_script = format!(
-        "{}/install.sh",
-        transaction_artifact_dir_path(transaction_id)
-            .ok()
-            .and_then(|path| path.into_os_string().into_string().ok())
-            .unwrap_or_default()
-    );
+    let expected_script = match transaction_artifact_dir_path(transaction_id) {
+        Ok(path) => path.join("install.sh"),
+        Err(_) => return false,
+    };
+    let expected_script = expected_script.to_string_lossy();
     cmdline
         .split(|byte| *byte == 0)
         .any(|arg| arg == expected_script.as_bytes())
@@ -3928,7 +3926,7 @@ echo "  User password set."
                 // contain no user-controlled data.
                 let mut staged_secret_paths = Vec::<String>::new();
                 if !client_msg.user_password.is_empty() {
-                    staged_secret_paths.push(pw_file.clone());
+                    staged_secret_paths.push(format!("{transaction_dir}/user-password"));
                 }
 
                 if requires_luks {
@@ -3946,7 +3944,7 @@ echo "  User password set."
                                     RelayMessage::error(&format!("Failed to stage LUKS2 passphrase: {}", error)).to_json(),
                                 ))
                                 .await;
-                            let _ = tokio::fs::remove_file(&pw_file).await;
+                            let _ = tokio::fs::remove_file(format!("{transaction_dir}/user-password")).await;
                             continue;
                         }
                     };
@@ -8507,6 +8505,29 @@ mod tests {
         let second = new_session_id().expect("OS CSPRNG should be available");
         assert_ne!(first, second);
     }
+
+    fn transaction_artifact_namespace_is_private_and_collision_fail_closed() {
+        let transaction_id = "0123456789abcdef0123456789abcdef";
+        assert!(transaction_artifact_dir_path(transaction_id).is_ok());
+        assert!(transaction_artifact_dir_path("too-short").is_err());
+        assert!(transaction_artifact_dir_path("0123456789abcdef0123456789abcdeg").is_err());
+
+        let path = create_transaction_artifact_dir(transaction_id)
+            .expect("fresh transaction artifact namespace should be creatable");
+        let metadata = std::fs::metadata(&path).expect("artifact directory should exist");
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        assert!(metadata.is_dir());
+        assert_eq!(metadata.permissions().mode() & 0o777, 0o700);
+        assert_eq!(metadata.uid(), unsafe { libc::geteuid() });
+
+        let error = create_transaction_artifact_dir(transaction_id)
+            .expect_err("reusing a transaction artifact namespace must fail closed");
+        assert!(error.contains("already exists"));
+
+        remove_transaction_artifact_dir(&path);
+        assert!(!std::path::Path::new(&path).exists());
+    }
+
 
     #[test]
     fn cleanup_trap_contains_no_nested_shell_quotes() {
