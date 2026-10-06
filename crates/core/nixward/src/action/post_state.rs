@@ -629,6 +629,10 @@ impl NixPostStateReceiptV1 {
         if expectation.authorized_definition_digest != observed_definition_digest {
             return Err(NixPostStateErrorV1::DefinitionMismatch);
         }
+        let observed_definition_content_digest = observation.definition_content_digest.clone();
+        if expectation.authorized_definition_content_digest != observed_definition_content_digest {
+            return Err(NixPostStateErrorV1::DefinitionContentMismatch);
+        }
         let manager_owner = observation
             .systemd_manager_owner
             .clone()
@@ -690,8 +694,10 @@ impl NixPostStateReceiptV1 {
             authorized_generation: expectation.authorized_generation,
             observed_generation: observation.observed_generation,
             authorized_definition_digest: expectation.authorized_definition_digest.clone(),
+            authorized_definition_content_digest: expectation.authorized_definition_content_digest.clone(),
             observed_definition_identity: observation.definition_identity.clone(),
             observed_definition_digest,
+            observed_definition_content_digest,
             operation: expectation.operation,
             systemd_job_id,
             systemd_job_type,
@@ -766,6 +772,7 @@ impl NixPostStateReceiptV1 {
             unit: self.target_unit.clone(),
             authorized_generation: self.authorized_generation,
             authorized_definition_digest: self.authorized_definition_digest.clone(),
+            authorized_definition_content_digest: self.authorized_definition_content_digest.clone(),
             pre_invocation_id: self.pre_invocation_id.clone(),
             required_stability_us: self.required_stability_us,
         };
@@ -1121,6 +1128,11 @@ fn validate_expectation_against_intent(
     }
     if context.authorized_definition_digest != expectation.authorized_definition_digest {
         return Err(NixPostStateErrorV1::DefinitionMismatch);
+    }
+    if context.authorized_definition_content_digest
+        != expectation.authorized_definition_content_digest
+    {
+        return Err(NixPostStateErrorV1::DefinitionContentMismatch);
     }
     if context.pre_invocation_id != expectation.pre_invocation_id {
         return Err(NixPostStateErrorV1::InvocationMismatch);
