@@ -84,6 +84,7 @@ pub enum RelationalHarmonicError {
     OutOfRange(&'static str, f64),
     InsufficientSamples(usize),
     NonMonotonicTime,
+    NonUniformSampling,
 }
 
 impl std::fmt::Display for RelationalHarmonicError {
@@ -99,6 +100,9 @@ impl std::fmt::Display for RelationalHarmonicError {
             }
             Self::NonMonotonicTime => {
                 write!(f, "relational sample times must increase strictly")
+            }
+            Self::NonUniformSampling => {
+                write!(f, "temporal information-flow estimation requires uniform sampling")
             }
         }
     }
@@ -388,6 +392,15 @@ impl DirectionalInformationFlow {
             }
         }
 
+        let dt0 = samples[1].time - samples[0].time;
+        let tolerance = 1e-6 * dt0.abs().max(1.0);
+        if !samples
+            .windows(2)
+            .all(|w| ((w[1].time - w[0].time) - dt0).abs() <= tolerance)
+        {
+            return Err(RelationalHarmonicError::NonUniformSampling);
+        }
+
         let config = crate::hdc::information_theory::InformationTheoryConfig::default();
         let mut estimator =
             crate::hdc::information_theory::TransferEntropyEstimator::new(config, samples.len());
@@ -533,6 +546,56 @@ mod tests {
             HarmonicStatus::NonUniformSampling
         );
         assert_eq!(profile.harmonic.dominant_bin, None);
+    }
+
+    #[test]
+    fn directional_information_flow_has_explicit_sample_floor() {
+        let samples = (0..8)
+            .map(|i| RelationalSignalSample::new(i as f64, i as f64, (i + 1) as f64))
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        assert!(matches!(
+            DirectionalInformationFlow::compute(&samples, 16),
+            Err(RelationalHarmonicError::InsufficientSamples(8))
+        ));
+    }
+
+    #[test]
+    fn directional_information_flow_refuses_irregular_sampling() {
+        let samples = vec![
+            RelationalSignalSample::new(0.0, 0.1, 0.2).unwrap(),
+            RelationalSignalSample::new(1.0, 0.2, 0.3).unwrap(),
+            RelationalSignalSample::new(2.2, 0.3, 0.4).unwrap(),
+            RelationalSignalSample::new(3.2, 0.4, 0.5).unwrap(),
+            RelationalSignalSample::new(4.2, 0.5, 0.6).unwrap(),
+            RelationalSignalSample::new(5.2, 0.6, 0.7).unwrap(),
+        ];
+
+        assert_eq!(
+            DirectionalInformationFlow::compute(&samples, 6),
+            Err(RelationalHarmonicError::NonUniformSampling)
+        );
+    }
+
+    #[test]
+    fn directional_information_flow_reuses_existing_estimator() {
+        let samples = (0..128)
+            .map(|i| {
+                let a = ((i as f64) * 0.17).sin();
+                let b = ((i as f64 - 1.0) * 0.17).sin();
+                RelationalSignalSample::new(i as f64, a, b)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        let flow = DirectionalInformationFlow::compute(&samples, 100).unwrap();
+
+        assert_eq!(flow.samples, 128);
+        assert_eq!(flow.status, EvidenceStatus::Proxy);
+        assert!(flow.te_a_to_b.is_finite());
+        assert!(flow.te_b_to_a.is_finite());
+        assert!(flow.net_a_to_b.is_finite());
     }
 
     #[test]
