@@ -62,6 +62,7 @@ fn evidence(
         )
         .then(|| ObservationProvenanceRef {
             observation_id: format!("benchmark-observation:{id}"),
+            observation_record_digest: format!("benchmark-record-digest:{id}"),
             subject_id: format!("benchmark-subject:{id}"),
             activity_id: format!("benchmark-activity:{id}"),
             measurand_id: format!("benchmark-measurand:{id}"),
