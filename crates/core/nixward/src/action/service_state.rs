@@ -7,6 +7,7 @@
 //! This module observes and commits to state; it does not execute commands,
 //! query the host, authorize an effect, or mint execution authority.
 
+use super::generation_observer::NixVerifiedNixOSGenerationV1;
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -478,14 +479,15 @@ impl std::fmt::Debug for NixVerifiedServicePreStateV1 {
 impl NixVerifiedServicePreStateV1 {
     pub(crate) fn from_observer(
         state: &NixServiceObservedStateV1,
-        generation: u64,
+        generation: &NixVerifiedNixOSGenerationV1,
     ) -> Result<Self, NixServiceStateErrorV1> {
-        if generation == 0 {
+        state.validate_shape()?;
+        let generation_number = generation.generation();
+        if generation_number == 0 {
             return Err(NixServiceStateErrorV1::InvalidGeneration);
         }
-        state.validate_shape()?;
         let state_digest = state.digest()?;
-        let identity = state.execution_pre_state_identity(generation)?;
+        let identity = state.execution_pre_state_identity(generation_number)?;
         Ok(Self {
             unit: state.unit.clone(),
             generation,
