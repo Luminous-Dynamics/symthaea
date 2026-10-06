@@ -3704,7 +3704,6 @@ mod tests {
                 measurand_id: format!("fixture-measurand:{id}"),
                 procedure_id: "fixture-measurement-procedure-v1".into(),
                 procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
-                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
                 record_digest: format!("fixture-record-digest:{id}"),
                 measurement_system_id: Some("fixture-measurement-system-v1".into()),
                 calibration_chain_refs: vec!["fixture-calibration-chain-v1".into()],
@@ -6213,6 +6212,49 @@ mod tests {
             }
         );
 
+    }
+
+    #[test]
+    fn observation_provenance_requires_procedure_digest() {
+        let mut observation = ObservationProvenanceRef {
+            observation_id: "obs".into(),
+            subject_id: "subject".into(),
+            activity_id: "activity".into(),
+            measurand_id: "measurand".into(),
+            procedure_id: "procedure".into(),
+            procedure_digest: "procedure-digest".into(),
+            record_digest: "record".into(),
+            measurement_system_id: Some("system".into()),
+            calibration_chain_refs: vec!["calibration".into()],
+            experimental_design_id: None,
+            experimental_target_id: None,
+        };
+
+        observation.validate().unwrap();
+        observation.procedure_digest.clear();
+        assert_eq!(
+            observation.validate().unwrap_err(),
+            AssessmentError::InvalidObservationProvenance
+        );
+    }
+
+    #[test]
+    fn experimental_protocol_requires_procedure_digest() {
+        let mut protocol = ExperimentalProtocolRef {
+            protocol_id: "protocol".into(),
+            protocol_revision: "v1".into(),
+            protocol_digest: "protocol-digest".into(),
+            procedure_id: "procedure".into(),
+            procedure_digest: "procedure-digest".into(),
+            basis: fixture_basis(),
+        };
+
+        protocol.validate().unwrap();
+        protocol.procedure_digest.clear();
+        assert_eq!(
+            protocol.validate().unwrap_err(),
+            AssessmentError::InvalidExperimentalDesign
+        );
     }
 
     #[test]
