@@ -32,7 +32,7 @@ test_config "Minimal (no options)" '{ config, pkgs, ... }: {
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   networking.hostName = "minimal";
-  system.stateVersion = "25.05";
+  system.stateVersion = "26.05";
 }'
 
 # Test 2: GNOME desktop
@@ -44,7 +44,7 @@ test_config "GNOME desktop" '{ config, pkgs, ... }: {
   services.xserver.enable = true;
   services.xserver.displayManager.gdm.enable = true;
   services.xserver.desktopManager.gnome.enable = true;
-  system.stateVersion = "25.05";
+  system.stateVersion = "26.05";
 }'
 
 # Test 3: KDE Plasma
@@ -56,7 +56,7 @@ test_config "KDE Plasma 6" '{ config, pkgs, ... }: {
   services.desktopManager.plasma6.enable = true;
   services.displayManager.sddm.enable = true;
   services.displayManager.sddm.wayland.enable = true;
-  system.stateVersion = "25.05";
+  system.stateVersion = "26.05";
 }'
 
 # Test 4: NVIDIA GPU
@@ -73,7 +73,7 @@ test_config "NVIDIA GPU" '{ config, pkgs, ... }: {
     nvidiaSettings = true;
     package = config.boot.kernelPackages.nvidiaPackages.stable;
   };
-  system.stateVersion = "25.05";
+  system.stateVersion = "26.05";
 }'
 
 # Test 5: Full encryption + Secure Boot
@@ -84,7 +84,7 @@ test_config "Encryption + LUKS" '{ config, pkgs, ... }: {
   boot.initrd.luks.devices."cryptroot" = { device = "/dev/disk/by-uuid/placeholder"; };
   boot.initrd.systemd.enable = true;
   networking.hostName = "encrypted";
-  system.stateVersion = "25.05";
+  system.stateVersion = "26.05";
 }'
 
 # Test 6: ZFS
@@ -97,7 +97,7 @@ test_config "ZFS filesystem" '{ config, pkgs, ... }: {
   networking.hostId = "deadbeef";
   services.zfs.autoScrub.enable = true;
   services.zfs.trim.enable = true;
-  system.stateVersion = "25.05";
+  system.stateVersion = "26.05";
 }'
 
 # Test 7: Home Manager
@@ -109,12 +109,12 @@ test_config "Home Manager config" '{ config, pkgs, ... }: {
   home-manager.useGlobalPkgs = true;
   home-manager.useUserPackages = true;
   home-manager.users.testuser = { pkgs, ... }: {
-    home.stateVersion = "25.05";
+    home.stateVersion = "26.05";
     programs.git.enable = true;
     programs.zsh = { enable = true; oh-my-zsh = { enable = true; theme = "robbyrussell"; }; };
     programs.starship.enable = true;
   };
-  system.stateVersion = "25.05";
+  system.stateVersion = "26.05";
 }'
 
 # Test 8: Laptop config
@@ -126,7 +126,7 @@ test_config "Laptop power management" '{ config, pkgs, ... }: {
   services.thermald.enable = true;
   services.power-profiles-daemon.enable = true;
   services.logind.lidSwitch = "suspend";
-  system.stateVersion = "25.05";
+  system.stateVersion = "26.05";
 }'
 
 # Test 9: Symthaea edition
@@ -137,7 +137,7 @@ test_config "Symthaea edition" '{ config, pkgs, ... }: {
   networking.hostName = "symthaea";
   services.ollama = { enable = true; host = "127.0.0.1"; port = 11434; };
   environment.systemPackages = with pkgs; [ ollama ];
-  system.stateVersion = "25.05";
+  system.stateVersion = "26.05";
 }'
 
 # Test 10: Kitchen sink
@@ -178,7 +178,7 @@ test_config "Kitchen sink (all options)" '{ config, pkgs, ... }: {
   home-manager.useUserPackages = true;
   nix.settings = { experimental-features = [ "nix-command" "flakes" ]; trusted-users = [ "root" ]; };
   environment.systemPackages = with pkgs; [ vim wget curl git firefox vscode neofetch htop ollama ];
-  system.stateVersion = "25.05";
+  system.stateVersion = "26.05";
 }'
 
 echo ""
