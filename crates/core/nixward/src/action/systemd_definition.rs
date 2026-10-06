@@ -72,13 +72,20 @@ pub struct NixSystemdDefinitionContentCommitmentV1 {
 
 impl NixSystemdDefinitionContentCommitmentV1 {
     pub fn validate_shape(&self) -> Result<(), NixSystemdDefinitionContentErrorV1> {
-        super::service_domain::NixServiceOperationV1::new(
+        let canonical_unit = super::service_domain::NixServiceOperationV1::new(
             self.unit.clone(),
             super::service_domain::NixServiceOperationKindV1::Start,
         )
         .map_err(|error| {
             NixSystemdDefinitionContentErrorV1::InvalidServiceUnit(error.to_string())
-        })?;
+        })?
+        .unit()
+        .to_string();
+        if canonical_unit != self.unit {
+            return Err(NixSystemdDefinitionContentErrorV1::InvalidServiceUnit(
+                "unit is not canonical".to_string(),
+            ));
+        }
         self.definition_identity
             .validate_shape()
             .map_err(NixSystemdDefinitionContentErrorV1::InvalidDefinitionIdentity)?;
@@ -207,13 +214,20 @@ fn compute_overall_digest(
     if files.is_empty() || files.len() > MAX_FILES {
         return Err(NixSystemdDefinitionContentErrorV1::InvalidFileCount);
     }
-    super::service_domain::NixServiceOperationV1::new(
+    let canonical_unit = super::service_domain::NixServiceOperationV1::new(
         unit.to_string(),
         super::service_domain::NixServiceOperationKindV1::Start,
     )
     .map_err(|error| {
         NixSystemdDefinitionContentErrorV1::InvalidServiceUnit(error.to_string())
-    })?;
+    })?
+    .unit()
+    .to_string();
+    if canonical_unit != unit {
+        return Err(NixSystemdDefinitionContentErrorV1::InvalidServiceUnit(
+            "unit is not canonical".to_string(),
+        ));
+    }
     identity
         .validate_shape()
         .map_err(NixSystemdDefinitionContentErrorV1::InvalidDefinitionIdentity)?;
