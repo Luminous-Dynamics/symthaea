@@ -3917,6 +3917,10 @@ mod tests {
                 procedure_id: "fixture-measurement-procedure-v1".into(),
                 procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
                 component_refs: vec!["fixture-uncertainty-component-v1".into()],
+                component_refs_digest: canonical_string_list_hash(&vec![
+                    "fixture-uncertainty-component-v1".into()
+                ])
+                .unwrap(),
                 record_digest: format!("fixture-uncertainty-digest:{id}"),
             }),
             scope: "synthetic functional unit".into(),
@@ -5629,6 +5633,7 @@ mod tests {
             procedure_id: "procedure".into(),
             procedure_digest: "procedure-digest".into(),
             component_refs: vec!["component".into()],
+            component_refs_digest: canonical_string_list_hash(&vec!["component".into()]).unwrap(),
             record_digest: "digest".into(),
         };
         assert_eq!(
