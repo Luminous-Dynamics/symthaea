@@ -399,7 +399,7 @@ impl NeurosemanticRemediationImpactArtifact {
         if unique_dimensions.len() != self.dimensions.len() {
             return Err("neurosemantic remediation impact artifact contains duplicate dimensions".into());
         }
-        for required in ["forgetfulness", "utility-impact", "residual-risk", "recovery-attack", "representation-residual"] {
+        for required in ["forgetfulness", "utility-impact", "residual-risk", "recovery-attack", "representation-residual", "forget-set", "retain-set"] {
             if !unique_dimensions.contains(required) {
                 return Err(format!("neurosemantic remediation impact artifact omits required dimension: {required}"));
             }
@@ -506,6 +506,9 @@ impl NeurosemanticRemediationImpactArtifact {
         if method.kind != kind {
             return Err("neurosemantic remediation evaluation method kind mismatch".into());
         }
+        if method.protocol_hash != self.study_protocol_hash {
+            return Err("neurosemantic remediation evaluation method is bound to a different study protocol".into());
+        }
         let expected_hash = match kind {
             NeurosemanticRemediationEvaluationMethodKind::RecoveryAttack =>
                 &self.recovery_method_hash,
@@ -518,6 +521,37 @@ impl NeurosemanticRemediationImpactArtifact {
         Ok(())
     }
 
+    pub fn verify_evaluation_set_pair_bytes(
+        &self,
+        forget_manifest_bytes: &[u8],
+        retain_manifest_bytes: &[u8],
+    ) -> Result<(), String> {
+        self.validate()?;
+        let forget = NeurosemanticRemediationEvaluationSetManifest::from_json_bytes(forget_manifest_bytes)?;
+        let retain = NeurosemanticRemediationEvaluationSetManifest::from_json_bytes(retain_manifest_bytes)?;
+        if forget.set_kind != NeurosemanticRemediationEvaluationSetKind::Forget
+            || retain.set_kind != NeurosemanticRemediationEvaluationSetKind::Retain
+        {
+            return Err("neurosemantic remediation evaluation set roles are invalid".into());
+        }
+        if forget.source_dataset_manifest_hash != retain.source_dataset_manifest_hash {
+            return Err("neurosemantic remediation forget/retain sets use different source dataset manifests".into());
+        }
+        let forget_members: BTreeSet<&str> =
+            forget.member_artifact_hashes.iter().map(String::as_str).collect();
+        if retain.member_artifact_hashes.iter().any(|hash| forget_members.contains(hash.as_str())) {
+            return Err("neurosemantic remediation forget and retain sets overlap".into());
+        }
+        self.verify_evaluation_set_manifest_bytes(
+            NeurosemanticRemediationEvaluationSetKind::Forget,
+            forget_manifest_bytes,
+        )?;
+        self.verify_evaluation_set_manifest_bytes(
+            NeurosemanticRemediationEvaluationSetKind::Retain,
+            retain_manifest_bytes,
+        )?;
+        Ok(())
+    }
     pub fn verify_study_protocol_bytes(&self, protocol_bytes: &[u8]) -> Result<(), String> {
         self.validate()?;
         if protocol_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
