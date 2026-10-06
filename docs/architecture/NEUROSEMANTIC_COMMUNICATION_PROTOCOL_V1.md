@@ -379,11 +379,12 @@ handling capability. The resolution has a protocol-enforced maximum lifetime of 
 and it cannot outlive the authority attestation it resolves. Deployments can and should use
 shorter status freshness windows for higher-risk data.
 
-The resulting capability retains the exact resolution fingerprint and context. A subsequent
-handling request therefore fails closed when the resolution is expired or otherwise belongs
-to a different consent context. The resolver signature authenticates the snapshot to the
-configured resolver key; trust in that resolver key remains an external identity/governance
-decision.
+The resulting capability retains the exact resolution fingerprint and context, including
+a content hash of the complete consent lease. A subsequent handling request therefore fails
+closed when the resolution is expired or otherwise belongs to a different consent context, or
+when the current lease contents differ from the lease that was resolved. The resolver signature
+authenticates the snapshot to the configured resolver key; trust in that resolver key remains
+an external identity/governance decision.
 
 ### External policy provenance hardening
 
