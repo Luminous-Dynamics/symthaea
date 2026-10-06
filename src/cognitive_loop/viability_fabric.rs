@@ -279,6 +279,16 @@ impl ViabilityState {
         }
     }
 
+    /// Derive a bounded cognitive resource decision from current viability pressure.
+    pub fn regulation_decision(&self, thresholds: RegulationThresholds) -> RegulationDecision {
+        let thresholds = if thresholds.validate() {
+            thresholds
+        } else {
+            RegulationThresholds::default()
+        };
+        RegulationDecision::from_pressure(self.regulation_pressure(), thresholds)
+    }
+
     /// Conservative pressure signal: prediction error or resource pressure can only increase
     /// regulation pressure. Missing optional signals are not treated as healthy evidence.
     pub fn regulation_pressure(&self) -> f64 {
@@ -297,6 +307,85 @@ impl ViabilityState {
             .fold(0.0_f64, f64::max)
         };
         resource.max(prediction)
+    }
+}
+
+/// Coarse cognitive resource modes. These are control states, not consciousness levels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CognitiveResourceMode {
+    Full,
+    Focused,
+    Recovery,
+    Survival,
+}
+
+/// Thresholds for mapping viability pressure into bounded cognitive resource allocation.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct RegulationThresholds {
+    pub focused: f64,
+    pub recovery: f64,
+    pub survival: f64,
+}
+
+impl Default for RegulationThresholds {
+    fn default() -> Self {
+        Self {
+            focused: 0.20,
+            recovery: 0.45,
+            survival: 0.75,
+        }
+    }
+}
+
+impl RegulationThresholds {
+    pub fn validate(&self) -> bool {
+        (0.0..=1.0).contains(&self.focused)
+            && (0.0..=1.0).contains(&self.recovery)
+            && (0.0..=1.0).contains(&self.survival)
+            && self.focused <= self.recovery
+            && self.recovery <= self.survival
+    }
+}
+
+/// Bounded cognitive response to viability pressure.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct RegulationDecision {
+    pub mode: CognitiveResourceMode,
+    pub pressure: f64,
+    pub planning_horizon_scale: f64,
+    pub exploration_scale: f64,
+    pub consolidation_priority: f64,
+    pub low_priority_cognition_scale: f64,
+}
+
+impl RegulationDecision {
+    pub fn from_pressure(pressure: f64, thresholds: RegulationThresholds) -> Self {
+        let p = pressure.clamp(0.0, 1.0);
+        let mode = if p >= thresholds.survival {
+            CognitiveResourceMode::Survival
+        } else if p >= thresholds.recovery {
+            CognitiveResourceMode::Recovery
+        } else if p >= thresholds.focused {
+            CognitiveResourceMode::Focused
+        } else {
+            CognitiveResourceMode::Full
+        };
+
+        // Pressure contracts planning/exploration and reallocates computation toward
+        // stabilization. These mappings are deliberately simple and inspectable.
+        let planning_horizon_scale = (1.0 - 0.65 * p).clamp(0.25, 1.0);
+        let exploration_scale = (1.0 - p).clamp(0.0, 1.0);
+        let consolidation_priority = (0.15 + 0.85 * p).clamp(0.0, 1.0);
+        let low_priority_cognition_scale = (1.0 - 0.80 * p).clamp(0.10, 1.0);
+
+        Self {
+            mode,
+            pressure: p,
+            planning_horizon_scale,
+            exploration_scale,
+            consolidation_priority,
+            low_priority_cognition_scale,
+        }
     }
 }
 
@@ -690,6 +779,32 @@ mod tests {
         };
 
         assert!(fabric.observe_action(good).is_ok());
+    }
+
+    #[test]
+    fn regulation_modes_follow_pressure() {
+        let full = RegulationDecision::from_pressure(0.1, RegulationThresholds::default());
+        let focused = RegulationDecision::from_pressure(0.3, RegulationThresholds::default());
+        let recovery = RegulationDecision::from_pressure(0.6, RegulationThresholds::default());
+        let survival = RegulationDecision::from_pressure(0.9, RegulationThresholds::default());
+
+        assert_eq!(full.mode, CognitiveResourceMode::Full);
+        assert_eq!(focused.mode, CognitiveResourceMode::Focused);
+        assert_eq!(recovery.mode, CognitiveResourceMode::Recovery);
+        assert_eq!(survival.mode, CognitiveResourceMode::Survival);
+        assert!(survival.exploration_scale < full.exploration_scale);
+        assert!(survival.consolidation_priority > full.consolidation_priority);
+    }
+
+    #[test]
+    fn invalid_thresholds_fail_to_safe_defaults() {
+        let thresholds = RegulationThresholds {
+            focused: 0.8,
+            recovery: 0.2,
+            survival: 0.1,
+        };
+        let decision = RegulationDecision::from_pressure(0.5, thresholds);
+        assert_eq!(decision.mode, CognitiveResourceMode::Recovery);
     }
 
     #[test]
