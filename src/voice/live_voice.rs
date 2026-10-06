@@ -194,6 +194,8 @@ impl PhonologicalPlanRealizationReceipt {
 pub struct VerifiedLexicalPhonologicalRealizationReceipt {
     /// Existing v3 realization receipt, preserving its independent plan/audio accounting.
     pub realization: PhonologicalPlanRealizationReceipt,
+    /// Embedded pronunciation resources used when deriving the witness.
+    pub pronunciation_lexicon_sources: Vec<String>,
     /// Exact witness contract version.
     pub witness_version: String,
     /// Exact lexical-binding provenance carried by the witness.
@@ -219,6 +221,15 @@ impl VerifiedLexicalPhonologicalRealizationReceipt {
 
         if self.witness_version != witness.version {
             anyhow::bail!("verified realization receipt witness version does not match witness");
+        }
+        if self
+            .pronunciation_lexicon_sources
+            .iter()
+            .any(|source| source.trim().is_empty())
+        {
+            anyhow::bail!(
+                "verified realization receipt contains an empty pronunciation-lexicon source"
+            );
         }
         if self.lexical_binding_provenance != binding.provenance_token() {
             anyhow::bail!(
@@ -362,6 +373,157 @@ impl LiveVoice {
         }
     }
 
+    /// Derive an auditable English lexical-to-phonological witness using only embedded
+    /// pronunciation lexicons.
+    ///
+    /// The general SimpleG2P spelling-rule fallback is deliberately excluded. Every lexical
+    /// constituent must have a pronunciation entry, and the supplied phonological stream must
+    /// match it in order. CMU stress digits are checked against the plan's explicit stress field.
+    #[cfg(feature = "ssm_language")]
+    pub fn derive_english_lexical_phonological_witness(
+        &self,
+        binding: &LexicalMorphosyntacticBinding,
+        segments: &[symthaea_broca::PhonemeSlot],
+    ) -> Result<(LexicalPhonologicalWitness, Vec<String>)> {
+        binding
+            .validate()
+            .map_err(|error| anyhow::anyhow!("invalid lexical binding: {error}"))?;
+
+        if !binding.language.language_tag.eq_ignore_ascii_case("en") {
+            anyhow::bail!(
+                "strict embedded pronunciation witness currently supports only language tag en"
+            );
+        }
+        if segments.is_empty() {
+            anyhow::bail!("strict lexical pronunciation witness requires phonological segments");
+        }
+
+        let mut mappings = Vec::with_capacity(binding.constituents.len());
+        let mut cursor = 0usize;
+        let mut sources = Vec::new();
+
+        for (lexical_position, constituent) in binding.constituents.iter().enumerate() {
+            let form = constituent
+                .morphophonological_form
+                .as_deref()
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "lexical position {lexical_position} has no morphophonological form"
+                    )
+                })?;
+
+            let (expected_phones, source) = self
+                .g2p
+                .word_to_phonemes_from_lexicon(form)
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "lexical position {lexical_position} form {form:?} has no embedded pronunciation"
+                    )
+                })?;
+            sources.push(source.to_string());
+
+            while segments
+                .get(cursor)
+                .is_some_and(|segment| segment.symbol.eq_ignore_ascii_case("SIL"))
+            {
+                cursor += 1;
+            }
+
+            let start = cursor;
+            let mut symbols = Vec::with_capacity(expected_phones.len());
+            for (offset, expected_phone) in expected_phones.iter().enumerate() {
+                let segment = segments.get(cursor).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "lexical position {lexical_position} requires pronunciation segment offset {offset}, but the stream ended"
+                    )
+                })?;
+                if segment.symbol.eq_ignore_ascii_case("SIL") {
+                    anyhow::bail!(
+                        "explicit SIL occurred inside lexical position {lexical_position}"
+                    );
+                }
+
+                let expected_base = expected_phone
+                    .trim_end_matches(|c: char| c.is_ascii_digit());
+                let actual_base = segment
+                    .symbol
+                    .trim_end_matches(|c: char| c.is_ascii_digit());
+                if expected_base != actual_base {
+                    anyhow::bail!(
+                        "lexical position {lexical_position} pronunciation mismatch at segment {cursor}: expected {expected_phone}, got {}",
+                        segment.symbol
+                    );
+                }
+
+                if let Some(stress_digit) =
+                    expected_phone.chars().last().filter(|c| c.is_ascii_digit())
+                {
+                    let expected_stress = match stress_digit {
+                        '0' => 0,
+                        '1' => 1,
+                        '2' => 2,
+                        _ => unreachable!("digit filter limits pronunciation stress to ASCII digits"),
+                    };
+                    if segment.stress.ordinal() != expected_stress {
+                        anyhow::bail!(
+                            "lexical position {lexical_position} stress mismatch at segment {cursor}: expected {expected_stress}, got {}",
+                            segment.stress.ordinal()
+                        );
+                    }
+                }
+
+                symbols.push(segment.symbol.clone());
+                cursor += 1;
+            }
+
+            mappings.push(LexicalPhonologicalMapping {
+                lexical_position,
+                lexeme_id: constituent.lexeme_id.clone(),
+                morphophonological_form: constituent.morphophonological_form.clone(),
+                segment_indices: (start..cursor).collect(),
+                symbols,
+            });
+        }
+
+        if segments[cursor..]
+            .iter()
+            .any(|segment| !segment.symbol.eq_ignore_ascii_case("SIL"))
+        {
+            anyhow::bail!(
+                "phonological stream contains non-silence segments not accounted for by the embedded pronunciation witness"
+            );
+        }
+
+        let witness = LexicalPhonologicalWitness::new(binding, mappings)
+            .map_err(|error| anyhow::anyhow!("invalid derived lexical witness: {error}"))?;
+        sources.sort();
+        sources.dedup();
+
+        Ok((witness, sources))
+    }
+
+    /// Realize a plan by deriving its lexical-to-phonological witness strictly from the
+    /// embedded English pronunciation resources. Unlisted forms fail closed instead of
+    /// falling back to spelling heuristics.
+    #[cfg(feature = "ssm_language")]
+    pub fn speak_english_lexicon_verified_lexical_phonological_plan_with_receipt(
+        &mut self,
+        plan: &PhonologicalPlan,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+    ) -> Result<VerifiedLexicalPhonologicalRealizationReceipt> {
+        plan.validate_against_frame(frame)
+            .map_err(|error| anyhow::anyhow!("invalid phonological plan lineage: {error}"))?;
+        let (witness, sources) =
+            self.derive_english_lexical_phonological_witness(binding, &plan.segments)?;
+        let mut receipt = self
+            .speak_verified_lexical_phonological_plan_with_receipt(
+                plan, frame, binding, &witness,
+            )?;
+        receipt.pronunciation_lexicon_sources = sources;
+        Ok(receipt)
+    }
+
     /// Synthesize an explicit phonological plan through the live audio output path.
     ///
     /// This is intentionally plan-native: no text, G2P reconstruction, or lexical inference
@@ -428,6 +590,7 @@ impl LiveVoice {
 
         Ok(VerifiedLexicalPhonologicalRealizationReceipt {
             realization,
+            pronunciation_lexicon_sources: Vec::new(),
             witness_version: witness.version.clone(),
             lexical_binding_provenance: binding.provenance_token(),
             witness_blake3: blake3::hash(witness.grounding_surface().as_bytes())
@@ -1507,6 +1670,71 @@ mod tests {
             .synthesize_phonological_plan(&plan)
             .expect_err("non-divisible sample rate must fail closed");
         assert!(error.to_string().contains("sample rate divisible by 200 Hz"));
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_strict_english_lexicon_derivation_rejects_heuristic_fallback() {
+        use symthaea_broca::{
+            ContentBindingStatus, GrammaticalFunction, LanguageRuleBinding, LanguageRuleStatus,
+            LexemeBinding, LexicalSource, LinguisticFrame, PhonemeSlot, SpeechPlan,
+            StructuredDecoder, SyllableStress, ThoughtChannels, LexicalMorphosyntacticBinding,
+        };
+
+        let genesis = GenesisSeed::from_phrase("strict-lexicon-witness-test");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(2);
+        let readout = decoder.decode(&channels);
+        let frame = LinguisticFrame::from_speech_plan(&SpeechPlan::from_readout(&channels, &readout));
+
+        let constituent = frame
+            .constituents
+            .first()
+            .expect("fixture frame must have a constituent");
+        let binding = LexicalMorphosyntacticBinding::new(
+            &frame,
+            LanguageRuleBinding {
+                language_tag: "en".into(),
+                status: LanguageRuleStatus::Bound,
+                rule_id: Some("fixture:rules:v1".into()),
+                provenance: Some("fixture:rules:v1".into()),
+                unbound_reason: None,
+            },
+            vec![LexemeBinding {
+                position: 0,
+                source: LexicalSource::SemanticConstituent {
+                    role: constituent.role.clone(),
+                    prime: constituent.prime.clone(),
+                },
+                lemma: "zzzxxyq".into(),
+                lexeme_id: "en:fixture:unlisted".into(),
+                grammatical_function: GrammaticalFunction::Other("fixture".into()),
+                morphology: Vec::new(),
+                morphophonological_form: Some("zzzxxyq".into()),
+                provenance: "fixture:v1".into(),
+                semantic_payload: true,
+            }],
+            Vec::new(),
+            Vec::new(),
+        );
+
+        // The fixture intentionally fails before any heuristic phonology can be admitted.
+        assert!(binding.is_err());
+
+        let mut plan = symthaea_broca::PhonologicalPlan::from_linguistic_frame(&frame);
+        plan.bind_segments(
+            vec![PhonemeSlot::new(
+                "Z",
+                0,
+                SyllableStress::Primary,
+                true,
+                false,
+                true,
+            )],
+            ContentBindingStatus::PhonologicallyBound,
+        )
+        .expect("explicit phonological fixture");
+        assert!(!plan.ready_for_realization());
     }
 
     #[cfg(feature = "ssm_language")]
