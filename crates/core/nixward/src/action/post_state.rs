@@ -1051,19 +1051,29 @@ fn validate_expectation_against_intent(
         return Err(NixPostStateErrorV1::MissingBoundPreState);
     };
 
-    if let Some(generation) = pre_state_identity.strip_prefix("generation:") {
-        let generation = generation
-            .parse::<u64>()
-            .map_err(|_| NixPostStateErrorV1::InvalidBoundPreState)?;
-        if generation != expectation.authorized_generation {
-            return Err(NixPostStateErrorV1::GenerationMismatch);
-        }
-        return Ok(());
+    let Some(context) = intent.service_effect_context.as_ref() else {
+        return Err(NixPostStateErrorV1::MissingServiceEffectContext);
+    };
+
+    if context.operation != expectation.operation || context.unit != expectation.unit {
+        return Err(NixPostStateErrorV1::ServiceEffectContextMismatch);
+    }
+    if context.authorized_generation != expectation.authorized_generation {
+        return Err(NixPostStateErrorV1::GenerationMismatch);
+    }
+    if context.authorized_definition_digest != expectation.authorized_definition_digest {
+        return Err(NixPostStateErrorV1::DefinitionMismatch);
+    }
+    if context.pre_invocation_id != expectation.pre_invocation_id {
+        return Err(NixPostStateErrorV1::InvocationMismatch);
+    }
+    if context.required_stability_us != expectation.required_stability_us {
+        return Err(NixPostStateErrorV1::StabilityContractMismatch);
     }
 
     let prefix = "nixward-service-pre-state-v1|generation=";
     let Some(rest) = pre_state_identity.strip_prefix(prefix) else {
-        return Err(NixPostStateErrorV1::InvalidBoundPreState);
+        return Err(NixPostStateErrorV1::MissingServiceEffectContext);
     };
     let (generation, rest) = rest
         .split_once("|unit=")
@@ -1071,7 +1081,7 @@ fn validate_expectation_against_intent(
     let generation = generation
         .parse::<u64>()
         .map_err(|_| NixPostStateErrorV1::InvalidBoundPreState)?;
-    let (unit, _) = rest
+    let (unit, state) = rest
         .split_once("|state=")
         .ok_or(NixPostStateErrorV1::InvalidBoundPreState)?;
 
@@ -1080,6 +1090,20 @@ fn validate_expectation_against_intent(
     }
     if unit != expectation.unit {
         return Err(NixPostStateErrorV1::UnitMismatch);
+    }
+    if state != context.pre_state_digest {
+        return Err(NixPostStateErrorV1::PreStateDigestMismatch);
+    }
+    context
+        .validate_shape()
+        .map_err(|error| NixPostStateErrorV1::InvalidServiceEffectContext(error.to_string()))?;
+    let context_digest = context
+        .digest()
+        .map_err(|error| NixPostStateErrorV1::InvalidServiceEffectContext(error.to_string()))?;
+    if context_digest.is_empty() {
+        return Err(NixPostStateErrorV1::InvalidServiceEffectContext(
+            "empty service effect context digest".to_string(),
+        ));
     }
     Ok(())
 }
