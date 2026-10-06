@@ -711,6 +711,43 @@ impl MorphophonologicalCompilationWitness {
 
     /// Verify that every selected source slice matches the exact source artifact bytes and that
     /// the declared compilation output is the exact current rule-set identity.
+    /// Re-execute the UniMorph TSV compiler from the exact persisted source slices and
+    /// compare both the emitted executable rule set and compilation witness with this state.
+    ///
+    /// This is stronger than checking hashes alone: the current compiler implementation must
+    /// reproduce the recorded transformation.
+    pub fn replay_unimorph_tsv_compilation(
+        &self,
+        source_artifact: &[u8],
+        output_rule_set: &MorphophonologicalRuleSet,
+    ) -> Result<(), MorphophonologicalCompilationWitnessError> {
+        if self.compiler_id != UNIMORPH_TSV_COMPILER_ID
+            || self.compiler_version != UNIMORPH_TSV_COMPILER_VERSION
+        {
+            return Err(MorphophonologicalCompilationWitnessError::UnsupportedCompiler);
+        }
+
+        let (recompiled_rule_set, recompiled_witness) =
+            MorphophonologicalRuleSet::compile_unimorph_tsv_source(
+                output_rule_set.language_tag.clone(),
+                output_rule_set.dialect_scope.clone(),
+                output_rule_set.resource_evidence.clone(),
+                output_rule_set.rule_id.clone(),
+                output_rule_set.provenance.clone(),
+                source_artifact,
+                self.source_slices.clone(),
+            )
+            .map_err(|_| MorphophonologicalCompilationWitnessError::CompilerReplayFailed)?;
+
+        if recompiled_rule_set != *output_rule_set {
+            return Err(MorphophonologicalCompilationWitnessError::CompilerReplayMismatch);
+        }
+        if recompiled_witness != *self {
+            return Err(MorphophonologicalCompilationWitnessError::WitnessReplayMismatch);
+        }
+        Ok(())
+    }
+
     pub fn validate_against_source_artifact_and_rule_set(
         &self,
         source_artifact: &[u8],
@@ -806,6 +843,10 @@ pub enum MorphophonologicalCompilationWitnessError {
     SourceSelectionMismatch,
     OutputRuleSetMismatch,
     TransformationMismatch,
+    UnsupportedCompiler,
+    CompilerReplayFailed,
+    CompilerReplayMismatch,
+    WitnessReplayMismatch,
 }
 
 impl std::fmt::Display for MorphophonologicalCompilationWitnessError {
@@ -828,6 +869,10 @@ impl std::fmt::Display for MorphophonologicalCompilationWitnessError {
             Self::SourceSelectionMismatch => write!(f, "morphophonological compilation witness source selection digest does not match its selected records"),
             Self::OutputRuleSetMismatch => write!(f, "morphophonological compilation witness output rule-set identity does not match"),
             Self::TransformationMismatch => write!(f, "morphophonological compilation witness transformation digest does not match its declared inputs"),
+            Self::UnsupportedCompiler => write!(f, "morphophonological compilation witness compiler implementation is not supported for replay"),
+            Self::CompilerReplayFailed => write!(f, "morphophonological compilation witness compiler replay failed"),
+            Self::CompilerReplayMismatch => write!(f, "morphophonological compilation witness compiler replay did not reproduce the exact output rule set"),
+            Self::WitnessReplayMismatch => write!(f, "morphophonological compilation witness compiler replay did not reproduce the exact witness"),
         }
     }
 }
@@ -3176,6 +3221,18 @@ mod tests {
         witness
             .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
             .expect("compiler witness should replay against exact source bytes");
+        witness
+            .replay_unimorph_tsv_compilation(artifact, &rule_set)
+            .expect("current UniMorph compiler must reproduce the exact rule set and witness");
+
+        let mut replay_tampered = witness.clone();
+        replay_tampered.normalization_policy = "different-normalization-v0".into();
+        assert_eq!(
+            replay_tampered
+                .replay_unimorph_tsv_compilation(artifact, &rule_set)
+                .expect_err("transformation metadata tampering must fail compiler replay"),
+            MorphophonologicalCompilationWitnessError::TransformationMismatch
+        );
 
         let mut reversed = slices;
         reversed.reverse();
