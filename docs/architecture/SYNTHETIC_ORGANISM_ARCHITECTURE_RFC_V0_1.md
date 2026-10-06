@@ -643,6 +643,67 @@ and verify that:
 - model versions remain attributable;
 - lifecycle transitions affect computation.
 
+## 12.1 Initial implementation landed
+
+The RFC's first qualification layer is now implemented on the RFC branch:
+
+- `src/cognitive_loop/viability_fabric.rs`
+  - typed viability state;
+  - lifecycle phase;
+  - signed action consequences;
+  - separated prediction-error channels;
+  - pre-action prediction ledger;
+  - outcome provenance;
+  - fail-closed rejection of post-hoc predictions;
+  - preservation of pending predictions after rejected/tampered outcomes.
+- `src/cognitive_loop/viability_micro_world.rs`
+  - deterministic six-action environment;
+  - replay-stable transition function;
+  - persistence predictor baseline;
+  - generic predictor trait;
+  - prediction-error evaluator;
+  - survival-aware homeostatic policy;
+  - closed-loop policy runner.
+
+The deterministic micro-world is intentionally simple. Its role is to establish a test
+oracle and a reproducible experimental boundary before attempting to qualify real
+HDC/CfC/FEP predictions.
+
+The first benchmark questions are therefore:
+
+1. Can a predictor beat persistence?
+2. Can a policy maintain viability while pursuing progress?
+3. Does prediction error remain attributable to a pre-action forecast?
+4. Do identical runs produce identical evidence?
+
+No current result from this harness should be interpreted as evidence of consciousness
+or biological life.
+
+## 12.2 Next integration boundary
+
+The next implementation should wrap the existing `WorldModelBridge` and FEP trajectory
+planner, rather than invent a separate predictor. The micro-world becomes the
+deterministic external oracle:
+
+~~~text
+existing WorldModel/FEP prediction
+              |
+              v
+        Viability Fabric
+              |
+              v
+      MicroWorld transition
+              |
+              v
+      observed consequence
+              |
+              v
+       prediction-error ledger
+~~~
+
+Once this is working, we can measure whether the existing world-model path actually
+improves with experience rather than merely updating state.
+
 ## 13. Metrics
 
 Do not use a single "organism score".
@@ -719,7 +780,20 @@ predict consequences, and recover from perturbations.
 
 Only after these phases should physical robotics be considered.
 
-## 15. Anti-patterns
+## 15. Current research position
+
+A recent embodied-intelligence framing distinguishes a basic input-output system (S0)
+from systems that maintain a boundary and endogenous stake in persistence (S1), systems
+that model consequences of their own actions (S2), and increasingly social/collective
+organization above that. This RFC is deliberately aimed at making those transitions
+measurable rather than inferred from labels.
+
+Reference:
+- "The Embodied Hijack: when Pleistocene minds meet disembodied artificial intelligence",
+  Frontiers in Psychology, 2026:
+  https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1889386/full
+
+## 16. Anti-patterns
 
 Do not:
 
@@ -733,7 +807,7 @@ Do not:
 - conflate source observations with derived interpretations;
 - use a single world-model loss as proof of causal understanding.
 
-## 16. Success criterion
+## 17. Success criterion
 
 The strongest near-term milestone is not "Symthaea says she is conscious."
 
@@ -751,7 +825,7 @@ It would also give us a much stronger scientific substrate for future consciousn
 research because we would be measuring a system that is actually maintaining itself in
 continuous interaction, rather than evaluating isolated static computations.
 
-## 17. Relationship to Mycelix
+## 18. Relationship to Mycelix
 
 Mycelix should remain outside the core cognitive state machine.
 
@@ -772,7 +846,7 @@ Mycelix becomes the **social/ecological substrate**.
 That separation avoids making a network protocol a prerequisite for local viability while
 still enabling a later distributed organism architecture.
 
-## 18. Scientific posture
+## 19. Scientific posture
 
 This RFC deliberately uses "organism-like", "viability", and "autopoietic capability"
 as engineering terms.
