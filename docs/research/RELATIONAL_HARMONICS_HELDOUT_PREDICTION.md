@@ -68,6 +68,8 @@ The initial qualification model is a small linear predictor with:
 - explicit intercept;
 - fixed, caller-supplied ridge coefficient;
 - deterministic Gaussian elimination with pivoting;
+- train-only feature standardization;
+- fixed transforms carried unchanged into the held-out window;
 - no hyperparameter search;
 - no random seed;
 - no test-set tuning.
@@ -79,6 +81,8 @@ A positive relative MSE improvement means the relational model has lower held-ou
 The evaluator does not convert improvement into a significance claim.
 
 The persistence baseline is intentionally non-parametric: it uses only the most recent training target. A relational model that cannot beat this baseline has not demonstrated useful predictive value merely by exploiting temporal persistence.
+
+For fitted linear models, each training window supplies its own feature mean and scale. Constant training features use unit scale after centering. The held-out window is transformed with those frozen training statistics; no test-window statistics enter preprocessing. Ridge regularization is applied after this standardization so the fixed lambda is not silently reweighted by raw feature units.
 
 ## 5. Multiple prediction null families
 
@@ -148,10 +152,11 @@ For each segment:
 1. freeze the predictor definitions;
 2. define the outcome horizon before looking at test results;
 3. fit all fixed feature families, including the persistence baseline, using training observations only;
-4. evaluate on the contiguous held-out future segment;
-5. record MAE and MSE for all families;
-6. repeat the same evaluation for each null family;
-7. preserve all split definitions and source data hashes.
+4. fit any preprocessing parameters on that training window only and freeze them before transforming the held-out segment;
+5. evaluate on the contiguous held-out future segment;
+6. record MAE and MSE for all families;
+7. repeat the same evaluation for each null family;
+8. preserve all split definitions, preprocessing parameters, and source data hashes.
 
 The qualification artifact should retain:
 
