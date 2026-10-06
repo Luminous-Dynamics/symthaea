@@ -776,6 +776,8 @@ impl WebGpuRenderer {
                     },
                     Ordering::Release,
                 );
+                // Publish the reason first; the Release latch below is the
+                // synchronization point observed with Acquire by health/recovery.
                 device_lost.store(true, Ordering::Release);
                 web_sys::console::warn_2(
                     &format!("Symthaea WebGPU cognitive device lost ({reason:?})").into(),
@@ -1130,6 +1132,8 @@ impl WebGpuMovieRenderer {
                     },
                     Ordering::Release,
                 );
+                // Publish the reason first; the Release latch below is the
+                // synchronization point observed with Acquire by health/recovery.
                 device_lost.store(true, Ordering::Release);
                 web_sys::console::warn_2(
                     &format!("Symthaea WebGPU movie device lost ({reason:?})").into(),
