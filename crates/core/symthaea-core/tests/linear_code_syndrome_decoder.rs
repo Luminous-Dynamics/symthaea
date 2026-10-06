@@ -939,7 +939,7 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
             .collect::<Vec<_>>()
             .join(",");
         println!(
-            "RANDOM_LIST_ORACLE=dimension={dimension};rank={rank};observations={observations};no_match={no_match};max_multiplicity={max_multiplicity};histogram={histogram_serialized};deterministic=true;independent_syndrome_oracle=true",
+            "RANDOM_LIST_ORACLE=dimension={dimension};rank={rank};observations={observations};no_match={no_match};max_multiplicity={max_multiplicity};histogram={histogram_serialized};deterministic=true;independent_syndrome_oracle=true;independent_codeword_oracle=true",
         );
     }
 }

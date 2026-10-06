@@ -126,6 +126,12 @@ parity-check construction based on u64 nullspace elimination. It does not call t
 decoder's parity-check constructor. The resulting syndrome is compared directly
 with the production parity-check syndrome for every probe.
 
+The nearest-codeword oracle is also independently reconstructed from the generator
+basis by explicit GF(2) subset enumeration rather than calling the production
+codeword-enumeration method. The qualification first requires the production and
+independent codeword sets to agree exactly, then uses the independently reconstructed
+set for nearest-distance and multiplicity checks.
+
 For each generated code, the probe bound is one above the guaranteed unique-decoding
 radius. When the independent nearest-codeword oracle places the observation within
 that bound, every minimum-syndrome error and corresponding nearest codeword must be
