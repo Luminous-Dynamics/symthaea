@@ -6994,7 +6994,6 @@ mod tests {
         assert!(!origin_is_allowed("file:///tmp/installer.html"));
     }
 
-    #[test]
     #[cfg(unix)]
     #[test]
     fn token_file_requires_private_owner_only_permissions() {
@@ -7004,8 +7003,7 @@ mod tests {
             "symthaea-token-file-{}",
             new_session_id().unwrap()
         ));
-        std::fs::write(&path, "secret-token
-").unwrap();
+        std::fs::write(&path, "secret-token\n").unwrap();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
         assert_eq!(read_token_file(path.to_str().unwrap()).unwrap(), "secret-token");
 
@@ -7014,6 +7012,7 @@ mod tests {
         let _ = std::fs::remove_file(&path);
     }
 
+    #[test]
     fn noninteractive_auth_banner_redacts_token() {
         let banner = auth_token_banner("super-secret-token", false);
         assert!(!banner.contains("super-secret-token"));
@@ -7030,7 +7029,7 @@ mod tests {
 
     fn transaction_ids_are_random_and_not_clock_derived() {
         let first = SystemTransaction::begin(MutationKind::Rollback, "relay-test-a-00000001", None, b"rollback").unwrap();
-        let second = SystemTransaction::begin(MutationKind::Rollback, None, b"rollback").unwrap();
+        let second = SystemTransaction::begin(MutationKind::Rollback, "relay-test-b-00000001", None, b"rollback").unwrap();
         assert_ne!(first.transaction_id, second.transaction_id);
         assert_eq!(first.request_digest, second.request_digest);
         assert_eq!(first.transaction_id.len(), 32);
