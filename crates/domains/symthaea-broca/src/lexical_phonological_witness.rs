@@ -456,15 +456,21 @@ mod tests {
     fn legacy_witness_schema_fails_closed() {
         let binding = binding();
         let witness = witness_for_segments(&binding);
-        let mut legacy = witness.clone();
-        legacy.version = "broca-lexical-phonological-witness-v2".into();
 
-        assert_eq!(
-            legacy
-                .validate_against_binding(&binding)
-                .expect_err("legacy witness schema must fail closed"),
-            LexicalPhonologicalWitnessError::InvalidVersion
-        );
+        for version in [
+            "broca-lexical-phonological-witness-v1",
+            "broca-lexical-phonological-witness-v2",
+        ] {
+            let mut legacy = witness.clone();
+            legacy.version = version.into();
+
+            assert_eq!(
+                legacy
+                    .validate_against_binding(&binding)
+                    .expect_err("legacy witness schema must fail closed"),
+                LexicalPhonologicalWitnessError::InvalidVersion
+            );
+        }
     }
 
     #[test]
