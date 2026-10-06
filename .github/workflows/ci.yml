@@ -201,6 +201,23 @@ jobs:
       - name: Run doc tests
         run: cargo test --doc
 
+  nixforhumanity-relay:
+    name: NixForHumanity Relay Server Boundary
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    timeout-minutes: 30
+    # The browser/WASM path does not compile the server-only relay binary.
+    # Keep the privileged WebSocket execution surface independently executable
+    # in CI so a new security module cannot become feature-gated dead code.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Test ssh-relay with server feature
+        run: cargo test -p symthaea-spore --bin ssh-relay --features server -- --nocapture
+
   muse:
     name: Muse (tests, studio, wasm UI)
     runs-on: ubuntu-latest
