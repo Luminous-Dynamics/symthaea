@@ -178,6 +178,7 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
     jobs = parse_jobs(text)
     runner_jobs = 0
     draft_guarded = 0
+    pr_capable_runner_jobs = 0
     for job, block in jobs.items():
         if not has_runner_allocation(block):
             continue
@@ -185,6 +186,7 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
         expression = job_level_if_expression(block, job)
         if explicitly_excludes_pull_request(expression):
             continue
+        pr_capable_runner_jobs += 1
         if not has_draft_guard(expression):
             raise SafetyError(
                 f"{path}: runner-capable job {job!r} lacks a job-level "
@@ -192,10 +194,13 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
             )
         draft_guarded += 1
 
-    if runner_jobs:
+    # ready_for_review is necessary only when at least one runner-capable job
+    # can actually admit pull_request events. A workflow whose runner roots all
+    # explicitly exclude PRs must not be forced to subscribe to an event that
+    # cannot allocate a runner.
+    if pr_capable_runner_jobs:
         require_ready_event(path, pr_block)
     return runner_jobs, draft_guarded
-
 
 def require_contains(expression: str | None, needle: str, label: str) -> None:
     if expression is None or needle not in expression:
