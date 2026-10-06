@@ -123,3 +123,6 @@ The duplicate-token rejection is intentionally syntactic. It does not infer sema
 
 
 Revision commitments are not self-certifying: validation first requires the generated current implementation and parser revisions, so recomputing the transformation digest with a forged revision does not make a witness acceptable.
+
+
+Structural source-artifact validation intentionally does not require the recorded compiler revision to equal the current implementation; this preserves historical witness inspectability. Current compiler replay is the stronger admission operation and requires the generated implementation and parser revisions to equal the current implementation before re-execution.
