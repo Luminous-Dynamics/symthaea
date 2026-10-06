@@ -176,7 +176,7 @@ test_config "Kitchen sink (all options)" '{ config, pkgs, ... }: {
   users.users.alice = { isNormalUser = true; extraGroups = [ "networkmanager" ]; };
   home-manager.useGlobalPkgs = true;
   home-manager.useUserPackages = true;
-  nix.settings = { experimental-features = [ "nix-command" "flakes" ]; trusted-users = [ "root" "@wheel" ]; };
+  nix.settings = { experimental-features = [ "nix-command" "flakes" ]; trusted-users = [ "root" ]; };
   environment.systemPackages = with pkgs; [ vim wget curl git firefox vscode neofetch htop ollama ];
   system.stateVersion = "25.05";
 }'
