@@ -207,6 +207,8 @@ JSON schemas are versioned in the emitted document:
 - `relational-prediction-evidence/v2` for one held-out segment;
 - `relational-prediction-rolling-evidence/v2` for the repeated-origin bundle.
 
+For rolling-origin bundles, the packet also retains `origin_starts`, the exact source-sample start index realized for each child segment. Validation recomputes these from `first_origin` and `step_samples`, so the declared schedule and retained child packets cannot silently diverge.
+
 The evidence packet is intentionally not a self-contained copy of the training dataset. It retains enough of the held-out computation to independently reconstruct test predictions and verify the reported losses, while the caller-attested source-data SHA-256 remains the commitment to the underlying source artifact. Full coefficient-training replay still requires access to the exact source data identified by that digest.
 
 Serialization is an evidence transport mechanism, not an inference procedure. A valid packet proves that the recorded computation is internally self-consistent; it does not prove that the source data are scientifically appropriate, that the target is truly independent, or that the measured predictive difference is causal.
