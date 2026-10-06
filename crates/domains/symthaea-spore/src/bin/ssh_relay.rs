@@ -2696,7 +2696,7 @@ async fn verify_service_postcondition(action: &str, service: &str) -> Result<boo
     let unit = format!("{}.service", service);
     let active_state = run_cmd(&format!(
         "systemctl show --property=ActiveState --value '{}'",
-        unit.replace(''', "'\''")
+        unit
     ))
     .await
     .map_err(|error| format!("service postcondition probe failed: {error}"))?;
@@ -2709,7 +2709,7 @@ async fn verify_service_postcondition(action: &str, service: &str) -> Result<boo
     }
     let unit_file_state = run_cmd(&format!(
         "systemctl show --property=UnitFileState --value '{}'",
-        unit.replace(''', "'\''")
+        unit
     ))
     .await
     .map_err(|error| format!("service enablement postcondition probe failed: {error}"))?;
