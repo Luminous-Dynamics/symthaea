@@ -379,59 +379,54 @@ impl TransactionLedger {
     }
 
     fn load(&self) -> Result<HashMap<String, JournalRecord>, String> {
-        let metadata = match std::fs::symlink_metadata(&self.path) {
-            Ok(metadata) => metadata,
+        // Open first, then validate the descriptor we actually received. This
+        // removes the metadata/open TOCTOU window while O_NOFOLLOW rejects a
+        // symlink at the final path component.
+        let file = match OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(&self.path)
+        {
+            Ok(file) => file,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                 return Ok(HashMap::new());
             }
             Err(error) => {
                 return Err(format!(
-                    "unable to inspect transaction ledger {}: {error}",
+                    "unable to read transaction ledger {}: {error}",
                     self.path.display()
                 ));
             }
         };
+        let metadata = file.metadata().map_err(|error| {
+            format!(
+                "unable to inspect transaction ledger {}: {error}",
+                self.path.display()
+            )
+        })?;
         if !metadata.file_type().is_file() {
             return Err(format!(
                 "transaction ledger {} is not a regular file",
                 self.path.display()
             ));
         }
-        let mode = {
-            use std::os::unix::fs::PermissionsExt;
-            metadata.permissions().mode() & 0o777
-        };
-        if mode != 0o600 {
-            return Err(format!(
-                "transaction ledger {} has unsafe permissions {:04o}; require 0600",
-                self.path.display(),
-                mode
-            ));
-        }
         {
-            use std::os::unix::fs::MetadataExt;
-            let owner = unsafe { libc::geteuid() };
-            if metadata.uid() != owner {
+            use std::os::unix::fs::{MetadataExt, PermissionsExt};
+            let mode = metadata.permissions().mode() & 0o777;
+            if mode != 0o600 {
+                return Err(format!(
+                    "transaction ledger {} has unsafe permissions {:04o}; require 0600",
+                    self.path.display(),
+                    mode
+                ));
+            }
+            if metadata.uid() != unsafe { libc::geteuid() } {
                 return Err(format!(
                     "transaction ledger {} is not owned by relay user",
                     self.path.display()
                 ));
             }
         }
-        // Re-open the already-validated ledger without following a symlink.
-        // O_NOFOLLOW closes the metadata/open race where the path could otherwise be
-        // replaced between symlink_metadata() and the actual read.
-        let file = OpenOptions::new()
-            .read(true)
-            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-            .open(&self.path)
-            .map_err(|error| {
-                format!(
-                    "unable to read transaction ledger {}: {error}",
-                    self.path.display()
-                )
-            })?;
-
         let mut records = HashMap::new();
         let mut transaction_owners = HashMap::<String, String>::new();
         let mut reader = BufReader::new(file);
