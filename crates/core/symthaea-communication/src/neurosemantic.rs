@@ -30,6 +30,8 @@ const NEUROSEMANTIC_POLICY_PROVENANCE_DOMAIN: &[u8] =
     b"symthaea-neurosemantic-policy-provenance-v1\0";
 const NEUROSEMANTIC_DERIVATION_PROVENANCE_DOMAIN: &[u8] =
     b"symthaea-neurosemantic-derivation-provenance-v1\0";
+const NEUROSEMANTIC_STATUS_SOURCE_DOMAIN: &[u8] =
+    b"symthaea-neurosemantic-status-source-v1\0";
 const NEUROSEMANTIC_POLICY_ATTESTATION_DOMAIN: &[u8] =
     b"symthaea-neurosemantic-policy-attestation-v1\0";
 const MAX_NEUROSEMANTIC_AUTHORITY_REF_BYTES: usize = 4096;
@@ -255,12 +257,13 @@ pub struct NeurosemanticAuthorityResolutionAttestation {
     pub direction: ChannelDirection,
     pub status: NeurosemanticAuthorityStatus,
     pub status_source_ref: String,
+    pub status_source_hash: String,
     pub checked_at_unix_s: u64,
     pub expires_at_unix_s: u64,
     pub signature: Vec<u8>,
 }
 
-pub const NEUROSEMANTIC_AUTHORITY_RESOLUTION_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_AUTHORITY_RESOLUTION_SCHEMA_VERSION: u16 = 2;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NeurosemanticPolicyProvenanceBinding {
@@ -281,6 +284,8 @@ pub struct NeurosemanticPolicyProvenanceBinding {
     authority_resolution_lease_id: String,
     authority_resolution_consent_epoch: u64,
     authority_resolution_lease_fingerprint: String,
+    authority_resolution_status_source_ref: String,
+    authority_resolution_status_source_hash: String,
     authority_resolution_purpose: CommunicationPurpose,
     authority_resolution_channel: CognitiveChannel,
     authority_resolution_direction: ChannelDirection,
@@ -326,6 +331,7 @@ impl NeurosemanticAuthorityResolutionAttestation {
             || !valid_blake3_digest(&self.consent_lease_fingerprint)
             || !valid_identifier(&self.status_source_ref)
             || self.status_source_ref.len() > MAX_NEUROSEMANTIC_STATUS_SOURCE_REF_BYTES
+            || !valid_blake3_digest(&self.status_source_hash)
             || self.checked_at_unix_s >= self.expires_at_unix_s
             || self.expires_at_unix_s.saturating_sub(self.checked_at_unix_s)
                 > MAX_NEUROSEMANTIC_AUTHORITY_RESOLUTION_TTL_S
@@ -347,6 +353,17 @@ impl NeurosemanticAuthorityResolutionAttestation {
             .map_err(|error| format!("neurosemantic authority resolution JSON: {error}"))?;
         resolution.validate()?;
         Ok(resolution)
+    }
+
+    /// Verify that the exact external authority/status record is bound to the
+    /// declared status-source reference and digest. The resolver signature still
+    /// determines the asserted status; this check only prevents source-artifact
+    /// substitution behind an otherwise unchanged source reference.
+    pub fn verify_status_source_binding_bytes(&self, record_bytes: &[u8]) -> bool {
+        self.validate().is_ok()
+            && record_bytes.len() <= MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            && compute_status_source_hash(&self.status_source_ref, record_bytes)
+                == self.status_source_hash
     }
 
     pub fn verify(
@@ -578,6 +595,14 @@ impl NeurosemanticPolicyProvenanceBinding {
     pub fn authority_resolution_lease_fingerprint(&self) -> &str {
         &self.authority_resolution_lease_fingerprint
     }
+
+    pub fn authority_resolution_status_source_ref(&self) -> &str {
+        &self.authority_resolution_status_source_ref
+    }
+
+    pub fn authority_resolution_status_source_hash(&self) -> &str {
+        &self.authority_resolution_status_source_hash
+    }
 }
 
 impl NeurosemanticHandlingPolicy {
@@ -641,6 +666,7 @@ impl NeurosemanticHandlingPolicy {
         &self,
         record_bytes: &[u8],
         derivation_record_bytes: &[u8],
+        status_record_bytes: &[u8],
         attestation: &NeurosemanticPolicyAuthorityAttestation,
         verifying_key: &VerifyingKey,
         resolution: &NeurosemanticAuthorityResolutionAttestation,
@@ -653,6 +679,7 @@ impl NeurosemanticHandlingPolicy {
         }
         if record_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
             || derivation_record_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            || status_record_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
         {
             return Err("neurosemantic provenance record exceeds the serialized artifact limit".into());
         }
@@ -668,6 +695,9 @@ impl NeurosemanticHandlingPolicy {
         ) != self.derivation_provenance_hash
         {
             return Err("neurosemantic derivation provenance reference/record binding mismatch".into());
+        }
+        if !resolution.verify_status_source_binding_bytes(status_record_bytes) {
+            return Err("neurosemantic authority status source reference/record binding mismatch".into());
         }
         context.validate()?;
         attestation.verify(
@@ -718,6 +748,8 @@ impl NeurosemanticHandlingPolicy {
             authority_resolution_lease_id: resolution.lease_id.clone(),
             authority_resolution_consent_epoch: resolution.consent_epoch,
             authority_resolution_lease_fingerprint: resolution.consent_lease_fingerprint.clone(),
+            authority_resolution_status_source_ref: resolution.status_source_ref.clone(),
+            authority_resolution_status_source_hash: resolution.status_source_hash.clone(),
             authority_resolution_purpose: resolution.purpose,
             authority_resolution_channel: resolution.channel,
             authority_resolution_direction: resolution.direction,
@@ -1436,6 +1468,16 @@ pub fn compute_derivation_provenance_hash(provenance_ref: &str, record_bytes: &[
     hasher.finalize().to_hex().to_string()
 }
 
+pub fn compute_status_source_hash(provenance_ref: &str, record_bytes: &[u8]) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(NEUROSEMANTIC_STATUS_SOURCE_DOMAIN);
+    hasher.update(&(provenance_ref.len() as u64).to_le_bytes());
+    hasher.update(provenance_ref.as_bytes());
+    hasher.update(&(record_bytes.len() as u64).to_le_bytes());
+    hasher.update(record_bytes);
+    hasher.finalize().to_hex().to_string()
+}
+
 fn valid_identifier(value: &str) -> bool {
     !value.trim().is_empty() && value.len() <= MAX_NEUROSEMANTIC_ID_BYTES
 }
@@ -1554,6 +1596,10 @@ mod tests {
             direction: context.direction,
             status: NeurosemanticAuthorityStatus::Active,
             status_source_ref: "mycelix-status:synthetic-1".into(),
+            status_source_hash: compute_status_source_hash(
+                "mycelix-status:synthetic-1",
+                b"synthetic-status-record-1",
+            ),
             checked_at_unix_s,
             expires_at_unix_s,
             signature: Vec::new(),
@@ -1574,6 +1620,7 @@ mod tests {
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
                 b"synthetic-derivation-record-1",
+                b"synthetic-status-record-1",
                 &attestation,
                 &verifying_key,
                 &resolution,
@@ -1695,7 +1742,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_data_policy_schema_is_rejected_by_v6_validator() {
+    fn legacy_data_policy_schema_is_rejected_by_v7_validator() {
         let policy = semantic_policy();
         let mut value = serde_json::to_value(&policy).unwrap();
         value
@@ -1871,6 +1918,7 @@ mod tests {
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
                 b"synthetic-derivation-record-1",
+                b"synthetic-status-record-1",
                 &attestation,
                 &verifying_key,
                 &resolution,
@@ -1968,6 +2016,7 @@ mod tests {
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
                 b"synthetic-derivation-record-1",
+                b"synthetic-status-record-1",
                 &substituted_attestation,
                 &authority_key,
                 &resolution,
@@ -1990,6 +2039,7 @@ mod tests {
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
                 b"synthetic-derivation-record-1",
+                b"synthetic-status-record-1",
                 &attestation,
                 &authority_key,
                 &resolution,
@@ -2071,6 +2121,7 @@ mod tests {
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
                 b"synthetic-derivation-record-1",
+                b"synthetic-status-record-1",
                 &attestation,
                 &authority_key,
                 &resolution,
@@ -2097,6 +2148,7 @@ mod tests {
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
                 b"synthetic-derivation-record-1",
+                b"synthetic-status-record-1",
                 &attestation,
                 &authority_key,
                 &resolution,
@@ -2160,6 +2212,7 @@ mod tests {
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
                 b"synthetic-derivation-record-1",
+                b"synthetic-status-record-1",
                 &attestation,
                 &authority_key,
                 &resolution,
@@ -2176,6 +2229,7 @@ mod tests {
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
                 b"synthetic-derivation-record-1",
+                b"synthetic-status-record-1",
                 &attestation,
                 &authority_key,
                 &suspended,
@@ -2190,6 +2244,7 @@ mod tests {
             .bind_policy_provenance_with_attestation_and_resolution(
                 b"synthetic-policy-record-1",
                 b"synthetic-derivation-record-1",
+                b"synthetic-status-record-1",
                 &attestation,
                 &authority_key,
                 &resolution,
@@ -2275,6 +2330,46 @@ mod tests {
     }
 
     #[test]
+    fn authority_resolution_requires_exact_status_source_record() {
+        let policy = semantic_policy();
+        let (attestation, authority_key) = authority_attestation(&policy);
+        let context = binding_context();
+        let (resolution, resolver_key) =
+            authority_resolution(&policy, &attestation, &context, 100, 2_000);
+        assert!(resolution.verify_status_source_binding_bytes(b"synthetic-status-record-1"));
+        assert!(!resolution.verify_status_source_binding_bytes(b"synthetic-status-record-2"));
+
+        assert!(policy
+            .handling
+            .bind_policy_provenance_with_attestation_and_resolution(
+                b"synthetic-policy-record-1",
+                b"synthetic-derivation-record-1",
+                b"synthetic-status-record-1",
+                &attestation,
+                &authority_key,
+                &resolution,
+                &resolver_key,
+                &context,
+                150,
+            )
+            .is_ok());
+        assert!(policy
+            .handling
+            .bind_policy_provenance_with_attestation_and_resolution(
+                b"synthetic-policy-record-1",
+                b"synthetic-derivation-record-1",
+                b"synthetic-status-record-2",
+                &attestation,
+                &authority_key,
+                &resolution,
+                &resolver_key,
+                &context,
+                150,
+            )
+            .is_err());
+    }
+
+    #[test]
     fn handling_policy_defaults_to_deny() {
         let policy = NeurosemanticHandlingPolicy::default();
         assert!(!policy.validates());
@@ -2295,6 +2390,11 @@ mod tests {
                 "synthetic-policy-record-1",
                 b"synthetic-policy-record-1",
             ),
+            derivation_provenance_ref: "synthetic-derivation-record-1".into(),
+            derivation_provenance_hash: compute_derivation_provenance_hash(
+                "synthetic-derivation-record-1",
+                b"synthetic-derivation-record-1",
+            ),
             origin_jurisdiction: "ZA".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
             permitted_secondary_uses: BTreeSet::new(),
@@ -2312,6 +2412,11 @@ mod tests {
             schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
             policy_provenance_ref: "synthetic-policy-record-1".into(),
             policy_provenance_hash: String::new(),
+            derivation_provenance_ref: "synthetic-derivation-record-1".into(),
+            derivation_provenance_hash: compute_derivation_provenance_hash(
+                "synthetic-derivation-record-1",
+                b"synthetic-derivation-record-1",
+            ),
             origin_jurisdiction: "ZA".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
             permitted_secondary_uses: BTreeSet::new(),
@@ -2432,6 +2537,11 @@ mod tests {
             schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
             policy_provenance_ref: String::new(),
             policy_provenance_hash: String::new(),
+            derivation_provenance_ref: "synthetic-derivation-record-1".into(),
+            derivation_provenance_hash: compute_derivation_provenance_hash(
+                "synthetic-derivation-record-1",
+                b"synthetic-derivation-record-1",
+            ),
             origin_jurisdiction: "ZA".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
             permitted_secondary_uses: BTreeSet::new(),
@@ -2451,6 +2561,11 @@ mod tests {
             policy_provenance_hash: compute_policy_provenance_hash(
                 "synthetic-policy-record-1",
                 b"synthetic-policy-record-1",
+            ),
+            derivation_provenance_ref: "synthetic-derivation-record-1".into(),
+            derivation_provenance_hash: compute_derivation_provenance_hash(
+                "synthetic-derivation-record-1",
+                b"synthetic-derivation-record-1",
             ),
             origin_jurisdiction: "ZA".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into(), "GB".into()]),
