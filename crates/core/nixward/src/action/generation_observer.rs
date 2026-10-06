@@ -10,7 +10,7 @@ const SYSTEM_PROFILE: &str = "/nix/var/nix/profiles/system";
 const GENERATION_PREFIX: &str = "system-";
 const GENERATION_SUFFIX: &str = "-link";
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct NixVerifiedNixOSGenerationV1 {
     generation: u64,
     profile_path: PathBuf,
