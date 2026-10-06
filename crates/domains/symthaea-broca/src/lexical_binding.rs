@@ -126,6 +126,9 @@ pub const MORPHOPHONOLOGICAL_RULE_SELECTION_POLICY: &str =
 pub const MORPHOPHONOLOGICAL_RESOURCE_EVIDENCE_VERSION: &str =
     "broca-morphophonological-resource-evidence-v2";
 
+pub const MORPHOPHONOLOGICAL_COMPILATION_WITNESS_VERSION: &str =
+    "broca-morphophonological-compilation-witness-v1";
+
 /// Whether an executable morphology resource is externally sourced or explicitly
 /// authored as a local/fixture resource.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -311,6 +314,247 @@ impl std::fmt::Display for MorphophonologicalResourceEvidenceError {
 }
 
 impl std::error::Error for MorphophonologicalResourceEvidenceError {}
+
+/// One exact byte range selected from a frozen source artifact for compilation.
+///
+/// The verifier uses the offset/length to recompute the record digest from the actual source
+/// artifact rather than trusting a caller-supplied record identity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MorphophonologicalSourceSlice {
+    pub record_id: String,
+    pub byte_offset: usize,
+    pub byte_length: usize,
+    pub record_blake3: String,
+}
+
+/// Provenance for the transformation from selected source-artifact records into the exact
+/// executable morphophonological rule set.
+///
+/// This proves byte-level source selection and binds that selection to a named compiler policy
+/// and exact output rule-set identity. It deliberately does not claim semantic equivalence to
+/// the external linguistic resource.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MorphophonologicalCompilationWitness {
+    pub version: String,
+    pub compiler_id: String,
+    pub compiler_version: String,
+    pub normalization_policy: String,
+    pub source_artifact_blake3: String,
+    pub source_selection_blake3: String,
+    pub source_slices: Vec<MorphophonologicalSourceSlice>,
+    pub output_rule_set_blake3: String,
+    pub transformation_blake3: String,
+}
+
+impl MorphophonologicalCompilationWitness {
+    pub fn new(
+        compiler_id: impl Into<String>,
+        compiler_version: impl Into<String>,
+        normalization_policy: impl Into<String>,
+        source_artifact: &[u8],
+        source_slices: Vec<MorphophonologicalSourceSlice>,
+        output_rule_set: &MorphophonologicalRuleSet,
+    ) -> Result<Self, MorphophonologicalCompilationWitnessError> {
+        output_rule_set
+            .validate()
+            .map_err(|_| MorphophonologicalCompilationWitnessError::InvalidRuleSet)?;
+
+        let witness = Self {
+            version: MORPHOPHONOLOGICAL_COMPILATION_WITNESS_VERSION.to_string(),
+            compiler_id: compiler_id.into(),
+            compiler_version: compiler_version.into(),
+            normalization_policy: normalization_policy.into(),
+            source_artifact_blake3: blake3::hash(source_artifact).to_hex().to_string(),
+            source_selection_blake3: String::new(),
+            source_slices,
+            output_rule_set_blake3: output_rule_set.resource_blake3(),
+            transformation_blake3: String::new(),
+        };
+
+        witness.validate_shape()?;
+        let mut witness = witness;
+        witness.source_selection_blake3 = witness.compute_source_selection_blake3();
+        witness.transformation_blake3 = witness.compute_transformation_blake3();
+        witness.validate_against_source_artifact_and_rule_set(source_artifact, output_rule_set)?;
+        Ok(witness)
+    }
+
+    pub fn validate_shape(&self) -> Result<(), MorphophonologicalCompilationWitnessError> {
+        if self.version != MORPHOPHONOLOGICAL_COMPILATION_WITNESS_VERSION {
+            return Err(MorphophonologicalCompilationWitnessError::InvalidVersion);
+        }
+        for value in [
+            self.compiler_id.as_str(),
+            self.compiler_version.as_str(),
+            self.normalization_policy.as_str(),
+        ] {
+            if value.trim().is_empty() {
+                return Err(MorphophonologicalCompilationWitnessError::EmptyMetadata);
+            }
+        }
+        if !is_canonical_blake3_digest(&self.source_artifact_blake3)
+            || !is_canonical_blake3_digest(&self.source_selection_blake3)
+            || !is_canonical_blake3_digest(&self.output_rule_set_blake3)
+            || !is_canonical_blake3_digest(&self.transformation_blake3)
+        {
+            return Err(MorphophonologicalCompilationWitnessError::MalformedDigest);
+        }
+        if self.source_slices.is_empty() {
+            return Err(MorphophonologicalCompilationWitnessError::EmptySourceSelection);
+        }
+
+        let mut ids = HashSet::new();
+        let mut ranges = self
+            .source_slices
+            .iter()
+            .map(|slice| {
+                if slice.record_id.trim().is_empty()
+                    || !is_canonical_blake3_digest(&slice.record_blake3)
+                {
+                    return Err(MorphophonologicalCompilationWitnessError::MalformedSourceSlice);
+                }
+                if !ids.insert(slice.record_id.clone()) {
+                    return Err(MorphophonologicalCompilationWitnessError::DuplicateSourceRecordId);
+                }
+                let end = slice
+                    .byte_offset
+                    .checked_add(slice.byte_length)
+                    .ok_or(MorphophonologicalCompilationWitnessError::SourceRangeOverflow)?;
+                Ok((slice.byte_offset, end))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        ranges.sort_unstable();
+        for window in ranges.windows(2) {
+            if window[0].1 > window[1].0 {
+                return Err(MorphophonologicalCompilationWitnessError::OverlappingSourceSlices);
+            }
+        }
+        Ok(())
+    }
+
+    fn compute_source_selection_blake3(&self) -> String {
+        let surface = self
+            .source_slices
+            .iter()
+            .map(|slice| {
+                format!(
+                    "{}:{}:{}:{}",
+                    slice.record_id, slice.byte_offset, slice.byte_length, slice.record_blake3
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("
+");
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-morphophonological-source-selection-v1 ");
+        hasher.update(surface.as_bytes());
+        hasher.finalize().to_hex().to_string()
+    }
+
+    fn compute_transformation_blake3(&self) -> String {
+        let surface = format!(
+            "{}
+{}
+{}
+{}
+{}",
+            self.compiler_id,
+            self.compiler_version,
+            self.normalization_policy,
+            self.source_selection_blake3,
+            self.output_rule_set_blake3,
+        );
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-morphophonological-compilation-v1 ");
+        hasher.update(surface.as_bytes());
+        hasher.finalize().to_hex().to_string()
+    }
+
+    /// Verify that every selected source slice matches the exact source artifact bytes and that
+    /// the declared compilation output is the exact current rule-set identity.
+    pub fn validate_against_source_artifact_and_rule_set(
+        &self,
+        source_artifact: &[u8],
+        output_rule_set: &MorphophonologicalRuleSet,
+    ) -> Result<(), MorphophonologicalCompilationWitnessError> {
+        self.validate_shape()?;
+        if self.source_artifact_blake3
+            != blake3::hash(source_artifact).to_hex().to_string()
+        {
+            return Err(MorphophonologicalCompilationWitnessError::SourceArtifactMismatch);
+        }
+        if self.output_rule_set_blake3 != output_rule_set.resource_blake3() {
+            return Err(MorphophonologicalCompilationWitnessError::OutputRuleSetMismatch);
+        }
+        if self.source_selection_blake3 != self.compute_source_selection_blake3() {
+            return Err(MorphophonologicalCompilationWitnessError::SourceSelectionMismatch);
+        }
+        if self.transformation_blake3 != self.compute_transformation_blake3() {
+            return Err(MorphophonologicalCompilationWitnessError::TransformationMismatch);
+        }
+
+        for slice in &self.source_slices {
+            let end = slice
+                .byte_offset
+                .checked_add(slice.byte_length)
+                .ok_or(MorphophonologicalCompilationWitnessError::SourceRangeOverflow)?;
+            let bytes = source_artifact
+                .get(slice.byte_offset..end)
+                .ok_or(MorphophonologicalCompilationWitnessError::SourceSliceOutOfBounds)?;
+            let actual = blake3::hash(bytes).to_hex().to_string();
+            if actual != slice.record_blake3 {
+                return Err(MorphophonologicalCompilationWitnessError::SourceRecordMismatch {
+                    record_id: slice.record_id.clone(),
+                });
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MorphophonologicalCompilationWitnessError {
+    InvalidVersion,
+    InvalidRuleSet,
+    EmptyMetadata,
+    MalformedDigest,
+    EmptySourceSelection,
+    MalformedSourceSlice,
+    DuplicateSourceRecordId,
+    SourceRangeOverflow,
+    OverlappingSourceSlices,
+    SourceArtifactMismatch,
+    SourceSliceOutOfBounds,
+    SourceRecordMismatch { record_id: String },
+    SourceSelectionMismatch,
+    OutputRuleSetMismatch,
+    TransformationMismatch,
+}
+
+impl std::fmt::Display for MorphophonologicalCompilationWitnessError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidVersion => write!(f, "morphophonological compilation witness version is unsupported"),
+            Self::InvalidRuleSet => write!(f, "morphophonological compilation witness output rule set is invalid"),
+            Self::EmptyMetadata => write!(f, "morphophonological compilation witness compiler metadata must be non-empty"),
+            Self::MalformedDigest => write!(f, "morphophonological compilation witness contains a malformed BLAKE3 digest"),
+            Self::EmptySourceSelection => write!(f, "morphophonological compilation witness must select at least one source record"),
+            Self::MalformedSourceSlice => write!(f, "morphophonological compilation witness contains a malformed source slice"),
+            Self::DuplicateSourceRecordId => write!(f, "morphophonological compilation witness source record ids must be unique"),
+            Self::SourceRangeOverflow => write!(f, "morphophonological compilation witness source range overflows"),
+            Self::OverlappingSourceSlices => write!(f, "morphophonological compilation witness source slices must not overlap"),
+            Self::SourceArtifactMismatch => write!(f, "morphophonological compilation witness source artifact does not match"),
+            Self::SourceSliceOutOfBounds => write!(f, "morphophonological compilation witness source slice is out of bounds"),
+            Self::SourceRecordMismatch { record_id } => write!(f, "morphophonological compilation witness source record {record_id} does not match its exact bytes"),
+            Self::SourceSelectionMismatch => write!(f, "morphophonological compilation witness source selection digest does not match its selected records"),
+            Self::OutputRuleSetMismatch => write!(f, "morphophonological compilation witness output rule-set identity does not match"),
+            Self::TransformationMismatch => write!(f, "morphophonological compilation witness transformation digest does not match its declared inputs"),
+        }
+    }
+}
+
+impl std::error::Error for MorphophonologicalCompilationWitnessError {}
 
 fn is_canonical_blake3_digest(value: &str) -> bool {
     value.len() == 64
@@ -2361,6 +2605,61 @@ mod tests {
         );
     }
 
+    #[test]
+    fn morphophonological_compilation_witness_binds_source_selection_and_output_rule_set() {
+        let binding = morphophonological_fixture_binding();
+        let rule_set = morphophonological_fixture_rule_set();
+        let artifact = b"row0\tfixture\nrow1\tfixture\n";
+        let slices = vec![
+            MorphophonologicalSourceSlice {
+                record_id: "row0".into(),
+                byte_offset: 0,
+                byte_length: 13,
+                record_blake3: blake3::hash(&artifact[..13]).to_hex().to_string(),
+            },
+            MorphophonologicalSourceSlice {
+                record_id: "row1".into(),
+                byte_offset: 13,
+                byte_length: artifact.len() - 13,
+                record_blake3: blake3::hash(&artifact[13..]).to_hex().to_string(),
+            },
+        ];
+
+        let witness = MorphophonologicalCompilationWitness::new(
+            "symthaea-fixture-compiler",
+            "fixture-compiler-v1",
+            "fixture-normalization-v1",
+            artifact,
+            slices,
+            &rule_set,
+        )
+        .expect("compilation witness should validate");
+
+        witness
+            .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
+            .expect("exact source selection and rule-set identity should replay");
+
+        let mut tampered = artifact.to_vec();
+        tampered[0] = b'X';
+        assert_eq!(
+            witness
+                .validate_against_source_artifact_and_rule_set(&tampered, &rule_set)
+                .expect_err("source artifact tampering must fail closed"),
+            MorphophonologicalCompilationWitnessError::SourceArtifactMismatch
+        );
+
+        let mut rule_tampered = rule_set.clone();
+        rule_tampered.rules[0].operation =
+            MorphophonologicalRuleOperation::AppendSuffix { suffix: "t".into() };
+        assert_eq!(
+            witness
+                .validate_against_source_artifact_and_rule_set(artifact, &rule_tampered)
+                .expect_err("output rule-set tampering must fail closed"),
+            MorphophonologicalCompilationWitnessError::OutputRuleSetMismatch
+        );
+    }
+
+    #[test]
     #[test]
     fn morphophonological_resource_evidence_verifies_exact_source_artifact_bytes() {
         let artifact = b"fixture morphology resource v2\nwalk<TAB>walked<TAB>V;PST\n";
