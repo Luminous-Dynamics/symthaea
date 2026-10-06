@@ -354,26 +354,29 @@ impl NeurosemanticArtifactLifecycleReceipt {
             NeurosemanticArtifactLifecycleState::Requested
             | NeurosemanticArtifactLifecycleState::Accepted
             | NeurosemanticArtifactLifecycleState::Processing => {
-                if has_effect || has_verification {
+                if has_effect || has_verification || self.effect_agent_ref.is_some() {
                     return Err("neurosemantic lifecycle pre-application state cannot claim effect or independent verification evidence".into());
                 }
             }
             NeurosemanticArtifactLifecycleState::Applied => {
-                if !has_effect || has_verification {
-                    return Err("neurosemantic applied lifecycle state requires effect evidence and no independent verification".into());
+                if !has_effect || has_verification || self.effect_agent_ref.is_none() {
+                    return Err("neurosemantic applied lifecycle state requires effect evidence, an effect agent, and no independent verification".into());
                 }
             }
             NeurosemanticArtifactLifecycleState::IndependentlyVerified => {
-                if !has_effect || !has_verification {
-                    return Err("neurosemantic independently-verified lifecycle state requires both effect and verifier evidence".into());
+                if !has_effect || !has_verification || self.effect_agent_ref.is_none() {
+                    return Err("neurosemantic independently-verified lifecycle state requires effect evidence, an effect agent, and verifier evidence".into());
                 }
                 if self.verification_target_effect_evidence_hash != self.effect_evidence_hash {
                     return Err("neurosemantic verifier target does not match the applied effect evidence".into());
                 }
+                if self.verification_agent_ref == self.effect_agent_ref {
+                    return Err("neurosemantic independent verifier must differ from the effect agent".into());
+                }
             }
             NeurosemanticArtifactLifecycleState::Rejected => {
-                if has_verification {
-                    return Err("neurosemantic rejected lifecycle state cannot claim independent verification".into());
+                if has_verification || self.effect_agent_ref.is_some() {
+                    return Err("neurosemantic rejected lifecycle state cannot claim independent verification or applied effect identity".into());
                 }
             }
         }
@@ -483,6 +486,10 @@ impl NeurosemanticArtifactLifecycleReceipt {
         )?;
         if compute_lifecycle_verification_scope_hash(scope_ref, scope_bytes) != expected_hash {
             return Err("neurosemantic lifecycle verification scope hash mismatch".into());
+        }
+        let target_set = NeurosemanticArtifactLifecycleVerificationTargetSet::from_json_bytes(scope_bytes)?;
+        if target_set.scope_ref != scope_ref || target_set.root_artifact_hash != self.artifact_hash {
+            return Err("neurosemantic lifecycle verification target set does not match the receipt root".into());
         }
         Ok(())
     }
