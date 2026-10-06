@@ -5539,7 +5539,11 @@ mod tests {
             "raid1-btrfs",
             "raid1-mdadm",
             "raid5-mdadm",
+            "raid6-mdadm",
+            "raid10-mdadm",
             "zfs-mirror",
+            "zfs-raidz",
+            "zfs-raidz2",
         ];
         for layout in layouts {
             let message = ClientMessage {
