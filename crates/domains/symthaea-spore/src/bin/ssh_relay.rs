@@ -2775,6 +2775,18 @@ async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
         ));
     }
 
+    let configuration = std::path::Path::new(&image_dir).join("configuration.nix");
+    let configuration_metadata = tokio::fs::symlink_metadata(&configuration)
+        .await
+        .map_err(|error| format!("image configuration sidecar postcondition probe failed: {error}"))?;
+    if !configuration_metadata.file_type().is_file()
+        || configuration_metadata.len() == 0
+        || configuration_metadata.uid() != unsafe { libc::geteuid() }
+        || configuration_metadata.mode() & 0o077 != 0
+    {
+        return Ok(false);
+    }
+
     for artifact in ["system.btrfs.zst", "system.tar.gz"] {
         let path = std::path::Path::new(&image_dir).join(artifact);
         let Ok(metadata) = tokio::fs::symlink_metadata(&path).await else {
@@ -6409,7 +6421,7 @@ else
     echo "Image size: $SIZE"
 fi
 
-cp /etc/nixos/configuration.nix "$DEST/" 2>/dev/null || true
+cp /etc/nixos/configuration.nix "$DEST/"
 cp /etc/nixos/hardware-configuration.nix "$DEST/" 2>/dev/null || true
 cp /etc/nixos/flake.nix "$DEST/" 2>/dev/null || true
 cp /etc/nixos/flake.lock "$DEST/" 2>/dev/null || true
