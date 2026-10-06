@@ -5012,6 +5012,68 @@ mod tests {
     }
 
     #[test]
+    fn measurement_uncertainty_budget_attested_frontier_digest_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-budget-attestation-digest",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "budget-attestation-digest",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .uncertainty_budget_component_set_digest = "different-budget-frontier".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBudgetComponentSetDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_budget_attested_frontier_count_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-budget-attestation-count",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "budget-attestation-count",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .uncertainty_budget_component_count = 2;
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBudgetComponentCountMismatch { .. }
+        ));
+    }
+
+    #[test]
     fn measurement_uncertainty_budget_component_count_fails_closed() {
         let c = candidate(
             "uncertainty-component-count",
@@ -5071,8 +5133,7 @@ mod tests {
             .unwrap_err();
         assert!(matches!(
             error,
-            AssessmentError::MeasurementUncertaintyComponentRefsDigestMismatch { .. }
-                | AssessmentError::MeasurementUncertaintyBudgetComponentSetDigestMismatch { .. }
+            AssessmentError::MeasurementUncertaintyBudgetComponentSetDigestMismatch { .. }
         ));
     }
 
