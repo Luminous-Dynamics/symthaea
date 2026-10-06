@@ -1329,6 +1329,9 @@ mod tests {
         stability: Option<NixPostStateStabilityEvidenceV1>,
     ) -> Result<NixPostStateReceiptV1, NixPostStateErrorV1> {
         let verified = NixVerifiedPostStateObservationV1::from_observer(obs.clone())?;
+        let verified_stability = stability
+            .map(NixVerifiedPostStateStabilityEvidenceV1::from_observer)
+            .transpose()?;
 
         use super::super::authorization::{
             NixActionIntentV1, NixAuthorizationProfileV1, NixActionScopeV1,
@@ -1358,7 +1361,7 @@ mod tests {
             &authorization,
             exp,
             &verified,
-            stability,
+            verified_stability.as_ref(),
             "systemd-observer-v1",
             "1",
         )
@@ -1373,6 +1376,7 @@ mod tests {
             operation,
             unit: "nginx.service".to_string(),
             observed_generation: 42,
+            unit_object_path: "/org/freedesktop/systemd1/unit/nginx_2eservice".to_string(),
             definition_identity: definition(),
             active_state,
             sub_state: "running".to_string(),
@@ -1387,9 +1391,42 @@ mod tests {
                     manager_owner: ":1.123".to_string(),
                 }
             }),
+            systemd_manager_owner: Some(":1.123".to_string()),
             invocation_id: Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string()),
             state_change_at_monotonic_us: 900,
             observed_at_monotonic_us: 2_000,
+        }
+    }
+
+    fn stability(
+        obs: &NixServicePostStateObservationV1,
+        required_window_us: u64,
+        window_start_monotonic_us: u64,
+        window_end_monotonic_us: u64,
+        captured_at: &[u64],
+    ) -> NixPostStateStabilityEvidenceV1 {
+        let samples = captured_at
+            .iter()
+            .map(|captured_at_monotonic_us| NixPostStateStabilitySampleV1 {
+                operation: obs.operation,
+                unit: obs.unit.clone(),
+                unit_object_path: obs.unit_object_path.clone(),
+                observed_generation: obs.observed_generation,
+                definition_digest: obs.definition_digest().unwrap(),
+                state_digest: obs.state_digest().unwrap(),
+                manager_owner: obs.systemd_manager_owner.clone().unwrap(),
+                invocation_id: obs.invocation_id.clone(),
+                state_change_at_monotonic_us: obs.state_change_at_monotonic_us,
+                captured_at_monotonic_us: *captured_at_monotonic_us,
+            })
+            .collect::<Vec<_>>();
+        let sequence_digest = stability_sequence_digest(&samples).unwrap();
+        NixPostStateStabilityEvidenceV1 {
+            required_window_us,
+            window_start_monotonic_us: window_start_monotonic_us,
+            window_end_monotonic_us: window_end_monotonic_us,
+            samples,
+            sequence_digest,
         }
     }
 
@@ -1497,13 +1534,13 @@ mod tests {
         let receipt = build_receipt(
             &exp,
             &obs,
-            Some(NixPostStateStabilityEvidenceV1 {
-                required_window_us: 1_000,
-                window_start_monotonic_us: 1_000,
-                window_end_monotonic_us: 2_000,
-                last_state_change_at_monotonic_us: 900,
-                sample_count: 2,
-            }),
+            Some(stability(
+                &obs,
+                1_000,
+                1_000,
+                2_000,
+                &[1_000, 2_000],
+            )),
         )
         .unwrap();
 
@@ -1522,13 +1559,17 @@ mod tests {
                 ServiceActiveStateV1::Active,
                 ServiceUnitFileStateV1::Enabled,
             ),
-            Some(NixPostStateStabilityEvidenceV1 {
-                required_window_us: 1_000,
-                window_start_monotonic_us: 1_500,
-                window_end_monotonic_us: 2_000,
-                last_state_change_at_monotonic_us: 900,
-                sample_count: 2,
-            }),
+            Some(stability(
+                &observation(
+                    NixServiceOperationKindV1::Start,
+                    ServiceActiveStateV1::Active,
+                    ServiceUnitFileStateV1::Enabled,
+                ),
+                1_000,
+                1_500,
+                2_000,
+                &[1_500, 2_000],
+            )),
         );
 
         assert_eq!(
@@ -1614,7 +1655,7 @@ mod tests {
         variants.push(changed);
 
         let mut changed = receipt.clone();
-        changed.systemd_manager_owner = Some(":1.124".into());
+        changed.systemd_manager_owner = ":1.124".into();
         variants.push(changed);
 
         let mut changed = receipt.clone();
@@ -1656,42 +1697,36 @@ mod tests {
     }
 
     #[test]
-    fn receipt_cannot_have_job_evidence_without_manager_incarnation() {
+    fn receipt_requires_observation_manager_incarnation() {
         let mut obs = observation(
             NixServiceOperationKindV1::Start,
             ServiceActiveStateV1::Active,
             ServiceUnitFileStateV1::Enabled,
         );
-        let verified = NixVerifiedPostStateObservationV1::from_observer(obs.clone()).unwrap();
-        let receipt = build_receipt(
-            &expectation(NixServiceOperationKindV1::Start),
-            &obs,
-            None,
-        )
-        .unwrap();
-        let mut tampered = receipt;
-        tampered.systemd_manager_owner = None;
+        obs.systemd_manager_owner = None;
         assert_eq!(
-            tampered.validate_shape().unwrap_err(),
-            NixPostStateErrorV1::IncompleteJobEvidence
+            build_receipt(
+                &expectation(NixServiceOperationKindV1::Start),
+                &obs,
+                None,
+            ).unwrap_err(),
+            NixPostStateErrorV1::MissingManagerOwner
         );
-        let _ = verified;
     }
 
     #[test]
-    fn receipt_without_job_evidence_cannot_carry_manager_incarnation() {
+    fn receipt_manager_incarnation_is_not_optional_for_enablement() {
         let exp = expectation(NixServiceOperationKindV1::Enable);
         let obs = observation(
             NixServiceOperationKindV1::Enable,
             ServiceActiveStateV1::Inactive,
             ServiceUnitFileStateV1::Enabled,
         );
-        let receipt = build_receipt(&exp, &obs, None).unwrap();
-        let mut tampered = receipt;
-        tampered.systemd_manager_owner = Some(":1.124".into());
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.systemd_manager_owner = "org.freedesktop.systemd1".into();
         assert_eq!(
-            tampered.validate_shape().unwrap_err(),
-            NixPostStateErrorV1::IncompleteJobEvidence
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::InvalidManagerOwner
         );
     }
 
@@ -1728,13 +1763,13 @@ mod tests {
         let mut receipt = build_receipt(
             &exp,
             &obs,
-            Some(NixPostStateStabilityEvidenceV1 {
-                required_window_us: 1_000,
-                window_start_monotonic_us: 1_000,
-                window_end_monotonic_us: 2_000,
-                last_state_change_at_monotonic_us: 900,
-                sample_count: 2,
-            }),
+            Some(stability(
+                &obs,
+                1_000,
+                1_000,
+                2_000,
+                &[1_000, 2_000],
+            )),
         )
         .unwrap();
         assert_eq!(receipt.claim, NixPostStateClaimV1::Proven);
@@ -1764,13 +1799,13 @@ mod tests {
         let result = build_receipt(
             &exp,
             &obs,
-            Some(NixPostStateStabilityEvidenceV1 {
-                required_window_us: 1,
-                window_start_monotonic_us: 1_000,
-                window_end_monotonic_us: 2_000,
-                last_state_change_at_monotonic_us: 900,
-                sample_count: 2,
-            }),
+            Some(stability(
+                &obs,
+                1,
+                1_000,
+                2_000,
+                &[1_000, 2_000],
+            )),
         );
         assert_eq!(result.unwrap_err(), NixPostStateErrorV1::Violated);
     }
