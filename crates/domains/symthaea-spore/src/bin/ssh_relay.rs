@@ -2924,9 +2924,11 @@ echo "  User password set."
                 }
 
                 if !staged_secret_paths.is_empty() {
+                    // Session-scoped paths are generated locally from the numeric
+                    // session id, so no user-controlled shell metacharacters can appear.
                     let cleanup = staged_secret_paths
                         .iter()
-                        .map(|path| format!("rm -f '{}'", path))
+                        .map(|path| format!("rm -f -- {}", path))
                         .collect::<Vec<_>>()
                         .join("; ");
                     script = format!("trap '{}' EXIT\n{}", cleanup, script);
@@ -5636,6 +5638,22 @@ mod tests {
     }
 
     // ── Generated config secret hygiene ──
+
+    #[test]
+    fn cleanup_trap_contains_no_nested_shell_quotes() {
+        let paths = [
+            "/tmp/sovereign-user-pw-42",
+            "/tmp/sovereign-luks-pw-42",
+        ];
+        let cleanup = paths
+            .iter()
+            .map(|path| format!("rm -f -- {}", path))
+            .collect::<Vec<_>>()
+            .join("; ");
+        let trap = format!("trap '{}' EXIT", cleanup);
+        assert!(trap.contains("rm -f -- /tmp/sovereign-user-pw-42"));
+        assert!(!trap.contains("rm -f '/tmp"));
+    }
 
     #[test]
     fn single_luks_script_uses_session_scoped_keyfile_not_secret_text() {
