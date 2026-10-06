@@ -93,7 +93,11 @@ pub fn verify_eddsa_jcs_2022(
         .unwrap_or(false)
         || resolved_method.method_type() != resolution.verification_method_type
         || resolved_method.material_digest != resolution.verification_method_material_digest
-        || resolved_method.controller != resolution.resolved_verification_method_controller
+        || !url_values_equivalent(
+            resolved_method.controller.as_str(),
+            resolution.resolved_verification_method_controller.as_str(),
+        )
+        .unwrap_or(false)
         || resolved_method.lifecycle != resolution.verification_method_lifecycle
     {
         return Err(SnapshotError::Verification(
