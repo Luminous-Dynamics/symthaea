@@ -769,8 +769,7 @@ impl ClaimControllerDocumentIdentity {
 /// * the method identifier's primary resource is the controller document URL;
 /// * the controller document's `id` is that URL;
 /// * the resolved method identifier is exactly the requested method;
-/// * the method's declared controller exactly matches the controller requested for
-///   verification; and
+/// * the method's declared controller is exactly that controller-document URL; and
 /// * the exact method is a member of the requested verification relationship.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerificationMethodResolution {
@@ -867,13 +866,21 @@ impl VerificationMethodResolution {
         resolved_verification_method_controller
             .validate_structure()
             .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
-        Url::parse(resolved_verification_method_controller.as_str())
+        let resolved_controller = Url::parse(resolved_verification_method_controller.as_str())
             .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
+        if resolved_controller.as_str() != controller_document_ref {
+            return Err(VerificationFailure::ControllerMismatch {
+                expected: ClaimControllerIdentity::new(controller_document_ref.clone())
+                    .expect("validated controller document URL"),
+                actual: resolved_verification_method_controller,
+            });
+        }
 
-        if resolved_verification_method_controller != request.expected_controller {
+        if request.expected_controller.as_str() != controller_document_ref {
             return Err(VerificationFailure::ControllerMismatch {
                 expected: request.expected_controller.clone(),
-                actual: resolved_verification_method_controller,
+                actual: ClaimControllerIdentity::new(controller_document_ref.clone())
+                    .expect("validated controller document URL"),
             });
         }
 
@@ -992,8 +999,16 @@ impl VerificationMethodResolution {
             });
         }
 
-        Url::parse(self.resolved_verification_method_controller.as_str())
-            .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
+        let resolved_controller =
+            Url::parse(self.resolved_verification_method_controller.as_str())
+                .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
+        if resolved_controller.as_str() != self.controller_document_ref {
+            return Err(VerificationFailure::ControllerMismatch {
+                expected: ClaimControllerIdentity::new(self.controller_document_ref.clone())
+                    .expect("validated controller document URL"),
+                actual: self.resolved_verification_method_controller.clone(),
+            });
+        }
 
         self.verification_relationship.validate_structure()?;
         let mut canonical_methods = self.relationship_methods.clone();
@@ -1078,7 +1093,7 @@ impl VerificationMethodResolution {
 
     pub fn resolution_digest(&self) -> String {
         let encoded = (
-            "symthaea:verification-method-resolution:v2",
+            "symthaea:verification-method-resolution:v1",
             self.schema_version,
             self.verification_method.as_str(),
             self.verification_method_type.as_str(),
@@ -2039,68 +2054,6 @@ mod tests {
     }
 
     #[test]
-    fn resolution_accepts_verification_method_controller_distinct_from_document() {
-        let claim = fixture_claim();
-        let mut request = VerificationRequest::from_claim(
-            &claim,
-            ClaimProofPurpose::new("assertionMethod").unwrap(),
-            ClaimControllerIdentity::new("https://key-controller.example").unwrap(),
-            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
-            default_freshness(),
-        )
-        .unwrap();
-
-        request.controller_document_network_policy =
-            ControllerDocumentNetworkPolicy::strict_for_url(
-                request.verification_method.as_str()
-            )
-            .unwrap();
-
-        let resolution = VerificationMethodResolution::from_controller_document(
-            &request,
-            "https://example.test/controller",
-            ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
-            request.verification_method.clone(),
-            "Multikey",
-            &"44".repeat(32),
-            ClaimControllerIdentity::new("https://key-controller.example").unwrap(),
-            &[request.verification_method.clone()],
-            &"11".repeat(32),
-            VerificationMethodLifecycle::new(None, None).unwrap(),
-            ControllerDocumentSnapshotScope::historical_at(
-                request.freshness.lifecycle_reference_time(),
-                "snapshot:verification-history",
-                request.freshness.verification_time.as_str(),
-            )
-            .unwrap(),
-        )
-        .unwrap();
-
-        let dereference = ControllerDocumentDereferenceAttestation::from_adapter(
-            &request,
-            "https://example.test/controller",
-            "application/cid",
-            1024,
-            0,
-            request.freshness.verification_time.clone(),
-            ControllerDocumentResolutionSource::HistoricalRegistry,
-            &"11".repeat(32),
-            None,
-        )
-        .unwrap();
-        let resolution = resolution
-            .with_controller_document_dereference(dereference, &request)
-            .unwrap();
-
-        assert_eq!(
-            resolution.resolved_verification_method_controller.as_str(),
-            "https://key-controller.example"
-        );
-        assert!(resolution.validate_structure().is_ok());
-        assert!(resolution.matches_request(&request));
-    }
-
-    #[test]
     fn resolution_rejects_method_absent_from_requested_relationship() {
         let claim = fixture_claim();
         let request = VerificationRequest::from_claim(
@@ -2164,8 +2117,10 @@ mod tests {
         let mut wrong_controller = resolution.clone();
         wrong_controller.resolved_verification_method_controller =
             ClaimControllerIdentity::new("https://other.example").unwrap();
-        assert!(wrong_controller.validate_structure().is_ok());
-        assert!(!wrong_controller.matches_request(&request));
+        assert!(matches!(
+            wrong_controller.validate_structure(),
+            Err(VerificationFailure::ControllerMismatch { .. })
+        ));
 
         let mut missing_method = resolution.clone();
         missing_method.relationship_methods.clear();
