@@ -682,7 +682,7 @@ fn write_nix_settings(out: &mut String) {
         "    experimental-features = [ \"nix-command\" \"flakes\" ];"
     )
     .unwrap();
-    writeln!(out, "    trusted-users = [ \"root\" \"@wheel\" ];").unwrap();
+    // Least privilege: wheel members can use sudo when they need elevated Nix access;\n    // do not grant the Nix daemon blanket trusted-user authority to every wheel member.\n    writeln!(out, "    trusted-users = [ \"root\" ];").unwrap();
     writeln!(out, "  }};\n").unwrap();
 }
 
@@ -1149,6 +1149,17 @@ mod tests {
             "unexpected warnings: {:?}",
             result.warnings
         );
+    }
+
+    #[test]
+    fn generated_config_does_not_trust_wheel_group() {
+        let result = generate(&test_hw(), &test_choices(), &[]);
+        assert!(result
+            .configuration_nix
+            .contains("trusted-users = [ \"root\" ];"));
+        assert!(!result
+            .configuration_nix
+            .contains("trusted-users = [ \"root\" \"@wheel\" ];"));
     }
 
     #[test]
