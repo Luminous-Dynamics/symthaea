@@ -735,7 +735,11 @@ impl NeurosemanticHandlingPolicy {
         {
             return Err("neurosemantic policy provenance reference/record binding mismatch".into());
         }
-        self.verify_derivation_provenance_record_bytes(derivation_record_bytes)?;
+        let derivation_lineage =
+            self.verify_derivation_provenance_record_bytes(derivation_record_bytes)?;
+        if derivation_lineage.generated_at_unix_s > now_unix_s {
+            return Err("neurosemantic derivation lineage is dated in the future".into());
+        }
         if !resolution.verify_status_source_binding_bytes(status_record_bytes) {
             return Err("neurosemantic authority status source reference/record binding mismatch".into());
         }
@@ -2480,6 +2484,75 @@ mod tests {
                 b"synthetic-policy-record-1",
                 &serde_json::to_vec(&synthetic_derivation_lineage_record()).unwrap(),
                 b"synthetic-status-record-2",
+                &attestation,
+                &authority_key,
+                &resolution,
+                &resolver_key,
+                &context,
+                150,
+            )
+            .is_err());
+    }
+
+    #[test]
+    fn derivation_lineage_record_is_bounded_and_machine_verifiable() {
+        let record = synthetic_derivation_lineage_record();
+        let encoded = serde_json::to_vec(&record).unwrap();
+        assert_eq!(NeurosemanticDerivationLineageRecord::from_json_bytes(&encoded).unwrap(), record);
+
+        let mut duplicate = record.clone();
+        duplicate.input_artifact_refs.push("input-artifact-1".into());
+        assert!(duplicate.validate().is_err());
+
+        let mut bad_revision = record.clone();
+        bad_revision.execution_revision = "placeholder".into();
+        assert!(bad_revision.validate().is_err());
+
+        let oversized = vec![b' '; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1];
+        assert!(NeurosemanticDerivationLineageRecord::from_json_bytes(&oversized).is_err());
+    }
+
+    #[test]
+    fn packet_rejects_derivation_lineage_output_substitution() {
+        let mut policy = semantic_policy();
+        policy.handling.derivation_output_artifact_hash =
+            content_hash(&serde_json::to_vec(&NeurosemanticPayload::Hypervector(vec![9, 9])).unwrap());
+        assert!(NeurosemanticPacket::new_with_policy(
+            111,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            policy,
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn derivation_lineage_future_timestamp_is_fail_closed() {
+        let mut policy = semantic_policy();
+        let mut record = synthetic_derivation_lineage_record();
+        record.generated_at_unix_s = 151;
+        let record_bytes = serde_json::to_vec(&record).unwrap();
+        policy.handling.derivation_provenance_hash = compute_derivation_provenance_hash(
+            &policy.handling.derivation_provenance_ref,
+            &record_bytes,
+        );
+        let (attestation, authority_key) = authority_attestation(&policy);
+        let context = binding_context();
+        let (resolution, resolver_key) =
+            authority_resolution(&policy, &attestation, &context, 100, 2_000);
+        assert!(policy
+            .handling
+            .bind_policy_provenance_with_attestation_and_resolution(
+                b"synthetic-policy-record-1",
+                &record_bytes,
+                &serde_json::to_vec(&serde_json::json!({"status":"active"})).unwrap(),
                 &attestation,
                 &authority_key,
                 &resolution,
