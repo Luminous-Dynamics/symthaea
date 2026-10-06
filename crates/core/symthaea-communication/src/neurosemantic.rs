@@ -32,6 +32,8 @@ const NEUROSEMANTIC_DERIVATION_PROVENANCE_DOMAIN: &[u8] =
     b"symthaea-neurosemantic-derivation-provenance-v1\0";
 const NEUROSEMANTIC_STATUS_SOURCE_DOMAIN: &[u8] =
     b"symthaea-neurosemantic-status-source-v1\0";
+const NEUROSEMANTIC_LIFECYCLE_VERIFICATION_SCOPE_DOMAIN: &[u8] =
+    b"symthaea-neurosemantic-lifecycle-verification-scope-v1\0";
 const NEUROSEMANTIC_POLICY_ATTESTATION_DOMAIN: &[u8] =
     b"symthaea-neurosemantic-policy-attestation-v1\0";
 const MAX_NEUROSEMANTIC_AUTHORITY_REF_BYTES: usize = 4096;
@@ -215,6 +217,21 @@ pub struct NeurosemanticArtifactLifecycleReceipt {
     /// Lineage identity for the replacement/superseding artifact.
     pub resulting_derivation_provenance_ref: Option<String>,
     pub resulting_derivation_provenance_hash: Option<String>,
+}
+
+/// Compute the content identity of a lifecycle verification target-set artifact.
+pub fn compute_lifecycle_verification_scope_hash(scope_ref: &str, scope_bytes: &[u8]) -> String {
+    let mut bytes = Vec::with_capacity(
+        NEUROSEMANTIC_LIFECYCLE_VERIFICATION_SCOPE_DOMAIN.len()
+            + scope_ref.len()
+            + scope_bytes.len()
+            + 1,
+    );
+    bytes.extend_from_slice(NEUROSEMANTIC_LIFECYCLE_VERIFICATION_SCOPE_DOMAIN);
+    bytes.extend_from_slice(scope_ref.as_bytes());
+    bytes.push(0);
+    bytes.extend_from_slice(scope_bytes);
+    content_hash(&bytes)
 }
 
 impl NeurosemanticArtifactLifecycleReceipt {
@@ -414,12 +431,7 @@ impl NeurosemanticArtifactLifecycleReceipt {
         let expected_hash = self.verification_scope_hash.as_deref().ok_or_else(||
             "neurosemantic lifecycle receipt has no verification scope hash".to_string(),
         )?;
-        let mut bytes = Vec::with_capacity(scope_ref.len() + scope_bytes.len() + 64);
-        bytes.extend_from_slice(b"symthaea-neurosemantic-lifecycle-verification-scope-v1\0");
-        bytes.extend_from_slice(scope_ref.as_bytes());
-        bytes.push(0);
-        bytes.extend_from_slice(scope_bytes);
-        if content_hash(&bytes) != expected_hash {
+        if compute_lifecycle_verification_scope_hash(scope_ref, scope_bytes) != expected_hash {
             return Err("neurosemantic lifecycle verification scope hash mismatch".into());
         }
         Ok(())
