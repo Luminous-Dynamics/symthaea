@@ -850,10 +850,103 @@ fn parse_job_type(value: String) -> Result<NixSystemdJobTypeV1, NixSystemdObserv
     }
 }
 
+fn stability_sample_from_observation(
+    observation: &NixServicePostStateObservationV1,
+) -> Result<NixPostStateStabilitySampleV1, NixSystemdObserverErrorV1> {
+    let manager_owner = observation
+        .systemd_manager_owner
+        .as_deref()
+        .ok_or(NixSystemdObserverErrorV1::InvalidPostState(
+            "stability observation has no systemd manager owner".to_string(),
+        ))?;
+    Ok(NixPostStateStabilitySampleV1 {
+        operation: observation.operation,
+        unit: observation.unit.clone(),
+        unit_object_path: observation.unit_object_path.clone(),
+        observed_generation: observation.observed_generation,
+        definition_digest: observation.definition_digest().map_err(|error| {
+            NixSystemdObserverErrorV1::InvalidPostState(error.to_string())
+        })?,
+        state_digest: observation.state_digest().map_err(|error| {
+            NixSystemdObserverErrorV1::InvalidPostState(error.to_string())
+        })?,
+        manager_owner: manager_owner.to_string(),
+        invocation_id: observation.invocation_id.clone(),
+        state_change_at_monotonic_us: observation.state_change_at_monotonic_us,
+        captured_at_monotonic_us: observation.observed_at_monotonic_us,
+    })
+}
+
+fn stability_sequence_digest_for_observer(
+    samples: &[NixPostStateStabilitySampleV1],
+) -> Result<String, NixSystemdObserverErrorV1> {
+    let mut h = blake3::Hasher::new();
+    h.update(b"nixward-post-state-stability-sequence-v1");
+    h.update(&(u32::try_from(samples.len()).map_err(|_| {
+        NixSystemdObserverErrorV1::InvalidPostState(
+            "too many stability samples".to_string(),
+        )
+    })?).to_be_bytes());
+    for sample in samples {
+        let sample_digest = sample_digest_for_observer(sample)?;
+        h.update(&(sample_digest.len() as u64).to_be_bytes());
+        h.update(sample_digest.as_bytes());
+    }
+    Ok(h.finalize().to_hex().to_string())
+}
+
+fn sample_digest_for_observer(
+    sample: &NixPostStateStabilitySampleV1,
+) -> Result<String, NixSystemdObserverErrorV1> {
+    sample.validate_shape().map_err(|error| {
+        NixSystemdObserverErrorV1::InvalidPostState(error.to_string())
+    })?;
+    let mut h = blake3::Hasher::new();
+    h.update(b"nixward-post-state-stability-sample-v1");
+    h.update(&[operation_tag_for_observer(sample.operation)]);
+    put_len_prefixed(&mut h, sample.unit.as_bytes());
+    put_len_prefixed(&mut h, sample.unit_object_path.as_bytes());
+    h.update(&sample.observed_generation.to_be_bytes());
+    put_len_prefixed(&mut h, sample.definition_digest.as_bytes());
+    put_len_prefixed(&mut h, sample.state_digest.as_bytes());
+    put_len_prefixed(&mut h, sample.manager_owner.as_bytes());
+    put_optional_string(&mut h, sample.invocation_id.as_deref());
+    h.update(&sample.state_change_at_monotonic_us.to_be_bytes());
+    h.update(&sample.captured_at_monotonic_us.to_be_bytes());
+    Ok(h.finalize().to_hex().to_string())
+}
+
+fn operation_tag_for_observer(operation: NixServiceOperationKindV1) -> u8 {
+    match operation {
+        NixServiceOperationKindV1::Start => 0,
+        NixServiceOperationKindV1::Stop => 1,
+        NixServiceOperationKindV1::Restart => 2,
+        NixServiceOperationKindV1::Reload => 3,
+        NixServiceOperationKindV1::Enable => 4,
+        NixServiceOperationKindV1::Disable => 5,
+    }
+}
+
+fn put_len_prefixed(h: &mut blake3::Hasher, value: &[u8]) {
+    h.update(&(value.len() as u64).to_be_bytes());
+    h.update(value);
+}
+
+fn put_optional_string(h: &mut blake3::Hasher, value: Option<&str>) {
+    match value {
+        Some(value) => {
+            h.update(&[1]);
+            put_len_prefixed(h, value.as_bytes());
+        }
+        None => h.update(&[0]),
+    }
+}
 fn build_observation_from_properties(
     operation: NixServiceOperationKindV1,
     expected_unit: &str,
     generation: u64,
+    unit_object_path: &OwnedObjectPath,
+    manager_owner: &str,
     properties: &HashMap<String, OwnedValue>,
     job: Option<NixSystemdJobEvidenceV1>,
 ) -> Result<NixServicePostStateObservationV1, NixSystemdObserverErrorV1> {
@@ -946,11 +1039,13 @@ fn build_observation_from_properties(
         operation,
         unit: expected_unit.to_string(),
         observed_generation: generation,
+        unit_object_path: unit_object_path.as_str().to_string(),
         definition_identity,
         active_state,
         sub_state,
         unit_file_state,
         systemd_job: job,
+        systemd_manager_owner: Some(manager_owner.to_string()),
         invocation_id,
         state_change_at_monotonic_us,
         observed_at_monotonic_us,
