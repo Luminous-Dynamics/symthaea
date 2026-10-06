@@ -323,6 +323,12 @@ pub trait MicroWorldPredictor {
     fn predict(&mut self, state: MicroWorldObservation, action: MicroAction)
         -> MicroWorldObservation;
 
+    /// Confidence in the forecast. Zero means the forecast should not materially
+    /// override the currently observed state.
+    fn prediction_confidence(&self, _action: MicroAction) -> f64 {
+        0.0
+    }
+
     /// Optional online learning hook. The default is a fixed predictor.
     fn observe_transition(
         &mut self,
@@ -363,6 +369,12 @@ impl MicroWorldPredictor for WorldModelBridgePredictor {
             return state;
         };
         decode_observation(state.cycle.saturating_add(1), &predicted)
+    }
+
+    fn prediction_confidence(&self, action: MicroAction) -> f64 {
+        self.bridge
+            .action_confidence(action.index())
+            .unwrap_or(0.0) as f64
     }
 
     fn observe_transition(
@@ -474,7 +486,22 @@ impl HomeostaticPolicy {
         let mut best_score = f64::NEG_INFINITY;
 
         for action in MicroAction::ALL {
-            let predicted = predictor.predict(current, action);
+            let predicted_raw = predictor.predict(current, action);
+            let confidence = predictor.prediction_confidence(action).clamp(0.0, 1.0);
+            // Low-confidence predictions are blended toward the observed state rather than
+            // being allowed to dictate policy as if they were established.
+            let predicted = MicroWorldObservation {
+                cycle: predicted_raw.cycle,
+                energy: current.energy + confidence * (predicted_raw.energy - current.energy),
+                integrity: current.integrity
+                    + confidence * (predicted_raw.integrity - current.integrity),
+                knowledge: current.knowledge
+                    + confidence * (predicted_raw.knowledge - current.knowledge),
+                threat: current.threat
+                    + confidence * (predicted_raw.threat - current.threat),
+                progress: current.progress
+                    + confidence * (predicted_raw.progress - current.progress),
+            };
             let score = Self::score(predicted, current, action);
             if score > best_score {
                 best_score = score;
@@ -510,7 +537,7 @@ pub fn run_homeostatic_agent<P: MicroWorldPredictor>(
     predictor: &mut P,
     max_cycles: u64,
 ) -> HomeostaticRunReport {
-    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let mut world = MicroWorld::default();
     let policy = HomeostaticPolicy;
     let mut fabric = ViabilityFabric::new(max_cycles as usize + 1);
     let mut cumulative_error = 0.0;
@@ -633,7 +660,7 @@ fn evaluate_predictor_scenario<P: MicroWorldPredictor>(
     scenario: &MicroWorldScenario,
     max_cycles: u64,
 ) -> MicroWorldReport {
-    let mut world = MicroWorld::default();
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
     let mut fabric = ViabilityFabric::new(max_cycles as usize + 1);
     let mut baseline_error = 0.0;
     let mut predictor_error = 0.0;
@@ -644,7 +671,11 @@ fn evaluate_predictor_scenario<P: MicroWorldPredictor>(
         let action = scenario.schedule[steps as usize % scenario.schedule.len()];
 
         let predicted = predictor.predict(before, action);
-        let predicted_world_delta = signed_delta(before, predicted);
+        let predicted_world_delta = signed_delta_with_confidence(
+            before,
+            predicted,
+            predictor.prediction_confidence(action),
+        );
         let action_id = steps + 1;
 
         fabric.begin_cycle(before.cycle);
@@ -770,13 +801,21 @@ pub fn evaluate_predictor_suite<P: MicroWorldPredictor>(
 }
 
 fn signed_delta(before: MicroWorldObservation, after: MicroWorldObservation) -> ViabilityDelta {
+    signed_delta_with_confidence(before, after, 1.0)
+}
+
+fn signed_delta_with_confidence(
+    before: MicroWorldObservation,
+    after: MicroWorldObservation,
+    confidence: f64,
+) -> ViabilityDelta {
     ViabilityDelta::new(
         after.energy - before.energy
             + (after.integrity - before.integrity)
             + (after.knowledge - before.knowledge)
             + (after.threat - before.threat)
             + (after.progress - before.progress),
-        1.0,
+        confidence.clamp(0.0, 1.0),
     )
 }
 
@@ -841,6 +880,10 @@ mod tests {
             ) -> MicroWorldObservation {
                 transition(state, action)
             }
+
+            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
+                1.0
+            }
         }
 
         let mut predictor = Oracle;
@@ -855,6 +898,10 @@ mod tests {
         impl MicroWorldPredictor for Oracle {
             fn predict(&mut self, state: MicroWorldObservation, action: MicroAction) -> MicroWorldObservation {
                 transition(state, action)
+            }
+
+            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
+                1.0
             }
         }
 
