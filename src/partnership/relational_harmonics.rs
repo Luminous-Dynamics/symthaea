@@ -562,6 +562,78 @@ fn residualize_on_single_driver(values: &[f64], driver: &[f64]) -> Vec<f64> {
         .collect()
 }
 
+
+/// Deterministic pseudo-partner calibration for lag correlation.
+///
+/// Each surrogate circularly shifts B relative to A. The result is an
+/// empirical null comparison, not a formal p-value.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PartnerShuffleSurrogateSummary {
+    pub samples: usize,
+    pub surrogate_count: usize,
+    pub observed_best_absolute_correlation: f64,
+    pub observed_best_lag: Option<usize>,
+    pub max_surrogate_absolute_correlation: f64,
+    pub exceedance_count: usize,
+    pub exceedance_fraction: f64,
+    pub status: EvidenceStatus,
+}
+
+impl PartnerShuffleSurrogateSummary {
+    pub fn compute(
+        samples: &[RelationalSignalSample],
+        max_lag: usize,
+        surrogate_count: usize,
+    ) -> Result<Self, RelationalHarmonicError> {
+        if samples.len() < 16 {
+            return Err(RelationalHarmonicError::InsufficientSamples(samples.len()));
+        }
+
+        if surrogate_count == 0 {
+            return Err(RelationalHarmonicError::InsufficientSamples(0));
+        }
+
+        let observed = LagCorrelationSummary::compute(samples, max_lag)?;
+        let count = surrogate_count.min(samples.len() - 1);
+
+        let mut exceedance_count = 0usize;
+        let mut max_surrogate = 0.0_f64;
+
+        for index in 0..count {
+            let shift = 1 + (index * (samples.len() - 1) / count);
+            let shifted = samples
+                .iter()
+                .enumerate()
+                .map(|(i, sample)| RelationalSignalSample {
+                    time: sample.time,
+                    agent_a: sample.agent_a,
+                    agent_b: samples[(i + shift) % samples.len()].agent_b,
+                })
+                .collect::<Vec<_>>();
+
+            let surrogate = LagCorrelationSummary::compute(&shifted, max_lag)?;
+            max_surrogate = max_surrogate.max(surrogate.best_absolute_correlation);
+
+            if surrogate.best_absolute_correlation
+                >= observed.best_absolute_correlation - 1e-12
+            {
+                exceedance_count += 1;
+            }
+        }
+
+        Ok(Self {
+            samples: samples.len(),
+            surrogate_count: count,
+            observed_best_absolute_correlation: observed.best_absolute_correlation,
+            observed_best_lag: observed.best_lag,
+            max_surrogate_absolute_correlation: max_surrogate,
+            exceedance_count,
+            exceedance_fraction: exceedance_count as f64 / count as f64,
+            status: EvidenceStatus::Proxy,
+        })
+    }
+}
+
 /// Lagged correlation structure computed directly from the independent
 /// agent signals.
 ///
