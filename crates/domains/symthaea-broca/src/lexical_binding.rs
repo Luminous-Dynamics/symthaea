@@ -512,6 +512,7 @@ impl MorphophonologicalRuleSet {
             let operation = infer_simple_unimorph_operation(&record.lemma, &record.form)?;
             rules.push(MorphophonologicalRule {
                 rule_id: format!("{rule_set_id}:source:{}", record.record_id),
+                source_record_id: Some(record.record_id),
                 lemma: Some(record.lemma),
                 morphology: vec![MorphologicalFeature {
                     category: UNIMORPH_TSV_FEATURE_BUNDLE_CATEGORY.to_string(),
@@ -727,6 +728,27 @@ impl MorphophonologicalCompilationWitness {
         if self.output_rule_set_blake3 != output_rule_set.resource_blake3() {
             return Err(MorphophonologicalCompilationWitnessError::OutputRuleSetMismatch);
         }
+        let selected_ids = self
+            .source_slices
+            .iter()
+            .map(|slice| slice.record_id.as_str())
+            .collect::<HashSet<_>>();
+        let output_ids = output_rule_set
+            .rules
+            .iter()
+            .filter_map(|rule| rule.source_record_id.as_deref())
+            .collect::<Vec<_>>();
+        if !output_ids.is_empty() {
+            let output_id_set = output_ids.iter().copied().collect::<HashSet<_>>();
+            if output_ids.len() != self.source_slices.len()
+                || output_id_set.len() != output_ids.len()
+                || output_id_set != selected_ids
+            {
+                return Err(
+                    MorphophonologicalCompilationWitnessError::SourceRecordRuleMappingMismatch,
+                );
+            }
+        }
         if let Some(resource_digest) = output_rule_set
             .resource_evidence
             .source_artifact_blake3
@@ -777,6 +799,7 @@ pub enum MorphophonologicalCompilationWitnessError {
     SourceRangeOverflow,
     OverlappingSourceSlices,
     SourceArtifactMismatch,
+    SourceRecordRuleMappingMismatch,
     SourceSliceOutOfBounds,
     SourceRecordMismatch { record_id: String },
     SourceArtifactIdentityMismatch,
@@ -798,6 +821,7 @@ impl std::fmt::Display for MorphophonologicalCompilationWitnessError {
             Self::SourceRangeOverflow => write!(f, "morphophonological compilation witness source range overflows"),
             Self::OverlappingSourceSlices => write!(f, "morphophonological compilation witness source slices must not overlap"),
             Self::SourceArtifactMismatch => write!(f, "morphophonological compilation witness source artifact does not match"),
+            Self::SourceRecordRuleMappingMismatch => write!(f, "morphophonological compilation witness selected source records do not map one-to-one to compiled rules"),
             Self::SourceSliceOutOfBounds => write!(f, "morphophonological compilation witness source slice is out of bounds"),
             Self::SourceRecordMismatch { record_id } => write!(f, "morphophonological compilation witness source record {record_id} does not match its exact bytes"),
             Self::SourceArtifactIdentityMismatch => write!(f, "morphophonological compilation witness source artifact identity does not match the output rule-set resource evidence"),
@@ -833,6 +857,11 @@ pub enum MorphophonologicalRuleOperation {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MorphophonologicalRule {
     pub rule_id: String,
+    /// Exact source-record identity for rules compiled from a source artifact.
+    ///
+    /// Hand-authored/generic rules may leave this unset. Compilation-backed rule sets set it
+    /// explicitly, and the compilation witness can then require a one-to-one source mapping.
+    pub source_record_id: Option<String>,
     /// Optional exact lemma scope. When present, the rule applies only to that lemma.
     ///
     /// This enables compiled paradigm data where many lemmas share the same feature bundle.
@@ -927,6 +956,11 @@ impl MorphophonologicalRuleSet {
         for rule in &self.rules {
             if rule.rule_id.trim().is_empty() {
                 return Err(MorphophonologicalRuleSetError::EmptyRuleId);
+            }
+            if let Some(source_record_id) = rule.source_record_id.as_deref() {
+                if source_record_id.trim().is_empty() {
+                    return Err(MorphophonologicalRuleSetError::InvalidSourceRecordId);
+                }
             }
             if let Some(lemma) = rule.lemma.as_deref() {
                 if lemma.trim().is_empty() {
@@ -1110,6 +1144,7 @@ pub enum MorphophonologicalRuleSetError {
     EmptyRuleSet,
     EmptyRuleId,
     DuplicateRuleId,
+    InvalidSourceRecordId,
     InvalidLemmaScope,
     InvalidMorphology,
     AmbiguousFeatureMatch,
@@ -1135,6 +1170,7 @@ impl std::fmt::Display for MorphophonologicalRuleSetError {
             Self::EmptyRuleSet => write!(f, "morphophonological rule set must contain at least one rule"),
             Self::EmptyRuleId => write!(f, "morphophonological rule id must be non-empty"),
             Self::DuplicateRuleId => write!(f, "morphophonological rule ids must be unique"),
+            Self::InvalidSourceRecordId => write!(f, "morphophonological rule source-record id must be non-empty"),
             Self::InvalidLemmaScope => write!(f, "morphophonological rule lemma scope must be non-empty"),
             Self::InvalidMorphology => write!(f, "morphophonological rule morphology contains duplicate feature categories"),
             Self::AmbiguousFeatureMatch => write!(f, "morphophonological rule set contains duplicate exact feature matches"),
@@ -2498,8 +2534,10 @@ mod tests {
             output_form: "walked".into(),
             language_tag: "en".into(),
             rule_id: "fixture:english-morphology:v1".into(),
+            source_record_id: None,
             rule_provenance: "fixture:rules:v1".into(),
             applied_rule_id: "fixture:past-tense".into(),
+            source_record_id: None,
         }
     }
 
@@ -2517,6 +2555,7 @@ mod tests {
             "fixture:rules:v1",
             vec![MorphophonologicalRule {
                 rule_id: "fixture:past-tense".into(),
+                source_record_id: None,
                 lemma: None,
                 morphology: vec![MorphologicalFeature {
                     category: "tense".into(),
@@ -2659,6 +2698,7 @@ mod tests {
             vec![
                 MorphophonologicalRule {
                     rule_id: "fixture:walk-past".into(),
+                    source_record_id: None,
                     lemma: Some("walk".into()),
                     morphology: vec![MorphologicalFeature {
                         category: "tense".into(),
@@ -2670,6 +2710,7 @@ mod tests {
                 },
                 MorphophonologicalRule {
                     rule_id: "fixture:jump-past".into(),
+                    source_record_id: None,
                     lemma: Some("jump".into()),
                     morphology: vec![MorphologicalFeature {
                         category: "tense".into(),
@@ -2732,6 +2773,7 @@ mod tests {
             "fixture:rules:v1",
             vec![MorphophonologicalRule {
                 rule_id: "fixture:past-tense".into(),
+                source_record_id: None,
                 lemma: None,
                 morphology: vec![MorphologicalFeature {
                     category: "tense".into(),
@@ -2782,6 +2824,7 @@ mod tests {
             vec![
                 MorphophonologicalRule {
                     rule_id: "fixture:walk-one".into(),
+                    source_record_id: None,
                     lemma: Some("walk".into()),
                     morphology: vec![MorphologicalFeature {
                         category: "tense".into(),
@@ -2793,6 +2836,7 @@ mod tests {
                 },
                 MorphophonologicalRule {
                     rule_id: "fixture:walk-two".into(),
+                    source_record_id: None,
                     lemma: Some("walk".into()),
                     morphology: vec![MorphologicalFeature {
                         category: "tense".into(),
@@ -2829,6 +2873,7 @@ mod tests {
             vec![
                 MorphophonologicalRule {
                     rule_id: "fixture:one".into(),
+                    source_record_id: None,
                     lemma: None,
                     morphology: vec![MorphologicalFeature {
                         category: "tense".into(),
@@ -2840,6 +2885,7 @@ mod tests {
                 },
                 MorphophonologicalRule {
                     rule_id: "fixture:two".into(),
+                    source_record_id: None,
                     lemma: None,
                     morphology: vec![MorphologicalFeature {
                         category: "tense".into(),
@@ -3230,6 +3276,39 @@ mod tests {
         witness
             .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
             .expect("external artifact evidence should replay");
+    }
+
+    #[test]
+    fn unimorph_compilation_witness_rejects_source_to_rule_mapping_drift() {
+        let artifact = b"walk\twalked\tV;PST\n";
+        let (rule_set, witness) = MorphophonologicalRuleSet::compile_unimorph_tsv_source(
+            "en",
+            "en-unspecified",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "fixture:unimorph-tsv",
+                "fixture-snapshot-v1",
+            )
+            .unwrap(),
+            "fixture:unimorph:v1",
+            "fixture:compiler:v1",
+            artifact,
+            vec![MorphophonologicalSourceSlice {
+                record_id: "walk-past".into(),
+                byte_offset: 0,
+                byte_length: artifact.len(),
+                record_blake3: blake3::hash(artifact).to_hex().to_string(),
+            }],
+        )
+        .expect("compiler fixture");
+
+        let mut tampered = rule_set;
+        tampered.rules[0].source_record_id = Some("different-record".into());
+        assert_eq!(
+            witness
+                .validate_against_source_artifact_and_rule_set(artifact, &tampered)
+                .expect_err("source-to-rule mapping drift must fail closed"),
+            MorphophonologicalCompilationWitnessError::OutputRuleSetMismatch
+        );
     }
 
     #[test]
