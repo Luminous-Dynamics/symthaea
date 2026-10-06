@@ -1712,17 +1712,12 @@ mod tests {
         let mut snapshot = snapshot();
         snapshot.document = r##"{
             "id": "https://example.test/controller",
-            "verificationMethod": [{
+            "assertionMethod": [{
                 "id": "https://example.test/controller#key-1",
                 "type": "Multikey",
                 "controller": "https://example.test/controller",
-                "expires": "2026-10-06T00:00:00Z",
+                "expires": "2026-10-06T02:00:00+02:00",
                 "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
-            }],
-            "assertionMethod": [{
-                "id": "https://example.test/controller#key-1",
-                "controller": "https://example.test/controller",
-                "expires": "2026-10-06T02:00:00+02:00"
             }]
         }"##.into();
 
