@@ -29,6 +29,11 @@
 
 use super::relational_harmonics::EvidenceStatus;
 
+const EVIDENCE_SCHEMA: &str = "relational-prediction-evidence/v1";
+const ROLLING_EVIDENCE_SCHEMA: &str = "relational-prediction-rolling-evidence/v1";
+const FEATURE_SCHEMA: &str = "relational-prediction-features/v1";
+const MODEL_SCHEMA: &str = "linear-ridge-standardized-v1";
+
 /// A future outcome paired with features available strictly before that outcome.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RelationalPredictionSample {
@@ -520,7 +525,9 @@ impl HeldOutRelationalPredictionEvidence {
             .collect::<Vec<_>>();
 
         Ok(serde_json::json!({
-            "schema": "relational-prediction-evidence/v1",
+            "schema": EVIDENCE_SCHEMA,
+            "feature_schema": FEATURE_SCHEMA,
+            "model_schema": MODEL_SCHEMA,
             "provenance": {
                 "protocol_id": &self.provenance.protocol_id,
                 "source_data_sha256": &self.provenance.source_data_sha256,
@@ -758,7 +765,9 @@ impl RollingOriginRelationalPredictionEvidence {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(serde_json::json!({
-            "schema": "relational-prediction-rolling-evidence/v1",
+            "schema": ROLLING_EVIDENCE_SCHEMA,
+            "feature_schema": FEATURE_SCHEMA,
+            "model_schema": MODEL_SCHEMA,
             "provenance": {
                 "protocol_id": &self.provenance.protocol_id,
                 "source_data_sha256": &self.provenance.source_data_sha256,
@@ -1289,6 +1298,8 @@ fn feature_set_name(feature_set: PredictionFeatureSet) -> &'static str {
 
 fn prediction_evidence_record_json(record: &PredictionEvidenceRecord) -> serde_json::Value {
     serde_json::json!({
+        "feature_schema": FEATURE_SCHEMA,
+        "model_schema": MODEL_SCHEMA,
         "feature_set": feature_set_name(record.feature_set),
         "train_samples": record.train_samples,
         "test_samples": record.test_samples,
