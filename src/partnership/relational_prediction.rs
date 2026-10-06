@@ -433,6 +433,106 @@ pub struct HeldOutRelationalPredictionSummary {
     pub status: EvidenceStatus,
 }
 
+impl HeldOutRelationalPredictionEvidence {
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        validate_evidence_provenance(&self.provenance)?;
+        if self.records.len() != PredictionFeatureSet::all().len() {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        for feature_set in PredictionFeatureSet::all() {
+            if self.records.iter().filter(|record| record.feature_set == feature_set).count() != 1 {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+
+        for record in &self.records {
+            record.validate_trace()?;
+            if record.score() != self.summary.score(record.feature_set) {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+
+        let reference = self
+            .records
+            .first()
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+        for record in &self.records[1..] {
+            if record.feature_times != reference.feature_times
+                || record.outcome_times != reference.outcome_times
+                || record.observed_outcomes != reference.observed_outcomes
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+
+        let min_horizon = reference
+            .outcome_times
+            .iter()
+            .zip(&reference.feature_times)
+            .map(|(outcome, feature)| outcome - feature)
+            .fold(f64::INFINITY, f64::min);
+        let max_horizon = reference
+            .outcome_times
+            .iter()
+            .zip(&reference.feature_times)
+            .map(|(outcome, feature)| outcome - feature)
+            .fold(f64::NEG_INFINITY, f64::max);
+
+        if (min_horizon - self.summary.minimum_outcome_horizon).abs() > 1e-12
+            || (max_horizon - self.summary.maximum_outcome_horizon).abs() > 1e-12
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+
+        let scores = PredictionFeatureSet::all()
+            .into_iter()
+            .map(|feature_set| {
+                let score = self.summary.score(feature_set);
+                serde_json::json!({
+                    "feature_set": feature_set_name(feature_set),
+                    "parameter_count": score.parameter_count,
+                    "train_samples": score.train_samples,
+                    "test_samples": score.test_samples,
+                    "mean_absolute_error": score.mean_absolute_error,
+                    "mean_squared_error": score.mean_squared_error
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let records = self
+            .records
+            .iter()
+            .map(prediction_evidence_record_json)
+            .collect::<Vec<_>>();
+
+        Ok(serde_json::json!({
+            "schema": "relational-prediction-evidence/v1",
+            "provenance": {
+                "protocol_id": &self.provenance.protocol_id,
+                "source_data_sha256": &self.provenance.source_data_sha256,
+                "software_commit_sha": &self.provenance.software_commit_sha
+            },
+            "split": {
+                "train_samples": self.summary.train_samples,
+                "test_samples": self.summary.test_samples,
+                "gap_samples": self.summary.gap_samples,
+                "minimum_outcome_horizon": self.summary.minimum_outcome_horizon,
+                "maximum_outcome_horizon": self.summary.maximum_outcome_horizon
+            },
+            "scores": scores,
+            "records": records
+        }).to_string())
+    }
+}
+
 impl HeldOutRelationalPredictionSummary {
     pub fn compute_evidence(
         samples: &[RelationalPredictionSample],
@@ -595,6 +695,91 @@ pub struct RollingOriginRelationalPredictionSummary {
     pub mean_relational_profile_mse: f64,
     pub segments: Vec<HeldOutRelationalPredictionSummary>,
     pub status: EvidenceStatus,
+}
+
+impl RollingOriginRelationalPredictionEvidence {
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        validate_evidence_provenance(&self.provenance)?;
+        if self.origins.len() != self.config.origin_count
+            || self.observed.segments.len() != self.config.origin_count
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        for (index, origin) in self.origins.iter().enumerate() {
+            origin.validate()?;
+            if origin.provenance != self.provenance
+                || origin.summary != self.observed.segments[index]
+                || origin.summary.train_samples != self.config.train_samples
+                || origin.summary.test_samples != self.config.test_samples
+                || origin.summary.gap_samples != self.config.gap_samples
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+
+            for record in &origin.records {
+                let tolerance = 1e-9 * self.config.forecast_horizon.abs().max(1.0);
+                for (feature_time, outcome_time) in
+                    record.feature_times.iter().zip(&record.outcome_times)
+                {
+                    let horizon = *outcome_time - *feature_time;
+                    if (horizon - self.config.forecast_horizon).abs() > tolerance {
+                        return Err(RelationalPredictionError::InvalidSplit);
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+
+        let origins = self
+            .origins
+            .iter()
+            .map(|origin| {
+                let json = origin.to_json()?;
+                serde_json::from_str::<serde_json::Value>(&json)
+                    .map_err(|_| RelationalPredictionError::ModelFitFailed)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(serde_json::json!({
+            "schema": "relational-prediction-rolling-evidence/v1",
+            "provenance": {
+                "protocol_id": &self.provenance.protocol_id,
+                "source_data_sha256": &self.provenance.source_data_sha256,
+                "software_commit_sha": &self.provenance.software_commit_sha
+            },
+            "rolling_config": {
+                "first_origin": self.config.first_origin,
+                "train_samples": self.config.train_samples,
+                "test_samples": self.config.test_samples,
+                "gap_samples": self.config.gap_samples,
+                "origin_count": self.config.origin_count,
+                "step_samples": self.config.step_samples,
+                "forecast_horizon": self.config.forecast_horizon,
+                "ridge_lambda": self.config.ridge_lambda
+            },
+            "observed": {
+                "mean_persistence_mse": self.observed.mean_persistence_mse,
+                "mean_isolated_agents_mse": self.observed.mean_isolated_agents_mse,
+                "mean_common_driver_mse": self.observed.mean_common_driver_mse,
+                "mean_synchrony_only_mse": self.observed.mean_synchrony_only_mse,
+                "mean_non_relational_context_mse": self.observed.mean_non_relational_context_mse,
+                "mean_relational_augmented_mse": self.observed.mean_relational_augmented_mse,
+                "mean_relational_profile_mse": self.observed.mean_relational_profile_mse,
+                "per_origin_improvement": self.observed.augmented_mse_improvement_per_origin(),
+                "median_improvement": self.observed.median_augmented_mse_improvement(),
+                "minimum_improvement": self.observed.minimum_augmented_mse_improvement(),
+                "origins_beating_non_relational": self.observed.origins_beating_non_relational(),
+                "origins_beating_persistence": self.observed.origins_beating_persistence()
+            },
+            "origins": origins
+        }).to_string())
+    }
 }
 
 impl RollingOriginRelationalPredictionSummary {
