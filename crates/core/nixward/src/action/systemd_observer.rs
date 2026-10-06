@@ -372,7 +372,8 @@ impl NixSystemdReadOnlyObserverV1 {
             stability_sample_from_observation(first.as_ref())?,
             stability_sample_from_observation(second.as_ref())?,
         ];
-        let sequence_digest = stability_sequence_digest_for_observer(&samples)?;
+        let sequence_digest = super::post_state::stability_sequence_digest(&samples)
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
 
         let evidence = NixPostStateStabilityEvidenceV1 {
             required_window_us,
@@ -877,70 +878,6 @@ fn stability_sample_from_observation(
     })
 }
 
-fn stability_sequence_digest_for_observer(
-    samples: &[NixPostStateStabilitySampleV1],
-) -> Result<String, NixSystemdObserverErrorV1> {
-    let mut h = blake3::Hasher::new();
-    h.update(b"nixward-post-state-stability-sequence-v1");
-    h.update(&(u32::try_from(samples.len()).map_err(|_| {
-        NixSystemdObserverErrorV1::InvalidPostState(
-            "too many stability samples".to_string(),
-        )
-    })?).to_be_bytes());
-    for sample in samples {
-        let sample_digest = sample_digest_for_observer(sample)?;
-        h.update(&(sample_digest.len() as u64).to_be_bytes());
-        h.update(sample_digest.as_bytes());
-    }
-    Ok(h.finalize().to_hex().to_string())
-}
-
-fn sample_digest_for_observer(
-    sample: &NixPostStateStabilitySampleV1,
-) -> Result<String, NixSystemdObserverErrorV1> {
-    sample.validate_shape().map_err(|error| {
-        NixSystemdObserverErrorV1::InvalidPostState(error.to_string())
-    })?;
-    let mut h = blake3::Hasher::new();
-    h.update(b"nixward-post-state-stability-sample-v1");
-    h.update(&[operation_tag_for_observer(sample.operation)]);
-    put_len_prefixed(&mut h, sample.unit.as_bytes());
-    put_len_prefixed(&mut h, sample.unit_object_path.as_bytes());
-    h.update(&sample.observed_generation.to_be_bytes());
-    put_len_prefixed(&mut h, sample.definition_digest.as_bytes());
-    put_len_prefixed(&mut h, sample.state_digest.as_bytes());
-    put_len_prefixed(&mut h, sample.manager_owner.as_bytes());
-    put_optional_string(&mut h, sample.invocation_id.as_deref());
-    h.update(&sample.state_change_at_monotonic_us.to_be_bytes());
-    h.update(&sample.captured_at_monotonic_us.to_be_bytes());
-    Ok(h.finalize().to_hex().to_string())
-}
-
-fn operation_tag_for_observer(operation: NixServiceOperationKindV1) -> u8 {
-    match operation {
-        NixServiceOperationKindV1::Start => 0,
-        NixServiceOperationKindV1::Stop => 1,
-        NixServiceOperationKindV1::Restart => 2,
-        NixServiceOperationKindV1::Reload => 3,
-        NixServiceOperationKindV1::Enable => 4,
-        NixServiceOperationKindV1::Disable => 5,
-    }
-}
-
-fn put_len_prefixed(h: &mut blake3::Hasher, value: &[u8]) {
-    h.update(&(value.len() as u64).to_be_bytes());
-    h.update(value);
-}
-
-fn put_optional_string(h: &mut blake3::Hasher, value: Option<&str>) {
-    match value {
-        Some(value) => {
-            h.update(&[1]);
-            put_len_prefixed(h, value.as_bytes());
-        }
-        None => h.update(&[0]),
-    }
-}
 fn build_observation_from_properties(
     operation: NixServiceOperationKindV1,
     expected_unit: &str,
