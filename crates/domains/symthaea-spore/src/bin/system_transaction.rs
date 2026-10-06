@@ -1253,6 +1253,77 @@ mod tests {
     }
 
     #[test]
+    fn ledger_rejects_invalid_request_id_on_load() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-transaction-ledger-invalid-request-{name}.jsonl"));
+        let event = serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "event": "started",
+            "request_id": "bad request id",
+            "transaction_id": "0123456789abcdef0123456789abcdef",
+            "mutation": "install",
+            "target_machine_digest": null,
+            "request_digest": "a".repeat(64),
+            "outcome": null
+        });
+        std::fs::write(&path, format!("{event}\n")).unwrap();
+        std::fs::set_permissions(
+            &path,
+            std::fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let error = ledger.load().expect_err("invalid request id must fail closed");
+        assert!(error.contains("invalid request_id"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn ledger_rejects_truncated_journal_event() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-transaction-ledger-truncated-{name}.jsonl"));
+        std::fs::write(&path, r#"{"schema_version":1,"event":"started","#).unwrap();
+        std::fs::set_permissions(
+            &path,
+            std::fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let error = ledger.load().expect_err("truncated JSON must fail closed");
+        assert!(error.contains("malformed"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn ledger_rejects_terminal_event_without_prior_start() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-transaction-ledger-orphan-completion-{name}.jsonl"));
+        let event = serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "event": "completed",
+            "request_id": "orphan-request-0001",
+            "transaction_id": "0123456789abcdef0123456789abcdef",
+            "mutation": "install",
+            "target_machine_digest": null,
+            "request_digest": "a".repeat(64),
+            "outcome": "failed"
+        });
+        std::fs::write(&path, format!("{event}\n")).unwrap();
+        std::fs::set_permissions(
+            &path,
+            std::fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let error = ledger.load().expect_err("orphan completion must fail closed");
+        assert!(error.contains("no prior start"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn randomness_failure_is_not_silently_replaced() {
         // The helper is intentionally the only operation-ID source; callers
         // receive an Err rather than falling back to timestamps.
