@@ -273,6 +273,40 @@ fn rfc9942_unprotected_text_label_resource_limit_is_typed() {
 }
 
 #[test]
+fn rfc9942_inclusion_path_semantic_bound_is_distinct_from_resource_cap() {
+    let mut semantic_oversize = vec![0x83, 0x02, 0x00, 0x82];
+    semantic_oversize.extend_from_slice(&[0x58, 0x20]);
+    semantic_oversize.extend_from_slice(&[0u8; 32]);
+    semantic_oversize.extend_from_slice(&[0x58, 0x20]);
+    semantic_oversize.extend_from_slice(&[0u8; 32]);
+
+    let mut semantic_vdp = vec![0xa1, 0x20, 0x81, 0x59,
+        (semantic_oversize.len() >> 8) as u8, semantic_oversize.len() as u8];
+    semantic_vdp.extend_from_slice(&semantic_oversize);
+    assert!(matches!(
+        Rfc9942Vdp::from_cbor(&semantic_vdp),
+        Err(Rfc9942VdpError::InvalidProof(_))
+    ));
+
+    let mut resource_oversize = vec![0x83, 0x02, 0x00, 0xd8];
+    resource_oversize.truncate(4);
+    resource_oversize.push(0x18);
+    resource_oversize.push(0x41);
+    resource_oversize.push(0x5f);
+    resource_oversize.extend(std::iter::repeat_n(0x40, 4097));
+    resource_oversize.push(0xff);
+
+    let len = resource_oversize.len();
+    let mut resource_vdp = vec![0xa1, 0x20, 0x81, 0x59,
+        (len >> 8) as u8, len as u8];
+    resource_vdp.extend_from_slice(&resource_oversize);
+    assert_eq!(
+        Rfc9942Vdp::from_cbor(&resource_vdp),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
+
+#[test]
 fn rfc9942_proof_hash_chunk_resource_limit_is_typed() {
     for (proof_prefix, proof_label, label) in [
         (vec![0x83, 0x02, 0x00, 0x81], 0x20, "inclusion"),
