@@ -159,6 +159,12 @@ pub enum PredictionFeatureSet {
     CommonDriver,
     /// Only simultaneous relational alignment.
     SynchronyOnly,
+    /// Isolated agents + common driver + synchrony, with no relational
+    /// directionality or turn-taking channels.
+    NonRelationalContext,
+    /// Non-relational context augmented with directional and turn-taking
+    /// relational channels.
+    RelationalAugmented,
     /// Alignment plus directional and turn-taking relational channels.
     RelationalProfile,
 }
@@ -245,6 +251,8 @@ pub struct HeldOutRelationalPredictionSummary {
     pub isolated_agents: PredictionScore,
     pub common_driver: PredictionScore,
     pub synchrony_only: PredictionScore,
+    pub non_relational_context: PredictionScore,
+    pub relational_augmented: PredictionScore,
     pub relational_profile: PredictionScore,
     pub status: EvidenceStatus,
 }
@@ -264,6 +272,8 @@ impl HeldOutRelationalPredictionSummary {
             fit_and_score(samples, &config, PredictionFeatureSet::IsolatedAgents)?,
             fit_and_score(samples, &config, PredictionFeatureSet::CommonDriver)?,
             fit_and_score(samples, &config, PredictionFeatureSet::SynchronyOnly)?,
+            fit_and_score(samples, &config, PredictionFeatureSet::NonRelationalContext)?,
+            fit_and_score(samples, &config, PredictionFeatureSet::RelationalAugmented)?,
             fit_and_score(samples, &config, PredictionFeatureSet::RelationalProfile)?,
         ];
 
@@ -288,7 +298,9 @@ impl HeldOutRelationalPredictionSummary {
             isolated_agents: scores[0],
             common_driver: scores[1],
             synchrony_only: scores[2],
-            relational_profile: scores[3],
+            non_relational_context: scores[3],
+            relational_augmented: scores[4],
+            relational_profile: scores[5],
             status: EvidenceStatus::Measured,
         })
     }
@@ -299,12 +311,14 @@ impl HeldOutRelationalPredictionSummary {
             PredictionFeatureSet::IsolatedAgents => self.isolated_agents,
             PredictionFeatureSet::CommonDriver => self.common_driver,
             PredictionFeatureSet::SynchronyOnly => self.synchrony_only,
+            PredictionFeatureSet::NonRelationalContext => self.non_relational_context,
+            PredictionFeatureSet::RelationalAugmented => self.relational_augmented,
             PredictionFeatureSet::RelationalProfile => self.relational_profile,
         }
     }
 
-    /// Positive values mean the relational model has lower MSE than the
-    /// specified baseline; negative values mean the baseline is better.
+    /// Positive values mean the selected relational model has lower MSE than
+    /// the specified baseline; negative values mean the baseline is better.
     pub fn relational_mse_improvement_over(
         &self,
         baseline: PredictionFeatureSet,
@@ -316,6 +330,162 @@ impl HeldOutRelationalPredictionSummary {
 
         Some((baseline_mse - self.relational_profile.mean_squared_error) / baseline_mse)
     }
+
+    /// Positive values mean relational channels add predictive information
+    /// beyond the nested non-relational context model.
+    pub fn augmented_mse_improvement_over_non_relational(&self) -> Option<f64> {
+        let baseline_mse = self.non_relational_context.mean_squared_error;
+        if baseline_mse <= 1e-20 {
+            return None;
+        }
+
+        Some(
+            (baseline_mse - self.relational_augmented.mean_squared_error) / baseline_mse,
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RollingOriginRelationalPredictionConfig {
+    /// Earliest index at which the first training window starts.
+    pub first_origin: usize,
+    /// Fixed training-window size.
+    pub train_samples: usize,
+    /// Fixed test-window size.
+    pub test_samples: usize,
+    /// Fixed gap between training and test feature windows.
+    pub gap_samples: usize,
+    /// Number of forward origins to evaluate.
+    pub origin_count: usize,
+    /// Forward step between origins.
+    pub step_samples: usize,
+    /// Fixed ridge coefficient shared across every origin.
+    pub ridge_lambda: f64,
+}
+
+impl Default for RollingOriginRelationalPredictionConfig {
+    fn default() -> Self {
+        Self {
+            first_origin: 0,
+            train_samples: 48,
+            test_samples: 16,
+            gap_samples: 4,
+            origin_count: 4,
+            step_samples: 16,
+            ridge_lambda: 1e-8,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RollingOriginRelationalPredictionSummary {
+    pub first_origin: usize,
+    pub train_samples: usize,
+    pub test_samples: usize,
+    pub gap_samples: usize,
+    pub origin_count: usize,
+    pub step_samples: usize,
+    pub mean_persistence_mse: f64,
+    pub mean_isolated_agents_mse: f64,
+    pub mean_common_driver_mse: f64,
+    pub mean_synchrony_only_mse: f64,
+    pub mean_non_relational_context_mse: f64,
+    pub mean_relational_augmented_mse: f64,
+    pub mean_relational_profile_mse: f64,
+    pub segments: Vec<HeldOutRelationalPredictionSummary>,
+    pub status: EvidenceStatus,
+}
+
+impl RollingOriginRelationalPredictionSummary {
+    pub fn compute(
+        samples: &[RelationalPredictionSample],
+        config: RollingOriginRelationalPredictionConfig,
+    ) -> Result<Self, RelationalPredictionError> {
+        validate_rolling_config(samples.len(), &config)?;
+
+        let mut segments = Vec::with_capacity(config.origin_count);
+        for origin in 0..config.origin_count {
+            let start = config.first_origin + origin * config.step_samples;
+            let end = start
+                + config.train_samples
+                + config.gap_samples
+                + config.test_samples;
+            let segment = &samples[start..end];
+
+            segments.push(HeldOutRelationalPredictionSummary::compute(
+                segment,
+                HeldOutRelationalPredictionConfig {
+                    train_samples: config.train_samples,
+                    test_samples: config.test_samples,
+                    gap_samples: config.gap_samples,
+                    ridge_lambda: config.ridge_lambda,
+                },
+            )?);
+        }
+
+        let mean = |select: fn(&HeldOutRelationalPredictionSummary) -> f64| {
+            segments.iter().map(select).sum::<f64>() / segments.len() as f64
+        };
+
+        Ok(Self {
+            first_origin: config.first_origin,
+            train_samples: config.train_samples,
+            test_samples: config.test_samples,
+            gap_samples: config.gap_samples,
+            origin_count: config.origin_count,
+            step_samples: config.step_samples,
+            mean_persistence_mse: mean(|s| s.persistence_baseline.mean_squared_error),
+            mean_isolated_agents_mse: mean(|s| s.isolated_agents.mean_squared_error),
+            mean_common_driver_mse: mean(|s| s.common_driver.mean_squared_error),
+            mean_synchrony_only_mse: mean(|s| s.synchrony_only.mean_squared_error),
+            mean_non_relational_context_mse: mean(|s| s.non_relational_context.mean_squared_error),
+            mean_relational_augmented_mse: mean(|s| s.relational_augmented.mean_squared_error),
+            mean_relational_profile_mse: mean(|s| s.relational_profile.mean_squared_error),
+            segments,
+            status: EvidenceStatus::Measured,
+        })
+    }
+
+    /// Positive means the relationally augmented model improves mean MSE over
+    /// the nested non-relational context model.
+    pub fn mean_augmented_mse_improvement(&self) -> Option<f64> {
+        if self.mean_non_relational_context_mse <= 1e-20 {
+            return None;
+        }
+
+        Some(
+            (self.mean_non_relational_context_mse - self.mean_relational_augmented_mse)
+                / self.mean_non_relational_context_mse,
+        )
+    }
+}
+
+fn validate_rolling_config(
+    total_samples: usize,
+    config: &RollingOriginRelationalPredictionConfig,
+) -> Result<(), RelationalPredictionError> {
+    if config.train_samples < 8
+        || config.test_samples < 4
+        || config.origin_count == 0
+        || config.step_samples == 0
+        || !config.ridge_lambda.is_finite()
+        || config.ridge_lambda < 0.0
+    {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    let final_end = config
+        .first_origin
+        .saturating_add((config.origin_count - 1).saturating_mul(config.step_samples))
+        .saturating_add(config.train_samples)
+        .saturating_add(config.gap_samples)
+        .saturating_add(config.test_samples);
+
+    if final_end > total_samples {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    Ok(())
 }
 
 /// Deterministic empirical calibration family for held-out relational prediction.
@@ -551,6 +721,21 @@ fn feature_vector(
         PredictionFeatureSet::IsolatedAgents => vec![sample.agent_a, sample.agent_b],
         PredictionFeatureSet::CommonDriver => vec![sample.common_driver],
         PredictionFeatureSet::SynchronyOnly => vec![sample.alignment],
+        PredictionFeatureSet::NonRelationalContext => vec![
+            sample.agent_a,
+            sample.agent_b,
+            sample.common_driver,
+            sample.alignment,
+        ],
+        PredictionFeatureSet::RelationalAugmented => vec![
+            sample.agent_a,
+            sample.agent_b,
+            sample.common_driver,
+            sample.alignment,
+            sample.a_to_b,
+            sample.b_to_a,
+            sample.turn_taking,
+        ],
         PredictionFeatureSet::RelationalProfile => vec![
             sample.alignment,
             sample.a_to_b,
@@ -775,6 +960,11 @@ mod tests {
                 < summary.persistence_baseline.mean_squared_error
         );
         assert!(
+            summary.relational_augmented.mean_squared_error
+                < summary.non_relational_context.mean_squared_error
+        );
+        assert!(summary.augmented_mse_improvement_over_non_relational().unwrap() > 0.0);
+        assert!(
             summary
                 .relational_mse_improvement_over(PredictionFeatureSet::SynchronyOnly)
                 .unwrap()
@@ -842,6 +1032,72 @@ mod tests {
             ),
             Err(RelationalPredictionError::OutcomeNotAfterFeatures)
         );
+    }
+
+    #[test]
+    fn rolling_origin_repeats_the_temporal_boundary() {
+        let samples = build_samples(0.5);
+        let summary = RollingOriginRelationalPredictionSummary::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                train_samples: 32,
+                test_samples: 8,
+                gap_samples: 2,
+                origin_count: 4,
+                step_samples: 8,
+                ridge_lambda: 1e-8,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(summary.status, EvidenceStatus::Measured);
+        assert_eq!(summary.origin_count, 4);
+        assert_eq!(summary.segments.len(), 4);
+        assert!(summary.mean_relational_profile_mse.is_finite());
+        assert!(summary.mean_augmented_mse_improvement().unwrap() >= 0.0);
+    }
+
+    #[test]
+    fn rolling_origin_is_deterministic() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+
+        let first = RollingOriginRelationalPredictionSummary::compute(&samples, config).unwrap();
+        let second = RollingOriginRelationalPredictionSummary::compute(&samples, config).unwrap();
+
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn rolling_origin_rejects_zero_step_or_zero_origins() {
+        let samples = build_samples(0.5);
+
+        let zero_step = RollingOriginRelationalPredictionSummary::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                step_samples: 0,
+                ..Default::default()
+            },
+        );
+        assert_eq!(zero_step, Err(RelationalPredictionError::InvalidSplit));
+
+        let zero_origins = RollingOriginRelationalPredictionSummary::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                origin_count: 0,
+                ..Default::default()
+            },
+        );
+        assert_eq!(zero_origins, Err(RelationalPredictionError::InvalidSplit));
     }
 
     #[test]
