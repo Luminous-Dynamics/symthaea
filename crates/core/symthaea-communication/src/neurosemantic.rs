@@ -3388,6 +3388,30 @@ mod tests {
     }
 
     #[test]
+    fn remediation_evaluation_environment_schema_is_fail_closed() {
+        let environment = NeurosemanticRemediationEvaluationEnvironment {
+            schema_version: NEUROSEMANTIC_REMEDIATION_EVALUATION_ENVIRONMENT_SCHEMA_VERSION,
+            environment_ref: "environment-schema-test".into(),
+            platform_ref: "linux-x86_64".into(),
+            runtime_ref: "rust-runtime".into(),
+            toolchain_ref: "rust-1.96".into(),
+            dependency_lock_hash: content_hash(b"deps"),
+            configuration_hash: content_hash(b"config"),
+            execution_revision: "6".repeat(40),
+        };
+        let encoded = serde_json::to_vec(&environment).unwrap();
+        assert_eq!(NeurosemanticRemediationEvaluationEnvironment::from_json_bytes(&encoded).unwrap(), environment);
+        let mut legacy = environment.clone();
+        legacy.schema_version = 0;
+        assert!(NeurosemanticRemediationEvaluationEnvironment::from_json_bytes(&serde_json::to_vec(&legacy).unwrap()).is_err());
+        let mut bad_revision = environment.clone();
+        bad_revision.execution_revision = "0".repeat(40);
+        assert!(bad_revision.validate().is_err());
+        let oversized = vec![b' '; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1];
+        assert!(NeurosemanticRemediationEvaluationEnvironment::from_json_bytes(&oversized).is_err());
+    }
+
+    #[test]
     fn remediation_evaluation_method_schema_is_fail_closed() {
         let method = NeurosemanticRemediationEvaluationMethod {
             schema_version: NEUROSEMANTIC_REMEDIATION_EVALUATION_METHOD_SCHEMA_VERSION,
