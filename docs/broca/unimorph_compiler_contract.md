@@ -8,7 +8,7 @@ The accepted input shape is a selected single-line record:
 
 lemma<TAB>form<TAB>feature1;feature2;...
 
-The source record is treated as UTF-8 bytes. Only a terminal LF or CRLF is removed for parsing. The three parsed fields are trimmed.
+The source record is treated as UTF-8 bytes. Only a terminal LF or CRLF is removed for parsing; any remaining LF or CR is rejected. The three parsed fields are trimmed.
 
 ## Normalization
 
@@ -120,3 +120,6 @@ Changing either the compiler module or the revision-generation mechanism invalid
 
 
 The duplicate-token rejection is intentionally syntactic. It does not infer semantic conflicts between different UniMorph dimensions; those remain part of the official taxonomy/canonicalizer qualification tracked separately.
+
+
+Revision commitments are not self-certifying: validation first requires the generated current implementation and parser revisions, so recomputing the transformation digest with a forged revision does not make a witness acceptable.
