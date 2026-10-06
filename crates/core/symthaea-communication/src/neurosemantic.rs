@@ -2082,6 +2082,14 @@ mod tests {
             .insert("schema_version".into(), serde_json::json!(999));
         let encoded = serde_json::to_vec(&value).unwrap();
         assert!(NeurosemanticAuthorityResolutionAttestation::from_json_bytes(&encoded).is_err());
+
+        let mut legacy = serde_json::to_value(&resolution).unwrap();
+        legacy
+            .as_object_mut()
+            .unwrap()
+            .insert("schema_version".into(), serde_json::json!(1));
+        let legacy_encoded = serde_json::to_vec(&legacy).unwrap();
+        assert!(NeurosemanticAuthorityResolutionAttestation::from_json_bytes(&legacy_encoded).is_err());
     }
 
     #[test]
