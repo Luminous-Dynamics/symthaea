@@ -923,9 +923,9 @@ fn config_write_commands(
     browser_config: &str,
     fallback_config: &str,
     browser_flake: &str,
-    session_id: u64,
+    transaction_dir: &str,
 ) -> String {
-    let staging = format!("/tmp/symthaea-config-{}", session_id);
+    let staging = format!("{transaction_dir}/config");
     let mut out = String::new();
     out.push_str("mkdir -p /mnt/etc/nixos\n");
 
@@ -990,7 +990,7 @@ fn config_write_commands_heredoc(
     out
 }
 
-fn generate_install_script(msg: &ClientMessage, session_id: u64) -> String {
+fn generate_install_script(msg: &ClientMessage, transaction_dir: &str) -> String {
     // SECURITY: All user inputs (disk, hostname, timezone, keyboard, desktop, gpu_driver)
     // MUST be validated by the caller before reaching this function.
     // See validate_disk_path(), validate_hostname_relay(), sanitize_input().
@@ -1217,7 +1217,7 @@ nixos-generate-config --root /mnt
                 &msg.configuration_nix,
                 &fallback_alongside,
                 &msg.flake_nix,
-                session_id,
+                transaction_dir,
             ));
             script.push_str(&bootloader_patch_commands(&msg.disk));
 
@@ -1387,7 +1387,7 @@ nixos-generate-config --root /mnt || echo "WARNING: nixos-generate-config failed
                 &msg.configuration_nix,
                 &fallback_single,
                 &msg.flake_nix,
-                session_id,
+                transaction_dir,
             ));
             // Patch bootloader for BIOS mode
             script.push_str(&bootloader_patch_commands(&msg.disk));
@@ -1533,7 +1533,7 @@ echo '  networking.hostId = "deadbeef";' >> /mnt/etc/nixos/hardware-configuratio
                 &msg.configuration_nix,
                 &fallback_zfs,
                 &msg.flake_nix,
-                session_id,
+                transaction_dir,
             ));
             script.push_str(&bootloader_patch_commands(&msg.disk));
 
@@ -1565,7 +1565,7 @@ echo "COMPLETE"
             // Full disk wipe → LUKS2 encryption → btrfs → nixos-install
             // The LUKS secret is staged separately by the authenticated
             // install handler and is never interpolated into this script.
-            let luks_key_file = format!("/tmp/sovereign-luks-pw-{}", session_id);
+            let luks_key_file = format!("{transaction_dir}/luks-passphrase");
             let mut script = format!(
                 r#"set -eo pipefail
 echo "=== Symthaea Sovereign Birth: Encrypted Single Disk ==="
@@ -1857,7 +1857,7 @@ nixos-generate-config --root /mnt
                 &msg.configuration_nix,
                 &fallback_dual,
                 &msg.flake_nix,
-                session_id,
+                transaction_dir,
             ));
             script.push_str(&bootloader_patch_commands(&msg.standard_disk));
 
@@ -1994,7 +1994,7 @@ nixos-generate-config --root /mnt
                 &msg.configuration_nix,
                 &fallback_raid1_btrfs,
                 &msg.flake_nix,
-                session_id,
+                transaction_dir,
             ));
             script.push_str(&bootloader_patch_commands(&msg.disk));
 
@@ -2129,7 +2129,7 @@ mdadm --detail --scan >> /mnt/etc/mdadm.conf
                 &msg.configuration_nix,
                 &fallback_raid1_mdadm,
                 &msg.flake_nix,
-                session_id,
+                transaction_dir,
             ));
             script.push_str(&bootloader_patch_commands(&msg.disk));
 
@@ -2269,7 +2269,7 @@ mdadm --detail --scan >> /mnt/etc/mdadm.conf 2>/dev/null || true
                 &msg.configuration_nix,
                 &fallback_config,
                 &msg.flake_nix,
-                session_id,
+                transaction_dir,
             ));
             script.push_str(&bootloader_patch_commands(&msg.disk));
             script.push_str(
@@ -2394,7 +2394,7 @@ nixos-generate-config --root /mnt
                 &msg.configuration_nix,
                 &fallback_config,
                 &msg.flake_nix,
-                session_id,
+                transaction_dir,
             ));
             script.push_str(&bootloader_patch_commands(&msg.disk));
             script.push_str(
@@ -3758,7 +3758,20 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 // The whole asynchronous install evidence namespace is private
                 // to this transaction. Other local users cannot replace status,
                 // PID, log, script, or staged configuration paths from /tmp.
-                let config_staging_dir = transaction_dir.clone();
+                let config_staging_dir = format!("{transaction_dir}/config");
+                if let Err(error) = tokio::fs::create_dir_all(&config_staging_dir).await {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Unable to create transaction config staging namespace: {}",
+                                error
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
+                    continue;
+                }
                 // Stage configuration.nix (browser-supplied or will be generated by fallback in script)
                 if !client_msg.configuration_nix.is_empty() {
                     let config_path = format!("{}/configuration.nix", config_staging_dir);
@@ -3800,7 +3813,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     }
                 }
 
-                let mut script = generate_install_script(&client_msg, session_id);
+                let mut script = generate_install_script(&client_msg, &transaction_dir);
 
                 // Always: pre-install disk snapshot (instant, non-destructive)
                 let snapshot = disk_snapshot(&disk);
@@ -3951,7 +3964,7 @@ echo "  User password set."
                     if let Err(error) = luks_file.write_all(client_msg.luks_passphrase.as_bytes()) {
                         drop(luks_file);
                         let _ = tokio::fs::remove_file(&luks_key_path).await;
-                        let _ = tokio::fs::remove_file(format!("/tmp/sovereign-user-pw-{}", session_id)).await;
+                        let _ = tokio::fs::remove_file(format!("{transaction_dir}/user-password")).await;
                         let _ = ws_tx
                             .send(Message::Text(
                                 RelayMessage::error(&format!("Failed to stage LUKS2 passphrase: {}", error)).to_json(),
@@ -3962,7 +3975,7 @@ echo "  User password set."
                     if let Err(error) = luks_file.sync_all() {
                         drop(luks_file);
                         let _ = tokio::fs::remove_file(&luks_key_path).await;
-                        let _ = tokio::fs::remove_file(format!("/tmp/sovereign-user-pw-{}", session_id)).await;
+                        let _ = tokio::fs::remove_file(format!("{transaction_dir}/user-password")).await;
                         let _ = ws_tx
                             .send(Message::Text(
                                 RelayMessage::error(&format!("Failed to flush LUKS2 passphrase: {}", error)).to_json(),
@@ -4300,7 +4313,7 @@ echo "  User password set."
                 // LEGACY: The old blocking path (kept for reference)
                 // This is what we replaced with the log-polling approach above.
                 if false {
-                    match run_cmd("bash /tmp/symthaea-install.sh 2>&1").await {
+                    match run_cmd(&format!("bash {} 2>&1", script_path)).await {
                         Ok(result) => {
                             for line in result.stdout.lines().chain(result.stderr.lines()) {
                                 if line.trim().is_empty() {
@@ -8530,6 +8543,25 @@ mod tests {
 
 
     #[test]
+    #[test]
+    fn transaction_config_staging_is_nested_under_private_namespace() {
+        let commands = config_write_commands(
+            "browser-config",
+            "fallback-config",
+            "",
+            "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef",
+        );
+        assert!(commands.contains(
+            "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef/config/configuration.nix"
+        ));
+        assert!(commands.contains(
+            "rm -rf /tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef/config"
+        ));
+        assert!(!commands.contains(
+            "rm -rf /tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef\n"
+        ));
+    }
+
     fn cleanup_trap_contains_no_nested_shell_quotes() {
         let paths = [
             "/tmp/sovereign-user-pw-42",
@@ -8576,8 +8608,11 @@ mod tests {
             luks_passphrase: "not-embedded-secret".into(),
             extra_disks: Vec::new(),
         };
-        let script = generate_install_script(&message, 1234);
-        assert!(script.contains("/tmp/sovereign-luks-pw-1234"));
+        let script = generate_install_script(
+            &message,
+            "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef",
+        );
+        assert!(script.contains("/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef/luks-passphrase"));
         assert!(!script.contains("not-embedded-secret"));
         assert!(!script.contains("legacy-command-field-must-not-be-used"));
         assert!(script.contains("if [ ! -s \"$LUKS_KEYFILE\" ]"));
@@ -8629,7 +8664,10 @@ mod tests {
                 user_password: String::new(),
                 extra_disks: Vec::new(),
             };
-            let script = generate_install_script(&message, 42);
+            let script = generate_install_script(
+                &message,
+                "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef",
+            );
             assert!(
                 !script.contains("initialPassword"),
                 "layout {layout} embedded an initialPassword in generated config"
