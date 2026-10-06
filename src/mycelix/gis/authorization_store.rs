@@ -827,6 +827,56 @@ fn backfill_native_replay_history(
     Ok(())
 }
 
+fn validate_native_replay_history_records(
+    connection: &Connection,
+) -> Result<(), AuthorizationStoreError> {
+    let mut stmt = connection.prepare(
+        "SELECT native_replay_identity,native_authority_namespace,
+                native_authorization_id,native_replay_derivation_digest
+         FROM authorization_native_replay_history
+         WHERE native_replay_identity IS NOT NULL
+           AND native_replay_identity <> ''",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_,String>(0)?,
+            row.get::<_,Option<String>>(1)?,
+            row.get::<_,Option<String>>(2)?,
+            row.get::<_,Option<String>>(3)?,
+        ))
+    })?;
+
+    for row in rows {
+        let (identity, namespace, native_id, derivation_digest) = row?;
+        match (
+            namespace.as_deref().filter(|value| !value.is_empty()),
+            native_id.as_deref().filter(|value| !value.is_empty()),
+            derivation_digest.as_deref().filter(|value| !value.is_empty()),
+        ) {
+            (None, None, None) => {}
+            (Some(namespace), Some(native_id), Some(derivation_digest)) => {
+                let derived = super::NativeReplayDerivation::derive(namespace, native_id)
+                    .map_err(|_| AuthorizationStoreError::InvalidState(
+                        "invalid native replay derivation witness in history".into()
+                    ))?;
+                if derived.native_replay_identity != identity
+                    || derived.derivation_digest != derivation_digest
+                {
+                    return Err(AuthorizationStoreError::InvalidState(
+                        "native replay history derivation mismatch".into(),
+                    ));
+                }
+            }
+            _ => {
+                return Err(AuthorizationStoreError::InvalidState(
+                    "partial native replay derivation witness in history".into(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_attempt_operation_consistency(
     connection: &Connection,
 ) -> Result<(), AuthorizationStoreError> {
@@ -1762,6 +1812,7 @@ impl SqliteAuthorizationStore {
         // The replay ledger is then a stable historical authority even when
         // those source rows are later compacted.
         backfill_native_replay_history(&mut connection)?;
+        validate_native_replay_history_records(&connection)?;
         Ok(store)
     }
 
@@ -11622,7 +11673,46 @@ mod tests {
                 |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
             )
             .unwrap();
-        assert_eq!(row, ("".into(), "".into(), "".into()));
+        assert_eq!(
+            row,
+            ("".into(), "rp-legacy-native-replay-history".into(), "".into())
+        );
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn forged_native_replay_history_witness_fails_store_reopen() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-forged-native-replay-history-{}.db",
+            std::process::id()
+        ));
+        {
+            let store = SqliteAuthorizationStore::open(&path).unwrap();
+            store
+                .connection()
+                .unwrap()
+                .execute(
+                    "INSERT INTO authorization_native_replay_history(
+                        native_replay_identity,authorization_instance,attempt_id,operation_id,
+                        relying_party_id,native_authority_namespace,native_authorization_id,
+                        native_replay_derivation_digest,boundary_id,action_digest,target_identity)
+                     VALUES(
+                        'sha256:forged-history','auth-forged-history','attempt-forged-history',
+                        'operation-forged-history','default',
+                        'issuer.forced-history','native-grant:forced-history',
+                        'sha256:forged-derivation','boundary-forged-history',
+                        'sha256:forged-action','target-forged-history')",
+                    [],
+                )
+                .unwrap();
+        }
+
+        assert!(matches!(
+            SqliteAuthorizationStore::open(&path),
+            Err(AuthorizationStoreError::InvalidState(message))
+                if message.contains("native replay history derivation mismatch")
+        ));
 
         let _ = std::fs::remove_file(path);
     }
