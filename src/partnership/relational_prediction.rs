@@ -1944,7 +1944,9 @@ mod tests {
 
         evidence.validate().unwrap();
         let json = evidence.to_json().unwrap();
-        assert!(json.contains("relational-prediction-evidence/v1"));
+        assert!(json.contains(EVIDENCE_SCHEMA));
+        assert!(json.contains(FEATURE_SCHEMA));
+        assert!(json.contains(MODEL_SCHEMA));
         assert!(json.contains("RelationalAugmented"));
         assert!(json.contains("predictions"));
         assert_eq!(evidence.records.len(), 7);
