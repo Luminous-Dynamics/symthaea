@@ -1986,6 +1986,40 @@ mod tests {
     use super::*;
 
     #[test]
+    fn durable_transaction_outcome_accepts_only_terminal_receipts() {
+        let success = serde_json::json!({
+            "type": "exit",
+            "code": 0,
+            "transaction": {"outcome": "observed_success"}
+        });
+        let failed = serde_json::json!({
+            "type": "exit",
+            "code": 17,
+            "transaction": {"outcome": "failed"}
+        });
+        let uncertain = serde_json::json!({
+            "type": "exit",
+            "code": null,
+            "transaction": {"outcome": "indeterminate"}
+        });
+        let missing = serde_json::json!({"type": "exit", "code": 0});
+        let unknown = serde_json::json!({
+            "type": "exit",
+            "code": 0,
+            "transaction": {"outcome": "future_value"}
+        });
+
+        assert_eq!(
+            durable_transaction_outcome(&success),
+            Some("observed_success")
+        );
+        assert_eq!(durable_transaction_outcome(&failed), Some("failed"));
+        assert_eq!(durable_transaction_outcome(&uncertain), Some("indeterminate"));
+        assert_eq!(durable_transaction_outcome(&missing), None);
+        assert_eq!(durable_transaction_outcome(&unknown), None);
+    }
+
+    #[test]
     fn destructive_relay_messages_require_install_state() {
         assert!(!relay_message_allowed(&RelayState::Ready, "exit"));
         assert!(!relay_message_allowed(&RelayState::Probing, "progress"));
