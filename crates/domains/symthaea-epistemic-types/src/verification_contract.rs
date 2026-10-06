@@ -797,14 +797,15 @@ fn parse_timestamp(
     // Chrono stores nanoseconds. Never silently collapse distinct instants:
     // fractional digits beyond nanoseconds are accepted only when they are all
     // zero, so the value remains exactly representable.
-    if let Some(dot) = parse_value[parse_value.find('T').ok_or_else(|| {
+    let time_start = parse_value.find('T').ok_or_else(|| {
         VerificationFailure::InvalidTimestamp {
             field,
             value: value.to_owned(),
         }
-    })?..]
+    })?;
+    if let Some(dot) = parse_value[time_start..]
         .find('.')
-        .map(|offset| offset + parse_value.find('T').unwrap())
+        .map(|offset| offset + time_start)
     {
         let fraction_start = dot + 1;
         let timezone_start = parse_value[fraction_start..]
