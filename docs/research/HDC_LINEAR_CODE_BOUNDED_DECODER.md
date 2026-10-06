@@ -124,22 +124,13 @@ The randomized qualification surface now probes deterministic observations from 
 existing moderate-rate and low-rate regimes, using an independent test-side
 parity-check construction based on u64 nullspace elimination. It does not call the
 decoder's parity-check constructor. The resulting syndrome is compared directly
-with the production parity-check syndrome for every probe. The independent check
-rows are also subjected to a separate rank computation and must have rank (n-k);
-row count alone is therefore not accepted as evidence of a full-rank parity check.
+with the production parity-check syndrome for every probe.
 
 The nearest-codeword oracle is also independently reconstructed from the generator
 basis by explicit GF(2) subset enumeration rather than calling the production
 codeword-enumeration method. The qualification first requires the production and
 independent codeword sets to agree exactly, then uses the independently reconstructed
 set for nearest-distance and multiplicity checks.
-
-The randomized surface additionally checks translation equivariance. Translating an
-observation by any codeword must leave its syndrome and minimum-weight error
-representatives unchanged while translating every returned nearest codeword by the
-same codeword. Scalar uniqueness/ambiguity/no-match classification and list
-completeness must remain unchanged. This probes the linear coset structure rather
-than only isolated observations.
 
 For each generated code, the probe bound is one above the guaranteed unique-decoding
 radius. When the independent nearest-codeword oracle places the observation within
@@ -150,8 +141,6 @@ remain explicit NoMatchWithinBound results.
 
 The entire probe is repeated with identical seeds and observations and the
 complete multiplicity histogram (1 through 16) must be identical. The emitted
-ledger records the independent-check-rank and translation-equivariance gates
-alongside the syndrome and codeword oracle markers. The emitted
 ledger therefore exposes the full observed list-size distribution rather than
 only a selected prefix. This makes the empirical random-code result deterministic
 without pretending it is an asymptotic theorem.

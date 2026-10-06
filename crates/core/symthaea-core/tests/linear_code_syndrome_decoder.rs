@@ -407,7 +407,8 @@ fn minimum_weight_syndrome_multiplicity_matches_nearest_codeword_multiplicity_ex
                 "listed codeword was not nearest for observation={mask:#x}"
             );
         }
-        assert_eq!(listed.outcome, result,
+        assert_eq!(
+            listed.outcome, result,
             "list-valued and scalar decoder outcomes diverged for observation={mask:#x}"
         );
         assert_eq!(
@@ -811,8 +812,7 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
                 production_masks.sort_unstable();
                 independent_masks.sort_unstable();
                 assert_eq!(
-                    production_masks,
-                    independent_masks,
+                    production_masks, independent_masks,
                     "production codeword enumeration diverged from independent basis reconstruction: regime={dimension}x{rank} seed=0x{seed:X}"
                 );
 
@@ -860,11 +860,9 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
                     let shift = &codewords[(seed as usize) % codewords.len()];
                     let mut shifted_observation = observation.clone();
                     shifted_observation.xor_assign(shift);
-                    let shifted =
-                        decoder.decode_with_minimum_list(&shifted_observation, bound, 32);
+                    let shifted = decoder.decode_with_minimum_list(&shifted_observation, bound, 32);
                     assert_eq!(
-                        shifted.minimum_errors,
-                        listed_a.minimum_errors,
+                        shifted.minimum_errors, listed_a.minimum_errors,
                         "codeword translation changed minimum error representatives: regime={dimension}x{rank} seed=0x{seed:X} mask={mask:#x}"
                     );
                     assert_eq!(
