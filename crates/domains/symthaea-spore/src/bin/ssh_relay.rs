@@ -2821,7 +2821,7 @@ async fn verify_preservation_artifacts(backup_dir: &str) -> Result<bool, String>
     let path = validate_preservation_path(backup_dir)?;
 
     use std::os::unix::fs::MetadataExt;
-    let dir = tokio::fs::metadata(&path)
+    let dir = tokio::fs::symlink_metadata(&path)
         .await
         .map_err(|error| format!("preservation directory postcondition probe failed: {error}"))?;
     if !dir.is_dir() {
