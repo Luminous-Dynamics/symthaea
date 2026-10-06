@@ -4385,6 +4385,134 @@ mod tests {
     }
 
     #[test]
+    fn remediation_metric_computation_reproduces_exact_observations() {
+        let definition = NeurosemanticRemediationMetricDefinition {
+            schema_version: NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
+            metric_ref: "metric-computation".into(),
+            kind: NeurosemanticRemediationMeasurementKind::Forgetfulness,
+            estimand_ref: "forgetfulness-on-forget-set".into(),
+            scope_ref: "forget-set-v1".into(),
+            unit_ref: "proportion".into(),
+            aggregation_ref: "per-item-rate".into(),
+            direction: NeurosemanticRemediationMetricDirection::DescriptiveOnly,
+        };
+        let observation_set = NeurosemanticRemediationObservationSetArtifact {
+            schema_version: NEUROSEMANTIC_REMEDIATION_OBSERVATION_SET_SCHEMA_VERSION,
+            observation_set_ref: "observation-set-computation".into(),
+            metric_ref: definition.metric_ref.clone(),
+            kind: definition.kind,
+            scope_ref: definition.scope_ref.clone(),
+            eligible_subject_artifact_hashes: vec![
+                content_hash(b"item-1"),
+                content_hash(b"item-2"),
+                content_hash(b"item-3"),
+            ],
+            observations: vec![
+                NeurosemanticRemediationObservationRecord {
+                    observation_ref: "observation-1".into(),
+                    subject_artifact_hash: content_hash(b"item-1"),
+                    failure_observed: false,
+                    group_ref: None,
+                },
+                NeurosemanticRemediationObservationRecord {
+                    observation_ref: "observation-2".into(),
+                    subject_artifact_hash: content_hash(b"item-2"),
+                    failure_observed: true,
+                    group_ref: None,
+                },
+            ],
+        };
+        let observation_bytes = serde_json::to_vec(&observation_set).unwrap();
+        let observation_roundtrip =
+            NeurosemanticRemediationObservationSetArtifact::from_json_bytes(
+                &observation_bytes,
+                &definition.aggregation_ref,
+            )
+            .unwrap();
+        let (eligible, observed, failures, ratio_numerator, ratio_denominator) =
+            recompute_metric_ratio(&observation_roundtrip, &definition.aggregation_ref).unwrap();
+        assert_eq!((eligible, observed, failures), (3, 2, 1));
+        assert!(fixed_point_equals_ratio(5, 1, ratio_numerator, ratio_denominator));
+
+        let computation = NeurosemanticRemediationMetricComputationArtifact {
+            schema_version: NEUROSEMANTIC_REMEDIATION_METRIC_COMPUTATION_SCHEMA_VERSION,
+            computation_ref: "computation-exact-observations".into(),
+            metric_ref: definition.metric_ref.clone(),
+            kind: definition.kind,
+            metric_definition_hash: definition.fingerprint().unwrap(),
+            observation_set_hash: observation_set
+                .fingerprint(&definition.aggregation_ref)
+                .unwrap(),
+            aggregation_ref: definition.aggregation_ref.clone(),
+            execution_revision: "7".repeat(40),
+            estimate_numerator: 5,
+            estimate_scale: 1,
+            eligible_sample_count: 3,
+            observed_sample_count: 2,
+            failure_count: 1,
+        };
+        assert!(computation.validate().is_ok());
+        assert!(fixed_point_equals_ratio(
+            computation.estimate_numerator,
+            computation.estimate_scale,
+            ratio_numerator,
+            ratio_denominator,
+        ));
+
+        let mut forged = computation.clone();
+        forged.estimate_numerator = 6;
+        assert!(!fixed_point_equals_ratio(
+            forged.estimate_numerator,
+            forged.estimate_scale,
+            ratio_numerator,
+            ratio_denominator,
+        ));
+
+        let mut duplicate_subject = observation_set.clone();
+        duplicate_subject.observations[1].subject_artifact_hash =
+            duplicate_subject.observations[0].subject_artifact_hash.clone();
+        assert!(duplicate_subject
+            .validate(&definition.aggregation_ref)
+            .is_err());
+
+        let mut out_of_population = observation_set.clone();
+        out_of_population.observations[1].subject_artifact_hash = content_hash(b"item-4");
+        assert!(out_of_population
+            .validate(&definition.aggregation_ref)
+            .is_err());
+    }
+
+    #[test]
+    fn remediation_observation_set_subgroup_gap_requires_explicit_groups() {
+        let set = NeurosemanticRemediationObservationSetArtifact {
+            schema_version: NEUROSEMANTIC_REMEDIATION_OBSERVATION_SET_SCHEMA_VERSION,
+            observation_set_ref: "subgroup-gap-observations".into(),
+            metric_ref: "metric-fairness-gap".into(),
+            kind: NeurosemanticRemediationMeasurementKind::FairnessImpact,
+            scope_ref: "fairness-split-v1".into(),
+            eligible_subject_artifact_hashes: vec![
+                content_hash(b"fair-1"),
+                content_hash(b"fair-2"),
+            ],
+            observations: vec![
+                NeurosemanticRemediationObservationRecord {
+                    observation_ref: "fair-observation-1".into(),
+                    subject_artifact_hash: content_hash(b"fair-1"),
+                    failure_observed: false,
+                    group_ref: None,
+                },
+                NeurosemanticRemediationObservationRecord {
+                    observation_ref: "fair-observation-2".into(),
+                    subject_artifact_hash: content_hash(b"fair-2"),
+                    failure_observed: false,
+                    group_ref: None,
+                },
+            ],
+        };
+        assert!(set.validate("worst-subgroup-gap").is_err());
+    }
+
+    #[test]
     fn remediation_measurement_worst_case_is_recomputed_not_supplied() {
         let definitions = [
             (
