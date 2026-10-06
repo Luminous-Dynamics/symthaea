@@ -17,6 +17,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use nixward::NixParser;
 use nixward::action::authorization::{NixActionIntentV1, NixAuthorizationErrorV1, NixLocalExecutionAuthorityV1};
+use nixward::action::{NixSystemdReadOnlyObserverV1, NixVerifiedServiceDefinitionContentV1};
 use nixward::action::local_approval::LocalApprovalDecisionKindV1;
 use nixward::action::temporal::UnixMillisV1;
 #[cfg(target_os = "linux")]
@@ -105,6 +106,25 @@ fn pre_state_identity_for_command(
         }
         _ => Ok(generation.map(|generation| format!("generation:{generation}"))),
     }
+}
+
+fn capture_authoritative_service_definition_content(
+    unit: &str,
+) -> Result<NixVerifiedServiceDefinitionContentV1, String> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| format!("could not create capture runtime: {error}"))?;
+
+    runtime.block_on(async {
+        let observer = NixSystemdReadOnlyObserverV1::connect_system()
+            .await
+            .map_err(|error| format!("could not connect read-only systemd observer: {error}"))?;
+        observer
+            .capture_service_definition_content(unit)
+            .await
+            .map_err(|error| format!("authoritative service definition capture failed: {error}"))
+    })
 }
 
 
@@ -1440,11 +1460,7 @@ impl DaemonState {
 
                                 let intent = match NixActionIntentV1::from_command(
                                     "nixward:daemon",
-                                    self.prev_snapshot.as_ref().and_then(|snapshot| {
-                                        snapshot
-                                            .generation
-                                            .map(|generation| format!("generation:{generation}"))
-                                    }),
+                                    pre_state_identity.clone(),
                                     &cmd,
                                 ) {
                                     Ok(intent) => intent,
@@ -1461,6 +1477,34 @@ impl DaemonState {
                                         );
                                     }
                                 };
+                                // Service authority requires a fresh observer-sealed definition
+                                // capture immediately before promotion. Capture happens while the
+                                // consumed approval token is still retained so a failed observation
+                                // cannot consume the only governed approval and then fall through
+                                // to a legacy authority path.
+                                let service_definition_content = match &cmd {
+                                    NixOSCommand::Service { unit, .. } => {
+                                        match capture_authoritative_service_definition_content(unit) {
+                                            Ok(content) => Some(content),
+                                            Err(error) => {
+                                                eprintln!(
+                                                    "nixward-daemon: refusing approved Service execution without authoritative definition capture: {error}"
+                                                );
+                                                self.local_approval_consumed = None;
+                                                self.pending_local_approval = None;
+                                                self.pending_action = None;
+                                                self.pending_action_intent_digest = None;
+                                                self.watchdog_status = None;
+                                                return (
+                                                    dynamic_threshold,
+                                                    Some(best_action.expected_free_energy),
+                                                );
+                                            }
+                                        }
+                                    }
+                                    _ => None,
+                                };
+
                                 let consumed_approval = match self.local_approval_consumed.take() {
                                     Some(approval) => approval,
                                     None => {
@@ -1475,23 +1519,34 @@ impl DaemonState {
                                         );
                                     }
                                 };
-                                execution_authority = Some(match NixLocalExecutionAuthorityV1::from_consumed_local_approval(
+
+                                let promotion_result = match service_definition_content.as_ref() {
+                                    Some(content) => {
+                                        NixLocalExecutionAuthorityV1::from_consumed_local_approval_with_definition_capture(
+                                            intent,
+                                            consumed_approval,
+                                            content,
+                                        )
+                                    }
+                                    None => NixLocalExecutionAuthorityV1::from_consumed_local_approval(
                                         intent,
                                         consumed_approval,
-                                    ) {
-                                        Ok(authority) => authority,
-                                        Err(error) => {
-                                            eprintln!(
-                                                "nixward-daemon: approved action could not be promoted to execution authority: {error}"
-                                            );
-                                            self.pending_action = None;
-                                            self.pending_action_intent_digest = None;
-                                            return (
-                                                dynamic_threshold,
-                                                Some(best_action.expected_free_energy),
-                                            );
-                                        }
-                                    });
+                                    ),
+                                };
+                                execution_authority = Some(match promotion_result {
+                                    Ok(authority) => authority,
+                                    Err(error) => {
+                                        eprintln!(
+                                            "nixward-daemon: approved action could not be promoted to execution authority: {error}"
+                                        );
+                                        self.pending_action = None;
+                                        self.pending_action_intent_digest = None;
+                                        return (
+                                            dynamic_threshold,
+                                            Some(best_action.expected_free_energy),
+                                        );
+                                    }
+                                });
 
                                 eprintln!(
                                     "nixward-daemon: Watchdog APPROVED action: {}{}",

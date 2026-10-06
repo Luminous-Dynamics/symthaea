@@ -471,7 +471,37 @@ impl NixLocalExecutionAuthorityV1 {
             return Err(NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture);
         }
         service_effect_context_digest_for_intent(&intent)?;
-        Ok(Self { intent, approval })
+        Ok(Self {
+            intent,
+            approval,
+        })
+    }
+
+    /// Promote a consumed Service approval only after an observer-sealed definition-content capture.
+    ///
+    /// The content token is not caller-fabricable; it can only be obtained from the
+    /// read-only observer boundary. When an intent already carries a service-effect
+    /// context, this constructor additionally requires the sealed capture to match
+    /// both its source-identity and content commitments.
+    pub(crate) fn from_consumed_local_approval_with_definition_capture(
+        intent: NixActionIntentV1,
+        approval: ConsumedLocalApprovalDecisionV1,
+        content: &NixVerifiedServiceDefinitionContentV1,
+    ) -> Result<Self, NixAuthorizationErrorV1> {
+        if approval.decision_kind() != LocalApprovalDecisionKindV1::Approved {
+            return Err(NixAuthorizationErrorV1::NotApproved);
+        }
+        let digest = intent.digest()?;
+        if approval.decision_evidence().action_intent_digest != digest {
+            return Err(NixAuthorizationErrorV1::IntentMismatch);
+        }
+
+        validate_service_definition_capture_binding(&intent, content)?;
+        service_effect_context_digest_for_intent(&intent)?;
+        Ok(Self {
+            intent,
+            approval,
+        })
     }
 
     /// Validate that the execution command is exactly the action that was approved.
@@ -505,6 +535,7 @@ impl NixLocalExecutionAuthorityV1 {
     pub(crate) fn projection_digest(&self) -> &str {
         self.approval.projection_digest()
     }
+
 }
 
 pub(crate) struct LiveNixAuthorizationV1 {
@@ -784,6 +815,35 @@ fn validate_service_definition_capture(
         return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
     }
     Ok(())
+}
+
+fn validate_service_definition_capture_binding(
+    intent: &NixActionIntentV1,
+    content: &NixVerifiedServiceDefinitionContentV1,
+) -> Result<String, NixAuthorizationErrorV1> {
+    let NixActionDescriptorV1::Service { unit, .. } = &intent.action else {
+        return Err(NixAuthorizationErrorV1::UnexpectedServiceEffectContext);
+    };
+
+    let evidence = content.as_ref();
+    if evidence.unit != *unit {
+        return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
+    }
+
+    let content_digest = content
+        .digest()
+        .map_err(NixAuthorizationErrorV1::InvalidServiceEffectContext)?;
+
+    if let Some(context) = intent.service_effect_context() {
+        if context.unit != *unit
+            || context.authorized_definition_digest != evidence.source_identity_digest
+            || context.authorized_definition_content_digest != content_digest
+        {
+            return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
+        }
+    }
+
+    Ok(content_digest)
 }
 
 fn service_effect_context_digest_for_intent(
@@ -1200,6 +1260,10 @@ fn postcondition_status_tag(value: NixPostconditionStatusV1) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::service_effect::{
+        NixSystemdUnitDefinitionContentEvidenceV1,
+        NixSystemdUnitDefinitionContentFileV1,
+    };
 
     fn rebuild() -> NixOSCommand {
         NixOSCommand::RebuildSwitch {
@@ -1426,6 +1490,64 @@ mod tests {
             "4444444444444444444444444444444444444444444444444444444444444444".into();
         changed.validate_shape().unwrap();
         assert_ne!(base.digest().unwrap(), changed.digest().unwrap());
+    }
+
+    #[test]
+    fn service_definition_capture_binding_matches_unit_and_context_commitments() {
+        let evidence = NixSystemdUnitDefinitionContentEvidenceV1 {
+            unit: "nginx.service".into(),
+            source_identity_digest: "11".repeat(32),
+            manager_owner: ":1.42".into(),
+            bus_id: "0123456789abcdef0123456789abcdef".into(),
+            files: vec![NixSystemdUnitDefinitionContentFileV1 {
+                path: "/nix/store/nginx.service".into(),
+                resolved_path: None,
+                byte_len: 3,
+                content_digest: "22".repeat(32),
+            }],
+            captured_at_monotonic_us: 1,
+        };
+        let sealed =
+            NixVerifiedServiceDefinitionContentV1::from_observer(evidence.clone()).unwrap();
+
+        let bare_intent = NixActionIntentV1::from_command(
+            "host:x",
+            Some("generation:42".into()),
+            &NixOSCommand::Service {
+                operation: NixServiceOperationKindV1::Restart,
+                unit: "nginx.service".into(),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            validate_service_definition_capture_binding(&bare_intent, &sealed).unwrap(),
+            sealed.digest().unwrap()
+        );
+
+        let context = NixServiceEffectContextV1::from_verified_definition_content(
+            NixServiceOperationKindV1::Restart,
+            "nginx.service",
+            42,
+            "aa".repeat(32),
+            Some("bb".repeat(16)),
+            1_000,
+            &sealed,
+        )
+        .unwrap();
+        let contextual = bare_intent.with_service_effect_context(context).unwrap();
+        assert_eq!(
+            validate_service_definition_capture_binding(&contextual, &sealed).unwrap(),
+            sealed.digest().unwrap()
+        );
+
+        let mut altered_evidence = evidence;
+        altered_evidence.files[0].content_digest = "33".repeat(32);
+        let altered =
+            NixVerifiedServiceDefinitionContentV1::from_observer(altered_evidence).unwrap();
+        assert_eq!(
+            validate_service_definition_capture_binding(&contextual, &altered).unwrap_err(),
+            NixAuthorizationErrorV1::DefinitionContentCaptureMismatch
+        );
     }
 
     #[test]
