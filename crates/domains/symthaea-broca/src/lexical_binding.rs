@@ -608,10 +608,10 @@ pub struct MorphophonologicalCompilationWitness {
     pub compiler_version: String,
     /// Exact content identity of the current UniMorph compiler source module and its build-time
     /// identity mechanism.
-    pub compiler_implementation_revision: String,
+    pub compiler_implementation_revision: Option<String>,
     /// Exact content identity of the accepted source-format parser surface and its build-time
     /// identity mechanism.
-    pub source_parser_revision: String,
+    pub source_parser_revision: Option<String>,
     pub normalization_policy: String,
     pub source_artifact_blake3: String,
     pub source_selection_blake3: String,
