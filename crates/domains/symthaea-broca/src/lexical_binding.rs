@@ -115,6 +115,204 @@ pub struct AgreementConstraint {
     pub feature: MorphologicalFeature,
 }
 
+/// Stable identity for explicit morphophonological derivation traces.
+pub const MORPHOPHONOLOGICAL_DERIVATION_WITNESS_VERSION: &str =
+    "broca-morphophonological-derivation-witness-v1";
+
+/// One explicit derivation step connecting a selected lemma and morphology to the
+/// morphophonological form supplied to downstream phonological realization.
+///
+/// This is an evidence contract, not a language engine: validation proves that the trace
+/// exactly describes the retained binding and rule-set identity. It does not prove that the
+/// referenced linguistic rule is complete, correct, natural, or appropriate for speakers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MorphophonologicalDerivationStep {
+    pub position: usize,
+    pub lexeme_id: String,
+    pub lemma: String,
+    pub morphology: Vec<MorphologicalFeature>,
+    pub output_form: String,
+    pub language_tag: String,
+    pub rule_id: String,
+    pub rule_provenance: String,
+}
+
+/// Explicit, fail-closed evidence that every bound lexical constituent has a recorded
+/// morphophonological realization under one explicitly identified language rule set.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MorphophonologicalDerivationWitness {
+    pub version: String,
+    pub language: LanguageRuleBinding,
+    pub steps: Vec<MorphophonologicalDerivationStep>,
+}
+
+impl MorphophonologicalDerivationWitness {
+    pub fn new(
+        binding: &LexicalMorphosyntacticBinding,
+        steps: Vec<MorphophonologicalDerivationStep>,
+    ) -> Result<Self, MorphophonologicalDerivationWitnessError> {
+        let witness = Self {
+            version: MORPHOPHONOLOGICAL_DERIVATION_WITNESS_VERSION.to_string(),
+            language: binding.language.clone(),
+            steps,
+        };
+        witness.validate_against_binding(binding)?;
+        Ok(witness)
+    }
+
+    /// Validate the complete trace against the exact persisted lexical/morphosyntactic binding.
+    pub fn validate_against_binding(
+        &self,
+        binding: &LexicalMorphosyntacticBinding,
+    ) -> Result<(), MorphophonologicalDerivationWitnessError> {
+        binding
+            .validate()
+            .map_err(|_| MorphophonologicalDerivationWitnessError::InvalidBinding)?;
+
+        if self.version != MORPHOPHONOLOGICAL_DERIVATION_WITNESS_VERSION {
+            return Err(MorphophonologicalDerivationWitnessError::InvalidVersion);
+        }
+
+        if self.language != binding.language {
+            return Err(MorphophonologicalDerivationWitnessError::LanguageBindingMismatch);
+        }
+
+        if !matches!(binding.language.status, LanguageRuleStatus::Bound) {
+            return Err(MorphophonologicalDerivationWitnessError::LanguageRulesMustBeBound);
+        }
+
+        if self.steps.len() != binding.constituents.len() {
+            return Err(MorphophonologicalDerivationWitnessError::StepCountMismatch);
+        }
+
+        let rule_id = binding
+            .language
+            .rule_id
+            .as_deref()
+            .ok_or(MorphophonologicalDerivationWitnessError::LanguageRulesMustBeBound)?;
+        let rule_provenance = binding
+            .language
+            .provenance
+            .as_deref()
+            .ok_or(MorphophonologicalDerivationWitnessError::LanguageRulesMustBeBound)?;
+
+        for (expected_position, (step, constituent)) in
+            self.steps.iter().zip(&binding.constituents).enumerate()
+        {
+            if step.position != expected_position || constituent.position != expected_position {
+                return Err(MorphophonologicalDerivationWitnessError::PositionMismatch {
+                    position: expected_position,
+                });
+            }
+            if step.lexeme_id != constituent.lexeme_id {
+                return Err(MorphophonologicalDerivationWitnessError::LexemeIdentityMismatch {
+                    position: expected_position,
+                });
+            }
+            if step.lemma != constituent.lemma {
+                return Err(MorphophonologicalDerivationWitnessError::LemmaMismatch {
+                    position: expected_position,
+                });
+            }
+            if step.morphology != constituent.morphology {
+                return Err(MorphophonologicalDerivationWitnessError::MorphologyMismatch {
+                    position: expected_position,
+                });
+            }
+            let expected_output = constituent
+                .morphophonological_form
+                .as_deref()
+                .ok_or(MorphophonologicalDerivationWitnessError::MissingOutputForm {
+                    position: expected_position,
+                })?;
+            if step.output_form != expected_output {
+                return Err(MorphophonologicalDerivationWitnessError::OutputFormMismatch {
+                    position: expected_position,
+                });
+            }
+            if step.language_tag != binding.language.language_tag {
+                return Err(MorphophonologicalDerivationWitnessError::LanguageTagMismatch {
+                    position: expected_position,
+                });
+            }
+            if step.rule_id != rule_id {
+                return Err(MorphophonologicalDerivationWitnessError::RuleIdMismatch {
+                    position: expected_position,
+                });
+            }
+            if step.rule_provenance != rule_provenance {
+                return Err(MorphophonologicalDerivationWitnessError::RuleProvenanceMismatch {
+                    position: expected_position,
+                });
+            }
+            if step.output_form.trim().is_empty() {
+                return Err(MorphophonologicalDerivationWitnessError::EmptyOutputForm {
+                    position: expected_position,
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn grounding_surface(&self) -> String {
+        serde_json::to_string(self).unwrap_or_else(|_| {
+            format!(
+                "{{\"version\":\"{}\",\"serialization\":\"failed\"}}",
+                self.version
+            )
+        })
+    }
+
+    pub fn provenance_token(&self) -> String {
+        let digest = blake3::hash(self.grounding_surface().as_bytes());
+        digest.to_hex().to_string()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MorphophonologicalDerivationWitnessError {
+    InvalidVersion,
+    InvalidBinding,
+    LanguageBindingMismatch,
+    LanguageRulesMustBeBound,
+    StepCountMismatch,
+    PositionMismatch { position: usize },
+    LexemeIdentityMismatch { position: usize },
+    LemmaMismatch { position: usize },
+    MorphologyMismatch { position: usize },
+    MissingOutputForm { position: usize },
+    OutputFormMismatch { position: usize },
+    LanguageTagMismatch { position: usize },
+    RuleIdMismatch { position: usize },
+    RuleProvenanceMismatch { position: usize },
+    EmptyOutputForm { position: usize },
+}
+
+impl std::fmt::Display for MorphophonologicalDerivationWitnessError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidVersion => write!(f, "morphophonological derivation witness version is unsupported"),
+            Self::InvalidBinding => write!(f, "lexical binding for morphophonological derivation is invalid"),
+            Self::LanguageBindingMismatch => write!(f, "morphophonological witness language binding does not match the lexical binding"),
+            Self::LanguageRulesMustBeBound => write!(f, "morphophonological derivation requires explicitly bound language rules"),
+            Self::StepCountMismatch => write!(f, "morphophonological derivation step count does not match lexical constituents"),
+            Self::PositionMismatch { position } => write!(f, "morphophonological derivation position {position} is not aligned with the lexical binding"),
+            Self::LexemeIdentityMismatch { position } => write!(f, "morphophonological derivation lexeme identity mismatches position {position}"),
+            Self::LemmaMismatch { position } => write!(f, "morphophonological derivation lemma mismatches position {position}"),
+            Self::MorphologyMismatch { position } => write!(f, "morphophonological derivation morphology mismatches position {position}"),
+            Self::MissingOutputForm { position } => write!(f, "lexical position {position} has no morphophonological output form"),
+            Self::OutputFormMismatch { position } => write!(f, "morphophonological derivation output mismatches position {position}"),
+            Self::LanguageTagMismatch { position } => write!(f, "morphophonological derivation language tag mismatches position {position}"),
+            Self::RuleIdMismatch { position } => write!(f, "morphophonological derivation rule id mismatches position {position}"),
+            Self::RuleProvenanceMismatch { position } => write!(f, "morphophonological derivation rule provenance mismatches position {position}"),
+            Self::EmptyOutputForm { position } => write!(f, "morphophonological derivation output at position {position} is empty"),
+        }
+    }
+}
+
+impl std::error::Error for MorphophonologicalDerivationWitnessError {}
+
 /// Complete lexical + morphosyntactic binding for one LinguisticFrame.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LexicalMorphosyntacticBinding {
@@ -1042,4 +1240,167 @@ mod tests {
         );
         assert_eq!(FormulationStrategy::Declarative as u8, 0);
     }
+
+    fn morphophonological_fixture_binding() -> LexicalMorphosyntacticBinding {
+        LexicalMorphosyntacticBinding {
+            version: LEXICAL_MORPHOSYNTACTIC_BINDING_VERSION.into(),
+            source_frame_version: "fixture-frame-v1".into(),
+            source_frame_grounding: "fixture-grounding".into(),
+            language: LanguageRuleBinding {
+                language_tag: "en".into(),
+                status: LanguageRuleStatus::Bound,
+                rule_id: Some("fixture:english-morphology:v1".into()),
+                provenance: Some("fixture:rules:v1".into()),
+                unbound_reason: None,
+            },
+            constituents: vec![LexemeBinding {
+                position: 0,
+                source: LexicalSource::SemanticConstituent {
+                    role: "AGENT".into(),
+                    prime: "I".into(),
+                },
+                lemma: "walk".into(),
+                lexeme_id: "fixture:walk".into(),
+                grammatical_function: GrammaticalFunction::Verb,
+                morphology: vec![MorphologicalFeature {
+                    category: "tense".into(),
+                    value: "past".into(),
+                }],
+                morphophonological_form: Some("walked".into()),
+                provenance: "fixture:lexicon:v1".into(),
+                semantic_payload: true,
+            }],
+            dependencies: Vec::new(),
+            agreement: Vec::new(),
+        }
+    }
+
+    fn valid_morphophonological_step() -> MorphophonologicalDerivationStep {
+        MorphophonologicalDerivationStep {
+            position: 0,
+            lexeme_id: "fixture:walk".into(),
+            lemma: "walk".into(),
+            morphology: vec![MorphologicalFeature {
+                category: "tense".into(),
+                value: "past".into(),
+            }],
+            output_form: "walked".into(),
+            language_tag: "en".into(),
+            rule_id: "fixture:english-morphology:v1".into(),
+            rule_provenance: "fixture:rules:v1".into(),
+        }
+    }
+
+    #[test]
+    fn morphophonological_derivation_witness_binds_exact_inputs_and_rule_identity() {
+        let binding = morphophonological_fixture_binding();
+        let witness = MorphophonologicalDerivationWitness::new(
+            &binding,
+            vec![valid_morphophonological_step()],
+        )
+        .expect("explicit derivation trace should validate");
+
+        assert!(witness.validate_against_binding(&binding).is_ok());
+        assert_eq!(witness.provenance_token().len(), 64);
+    }
+
+    #[test]
+    fn morphophonological_derivation_witness_rejects_output_tampering() {
+        let binding = morphophonological_fixture_binding();
+        let mut witness = MorphophonologicalDerivationWitness::new(
+            &binding,
+            vec![valid_morphophonological_step()],
+        )
+        .unwrap();
+        witness.steps[0].output_form = "walks".into();
+
+        assert_eq!(
+            witness
+                .validate_against_binding(&binding)
+                .expect_err("output tampering must fail closed"),
+            MorphophonologicalDerivationWitnessError::OutputFormMismatch { position: 0 }
+        );
+    }
+
+    #[test]
+    fn morphophonological_derivation_witness_rejects_lemma_and_morphology_tampering() {
+        let binding = morphophonological_fixture_binding();
+
+        let mut lemma_tampered = MorphophonologicalDerivationWitness::new(
+            &binding,
+            vec![valid_morphophonological_step()],
+        )
+        .unwrap();
+        lemma_tampered.steps[0].lemma = "run".into();
+        assert_eq!(
+            lemma_tampered
+                .validate_against_binding(&binding)
+                .expect_err("lemma tampering must fail closed"),
+            MorphophonologicalDerivationWitnessError::LemmaMismatch { position: 0 }
+        );
+
+        let mut morphology_tampered = MorphophonologicalDerivationWitness::new(
+            &binding,
+            vec![valid_morphophonological_step()],
+        )
+        .unwrap();
+        morphology_tampered.steps[0].morphology[0].value = "present".into();
+        assert_eq!(
+            morphology_tampered
+                .validate_against_binding(&binding)
+                .expect_err("morphology tampering must fail closed"),
+            MorphophonologicalDerivationWitnessError::MorphologyMismatch { position: 0 }
+        );
+    }
+
+    #[test]
+    fn morphophonological_derivation_witness_rejects_rule_and_language_tampering() {
+        let binding = morphophonological_fixture_binding();
+
+        let mut rule_tampered = MorphophonologicalDerivationWitness::new(
+            &binding,
+            vec![valid_morphophonological_step()],
+        )
+        .unwrap();
+        rule_tampered.steps[0].rule_id = "fixture:other-rule:v1".into();
+        assert_eq!(
+            rule_tampered
+                .validate_against_binding(&binding)
+                .expect_err("rule identity tampering must fail closed"),
+            MorphophonologicalDerivationWitnessError::RuleIdMismatch { position: 0 }
+        );
+
+        let mut language_tampered = MorphophonologicalDerivationWitness::new(
+            &binding,
+            vec![valid_morphophonological_step()],
+        )
+        .unwrap();
+        language_tampered.steps[0].language_tag = "en-GB".into();
+        assert_eq!(
+            language_tampered
+                .validate_against_binding(&binding)
+                .expect_err("language tampering must fail closed"),
+            MorphophonologicalDerivationWitnessError::LanguageTagMismatch { position: 0 }
+        );
+    }
+
+    #[test]
+    fn morphophonological_derivation_witness_rejects_unbound_rule_sets() {
+        let mut binding = morphophonological_fixture_binding();
+        binding.language = LanguageRuleBinding {
+            language_tag: "en".into(),
+            status: LanguageRuleStatus::Unbound,
+            rule_id: None,
+            provenance: None,
+            unbound_reason: Some("fixture has no executable rule set".into()),
+        };
+
+        let error = MorphophonologicalDerivationWitness::new(&binding, Vec::new())
+            .expect_err("unbound language rules must not be elevated to derivation evidence");
+        assert_eq!(
+            error,
+            MorphophonologicalDerivationWitnessError::LanguageRulesMustBeBound
+        );
+    }
+
 }
