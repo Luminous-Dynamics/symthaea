@@ -229,6 +229,13 @@ pub struct PredictionScore {
     pub mean_squared_error: f64,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct FittedLinearModel {
+    coefficients: Vec<f64>,
+    means: Vec<f64>,
+    scales: Vec<f64>,
+}
+
 impl PredictionScore {
     pub fn is_finite(&self) -> bool {
         self.mean_absolute_error.is_finite() && self.mean_squared_error.is_finite()
@@ -865,7 +872,7 @@ fn fit_and_score(
         return score_persistence_baseline(samples, config);
     }
 
-    let coefficients = fit_linear_model(
+    let model = fit_linear_model(
         &samples[..config.train_samples],
         feature_set,
         config.ridge_lambda,
@@ -878,7 +885,7 @@ fn fit_and_score(
 
     for sample in &samples[test_start..test_end] {
         let features = feature_vector(sample, feature_set);
-        let prediction = predict(&coefficients, &features);
+        let prediction = predict(&model, &features);
         if !prediction.is_finite() {
             return Err(RelationalPredictionError::ModelFitFailed);
         }
@@ -894,7 +901,7 @@ fn fit_and_score(
     let n = config.test_samples as f64;
     Ok(PredictionScore {
         feature_set,
-        parameter_count: coefficients.len(),
+        parameter_count: model.coefficients.len(),
         train_samples: config.train_samples,
         test_samples: config.test_samples,
         mean_absolute_error: absolute_error / n,
