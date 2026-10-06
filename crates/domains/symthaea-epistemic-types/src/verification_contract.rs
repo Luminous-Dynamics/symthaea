@@ -722,12 +722,160 @@ fn parse_timestamp(
     field: &'static str,
     value: &str,
 ) -> Result<DateTime<FixedOffset>, VerificationFailure> {
-    DateTime::parse_from_rfc3339(value).map_err(|_| {
+    let end_of_day = validate_xsd11_date_time_stamp_lexical(value).map_err(|_| {
         VerificationFailure::InvalidTimestamp {
             field,
             value: value.to_owned(),
         }
-    })
+    })?;
+
+    // XSD 1.1 dateTimeStamp permits the lexical end-of-day form
+    // YYYY-MM-DDT24:00:00(.0+)?timezone. Chrono deliberately rejects 24:00:00,
+    // so normalize only that standards-defined spelling to the equivalent next-day
+    // instant while retaining the caller's original lexical representation.
+    let parse_value = if end_of_day {
+        let t = value.find('T').ok_or_else(|| VerificationFailure::InvalidTimestamp {
+            field,
+            value: value.to_owned(),
+        })?;
+        let mut normalized = value.to_owned();
+        normalized.replace_range(t + 1..t + 3, "00");
+        normalized
+    } else {
+        value.to_owned()
+    };
+
+    let parsed = DateTime::parse_from_rfc3339(&parse_value).map_err(|_| {
+        VerificationFailure::InvalidTimestamp {
+            field,
+            value: value.to_owned(),
+        }
+    })?;
+
+    if end_of_day {
+        parsed
+            .checked_add_signed(chrono::Duration::days(1))
+            .ok_or_else(|| VerificationFailure::InvalidTimestamp {
+                field,
+                value: value.to_owned(),
+            })
+    } else {
+        Ok(parsed)
+    }
+}
+
+fn validate_xsd11_date_time_stamp_lexical(value: &str) -> Result<bool, ()> {
+    let bytes = value.as_bytes();
+    let mut index = 0;
+
+    if bytes.first() == Some(&b'-') {
+        index += 1;
+    }
+
+    let year_start = index;
+    while index < bytes.len() && bytes[index].is_ascii_digit() {
+        index += 1;
+    }
+    let year_len = index - year_start;
+    if year_len < 4 || (year_len > 4 && bytes[year_start] == b'0') {
+        return Err(());
+    }
+    if bytes.get(index) != Some(&b'-') {
+        return Err(());
+    }
+    index += 1;
+
+    let month = parse_two_digits(bytes, &mut index)?;
+    if bytes.get(index) != Some(&b'-') {
+        return Err(());
+    }
+    index += 1;
+
+    let day = parse_two_digits(bytes, &mut index)?;
+    if !(1..=12).contains(&month) || day == 0 || day > 31 {
+        return Err(());
+    }
+
+    if bytes.get(index) != Some(&b'T') {
+        return Err(());
+    }
+    index += 1;
+
+    let hour = parse_two_digits(bytes, &mut index)?;
+    if bytes.get(index) != Some(&b':') {
+        return Err(());
+    }
+    index += 1;
+
+    let minute = parse_two_digits(bytes, &mut index)?;
+    if bytes.get(index) != Some(&b':') {
+        return Err(());
+    }
+    index += 1;
+
+    let second = parse_two_digits(bytes, &mut index)?;
+    if minute > 59 || second > 59 {
+        return Err(());
+    }
+
+    let end_of_day = if hour == 24 {
+        minute == 0 && second == 0
+    } else {
+        hour <= 23
+    };
+    if !end_of_day && hour > 23 {
+        return Err(());
+    }
+
+    if bytes.get(index) == Some(&b'.') {
+        index += 1;
+        let fraction_start = index;
+        while index < bytes.len() && bytes[index].is_ascii_digit() {
+            index += 1;
+        }
+        if fraction_start == index {
+            return Err(());
+        }
+        if end_of_day && bytes[fraction_start..index].iter().any(|byte| *byte != b'0') {
+            return Err(());
+        }
+    }
+
+    match bytes.get(index) {
+        Some(b'Z') if index + 1 == bytes.len() => Ok(end_of_day),
+        Some(b'+') | Some(b'-') => {
+            if index + 6 != bytes.len()
+                || bytes.get(index + 3) != Some(&b':')
+                || !bytes[index + 1].is_ascii_digit()
+                || !bytes[index + 2].is_ascii_digit()
+                || !bytes[index + 4].is_ascii_digit()
+                || !bytes[index + 5].is_ascii_digit()
+            {
+                return Err(());
+            }
+            let offset_hour = (bytes[index + 1] - b'0') as u8 * 10
+                + (bytes[index + 2] - b'0') as u8;
+            let offset_minute = (bytes[index + 4] - b'0') as u8 * 10
+                + (bytes[index + 5] - b'0') as u8;
+            if offset_hour > 14 || offset_minute > 59 || (offset_hour == 14 && offset_minute != 0) {
+                return Err(());
+            }
+            Ok(end_of_day)
+        }
+        _ => Err(()),
+    }
+}
+
+fn parse_two_digits(bytes: &[u8], index: &mut usize) -> Result<u8, ()> {
+    if *index + 2 > bytes.len()
+        || !bytes[*index].is_ascii_digit()
+        || !bytes[*index + 1].is_ascii_digit()
+    {
+        return Err(());
+    }
+    let value = (bytes[*index] - b'0') * 10 + (bytes[*index + 1] - b'0');
+    *index += 2;
+    Ok(value)
 }
 
 /// Typed identity of the concrete controlled-identifier document resource
@@ -2408,6 +2556,29 @@ mod tests {
         let resolution = resolved_method(&weaker_request);
         assert!(resolution.matches_request(&weaker_request));
         assert!(!resolution.matches_request(&request));
+    }
+
+    #[test]
+    fn timestamp_parser_matches_xsd11_date_time_stamp_boundary() {
+        let end_of_day = parse_timestamp("timestamp", "2026-10-05T24:00:00Z").unwrap();
+        let next_day = parse_timestamp("timestamp", "2026-10-06T00:00:00Z").unwrap();
+        assert_eq!(end_of_day, next_day);
+
+        let end_of_day_fraction =
+            parse_timestamp("timestamp", "2026-10-05T24:00:00.000Z").unwrap();
+        assert_eq!(end_of_day_fraction, next_day);
+
+        for invalid in [
+            "2026-10-05T00:00:60Z",
+            "2026-10-05T24:00:00.1Z",
+            "2026-10-05T23:59:59",
+            "2026-10-05T23:59:59+14:01",
+        ] {
+            assert!(matches!(
+                parse_timestamp("timestamp", invalid),
+                Err(VerificationFailure::InvalidTimestamp { .. })
+            ));
+        }
     }
 
     #[test]
