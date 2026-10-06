@@ -23,7 +23,7 @@ echo "-- focused Nixward formatting --"
 rustfmt --edition 2024 --check \
   crates/core/nixward/src/action/authorization.rs \
   crates/core/nixward/src/action/executor.rs \
-  crates/core/nixward/src/action/config_writer.rs
+  crates/core/nixward/src/action/config_writer.rs   crates/core/nixward/src/action/post_state.rs
 
 echo "-- source boundary --"
 bash scripts/check-nixward-observation-boundary.sh
@@ -49,6 +49,9 @@ cargo test -p nixward --lib action::service_domain::tests
 
 echo "-- service-manager boundary tests --"
 cargo test -p nixward --lib action::service_manager::tests
+
+echo "-- post-state evidence tests --"
+cargo test -p nixward --lib action::post_state::tests
 
 echo "-- executor typed-service tests --"
 cargo test -p nixward --lib action::executor::tests
