@@ -1398,11 +1398,25 @@ impl DaemonState {
 
                             let intent = match (&cmd, approval_definition_content.as_ref()) {
                                 (NixOSCommand::Service { .. }, Some(content)) => {
+                                    let pre_state_identity = match pre_state_identity.as_deref() {
+                                        Some(identity) => identity,
+                                        None => {
+                                            eprintln!(
+                                                "nixward-daemon: refusing Service action because its pre-state identity disappeared"
+                                            );
+                                            self.watchdog_status = None;
+                                            self.pending_action = None;
+                                            self.pending_action_intent_digest = None;
+                                            self.pending_local_approval = None;
+                                            return (
+                                                dynamic_threshold,
+                                                Some(best_action.expected_free_energy),
+                                            );
+                                        }
+                                    };
                                     let context = match service_effect_context_from_capture(
                                         &cmd,
-                                        pre_state_identity
-                                            .as_deref()
-                                            .ok_or_else(|| "service action lost its pre-state identity".to_string()),
+                                        pre_state_identity,
                                         content,
                                     ) {
                                         Ok(context) => context,
