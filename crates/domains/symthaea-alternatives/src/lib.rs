@@ -8169,37 +8169,50 @@ mod tests {
     #[test]
     fn calibration_traceability_order_is_receipt_significant() {
         let case = crate::corpus::five_pathway_adversarial_case();
-        let original = AlternativesEngine
-            .assess(&case.requirement, &case.candidates, Some(case.incumbent_id))
-            .unwrap();
-        let mut changed = case.clone();
-        let observed = changed
+        let mut ordered = case.clone();
+        let observed = ordered
             .candidates
             .iter_mut()
             .flat_map(|candidate| candidate.evidence.iter_mut())
-            .find(|evidence| {
-                evidence
-                    .observation
-                    .as_ref()
-                    .is_some_and(|observation| observation.calibration_chain_refs.len() >= 1)
-            })
+            .find(|evidence| evidence.observation.is_some())
             .unwrap();
-        let chain = &mut observed
+        observed
             .observation
             .as_mut()
             .unwrap()
-            .calibration_chain_refs;
-        chain.insert(0, CalibrationTraceabilityRef {
-            calibration_id: "additional-reference".into(),
-            calibration_revision: "v1".into(),
-            calibration_record_digest: "additional-record-digest".into(),
-            used_at_epoch_seconds: 1_700_000_001,
-        });
+            .calibration_chain_refs
+            .push(CalibrationTraceabilityRef {
+                calibration_id: "additional-reference".into(),
+                calibration_revision: "v1".into(),
+                calibration_record_digest: "additional-record-digest".into(),
+                used_at_epoch_seconds: 1_700_000_001,
+            });
 
-        let changed_result = AlternativesEngine
-            .assess(&changed.requirement, &changed.candidates, Some(changed.incumbent_id))
+        let mut reversed = ordered.clone();
+        let observed = reversed
+            .candidates
+            .iter_mut()
+            .flat_map(|candidate| candidate.evidence.iter_mut())
+            .find(|evidence| evidence.observation.is_some())
             .unwrap();
-        assert_ne!(original.receipt.payload_hash, changed_result.receipt.payload_hash);
+        observed
+            .observation
+            .as_mut()
+            .unwrap()
+            .calibration_chain_refs
+            .reverse();
+
+        let ordered_result = AlternativesEngine
+            .assess(&ordered.requirement, &ordered.candidates, Some(ordered.incumbent_id))
+            .unwrap();
+        let reversed_result = AlternativesEngine
+            .assess(
+                &reversed.requirement,
+                &reversed.candidates,
+                Some(reversed.incumbent_id),
+            )
+            .unwrap();
+        assert_ne!(ordered_result.receipt.payload_hash, reversed_result.receipt.payload_hash);
     }
 
     #[test]
