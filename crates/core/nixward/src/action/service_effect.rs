@@ -171,6 +171,33 @@ impl NixServiceEffectContextV1 {
         Ok(())
     }
 
+    pub(crate) fn from_verified_definition_content(
+        operation: NixServiceOperationKindV1,
+        unit: impl Into<String>,
+        authorized_generation: u64,
+        pre_state_digest: impl Into<String>,
+        pre_invocation_id: Option<String>,
+        required_stability_us: u64,
+        content: &NixVerifiedServiceDefinitionContentV1,
+    ) -> Result<Self, NixServiceEffectContextErrorV1> {
+        let unit = unit.into();
+        let evidence = content.as_ref();
+        if evidence.unit != unit {
+            return Err(NixServiceEffectContextErrorV1::DefinitionContentUnitMismatch);
+        }
+        let content_digest = content.digest()?;
+        Self::new(
+            operation,
+            unit,
+            authorized_generation,
+            pre_state_digest,
+            evidence.source_identity_digest.clone(),
+            content_digest,
+            pre_invocation_id,
+            required_stability_us,
+        )
+    }
+
     pub fn digest(&self) -> Result<String, NixServiceEffectContextErrorV1> {
         self.validate_shape()?;
         let mut hasher = Hasher::new();
@@ -268,6 +295,8 @@ pub enum NixServiceEffectContextErrorV1 {
     DefinitionFileTooLarge,
     #[error("invalid content capture timestamp")]
     InvalidCaptureTimestamp,
+    #[error("definition content unit does not match the service intent")]
+    DefinitionContentUnitMismatch,
 }
 
 #[cfg(test)]
