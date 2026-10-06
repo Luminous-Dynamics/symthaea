@@ -1913,6 +1913,37 @@ mod tests {
     }
 
     #[test]
+    fn authority_resolution_status_schema_is_stable() {
+        for (status, expected) in [
+            (NeurosemanticAuthorityStatus::Active, "Active"),
+            (NeurosemanticAuthorityStatus::Suspended, "Suspended"),
+            (NeurosemanticAuthorityStatus::Revoked, "Revoked"),
+            (NeurosemanticAuthorityStatus::Unknown, "Unknown"),
+            (NeurosemanticAuthorityStatus::Unavailable, "Unavailable"),
+        ] {
+            assert_eq!(
+                serde_json::to_string(&status).unwrap(),
+                format!(""{expected}"")
+            );
+        }
+    }
+
+    #[test]
+    fn authority_resolution_schema_version_fails_closed() {
+        let policy = semantic_policy();
+        let (attestation, _) = authority_attestation(&policy);
+        let context = binding_context();
+        let (resolution, _) =
+            authority_resolution(&policy, &attestation, &context, 100, 2_000);
+        let mut value = serde_json::to_value(&resolution).unwrap();
+        value.as_object_mut()
+            .unwrap()
+            .insert("schema_version".into(), serde_json::json!(999));
+        let encoded = serde_json::to_vec(&value).unwrap();
+        assert!(NeurosemanticAuthorityResolutionAttestation::from_json_bytes(&encoded).is_err());
+    }
+
+    #[test]
     fn authority_resolution_message_requires_valid_unsigned_fields() {
         let policy = semantic_policy();
         let (attestation, _) = authority_attestation(&policy);
