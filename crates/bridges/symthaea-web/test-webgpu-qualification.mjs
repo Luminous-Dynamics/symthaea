@@ -83,6 +83,7 @@ const QUALIFICATION_ENVIRONMENT = {
   runner_os: process.env.RUNNER_OS || null,
   runner_arch: process.env.RUNNER_ARCH || null,
   runner_name: process.env.RUNNER_NAME || null,
+  chromium_ozone_platform: 'x11',
 };
 const missingInputDigests = Object.entries(QUALIFICATION_INPUT_DIGESTS)
   .filter(([, digest]) => !/^[a-f0-9]{64}$/.test(digest || ''))
@@ -1161,6 +1162,7 @@ async function runMode(mode) {
   const args = [
     '--no-sandbox',
     '--disable-setuid-sandbox',
+    '--ozone-platform=x11',
   ];
   if (gpuMode) {
     args.push(
@@ -1652,6 +1654,11 @@ try {
     expected_pr_head_sha: EXPECTED_CHECKED_OUT_SHA,
     qualification_environment: QUALIFICATION_ENVIRONMENT,
     qualification_input_digests: QUALIFICATION_INPUT_DIGESTS,
+    browser_execution_contract: {
+      ozone_platform: 'x11',
+      headed_under_xvfb: HEADLESS === false,
+      viewport: { width: 1280, height: 900, device_scale_factor: 1 },
+    },
     run_id: process.env.GITHUB_RUN_ID || null,
     workflow_ref: process.env.GITHUB_WORKFLOW_REF || null,
     ok: Object.keys(failures).length === 0,
