@@ -30,7 +30,8 @@ use symthaea_core::genesis::GenesisSeed;
 #[cfg(feature = "ssm_language")]
 use symthaea_broca::{
     ContentBindingStatus, LexicalMorphosyntacticBinding, LexicalPhonologicalWitness,
-    LinguisticFrame, PhonologicalPlan,
+    LinguisticFrame, MorphophonologicalDerivationWitness, MorphophonologicalRuleSet,
+    PhonologicalPlan,
 };
 use symthaea_vocal_tract::pipeline::{
     Intonation, MannerClass, PitchAccent, ProsodyContext, phoneme_manner_class, predict_duration,
@@ -207,6 +208,132 @@ pub struct VerifiedLexicalPhonologicalRealizationReceipt {
     pub lexical_binding_provenance: String,
     /// Canonical witness identity used to authorize the lexical realization.
     pub witness_blake3: String,
+}
+
+/// A stronger realization receipt that records the morphophonological derivation witness
+/// alongside the existing lexical-to-phonological realization receipt.
+///
+/// This is additive: ordinary lexical verification does not acquire a stronger claim merely
+/// because this type exists. Callers must explicitly choose this receipt and admission path.
+#[cfg(feature = "ssm_language")]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt {
+    pub schema_version: u32,
+    pub realization: VerifiedLexicalPhonologicalRealizationReceipt,
+    pub morphophonological_witness: MorphophonologicalDerivationWitness,
+    pub morphophonological_witness_version: String,
+    pub morphophonological_witness_blake3: String,
+    pub morphophonological_rule_set_blake3: String,
+}
+
+#[cfg(feature = "ssm_language")]
+impl MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt {
+    pub const SCHEMA_VERSION: u32 = 1;
+
+    pub fn verify_against_plan_and_rule_set(
+        &self,
+        plan: &PhonologicalPlan,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        lexical_witness: &LexicalPhonologicalWitness,
+        morphophonological_witness: &MorphophonologicalDerivationWitness,
+        rule_set: &MorphophonologicalRuleSet,
+    ) -> Result<()> {
+        if self.schema_version != Self::SCHEMA_VERSION {
+            anyhow::bail!("morphophonological realization receipt schema version is unsupported");
+        }
+        self.realization
+            .verify_against_plan(plan, frame, binding, lexical_witness)?;
+
+        morphophonological_witness
+            .validate_against_binding_and_rule_set(binding, rule_set)
+            .map_err(|error| anyhow::anyhow!("invalid morphophonological witness: {error}"))?;
+
+        if self.morphophonological_witness_version != morphophonological_witness.version {
+            anyhow::bail!(
+                "morphophonological realization receipt witness version does not match witness"
+            );
+        }
+        if self.morphophonological_witness != *morphophonological_witness {
+            anyhow::bail!(
+                "morphophonological realization receipt witness does not match supplied witness"
+            );
+        }
+        let expected_witness =
+            blake3::hash(morphophonological_witness.grounding_surface().as_bytes())
+                .to_hex()
+                .to_string();
+        if self.morphophonological_witness_blake3 != expected_witness {
+            anyhow::bail!(
+                "morphophonological realization receipt witness hash does not match witness"
+            );
+        }
+        if self.morphophonological_rule_set_blake3 != rule_set.resource_blake3() {
+            anyhow::bail!(
+                "morphophonological realization receipt rule-set hash does not match executable rule set"
+            );
+        }
+
+        Ok(())
+    }
+
+    pub fn verify_against_plan_and_rule_set_and_current_resources(
+        &self,
+        plan: &PhonologicalPlan,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        lexical_witness: &LexicalPhonologicalWitness,
+        morphophonological_witness: &MorphophonologicalDerivationWitness,
+        rule_set: &MorphophonologicalRuleSet,
+        g2p: &SimpleG2P,
+    ) -> Result<()> {
+        self.realization
+            .verify_against_plan_and_current_resources(
+                plan,
+                frame,
+                binding,
+                lexical_witness,
+                g2p,
+            )?;
+        self.verify_against_plan_and_rule_set(
+            plan,
+            frame,
+            binding,
+            lexical_witness,
+            morphophonological_witness,
+            rule_set,
+        )
+    }
+
+    pub fn verify_against_plan_and_rule_set_with_source_artifact(
+        &self,
+        plan: &PhonologicalPlan,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        lexical_witness: &LexicalPhonologicalWitness,
+        morphophonological_witness: &MorphophonologicalDerivationWitness,
+        rule_set: &MorphophonologicalRuleSet,
+        source_artifact: &[u8],
+    ) -> Result<()> {
+        self.verify_against_plan_and_rule_set(
+            plan,
+            frame,
+            binding,
+            lexical_witness,
+            morphophonological_witness,
+            rule_set,
+        )?;
+        morphophonological_witness
+            .validate_against_binding_and_rule_set_with_source_artifact(
+                binding,
+                rule_set,
+                source_artifact,
+            )
+            .map_err(|error| {
+                anyhow::anyhow!("invalid morphophonological source artifact: {error}")
+            })?;
+        Ok(())
+    }
 }
 
 #[cfg(feature = "ssm_language")]
@@ -721,6 +848,96 @@ impl LiveVoice {
         let (samples, receipt) = self.synthesize_phonological_plan(plan)?;
         write_wav(path, &samples, receipt.sample_rate)?;
         Ok(receipt.sample_count)
+    }
+
+    /// Stronger admission path: requires a morphophonological witness backed by an
+    /// executable rule set before synthesis/audio enqueue occurs.
+    #[cfg(feature = "ssm_language")]
+    pub fn speak_morphophonology_verified_lexical_phonological_plan_with_receipt(
+        &mut self,
+        plan: &PhonologicalPlan,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        lexical_witness: &LexicalPhonologicalWitness,
+        morphophonological_witness: &MorphophonologicalDerivationWitness,
+        rule_set: &MorphophonologicalRuleSet,
+    ) -> Result<MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt> {
+        morphophonological_witness
+            .validate_against_binding_and_rule_set(binding, rule_set)
+            .map_err(|error| {
+                anyhow::anyhow!("invalid morphophonological admission witness: {error}")
+            })?;
+
+        let realization = self.speak_verified_lexical_phonological_plan_with_receipt(
+            plan,
+            frame,
+            binding,
+            lexical_witness,
+        )?;
+
+        let receipt = MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt {
+            schema_version: MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt::SCHEMA_VERSION,
+            realization,
+            morphophonological_witness: morphophonological_witness.clone(),
+            morphophonological_witness_version: morphophonological_witness.version.clone(),
+            morphophonological_witness_blake3: morphophonological_witness.provenance_token(),
+            morphophonological_rule_set_blake3: rule_set.resource_blake3(),
+        };
+
+        receipt.verify_against_plan_and_rule_set(
+            plan,
+            frame,
+            binding,
+            lexical_witness,
+            morphophonological_witness,
+            rule_set,
+        )?;
+        Ok(receipt)
+    }
+
+    /// Source-artifact-backed variant: the exact source bytes are checked before synthesis.
+    #[cfg(feature = "ssm_language")]
+    pub fn speak_morphophonology_verified_lexical_phonological_plan_with_source_artifact_receipt(
+        &mut self,
+        plan: &PhonologicalPlan,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        lexical_witness: &LexicalPhonologicalWitness,
+        morphophonological_witness: &MorphophonologicalDerivationWitness,
+        rule_set: &MorphophonologicalRuleSet,
+        source_artifact: &[u8],
+    ) -> Result<MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt> {
+        morphophonological_witness
+            .validate_against_binding_and_rule_set_with_source_artifact(
+                binding,
+                rule_set,
+                source_artifact,
+            )
+            .map_err(|error| {
+                anyhow::anyhow!(
+                    "invalid morphophonological source-artifact admission: {error}"
+                )
+            })?;
+
+        let receipt = self.speak_morphophonology_verified_lexical_phonological_plan_with_receipt(
+            plan,
+            frame,
+            binding,
+            lexical_witness,
+            morphophonological_witness,
+            rule_set,
+        )?;
+
+        receipt.verify_against_plan_and_rule_set_with_source_artifact(
+            plan,
+            frame,
+            binding,
+            lexical_witness,
+            morphophonological_witness,
+            rule_set,
+            source_artifact,
+        )?;
+        Ok(receipt)
     }
 
     /// Realize a lexicalized plan only after the exact lexical binding and realization witness
@@ -2321,6 +2538,183 @@ mod tests {
                 .verify_against_plan(&plan, &frame, &binding, &witness)
                 .is_err(),
             "selected pronunciation variant tampering must fail closed"
+        );
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_morphophonological_verified_path_binds_rule_set_before_realization() {
+        use symthaea_broca::{
+            ContentBindingStatus, GrammaticalFunction, LanguageRuleBinding, LanguageRuleStatus,
+            LexemeBinding, LexicalPhonologicalMapping, LexicalPhonologicalWitness, LexicalSource,
+            LinguisticFrame, MorphophonologicalDerivationWitness, MorphophonologicalResourceEvidence,
+            MorphophonologicalRule, MorphophonologicalRuleOperation, MorphophonologicalRuleSet,
+            PhonemeSlot, SpeechPlan, StructuredDecoder, SyllableStress, ThoughtChannels,
+            LexicalMorphosyntacticBinding,
+        };
+
+        let genesis = GenesisSeed::from_phrase("morphophonological-admission-path");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(2);
+        let readout = decoder.decode(&channels);
+        let speech_plan = SpeechPlan::from_readout(&channels, &readout);
+        let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+
+        let constituents = frame
+            .constituents
+            .iter()
+            .map(|slot| LexemeBinding {
+                position: slot.position,
+                source: LexicalSource::SemanticConstituent {
+                    role: slot.role.clone(),
+                    prime: slot.prime.clone(),
+                },
+                lemma: slot.prime.to_ascii_lowercase(),
+                lexeme_id: format!("fixture:lexeme:{}", slot.position),
+                grammatical_function: GrammaticalFunction::Other("fixture".into()),
+                morphology: Vec::new(),
+                morphophonological_form: Some(slot.prime.to_ascii_lowercase()),
+                provenance: "fixture:lexicon:v1".into(),
+                semantic_payload: true,
+            })
+            .collect::<Vec<_>>();
+
+        let binding = LexicalMorphosyntacticBinding::new(
+            &frame,
+            LanguageRuleBinding {
+                language_tag: "en".into(),
+                status: LanguageRuleStatus::Bound,
+                rule_id: Some("fixture:rules:v1".into()),
+                provenance: Some("fixture:rules:v1".into()),
+                unbound_reason: None,
+            },
+            constituents,
+            Vec::new(),
+            Vec::new(),
+        )
+        .expect("fixture lexical binding");
+
+        let segments = binding
+            .constituents
+            .iter()
+            .enumerate()
+            .map(|(index, _)| {
+                PhonemeSlot::new(
+                    "AH",
+                    index,
+                    SyllableStress::Primary,
+                    true,
+                    false,
+                    index + 1 == binding.constituents.len(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let lexical_witness = LexicalPhonologicalWitness::new(
+            &binding,
+            segments
+                .iter()
+                .enumerate()
+                .map(|(index, segment)| {
+                    LexicalPhonologicalMapping::from_lexical_binding(
+                        &binding,
+                        index,
+                        vec![index],
+                        vec![segment.symbol.clone()],
+                    )
+                    .expect("lexical position exists")
+                })
+                .collect(),
+        )
+        .expect("fixture lexical witness");
+
+        let rule_set = MorphophonologicalRuleSet::new(
+            "en",
+            "fixture:rules:v1",
+            "en-US",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "fixture:rules:v1",
+                "fixture-v1",
+            )
+            .expect("fixture resource evidence"),
+            "fixture:rules:v1",
+            "fixture:rules:v1",
+            vec![MorphophonologicalRule {
+                rule_id: "fixture:identity".into(),
+                morphology: Vec::new(),
+                operation: MorphophonologicalRuleOperation::Identity,
+            }],
+        )
+        .expect("identity rule set");
+
+        let morph_witness =
+            MorphophonologicalDerivationWitness::from_rule_set(&binding, &rule_set)
+                .expect("morphophonological witness");
+
+        let mut plan = symthaea_broca::PhonologicalPlan::from_linguistic_frame(&frame);
+        plan.bind_lexical_segments_from_binding_with_witness(
+            &frame,
+            &binding,
+            &lexical_witness,
+            segments,
+        )
+        .expect("witness-backed lexical plan");
+        assert_eq!(plan.content_binding, ContentBindingStatus::LexicallyBound);
+
+        let mut voice = LiveVoice::new_headless(&genesis);
+        let receipt = voice
+            .speak_morphophonology_verified_lexical_phonological_plan_with_receipt(
+                &plan,
+                &frame,
+                &binding,
+                &lexical_witness,
+                &morph_witness,
+                &rule_set,
+            )
+            .expect("morphophonology-backed realization should succeed");
+
+        receipt
+            .verify_against_plan_and_rule_set(
+                &plan,
+                &frame,
+                &binding,
+                &lexical_witness,
+                &morph_witness,
+                &rule_set,
+            )
+            .expect("combined receipt should independently revalidate");
+
+        let mut tampered_witness = morph_witness.clone();
+        tampered_witness.steps[0].output_form.push('!');
+        assert!(
+            receipt
+                .verify_against_plan_and_rule_set(
+                    &plan,
+                    &frame,
+                    &binding,
+                    &lexical_witness,
+                    &tampered_witness,
+                    &rule_set,
+                )
+                .is_err(),
+            "morphophonological witness tampering must invalidate the combined receipt"
+        );
+
+        let mut tampered_rules = rule_set.clone();
+        tampered_rules.rules[0].operation =
+            MorphophonologicalRuleOperation::AppendSuffix { suffix: "x".into() };
+        assert!(
+            receipt
+                .verify_against_plan_and_rule_set(
+                    &plan,
+                    &frame,
+                    &binding,
+                    &lexical_witness,
+                    &morph_witness,
+                    &tampered_rules,
+                )
+                .is_err(),
+            "executable rule-set tampering must invalidate the combined receipt"
         );
     }
 
