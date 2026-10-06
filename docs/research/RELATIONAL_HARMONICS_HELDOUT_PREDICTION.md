@@ -256,6 +256,8 @@ A separate 2026 literature describes rolling-origin forecast instability as chan
 
 The design is deliberately descriptive at this stage. Predictive-error differences across strongly dependent origins should not automatically be converted into a classical IID significance test. Recent forecast-evaluation work explicitly develops procedures that account for autocorrelation and overlapping forecast windows, reinforcing the need to preserve loss differentials and their dependence structure before choosing formal inference. [Grant, Mrazik & Satchell, 2026](https://doi.org/10.1002/for.70150)
 
+A 2026 Journal of Applied Econometrics contribution develops robust forecast-accuracy tests for nested regressions and highlights the nonstandard behavior of common nested forecast tests under practical dependence and estimation conditions, reinforcing the decision to defer formal inference until the empirical loss process is characterized. [Morico et al. (2026)](https://doi.org/10.1002/jae.70056)
+
 ## 10. What would count as meaningful evidence
 
 A strong result would require more than:
