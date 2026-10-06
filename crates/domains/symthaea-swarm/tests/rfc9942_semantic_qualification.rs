@@ -1611,6 +1611,37 @@ fn rfc9942_indefinite_crit_array_resource_limit_is_typed() {
 }
 
 #[test]
+fn rfc9942_protected_extension_recursion_resource_limit_is_typed() {
+    let mut receipt_protected = vec![0xa3, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01, 0x18, 0x1e];
+    receipt_protected.extend(std::iter::repeat_n(0xc0, 17));
+    receipt_protected.push(0xf6);
+
+    let mut receipt = vec![0xd2, 0x84, 0x58, receipt_protected.len() as u8];
+    receipt.extend_from_slice(&receipt_protected);
+    receipt.extend_from_slice(&[0xa0, 0xf6, 0x58, 0x40]);
+    receipt.extend_from_slice(&[0u8; 64]);
+
+    assert_eq!(
+        Rfc9942ReceiptEnvelope::from_cbor(&receipt),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+
+    let mut outer_protected = vec![0xa2, 0x01, 0x26, 0x18, 0x1e];
+    outer_protected.extend(std::iter::repeat_n(0xc0, 17));
+    outer_protected.push(0xf6);
+
+    let mut outer = vec![0xd2, 0x84, 0x58, outer_protected.len() as u8];
+    outer.extend_from_slice(&outer_protected);
+    outer.extend_from_slice(&[0xa0, 0xf6, 0x58, 0x40]);
+    outer.extend_from_slice(&[0u8; 64]);
+
+    assert_eq!(
+        Rfc9942SignatureWithReceipts::from_cbor(&outer),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
+
+#[test]
 fn rfc9942_receipt_extension_recursion_resource_limit_is_typed() {
     let mut encoded = vec![0xd2, 0x84, 0x47, 0xa2, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01, 0xa1, 0x18, 0x1e];
     for _ in 0..17 { encoded.push(0xc0); }
