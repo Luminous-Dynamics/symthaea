@@ -2774,6 +2774,43 @@ async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
     Ok(false)
 }
 
+async fn verify_restored_image_postcondition(image_dir: &str) -> Result<bool, String> {
+    let image_dir = validate_image_path(image_dir)?;
+    let target = tokio::fs::symlink_metadata("/mnt/etc/nixos/configuration.nix")
+        .await
+        .map_err(|error| format!("restored configuration postcondition probe failed: {error}"))?;
+    if !target.file_type().is_file() || target.len() == 0 {
+        return Ok(false);
+    }
+
+    let expected_path = std::path::Path::new(&image_dir).join("configuration.nix");
+    let expected = match tokio::fs::symlink_metadata(&expected_path).await {
+        Ok(metadata) if metadata.file_type().is_file() && metadata.len() > 0 => {
+            Some(
+                tokio::fs::read(&expected_path)
+                    .await
+                    .map_err(|error| format!("restored source configuration probe failed: {error}"))?,
+            )
+        }
+        Ok(_) => return Ok(false),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => {
+            return Err(format!(
+                "restored source configuration metadata probe failed: {error}"
+            ))
+        }
+    };
+
+    let actual = tokio::fs::read("/mnt/etc/nixos/configuration.nix")
+        .await
+        .map_err(|error| format!("restored configuration read failed: {error}"))?;
+
+    match expected {
+        Some(expected) => Ok(configuration_bytes_match(&actual, &expected)),
+        None => Ok(!actual.is_empty()),
+    }
+}
+
 fn wifi_connection_observed(output: &str, profile_name: &str) -> bool {
     output.lines().any(|line| {
         let Some((name, device)) = line.split_once(':') else {
@@ -6599,7 +6636,19 @@ echo "COMPLETE"
                 match run_cmd(&script).await {
                     Ok(r) => {
                         let observed_outcome = if r.exit_status == 0 {
-                            TransactionOutcome::ObservedSuccess
+                            match verify_restored_image_postcondition(&image_path).await {
+                                Ok(true) => TransactionOutcome::ObservedSuccess,
+                                Ok(false) => TransactionOutcome::Failed,
+                                Err(error) => {
+                                    eprintln!(
+                                        "[{}] {} restore postcondition probe failed: {}",
+                                        peer_addr,
+                                        transaction.log_line(),
+                                        error
+                                    );
+                                    TransactionOutcome::Indeterminate
+                                }
+                            }
                         } else {
                             TransactionOutcome::Failed
                         };
