@@ -306,7 +306,7 @@ impl TransactionLedger {
     }
 
     fn load(&self) -> Result<HashMap<String, JournalRecord>, String> {
-        let metadata = match std::fs::metadata(&self.path) {
+        let metadata = match std::fs::symlink_metadata(&self.path) {
             Ok(metadata) => metadata,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                 return Ok(HashMap::new());
@@ -461,6 +461,7 @@ impl TransactionLedger {
             .create(true)
             .append(true)
             .read(true)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
             .mode(0o600)
             .open(&self.path)
             .map_err(|error| {
@@ -687,6 +688,23 @@ mod tests {
         assert!(validate_request_id("short").is_err());
         assert!(validate_request_id("0123456789abcdef!").is_err());
         assert!(validate_request_id(&"a".repeat(129)).is_err());
+    }
+
+    #[test]
+    fn ledger_rejects_symlinked_ledger_path() {
+        let name = random_operation_id().unwrap();
+        let target =
+            std::env::temp_dir().join(format!("symthaea-transaction-ledger-target-{name}.jsonl"));
+        let path =
+            std::env::temp_dir().join(format!("symthaea-transaction-ledger-link-{name}.jsonl"));
+        std::fs::write(&target, "").unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&target, &path).unwrap();
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let error = ledger.load().expect_err("symlinked ledger must fail closed");
+        assert!(error.contains("not a regular file"));
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(&target);
     }
 
     #[test]
