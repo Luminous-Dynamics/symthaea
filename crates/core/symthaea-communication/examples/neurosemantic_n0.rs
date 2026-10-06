@@ -540,8 +540,10 @@ fn main() -> Result<(), String> {
     let utility_evidence = b"synthetic-retained-utility-evaluation-v1";
     let fairness_evidence = b"synthetic-subgroup-impact-evaluation-v1";
     let residual_evidence = b"synthetic-residual-recovery-evaluation-v1";
-    let study_protocol_hash = symthaea_communication::content_hash(b"synthetic-remediation-protocol-v1");
-    let evaluation_split_manifest_hash = symthaea_communication::content_hash(b"synthetic-remediation-split-v1");
+    let study_protocol_bytes = b"synthetic-remediation-protocol-v1";
+    let evaluation_split_manifest_bytes = b"synthetic-remediation-split-v1";
+    let study_protocol_hash = symthaea_communication::content_hash(study_protocol_bytes);
+    let evaluation_split_manifest_hash = symthaea_communication::content_hash(evaluation_split_manifest_bytes);
     let lifecycle_receipt_hash = lifecycle_receipt.fingerprint()?;
     let remediation_impact = NeurosemanticRemediationImpactArtifact {
         schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_IMPACT_ARTIFACT_SCHEMA_VERSION,
@@ -622,10 +624,21 @@ fn main() -> Result<(), String> {
             &post_model_lineage_bytes,
         ).is_err()
     };
+    let remediation_protocol_verified = remediation_impact
+        .verify_study_protocol_bytes(study_protocol_bytes)
+        .is_ok();
+    let remediation_split_manifest_verified = remediation_impact
+        .verify_evaluation_split_manifest_bytes(evaluation_split_manifest_bytes)
+        .is_ok();
     let remediation_protocol_substitution_blocked = {
         let mut forged = remediation_impact.clone();
         forged.study_protocol_hash = symthaea_communication::content_hash(b"other-protocol");
-        forged.fingerprint().is_ok() && forged.study_protocol_hash != remediation_impact.study_protocol_hash
+        forged.verify_study_protocol_bytes(study_protocol_bytes).is_err()
+    };
+    let remediation_split_substitution_blocked = {
+        let mut forged = remediation_impact.clone();
+        forged.evaluation_split_manifest_hash = symthaea_communication::content_hash(b"other-split");
+        forged.verify_evaluation_split_manifest_bytes(evaluation_split_manifest_bytes).is_err()
     };
     let remediation_evidence_substitution_blocked = remediation_impact
         .verify_evidence_bytes(NeurosemanticRemediationImpactEvidenceKind::ResidualRisk, b"tampered-residual-evidence")
@@ -1060,7 +1073,10 @@ fn main() -> Result<(), String> {
         "remediation_effect_evidence_substitution_blocked": remediation_effect_evidence_substitution_blocked,
         "remediation_model_substitution_blocked": remediation_model_substitution_blocked,
         "remediation_lineage_substitution_blocked": remediation_lineage_substitution_blocked,
+        "remediation_protocol_verified": remediation_protocol_verified,
+        "remediation_split_manifest_verified": remediation_split_manifest_verified,
         "remediation_protocol_substitution_blocked": remediation_protocol_substitution_blocked,
+        "remediation_split_substitution_blocked": remediation_split_substitution_blocked,
         "remediation_evidence_substitution_blocked": remediation_evidence_substitution_blocked,
         "remediation_dimension_claim_blocked": remediation_dimension_claim_blocked,
         "remediation_schema_migration_blocked": remediation_schema_migration_blocked,
