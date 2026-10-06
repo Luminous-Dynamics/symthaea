@@ -858,6 +858,7 @@ fn random_operation_id() -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::fs::PermissionsExt;
 
     #[test]
     fn mutation_lock_rejects_second_file_description() {
