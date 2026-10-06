@@ -1648,7 +1648,7 @@ nixos-generate-config --root /mnt
             // ('NIXCONF') since it should already contain the correct UUID or be self-contained.
             if !msg.configuration_nix.is_empty() {
                 // Browser config pre-staged — copy from temp dir (no heredoc)
-                let staging = format!("/tmp/symthaea-config-{}", session_id);
+                let staging = format!("{transaction_dir}/config");
                 script.push_str(&format!("mkdir -p /mnt/etc/nixos\ncp {}/configuration.nix /mnt/etc/nixos/configuration.nix\n", staging));
                 if !msg.flake_nix.is_empty() {
                     script.push_str(&format!(
