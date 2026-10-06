@@ -195,6 +195,8 @@ pub struct NixServicePostStateExpectationV1 {
     pub authorized_generation: u64,
     /// Exact systemd unit-definition source identity captured before execution.
     pub authorized_definition_digest: String,
+    /// Digest of the observer-produced definition-content commitment.
+    pub authorized_definition_content_digest: String,
     /// Restart proof requires both pre- and post-invocation identities.
     pub pre_invocation_id: Option<String>,
     /// Zero disables stability as a claim requirement. Non-zero requires a
@@ -210,6 +212,10 @@ impl NixServicePostStateExpectationV1 {
             return Err(NixPostStateErrorV1::InvalidGeneration);
         }
         validate_digest(&self.authorized_definition_digest, "authorized definition digest")?;
+        validate_digest(
+            &self.authorized_definition_content_digest,
+            "authorized definition content digest",
+        )?;
         validate_optional_invocation_id(self.pre_invocation_id.as_deref(), "pre-invocation id")?;
         Ok(())
     }
@@ -221,6 +227,7 @@ impl NixServicePostStateExpectationV1 {
             &self.unit,
             self.authorized_generation,
             &self.authorized_definition_digest,
+            &self.authorized_definition_content_digest,
             self.pre_invocation_id.as_deref(),
             self.required_stability_us,
         ))
@@ -1204,6 +1211,7 @@ fn service_effect_digest(
     unit: &str,
     authorized_generation: u64,
     authorized_definition_digest: &str,
+    authorized_definition_content_digest: &str,
     pre_invocation_id: Option<&str>,
     required_stability_us: u64,
 ) -> String {
@@ -1213,6 +1221,7 @@ fn service_effect_digest(
     put_str(&mut h, unit);
     put_u64(&mut h, authorized_generation);
     put_str(&mut h, authorized_definition_digest);
+    put_str(&mut h, authorized_definition_content_digest);
     put_opt_str(&mut h, pre_invocation_id);
     put_u64(&mut h, required_stability_us);
     h.finalize().to_hex().to_string()
