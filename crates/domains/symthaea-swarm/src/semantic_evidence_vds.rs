@@ -4526,6 +4526,30 @@ mod tests {
     }
 
     #[test]
+    fn cbor_generic_bstr_length_cap_remains_structural() {
+        let mut wire = vec![0x58, 0x05];
+        wire.extend_from_slice(b"12345");
+        let mut reader = CborReader::new(&wire);
+        assert_eq!(
+            reader.skip_value_with_limits(0, 4, 64, usize::MAX),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+        assert_eq!(reader.offset, 2);
+    }
+
+    #[test]
+    fn cbor_resource_aware_bstr_length_cap_remains_resource_typed() {
+        let mut wire = vec![0x58, 0x05];
+        wire.extend_from_slice(b"12345");
+        let mut reader = CborReader::new(&wire);
+        assert_eq!(
+            reader.skip_value_with_resource_limits(0, 4, 64, usize::MAX),
+            Err(Rfc9162ProofDecodeError::ResourceLimitExceeded)
+        );
+        assert_eq!(reader.offset, 2);
+    }
+
+    #[test]
     fn cbor_bstr_array_applies_aggregate_budget_before_member_allocation() {
         let wire = vec![0x82, 0x44, 0xaa, 0xbb, 0xcc, 0xdd, 0x41, 0xee];
         let mut reader = CborReader::new(&wire);
