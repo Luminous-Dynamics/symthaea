@@ -1765,6 +1765,18 @@ mod tests {
             )
             .is_err());
 
+        let mut changed_lineage_policy = policy.clone();
+        changed_lineage_policy.handling.derivation_provenance_ref =
+            "synthetic-derivation-record-2".into();
+        assert!(good_attestation
+            .verify(
+                &changed_lineage_policy.handling.fingerprint_for_attestation().unwrap(),
+                &changed_lineage_policy.handling.policy_provenance_hash,
+                &verifying_key,
+                150
+            )
+            .is_err());
+
         let mut changed_policy = policy.clone();
         changed_policy.handling.retention = NeurosemanticRetentionPolicy::Ephemeral;
         assert!(good_attestation
