@@ -82,6 +82,22 @@ fn rustc_identity() -> Vec<u8> {
     output.stdout
 }
 
+fn cargo_identity() -> Vec<u8> {
+    let cargo = env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+    let output = Command::new(&cargo)
+        .arg("--version")
+        .arg("--verbose")
+        .output()
+        .unwrap_or_else(|error| panic!("failed to execute cargo for compiler identity: {error}"));
+    if !output.status.success() {
+        panic!(
+            "cargo identity command failed with status {}",
+            output.status
+        );
+    }
+    output.stdout
+}
+
 fn cargo_feature_identity() -> Vec<u8> {
     let mut features = env::vars()
         .filter_map(|(key, value)| {
@@ -101,6 +117,7 @@ fn main() {
     println!("cargo:rerun-if-changed=../../../Cargo.lock");
     println!("cargo:rerun-if-changed=../../../rust-toolchain.toml");
     println!("cargo:rerun-if-env-changed=RUSTC");
+    println!("cargo:rerun-if-env-changed=CARGO");
     println!("cargo:rerun-if-env-changed=CARGO_ENCODED_RUSTFLAGS");
     for feature in [
         "CARGO_FEATURE_GPU",
@@ -134,6 +151,7 @@ fn main() {
     let cargo_lock = read_required(&workspace_root.join("Cargo.lock"));
     let rust_toolchain = read_required(&workspace_root.join("rust-toolchain.toml"));
     let rustc_identity = rustc_identity();
+    let cargo_identity = cargo_identity();
     let cargo_features = cargo_feature_identity();
     let rustflags = env::var("CARGO_ENCODED_RUSTFLAGS").unwrap_or_default().into_bytes();
     let target = env::var("TARGET").unwrap_or_default().into_bytes();
@@ -166,13 +184,14 @@ fn main() {
     // This is intentionally separate from compiler source identity: the same checked-in source
     // can have different dependency/toolchain semantics if its build context changes.
     let build_context_revision = domain_digest(
-        b"symthaea-broca-unimorph-compiler-build-context-revision-v1",
+        b"symthaea-broca-unimorph-compiler-build-context-revision-v2",
         &[
             &crate_manifest,
             &workspace_manifest,
             &cargo_lock,
             &rust_toolchain,
             &rustc_identity,
+            &cargo_identity,
             &cargo_features,
             &rustflags,
             &target,
