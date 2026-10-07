@@ -4145,7 +4145,7 @@ impl std::fmt::Display for AssessmentError {
             } => write!(
                 f,
                 "duplicate calibration traceability link {calibration_id}@{calibration_revision}/{calibration_record_digest} used at {used_at_epoch_seconds}"
-            )
+            ),
             Self::CalibrationTraceabilityReferenceMissing => {
                 write!(f, "calibration traceability reference node is missing")
             }
