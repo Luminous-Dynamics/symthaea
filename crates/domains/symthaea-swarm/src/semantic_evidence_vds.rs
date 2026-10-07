@@ -114,6 +114,18 @@ pub enum Rfc9942VerifiedProof {
     },
 }
 
+/// How the authenticated COSE payload was transported into verification.
+///
+/// This is semantic provenance rather than a second cryptographic identity:
+/// the payload hash records the exact authenticated bytes, while this mode
+/// records whether those bytes were carried in the COSE object or supplied
+/// externally under detached-payload processing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rfc9942PayloadMode {
+    Attached,
+    Detached,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rfc9942VerifiedReceipt {
     algorithm_id: i64,
@@ -123,6 +135,9 @@ pub struct Rfc9942VerifiedReceipt {
     /// Receipt signature. For RFC 9942 inclusion this is the proof-derived
     /// Merkle root; for consistency it is the newer Merkle root.
     payload_sha256: [u8; 32],
+    /// Whether the authenticated payload was attached to the Receipt or
+    /// supplied through the detached-payload verification path.
+    payload_mode: Rfc9942PayloadMode,
     /// SHA-256 fingerprint of the exact public key bytes used to authenticate
     /// the Receipt. This prevents downstream policy code from confusing an
     /// otherwise identical proof authenticated under a different trust root.
@@ -141,6 +156,7 @@ impl Rfc9942VerifiedReceipt {
     pub const fn vds_id(&self) -> u64 { self.vds_id }
     pub const fn proof(&self) -> Rfc9942VerifiedProof { self.proof }
     pub const fn payload_sha256(&self) -> [u8; 32] { self.payload_sha256 }
+    pub const fn payload_mode(&self) -> Rfc9942PayloadMode { self.payload_mode }
     pub const fn verification_key_sha256(&self) -> [u8; 32] { self.verification_key_sha256 }
     pub const fn protected_header_sha256(&self) -> [u8; 32] { self.protected_header_sha256 }
     pub const fn external_aad_sha256(&self) -> [u8; 32] { self.external_aad_sha256 }
@@ -165,6 +181,7 @@ pub enum Rfc9942ReceiptPlacement {
 pub struct Rfc9942VerifiedSignatureWithReceipt {
     outer_algorithm_id: i64,
     outer_payload_sha256: [u8; 32],
+    outer_payload_mode: Rfc9942PayloadMode,
     outer_verification_key_sha256: [u8; 32],
     outer_protected_header_sha256: [u8; 32],
     outer_external_aad_sha256: [u8; 32],
@@ -176,6 +193,7 @@ pub struct Rfc9942VerifiedSignatureWithReceipt {
 impl Rfc9942VerifiedSignatureWithReceipt {
     pub const fn outer_algorithm_id(&self) -> i64 { self.outer_algorithm_id }
     pub const fn outer_payload_sha256(&self) -> [u8; 32] { self.outer_payload_sha256 }
+    pub const fn outer_payload_mode(&self) -> Rfc9942PayloadMode { self.outer_payload_mode }
     pub const fn outer_verification_key_sha256(&self) -> [u8; 32] { self.outer_verification_key_sha256 }
     pub const fn outer_protected_header_sha256(&self) -> [u8; 32] { self.outer_protected_header_sha256 }
     pub const fn outer_external_aad_sha256(&self) -> [u8; 32] { self.outer_external_aad_sha256 }
@@ -483,6 +501,7 @@ impl Rfc9942ReceiptEnvelope {
         &self,
         proof: Rfc9942VerifiedProof,
         payload: &[u8],
+        payload_mode: Rfc9942PayloadMode,
         public_key: &[u8],
         external_aad: &[u8],
     ) -> Rfc9942VerifiedReceipt {
@@ -491,6 +510,7 @@ impl Rfc9942ReceiptEnvelope {
             vds_id: self.vds_id,
             proof,
             payload_sha256: sha256(payload),
+            payload_mode,
             verification_key_sha256: sha256(public_key),
             protected_header_sha256: sha256(&self.protected_header_bytes()),
             external_aad_sha256: sha256(external_aad),
@@ -744,6 +764,10 @@ impl Rfc9942ReceiptEnvelope {
                 candidate_leaf: leaf_hash(candidate_entry),
             },
             &authenticated_payload,
+            match self.payload {
+                Rfc9942ReceiptPayload::Attached(_) => Rfc9942PayloadMode::Attached,
+                Rfc9942ReceiptPayload::Detached => Rfc9942PayloadMode::Detached,
+            },
             public_key,
             external_aad,
         ))
@@ -774,6 +798,7 @@ impl Rfc9942ReceiptEnvelope {
         Ok(self.verified_state(
             Rfc9942VerifiedProof::Consistency { proof_index, older, newer },
             payload,
+            Rfc9942PayloadMode::Detached,
             public_key,
             external_aad,
         ))
@@ -1254,6 +1279,10 @@ impl Rfc9942SignatureWithReceipts {
         Ok(Rfc9942VerifiedSignatureWithReceipt {
             outer_algorithm_id: self.protected_algorithm_id()?,
             outer_payload_sha256: sha256(payload),
+            outer_payload_mode: match self.payload {
+                Rfc9942SignaturePayload::Attached(_) => Rfc9942PayloadMode::Attached,
+                Rfc9942SignaturePayload::Detached => Rfc9942PayloadMode::Detached,
+            },
             outer_verification_key_sha256: sha256(outer_public_key),
             outer_protected_header_sha256: sha256(&self.protected_header_bytes()),
             outer_external_aad_sha256: sha256(outer_external_aad),
