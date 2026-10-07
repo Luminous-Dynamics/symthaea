@@ -46,6 +46,18 @@ def main() -> None:
     text = SOURCE.read_text(encoding="utf-8")
     lines = text.splitlines()
 
+    # Source-integrity sentinels: catch accidental partial-blob overwrites before
+    # the more specific architectural checks run.
+    for marker in (
+        "Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics",
+        "async fn handle_connection(",
+        "async fn handle_connection_ws(",
+        "fn main(",
+        "#[cfg(test)]",
+    ):
+        if marker not in text:
+            fail(f"relay source integrity sentinel disappeared: {marker!r}")
+
     match_index = next(
         (i for i, line in enumerate(lines) if "match client_msg.command.as_str()" in line),
         None,
@@ -77,20 +89,21 @@ def main() -> None:
         '.args(["-c"',
     )
 
-    # Shell-backed execution is tolerated only in this explicit read-only
-    # diagnostic census. Every other websocket command arm must be shell-free.
-    # This turns the old "mutation allowlist" into a closed-world policy:
-    # a newly added consequential arm cannot silently inherit run_cmd().
-    SHELL_ALLOWED_READ_ONLY = {
-        "probe_hardware",
-        "scan_apps",
-        "deep_scan",
-        "gc_analyze",
-        "diagnose",
-        "netboot_info",
-        "list_images",
-        "inventory",
-    }
+    # Closed-world shell policy: the generic shell-string executor is test-only.
+    # Production websocket arms must use typed argv or the dedicated descriptor-bound
+    # script capability. This catches both accidental mutation regressions and
+    # diagnostics that later acquire user-controlled inputs.
+    for line_number, line in enumerate(lines, start=1):
+        if "run_cmd(" in line and "async fn run_cmd" not in line:
+            fail(
+                f"production relay source contains run_cmd() at line {line_number}; "
+                "generic shell execution is test-only"
+            )
+        if "run_cmd_with_stdin(" in line:
+            fail(
+                f"production relay source contains run_cmd_with_stdin() at line {line_number}; "
+                "generic shell execution is test-only"
+            )
 
     ordered = sorted(
         ((index, name) for name, index in arm_indexes.items()),
@@ -99,16 +112,6 @@ def main() -> None:
     for position, (start, name) in enumerate(ordered):
         end = ordered[position + 1][0] if position + 1 < len(ordered) else len(lines)
         body = "\n".join(lines[start:end])
-        has_shell_executor = any(
-            needle in body for needle in ("run_cmd(", "run_cmd_with_stdin(")
-        )
-
-        if has_shell_executor and name not in SHELL_ALLOWED_READ_ONLY:
-            fail(
-                f'command arm {name!r} contains shell-backed execution; '
-                "only explicitly enumerated read-only diagnostic arms may use it"
-            )
-
         if name in MUTATIONS:
             for required in (
                 "mutation_lock.try_lock()",
@@ -123,13 +126,6 @@ def main() -> None:
             for needle in forbidden:
                 if needle in body:
                     fail(f'mutation arm {name!r} contains forbidden shell boundary {needle!r}')
-
-        if name in SHELL_ALLOWED_READ_ONLY and has_shell_executor:
-            if "client_msg." in body:
-                fail(
-                    f'read-only diagnostic arm {name!r} interpolates command-message '
-                    "state into its shell authority surface"
-                )
 
     # The pre-install check is non-destructive, but it accepts a browser-selected
     # disk. Keep that value out of generated shell source: the script must receive
@@ -238,10 +234,10 @@ def main() -> None:
     # bypassing the trusted executable resolver while preserving shell compatibility
     # only inside the dedicated shell/script adapters.
     process_calls = [line for line in lines if "privileged_process(" in line]
-    if len(process_calls) != 4:
+    if len(process_calls) != 5:
         fail(
             "unexpected privileged_process constructor count: "
-            f"expected 4 capability-bound sites, found {len(process_calls)}"
+            f"expected 5 capability-bound sites, found {len(process_calls)}"
         )
     allowed_constructor_fragments = (
         "fn privileged_process(",
