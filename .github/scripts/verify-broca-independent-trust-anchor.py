@@ -220,6 +220,26 @@ def list_pr_files(pr_number: int) -> list[dict[str, Any]]:
     raise VerificationError("pull-request file list exceeded the independent verifier's 3000-file safety bound")
 
 
+def list_commit_pull_requests(commit_sha: str) -> list[dict[str, Any]]:
+    pull_requests: list[dict[str, Any]] = []
+    for page in range(1, 11):
+        page_pull_requests = api_request(
+            "GET",
+            f"/commits/{commit_sha}/pulls",
+            query={"per_page": "100", "page": str(page)},
+        )
+        if not isinstance(page_pull_requests, list):
+            raise VerificationError(
+                f"unexpected commit pull-request response on page {page}"
+            )
+        pull_requests.extend(page_pull_requests)
+        if len(page_pull_requests) < 100:
+            return pull_requests
+    raise VerificationError(
+        "commit pull-request enumeration exceeded the independent verifier's 1000-PR safety bound"
+    )
+
+
 def latest_required_runs(head_sha: str) -> dict[str, dict[str, Any] | None]:
     runs = list_head_runs(head_sha)
     result: dict[str, dict[str, Any] | None] = {}
@@ -551,11 +571,7 @@ def main() -> int:
             )
             return 0
 
-        associated = api_request(
-            "GET",
-            f"/commits/{TRIGGER_RUN_HEAD_SHA}/pulls",
-            query={"per_page": "100"},
-        )
+        associated = list_commit_pull_requests(TRIGGER_RUN_HEAD_SHA)
         candidates = [
             pr
             for pr in associated
