@@ -1280,6 +1280,60 @@ mod tests {
     }
 
     #[test]
+    fn adversarial_predictor_produces_detectable_exploitation_gap() {
+        #[derive(Debug, Default)]
+        struct AdversarialPredictor;
+
+        impl MicroWorldPredictor for AdversarialPredictor {
+            fn predict(
+                &self,
+                state: MicroWorldObservation,
+                action: MicroAction,
+            ) -> MicroWorldObservation {
+                let mut oracle = MicroAction::ALL
+                    .into_iter()
+                    .map(|candidate| {
+                        (
+                            candidate,
+                            HomeostaticPolicy::benchmark_action_score(
+                                transition(state, candidate),
+                                state,
+                                candidate,
+                            ),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                oracle.sort_by(|(_, a), (_, b)| {
+                    b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal)
+                });
+
+                let best = oracle[0].0;
+                let second = oracle[1].0;
+                if action == best {
+                    transition(state, second)
+                } else if action == second {
+                    transition(state, best)
+                } else {
+                    transition(state, action)
+                }
+            }
+
+            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
+                1.0
+            }
+        }
+
+        let report = evaluate_frozen_policy_ranking(
+            &AdversarialPredictor,
+            &benchmark_scenarios()[0],
+            8,
+        );
+
+        assert!(report.strict_inversion_rate > 0.0);
+        assert!(report.exploitation_gap() > 0.0);
+    }
+
+    #[test]
     fn oracle_policy_has_zero_exploitation_gap() {
         let predictor = OraclePredictor;
         let report = evaluate_frozen_policy_ranking(
