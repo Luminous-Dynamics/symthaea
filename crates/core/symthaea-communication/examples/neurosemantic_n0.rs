@@ -890,14 +890,15 @@ fn main() -> Result<(), String> {
     let statistical_sampling_frame_byte_refs: Vec<&[u8]> =
         vec![statistical_sampling_frame_bytes.as_slice()];
 
+    let statistical_randomization_seed_hex = format!("{:064x}", 42);
     let statistical_randomness_commitment =
         symthaea_communication::NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact {
             schema_version:
                 symthaea_communication::NEUROSEMANTIC_REMEDIATION_STATISTICAL_RANDOMNESS_COMMITMENT_SCHEMA_VERSION,
-            commitment_ref: "synthetic-statistical-randomness-commitment-v1".into(),
+            commitment_ref: "synthetic-statistical-randomness-commitment-v2".into(),
             selection_procedure_ref: "simple-random-without-replacement-v1".into(),
             randomization_seed_hash: symthaea_communication::content_hash(
-                &42u64.to_le_bytes(),
+                statistical_randomization_seed_hex.as_bytes(),
             ),
             study_protocol_hash: study_protocol_hash.clone(),
             execution_revision: execution_revision.clone(),
@@ -909,11 +910,11 @@ fn main() -> Result<(), String> {
         symthaea_communication::NeurosemanticRemediationStatisticalSelectionTraceArtifact {
             schema_version:
                 symthaea_communication::NEUROSEMANTIC_REMEDIATION_STATISTICAL_SELECTION_TRACE_SCHEMA_VERSION,
-            selection_ref: "synthetic-statistical-selection-v1".into(),
+            selection_ref: "synthetic-statistical-selection-v2".into(),
             sampling_frame_hash: statistical_sampling_frame.fingerprint()?,
             selection_procedure_ref: "simple-random-without-replacement-v1".into(),
             randomness_commitment_hash: statistical_randomness_commitment.fingerprint()?,
-            randomization_seed_u64: 42,
+            randomization_seed_hex: statistical_randomization_seed_hex.clone(),
             sample_size: observation_sets[0].observations.len() as u32,
             selected_subject_artifact_hashes: observation_sets[0]
                 .observations
@@ -1806,10 +1807,10 @@ fn main() -> Result<(), String> {
             symthaea_communication::NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact {
                 schema_version:
                     symthaea_communication::NEUROSEMANTIC_REMEDIATION_STATISTICAL_RANDOMNESS_COMMITMENT_SCHEMA_VERSION,
-                commitment_ref: "synthetic-alternate-randomness-commitment-v1".into(),
+                commitment_ref: "synthetic-alternate-randomness-commitment-v2".into(),
                 selection_procedure_ref: "simple-random-without-replacement-v1".into(),
                 randomization_seed_hash: symthaea_communication::content_hash(
-                    &43u64.to_le_bytes(),
+                    format!("{:064x}", 43).as_bytes(),
                 ),
                 study_protocol_hash: study_protocol_hash.clone(),
                 execution_revision: execution_revision.clone(),
@@ -1867,10 +1868,11 @@ fn main() -> Result<(), String> {
             symthaea_communication::NeurosemanticRemediationStatisticalSelectionTraceArtifact {
                 schema_version:
                     symthaea_communication::NEUROSEMANTIC_REMEDIATION_STATISTICAL_SELECTION_TRACE_SCHEMA_VERSION,
-                selection_ref: "synthetic-alternate-selection-v1".into(),
+                selection_ref: "synthetic-alternate-selection-v2".into(),
                 sampling_frame_hash: statistical_sampling_frame.fingerprint()?,
                 selection_procedure_ref: "simple-random-without-replacement-v1".into(),
-                randomization_seed_u64: 42,
+                randomness_commitment_hash: statistical_randomness_commitment.fingerprint()?,
+                randomization_seed_hex: statistical_randomization_seed_hex.clone(),
                 sample_size: 1,
                 selected_subject_artifact_hashes: vec![
                     statistical_sampling_frame.member_artifact_hashes[0].clone(),
