@@ -1004,7 +1004,7 @@ impl NixOSExecutor {
             .pre_state_identity()
             .ok_or_else(|| "execution authority has no bound pre-state identity".to_string())?;
 
-        if let NixOSCommand::Service { unit, .. } = command {
+        if let NixOSCommand::Service { operation, unit } = command {
             if self.dry_run {
                 return Ok(());
             }
