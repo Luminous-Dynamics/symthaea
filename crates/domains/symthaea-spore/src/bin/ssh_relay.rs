@@ -62,6 +62,7 @@ fn privileged_process(program: &str) -> tokio::process::Command {
     command
 }
 
+#[cfg(test)]
 fn privileged_shell_command(cmd: &str) -> tokio::process::Command {
     // Use /bin/sh (POSIX, always available) as fallback if bash isn't in PATH.
     let shell = if std::path::Path::new("/bin/bash").exists() {
@@ -81,6 +82,7 @@ fn privileged_shell_command(cmd: &str) -> tokio::process::Command {
     command
 }
 
+#[cfg(test)]
 async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
     let output = privileged_shell_command(cmd).output().await?;
     Ok(CmdResult {
@@ -99,9 +101,9 @@ fn trusted_typed_executable(
     const SYSTEM_BIN: &str = "/run/current-system/sw/bin/";
 
     let basename = match program {
-        "btrfs" | "docker" | "du" | "echo" | "gzip" | "lsblk" | "nix-collect-garbage" | "nix-env"
-        | "nix-instantiate" | "nixos-rebuild" | "mysqldump" | "nixos-version" | "nmcli" | "pg_dumpall" | "systemctl"
-        | "tar" | "uname" | "zstd" => Some(program),
+        "btrfs" | "docker" | "du" | "echo" | "find" | "gzip" | "lsblk" | "nix-collect-garbage"
+        | "nix-env" | "nix-instantiate" | "nixos-rebuild" | "mysqldump" | "nixos-version" | "nmcli"
+        | "pg_dumpall" | "python3" | "systemctl" | "tar" | "uname" | "zstd" => Some(program),
         _ => None,
     };
 
@@ -210,6 +212,51 @@ fn trusted_script_process(
         .args(args)
         .stdin(std::process::Stdio::from(script));
     command
+}
+
+fn trusted_script_process_from_stdin(
+    args: &[&str],
+) -> tokio::process::Command {
+    let shell = trusted_script_shell();
+    let mut command = trusted_typed_process(shell).unwrap_or_else(|_| {
+        // trusted_script_shell() is a fixed system path, so this is unreachable
+        // under the trusted executable allowlist. Keep a deterministic fallback
+        // for test environments that do not expose the configured shell.
+        privileged_process("/bin/sh")
+    });
+    if shell.ends_with("/bash") {
+        command.arg("-p");
+    }
+    command
+        .arg("-s")
+        .arg("--")
+        .arg("nixforhumanity-inline-script")
+        .args(args)
+}
+
+async fn run_privileged_script_source(
+    script: &str,
+    args: &[&str],
+) -> Result<CmdResult, std::io::Error> {
+    use tokio::io::AsyncWriteExt;
+
+    let mut command = trusted_script_process_from_stdin(args);
+    command.stdin(std::process::Stdio::piped());
+    let mut child = command.spawn().await?;
+    let mut stdin = child.stdin.take().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::BrokenPipe,
+            "trusted inline script did not expose stdin",
+        )
+    })?;
+    stdin.write_all(script.as_bytes()).await?;
+    drop(stdin);
+    let output = child.wait_with_output().await?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
 }
 
 async fn run_privileged_script_with_args(
@@ -7346,7 +7393,7 @@ echo '}'
 echo '}'
 "#;
 
-                match run_cmd(probe_script).await {
+                match run_privileged_script_source(probe_script, &[]).await {
                     Ok(result) if result.exit_status == 0 => {
                         eprintln!("[{}] Hardware probe complete", peer_addr);
                         // Strip ANSI escape codes and control chars that corrupt JSON,
@@ -7541,7 +7588,7 @@ done
 echo ']'
 "#;
 
-                match run_cmd(scan_script).await {
+                match run_privileged_script_source(scan_script, &[]).await {
                     Ok(result) if result.exit_status == 0 => {
                         eprintln!("[{}] App scan complete", peer_addr);
                         let _ = ws_tx
@@ -7764,7 +7811,7 @@ echo '}'
 echo '}'
 "#;
 
-                match run_cmd(deep_scan_script).await {
+                match run_privileged_script_source(deep_scan_script, &[]).await {
                     Ok(result) => {
                         eprintln!("[{}] Deep scan complete", peer_addr);
                         let _ = ws_tx
@@ -8525,7 +8572,7 @@ fi
 printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"generations":%s}' \
     "${STORE_SIZE:-0}" "${RECLAIMABLE:-0}" "${DEAD_COUNT:-0}" "${ROOT_COUNT:-0}" "${GEN_COUNT:-0}"
 "#;
-                match run_cmd(script).await {
+                match run_privileged_script_source(script, &[]).await {
                     Ok(r) if r.exit_status == 0 => {
                         let clean: String = r
                             .stdout
