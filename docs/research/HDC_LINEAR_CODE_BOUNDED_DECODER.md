@@ -209,7 +209,7 @@ The qualification workflow does not treat the event payload alone as sufficient 
 binds the current repository, triggering repository, and head repository by numeric repository ID,
 then re-fetches the live Actions run and requires its repository ID, exact head SHA, head ref,
 workflow ID/path/name, and (for pull-request events) PR head/base SHAs and repository IDs to agree
-with the event. The receipt records these validated values as schema v12 fields. This makes a
+with the event. The receipt records these validated values as schema v14 fields. This makes a
 successful receipt evidence about the actual executed run rather than only about the triggering
 payload.
 
@@ -467,6 +467,29 @@ This is an important evidence boundary: bounded-distance decoding identifies a n
 
 The factorization layer remains separate. Even a unique codeword result can still carry an affine factorization fiber of cardinality 2^d, and the decoder does not inspect that fiber when making its codeword-level decision.
 
+
+## Generator-basis presentation invariance
+
+Coordinate relabeling tests establish equivariance under an ambient Hamming-space
+permutation. A separate metamorphic boundary now changes the presentation of the
+same linear code instead: the eight-generator basis is reversed and each generator
+is sheared with its adjacent predecessor by XOR. This transformation is invertible,
+so it changes the basis presentation without changing the represented subspace.
+
+The qualification reconstructs both codes from their respective bases and requires:
+
+- exact equality of the complete represented codeword set;
+- identical canonical parity-check rows, columns, and fingerprint;
+- identical bounded-decoder scalar/list outcomes on 64 deterministic 73-bit probes;
+- exact equality of all four decoder work counters.
+
+The witness is intentionally metamorphic rather than an independent oracle: its
+purpose is to catch hidden dependence on generator ordering or basis presentation
+inside the parity-check/decoder pipeline, which is a different failure mode from
+coordinate-indexing errors.
+
+The emitted ledger is `GENERATOR_BASIS_EQUIVARIANCE`, and the workflow promotes it
+to a required gate in receipt schema v14.
 ## 2026 coding-theory context
 
 Recent results sharpen, rather than collapse, this distinction. Silas determines the sharp typical worst-case list-size behavior of random linear codes at capacity for every finite field, while Yuan and Zhu obtain asymptotically optimal list-size scaling for fixed finite fields. These are asymptotic list-decoding results and do not certify the finite Boolean fixtures used here.
