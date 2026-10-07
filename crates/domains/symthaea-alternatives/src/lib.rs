@@ -8735,6 +8735,8 @@ mod tests {
                 .as_mut()
                 .unwrap();
             topology.measurement_model_digest = "wrong-measurement-model-digest".into();
+            topology.input_frontier.measurement_model_digest =
+                "wrong-measurement-model-digest".into();
             let topology_digest = topology.canonical_digest().unwrap();
             let uncertainty = evidence.uncertainty.as_mut().unwrap();
             uncertainty.evaluation.calibration_topology_digest = Some(topology_digest);
