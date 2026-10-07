@@ -231,6 +231,14 @@ impl SystemTransaction {
     }
 
     pub(crate) fn receipt(&self, outcome: TransactionOutcome) -> TransactionReceipt {
+        self.receipt_with_artifact(outcome, None)
+    }
+
+    pub(crate) fn receipt_with_artifact(
+        &self,
+        outcome: TransactionOutcome,
+        artifact_commitment: Option<ArtifactCommitment>,
+    ) -> TransactionReceipt {
         TransactionReceipt {
             schema_version: self.schema_version,
             request_id: self.request_id.clone(),
@@ -240,7 +248,7 @@ impl SystemTransaction {
             request_digest: self.request_digest.clone(),
             authorization: self.authorization,
             outcome,
-            artifact_commitment: None,
+            artifact_commitment,
         }
     }
 
