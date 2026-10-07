@@ -394,6 +394,7 @@ def main() -> int:
             or trigger_run.get("head_branch") != TRIGGER_RUN_HEAD_BRANCH
             or trigger_run.get("run_attempt") != TRIGGER_RUN_ATTEMPT
             or trigger_run.get("conclusion") != TRIGGER_RUN_CONCLUSION
+            or not trigger_run.get("workflow_id")
         ):
             raise StaleError(
                 "workflow_run event payload does not match authoritative GitHub run state"
@@ -691,6 +692,17 @@ def main() -> int:
         if TRIGGER_RUN_NAME not in REQUIRED_WORKFLOWS:
             raise VerificationError(
                 f"unexpected triggering workflow: {TRIGGER_RUN_NAME!r}"
+            )
+
+        workflow_paths = {
+            "Broca Feature Matrix": ".github/workflows/broca-feature-matrix.yml",
+            "Workflow Syntax": ".github/workflows/workflow-syntax.yml",
+            "PR Governance": ".github/workflows/pr-governance.yml",
+        }
+        expected_path = workflow_paths[TRIGGER_RUN_NAME]
+        if trigger_run.get("path") != expected_path:
+            raise VerificationError(
+                f"triggering workflow path mismatch: expected {expected_path!r}, got {trigger_run.get('path')!r}"
             )
 
         receipt["qualification_result"] = "PASS"
