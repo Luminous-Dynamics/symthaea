@@ -1922,6 +1922,30 @@ mod tests {
     }
 
     #[test]
+    fn revisable_harvest_regime_changes_only_harvest_yield() {
+        let state = MicroWorld::default().observe();
+        let nominal_harvest =
+            transition_with_harvest_yield_scale(state, MicroAction::Harvest, 1.0);
+        let shifted_harvest =
+            transition_with_harvest_yield_scale(state, MicroAction::Harvest, 0.60);
+
+        assert_eq!(
+            nominal_harvest,
+            transition(state, MicroAction::Harvest)
+        );
+        assert!(shifted_harvest.energy < nominal_harvest.energy);
+        assert_eq!(shifted_harvest.integrity, nominal_harvest.integrity);
+        assert_eq!(shifted_harvest.knowledge, nominal_harvest.knowledge);
+        assert_eq!(shifted_harvest.threat, nominal_harvest.threat);
+        assert_eq!(shifted_harvest.progress, nominal_harvest.progress);
+
+        assert_eq!(
+            transition_with_harvest_yield_scale(state, MicroAction::Repair, 0.60),
+            transition(state, MicroAction::Repair)
+        );
+    }
+
+    #[test]
     fn negative_effects_survive_world_transition() {
         let state = MicroWorld::default().observe();
         let next = transition(state, MicroAction::Explore);
