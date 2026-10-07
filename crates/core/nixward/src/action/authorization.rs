@@ -546,6 +546,30 @@ impl NixLocalExecutionAuthorityV1 {
         self.approval.projection_digest()
     }
 
+    /// Construct the canonical durable authorization artifact represented by this
+    /// consumed live approval. This is intentionally derived only after the live
+    /// approval has been admitted; it is not a reconstruction of an older record.
+    pub(crate) fn canonical_authorization_record(
+        &self,
+    ) -> Result<NixExecutionAuthorizationRecordV1, NixAuthorizationErrorV1> {
+        let intent_digest = self.intent.digest()?;
+        let service_effect_context_digest = service_effect_context_digest_for_intent(&self.intent)?;
+        let decision = self.approval.decision_evidence();
+
+        let record = NixExecutionAuthorizationRecordV1 {
+            action_intent_digest: intent_digest,
+            service_effect_context_digest,
+            profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
+            authority_ref: self.approval.request_id().to_string(),
+            issued_at_unix_ms: decision.decided_at_unix_ms,
+            expires_at_unix_ms: None,
+            decision: NixAuthorizationDecisionV1::Approved,
+        };
+        record.validate_shape()?;
+        record.validate_against_intent(&self.intent)?;
+        Ok(record)
+    }
+
     pub(crate) fn service_definition_content_digest(&self) -> Option<&str> {
         self.intent
             .service_effect_context()
