@@ -729,7 +729,7 @@ impl MorphophonologicalRuleSet {
         hasher.update(b"symthaea-morphophonological-resource-evidence-v1\\0");
         hasher.update(self.resource_evidence.version.as_bytes());
         hasher.update(&(serde_json::to_string(&self.resource_evidence)
-            .unwrap_or_else(|_| String::from("serialization-failed")))
+            .unwrap_or_else(|_| String::from("serialization-failed"))
             .len() as u64)
             .to_le_bytes());
         hasher.update(
