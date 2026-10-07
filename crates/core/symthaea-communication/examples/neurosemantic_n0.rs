@@ -1362,8 +1362,23 @@ fn main() -> Result<(), String> {
         forged.inference_scope =
             symthaea_communication::NeurosemanticRemediationUncertaintyInferenceScope::FixedEvaluationPopulation;
         let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
-        remediation_impact
+        let mut forged_measurement = measurement.clone();
+        forged_measurement.measurements[0].uncertainty =
+            NeurosemanticRemediationUncertainty::Interval {
+                lower_numerator: 0,
+                upper_numerator: 6_577,
+                scale: 4,
+                confidence_level_bps: 9_500,
+                uncertainty_method_ref: "wilson-score-95-v1".into(),
+                uncertainty_computation_artifact_hash: symthaea_communication::content_hash(&bytes),
+            };
+        let forged_measurement_bytes =
+            serde_json::to_vec(&forged_measurement).map_err(|e| e.to_string())?;
+        let mut forged_impact = remediation_impact.clone();
+        forged_impact.measurement_artifact_hash = forged_measurement.fingerprint()?;
+        forged_impact
             .verify_measurement_computation_bundle_bytes(
+                &forged_measurement_bytes,
                 &measurement_bytes,
                 &computation_byte_refs,
                 &observation_set_byte_refs,
@@ -1376,7 +1391,7 @@ fn main() -> Result<(), String> {
     };
     let remediation_uncertainty_statistical_design_substitution_blocked = {
         let mut forged_uncertainty = uncertainty_computation.clone();
-        let alternate_design = alternate_nonprobability_statistical_design.clone();
+        let mut alternate_design = alternate_nonprobability_statistical_design.clone();
         alternate_design.design_ref = "synthetic-nonprobability-statistical-design-v2".into();
         let alternate_design_bytes =
             serde_json::to_vec(&alternate_design).map_err(|e| e.to_string())?;
@@ -1396,7 +1411,9 @@ fn main() -> Result<(), String> {
             };
         let forged_measurement_bytes =
             serde_json::to_vec(&forged_measurement).map_err(|e| e.to_string())?;
-        remediation_impact
+        let mut forged_impact = remediation_impact.clone();
+        forged_impact.measurement_artifact_hash = forged_measurement.fingerprint()?;
+        forged_impact
             .verify_measurement_computation_bundle_bytes(
                 &forged_measurement_bytes,
                 &computation_byte_refs,
@@ -1433,7 +1450,9 @@ fn main() -> Result<(), String> {
             };
         let forged_measurement_bytes =
             serde_json::to_vec(&forged_measurement).map_err(|e| e.to_string())?;
-        remediation_impact
+        let mut forged_impact = remediation_impact.clone();
+        forged_impact.measurement_artifact_hash = forged_measurement.fingerprint()?;
+        forged_impact
             .verify_measurement_computation_bundle_bytes(
                 &forged_measurement_bytes,
                 &computation_byte_refs,
@@ -1467,7 +1486,9 @@ fn main() -> Result<(), String> {
             };
         let forged_measurement_bytes =
             serde_json::to_vec(&forged_measurement).map_err(|e| e.to_string())?;
-        remediation_impact
+        let mut forged_impact = remediation_impact.clone();
+        forged_impact.measurement_artifact_hash = forged_measurement.fingerprint()?;
+        forged_impact
             .verify_measurement_computation_bundle_bytes(
                 &forged_measurement_bytes,
                 &computation_byte_refs,
