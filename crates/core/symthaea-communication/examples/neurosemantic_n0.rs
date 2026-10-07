@@ -1255,6 +1255,44 @@ fn main() -> Result<(), String> {
             )
             .is_err()
     };
+    let remediation_uncertainty_target_mismatch_blocked = {
+        let mut forged_measurement = measurement.clone();
+        let mut forged_uncertainty = uncertainty_computation.clone();
+        forged_uncertainty.uncertainty_ref = "synthetic-fairness-wilson-v1".into();
+        forged_uncertainty.metric_ref = metric_fairness.metric_ref.clone();
+        forged_uncertainty.metric_definition_hash = metric_fairness.fingerprint()?;
+        forged_uncertainty.observation_set_hash = computation_artifacts[2].observation_set_hash.clone();
+        forged_uncertainty.point_estimate_numerator = computation_artifacts[2].estimate_numerator;
+        forged_uncertainty.point_estimate_scale = computation_artifacts[2].estimate_scale;
+        forged_uncertainty.lower_numerator = 0;
+        forged_uncertainty.upper_numerator = 6_577;
+        forged_uncertainty.scale = computation_artifacts[2].estimate_scale;
+        let uncertainty_hash = forged_uncertainty.fingerprint()?;
+        let uncertainty_bytes = serde_json::to_vec(&forged_uncertainty).map_err(|e| e.to_string())?;
+        forged_measurement.measurements[2].uncertainty =
+            NeurosemanticRemediationUncertainty::Interval {
+                lower_numerator: 0,
+                upper_numerator: 6_577,
+                scale: computation_artifacts[2].estimate_scale,
+                confidence_level_bps: 9_500,
+                uncertainty_method_ref: "wilson-score-95-v1".into(),
+                uncertainty_computation_artifact_hash: uncertainty_hash,
+            };
+        let forged_measurement_bytes =
+            serde_json::to_vec(&forged_measurement).map_err(|e| e.to_string())?;
+        let mut forged_impact = remediation_impact.clone();
+        forged_impact.measurement_artifact_hash = forged_measurement.fingerprint()?;
+        forged_impact
+            .verify_measurement_computation_bundle_bytes(
+                &forged_measurement_bytes,
+                &computation_byte_refs,
+                &observation_set_byte_refs,
+                &population_manifest_byte_refs,
+                &[uncertainty_bytes.as_slice()],
+                &uncertainty_assumption_byte_refs,
+            )
+            .is_err()
+    };
     let remediation_uncertainty_point_estimate_binding_blocked = {
         let mut forged = uncertainty_computation.clone();
         forged.point_estimate_numerator = 1;
@@ -1375,6 +1413,7 @@ fn main() -> Result<(), String> {
                 scale: 4,
                 confidence_level_bps: 9_500,
                 uncertainty_method_ref: "synthetic-structural-interval-v1".into(),
+                uncertainty_computation_artifact_hash: uncertainty_computation.fingerprint()?,
             };
         let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
         remediation_impact.verify_measurement_artifact_bytes(&bytes).is_err()
@@ -2009,6 +2048,7 @@ fn main() -> Result<(), String> {
         "remediation_computation_substitution_blocked": remediation_computation_substitution_blocked,
         "remediation_canonical_population_identity_substitution_blocked": remediation_canonical_population_identity_substitution_blocked,
         "remediation_uncertainty_method_substitution_blocked": remediation_uncertainty_method_substitution_blocked,
+        "remediation_uncertainty_target_mismatch_blocked": remediation_uncertainty_target_mismatch_blocked,
         "remediation_measurement_schema_v2_rejected": remediation_measurement_schema_v2_rejected,
         "remediation_uncertainty_substitution_blocked": remediation_uncertainty_substitution_blocked,
         "remediation_metric_direction_mismatch_blocked": remediation_metric_direction_mismatch_blocked,
