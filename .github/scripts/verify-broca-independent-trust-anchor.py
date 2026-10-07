@@ -24,6 +24,7 @@ from typing import Any
 API_VERSION = "2026-03-10"
 STATUS_CONTEXT = "Broca / Independent Trust Anchor"
 RECEIPT_PATH = Path("BROCA_INDEPENDENT_TRUST_ANCHOR_RECEIPT_V1.json")
+POLICY_PATH = Path("docs/broca/independent_trust_policy_v1.json")
 
 ALLOWED_PATH_PREFIXES = (
     ".github/workflows/broca-feature-matrix.yml",
@@ -224,6 +225,82 @@ def verify_broca_jobs(run_id: int) -> dict[str, Any]:
     }
 
 
+def load_policy() -> dict[str, Any]:
+    try:
+        policy = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise VerificationError(f"unable to load independent trust policy: {error}") from error
+    if policy.get("schema_version") != "broca-independent-trust-policy-v1":
+        raise VerificationError("independent trust policy schema mismatch")
+    if policy.get("repository") != REPOSITORY:
+        raise VerificationError("independent trust policy repository mismatch")
+    return policy
+
+
+def approved_snapshot(policy: dict[str, Any], pr: dict[str, Any], changed_files: list[tuple[str | None, str | None]]) -> dict[str, Any]:
+    approved = policy.get("approved_files")
+    if not isinstance(approved, list) or not approved:
+        raise VerificationError("independent trust policy has no approved file snapshot")
+
+    actual = [
+        {"path": name, "status": status, "blob_sha": next(
+            (
+                str(item.get("sha"))
+                for item in api_request(
+                    "GET",
+                    f"/pulls/{int(pr['number'])}/files",
+                    query={"per_page": "100", "page": "1"},
+                )
+                if False
+            ),
+            "",
+        )}
+        for name, status in []
+    ]
+
+    expected_keys = {
+        (item.get("path"), item.get("status"), item.get("blob_sha"))
+        for item in approved
+        if isinstance(item, dict)
+    }
+    if len(expected_keys) != len(approved):
+        raise VerificationError("independent trust policy contains malformed duplicate file entries")
+
+    actual_keys = {
+        (name, status, next(
+            (
+                file_item.get("sha")
+                for file_item in policy["_runtime_pr_files"]
+                if file_item.get("filename") == name and file_item.get("status") == status
+            ),
+            None,
+        ))
+        for name, status in changed_files
+    }
+    if actual_keys != expected_keys:
+        raise VerificationError(
+            f"approved PR snapshot mismatch: expected {sorted(expected_keys)!r}, got {sorted(actual_keys)!r}"
+        )
+
+    if pr.get("number") != policy.get("pull_request"):
+        raise VerificationError("PR number does not match independently approved snapshot")
+    if pr.get("base", {}).get("ref") != policy.get("base_branch"):
+        raise VerificationError("PR base branch does not match independently approved snapshot")
+    if pr.get("base", {}).get("sha") != policy.get("base_sha"):
+        raise VerificationError("PR base SHA does not match independently approved snapshot")
+    if pr.get("head", {}).get("sha") != policy.get("approved_head_sha"):
+        raise VerificationError("PR head SHA does not match independently approved snapshot")
+
+    return {
+        "schema_version": policy.get("schema_version"),
+        "pull_request": policy.get("pull_request"),
+        "base_branch": policy.get("base_branch"),
+        "base_sha": policy.get("base_sha"),
+        "approved_head_sha": policy.get("approved_head_sha"),
+        "approved_files": approved,
+    }
+
+
 def post_status(sha: str, state: str, description: str, target_url: str) -> None:
     api_request(
         "POST",
@@ -323,10 +400,15 @@ def main() -> int:
             "merge_commit_sha": pr.get("merge_commit_sha"),
         }
 
+        policy = load_policy()
+        pr_files = list_pr_files(pr_number)
         changed_files = sorted(
             (item.get("filename"), item.get("status"))
-            for item in list_pr_files(pr_number)
+            for item in pr_files
         )
+
+        policy["_runtime_pr_files"] = pr_files
+        snapshot = approved_snapshot(policy, pr, changed_files)
 
         relevant_files = [
             name
@@ -385,6 +467,7 @@ def main() -> int:
             ],
             "verified": True,
         }
+        receipt["verification"]["approved_snapshot"] = snapshot
 
         workflow_bytes, workflow_blob = get_file(
             ".github/workflows/broca-feature-matrix.yml", pr["head"]["sha"]
