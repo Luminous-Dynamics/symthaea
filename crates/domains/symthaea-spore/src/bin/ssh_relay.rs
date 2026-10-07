@@ -9949,6 +9949,41 @@ mod tests {
     }
 
     #[test]
+    fn image_namespace_freeze_rejects_symlinks_and_binds_modes() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-freeze-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let artifact = dir.join("configuration.nix");
+        std::fs::write(&artifact, b"config").unwrap();
+        std::fs::set_permissions(&artifact, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        freeze_image_namespace_blocking(dir.to_str().unwrap()).unwrap();
+        assert_eq!(
+            std::fs::metadata(&artifact).unwrap().permissions().mode() & 0o777,
+            0o400
+        );
+        assert_eq!(
+            std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777,
+            0o500
+        );
+
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let symlink = dir.join("attacker");
+        std::os::unix::fs::symlink("/etc/passwd", &symlink).unwrap();
+        let error = freeze_image_namespace_blocking(dir.to_str().unwrap())
+            .expect_err("image freeze must reject symlink artifacts");
+        assert!(error.contains("unable to open image namespace artifact") || error.contains("non-regular"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn configuration_postcondition_digest_is_exact() {
         let expected = b"{ config = true; }\n";
         assert!(configuration_bytes_match(expected, expected));
