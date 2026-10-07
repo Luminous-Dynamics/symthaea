@@ -457,6 +457,66 @@ fn small_fixture_quotient_metric_matches_ambient_coset_geometry() {
 }
 
 #[test]
+fn small_fixture_full_coset_distance_spectrum_is_syndrome_difference_invariant() {
+    let mut buckets: [Vec<u8>; 64] = std::array::from_fn(|_| Vec::new());
+
+    for mask in 0u16..256 {
+        let byte = mask as u8;
+        let syndrome = canonical_boundary_syndrome(byte) as usize;
+        buckets[syndrome].push(byte);
+    }
+
+    assert!(buckets.iter().all(|bucket| bucket.len() == 4));
+
+    // For every ordered pair of syndrome fibers, retain the complete 16-value
+    // Hamming-distance spectrum between their four ambient representatives.
+    // The expected spectrum is the weight spectrum of the XOR-difference
+    // syndrome fiber, repeated once for each of the four choices in the left
+    // fiber. This reasons entirely over the independently specified ambient
+    // partition and never enumerates codewords.
+    let mut pair_checks = 0usize;
+    let mut maximum_distance = 0usize;
+
+    for left in 0..64usize {
+        for right in 0..64usize {
+            let delta = left ^ right;
+            let mut observed = [0usize; 9];
+
+            for &left_word in &buckets[left] {
+                for &right_word in &buckets[right] {
+                    let distance = (left_word ^ right_word).count_ones() as usize;
+                    observed[distance] += 1;
+                    maximum_distance = maximum_distance.max(distance);
+                    pair_checks += 1;
+                }
+            }
+
+            let mut expected = [0usize; 9];
+            for &word in &buckets[delta] {
+                expected[word.count_ones() as usize] += buckets[left].len();
+            }
+
+            assert_eq!(
+                observed, expected,
+                "fiber distance spectrum was not determined by syndrome XOR: left={left} right={right} delta={delta}"
+            );
+            assert_eq!(
+                observed.iter().sum::<usize>(),
+                16,
+                "ordered fiber pair must contain exactly 16 ambient comparisons: left={left} right={right}"
+            );
+        }
+    }
+
+    assert_eq!(pair_checks, 64 * 64 * 16);
+    assert_eq!(maximum_distance, 8);
+
+    println!(
+        "SYNDROME_QUOTIENT_SPECTRUM=syndromes=64;fiber_size=4;ordered_fiber_pairs=4096;ambient_pair_checks={pair_checks};translation_invariant=true;full_distance_spectrum_exact=true;max_distance={maximum_distance};codeword_enumeration=false"
+    );
+}
+
+#[test]
 fn small_fixture_production_syndrome_matches_independent_oracle_and_is_linear() {
     let code = boundary_code();
     let parity_check = ParityCheckMatrix::from_code(&code).expect("parity-check matrix");

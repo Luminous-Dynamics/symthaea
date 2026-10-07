@@ -339,6 +339,31 @@ Hamming distance. This makes it a geometry-level invariant rather than another
 decoder-vs-oracle equality check.
 
 
+## Full coset-pair distance-spectrum closure
+
+The quotient-metric test can be strengthened without moving back to codeword
+enumeration. For every ordered pair of the 64 syndrome fibers, the qualification
+now compares the complete multiset of all 16 ambient Hamming distances between
+their four representatives.
+
+For fibers \\(F_s\\) and \\(F_t\\), let \\(\\Delta=s\\oplus t\\). Because these are additive
+cosets, every difference \\(x\\oplus y\\) with \\(x\\in F_s\\) and \\(y\\in F_t\\) lies in
+\\(F_\\Delta\\), and each element of \\(F_\\Delta\\) occurs exactly \\(|C|=4\\) times among
+the 16 ordered pairs. Therefore the complete distance spectrum between \\(F_s\\)
+and \\(F_t\\) must equal the Hamming-weight spectrum of \\(F_{s\\oplus t}\\), with every
+multiplicity multiplied by four.
+
+The finite qualification exhausts all 4,096 ordered syndrome-fiber pairs and all
+65,536 underlying ambient word pairs. It requires the complete spectrum to agree,
+not merely its minimum. This establishes translation invariance of the quotient
+distance distribution across the entire fixed Boolean fixture while remaining
+independent of the decoder and independent of codeword enumeration.
+
+The emitted ledger is
+`SYNDROME_QUOTIENT_SPECTRUM`. It is a geometry witness only: it does not establish
+an efficient decoder, a random-code asymptotic, or any production performance
+property.
+
 ## Beyond-radius semantics
 
 A separate fixture tests corruption beyond the unique-decoding radius without asking the decoder to recover an arbitrarily designated clean target.
