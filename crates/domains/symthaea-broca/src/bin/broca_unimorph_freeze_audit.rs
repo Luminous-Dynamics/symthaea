@@ -130,8 +130,8 @@ fn main() -> Result<()> {
         || artifact_len != EXPECTED_ARTIFACT_BYTES
         || artifact_blake3 != EXPECTED_ARTIFACT_BLAKE3
         || readme_blob != EXPECTED_README_BLOB_SHA
-        || !SNAPSHOT_MANIFEST.contains("- Source: Wikipedia")
-        || !SNAPSHOT_MANIFEST.contains("- License: CC BY-SA 3.0")
+        || !SNAPSHOT_MANIFEST.contains(&format!("- Source: {EXPECTED_SOURCE}"))
+        || !SNAPSHOT_MANIFEST.contains(&format!("- License: {EXPECTED_LICENSE}"))
     {
         bail!("checked-in UniMorph snapshot manifest disagrees with its frozen identity constants");
     }
