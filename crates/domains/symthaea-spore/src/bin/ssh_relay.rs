@@ -218,12 +218,7 @@ fn trusted_script_process_from_stdin(
     args: &[&str],
 ) -> tokio::process::Command {
     let shell = trusted_script_shell();
-    let mut command = trusted_typed_process(shell).unwrap_or_else(|_| {
-        // trusted_script_shell() is a fixed system path, so this is unreachable
-        // under the trusted executable allowlist. Keep a deterministic fallback
-        // for test environments that do not expose the configured shell.
-        privileged_process("/bin/sh")
-    });
+    let mut command = privileged_process(shell);
     if shell.ends_with("/bash") {
         command.arg("-p");
     }
@@ -9912,26 +9907,38 @@ echo '}'
             }
 
             "list_images" => {
-                match run_cmd(
-                    "ls -la /tmp/nixforhumanity-image-* 2>/dev/null | head -20 || echo '[]'",
-                )
-                .await
-                {
-                    Ok(r) => {
+                let mut images: Vec<String> = match std::fs::read_dir("/tmp") {
+                    Ok(entries) => entries
+                        .filter_map(Result::ok)
+                        .filter_map(|entry| {
+                            let name = entry.file_name().to_string_lossy().into_owned();
+                            if !name.starts_with("nixforhumanity-image-") {
+                                return None;
+                            }
+                            entry
+                                .file_type()
+                                .ok()
+                                .filter(|file_type| file_type.is_dir())
+                                .map(|_| format!("/tmp/{name}"))
+                        })
+                        .collect(),
+                    Err(error) => {
                         let _ = ws_tx
                             .send(Message::Text(
-                                serde_json::json!({"type":"images","data":r.stdout}).to_string(),
+                                RelayMessage::error(&format!("List failed: {error}")).to_json(),
                             ))
                             .await;
+                        continue;
                     }
-                    Err(e) => {
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::error(&format!("List failed: {}", e)).to_json(),
-                            ))
-                            .await;
-                    }
-                }
+                };
+                images.sort();
+                let data = images.join("
+");
+                let _ = ws_tx
+                    .send(Message::Text(
+                        serde_json::json!({"type":"images","data":data}).to_string(),
+                    ))
+                    .await;
             }
 
             "inventory" => {
@@ -10876,60 +10883,132 @@ async fn main() {
     eprintln!("  Session timeout: 30 minutes");
     eprintln!("  Rate limit: 1 active session per IP");
 
-    // PXE mode: spawn a background HTTP server for kernel+initrd
+    // PXE mode: serve verified immutable Nix store artifacts through a typed
+    // process. No shell globbing, command substitution, or interpolated server
+    // command is required.
     if let Some(pxe_p) = pxe_port {
         let pxe_bind = bind_addr.clone();
         tokio::spawn(async move {
-            // Find kernel and initrd in the nix store
-            let kernel_result = run_cmd("ls /nix/store/*/bzImage 2>/dev/null | head -1").await;
-            let initrd_result = run_cmd("ls /nix/store/*/initrd 2>/dev/null | head -1").await;
-            let kernel_path = kernel_result
-                .ok()
-                .map(|r| r.stdout.trim().to_string())
-                .unwrap_or_default();
-            let initrd_path = initrd_result
-                .ok()
-                .map(|r| r.stdout.trim().to_string())
-                .unwrap_or_default();
-
-            if kernel_path.is_empty() || initrd_path.is_empty() {
-                eprintln!(
-                    "PXE: NixOS kernel/initrd not found in nix store. PXE server not started."
-                );
-                eprintln!("PXE: Build the ISO first: nix-build nix/installer-iso.nix");
-                return;
+            fn find_store_artifact(name: &str) -> Result<Option<std::path::PathBuf>, String> {
+                let store = std::fs::read_dir("/nix/store")
+                    .map_err(|error| format!("unable to enumerate Nix store: {error}"))?;
+                for entry in store {
+                    let entry =
+                        entry.map_err(|error| format!("unable to inspect Nix store entry: {error}"))?;
+                    let candidate = entry.path().join(name);
+                    let file = match std::fs::OpenOptions::new()
+                        .read(true)
+                        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+                        .open(&candidate)
+                    {
+                        Ok(file) => file,
+                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                        Err(error) => {
+                            return Err(format!(
+                                "unable to open Nix store artifact {}: {error}",
+                                candidate.display()
+                            ))
+                        }
+                    };
+                    let metadata = file
+                        .metadata()
+                        .map_err(|error| format!("unable to inspect {}: {error}", candidate.display()))?;
+                    if metadata.is_file() {
+                        return Ok(Some(candidate));
+                    }
+                }
+                Ok(None)
             }
 
-            // Create a temp directory with symlinks and serve via python3
-            let setup_cmd = format!(
-                "TMPDIR=$(mktemp -d) && ln -sf '{}' \"$TMPDIR/bzImage\" && ln -sf '{}' \"$TMPDIR/initrd\" && echo \"$TMPDIR\"",
-                kernel_path, initrd_path
-            );
-            let tmpdir = match run_cmd(&setup_cmd).await {
-                Ok(r) if r.exit_status == 0 => r.stdout.trim().to_string(),
-                _ => {
-                    eprintln!("PXE: Failed to set up temp directory for serving");
+            let kernel_path = match find_store_artifact("bzImage") {
+                Ok(Some(path)) => path,
+                Ok(None) => {
+                    eprintln!("PXE: NixOS kernel not found in Nix store. PXE server not started.");
+                    return;
+                }
+                Err(error) => {
+                    eprintln!("PXE: Kernel discovery failed: {error}");
                     return;
                 }
             };
+            let initrd_path = match find_store_artifact("initrd") {
+                Ok(Some(path)) => path,
+                Ok(None) => {
+                    eprintln!("PXE: NixOS initrd not found in Nix store. PXE server not started.");
+                    return;
+                }
+                Err(error) => {
+                    eprintln!("PXE: initrd discovery failed: {error}");
+                    return;
+                }
+            };
+
+            let transaction_id = match random_operation_id() {
+                Ok(id) => id,
+                Err(error) => {
+                    eprintln!("PXE: Unable to allocate private serving namespace: {error}");
+                    return;
+                }
+            };
+            let tmpdir = format!("/tmp/nixforhumanity-pxe-{transaction_id}");
+            if let Err(error) = create_private_directory(&tmpdir) {
+                eprintln!("PXE: Failed to create private serving namespace: {error}");
+                return;
+            }
+
+            let kernel_link = format!("{tmpdir}/bzImage");
+            let initrd_link = format!("{tmpdir}/initrd");
+            if let Err(error) = std::os::unix::fs::symlink(&kernel_path, &kernel_link) {
+                eprintln!("PXE: Failed to stage kernel: {error}");
+                let _ = std::fs::remove_dir_all(&tmpdir);
+                return;
+            }
+            if let Err(error) = std::os::unix::fs::symlink(&initrd_path, &initrd_link) {
+                eprintln!("PXE: Failed to stage initrd: {error}");
+                let _ = std::fs::remove_dir_all(&tmpdir);
+                return;
+            }
 
             eprintln!(
                 "PXE: Serving kernel+initrd on http://{}:{}",
                 pxe_bind, pxe_p
             );
-            eprintln!("PXE:   kernel: {}", kernel_path);
-            eprintln!("PXE:   initrd: {}", initrd_path);
+            eprintln!("PXE:   kernel: {}", kernel_path.display());
+            eprintln!("PXE:   initrd: {}", initrd_path.display());
             eprintln!(
                 "PXE: For dnsmasq, add: dhcp-boot=pxelinux.0,,{}:{}",
                 pxe_bind, pxe_p
             );
 
-            // Serve the directory with python3
-            let serve_cmd = format!(
-                "cd '{}' && python3 -m http.server {} --bind {}",
-                tmpdir, pxe_p, pxe_bind
-            );
-            let _ = run_cmd(&serve_cmd).await;
+            let mut server = match trusted_typed_process("python3") {
+                Ok(command) => command,
+                Err(error) => {
+                    eprintln!("PXE: python3 capability unavailable: {error}");
+                    let _ = std::fs::remove_dir_all(&tmpdir);
+                    return;
+                }
+            };
+            server
+                .current_dir(&tmpdir)
+                .args([
+                    "-m",
+                    "http.server",
+                    &pxe_p.to_string(),
+                    "--bind",
+                    &pxe_bind,
+                ]);
+
+            match server.status().await {
+                Ok(status) => eprintln!(
+                    "PXE: HTTP server exited with {:?}",
+                    status.code()
+                ),
+                Err(error) => eprintln!("PXE: HTTP server failed: {error}"),
+            }
+
+            let _ = std::fs::remove_file(&kernel_link);
+            let _ = std::fs::remove_file(&initrd_link);
+            let _ = std::fs::remove_dir(&tmpdir);
         });
     }
 
