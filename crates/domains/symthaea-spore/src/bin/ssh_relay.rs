@@ -1379,7 +1379,19 @@ fn generate_system_config(msg: &ClientMessage) -> String {
     config.push_str("  networking.networkmanager.enable = true;\n");
 
     config
+}fn generate_system_config_module(msg: &ClientMessage) -> String {
+    let sys_config = generate_system_config(msg);
+    if sys_config.trim().is_empty() {
+        return String::new();
+    }
+
+    format!(
+        "{{ config, pkgs, ... }}:\n         {{\n           # ── System Configuration (NixForHumanity) ──\n{sys_config}           # Audio (PipeWire)\n           services.pulseaudio.enable = false;\n           security.rtkit.enable = true;\n           services.pipewire = {{ enable = true; alsa.enable = true; pulse.enable = true; }};\n         \n           # Nix settings\n           nix.settings.experimental-features = [ \"nix-command\" \"flakes\" ];\n           nix.gc = {{ automatic = true; dates = \"weekly\"; options = \"--delete-older-than 30d\"; }};\n         }}\n",
+        sys_config = sys_config,
+    )
 }
+
+
 
 /// Generate boot mode detection + partitioning commands.
 /// Returns a shell snippet that sets BOOT_MODE=efi|bios and creates boot partition accordingly.
@@ -1454,7 +1466,7 @@ mount "{boot}" /mnt/boot
 /// Generate a shell snippet that patches configuration.nix with system config (DE, GPU, locale).
 /// Appended after the configuration.nix heredoc in each layout.
 fn system_config_patch(msg: &ClientMessage, transaction_dir: &str) -> String {
-    if generate_system_config(msg).trim().is_empty() {
+    if generate_system_config_module(msg).is_empty() {
         return String::new();
     }
 
@@ -1470,6 +1482,7 @@ sed -i 's|imports = [|imports = [ ./system-config.nix|' /mnt/etc/nixos/configura
         staged = staged,
     )
 }
+
 
 /// Generate the automated install script based on layout type.
 /// Build the shell commands that write configuration.nix (and optionally flake.nix)
@@ -6304,6 +6317,22 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
+
+                if let Err(error) = std::fs::set_permissions(
+                    &config_staging_dir,
+                    std::fs::Permissions::from_mode(0o700),
+                ) {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Unable to secure transaction config staging namespace: {error}"
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
+                    continue;
+                }
                 // Stage browser-supplied configuration through one private, synchronized
                 // descriptor. Failure is fatal rather than being swallowed by an ignored chmod/write.
                 if !client_msg.configuration_nix.is_empty() {
@@ -6344,17 +6373,12 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
 
                 // Stage the server-generated system module before the install plan is
                 // assembled. This keeps client-derived Nix source out of shell text.
-                if client_msg.configuration_nix.is_empty()
-                    && !generate_system_config(&client_msg).trim().is_empty()
-                {
+                let system_config_module = generate_system_config_module(&client_msg);
+                if client_msg.configuration_nix.is_empty() && !system_config_module.is_empty() {
                     let system_config_path =
                         format!("{config_staging_dir}/system-config.nix");
-                    let system_config = format!(
-                        "{{ config, pkgs, ... }}:\n{{\n  # ── System Configuration (NixForHumanity) ──\n{}  # Audio (PipeWire)\n  services.pulseaudio.enable = false;\n  security.rtkit.enable = true;\n  services.pipewire = {{ enable = true; alsa.enable = true; pulse.enable = true; }};\n\n  # Nix settings\n  nix.settings.experimental-features = [ \"nix-command\" \"flakes\" ];\n  nix.gc = {{ automatic = true; dates = \"weekly\"; options = \"--delete-older-than 30d\"; }};\n}}\n",
-                        format!("{}\n", generate_system_config(&client_msg))
-                    );
                     if let Err(error) =
-                        write_private_file(&system_config_path, system_config.as_bytes(), 0o600)
+                        write_private_file(&system_config_path, system_config_module.as_bytes(), 0o600)
                     {
                         let _ = ws_tx
                             .send(Message::Text(
@@ -12907,6 +12931,10 @@ mod tests {
         message.timezone = "Europe/Berlin".into();
         message.keyboard = "de".into();
         message.desktop = "gnome".into();
+        let module = generate_system_config_module(&message);
+        assert!(module.contains("Europe/Berlin"));
+        assert!(module.contains("services.xserver.desktopManager.gnome.enable"));
+
         let patch = system_config_patch(
             &message,
             "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef",
