@@ -5944,6 +5944,7 @@ mod tests {
         .unwrap();
         let dependence = qualification.relational_loss_dependence(3, 2).unwrap();
         let receipt = ForecastInferenceSelectionReceipt::from_rolling(
+            &samples,
             &plan,
             &qualification,
             &dependence,
@@ -5954,6 +5955,7 @@ mod tests {
         assert_eq!(receipt.plan_blake3, plan.plan_blake3);
         assert_eq!(receipt.decision_path_id, "nested-fixed-horizon-bootstrap");
         assert_eq!(receipt.binding_blake3, ForecastInferenceBinding::from_rolling(
+            &samples,
             &plan,
             &qualification,
             &dependence,
@@ -6003,6 +6005,7 @@ mod tests {
         alternate_plan.plan_blake3 = inference_plan_digest(&alternate_plan);
         alternate_plan.validate().unwrap();
         let stopped = ForecastInferenceSelectionReceipt::from_rolling(
+            &samples,
             &alternate_plan,
             &qualification,
             &dependence,
@@ -6050,6 +6053,7 @@ mod tests {
         .unwrap();
         let dependence = qualification.relational_loss_dependence(8).unwrap();
         let receipt = ForecastInferenceSelectionReceipt::from_single(
+            &samples,
             &plan,
             &qualification,
             &dependence,
