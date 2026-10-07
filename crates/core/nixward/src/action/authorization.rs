@@ -483,7 +483,7 @@ impl NixLocalExecutionAuthorityV1 {
     /// read-only observer boundary. When an intent already carries a service-effect
     /// context, this constructor additionally requires the sealed capture to match
     /// both its source-identity and content commitments.
-    pub(crate) fn from_consumed_local_approval_with_definition_capture(
+    pub fn from_consumed_local_approval_with_definition_capture(
         intent: NixActionIntentV1,
         approval: ConsumedLocalApprovalDecisionV1,
         content: &NixVerifiedServiceDefinitionContentV1,
