@@ -822,6 +822,7 @@ impl CognitiveLoopService {
                 episodic_memory: EpisodicMemoryBridge::default(),
                 goal_system: GoalSystemBridge::new(),
                 world_model: WorldModelBridge::default(),
+                viability_fabric: super::viability_fabric::ViabilityFabric::new(1024),
                 agent: ActiveInferenceAgent::new(ActiveInferenceAgentConfig {
                     state_dim: 8,
                     obs_dim: 4,
