@@ -1179,6 +1179,13 @@ impl NixPostStateReceiptV1 {
             }
             None => put_u8(&mut h, 0),
         }
+        match self.systemd_job_type_observed {
+            Some(job_type) => {
+                put_u8(&mut h, 1);
+                put_u8(&mut h, job_type.discriminant());
+            }
+            None => put_u8(&mut h, 0),
+        }
         put_opt_str(&mut h, self.systemd_job_unit.as_deref());
         put_opt_str(&mut h, self.systemd_job_object_path.as_deref());
         put_opt_str(&mut h, self.systemd_job_result.as_deref());
