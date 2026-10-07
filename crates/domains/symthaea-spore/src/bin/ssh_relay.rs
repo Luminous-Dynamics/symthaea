@@ -93,8 +93,39 @@ async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
 /// Execute one privileged program with typed argv, without introducing a
 /// shell parsing boundary. Consequential mutation paths should prefer this
 /// helper whenever their operation can be represented by one executable.
+fn trusted_typed_executable(
+    program: &str,
+) -> Result<std::borrow::Cow<'_, str>, std::io::Error> {
+    const SYSTEM_BIN: &str = "/run/current-system/sw/bin/";
+
+    let basename = match program {
+        "btrfs" | "gzip" | "lsblk" | "nix" | "nix-collect-garbage" | "nix-env"
+        | "nix-instantiate" | "nixos-rebuild" | "nixos-version" | "nmcli" | "systemctl"
+        | "tar" | "uname" | "zstd" => Some(program),
+        _ => None,
+    };
+
+    if let Some(name) = basename {
+        return Ok(std::borrow::Cow::Owned(format!("{SYSTEM_BIN}{name}")));
+    }
+
+    if std::path::Path::new(program)
+        .strip_prefix("/nix/var/nix/profiles/system/bin/")
+        .ok()
+        .is_some_and(|name| name == std::path::Path::new("switch-to-configuration"))
+    {
+        return Ok(std::borrow::Cow::Borrowed(program));
+    }
+
+    Err(std::io::Error::new(
+        std::io::ErrorKind::PermissionDenied,
+        format!("typed privileged executor rejected untrusted program {program:?}"),
+    ))
+}
+
 async fn run_privileged_args(program: &str, args: &[&str]) -> Result<CmdResult, std::io::Error> {
-    let mut command = privileged_process(program);
+    let executable = trusted_typed_executable(program)?;
+    let mut command = privileged_process(executable.as_ref());
     command.args(args);
     let output = command.output().await?;
     Ok(CmdResult {
@@ -10240,6 +10271,30 @@ mod tests {
         assert!(
             !process_id_is_alive(pid, start_time.wrapping_add(1)),
             "same PID with a different process start time must be treated as non-identical"
+        );
+    }
+
+    #[test]
+    fn typed_executor_accepts_only_trusted_program_identities() {
+        assert_eq!(
+            trusted_typed_executable("nix-env").unwrap().as_ref(),
+            "/run/current-system/sw/bin/nix-env"
+        );
+        assert_eq!(
+            trusted_typed_executable(
+                "/nix/var/nix/profiles/system/bin/switch-to-configuration"
+            )
+            .unwrap()
+            .as_ref(),
+            "/nix/var/nix/profiles/system/bin/switch-to-configuration"
+        );
+        assert!(trusted_typed_executable("sh").is_err());
+        assert!(trusted_typed_executable("/tmp/attacker").is_err());
+        assert!(
+            trusted_typed_executable(
+                "/nix/var/nix/profiles/system/bin/switch-to-configuration-helper"
+            )
+            .is_err()
         );
     }
 
