@@ -876,6 +876,55 @@ fn main() -> Result<(), String> {
         .collect::<Result<_, _>>()?;
     let computation_byte_refs: Vec<&[u8]> =
         computation_bytes.iter().map(Vec::as_slice).collect();
+    let statistical_design = NeurosemanticRemediationStatisticalDesignArtifact {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_STATISTICAL_DESIGN_SCHEMA_VERSION,
+        design_ref: "synthetic-statistical-design-v1".into(),
+        metric_ref: metric_forgetfulness.metric_ref.clone(),
+        metric_definition_hash: metric_forgetfulness.fingerprint()?,
+        observation_set_hash: observation_sets[0]
+            .fingerprint(&metric_forgetfulness.aggregation_ref)
+            .unwrap(),
+        inference_scope:
+            symthaea_communication::NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation,
+        sampling_design:
+            symthaea_communication::NeurosemanticRemediationStatisticalSamplingDesign::ProbabilitySample,
+        dependence_model:
+            symthaea_communication::NeurosemanticRemediationStatisticalDependenceModel::IndependentObservationUnits,
+        analysis_unit_ref: "subject-artifact".into(),
+        outcome_model_ref: "binary-failure-indicator-v1".into(),
+        study_protocol_hash: study_protocol_hash.clone(),
+        assumptions_hash: symthaea_communication::content_hash(
+            b"independent Bernoulli trials; fixed binary outcome; no clustering correction declared",
+        ),
+        execution_revision: execution_revision.clone(),
+    };
+    let statistical_design_bytes =
+        serde_json::to_vec(&statistical_design).map_err(|e| e.to_string())?;
+    let statistical_design_byte_refs: Vec<&[u8]> =
+        vec![statistical_design_bytes.as_slice()];
+
+    let alternate_clustered_statistical_design = {
+        let mut candidate = statistical_design.clone();
+        candidate.design_ref = "synthetic-clustered-statistical-design-v1".into();
+        candidate.dependence_model =
+            symthaea_communication::NeurosemanticRemediationStatisticalDependenceModel::Clustered;
+        candidate
+    };
+    let alternate_clustered_statistical_design_bytes =
+        serde_json::to_vec(&alternate_clustered_statistical_design)
+            .map_err(|e| e.to_string())?;
+
+    let alternate_nonprobability_statistical_design = {
+        let mut candidate = statistical_design.clone();
+        candidate.design_ref = "synthetic-nonprobability-statistical-design-v1".into();
+        candidate.sampling_design =
+            symthaea_communication::NeurosemanticRemediationStatisticalSamplingDesign::NonProbabilitySample;
+        candidate
+    };
+    let alternate_nonprobability_statistical_design_bytes =
+        serde_json::to_vec(&alternate_nonprobability_statistical_design)
+            .map_err(|e| e.to_string())?;
+
     let uncertainty_computation = NeurosemanticRemediationUncertaintyComputationArtifact {
         schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_UNCERTAINTY_COMPUTATION_SCHEMA_VERSION,
         uncertainty_ref: "synthetic-uncertainty-computation-v1".into(),
@@ -892,6 +941,7 @@ fn main() -> Result<(), String> {
         confidence_level_bps: 9_500,
         inference_scope:
             symthaea_communication::NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation,
+        statistical_design_hash: statistical_design.fingerprint()?,
         method_ref: "wilson-score-95-v1".into(),
         assumptions_hash: symthaea_communication::content_hash(
             b"independent Bernoulli trials; fixed binary outcome; no clustering correction declared",
@@ -1088,6 +1138,7 @@ fn main() -> Result<(), String> {
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
                 &uncertainty_assumption_byte_refs,
+                &statistical_design_byte_refs,
             )
             .is_ok();
     let remediation_wilson_uncertainty_numerically_recomputed =
@@ -1106,6 +1157,7 @@ fn main() -> Result<(), String> {
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
                 &uncertainty_assumption_byte_refs,
+                &statistical_design_byte_refs,
             )
             .is_err()
     };
@@ -1124,6 +1176,7 @@ fn main() -> Result<(), String> {
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
                 &uncertainty_assumption_byte_refs,
+                &statistical_design_byte_refs,
             )
             .is_err()
     };
@@ -1142,6 +1195,7 @@ fn main() -> Result<(), String> {
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
                 &uncertainty_assumption_byte_refs,
+                &statistical_design_byte_refs,
             )
             .is_err()
     };
@@ -1160,6 +1214,7 @@ fn main() -> Result<(), String> {
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
                 &uncertainty_assumption_byte_refs,
+                &statistical_design_byte_refs,
             )
             .is_err()
     };
@@ -1178,6 +1233,7 @@ fn main() -> Result<(), String> {
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
                 &uncertainty_assumption_byte_refs,
+                &statistical_design_byte_refs,
             )
             .is_err()
     };
@@ -1197,6 +1253,7 @@ fn main() -> Result<(), String> {
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
                 &uncertainty_assumption_byte_refs,
+                &statistical_design_byte_refs,
             )
             .is_err()
     };
@@ -1215,6 +1272,7 @@ fn main() -> Result<(), String> {
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
                 &uncertainty_assumption_byte_refs,
+                &statistical_design_byte_refs,
             )
             .is_err()
     };
@@ -1233,6 +1291,7 @@ fn main() -> Result<(), String> {
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
                 &uncertainty_assumption_byte_refs,
+                &statistical_design_byte_refs,
             )
             .is_err()
     };
@@ -1254,6 +1313,7 @@ fn main() -> Result<(), String> {
                 &population_manifest_byte_refs,
                 &[bytes.as_slice()],
                 &uncertainty_assumption_byte_refs,
+                &statistical_design_byte_refs,
             )
             .is_err()
     };
@@ -1292,6 +1352,7 @@ fn main() -> Result<(), String> {
                 &population_manifest_byte_refs,
                 &[uncertainty_bytes.as_slice()],
                 &uncertainty_assumption_byte_refs,
+                &statistical_design_byte_refs,
             )
             .is_err()
     };
@@ -1308,9 +1369,116 @@ fn main() -> Result<(), String> {
                 &population_manifest_byte_refs,
                 &[bytes.as_slice()],
                 &uncertainty_assumption_byte_refs,
+                &statistical_design_byte_refs,
             )
             .is_err()
     };
+    let remediation_uncertainty_statistical_design_substitution_blocked = {
+        let mut forged_uncertainty = uncertainty_computation.clone();
+        let alternate_design = alternate_nonprobability_statistical_design.clone();
+        alternate_design.design_ref = "synthetic-nonprobability-statistical-design-v2".into();
+        let alternate_design_bytes =
+            serde_json::to_vec(&alternate_design).map_err(|e| e.to_string())?;
+        forged_uncertainty.statistical_design_hash = alternate_design.fingerprint()?;
+        let forged_uncertainty_bytes =
+            serde_json::to_vec(&forged_uncertainty).map_err(|e| e.to_string())?;
+        let mut forged_measurement = measurement.clone();
+        forged_measurement.measurements[0].uncertainty =
+            NeurosemanticRemediationUncertainty::Interval {
+                lower_numerator: 0,
+                upper_numerator: 6_577,
+                scale: 4,
+                confidence_level_bps: 9_500,
+                uncertainty_method_ref: "wilson-score-95-v1".into(),
+                uncertainty_computation_artifact_hash:
+                    symthaea_communication::content_hash(&forged_uncertainty_bytes),
+            };
+        let forged_measurement_bytes =
+            serde_json::to_vec(&forged_measurement).map_err(|e| e.to_string())?;
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &forged_measurement_bytes,
+                &computation_byte_refs,
+                &observation_set_byte_refs,
+                &population_manifest_byte_refs,
+                &[forged_uncertainty_bytes.as_slice()],
+                &uncertainty_assumption_byte_refs,
+                &[alternate_design_bytes.as_slice()],
+            )
+            .is_err()
+    };
+
+    let remediation_uncertainty_design_observation_substitution_blocked = {
+        let mut forged_uncertainty = uncertainty_computation.clone();
+        let mut alternate_design = statistical_design.clone();
+        alternate_design.design_ref = "synthetic-observation-mismatch-design-v1".into();
+        alternate_design.observation_set_hash =
+            symthaea_communication::content_hash(b"other-observation-set");
+        let alternate_design_bytes =
+            serde_json::to_vec(&alternate_design).map_err(|e| e.to_string())?;
+        forged_uncertainty.statistical_design_hash = alternate_design.fingerprint()?;
+        let forged_uncertainty_bytes =
+            serde_json::to_vec(&forged_uncertainty).map_err(|e| e.to_string())?;
+        let mut forged_measurement = measurement.clone();
+        forged_measurement.measurements[0].uncertainty =
+            NeurosemanticRemediationUncertainty::Interval {
+                lower_numerator: 0,
+                upper_numerator: 6_577,
+                scale: 4,
+                confidence_level_bps: 9_500,
+                uncertainty_method_ref: "wilson-score-95-v1".into(),
+                uncertainty_computation_artifact_hash:
+                    symthaea_communication::content_hash(&forged_uncertainty_bytes),
+            };
+        let forged_measurement_bytes =
+            serde_json::to_vec(&forged_measurement).map_err(|e| e.to_string())?;
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &forged_measurement_bytes,
+                &computation_byte_refs,
+                &observation_set_byte_refs,
+                &population_manifest_byte_refs,
+                &[forged_uncertainty_bytes.as_slice()],
+                &uncertainty_assumption_byte_refs,
+                &[alternate_design_bytes.as_slice()],
+            )
+            .is_err()
+    };
+
+    let remediation_uncertainty_dependence_substitution_blocked = {
+        let mut forged_uncertainty = uncertainty_computation.clone();
+        forged_uncertainty.statistical_design_hash =
+            alternate_clustered_statistical_design.fingerprint()?;
+        let forged_uncertainty_bytes =
+            serde_json::to_vec(&forged_uncertainty).map_err(|e| e.to_string())?;
+        let design_bytes =
+            serde_json::to_vec(&alternate_clustered_statistical_design).map_err(|e| e.to_string())?;
+        let mut forged_measurement = measurement.clone();
+        forged_measurement.measurements[0].uncertainty =
+            NeurosemanticRemediationUncertainty::Interval {
+                lower_numerator: 0,
+                upper_numerator: 6_577,
+                scale: 4,
+                confidence_level_bps: 9_500,
+                uncertainty_method_ref: "wilson-score-95-v1".into(),
+                uncertainty_computation_artifact_hash:
+                    symthaea_communication::content_hash(&forged_uncertainty_bytes),
+            };
+        let forged_measurement_bytes =
+            serde_json::to_vec(&forged_measurement).map_err(|e| e.to_string())?;
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &forged_measurement_bytes,
+                &computation_byte_refs,
+                &observation_set_byte_refs,
+                &population_manifest_byte_refs,
+                &[forged_uncertainty_bytes.as_slice()],
+                &uncertainty_assumption_byte_refs,
+                &[design_bytes.as_slice()],
+            )
+            .is_err()
+    };
+
     let remediation_uncertainty_point_estimate_binding_blocked = {
         let mut forged = uncertainty_computation.clone();
         forged.point_estimate_numerator = 1;
@@ -1323,6 +1491,7 @@ fn main() -> Result<(), String> {
                 &population_manifest_byte_refs,
                 &[bytes.as_slice()],
                 &uncertainty_assumption_byte_refs,
+                &statistical_design_byte_refs,
             )
             .is_err()
     };
@@ -1357,6 +1526,7 @@ fn main() -> Result<(), String> {
                 &populations,
                 &uncertainty_computation_byte_refs,
                 &uncertainty_assumption_byte_refs,
+                &statistical_design_byte_refs,
             )
             .is_err()
     };
@@ -1378,6 +1548,7 @@ fn main() -> Result<(), String> {
                 &population_manifest_byte_refs,
                 &[bytes.as_slice()],
                 &uncertainty_assumption_byte_refs,
+                &statistical_design_byte_refs,
             )
             .is_err()
     };
@@ -1393,6 +1564,7 @@ fn main() -> Result<(), String> {
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
                 &uncertainty_assumption_byte_refs,
+                &statistical_design_byte_refs,
             )
             .is_err()
     };
@@ -2066,6 +2238,9 @@ fn main() -> Result<(), String> {
         "remediation_computation_substitution_blocked": remediation_computation_substitution_blocked,
         "remediation_canonical_population_identity_substitution_blocked": remediation_canonical_population_identity_substitution_blocked,
         "remediation_uncertainty_method_substitution_blocked": remediation_uncertainty_method_substitution_blocked,
+        "remediation_uncertainty_statistical_design_substitution_blocked": remediation_uncertainty_statistical_design_substitution_blocked,
+        "remediation_uncertainty_design_observation_substitution_blocked": remediation_uncertainty_design_observation_substitution_blocked,
+        "remediation_uncertainty_dependence_substitution_blocked": remediation_uncertainty_dependence_substitution_blocked,
         "remediation_uncertainty_target_mismatch_blocked": remediation_uncertainty_target_mismatch_blocked,
         "remediation_measurement_schema_v2_rejected": remediation_measurement_schema_v2_rejected,
         "remediation_uncertainty_substitution_blocked": remediation_uncertainty_substitution_blocked,
