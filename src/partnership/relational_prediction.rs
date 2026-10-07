@@ -1362,7 +1362,7 @@ impl Default for RollingOriginRelationalPredictionConfig {
     }
 }
 
-const INFERENCE_PLAN_SCHEMA: &str = "relational-prediction-inference-plan/v1";
+const INFERENCE_PLAN_SCHEMA: &str = "relational-prediction-inference-plan/v2";
 const INFERENCE_BINDING_SCHEMA: &str = "relational-prediction-inference-binding/v1";
 
 /// Frozen analysis contract for future inferential qualification.
@@ -1375,6 +1375,10 @@ pub struct ForecastInferencePlan {
     pub loss: String,
     pub forecast_horizon: f64,
     pub origin_schedule_sha256: String,
+    /// Predeclared decision rule that maps design/dependence conditions to the inferential method.
+    pub method_selection_rule_id: String,
+    /// Cryptographic commitment to the exact decision-tree/specification used for method selection.
+    pub method_selection_rule_spec_sha256: String,
     pub procedure_id: String,
     pub procedure_spec_sha256: String,
     pub dependence_method_id: String,
@@ -1393,6 +1397,8 @@ impl ForecastInferencePlan {
     pub fn new(
         forecast_horizon: f64,
         origin_schedule_sha256: impl Into<String>,
+        method_selection_rule_id: impl Into<String>,
+        method_selection_rule_spec_sha256: impl Into<String>,
         procedure_id: impl Into<String>,
         procedure_spec_sha256: impl Into<String>,
         dependence_method_id: impl Into<String>,
@@ -1410,6 +1416,8 @@ impl ForecastInferencePlan {
             loss: "squared_error".to_string(),
             forecast_horizon,
             origin_schedule_sha256: origin_schedule_sha256.into(),
+            method_selection_rule_id: method_selection_rule_id.into(),
+            method_selection_rule_spec_sha256: method_selection_rule_spec_sha256.into(),
             procedure_id: procedure_id.into(),
             procedure_spec_sha256: procedure_spec_sha256.into(),
             dependence_method_id: dependence_method_id.into(),
@@ -1434,6 +1442,8 @@ impl ForecastInferencePlan {
             || !self.forecast_horizon.is_finite()
             || self.forecast_horizon <= 0.0
             || !is_hex_digest(&self.origin_schedule_sha256, 64)
+            || self.method_selection_rule_id.trim().is_empty()
+            || !is_hex_digest(&self.method_selection_rule_spec_sha256, 64)
             || self.procedure_id.trim().is_empty()
             || !is_hex_digest(&self.procedure_spec_sha256, 64)
             || self.dependence_method_id.trim().is_empty()
@@ -1476,6 +1486,8 @@ impl ForecastInferencePlan {
             "loss": &self.loss,
             "forecast_horizon": self.forecast_horizon,
             "origin_schedule_sha256": &self.origin_schedule_sha256,
+            "method_selection_rule_id": &self.method_selection_rule_id,
+            "method_selection_rule_spec_sha256": &self.method_selection_rule_spec_sha256,
             "procedure_id": &self.procedure_id,
             "procedure_spec_sha256": &self.procedure_spec_sha256,
             "dependence_method_id": &self.dependence_method_id,
@@ -4046,6 +4058,8 @@ fn inference_plan_digest(plan: &ForecastInferencePlan) -> String {
     update_string(&mut hasher, &plan.loss);
     update_f64(&mut hasher, plan.forecast_horizon);
     update_string(&mut hasher, &plan.origin_schedule_sha256);
+    update_string(&mut hasher, &plan.method_selection_rule_id);
+    update_string(&mut hasher, &plan.method_selection_rule_spec_sha256);
     update_string(&mut hasher, &plan.procedure_id);
     update_string(&mut hasher, &plan.procedure_spec_sha256);
     update_string(&mut hasher, &plan.dependence_method_id);
@@ -5233,7 +5247,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn single_inference_binding_derives_and_enforces_schedule() {
         let samples = build_samples(0.5);
         let config = config();
@@ -5249,6 +5262,8 @@ mod tests {
         let plan = ForecastInferencePlan::new(
             0.5,
             schedule,
+            "relational-inference-selection-rule-v1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "nested-forecast-bootstrap-v1",
             "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
             "loss-dependence-bartlett-v1",
@@ -5279,6 +5294,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn inference_binding_binds_plan_qualification_loss_vector_and_dependence() {
         let samples = build_samples(0.5);
         let config = RollingOriginRelationalPredictionConfig {
@@ -5306,6 +5322,8 @@ mod tests {
         let plan = ForecastInferencePlan::new(
             config.forecast_horizon,
             rolling_origin_schedule_sha256(config).unwrap(),
+            "relational-inference-selection-rule-v1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "nested-forecast-bootstrap-v1",
             "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
             "loss-dependence-bartlett-v1",
@@ -5379,6 +5397,8 @@ mod tests {
         let alternate_plan = ForecastInferencePlan::new(
             config.forecast_horizon,
             plan.origin_schedule_sha256.clone(),
+            "relational-inference-selection-rule-v1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "different-nested-procedure-v1",
             plan.procedure_spec_sha256.clone(),
             plan.dependence_method_id.clone(),
@@ -5404,6 +5424,8 @@ mod tests {
         let plan = ForecastInferencePlan::new(
             0.5,
             identity_a,
+            "relational-inference-selection-rule-v1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "nested-forecast-bootstrap-v1",
             identity_b,
             "loss-dependence-bartlett-v1",
@@ -5426,6 +5448,21 @@ mod tests {
         tampered.procedure_id = "different-procedure".to_string();
         assert_eq!(
             tampered.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut rule_tampered = plan.clone();
+        rule_tampered.method_selection_rule_id = "different-selection-rule".to_string();
+        assert_eq!(
+            rule_tampered.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut rule_spec_tampered = plan.clone();
+        rule_spec_tampered.method_selection_rule_spec_sha256 =
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string();
+        assert_eq!(
+            rule_spec_tampered.validate(),
             Err(RelationalPredictionError::InvalidEvidenceInputDigest)
         );
     }
