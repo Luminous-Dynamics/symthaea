@@ -1085,6 +1085,32 @@ impl HeldOutRelationalPredictionEvidence {
         Ok(profile)
     }
 
+    /// Return the retained target-level loss differentials without recomputing
+    /// them from summary scores.
+    pub fn relational_loss_differentials(
+        &self,
+    ) -> Result<Vec<RelationalForecastLossDifferential>, RelationalPredictionError> {
+        self.validate()?;
+        Ok(self.relational_loss_differentials.clone())
+    }
+
+    pub fn relational_loss_dependence(
+        &self,
+        max_lag: usize,
+    ) -> Result<ForecastLossDependenceProfile, RelationalPredictionError> {
+        self.validate()?;
+        let mut profile = ForecastLossDependenceProfile::compute(
+            &self
+                .relational_loss_differentials
+                .iter()
+                .map(|item| item.loss_differential)
+                .collect::<Vec<_>>(),
+            max_lag,
+        )?;
+        profile.evaluation_input_blake3 = Some(self.evaluation_input_blake3.clone());
+        Ok(profile)
+    }
+
     pub fn verify_against_samples(
         &self,
         samples: &[RelationalPredictionSample],
@@ -1737,6 +1763,12 @@ pub struct RollingOriginRelationalPredictionQualification {
     pub evaluation_input_blake3: String,
     /// Commitment over input identity, configuration, surrogate count, and provenance.
     pub qualification_identity_blake3: String,
+    /// Complete target-level loss differential vector for every retained rolling
+    /// origin, in origin-major/sample-major order.
+    pub relational_loss_differentials: Vec<RelationalForecastLossDifferential>,
+    /// Commitment over the retained loss differential vector and the parent
+    /// rolling evaluator identity.
+    pub relational_loss_differentials_blake3: String,
     /// Exact source-sample start index for each rolling origin.
     pub origin_starts: Vec<usize>,
     pub observed: RollingOriginRelationalPredictionSummary,
@@ -1789,6 +1821,49 @@ impl RollingOriginRelationalPredictionQualification {
         );
         if expected_identity != self.qualification_identity_blake3 {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        let expected_differential_count = self
+            .config
+            .origin_count
+            .checked_mul(self.config.test_samples)
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+        if self.relational_loss_differentials.len() != expected_differential_count {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        validate_loss_differentials(
+            &self.relational_loss_differentials,
+            self.config.origin_count,
+            self.config.test_samples,
+        )?;
+        let expected_loss_digest = loss_differentials_digest(
+            &self.evaluation_input_blake3,
+            &self.relational_loss_differentials,
+        );
+        if expected_loss_digest != self.relational_loss_differentials_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        for origin_index in 0..self.config.origin_count {
+            let start = origin_index * self.config.test_samples;
+            let end = start + self.config.test_samples;
+            let differential_mean = self.relational_loss_differentials[start..end]
+                .iter()
+                .map(|item| item.loss_differential)
+                .sum::<f64>()
+                / self.config.test_samples as f64;
+            let expected_differential_mean =
+                self.observed.segments[origin_index]
+                    .non_relational_context
+                    .mean_squared_error
+                    - self.observed.segments[origin_index]
+                        .relational_augmented
+                        .mean_squared_error;
+            if (differential_mean - expected_differential_mean).abs()
+                > 1e-12 * expected_differential_mean.abs().max(1.0)
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
         }
 
         let held_out_config = HeldOutRelationalPredictionConfig {
@@ -1902,7 +1977,17 @@ impl RollingOriginRelationalPredictionQualification {
             return Err(RelationalPredictionError::InvalidSurrogateCount);
         }
 
-        let observed = RollingOriginRelationalPredictionSummary::compute(samples, config)?;
+        let observed_evidence = RollingOriginRelationalPredictionSummary::compute_evidence(
+            samples,
+            config,
+            provenance.clone(),
+        )?;
+        let observed = observed_evidence.observed.clone();
+        let relational_loss_differentials =
+            observed_evidence.relational_loss_differentials()?;
+        let evaluation_input_blake3 = rolling_evaluation_input_digest(samples, config);
+        let relational_loss_differentials_blake3 =
+            loss_differentials_digest(&evaluation_input_blake3, &relational_loss_differentials);
         let segment_total = config
             .train_samples
             .checked_add(config.gap_samples)
@@ -1960,8 +2045,6 @@ impl RollingOriginRelationalPredictionQualification {
             )?);
         }
 
-        let evaluation_input_blake3 = rolling_evaluation_input_digest(samples, config);
-
         // The per-origin null traces are computed from local held-out slices,
         // so their replay commitments remain origin-local. Bind a separate
         // parent qualification commitment onto every retained child trace so
@@ -1990,6 +2073,8 @@ impl RollingOriginRelationalPredictionQualification {
             surrogate_count,
             evaluation_input_blake3,
             qualification_identity_blake3,
+            relational_loss_differentials,
+            relational_loss_differentials_blake3,
             origin_starts: (0..config.origin_count)
                 .map(|origin| {
                     config
@@ -2435,6 +2520,12 @@ pub struct HeldOutRelationalPredictionQualification {
     pub evaluation_input_blake3: String,
     /// Commitment over input identity, configuration, surrogate count, and provenance.
     pub qualification_identity_blake3: String,
+    /// Complete target-level loss differential vector for the critical nested
+    /// comparison, retained directly in the qualification artifact.
+    pub relational_loss_differentials: Vec<RelationalForecastLossDifferential>,
+    /// Commitment over the retained loss differential vector and the parent
+    /// evaluator identity.
+    pub relational_loss_differentials_blake3: String,
     pub observed: HeldOutRelationalPredictionSummary,
     pub circular_shift_null: PredictionNullSummary,
     pub feature_decoupling_null: PredictionNullSummary,
@@ -2515,6 +2606,29 @@ impl HeldOutRelationalPredictionQualification {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
         }
 
+        validate_loss_differentials(&self.relational_loss_differentials, 1, self.config.test_samples)?;
+        let expected_loss_digest = loss_differentials_digest(
+            &self.evaluation_input_blake3,
+            &self.relational_loss_differentials,
+        );
+        if expected_loss_digest != self.relational_loss_differentials_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        let differential_mean = self
+            .relational_loss_differentials
+            .iter()
+            .map(|item| item.loss_differential)
+            .sum::<f64>()
+            / self.config.test_samples as f64;
+        let expected_differential_mean =
+            self.observed.non_relational_context.mean_squared_error
+                - self.observed.relational_augmented.mean_squared_error;
+        if (differential_mean - expected_differential_mean).abs()
+            > 1e-12 * expected_differential_mean.abs().max(1.0)
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
         let expected_mse = self.observed.relational_augmented.mean_squared_error;
         let nulls = [
             (
@@ -2589,7 +2703,18 @@ impl HeldOutRelationalPredictionQualification {
         surrogate_count: usize,
         provenance: RelationalPredictionProvenance,
     ) -> Result<Self, RelationalPredictionError> {
-        let observed = HeldOutRelationalPredictionSummary::compute(samples, config)?;
+        let observed_evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            samples,
+            config,
+            provenance.clone(),
+        )?;
+        let observed = observed_evidence.summary.clone();
+        let relational_loss_differentials =
+            observed_evidence.relational_loss_differentials()?;
+        let evaluation_input_blake3 = evaluation_input_digest(samples, config);
+        let relational_loss_differentials_blake3 =
+            loss_differentials_digest(&evaluation_input_blake3, &relational_loss_differentials);
+
         let circular_shift_null = PredictionNullSummary::compute_for_feature_set(
             samples,
             config,
@@ -2612,7 +2737,6 @@ impl HeldOutRelationalPredictionQualification {
             surrogate_count,
         )?;
 
-        let evaluation_input_blake3 = evaluation_input_digest(samples, config);
         let qualification_identity_blake3 = single_qualification_identity_digest(
             &evaluation_input_blake3,
             &provenance,
@@ -2626,6 +2750,8 @@ impl HeldOutRelationalPredictionQualification {
             surrogate_count,
             evaluation_input_blake3,
             qualification_identity_blake3,
+            relational_loss_differentials,
+            relational_loss_differentials_blake3,
             observed,
             circular_shift_null,
             feature_decoupling_null,
@@ -3211,6 +3337,84 @@ fn rolling_qualification_identity_digest(
     update_f64(&mut hasher, config.ridge_lambda);
     update_usize(&mut hasher, surrogate_count);
     hasher.finalize().to_hex().to_string()
+}
+
+fn loss_differentials_digest(
+    parent_input_digest: &str,
+    differentials: &[RelationalForecastLossDifferential],
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-loss-differentials/v1");
+    update_string(&mut hasher, parent_input_digest);
+    update_usize(&mut hasher, differentials.len());
+    for differential in differentials {
+        update_usize(&mut hasher, differential.origin_index);
+        update_usize(&mut hasher, differential.sample_index);
+        update_f64(&mut hasher, differential.feature_time);
+        update_f64(&mut hasher, differential.outcome_time);
+        update_f64(&mut hasher, differential.observed_outcome);
+        update_f64(&mut hasher, differential.non_relational_squared_error);
+        update_f64(&mut hasher, differential.relational_squared_error);
+        update_f64(&mut hasher, differential.loss_differential);
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
+fn validate_loss_differentials(
+    differentials: &[RelationalForecastLossDifferential],
+    origin_count: usize,
+    test_samples: usize,
+) -> Result<(), RelationalPredictionError> {
+    if origin_count == 0 || test_samples < 4 {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    let expected = origin_count
+        .checked_mul(test_samples)
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+    if differentials.len() != expected {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    for (index, differential) in differentials.iter().enumerate() {
+        let expected_origin = index / test_samples;
+        let expected_sample = index % test_samples;
+        if differential.origin_index != expected_origin
+            || differential.sample_index != expected_sample
+            || !differential.feature_time.is_finite()
+            || !differential.outcome_time.is_finite()
+            || !differential.observed_outcome.is_finite()
+            || !differential.non_relational_squared_error.is_finite()
+            || !differential.relational_squared_error.is_finite()
+            || !differential.loss_differential.is_finite()
+            || differential.non_relational_squared_error < 0.0
+            || differential.relational_squared_error < 0.0
+            || (differential.loss_differential
+                - (differential.non_relational_squared_error
+                    - differential.relational_squared_error))
+                .abs()
+                > 1e-12
+                    * differential.loss_differential.abs().max(1.0)
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+    }
+
+    for origin in 0..origin_count {
+        let start = origin * test_samples;
+        let slice = &differentials[start..start + test_samples];
+        for pair in slice.windows(2) {
+            if pair[1].feature_time <= pair[0].feature_time
+                || pair[1].outcome_time <= pair[0].outcome_time
+                || pair[0].outcome_time <= pair[0].feature_time
+                || pair[1].outcome_time <= pair[1].feature_time
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn update_samples_digest(
