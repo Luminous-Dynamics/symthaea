@@ -124,7 +124,85 @@ pub struct ReceiptSelectionDecision {
     pub candidates: Vec<ReceiptSelectionCandidate>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReceiptSelectionDecisionError {
+    EmptyCollection,
+    CandidateCountMismatch,
+    CandidateIndexMismatch,
+    PolicyMismatch,
+    CollectionDigestZero,
+    SelectionDigestZero,
+    SelectedCandidateMismatch,
+    RejectedAfterSelection,
+    UnselectedCandidateMarkedSelected,
+}
+
 impl ReceiptSelectionDecision {
+    /// Validate the decision's internal referential invariants before it crosses
+    /// into a durable evidence system.
+    pub fn validate(&self) -> Result<(), ReceiptSelectionDecisionError> {
+        if self.collection_len == 0 {
+            return Err(ReceiptSelectionDecisionError::EmptyCollection);
+        }
+        if self.candidates.len() != self.collection_len as usize {
+            return Err(ReceiptSelectionDecisionError::CandidateCountMismatch);
+        }
+        if self.policy_id != POLICY_ID || self.policy_version != POLICY_VERSION {
+            return Err(ReceiptSelectionDecisionError::PolicyMismatch);
+        }
+        if self.collection_sha256 == [0; 32] {
+            return Err(ReceiptSelectionDecisionError::CollectionDigestZero);
+        }
+
+        let mut selected_count = 0usize;
+        for (expected_index, candidate) in self.candidates.iter().enumerate() {
+            if candidate.index as usize != expected_index {
+                return Err(ReceiptSelectionDecisionError::CandidateIndexMismatch);
+            }
+            match candidate.status {
+                ReceiptSelectionCandidateStatus::Selected => {
+                    selected_count += 1;
+                    if Some(candidate.index) != self.selected_index
+                        || Some(candidate.receipt_sha256) != self.selected_receipt_sha256
+                    {
+                        return Err(ReceiptSelectionDecisionError::SelectedCandidateMismatch);
+                    }
+                }
+                ReceiptSelectionCandidateStatus::Rejected(_) => {
+                    if self.selected_index.is_some_and(|index| candidate.index > index) {
+                        return Err(ReceiptSelectionDecisionError::RejectedAfterSelection);
+                    }
+                }
+                ReceiptSelectionCandidateStatus::NotEvaluatedAfterSelection => {
+                    if self.selected_index.is_none()
+                        || candidate.index <= self.selected_index.unwrap()
+                    {
+                        return Err(ReceiptSelectionDecisionError::UnselectedCandidateMarkedSelected);
+                    }
+                }
+            }
+        }
+
+        match self.selected_index {
+            Some(index) => {
+                if index >= self.collection_len
+                    || selected_count != 1
+                    || self.selected_receipt_sha256.is_none()
+                    || self.selected_receipt_sha256 == Some([0; 32])
+                {
+                    return Err(ReceiptSelectionDecisionError::SelectedCandidateMismatch);
+                }
+            }
+            None => {
+                if selected_count != 0 || self.selected_receipt_sha256.is_some() {
+                    return Err(ReceiptSelectionDecisionError::SelectedCandidateMismatch);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(
             DOMAIN.len() + self.candidates.len() * 37 + 128,
@@ -391,7 +469,38 @@ mod tests {
     }
 
     #[test]
-    fn candidates_after_selection_are_not_reported_as_rejected() {
+    #[test]
+    fn decision_validation_accepts_evaluator_output() {
+        let collection = collection();
+        let decision = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
+        assert_eq!(decision.validate(), Ok(()));
+    }
+
+    #[test]
+    fn decision_validation_rejects_mismatched_selected_digest() {
+        let collection = collection();
+        let mut decision = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
+        decision.selected_receipt_sha256 = Some([0xAA; 32]);
+        assert_eq!(
+            decision.validate(),
+            Err(ReceiptSelectionDecisionError::SelectedCandidateMismatch)
+        );
+    }
+
+    #[test]
+    fn decision_validation_rejects_unjustified_short_circuit_tail() {
+        let collection = collection();
+        let mut decision = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
+        decision.candidates[1].status = ReceiptSelectionCandidateStatus::Rejected(
+            ReceiptSelectionRejection::NoMatchingProof,
+        );
+        assert_eq!(
+            decision.validate(),
+            Err(ReceiptSelectionDecisionError::RejectedAfterSelection)
+        );
+    }
+
+        fn candidates_after_selection_are_not_reported_as_rejected() {
         let collection = collection();
         let decision = evaluate_priority_first_valid(&collection, |_index, _| {
             Ok(())
