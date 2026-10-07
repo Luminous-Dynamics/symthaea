@@ -1436,9 +1436,10 @@ impl CandidatePathway {
                         evidence_scope: evidence.scope.clone(),
                     });
                 }
-                if let Some(evidence_unit) = &evidence.unit
-                    && evidence_unit != &performance.unit
-                {
+                let Some(evidence_unit) = &evidence.unit else {
+                    return Err(AssessmentError::MissingEvidenceUnit(evidence.id.clone()));
+                };
+                if evidence_unit != &performance.unit {
                     return Err(AssessmentError::PerformanceEvidenceUnitMismatch {
                         evidence_id: evidence.id.clone(),
                         performance_unit: performance.unit.clone(),
@@ -1468,9 +1469,10 @@ impl CandidatePathway {
                         evidence_scope: evidence.scope.clone(),
                     });
                 }
-                if let Some(evidence_unit) = &evidence.unit
-                    && evidence_unit != &capability.unit
-                {
+                let Some(evidence_unit) = &evidence.unit else {
+                    return Err(AssessmentError::MissingEvidenceUnit(evidence.id.clone()));
+                };
+                if evidence_unit != &capability.unit {
                     return Err(AssessmentError::PerformanceEvidenceUnitMismatch {
                         evidence_id: evidence.id.clone(),
                         performance_unit: capability.unit.clone(),
@@ -1507,9 +1509,10 @@ impl CandidatePathway {
                         evidence_scope: evidence.scope.clone(),
                     });
                 }
-                if let Some(evidence_unit) = &evidence.unit
-                    && evidence_unit != &estimate.unit
-                {
+                let Some(evidence_unit) = &evidence.unit else {
+                    return Err(AssessmentError::MissingEvidenceUnit(evidence.id.clone()));
+                };
+                if evidence_unit != &estimate.unit {
                     return Err(AssessmentError::EvidenceUnitMismatch {
                         evidence_id: evidence.id.clone(),
                         burden_unit: estimate.unit.clone(),
@@ -2820,6 +2823,8 @@ pub enum AssessmentError {
         /// Evidence scope.
         evidence_scope: String,
     },
+    /// Quantitative evidence linked to an estimate does not declare its unit.
+    MissingEvidenceUnit(String),
     /// Linked evidence uses a different unit from a performance estimate.
     PerformanceEvidenceUnitMismatch {
         /// Evidence identifier.
@@ -3233,6 +3238,9 @@ impl std::fmt::Display for AssessmentError {
                 f,
                 "evidence {evidence_id} scope {evidence_scope} does not match performance scope {performance_scope}"
             ),
+            Self::MissingEvidenceUnit(evidence_id) => {
+                write!(f, "evidence {evidence_id} linked to a quantitative estimate is missing its unit")
+            }
             Self::PerformanceEvidenceUnitMismatch {
                 evidence_id,
                 performance_unit,
@@ -7290,6 +7298,33 @@ mod tests {
             evidence.validate().unwrap_err(),
             AssessmentError::EmptyDerivationIdentity
         ));
+    }
+
+    #[test]
+    fn quantitative_evidence_without_unit_fails_closed() {
+        let mut c = candidate(
+            "unitless-reported-evidence",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "unitless",
+                "source",
+                EvidenceKind::Reported,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.evidence[0].unit = None;
+        c.evidence[0].observation = None;
+        c.evidence[0].uncertainty = None;
+
+        assert_eq!(
+            AlternativesEngine
+                .assess(&fixture_requirement(), &[c], None)
+                .unwrap_err(),
+            AssessmentError::MissingEvidenceUnit("unitless".into())
+        );
     }
 
     #[test]
