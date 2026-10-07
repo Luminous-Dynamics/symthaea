@@ -362,6 +362,37 @@ The report retains:
 
 This matters because a single favorable held-out scenario can be explained by scenario-specific familiarity, initialization, or perturbation alignment. The leave-one-out matrix tests whether predictive structure transfers across the benchmark family rather than merely across one chosen split.
 
+### Regime-shift revision latency
+
+The qualification now separates legitimate revision from forgetting by explicitly changing one
+benchmark-defined environment fact: harvest yield is reduced to 60% of its nominal value.
+
+Only the harvest-energy contribution changes. The remaining action transition rules stay fixed and
+therefore form the protected invariant layer for this experiment.
+
+The model is first evaluated without learning on four held-out validation states under the shifted
+regime. It then receives at most eight shifted-regime harvest observations from a distinct deterministic
+adaptation stream. After every revision observation, the harness re-evaluates the held-out shifted
+validation set and the invariant anchor profile.
+
+The report retains:
+
+- pre-adaptation shifted-regime MAE;
+- shifted-regime validation MAE after every revision observation;
+- validation error ratio relative to the pre-adaptation value;
+- revision improvement;
+- revision latency, defined as the number of shifted-regime observations required to reach 25% of
+  the pre-adaptation validation error;
+- invariant-anchor regression and worst observed invariant regression.
+
+revision_latency_updates = None is a valid result: the target was not reached within the bounded
+adaptation stream. It must not be converted into zero latency.
+
+This experiment is intentionally distinct from cumulative retention. Cumulative retention asks whether
+later learning interferes with prior knowledge. Regime-shift revision asks whether the model can
+appropriately revise knowledge that the benchmark has explicitly declared revisable while preserving
+knowledge declared invariant.
+
 ## Continual-retention interpretation
 
 Recent 2026 continual-world-model work argues that retention should be stratified by what is expected to
@@ -409,6 +440,9 @@ anchor. The per-shock receipts preserve this distinction instead of hiding it be
 | Cumulative shock updates improve new shocks but later updates regress prior shocks | continual adaptation is causing interference with previously acquired environment-specific knowledge |
 | Cumulative anchors regress while prior shocks remain stable | adaptation may preserve recent task-specific knowledge while damaging the longer-lived invariant layer |
 | Prior-shock retention remains stable and the invariant anchor remains stable across the stream | stronger evidence of non-destructive cumulative adaptation, still limited to this deterministic stream |
+| Shifted-regime validation error falls to the target with stable invariant anchors | stronger evidence that an explicitly revisable environment fact can be updated without measurable damage to protected dynamics |
+| Shifted-regime validation error never reaches the target | adaptation is boundedly unresolved; report the observed revision latency as missing rather than treating non-revision as zero-cost |
+| Invariant anchors regress during regime revision | the plasticity mechanism is leaking into benchmark-declared invariants |
 
 No single metric is a synthetic-organism detector.
 
@@ -421,8 +455,8 @@ A future green qualification should report all of:
 3. frozen benchmark-manifest digest;
 4. training/frozen boundary;
 5. model and policy configuration;
-5. one-step and multi-horizon temporal prediction accuracy;
-6. policy-induced distribution-shift error;
+6. one-step and multi-horizon temporal prediction accuracy;
+7. policy-induced distribution-shift error;
 7. aggregate and planner-selected confidence calibration;
 8. action-ranking agreement and exploitation gap;
 9. survival and minimum viability margin;
@@ -437,7 +471,9 @@ A future green qualification should report all of:
 neighboring-probe transfer, and isolated anchor regression;
 18. cumulative adaptation response, including per-shock receipts, prior-shock retention, and
 pre-stream invariant-anchor retention;
-19. trace/invariant verification where action evidence is recorded.
+19. regime-shift revision response, including pre/post shifted validation error, revision latency,
+per-update receipts, and invariant-anchor regression;
+20. trace/invariant verification where action evidence is recorded.
 
 Queued CI is not a pass.
 
@@ -468,7 +504,8 @@ The current qualification gate is empirical execution of the complete protocol:
 with separate measurements for one-step error, discrete multi-step error, continuous extrapolation
 error, policy-induced distribution-shift error, confidence calibration, planning regret, survival,
 recovery, the completed leave-one-scenario-out transfer matrix, procedurally generated held-out
-transfer, isolated shock response, and cumulative adaptation/retention.
+transfer, isolated shock response, cumulative adaptation/retention, and bounded regime-shift
+revision latency.
 
 A dedicated CI job runs the qualification module directly. The branch should not be considered
 qualified until that job has completed successfully for the exact candidate commit; queued or
