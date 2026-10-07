@@ -554,21 +554,11 @@ def main() -> int:
                 raise StaleError(
                     "manual workflow-run target is not a valid same-repository pull-request run"
                 )
-                target_url = f"https://github.com/{REPOSITORY}/actions/runs/{TRIGGER_RUN_ID}"
-        receipt["trigger"] = {
-            "repository_id": TRIGGER_RUN_REPOSITORY_ID,
-            "activity_type": TRIGGER_ACTIVITY_TYPE,
-            "run_id": TRIGGER_RUN_ID,
-            "run_attempt": TRIGGER_RUN_ATTEMPT,
-            "run_name": TRIGGER_RUN_NAME,
-            "event": TRIGGER_RUN_EVENT,
-            "head_branch": TRIGGER_RUN_HEAD_BRANCH,
-            "head_sha": TRIGGER_RUN_HEAD_SHA,
-            "conclusion": TRIGGER_RUN_CONCLUSION,
-        }
-
-        if TRIGGER_RUN_EVENT != "pull_request":
-                raise StaleError(f"triggering event is not pull_request: {TRIGGER_RUN_EVENT!r}")
+        else:
+            if TRIGGER_RUN_EVENT != "pull_request":
+                raise StaleError(
+                    f"triggering event is not pull_request: {TRIGGER_RUN_EVENT!r}"
+                )
             if TRIGGER_ACTIVITY_TYPE not in {"requested", "in_progress", "completed"}:
                 raise StaleError(
                     f"unexpected workflow_run activity type: {TRIGGER_ACTIVITY_TYPE!r}"
@@ -594,8 +584,23 @@ def main() -> int:
                     "workflow_run event payload does not match authoritative GitHub run state"
                 )
 
+        target_url = f"https://github.com/{REPOSITORY}/actions/runs/{TRIGGER_RUN_ID}"
+        receipt["trigger"] = {
+            "repository_id": TRIGGER_RUN_REPOSITORY_ID,
+            "activity_type": TRIGGER_ACTIVITY_TYPE,
+            "run_id": TRIGGER_RUN_ID,
+            "run_attempt": TRIGGER_RUN_ATTEMPT,
+            "run_name": TRIGGER_RUN_NAME,
+            "event": TRIGGER_RUN_EVENT,
+            "head_branch": TRIGGER_RUN_HEAD_BRANCH,
+            "head_sha": TRIGGER_RUN_HEAD_SHA,
+            "conclusion": TRIGGER_RUN_CONCLUSION,
+        }
+
         if TRIGGER_RUN_EVENT != "pull_request":
-            raise StaleError(f"triggering event is not pull_request: {TRIGGER_RUN_EVENT!r}")
+            raise StaleError(
+                f"triggering event is not pull_request: {TRIGGER_RUN_EVENT!r}"
+            )
 
         if TRIGGER_ACTIVITY_TYPE in {"requested", "in_progress"}:
             receipt["qualification_result"] = "WAITING"
