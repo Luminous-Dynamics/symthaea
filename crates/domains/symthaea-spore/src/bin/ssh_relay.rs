@@ -1,3 +1,6350 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! NixForHumanity WebSocket Relay
+//!
+//! Runs on the target NixOS installer ISO. Receives commands from the browser
+//! via WebSocket and executes them locally. No SSH required.
+//!
+//! # Usage
+//! ```bash
+//! cargo run --bin ssh-relay --features server -- --port 8091
+//! ```
+
+use futures_util::{SinkExt, StreamExt};
+use std::collections::HashMap;
+use std::io::{IsTerminal, Read, Seek, SeekFrom, Write};
+use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::OpenOptionsExt;
+use std::sync::Arc;
+use std::time::Instant;
+use tokio::net::TcpListener;
+use tokio::sync::Mutex;
+use tokio_tungstenite::accept_hdr_async_with_config;
+use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
+use tokio_tungstenite::tungstenite::Message;
+
+mod system_transaction;
+use system_transaction::{
+    ArtifactCommitment, MutationKind, MutationLease, SystemTransaction, TransactionOutcome,
+};
+
+// Security validators from the library (shared with fuzz targets)
+use symthaea_spore::security::{
+    sanitize_heredoc, sanitize_input, token_eq, validate_disk_path,
+    validate_hostname as validate_hostname_relay, validate_username,
+};
+
+// TLS support
+use rustls::ServerConfig;
+use tokio_rustls::TlsAcceptor;
+
+/// Execute a shell command locally and return stdout/stderr + exit status.
+/// Replaces the previous SSH-to-localhost pattern.
+struct CmdResult {
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_status: u32,
+}
+
+fn privileged_process(program: &str) -> tokio::process::Command {
+    let mut command = tokio::process::Command::new(program);
+    command.env_clear();
+    const TRUSTED_PATH: &str =
+        "/run/current-system/sw/bin:/run/wrappers/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin:/sbin";
+    command.env("PATH", TRUSTED_PATH);
+    command.env(
+        "NIX_PATH",
+        "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos:nixos-config=/etc/nixos/configuration.nix",
+    );
+    command.env("LANG", "C");
+    command.env("LC_ALL", "C");
+    command
+}
+
+fn privileged_shell_command(cmd: &str) -> tokio::process::Command {
+    // Use /bin/sh (POSIX, always available) as fallback if bash isn't in PATH.
+    let shell = if std::path::Path::new("/bin/bash").exists() {
+        "/bin/bash"
+    } else if std::path::Path::new("/run/current-system/sw/bin/bash").exists() {
+        "/run/current-system/sw/bin/bash"
+    } else {
+        "/bin/sh"
+    };
+    let mut command = privileged_process(shell);
+    // Bash privileged mode disables startup-file hooks and imported shell
+    // functions, adding a process-local guard against ambient code injection.
+    if shell.ends_with("/bash") {
+        command.arg("-p");
+    }
+    command.arg("-c").arg(cmd);
+    command
+}
+
+async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
+    let output = privileged_shell_command(cmd).output().await?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
+/// Execute one privileged program with typed argv, without introducing a
+/// shell parsing boundary. Consequential mutation paths should prefer this
+/// helper whenever their operation can be represented by one executable.
+fn trusted_typed_executable(
+    program: &str,
+) -> Result<std::borrow::Cow<'_, str>, std::io::Error> {
+    const SYSTEM_BIN: &str = "/run/current-system/sw/bin/";
+
+    let basename = match program {
+        "btrfs" | "docker" | "du" | "echo" | "gzip" | "lsblk" | "nix-collect-garbage" | "nix-env"
+        | "nix-instantiate" | "nixos-rebuild" | "mysqldump" | "nixos-version" | "nmcli" | "pg_dumpall" | "systemctl"
+        | "tar" | "uname" | "zstd" => Some(program),
+        _ => None,
+    };
+
+    if let Some(name) = basename {
+        return Ok(std::borrow::Cow::Owned(format!("{SYSTEM_BIN}{name}")));
+    }
+
+    if std::path::Path::new(program)
+        .strip_prefix("/nix/var/nix/profiles/system/bin/")
+        .ok()
+        .is_some_and(|name| name == std::path::Path::new("switch-to-configuration"))
+    {
+        return Ok(std::borrow::Cow::Borrowed(program));
+    }
+
+    Err(std::io::Error::new(
+        std::io::ErrorKind::PermissionDenied,
+        format!("typed privileged executor rejected untrusted program {program:?}"),
+    ))
+}
+
+fn trusted_typed_process(
+    program: &str,
+) -> Result<tokio::process::Command, String> {
+    let executable = trusted_typed_executable(program)
+        .map_err(|error| format!("typed privileged executable rejected: {error}"))?;
+    Ok(privileged_process(executable.as_ref()))
+}
+
+
+async fn run_privileged_args(program: &str, args: &[&str]) -> Result<CmdResult, std::io::Error> {
+    let mut command = trusted_typed_process(program)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::PermissionDenied, error))?;
+    command.args(args);
+    let output = command.output().await?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
+fn open_trusted_script(path: &str) -> Result<std::fs::File, std::io::Error> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)?;
+
+    let metadata = file.metadata()?;
+    if !metadata.file_type().is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("privileged script {path} is not a regular file"),
+        ));
+    }
+    if metadata.uid() != unsafe { libc::geteuid() } {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            format!("privileged script {path} is not owned by the relay user"),
+        ));
+    }
+    if metadata.permissions().mode() & 0o777 != 0o700 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            format!(
+                "privileged script {path} has unsafe permissions {:04o}; require 0700",
+                metadata.permissions().mode() & 0o777
+            ),
+        ));
+    }
+    if metadata.len() == 0 || metadata.len() > 256 * 1024 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("privileged script {path} has unsupported size {}", metadata.len()),
+        ));
+    }
+
+    Ok(file)
+}
+
+fn trusted_script_shell() -> &'static str {
+    if std::path::Path::new("/bin/bash").exists() {
+        "/bin/bash"
+    } else if std::path::Path::new("/run/current-system/sw/bin/bash").exists() {
+        "/run/current-system/sw/bin/bash"
+    } else {
+        "/bin/sh"
+    }
+}
+
+fn trusted_script_process(
+    script: std::fs::File,
+    args: &[&str],
+) -> tokio::process::Command {
+    let shell = trusted_script_shell();
+    let mut command = privileged_process(shell);
+    if shell.ends_with("/bash") {
+        command.arg("-p");
+    }
+    command
+        .arg("-s")
+        .arg("--")
+        .arg("nixforhumanity-script")
+        .args(args)
+        .stdin(std::process::Stdio::from(script));
+    command
+}
+
+async fn run_privileged_script_with_args(
+    path: &str,
+    args: &[&str],
+) -> Result<CmdResult, std::io::Error> {
+    let script = open_trusted_script(path)?;
+    let mut command = trusted_script_process(script, args);
+    let output = command.output().await?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
+
+fn create_private_runtime_file(path: &str, mode: u32) -> Result<std::fs::File, std::io::Error> {
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(mode)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+}
+
+fn write_private_file(path: &str, contents: &[u8], mode: u32) -> Result<(), std::io::Error> {
+    let mut file = create_private_runtime_file(path, mode)?;
+    file.write_all(contents)?;
+    file.sync_all()
+}
+
+fn cleanup_sensitive_file(path: &str) -> Result<(), String> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    let mut file = match std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+    {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(format!("unable to open sensitive cleanup file {path}: {error}")),
+    };
+
+    let metadata = file
+        .metadata()
+        .map_err(|error| format!("unable to inspect sensitive cleanup file {path}: {error}"))?;
+    if !metadata.file_type().is_file()
+        || metadata.uid() != unsafe { libc::geteuid() }
+        || metadata.permissions().mode() & 0o077 != 0
+    {
+        return Err(format!(
+            "sensitive cleanup file {path} failed ownership, type, or permission checks"
+        ));
+    }
+
+    let mut remaining = metadata.len();
+    let zeros = [0u8; 8192];
+    while remaining > 0 {
+        let count = remaining.min(zeros.len() as u64) as usize;
+        file.write_all(&zeros[..count])
+            .map_err(|error| format!("unable to clear sensitive cleanup file {path}: {error}"))?;
+        remaining -= count as u64;
+    }
+    file.set_len(0)
+        .map_err(|error| format!("unable to truncate sensitive cleanup file {path}: {error}"))?;
+    file.sync_all()
+        .map_err(|error| format!("unable to synchronize sensitive cleanup file {path}: {error}"))?;
+
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!("unable to unlink sensitive cleanup file {path}: {error}")),
+    }
+}
+
+fn cleanup_sensitive_files(paths: &[String]) -> Result<(), String> {
+    let mut first_error = None;
+    for path in paths {
+        if let Err(error) = cleanup_sensitive_file(path) {
+            if first_error.is_none() {
+                first_error = Some(error);
+            }
+        }
+    }
+    match first_error {
+        Some(error) => Err(error),
+        None => Ok(()),
+    }
+}
+
+
+fn prepare_transaction_runtime(
+    log_path: &str,
+    status_path: &str,
+    pid_path: &str,
+) -> Result<(), std::io::Error> {
+    create_private_runtime_file(log_path, 0o600)?;
+    create_private_runtime_file(status_path, 0o600)?;
+    create_private_runtime_file(pid_path, 0o600)?;
+    Ok(())
+}
+
+async fn spawn_privileged_background_process(
+    mut command: tokio::process::Command,
+    log_path: &str,
+    status_path: &str,
+    pid_path: &str,
+) -> Result<u32, std::io::Error> {
+    if let Err(error) = prepare_transaction_runtime(log_path, status_path, pid_path) {
+        let _ = std::fs::remove_file(log_path);
+        let _ = std::fs::remove_file(status_path);
+        let _ = std::fs::remove_file(pid_path);
+        return Err(error);
+    }
+
+    let log = match std::fs::OpenOptions::new()
+        .write(true)
+        .append(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(log_path)
+    {
+        Ok(file) => file,
+        Err(error) => {
+            let _ = std::fs::remove_file(log_path);
+            let _ = std::fs::remove_file(status_path);
+            let _ = std::fs::remove_file(pid_path);
+            return Err(error);
+        }
+    };
+    let log_stderr = match log.try_clone() {
+        Ok(file) => file,
+        Err(error) => {
+            let _ = std::fs::remove_file(log_path);
+            let _ = std::fs::remove_file(status_path);
+            let _ = std::fs::remove_file(pid_path);
+            return Err(error);
+        }
+    };
+
+    let mut status_file = match std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(status_path)
+    {
+        Ok(file) => file,
+        Err(error) => {
+            let _ = std::fs::remove_file(log_path);
+            let _ = std::fs::remove_file(status_path);
+            let _ = std::fs::remove_file(pid_path);
+            return Err(error);
+        }
+    };
+
+    let mut child = match command
+        .stdout(std::process::Stdio::from(log))
+        .stderr(std::process::Stdio::from(log_stderr))
+        .spawn()
+        .await
+    {
+        Ok(child) => child,
+        Err(error) => {
+            let _ = std::fs::remove_file(log_path);
+            let _ = std::fs::remove_file(status_path);
+            let _ = std::fs::remove_file(pid_path);
+            return Err(error);
+        }
+    };
+
+    let Some(pid) = child.id() else {
+        let _ = child.kill().await;
+        let _ = child.wait().await;
+        let _ = std::fs::remove_file(log_path);
+        let _ = std::fs::remove_file(status_path);
+        let _ = std::fs::remove_file(pid_path);
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "spawned child has no observable PID",
+        ));
+    };
+
+    let start_time = match read_process_start_time_ticks(pid) {
+        Ok(start_time) => start_time,
+        Err(error) => {
+            // The child is already live, but its stable process identity could
+            // not be captured. Contain it before returning so no privileged
+            // mutation can continue without durable tracking.
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+            let _ = std::fs::remove_file(log_path);
+            let _ = std::fs::remove_file(status_path);
+            let _ = std::fs::remove_file(pid_path);
+            return Err(std::io::Error::new(
+                error.kind(),
+                format!("spawned child has no readable /proc start time: {error}"),
+            ));
+        }
+    };
+
+    let pid_write_result = (|| -> Result<(), std::io::Error> {
+        let mut pid_file = std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(pid_path)?;
+        pid_file.write_all(format!("{pid}:{start_time}\n").as_bytes())?;
+        pid_file.sync_all()?;
+        Ok(())
+    })();
+
+    if let Err(error) = pid_write_result {
+        // The privileged child may already have begun mutating state, but its
+        // durable identity was not recorded. Stop it immediately and fail closed.
+        let _ = child.kill().await;
+        let _ = child.wait().await;
+        let _ = std::fs::remove_file(log_path);
+        let _ = std::fs::remove_file(status_path);
+        let _ = std::fs::remove_file(pid_path);
+        return Err(error);
+    }
+
+    tokio::spawn(async move {
+        if let Ok(status) = child.wait().await {
+            if let Some(code) = status.code() {
+                let _ = std::io::Write::write_all(
+                    &mut status_file,
+                    format!("{code}\n").as_bytes(),
+                );
+                let _ = status_file.sync_all();
+            }
+        }
+    });
+
+    Ok(pid)
+}
+
+async fn spawn_privileged_background_script(
+    script_path: &str,
+    log_path: &str,
+    status_path: &str,
+    pid_path: &str,
+) -> Result<u32, std::io::Error> {
+    let script = open_trusted_script(script_path)?;
+    spawn_privileged_background_process(
+        trusted_script_process(script, &[]),
+        log_path,
+        status_path,
+        pid_path,
+    )
+    .await
+}
+
+fn read_private_small_file(path: &str, max_bytes: usize) -> Result<String, std::io::Error> {
+    use std::io::Read as _;
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
+
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)?;
+    let metadata = file.metadata()?;
+    if !metadata.file_type().is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "private transaction sidecar is not a regular file",
+        ));
+    }
+    if metadata.uid() != unsafe { libc::geteuid() } {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "private transaction sidecar is not owned by the relay user",
+        ));
+    }
+    if metadata.permissions().mode() & 0o777 != 0o600 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "private transaction sidecar has unsafe permissions",
+        ));
+    }
+    if metadata.len() > max_bytes as u64 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "private transaction sidecar exceeds bounded size",
+        ));
+    }
+    let mut contents = String::with_capacity(metadata.len() as usize);
+    file.read_to_string(&mut contents)?;
+    Ok(contents)
+}
+
+async fn read_transaction_status(path: &str) -> Result<Option<u32>, std::io::Error> {
+    match read_private_small_file(path, 128) {
+        Ok(contents) => {
+            let trimmed = contents.trim();
+            if trimmed.is_empty() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "transaction status sidecar is empty",
+                ));
+            }
+            match trimmed.parse::<u32>() {
+                Ok(code) => Ok(Some(code)),
+                Err(_) => Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "transaction status sidecar is malformed",
+                )),
+            }
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+fn read_process_start_time_ticks(pid: u32) -> Result<u64, std::io::Error> {
+    if pid == 0 || pid > libc::pid_t::MAX as u32 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "invalid process id",
+        ));
+    }
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat"))?;
+    let close_paren = stat.rfind(')').ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidData, "malformed /proc/<pid>/stat")
+    })?;
+    let fields: Vec<&str> = stat[close_paren + 1..].split_whitespace().collect();
+    fields
+        .get(19)
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "missing process start time in /proc/<pid>/stat",
+            )
+        })?
+        .parse::<u64>()
+        .map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "invalid process start time in /proc/<pid>/stat",
+            )
+        })
+}
+
+fn parse_process_identity(value: &str) -> Option<(u32, u64)> {
+    let (pid, start_time) = value.trim().split_once(':')?;
+    let pid = pid.parse::<u32>().ok()?;
+    let start_time = start_time.parse::<u64>().ok()?;
+    if pid == 0 || pid > libc::pid_t::MAX as u32 {
+        return None;
+    }
+    Some((pid, start_time))
+}
+
+fn process_id_is_alive(pid: u32, expected_start_time: u64) -> bool {
+    if pid == 0 || pid > libc::pid_t::MAX as u32 {
+        return false;
+    }
+    match read_process_start_time_ticks(pid) {
+        Ok(actual) if actual != expected_start_time => false,
+        Err(_) => false,
+        Ok(_) => {
+            let result = unsafe { libc::kill(pid as libc::pid_t, 0) };
+            result == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
+        }
+    }
+}
+
+
+async fn run_privileged_args_with_stdin(
+    program: &str,
+    args: &[&str],
+    input: std::fs::File,
+) -> Result<CmdResult, std::io::Error> {
+    let mut command = trusted_typed_process(program)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::PermissionDenied, error))?;
+    command.args(args);
+    command.stdin(std::process::Stdio::from(input));
+    let output = command.output().await?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
+/// nixos-anywhere orchestration stages.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "PascalCase")]
+enum NixosAnywhereStage {
+    Connecting,
+    UploadingKexec,
+    Kexec,
+    WaitingForReboot,
+    Partitioning,
+    Installing,
+    Configuring,
+    FinalReboot,
+    Verifying,
+    Complete,
+}
+
+impl NixosAnywhereStage {
+    fn percentage(&self) -> u8 {
+        match self {
+            Self::Connecting => 5,
+            Self::UploadingKexec => 15,
+            Self::Kexec => 25,
+            Self::WaitingForReboot => 35,
+            Self::Partitioning => 50,
+            Self::Installing => 70,
+            Self::Configuring => 85,
+            Self::FinalReboot => 92,
+            Self::Verifying => 97,
+            Self::Complete => 100,
+        }
+    }
+
+    fn inoculation_phase(&self) -> &'static str {
+        match self {
+            Self::Connecting => "TrustVerification",
+            Self::UploadingKexec | Self::Kexec | Self::WaitingForReboot => "FlakeEvaluation",
+            Self::Partitioning => "DiskPreparation",
+            Self::Installing | Self::Configuring => "StorePopulation",
+            Self::FinalReboot => "MokEnrollment",
+            Self::Verifying | Self::Complete => "FirstBreath",
+        }
+    }
+}
+
+/// Parse nixos-anywhere output to determine current stage.
+fn parse_stage(output: &str) -> Option<NixosAnywhereStage> {
+    let lower = output.to_lowercase();
+    if lower.contains("uploading kexec") || lower.contains("copying kexec") {
+        Some(NixosAnywhereStage::UploadingKexec)
+    } else if lower.contains("executing kexec") || lower.contains("kexec -e") {
+        Some(NixosAnywhereStage::Kexec)
+    } else if lower.contains("waiting for") && lower.contains("reboot") {
+        Some(NixosAnywhereStage::WaitingForReboot)
+    } else if lower.contains("partitioning") || lower.contains("disko") {
+        Some(NixosAnywhereStage::Partitioning)
+    } else if lower.contains("installing") || lower.contains("nixos-install") {
+        Some(NixosAnywhereStage::Installing)
+    } else if lower.contains("configuring") || lower.contains("nixos-rebuild") {
+        Some(NixosAnywhereStage::Configuring)
+    } else if lower.contains("final reboot") {
+        Some(NixosAnywhereStage::FinalReboot)
+    } else if lower.contains("verification") || lower.contains("complete") {
+        Some(NixosAnywhereStage::Complete)
+    } else {
+        None
+    }
+}
+
+// Security validators imported from symthaea_spore::security (see use statement above).
+// Local definitions removed — single source of truth for fuzzing and testing.
+
+// ── sanitize_heredoc also imported from security module ──
+
+/// Rate limiter: 1 active session per IP, with auth failure tracking.
+struct SessionTracker {
+    active: HashMap<String, Instant>,
+    failed_auths: HashMap<String, (u32, Instant)>, // (count, first_attempt)
+    timeout_secs: u64,
+}
+
+impl SessionTracker {
+    fn new(timeout_secs: u64) -> Self {
+        Self {
+            active: HashMap::new(),
+            failed_auths: HashMap::new(),
+            timeout_secs,
+        }
+    }
+
+    fn try_acquire(&mut self, ip: &str) -> bool {
+        let now = Instant::now();
+        // Expire old sessions
+        self.active
+            .retain(|_, start| now.duration_since(*start).as_secs() < self.timeout_secs);
+        if self.active.contains_key(ip) {
+            return false;
+        }
+        self.active.insert(ip.to_string(), now);
+        true
+    }
+
+    fn release(&mut self, ip: &str) {
+        self.active.remove(ip);
+    }
+
+    fn record_failed_auth(&mut self, ip: &str) {
+        let entry = self
+            .failed_auths
+            .entry(ip.to_string())
+            .or_insert((0, Instant::now()));
+        entry.0 += 1;
+    }
+
+    fn is_blocked(&self, ip: &str) -> bool {
+        if let Some((count, first)) = self.failed_auths.get(ip) {
+            // Block after 5 failed attempts within 5 minutes
+            *count >= 5 && first.elapsed().as_secs() < 300
+        } else {
+            false
+        }
+    }
+}
+
+/// Client → Relay message.
+#[derive(serde::Deserialize)]
+#[allow(dead_code)]
+struct ClientMessage {
+    action: String,
+    /// Caller-supplied idempotency key for consequential mutation actions.
+    #[serde(default)]
+    request_id: String,
+    /// Mandatory WebSocket auth token (must be sent via the `"auth"` action before any other action).
+    #[serde(default)]
+    token: String,
+    #[serde(default)]
+    host: String,
+    #[serde(default = "default_port")]
+    port: u16,
+    #[serde(default)]
+    username: String,
+    #[serde(default)]
+    password: String,
+    #[serde(default)]
+    command: String,
+    // Install-specific fields
+    #[serde(default)]
+    disk: String, // e.g., "/dev/nvme0n1"
+    #[serde(default)]
+    layout: String, // "single", "dual", "alongside", "sata", "vps"
+    #[serde(default)]
+    fast_disk: String, // For dual-disk: fast drive
+    #[serde(default)]
+    standard_disk: String, // For dual-disk: standard drive
+    #[serde(default)]
+    hostname: String,
+    #[serde(default)]
+    configuration_nix: String, // Generated configuration.nix content from browser
+    #[serde(default)]
+    flake_nix: String, // Generated flake.nix content
+    #[serde(default)]
+    disko_nix: String, // Generated disko-config.nix content
+    #[serde(default)]
+    hardware_nix: String, // Generated hardware-configuration.nix content
+    #[serde(default)]
+    secure_boot: bool, // Enable Secure Boot (lanzaboote + sbctl)
+    #[serde(default)]
+    tpm2_unlock: bool, // Enable TPM2 auto-unlock (requires LUKS + systemd initrd)
+    #[serde(default)]
+    fido2_unlock: bool, // Enable FIDO2/YubiKey unlock (requires LUKS + systemd initrd)
+    #[serde(default)]
+    desktop: String, // Desktop environment: gnome, plasma, hyprland, sway, xfce, none
+    #[serde(default)]
+    gpu_driver: String, // GPU driver: nvidia, nvidia-open, amdgpu, modesetting, none
+    #[serde(default)]
+    timezone: String, // e.g., "America/Chicago"
+    #[serde(default)]
+    keyboard: String, // e.g., "us", "de", "dvorak"
+    #[serde(default)]
+    user_password: String, // User account password (set via chpasswd after install)
+    /// LUKS2 disk-unlock passphrase (never written into the generated shell script).
+    #[serde(default)]
+    luks_passphrase: String,
+    /// Additional disks for RAID/ZFS multi-disk layouts (comma-separated or JSON array)
+    /// Digest of the authoritative target identity observed during probe.
+    /// Uses the same machine-binding construction as standalone Nixward.
+    #[serde(default)]
+    target_machine_digest: String,
+    #[serde(default)]
+    extra_disks: Vec<String>,
+}
+
+fn machine_binding_digest_hex_for(machine_id: &str) -> Result<String, String> {
+    let machine_id = machine_id.trim();
+    if machine_id.is_empty() || machine_id.len() > 256 || machine_id.chars().any(char::is_control) {
+        return Err("target machine identity is missing or invalid".into());
+    }
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"nixward-machine-binding-v1\0");
+    hasher.update(machine_id.as_bytes());
+    Ok(hasher
+        .finalize()
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
+}
+
+fn machine_binding_digest_hex() -> Result<String, String> {
+    let machine_id = std::fs::read_to_string("/etc/machine-id")
+        .map_err(|error| format!("unable to read target machine identity: {error}"))?;
+    machine_binding_digest_hex_for(&machine_id)
+}
+
+fn extract_explicit_nix_system(flake: &str) -> Option<&str> {
+    let marker = "system = \"";
+    let start = flake.find(marker)? + marker.len();
+    let rest = &flake[start..];
+    let end = rest.find('\"')?;
+    Some(&rest[..end])
+}
+
+fn validate_extra_disks(extra_disks: &[String]) -> Result<(), String> {
+    for extra_disk in extra_disks {
+        validate_disk_path(extra_disk)
+            .map(|_| ())
+            .map_err(|error| format!("Invalid extra disk: {error}"))?;
+    }
+    Ok(())
+}
+
+fn validate_install_layout(layout: &str) -> Result<(), String> {
+    match layout {
+        ""
+        | "alongside"
+        | "single"
+        | "single-zfs"
+        | "single-luks"
+        | "dual"
+        | "raid1-btrfs"
+        | "raid1-mdadm"
+        | "raid5-mdadm"
+        | "raid6-mdadm"
+        | "raid10-mdadm"
+        | "zfs-mirror"
+        | "zfs-raidz"
+        | "zfs-raidz2" => Ok(()),
+        _ => Err(format!("Unsupported install layout: {}", layout)),
+    }
+}
+
+fn validate_install_disk_topology(message: &ClientMessage) -> Result<(), String> {
+    let require_distinct = |left_name: &str, left: &str, right_name: &str, right: &str| {
+        let left = validate_disk_path(left)
+            .map_err(|error| format!("{left_name} is invalid: {error}"))?;
+        let right = validate_disk_path(right)
+            .map_err(|error| format!("{right_name} is invalid: {error}"))?;
+        if left == right {
+            return Err(format!(
+                "{left_name} and {right_name} must refer to distinct disks"
+            ));
+        }
+        Ok(())
+    };
+
+    match message.layout.as_str() {
+        "dual" | "raid1-btrfs" | "raid1-mdadm" => {
+            if message.fast_disk.trim().is_empty() || message.standard_disk.trim().is_empty() {
+                return Err(format!(
+                    "{} requires both fast_disk and standard_disk",
+                    message.layout
+                ));
+            }
+            require_distinct("fast_disk", &message.fast_disk, "standard_disk", &message.standard_disk)
+        }
+        "raid5-mdadm" | "raid6-mdadm" | "raid10-mdadm" | "zfs-mirror" | "zfs-raidz"
+        | "zfs-raidz2" => {
+            let mut disks = Vec::with_capacity(1 + message.extra_disks.len());
+            disks.push(
+                validate_disk_path(&message.disk)
+                    .map_err(|error| format!("primary disk is invalid: {error}"))?,
+            );
+            for extra_disk in &message.extra_disks {
+                disks.push(
+                    validate_disk_path(extra_disk)
+                        .map_err(|error| format!("extra disk is invalid: {error}"))?,
+                );
+            }
+            for (index, disk) in disks.iter().enumerate() {
+                if let Some((previous, _)) = disks[..index]
+                    .iter()
+                    .enumerate()
+                    .find(|(_, previous)| *previous == disk)
+                {
+                    return Err(format!(
+                        "storage topology reuses disk {} ({}) already assigned at position {}",
+                        disk,
+                        index + 1,
+                        previous + 1
+                    ));
+                }
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
+fn default_port() -> u16 {
+    22
+}
+
+fn auth_token_fingerprint(token: &str) -> String {
+    let hex = blake3::hash(token.as_bytes()).to_hex().to_string();
+    hex[..16].to_string()
+}
+
+const MAX_WS_MESSAGE_SIZE: usize = 8 * 1024 * 1024;
+const MAX_WS_FRAME_SIZE: usize = 2 * 1024 * 1024;
+
+fn relay_websocket_config() -> WebSocketConfig {
+    WebSocketConfig::default()
+        .max_message_size(Some(MAX_WS_MESSAGE_SIZE))
+        .max_frame_size(Some(MAX_WS_FRAME_SIZE))
+}
+
+fn origin_is_allowed(origin: &str) -> bool {
+    let uri = match origin.trim().parse::<tungstenite::http::Uri>() {
+        Ok(uri) => uri,
+        Err(_) => return false,
+    };
+    if uri.path() != "" {
+        return false;
+    }
+    let scheme = match uri.scheme_str() {
+        Some("http") | Some("https") => uri.scheme_str().unwrap(),
+        _ => return false,
+    };
+    let authority = match uri.authority() {
+        Some(authority) => authority,
+        None => return false,
+    };
+    let host = authority.host().to_ascii_lowercase();
+
+    if host == "localhost" || host == "127.0.0.1" {
+        return true;
+    }
+
+    // Remote browser origins must terminate on an explicitly trusted DNS
+    // suffix. Exact-host matching plus a dot boundary rejects lookalikes such
+    // as evil-luminousdynamics.io while still allowing approved subdomains.
+    const TRUSTED_SUFFIXES: [&str; 4] = [
+        "luminousdynamics.io",
+        "nixforhumanity.org",
+        "mycelix.net",
+        "relationalharmonics.org",
+    ];
+    scheme == "https"
+        && TRUSTED_SUFFIXES
+            .iter()
+            .any(|suffix| host == *suffix || host.ends_with(&format!(".{suffix}")))
+}
+
+fn read_token_file(path: &str) -> Result<String, String> {
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+        .map_err(|error| format!("unable to open token file {}: {error}", path))?;
+    let metadata = file
+        .metadata()
+        .map_err(|error| format!("unable to inspect token file {}: {error}", path))?;
+    if !metadata.file_type().is_file() {
+        return Err(format!("token file {} is not a regular file", path));
+    }
+    let mode = metadata.mode() & 0o777;
+    if mode & 0o077 != 0 {
+        return Err(format!(
+            "token file {} is group/world accessible (mode {:04o}); require 0600 or stricter",
+            path, mode
+        ));
+    }
+    if metadata.uid() != unsafe { libc::geteuid() } {
+        return Err(format!("token file {} is not owned by the relay process user", path));
+    }
+    use std::io::Read;
+    let mut token = String::new();
+    (&file)
+        .read_to_string(&mut token)
+        .map_err(|error| format!("unable to read token file {}: {error}", path))?;
+    let token = token.trim().to_string();
+    if token.is_empty() {
+        return Err(format!("token file {} is empty", path));
+    }
+    Ok(token)
+}
+
+fn auth_token_banner(token: &str, stderr_is_terminal: bool) -> String {
+    if stderr_is_terminal {
+        format!("  Auth token: {}", token)
+    } else {
+        format!(
+            "  Auth token: <redacted; fingerprint {}>",
+            auth_token_fingerprint(token)
+        )
+    }
+}
+
+/// Restrict restore inputs to image directories produced by this relay.
+///
+/// The generic input sanitizer is intentionally broader for other paths, but
+/// restoring an image is destructive and must not accept arbitrary filesystem
+/// locations merely because they contain shell-safe characters.
+fn validate_image_path(value: &str) -> Result<String, String> {
+    const PREFIX: &str = "/tmp/nixforhumanity-image-";
+    let path = sanitize_input(value, "image path", true)?;
+    let suffix = path.strip_prefix(PREFIX).ok_or_else(|| {
+        format!(
+            "Image path must be a relay-created image under {}",
+            PREFIX
+        )
+    })?;
+    if suffix.len() != 32 || !suffix.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err("Image path has an invalid transaction identifier".into());
+    }
+    Ok(path)
+}
+
+fn transaction_artifact_dir_path(transaction_id: &str) -> Result<std::path::PathBuf, String> {
+    if transaction_id.len() != 32
+        || !transaction_id.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err("transaction artifact identity must be exactly 32 hexadecimal characters".into());
+    }
+    Ok(std::path::PathBuf::from(format!(
+        "/tmp/nixforhumanity-transaction-{transaction_id}"
+    )))
+}
+
+fn create_transaction_artifact_dir(transaction_id: &str) -> Result<String, String> {
+    let path = transaction_artifact_dir_path(transaction_id)?;
+
+    use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
+    let mut builder = std::fs::DirBuilder::new();
+    builder.mode(0o700);
+    match builder.create(&path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            return Err(format!(
+                "transaction artifact directory {} already exists; refusing reuse",
+                path.display()
+            ));
+        }
+        Err(error) => {
+            return Err(format!(
+                "unable to create transaction artifact directory {}: {error}",
+                path.display()
+            ));
+        }
+    }
+
+    let directory = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(&path)
+        .map_err(|error| {
+            format!(
+                "unable to open transaction artifact directory {}: {error}",
+                path.display()
+            )
+        })?;
+
+    // The directory was created with a restrictive mode, but the exact
+    // descriptor is authoritative. Normalize it through the open descriptor
+    // and then require the expected owner/private mode.
+    directory
+        .set_permissions(std::fs::Permissions::from_mode(0o700))
+        .map_err(|error| {
+            format!(
+                "unable to protect transaction artifact directory {}: {error}",
+                path.display()
+            )
+        })?;
+    let metadata = directory.metadata().map_err(|error| {
+        format!(
+            "unable to inspect transaction artifact directory {}: {error}",
+            path.display()
+        )
+    })?;
+    let mode = metadata.permissions().mode() & 0o777;
+    if !metadata.is_dir() || mode != 0o700 {
+        return Err(format!(
+            "transaction artifact directory {} has invalid type or permissions {:04o}",
+            path.display(),
+            mode
+        ));
+    }
+    if metadata.uid() != unsafe { libc::geteuid() } {
+        return Err(format!(
+            "transaction artifact directory {} is not owned by relay user",
+            path.display()
+        ));
+    }
+
+    Ok(path.to_string_lossy().into_owned())
+}
+
+fn remove_transaction_artifact_dir(path: &str) {
+    let valid = path
+        .strip_prefix("/tmp/nixforhumanity-transaction-")
+        .is_some_and(|suffix| {
+            suffix.len() == 32 && suffix.bytes().all(|byte| byte.is_ascii_hexdigit())
+        });
+    if !valid {
+        eprintln!(
+            "refusing to recursively remove invalid transaction artifact path {}",
+            path
+        );
+        return;
+    }
+    if let Err(error) = std::fs::remove_dir_all(path) {
+        // Missing is benign during best-effort cleanup; any other error is
+        // surfaced because it may leave sensitive or authoritative staging data.
+        if error.kind() != std::io::ErrorKind::NotFound {
+            eprintln!(
+                "unable to remove transaction artifact directory {}: {}",
+                path, error
+            );
+        }
+    }
+}
+
+/// Generate Secure Boot setup commands (appended to install script when enabled).
+/// Git-initialize the NixOS config (always appended to install scripts).
+fn git_init_config() -> &'static str {
+    r#"
+# ── Git-Initialize NixOS Config ──
+echo "STAGE: Initializing config version control..."
+if chroot /mnt git --version >/dev/null 2>&1; then
+  if [ ! -d /mnt/etc/nixos/.git ]; then
+    if chroot /mnt git -C /etc/nixos init 2>/dev/null       && chroot /mnt git -C /etc/nixos add -A 2>/dev/null       && chroot /mnt git -C /etc/nixos commit -m "Initial NixOS configuration — Sovereign Inoculation" 2>/dev/null; then
+      echo "  Config versioned at /etc/nixos/.git"
+    else
+      echo "  Git init skipped (initial commit failed)"
+    fi
+  fi
+else
+  echo "  Git init skipped (git not available yet)"
+fi
+"#
+}
+
+/// Pre-install disk snapshot (partition table + UUIDs — always, instant).
+fn disk_snapshot(disk: &str) -> String {
+    format!(
+        r#"
+# ── Pre-Install Disk Snapshot (Tier 1: instant) ──
+echo "STAGE: Saving disk snapshot..."
+SNAPSHOT_DIR="/tmp/symthaea-pre-install-snapshot"
+mkdir -p "$SNAPSHOT_DIR"
+sfdisk -d {disk} > "$SNAPSHOT_DIR/partition-table.dump" 2>/dev/null
+dd if={disk} of="$SNAPSHOT_DIR/first-1M.img" bs=1M count=1 status=none 2>/dev/null
+blkid > "$SNAPSHOT_DIR/blkid.txt" 2>/dev/null
+lsblk -f > "$SNAPSHOT_DIR/lsblk.txt" 2>/dev/null
+fdisk -l {disk} > "$SNAPSHOT_DIR/fdisk.txt" 2>/dev/null
+echo "  Snapshot saved to $SNAPSHOT_DIR"
+echo "  Partition table can be restored with: sfdisk {disk} < partition-table.dump"
+"#,
+        disk = disk
+    )
+}
+
+fn secure_boot_postinstall() -> &'static str {
+    r#"
+# ── Secure Boot Setup (lanzaboote + sbctl) ──
+echo "STAGE: Setting up Secure Boot..."
+
+# Check if firmware is in Setup Mode
+SETUP_MODE=$(bootctl status 2>/dev/null | grep "Setup Mode:" | grep -c "setup" || echo "0")
+if [ "$SETUP_MODE" = "0" ]; then
+  echo "WARNING: Firmware is NOT in Setup Mode."
+  echo "WARNING: Secure Boot keys will be created but NOT enrolled."
+  echo "WARNING: Enter BIOS, clear Secure Boot keys, then re-run key enrollment."
+fi
+
+# Create Secure Boot keys on the installed system without spawning a nested shell.
+if chroot /mnt sbctl --version >/dev/null 2>&1; then
+  chroot /mnt sbctl create-keys 2>/dev/null || echo "Keys may already exist"
+  if [ "$SETUP_MODE" = "1" ]; then
+    if chroot /mnt sbctl enroll-keys --microsoft 2>/dev/null; then
+      echo "Secure Boot keys enrolled (with Microsoft CA)"
+    else
+      echo "Key enrollment failed — enroll manually after first boot"
+    fi
+  else
+    echo "Skipping key enrollment — firmware not in Setup Mode"
+    echo "After first boot: sudo sbctl enroll-keys --microsoft"
+  fi
+else
+  echo "sbctl not found — install it and run: sbctl create-keys && sbctl enroll-keys --microsoft"
+fi
+echo "  Secure Boot keys created at /etc/secureboot/"
+"#
+}
+
+/// Generate TPM2 auto-unlock enrollment (appended after LUKS install + Secure Boot).
+fn tpm2_postinstall() -> &'static str {
+    r#"
+# ── TPM2 Auto-Unlock Enrollment ──
+echo "STAGE: Enrolling TPM2 auto-unlock..."
+
+# Check TPM availability
+if [ ! -e /dev/tpmrm0 ]; then
+  echo "WARNING: TPM 2.0 not detected. Skipping auto-unlock enrollment."
+  echo "You will need to enter your passphrase at every boot."
+else
+  # Find the LUKS device
+  LUKS_DEV=$(blkid -t TYPE=crypto_LUKS -o device 2>/dev/null | head -1)
+  if [ -n "$LUKS_DEV" ]; then
+    # Enroll TPM2 with PCR 0 (firmware) and PCR 7 (Secure Boot state)
+    # The passphrase is required to authorize the enrollment
+    echo "Enrolling TPM2 on $LUKS_DEV (PCR 0+7)..."
+    systemd-cryptenroll "$LUKS_DEV" --tpm2-device=auto --tpm2-pcrs=0+7 2>&1 || echo "WARNING: TPM2 enrollment failed. You can retry after first boot with: sudo systemd-cryptenroll $LUKS_DEV --tpm2-device=auto --tpm2-pcrs=0+7"
+
+    # Update NixOS config to use systemd initrd (required for TPM2 unlock)
+    if [ -f /mnt/etc/nixos/configuration.nix ]; then
+      # Add systemd initrd and TPM2 config
+      sed -i '/boot.initrd.luks.devices/a\    cryptTabExtraOpts = [ "tpm2-device=auto" ];' /mnt/etc/nixos/configuration.nix 2>/dev/null || true
+      sed -i '/imports = /a\  boot.initrd.systemd.enable = true;' /mnt/etc/nixos/configuration.nix 2>/dev/null || true
+      echo "  TPM2 enrollment complete. Disk will auto-unlock at boot."
+      echo "  Passphrase is kept as fallback (firmware updates will require it)."
+    fi
+  else
+    echo "WARNING: No LUKS device found. TPM2 enrollment skipped."
+  fi
+fi
+"#
+}
+
+/// Generate FIDO2/YubiKey enrollment commands (appended after LUKS install).
+fn fido2_postinstall() -> &'static str {
+    r#"
+# ── FIDO2/YubiKey Enrollment ──
+echo "STAGE: Enrolling FIDO2 security key..."
+if ls /dev/hidraw* >/dev/null 2>&1; then
+    LUKS_DEV=$(blkid -t TYPE=crypto_LUKS -o device 2>/dev/null | head -1)
+    if [ -n "$LUKS_DEV" ]; then
+        echo "Enrolling FIDO2 device on $LUKS_DEV..."
+        echo "Touch your security key when it blinks."
+        systemd-cryptenroll "$LUKS_DEV" --fido2-device=auto 2>&1 || echo "WARNING: FIDO2 enrollment failed. Passphrase still works."
+    else
+        echo "WARNING: No LUKS device found. Skipping FIDO2 enrollment."
+    fi
+else
+    echo "WARNING: No FIDO2 device detected. Skipping enrollment."
+    echo "You can enroll later with: systemd-cryptenroll /dev/<device> --fido2-device=auto"
+fi
+"#
+}
+
+/// Generate NixOS configuration snippet for desktop environment, GPU, locale.
+fn generate_system_config(msg: &ClientMessage) -> String {
+    let mut config = String::new();
+
+    // Timezone
+    let tz = if msg.timezone.is_empty() {
+        "UTC"
+    } else {
+        &msg.timezone
+    };
+    config.push_str(&format!("  time.timeZone = \"{}\";\n", tz));
+
+    // Locale
+    config.push_str("  i18n.defaultLocale = \"en_US.UTF-8\";\n");
+
+    // Keyboard
+    let kb = if msg.keyboard.is_empty() {
+        "us"
+    } else {
+        &msg.keyboard
+    };
+    config.push_str(&format!("  console.keyMap = \"{}\";\n", kb));
+    config.push_str(&format!("  services.xserver.xkb.layout = \"{}\";\n", kb));
+
+    // Desktop environment
+    match msg.desktop.as_str() {
+        "gnome" => {
+            config.push_str("  services.xserver.enable = true;\n");
+            config.push_str("  services.xserver.displayManager.gdm.enable = true;\n");
+            config.push_str("  services.xserver.desktopManager.gnome.enable = true;\n");
+        }
+        "plasma" => {
+            config.push_str("  services.xserver.enable = true;\n");
+            config.push_str("  services.displayManager.sddm.enable = true;\n");
+            config.push_str("  services.desktopManager.plasma6.enable = true;\n");
+        }
+        "hyprland" => {
+            config.push_str("  programs.hyprland.enable = true;\n");
+            config.push_str("  services.displayManager.sddm.enable = true;\n");
+            config.push_str("  services.displayManager.sddm.wayland.enable = true;\n");
+        }
+        "sway" => {
+            config.push_str("  programs.sway.enable = true;\n");
+            config.push_str("  services.displayManager.sddm.enable = true;\n");
+            config.push_str("  services.displayManager.sddm.wayland.enable = true;\n");
+        }
+        "xfce" => {
+            config.push_str("  services.xserver.enable = true;\n");
+            config.push_str("  services.xserver.displayManager.lightdm.enable = true;\n");
+            config.push_str("  services.xserver.desktopManager.xfce.enable = true;\n");
+        }
+        _ => {} // "none" or empty — no DE (server/CLI)
+    }
+
+    // GPU driver
+    match msg.gpu_driver.as_str() {
+        "nvidia" => {
+            config.push_str("  services.xserver.videoDrivers = [ \"nvidia\" ];\n");
+            config.push_str("  hardware.nvidia.modesetting.enable = true;\n");
+            config.push_str("  hardware.nvidia.open = false;\n");
+        }
+        "nvidia-open" => {
+            config.push_str("  services.xserver.videoDrivers = [ \"nvidia\" ];\n");
+            config.push_str("  hardware.nvidia.modesetting.enable = true;\n");
+            config.push_str("  hardware.nvidia.open = true;\n");
+        }
+        "amdgpu" => {
+            config.push_str("  services.xserver.videoDrivers = [ \"amdgpu\" ];\n");
+        }
+        "modesetting" => {
+            config.push_str("  services.xserver.videoDrivers = [ \"modesetting\" ];\n");
+        }
+        _ => {} // "auto" or "none"
+    }
+
+    // Networking
+    config.push_str("  networking.networkmanager.enable = true;\n");
+
+    config
+}
+
+/// Generate boot mode detection + partitioning commands.
+/// Returns a shell snippet that sets BOOT_MODE=efi|bios and creates boot partition accordingly.
+fn boot_mode_detection() -> &'static str {
+    r#"
+# ── Boot Mode Detection ──
+if [ -d /sys/firmware/efi ]; then
+  BOOT_MODE="efi"
+  echo "  Boot mode: EFI/UEFI"
+else
+  BOOT_MODE="bios"
+  echo "  Boot mode: Legacy BIOS (GRUB will be used)"
+fi
+"#
+}
+
+/// Generate shell commands that write the correct bootloader config to configuration.nix.
+/// Called after nixos-generate-config, patches the bootloader section based on detected boot mode.
+fn bootloader_patch_commands(disk_var: &str) -> String {
+    format!(
+        r#"
+# Patch bootloader config based on detected boot mode
+if [ "$BOOT_MODE" = "bios" ]; then
+  echo "  Configuring GRUB for BIOS boot..."
+  sed -i 's|boot.loader.systemd-boot.enable = true|boot.loader.grub.enable = true|' /mnt/etc/nixos/configuration.nix 2>/dev/null || true
+  sed -i '/boot.loader.grub.enable/a\  boot.loader.grub.device = "{disk}";' /mnt/etc/nixos/configuration.nix 2>/dev/null || true
+  sed -i '/canTouchEfiVariables/d' /mnt/etc/nixos/configuration.nix 2>/dev/null || true
+fi
+"#,
+        disk = disk_var
+    )
+}
+
+/// Generate boot partition creation commands based on boot mode.
+/// EFI: 512MB FAT32 ESP. BIOS: 1MB BIOS boot + 512MB ext4 /boot.
+fn boot_partition_commands(disk_var: &str, boot_part_num: u32) -> String {
+    format!(
+        r#"
+if [ "$BOOT_MODE" = "efi" ]; then
+  sgdisk -n {n}:0:+512M -t {n}:EF00 -c {n}:boot "{disk}"
+else
+  # BIOS: create BIOS boot partition (1MB) + /boot partition (512MB)
+  sgdisk -n {n}:0:+1M -t {n}:EF02 -c {n}:bios-boot "{disk}"
+  sgdisk -n {next}:0:+512M -t {next}:8300 -c {next}:boot "{disk}"
+fi
+"#,
+        n = boot_part_num,
+        next = boot_part_num + 1,
+        disk = disk_var
+    )
+}
+
+/// Format and mount the boot partition based on boot mode.
+/// EFI: mkfs.vfat + mount to /boot. BIOS: mkfs.ext4 + mount to /boot.
+fn boot_format_mount(boot_part_var: &str) -> String {
+    format!(
+        r#"
+if [ "$BOOT_MODE" = "efi" ]; then
+  mkfs.vfat -F 32 "{boot}"
+else
+  # BIOS boot: format the /boot partition (not the 1MB BIOS boot partition)
+  # The BIOS boot partition (EF02) is left unformatted — GRUB writes to it directly
+  mkfs.ext4 -F -L boot "{boot}"
+fi
+mkdir -p /mnt/boot
+mount "{boot}" /mnt/boot
+"#,
+        boot = boot_part_var
+    )
+}
+
+/// Generate a shell snippet that patches configuration.nix with system config (DE, GPU, locale).
+/// Appended after the configuration.nix heredoc in each layout.
+fn system_config_patch(msg: &ClientMessage) -> String {
+    let sys_config = generate_system_config(msg);
+    if sys_config.trim().is_empty() {
+        return String::new();
+    }
+    // Write a supplementary config file instead of patching inline —
+    // avoids fragile heredoc-in-command-substitution shell constructs.
+    format!(
+        r#"
+# Write supplementary system config (DE, GPU, locale, networking)
+cat > /mnt/etc/nixos/system-config.nix << 'SYSPATCH'
+{{ config, pkgs, ... }}:
+{{
+  # ── System Configuration (NixForHumanity) ──
+{sys_config}
+  # Audio (PipeWire)
+  services.pulseaudio.enable = false;
+  security.rtkit.enable = true;
+  services.pipewire = {{ enable = true; alsa.enable = true; pulse.enable = true; }};
+
+  # Nix settings
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nix.gc = {{ automatic = true; dates = "weekly"; options = "--delete-older-than 30d"; }};
+}}
+SYSPATCH
+# Add import to configuration.nix
+sed -i 's|imports = \[|imports = [ ./system-config.nix|' /mnt/etc/nixos/configuration.nix 2>/dev/null || echo "  (config patch: manual import needed)"
+"#,
+        sys_config = sys_config,
+    )
+}
+
+/// Generate the automated install script based on layout type.
+/// Build the shell commands that write configuration.nix (and optionally flake.nix)
+/// to /mnt/etc/nixos/.  When the browser supplied a generated config we use that
+/// verbatim; otherwise we fall back to the hardcoded minimal config for this layout.
+///
+/// The content is written via heredoc so that braces in the Nix source are never
+/// passed through Rust's `format!()` (which would require `{{`/`}}` escaping).
+// sanitize_heredoc imported from symthaea_spore::security
+
+/// Write NixOS config files directly to the target filesystem.
+///
+/// SECURITY: This replaces the heredoc-based `config_write_commands()`.
+/// By writing files directly via the filesystem API, there is no shell
+/// interpolation, no heredoc delimiter to escape, and no injection vector.
+/// The relay runs on the target machine, so direct file writes are possible.
+async fn write_config_files(
+    browser_config: &str,
+    fallback_config: &str,
+    browser_flake: &str,
+) -> Result<(), String> {
+    // Ensure target directory exists
+    tokio::fs::create_dir_all("/mnt/etc/nixos")
+        .await
+        .map_err(|e| format!("Failed to create /mnt/etc/nixos: {}", e))?;
+
+    // configuration.nix
+    let config_body = if browser_config.is_empty() {
+        fallback_config
+    } else {
+        browser_config
+    };
+    tokio::fs::write("/mnt/etc/nixos/configuration.nix", config_body)
+        .await
+        .map_err(|e| format!("Failed to write configuration.nix: {}", e))?;
+
+    // flake.nix (only if the browser supplied one)
+    if !browser_flake.is_empty() {
+        tokio::fs::write("/mnt/etc/nixos/flake.nix", browser_flake)
+            .await
+            .map_err(|e| format!("Failed to write flake.nix: {}", e))?;
+    }
+
+    Ok(())
+}
+
+/// Write NixOS configs by copying pre-staged files from /tmp (no heredoc for user input).
+/// Falls back to heredoc only for server-generated fallback configs (safe: not user-controlled).
+fn config_write_commands(
+    browser_config: &str,
+    fallback_config: &str,
+    browser_flake: &str,
+    transaction_dir: &str,
+) -> String {
+    let staging = format!("{transaction_dir}/config");
+    let mut out = String::new();
+    out.push_str("mkdir -p /mnt/etc/nixos\n");
+
+    if !browser_config.is_empty() {
+        // Browser config pre-staged via tokio::fs::write — no heredoc, no injection
+        out.push_str(&format!(
+            "cp {}/configuration.nix /mnt/etc/nixos/configuration.nix\n",
+            staging
+        ));
+    } else {
+        // Server-generated fallback — safe to use heredoc (not user input)
+        out.push_str("cat > /mnt/etc/nixos/configuration.nix << 'NIXCONF'\n");
+        out.push_str(fallback_config);
+        if !fallback_config.ends_with('\n') {
+            out.push('\n');
+        }
+        out.push_str("NIXCONF\n");
+    }
+
+    if !browser_flake.is_empty() {
+        out.push_str(&format!(
+            "cp {}/flake.nix /mnt/etc/nixos/flake.nix\n",
+            staging
+        ));
+    }
+
+    out.push_str(&format!("rm -rf {}\n", staging));
+    out
+}
+
+/// Legacy heredoc-based config writing (kept for tests and fallback reference).
+fn config_write_commands_heredoc(
+    browser_config: &str,
+    fallback_config: &str,
+    browser_flake: &str,
+) -> String {
+    let mut out = String::new();
+
+    let config_body = if browser_config.is_empty() {
+        fallback_config
+    } else {
+        browser_config
+    };
+    let safe_config = sanitize_heredoc(config_body, "NIXCONF");
+    out.push_str("cat > /mnt/etc/nixos/configuration.nix << 'NIXCONF'\n");
+    out.push_str(&safe_config);
+    if !safe_config.ends_with('\n') {
+        out.push('\n');
+    }
+    out.push_str("NIXCONF\n");
+
+    if !browser_flake.is_empty() {
+        let safe_flake = sanitize_heredoc(browser_flake, "FLAKEEOF");
+        out.push_str("\ncat > /mnt/etc/nixos/flake.nix << 'FLAKEEOF'\n");
+        out.push_str(&safe_flake);
+        if !safe_flake.ends_with('\n') {
+            out.push('\n');
+        }
+        out.push_str("FLAKEEOF\n");
+    }
+
+    out
+}
+
+fn generate_install_script(msg: &ClientMessage, transaction_dir: &str) -> String {
+    // SECURITY: All user inputs (disk, hostname, timezone, keyboard, desktop, gpu_driver)
+    // MUST be validated by the caller before reaching this function.
+    // See validate_disk_path(), validate_hostname_relay(), sanitize_input().
+    let hostname = if msg.hostname.is_empty() {
+        "guardian"
+    } else {
+        &msg.hostname
+    };
+
+    match msg.layout.as_str() {
+        "alongside" => {
+            // Alongside Windows/Linux: find free space, reuse existing ESP, install
+            let mut script = format!(
+                r#"set -eo pipefail
+echo "=== Symthaea Sovereign Birth: Alongside Existing OS ==="
+
+DISK="{disk}"
+
+# Safety: Check for BitLocker
+echo "STAGE: Checking for BitLocker..."
+BITLOCKER_DETECTED=false
+for PART in $(blkid -o device "$DISK"* 2>/dev/null); do
+  if blkid "$PART" 2>/dev/null | grep -qi bitlocker; then
+    BITLOCKER_DETECTED=true
+    echo "BITLOCKER_DETECTED: $PART"
+    echo ""
+    echo "================================================================"
+    echo "  BITLOCKER ENCRYPTION DETECTED on $PART"
+    echo "================================================================"
+    echo ""
+    echo "  Before proceeding, you MUST:"
+    echo ""
+    echo "  1. FIND YOUR RECOVERY KEY — you will need it if BitLocker"
+    echo "     activates during partition changes."
+    echo ""
+    echo "     Where to find it:"
+    echo "     - Microsoft account: https://account.microsoft.com/devices/recoverykey"
+    echo "     - Azure AD: Check with your IT administrator"
+    echo "     - Printout: Check papers from when you set up this PC"
+    echo "     - USB drive: Check USB drives used during BitLocker setup"
+    echo ""
+    echo "  2. RECOMMENDED: Boot into Windows and SUSPEND BitLocker first:"
+    echo "     Settings > Privacy & Security > Device Encryption > Turn Off"
+    echo "     (or: manage-bde -protectors -disable C: from Admin CMD)"
+    echo ""
+    echo "  3. ALTERNATIVE: Shrink Windows partition from within Windows:"
+    echo "     Settings > System > Storage > Advanced > Disks & volumes"
+    echo "     Select C: > Shrink > Enter desired free space (min 40GB)"
+    echo ""
+    echo "  The install will continue, but if BitLocker recovery triggers,"
+    echo "  you will need your recovery key to access Windows again."
+    echo "================================================================"
+    echo ""
+  fi
+done
+
+# Step 1: Find unallocated space on the disk
+echo "STAGE: Detecting free space on {disk}..."
+LAST_END=$(sgdisk -p "$DISK" 2>/dev/null | grep '^ ' | tail -1 | awk '{{print $3}}')
+DISK_END=$(sgdisk -p "$DISK" 2>/dev/null | grep 'Disk size' | awk '{{print $3}}')
+FREE_SECTORS=$((DISK_END - LAST_END - 34))
+FREE_GB=$((FREE_SECTORS * 512 / 1073741824))
+echo "Last partition ends at sector $LAST_END, disk ends at $DISK_END"
+echo "Free space: ~${{FREE_GB}}GB ($FREE_SECTORS sectors)"
+
+if [ "$FREE_GB" -lt 20 ]; then
+  echo "STAGE: Attempting automatic NTFS partition shrink..."
+  # Find the largest NTFS partition (likely Windows C:)
+  NTFS_PART=""
+  NTFS_SIZE=0
+  for PART in $(lsblk -rno NAME,FSTYPE "$DISK" 2>/dev/null | awk '$2=="ntfs"{{print "/dev/"$1}}'); do
+    SZ=$(blockdev --getsize64 "$PART" 2>/dev/null || echo 0)
+    if [ "$SZ" -gt "$NTFS_SIZE" ]; then
+      NTFS_SIZE=$SZ
+      NTFS_PART=$PART
+    fi
+  done
+
+  if [ -n "$NTFS_PART" ] && [ "$BITLOCKER_DETECTED" = false ] && command -v ntfsresize >/dev/null 2>&1; then
+    echo "  Found NTFS partition: $NTFS_PART ($((NTFS_SIZE / 1073741824))GB)"
+    # Check NTFS consistency first
+    ntfsfix -n "$NTFS_PART" 2>/dev/null || true
+    # Get used space from ntfsinfo
+    NTFS_USED=$(ntfsresize --info --force "$NTFS_PART" 2>/dev/null | grep "resize at" | grep -oP '[0-9]+' | tail -1 || echo "0")
+    if [ "$NTFS_USED" -gt 0 ]; then
+      # New size = used + 20% headroom + 10GB safety margin (whichever is larger)
+      HEADROOM_20=$((NTFS_USED * 20 / 100))
+      MIN_HEADROOM=$((10 * 1024 * 1024 * 1024))
+      HEADROOM=$((HEADROOM_20 > MIN_HEADROOM ? HEADROOM_20 : MIN_HEADROOM))
+      NEW_SIZE=$((NTFS_USED + HEADROOM))
+      # Safety: never shrink below 50% of original
+      HALF=$((NTFS_SIZE / 2))
+      [ "$NEW_SIZE" -lt "$HALF" ] && NEW_SIZE=$HALF
+      NEW_GB=$((NEW_SIZE / 1073741824))
+      FREED_GB=$(((NTFS_SIZE - NEW_SIZE) / 1073741824))
+      echo "  Used: $((NTFS_USED / 1073741824))GB, New size: ${{NEW_GB}}GB (freeing ~${{FREED_GB}}GB)"
+      echo "  Running dry-run first..."
+      if ntfsresize --no-action --size "$NEW_SIZE" "$NTFS_PART" 2>&1; then
+        echo "  Dry-run passed. Resizing NTFS partition..."
+        ntfsresize --force --size "$NEW_SIZE" "$NTFS_PART" 2>&1
+        # Shrink the partition table entry to match
+        PART_NUM=$(echo "$NTFS_PART" | grep -oP '[0-9]+$')
+        NEW_SECTORS=$((NEW_SIZE / 512))
+        echo "  Updating partition table (partition $PART_NUM to $NEW_SECTORS sectors)..."
+        # Use sgdisk to delete and recreate the partition at the new size
+        PART_START=$(sgdisk -i "$PART_NUM" "$DISK" 2>/dev/null | grep "First sector" | awk '{{print $3}}')
+        PART_TYPE=$(sgdisk -i "$PART_NUM" "$DISK" 2>/dev/null | grep "Partition GUID code" | awk '{{print $4}}')
+        PART_NAME=$(sgdisk -i "$PART_NUM" "$DISK" 2>/dev/null | grep "Partition name" | cut -d"'" -f2)
+        if [ -n "$PART_START" ]; then
+          sgdisk -d "$PART_NUM" "$DISK" 2>/dev/null
+          sgdisk -n "$PART_NUM:$PART_START:+$NEW_SECTORS" -t "$PART_NUM:0700" -c "$PART_NUM:$PART_NAME" "$DISK" 2>/dev/null
+          partprobe "$DISK" 2>/dev/null || true
+          udevadm settle 2>/dev/null || true
+          echo "  NTFS partition shrunk successfully. Rechecking free space..."
+        fi
+        # Recheck free space
+        LAST_END=$(sgdisk -p "$DISK" 2>/dev/null | grep '^ ' | tail -1 | awk '{{print $3}}')
+        FREE_SECTORS=$((DISK_END - LAST_END - 34))
+        FREE_GB=$((FREE_SECTORS * 512 / 1073741824))
+        echo "  Free space after shrink: ~${{FREE_GB}}GB"
+      else
+        echo "  Dry-run FAILED — partition cannot be safely shrunk."
+        echo "  Please shrink from within Windows instead."
+      fi
+    else
+      echo "  Could not determine NTFS used space. Manual shrink required."
+    fi
+  elif [ "$BITLOCKER_DETECTED" = true ]; then
+    echo "  Cannot auto-shrink: BitLocker is active. Suspend BitLocker in Windows first."
+  elif [ -z "$NTFS_PART" ]; then
+    echo "  No NTFS partition found to shrink."
+  else
+    echo "  ntfsresize not available on this ISO."
+  fi
+
+  # Final check after potential shrink
+  if [ "$FREE_GB" -lt 20 ]; then
+    echo "ERROR: Still less than 20GB free space (${{FREE_GB}}GB)."
+    echo "ERROR: Boot into Windows and shrink the C: partition:"
+    echo "  Settings > System > Storage > Advanced > Disks & volumes"
+    echo "  Select C: drive > Shrink > Enter at least 40GB"
+    exit 1
+  fi
+fi
+
+# Step 2: Create NixOS partition in the free space (do NOT resize existing partitions)
+echo "STAGE: Partitioning free space..."
+PART_NUM=$(sgdisk -p "$DISK" | grep '^ ' | wc -l)
+PART_NUM=$((PART_NUM + 1))
+sgdisk -n "$PART_NUM:0:0" -t "$PART_NUM:8300" -c "$PART_NUM:nixos-root" "$DISK"
+partprobe "$DISK" 2>/dev/null || true
+udevadm settle 2>/dev/null || true
+sleep 3
+NIXOS_PART="${{DISK}}p$PART_NUM"
+[ -b "$NIXOS_PART" ] || NIXOS_PART="${{DISK}}$PART_NUM"
+echo "Created partition: $NIXOS_PART"
+
+# Step 3: Format with btrfs + subvolumes
+echo "STAGE: Formatting with btrfs..."
+mkfs.btrfs -f -L nixos "$NIXOS_PART"
+mount "$NIXOS_PART" /mnt
+btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@nix
+btrfs subvolume create /mnt/@log
+btrfs subvolume create /mnt/@snapshots
+btrfs subvolume create /mnt/@swap
+umount /mnt
+
+# Step 4: Mount everything
+echo "STAGE: Mounting filesystems..."
+mount -o subvol=@,compress=zstd:3,noatime "$NIXOS_PART" /mnt
+mkdir -p /mnt/{{home,nix,var/log,.snapshots,swap,boot,etc/nixos}}
+mount -o subvol=@home,compress=zstd:3,noatime "$NIXOS_PART" /mnt/home
+mount -o subvol=@nix,compress=zstd:3,noatime "$NIXOS_PART" /mnt/nix
+mount -o subvol=@log,compress=zstd:3,noatime "$NIXOS_PART" /mnt/var/log
+mount -o subvol=@snapshots,compress=zstd:3,noatime "$NIXOS_PART" /mnt/.snapshots
+mount -o subvol=@swap,noatime "$NIXOS_PART" /mnt/swap
+
+# Reuse existing EFI System Partition (do NOT create a new one)
+EFI_PART=$(lsblk -nlo NAME,PARTTYPE "$DISK" | grep -i 'c12a7328' | head -1 | awk '{{print "/dev/"$1}}')
+if [ -n "$EFI_PART" ]; then
+  mount "$EFI_PART" /mnt/boot
+  echo "Reusing existing ESP: $EFI_PART"
+else
+  echo "WARNING: No EFI partition found. systemd-boot may not work."
+fi
+
+# Step 5: Write NixOS configuration
+echo "STAGE: Generating configuration..."
+nixos-generate-config --root /mnt
+"#,
+                disk = msg.disk
+            );
+
+            // Append configuration.nix (and optionally flake.nix) via heredoc —
+            // avoids passing Nix braces through format!().
+            let fallback_alongside = format!(
+                "{{ config, pkgs, ... }}:\n\
+                 {{\n\
+                 \x20 imports = [ ./hardware-configuration.nix ];\n\
+                 \x20 networking.hostName = \"{hostname}\";\n\
+                 \x20 boot.loader.systemd-boot.enable = true;\n\
+                 \x20 boot.loader.efi.canTouchEfiVariables = true;\n\
+                 \x20 # Dual-boot: sync hardware clock with Windows (which uses localtime)\n\
+                 \x20 time.hardwareClockInLocalTime = true;\n\
+                 \x20 services.openssh.enable = true;\n\
+                 \x20 services.earlyoom = {{ enable = true; freeMemThreshold = 5; freeSwapThreshold = 5; }};\n\
+                 \x20 services.fstrim.enable = true;\n\
+                 \x20 services.smartd = {{ enable = true; autodetect = true; }};\n\
+                 \x20 services.btrfs.autoScrub = {{ enable = true; interval = \"monthly\"; fileSystems = [ \"/\" ]; }};\n\
+                 \x20 zramSwap = {{ enable = true; algorithm = \"zstd\"; }};\n\
+                 \x20 users.users.{hostname} = {{\n\
+                 \x20   isNormalUser = true;\n\
+                 \x20   extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];\n\
+                 \x20   \n\
+                 \x20 }};\n\
+                 \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs ];\n\
+                 \x20 system.stateVersion = \"26.05\";\n\
+                 }}",
+                hostname = hostname,
+            );
+            script.push_str(&config_write_commands(
+                &msg.configuration_nix,
+                &fallback_alongside,
+                &msg.flake_nix,
+                transaction_dir,
+            ));
+            script.push_str(&bootloader_patch_commands(&msg.disk));
+
+            script.push_str(&format!(r#"
+# Step 6: Create swap file
+echo "STAGE: Configuring swap..."
+fallocate -l 8G /mnt/swap/swapfile
+chmod 600 /mnt/swap/swapfile
+mkswap /mnt/swap/swapfile
+
+# Step 7: Install
+echo "STAGE: Installing NixOS..."
+echo "This may take several minutes as packages are downloaded..."
+
+# Bounded retry of the exact same install plan.
+# A failed realization must never trigger an unreviewed configuration mutation.
+ATTEMPT=1
+MAX_ATTEMPTS=3
+while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+    echo "  Install attempt $ATTEMPT/$MAX_ATTEMPTS..."
+    if nixos-install --no-root-passwd 2>&1; then
+        echo "  Install succeeded on attempt $ATTEMPT"
+        break
+    else
+        EXIT_CODE=$?
+        echo "  Install failed (exit $EXIT_CODE) on attempt $ATTEMPT"
+        if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+            echo "ERROR: Install failed after $MAX_ATTEMPTS attempts"
+            exit 1
+        fi
+        echo "STAGE: Retry unchanged plan (attempt $ATTEMPT)..."
+        echo "  No automatic configuration edits will be made."
+    fi
+    ATTEMPT=$((ATTEMPT + 1))
+done
+
+# Step 8: Verify
+echo "STAGE: Verifying installation..."
+ls /mnt/nix/store | wc -l | xargs -I{{}} echo "  {{}} store paths installed"
+ls /mnt/boot/EFI/BOOT/BOOTX64.EFI 2>/dev/null && echo "  Bootloader: OK" || echo "  Bootloader: checking..."
+ls /mnt/boot/EFI/systemd/systemd-bootx64.efi 2>/dev/null && echo "  systemd-boot: OK" || echo "  systemd-boot: checking..."
+
+echo ""
+echo "STAGE: FirstBreath"
+echo "=== Sovereign Birth Complete (Alongside) ==="
+echo "Reboot and select NixOS from the boot menu."
+echo "Login as: {hostname} (use the password supplied during install)"
+echo "Your existing OS is preserved — select it from the boot menu."
+echo "COMPLETE"
+"#, hostname = hostname));
+            script
+        }
+
+        "single" | "" => {
+            // Full disk wipe → direct partition → nixos-install
+            // Uses sgdisk + mkfs directly (no disko download needed on live ISO)
+            let mut script = format!(
+                r#"set -eo pipefail
+echo "=== Symthaea Sovereign Birth: Single Disk ==="
+{boot_detect}
+
+# Step 1: Wipe and partition
+echo "STAGE: Partitioning disk {disk}..."
+umount -R /mnt 2>/dev/null || true
+swapoff {disk}* 2>/dev/null || true
+wipefs -af {disk} 2>/dev/null || true
+sgdisk --zap-all {disk}
+
+# Boot partition (EFI or BIOS, auto-detected)
+if [ "$BOOT_MODE" = "efi" ]; then
+  sgdisk -n 1:0:+512M -t 1:EF00 -c 1:boot {disk}
+  sgdisk -n 2:0:0 -t 2:8300 -c 2:nixos {disk}
+  ROOT_NUM=2
+else
+  sgdisk -n 1:0:+1M -t 1:EF02 -c 1:bios-boot {disk}
+  sgdisk -n 2:0:+512M -t 2:8300 -c 2:boot {disk}
+  sgdisk -n 3:0:0 -t 3:8300 -c 3:nixos {disk}
+  ROOT_NUM=3
+fi
+partprobe {disk} 2>/dev/null || true
+blockdev --rereadpt {disk} 2>/dev/null || true
+udevadm settle 2>/dev/null || true
+sleep 3
+
+# Detect partition names (nvme uses p1/p2, sata uses 1/2)
+if [ "$BOOT_MODE" = "efi" ]; then
+  if [ -b "{disk}p1" ]; then BOOT="{disk}p1"; ROOT="{disk}p2"; else BOOT="{disk}1"; ROOT="{disk}2"; fi
+else
+  if [ -b "{disk}p2" ]; then BOOT="{disk}p2"; ROOT="{disk}p3"; else BOOT="{disk}2"; ROOT="{disk}3"; fi
+fi
+echo "  Boot: $BOOT ($BOOT_MODE)"
+echo "  Root: $ROOT"
+
+# Step 2: Format with btrfs (snapshots, compression, rollback)
+echo "STAGE: Formatting with btrfs..."
+wipefs -af "$BOOT" 2>/dev/null || true
+wipefs -af "$ROOT" 2>/dev/null || true
+if [ "$BOOT_MODE" = "efi" ]; then
+  mkfs.vfat -F 32 "$BOOT"
+else
+  mkfs.ext4 -F -L boot "$BOOT"
+fi
+mkfs.btrfs -f -L nixos "$ROOT"
+
+# Step 3: Create btrfs subvolumes
+mount "$ROOT" /mnt
+btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@nix
+btrfs subvolume create /mnt/@log
+btrfs subvolume create /mnt/@snapshots
+btrfs subvolume create /mnt/@swap
+umount /mnt
+
+# Step 4: Mount with compression
+echo "STAGE: Mounting filesystems..."
+mount -o subvol=@,compress=zstd:3,noatime "$ROOT" /mnt
+mkdir -p /mnt/{{boot,home,nix,var/log,.snapshots,swap}}
+mount "$BOOT" /mnt/boot
+mount -o subvol=@home,compress=zstd:3,noatime "$ROOT" /mnt/home
+mount -o subvol=@nix,compress=zstd:3,noatime "$ROOT" /mnt/nix
+mount -o subvol=@log,compress=zstd:3,noatime "$ROOT" /mnt/var/log
+mount -o subvol=@snapshots,compress=zstd:3,noatime "$ROOT" /mnt/.snapshots
+mount -o subvol=@swap,noatime "$ROOT" /mnt/swap
+
+# Step 4: Generate hardware config + write our config
+echo "STAGE: Generating configuration..."
+mkdir -p /mnt/etc/nixos
+nixos-generate-config --root /mnt || echo "WARNING: nixos-generate-config failed (may be normal for some layouts)"
+"#,
+                disk = msg.disk,
+                boot_detect = boot_mode_detection()
+            );
+
+            // Append configuration.nix (and optionally flake.nix) via heredoc —
+            // avoids passing Nix braces through format!().
+            let fallback_single = format!(
+                "{{ config, pkgs, ... }}:\n\
+                 {{\n\
+                 \x20 imports = [ ./hardware-configuration.nix ];\n\
+                 \x20 networking.hostName = \"{hostname}\";\n\
+                 \x20 boot.loader.systemd-boot.enable = true;\n\
+                 \x20 boot.loader.efi.canTouchEfiVariables = true;\n\
+                 \n\
+                 \x20 # Hardening (Symthaea defaults)\n\
+                 \x20 services.openssh.enable = true;\n\
+                 \x20 services.earlyoom = {{ enable = true; freeMemThreshold = 5; freeSwapThreshold = 5; }};\n\
+                 \x20 services.fstrim.enable = true;\n\
+                 \x20 services.smartd = {{ enable = true; autodetect = true; }};\n\
+                 \x20 services.btrfs.autoScrub = {{ enable = true; interval = \"monthly\"; fileSystems = [ \"/\" ]; }};\n\
+                 \x20 zramSwap = {{ enable = true; algorithm = \"zstd\"; }};\n\
+                 \x20 boot.kernel.sysctl.\"vm.swappiness\" = 60;\n\
+                 \n\
+                 \x20 # User\n\
+                 \x20 users.users.{hostname} = {{\n\
+                 \x20   isNormalUser = true;\n\
+                 \x20   extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];\n\
+                 \x20   \n\
+                 \x20 }};\n\
+                 \n\
+                 \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs ];\n\
+                 \x20 system.stateVersion = \"26.05\";\n\
+                 }}",
+                hostname = hostname,
+            );
+            script.push_str(&config_write_commands(
+                &msg.configuration_nix,
+                &fallback_single,
+                &msg.flake_nix,
+                transaction_dir,
+            ));
+            // Patch bootloader for BIOS mode
+            script.push_str(&bootloader_patch_commands(&msg.disk));
+
+            script.push_str(&format!(r#"
+# Step 5: Create swap file
+echo "STAGE: Configuring swap..."
+fallocate -l 16G /mnt/swap/swapfile
+chmod 600 /mnt/swap/swapfile
+mkswap /mnt/swap/swapfile
+
+# Step 6: Install
+echo "STAGE: Installing NixOS..."
+echo "This may take several minutes as packages are downloaded..."
+
+# Bounded retry of the exact same install plan.
+# A failed realization must never trigger an unreviewed configuration mutation.
+ATTEMPT=1
+MAX_ATTEMPTS=3
+while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+    echo "  Install attempt $ATTEMPT/$MAX_ATTEMPTS..."
+    if nixos-install --no-root-passwd 2>&1; then
+        echo "  Install succeeded on attempt $ATTEMPT"
+        break
+    else
+        EXIT_CODE=$?
+        echo "  Install failed (exit $EXIT_CODE) on attempt $ATTEMPT"
+        if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+            echo "ERROR: Install failed after $MAX_ATTEMPTS attempts"
+            exit 1
+        fi
+        echo "STAGE: Retry unchanged plan (attempt $ATTEMPT)..."
+        echo "  No automatic configuration edits will be made."
+    fi
+    ATTEMPT=$((ATTEMPT + 1))
+done
+
+# Step 6: Verify
+echo "STAGE: Verifying installation..."
+ls /mnt/nix/store | wc -l | xargs -I{{}} echo "  {{}} store paths installed"
+ls /mnt/boot/EFI/BOOT/BOOTX64.EFI && echo "  Bootloader: OK" || echo "  Bootloader: MISSING"
+
+echo ""
+echo "STAGE: FirstBreath"
+echo "=== Sovereign Birth Complete ==="
+echo "Reboot the machine: sudo reboot"
+echo "Login as: {hostname} (use the password supplied during install)"
+echo "COMPLETE"
+"#, hostname = hostname));
+            script
+        }
+
+        "single-zfs" => {
+            // Full disk wipe → ZFS pool with datasets → nixos-install
+            let mut script = format!(
+                r#"set -eo pipefail
+echo "=== NixForHumanity: Single Disk (ZFS) ==="
+
+DISK="{disk}"
+
+# Step 1: Wipe and partition
+echo "STAGE: Partitioning disk {disk}..."
+umount -R /mnt 2>/dev/null || true
+wipefs -af {disk} 2>/dev/null || true
+sgdisk --zap-all {disk}
+sgdisk -n 1:0:+512M -t 1:EF00 -c 1:boot {disk}
+sgdisk -n 2:0:0 -t 2:BF00 -c 2:zfs {disk}
+partprobe {disk} 2>/dev/null || true
+udevadm settle 2>/dev/null || true
+sleep 3
+
+if [ -b "{disk}p1" ]; then
+  BOOT="{disk}p1"
+  ROOT="{disk}p2"
+else
+  BOOT="{disk}1"
+  ROOT="{disk}2"
+fi
+echo "  Boot: $BOOT"
+echo "  Root: $ROOT"
+
+# Step 2: Format boot partition
+echo "STAGE: Formatting boot partition..."
+mkfs.vfat -F 32 "$BOOT"
+
+# Step 3: Create ZFS pool with datasets
+echo "STAGE: Creating ZFS pool..."
+# Generate a unique hostId
+HOSTID=$(head -c 8 /etc/machine-id 2>/dev/null || echo "deadbeef")
+
+zpool create -f \
+  -o ashift=12 \
+  -o autotrim=on \
+  -O acltype=posixacl \
+  -O relatime=on \
+  -O xattr=sa \
+  -O dnodesize=auto \
+  -O normalization=formD \
+  -O mountpoint=none \
+  -O canmount=off \
+  -O compression=zstd \
+  rpool "$ROOT"
+
+# Create datasets
+echo "STAGE: Creating ZFS datasets..."
+zfs create -o mountpoint=legacy rpool/root
+zfs create -o mountpoint=legacy rpool/home
+zfs create -o mountpoint=legacy rpool/nix
+zfs create -o mountpoint=legacy -o com.sun:auto-snapshot=false rpool/nix/store
+zfs create -o mountpoint=legacy rpool/var
+zfs create -o mountpoint=legacy rpool/var/log
+
+# Create swap zvol (ZFS doesn't support swap files)
+zfs create -V 8G -b 4096 rpool/swap
+mkswap /dev/zvol/rpool/swap
+
+# Step 4: Mount everything
+echo "STAGE: Mounting filesystems..."
+mount -t zfs rpool/root /mnt
+mkdir -p /mnt/{{boot,home,nix,var,var/log}}
+mount "$BOOT" /mnt/boot
+mount -t zfs rpool/home /mnt/home
+mount -t zfs rpool/nix /mnt/nix
+mount -t zfs rpool/var /mnt/var
+mount -t zfs rpool/var/log /mnt/var/log
+
+# Step 5: Generate hardware config
+echo "STAGE: Generating configuration..."
+mkdir -p /mnt/etc/nixos
+nixos-generate-config --root /mnt || echo "WARNING: nixos-generate-config issue (may be normal for ZFS)"
+
+# Write hostId to hardware-configuration.nix (required for ZFS)
+echo '  networking.hostId = "deadbeef";' >> /mnt/etc/nixos/hardware-configuration.nix 2>/dev/null || true
+"#,
+                disk = msg.disk
+            );
+
+            let fallback_zfs = format!(
+                "{{ config, pkgs, ... }}:\n{{\n  imports = [ ./hardware-configuration.nix ];\n  networking.hostName = \"{hostname}\";\n  boot.loader.systemd-boot.enable = true;\n  boot.loader.efi.canTouchEfiVariables = true;\n  boot.supportedFilesystems = [ \"zfs\" ];\n  boot.zfs.devNodes = \"/dev/disk/by-id\";\n  networking.hostId = \"deadbeef\";\n  services.zfs.autoScrub.enable = true;\n  services.zfs.trim.enable = true;\n  users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];  }};\n  environment.systemPackages = with pkgs; [ vim git curl wget htop ];\n  system.stateVersion = \"26.05\";\n}}",
+                hostname = hostname,
+            );
+            script.push_str(&config_write_commands(
+                &msg.configuration_nix,
+                &fallback_zfs,
+                &msg.flake_nix,
+                transaction_dir,
+            ));
+            script.push_str(&bootloader_patch_commands(&msg.disk));
+
+            // ZFS doesn't need separate swap file setup — zvol already created
+            script.push_str(&format!(
+                r#"
+# Step 6: Install
+echo "STAGE: Installing NixOS..."
+nixos-install --no-root-passwd 2>&1
+
+# Step 7: Verify
+echo "STAGE: Verifying installation..."
+zpool status rpool 2>&1 | head -10
+echo "  ZFS pool: OK"
+
+echo ""
+echo "STAGE: FirstBreath"
+echo "=== NixOS Installed (ZFS) ==="
+echo "Reboot: sudo reboot"
+echo "Login as: {hostname} (use the password supplied during install)"
+echo "COMPLETE"
+"#,
+                hostname = hostname
+            ));
+            script
+        }
+
+        "single-luks" => {
+            // Full disk wipe → LUKS2 encryption → btrfs → nixos-install
+            // The LUKS secret is staged separately by the authenticated
+            // install handler and is never interpolated into this script.
+            let luks_key_file = format!("{transaction_dir}/luks-passphrase");
+            let mut script = format!(
+                r#"set -eo pipefail
+echo "=== Symthaea Sovereign Birth: Encrypted Single Disk ==="
+
+# Step 1: Wipe and partition
+echo "STAGE: Partitioning disk {disk}..."
+umount -R /mnt 2>/dev/null || true
+swapoff {disk}* 2>/dev/null || true
+wipefs -af {disk} 2>/dev/null || true
+sgdisk --zap-all {disk}
+sgdisk -n 1:0:+512M -t 1:EF00 -c 1:boot {disk}
+sgdisk -n 2:0:0 -t 2:8309 -c 2:cryptroot {disk}
+partprobe {disk} 2>/dev/null || true
+udevadm settle 2>/dev/null || true
+sleep 3
+
+if [ -b "{disk}p1" ]; then
+  BOOT="{disk}p1"
+  CRYPT_PART="{disk}p2"
+else
+  BOOT="{disk}1"
+  CRYPT_PART="{disk}2"
+fi
+echo "  Boot: $BOOT"
+echo "  Encrypted partition: $CRYPT_PART"
+
+# Step 2: Set up LUKS2 encryption
+echo "STAGE: Setting up encryption..."
+LUKS_KEYFILE="{luks_key_file}"
+if [ ! -s "$LUKS_KEYFILE" ]; then
+  echo "ERROR: LUKS2 passphrase staging file is missing."
+  exit 1
+fi
+cryptsetup luksFormat --type luks2 --label cryptroot \
+  --pbkdf argon2id --iter-time 3000 "$CRYPT_PART" --key-file "$LUKS_KEYFILE"
+cryptsetup open "$CRYPT_PART" cryptroot --key-file "$LUKS_KEYFILE"
+CRYPT_UUID=$(blkid -s UUID -o value "$CRYPT_PART")
+echo "  LUKS UUID: $CRYPT_UUID"
+
+# Step 3: Format with btrfs
+echo "STAGE: Formatting with btrfs..."
+wipefs -af "$BOOT" 2>/dev/null || true
+mkfs.vfat -F 32 "$BOOT"
+mkfs.btrfs -f -L nixos /dev/mapper/cryptroot
+
+# Step 4: Create btrfs subvolumes
+mount /dev/mapper/cryptroot /mnt
+btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@nix
+btrfs subvolume create /mnt/@log
+btrfs subvolume create /mnt/@snapshots
+btrfs subvolume create /mnt/@swap
+umount /mnt
+
+# Step 5: Mount with compression
+echo "STAGE: Mounting filesystems..."
+mount -o subvol=@,compress=zstd:3,noatime /dev/mapper/cryptroot /mnt
+mkdir -p /mnt/{{boot,home,nix,var/log,.snapshots,swap}}
+mount "$BOOT" /mnt/boot
+mount -o subvol=@home,compress=zstd:3,noatime /dev/mapper/cryptroot /mnt/home
+mount -o subvol=@nix,compress=zstd:3,noatime /dev/mapper/cryptroot /mnt/nix
+mount -o subvol=@log,compress=zstd:3,noatime /dev/mapper/cryptroot /mnt/var/log
+mount -o subvol=@snapshots,compress=zstd:3,noatime /dev/mapper/cryptroot /mnt/.snapshots
+mount -o subvol=@swap,noatime /dev/mapper/cryptroot /mnt/swap
+
+# Step 6: Generate hardware config + write NixOS config with LUKS
+echo "STAGE: Generating configuration..."
+nixos-generate-config --root /mnt
+"#,
+                disk = msg.disk,
+                luks_key_file = luks_key_file
+            );
+
+            // Append configuration.nix (and optionally flake.nix) via heredoc.
+            // NOTE: The fallback LUKS config uses an *unquoted* heredoc (NIXCONF without
+            // single quotes) so that $CRYPT_UUID is expanded by the shell at install time.
+            // When the browser supplies a config, it is written with a quoted heredoc
+            // ('NIXCONF') since it should already contain the correct UUID or be self-contained.
+            if !msg.configuration_nix.is_empty() {
+                // Browser config pre-staged — copy from temp dir (no heredoc)
+                let staging = format!("{transaction_dir}/config");
+                script.push_str(&format!("mkdir -p /mnt/etc/nixos\ncp {}/configuration.nix /mnt/etc/nixos/configuration.nix\n", staging));
+                if !msg.flake_nix.is_empty() {
+                    script.push_str(&format!(
+                        "cp {}/flake.nix /mnt/etc/nixos/flake.nix\n",
+                        staging
+                    ));
+                }
+                script.push_str(&format!("rm -rf {}\n", staging));
+            } else {
+                // Fallback: unquoted heredoc for $CRYPT_UUID expansion
+                script.push_str(&format!(
+                    "cat > /mnt/etc/nixos/configuration.nix << NIXCONF\n\
+                     {{ config, pkgs, ... }}:\n\
+                     {{\n\
+                     \x20 imports = [ ./hardware-configuration.nix ];\n\
+                     \x20 networking.hostName = \"{hostname}\";\n\
+                     \x20 boot.loader.systemd-boot.enable = true;\n\
+                     \x20 boot.loader.efi.canTouchEfiVariables = true;\n\
+                     \n\
+                     \x20 # LUKS encryption\n\
+                     \x20 boot.initrd.luks.devices.\"cryptroot\" = {{\n\
+                     \x20   device = \"/dev/disk/by-uuid/$CRYPT_UUID\";\n\
+                     \x20   allowDiscards = true;\n\
+                     \x20 }};\n\
+                     \n\
+                     \x20 # Hardening (Symthaea defaults)\n\
+                     \x20 services.openssh.enable = true;\n\
+                     \x20 services.earlyoom = {{ enable = true; freeMemThreshold = 5; freeSwapThreshold = 5; }};\n\
+                     \x20 services.fstrim.enable = true;\n\
+                     \x20 services.smartd = {{ enable = true; autodetect = true; }};\n\
+                     \x20 services.btrfs.autoScrub = {{ enable = true; interval = \"monthly\"; fileSystems = [ \"/\" ]; }};\n\
+                     \x20 zramSwap = {{ enable = true; algorithm = \"zstd\"; }};\n\
+                     \x20 boot.kernel.sysctl.\"vm.swappiness\" = 60;\n\
+                     \n\
+                     \x20 # User\n\
+                     \x20 users.users.{hostname} = {{\n\
+                     \x20   isNormalUser = true;\n\
+                     \x20   extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];\n\
+                     \x20   \n\
+                     \x20 }};\n\
+                     \n\
+                     \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs cryptsetup ];\n\
+                     \x20 system.stateVersion = \"26.05\";\n\
+                     }}\n\
+                     NIXCONF\n",
+                    hostname = hostname,
+                    luks_key_file = luks_key_file,
+                ));
+                // Write flake.nix if provided by browser even with fallback config
+                if !msg.flake_nix.is_empty() {
+                    script.push_str("\ncat > /mnt/etc/nixos/flake.nix << 'FLAKEEOF'\n");
+                    script.push_str(&msg.flake_nix);
+                    if !msg.flake_nix.ends_with('\n') {
+                        script.push('\n');
+                    }
+                    script.push_str("FLAKEEOF\n");
+                }
+            }
+
+            // Patch bootloader for BIOS mode (LUKS layout)
+            script.push_str(&bootloader_patch_commands(&msg.disk));
+
+            script.push_str(&format!(r#"
+# Step 7: Create swap file
+echo "STAGE: Configuring swap..."
+fallocate -l 16G /mnt/swap/swapfile
+chmod 600 /mnt/swap/swapfile
+mkswap /mnt/swap/swapfile
+
+# Step 8: Install
+echo "STAGE: Installing NixOS..."
+echo "This may take several minutes as packages are downloaded..."
+
+# Bounded retry of the exact same install plan.
+# A failed realization must never trigger an unreviewed configuration mutation.
+ATTEMPT=1
+MAX_ATTEMPTS=3
+while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+    echo "  Install attempt $ATTEMPT/$MAX_ATTEMPTS..."
+    if nixos-install --no-root-passwd 2>&1; then
+        echo "  Install succeeded on attempt $ATTEMPT"
+        break
+    else
+        EXIT_CODE=$?
+        echo "  Install failed (exit $EXIT_CODE) on attempt $ATTEMPT"
+        if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+            echo "ERROR: Install failed after $MAX_ATTEMPTS attempts"
+            exit 1
+        fi
+        echo "STAGE: Retry unchanged plan (attempt $ATTEMPT)..."
+        echo "  No automatic configuration edits will be made."
+    fi
+    ATTEMPT=$((ATTEMPT + 1))
+done
+
+# Step 9: Verify
+echo "STAGE: Verifying installation..."
+ls /mnt/nix/store | wc -l | xargs -I{{}} echo "  {{}} store paths installed"
+ls /mnt/boot/EFI/BOOT/BOOTX64.EFI && echo "  Bootloader: OK" || echo "  Bootloader: MISSING"
+echo "  Encryption: LUKS2 on $CRYPT_PART"
+
+echo ""
+echo "STAGE: FirstBreath"
+echo "=== Sovereign Birth Complete (Encrypted) ==="
+echo "Reboot the machine: sudo reboot"
+echo "You will be prompted for your encryption passphrase at boot."
+echo "Login as: {hostname} (use the password supplied during install)"
+echo "COMPLETE"
+"#, hostname = hostname));
+            script
+        }
+
+        "dual" => {
+            // Dual-disk: fast drive for data (btrfs), standard for OS (ext4)
+            // Direct partitioning — no disko download needed
+            let mut script = format!(
+                r#"set -eo pipefail
+echo "=== Symthaea Sovereign Birth: Dual NVMe ==="
+
+# Step 1: Partition standard drive (OS)
+echo "STAGE: Partitioning standard drive {standard}..."
+sgdisk --zap-all {standard}
+sgdisk -n 1:0:+1G -t 1:EF00 -c 1:boot {standard}
+sgdisk -n 2:0:0 -t 2:8300 -c 2:nixos-root {standard}
+partprobe {standard} 2>/dev/null || true
+
+# Step 2: Partition fast drive (data)
+echo "STAGE: Partitioning fast drive {fast}..."
+sgdisk --zap-all {fast}
+sgdisk -n 1:0:0 -t 1:8300 -c 1:samsung-data {fast}
+partprobe {fast} 2>/dev/null || true
+sleep 2
+
+# Detect partition names
+if [ -b "{standard}p1" ]; then
+  STD_BOOT="{standard}p1"; STD_ROOT="{standard}p2"
+  FAST_DATA="{fast}p1"
+else
+  STD_BOOT="{standard}1"; STD_ROOT="{standard}2"
+  FAST_DATA="{fast}1"
+fi
+
+# Step 3: Format
+echo "STAGE: Formatting drives..."
+mkfs.vfat -F 32 "$STD_BOOT"
+mkfs.ext4 -F -L nixos "$STD_ROOT"
+mkfs.btrfs -f -L samsung "$FAST_DATA"
+
+# Step 4: Create btrfs subvolumes on fast drive
+echo "STAGE: Creating btrfs subvolumes..."
+mount "$FAST_DATA" /mnt
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@srv
+btrfs subvolume create /mnt/@swap
+btrfs subvolume create /mnt/@snapshots
+umount /mnt
+
+# Step 5: Mount everything
+echo "STAGE: Mounting filesystems..."
+mount "$STD_ROOT" /mnt
+mkdir -p /mnt/{{boot,home,srv,swap,.snapshots}}
+mount "$STD_BOOT" /mnt/boot
+mount -o subvol=@home,compress=zstd:3,noatime "$FAST_DATA" /mnt/home
+mount -o subvol=@srv,compress=zstd:3,noatime "$FAST_DATA" /mnt/srv
+mount -o subvol=@swap,noatime "$FAST_DATA" /mnt/swap
+mount -o subvol=@snapshots,compress=zstd:3,noatime "$FAST_DATA" /mnt/.snapshots
+
+# Step 6: Generate config + write ours
+echo "STAGE: Generating configuration..."
+nixos-generate-config --root /mnt
+"#,
+                fast = msg.fast_disk,
+                standard = msg.standard_disk
+            );
+
+            let fallback_dual = format!(
+                "{{ config, pkgs, ... }}:\n\
+                 {{\n\
+                 \x20 imports = [ ./hardware-configuration.nix ];\n\
+                 \x20 networking.hostName = \"{hostname}\";\n\
+                 \x20 boot.loader.systemd-boot.enable = true;\n\
+                 \x20 boot.loader.efi.canTouchEfiVariables = true;\n\
+                 \n\
+                 \x20 # Hardening\n\
+                 \x20 services.openssh.enable = true;\n\
+                 \x20 services.earlyoom = {{ enable = true; freeMemThreshold = 5; freeSwapThreshold = 5; }};\n\
+                 \x20 services.fstrim.enable = true;\n\
+                 \x20 services.smartd = {{ enable = true; autodetect = true; }};\n\
+                 \x20 services.btrfs.autoScrub = {{ enable = true; interval = \"monthly\"; fileSystems = [ \"/home\" ]; }};\n\
+                 \x20 zramSwap = {{ enable = true; algorithm = \"zstd\"; }};\n\
+                 \x20 boot.kernel.sysctl.\"vm.swappiness\" = 60;\n\
+                 \n\
+                 \x20 # User\n\
+                 \x20 users.users.{hostname} = {{\n\
+                 \x20   isNormalUser = true;\n\
+                 \x20   extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];\n\
+                 \x20   \n\
+                 \x20 }};\n\
+                 \n\
+                 \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs ];\n\
+                 \x20 system.stateVersion = \"26.05\";\n\
+                 }}",
+                hostname = hostname,
+            );
+            script.push_str(&config_write_commands(
+                &msg.configuration_nix,
+                &fallback_dual,
+                &msg.flake_nix,
+                transaction_dir,
+            ));
+            script.push_str(&bootloader_patch_commands(&msg.standard_disk));
+
+            script.push_str(&format!(
+                r#"
+# Step 7: Create swap file on fast drive
+echo "STAGE: Configuring swap..."
+fallocate -l 64G /mnt/swap/swapfile
+chmod 600 /mnt/swap/swapfile
+mkswap /mnt/swap/swapfile
+
+# Step 8: Install
+echo "STAGE: Installing NixOS..."
+echo "This may take several minutes..."
+nixos-install --no-root-passwd 2>&1
+
+# Step 9: Verify
+echo "STAGE: Verifying installation..."
+ls /mnt/nix/store | wc -l | xargs -I{{}} echo "  {{}} store paths installed"
+ls /mnt/boot/EFI/BOOT/BOOTX64.EFI && echo "  Bootloader: OK" || echo "  Bootloader: MISSING"
+
+echo ""
+echo "STAGE: FirstBreath"
+echo "=== Sovereign Birth Complete ==="
+echo "Reboot the machine: sudo reboot"
+echo "Login as: {hostname} (use the password supplied during install)"
+echo "COMPLETE"
+"#,
+                hostname = hostname
+            ));
+            script
+        }
+
+        "raid1-btrfs" => {
+            // btrfs RAID1 across two disks (mirrored data + metadata)
+            let mut script = format!(
+                r#"set -eo pipefail
+echo "=== Symthaea Sovereign Birth: btrfs RAID1 ==="
+
+DISK1="{fast_disk}"
+DISK2="{standard_disk}"
+
+# Step 1: Wipe both disks
+echo "STAGE: Partitioning disks..."
+for disk in "$DISK1" "$DISK2"; do
+  umount -R /mnt 2>/dev/null || true
+  swapoff ${{disk}}* 2>/dev/null || true
+  wipefs -af "$disk" 2>/dev/null || true
+  sgdisk --zap-all "$disk"
+done
+
+# Create ESP on first disk only
+sgdisk -n 1:0:+512M -t 1:EF00 -c 1:boot "$DISK1"
+sgdisk -n 2:0:0 -t 2:8300 -c 2:raid-member "$DISK1"
+# Second disk: all space for RAID
+sgdisk -n 1:0:0 -t 1:8300 -c 1:raid-member "$DISK2"
+
+partprobe "$DISK1" "$DISK2" 2>/dev/null || true
+udevadm settle 2>/dev/null || true
+sleep 3
+
+# Detect partition names
+if [ -b "${{DISK1}}p1" ]; then
+  BOOT="${{DISK1}}p1"; R1="${{DISK1}}p2"
+else
+  BOOT="${{DISK1}}1"; R1="${{DISK1}}2"
+fi
+if [ -b "${{DISK2}}p1" ]; then
+  R2="${{DISK2}}p1"
+else
+  R2="${{DISK2}}1"
+fi
+echo "  Boot: $BOOT"
+echo "  RAID members: $R1, $R2"
+
+# Step 2: Format with btrfs RAID1
+echo "STAGE: Creating btrfs RAID1 mirror..."
+wipefs -af "$BOOT" "$R1" "$R2" 2>/dev/null || true
+mkfs.vfat -F 32 "$BOOT"
+mkfs.btrfs -f -d raid1 -m raid1 -L nixos-raid "$R1" "$R2"
+
+# Step 3: Create subvolumes
+mount "$R1" /mnt
+btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@nix
+btrfs subvolume create /mnt/@log
+btrfs subvolume create /mnt/@snapshots
+btrfs subvolume create /mnt/@swap
+umount /mnt
+
+# Step 4: Mount with compression
+echo "STAGE: Mounting filesystems..."
+mount -o subvol=@,compress=zstd:3,noatime "$R1" /mnt
+mkdir -p /mnt/{{boot,home,nix,var/log,.snapshots,swap}}
+mount "$BOOT" /mnt/boot
+mount -o subvol=@home,compress=zstd:3,noatime "$R1" /mnt/home
+mount -o subvol=@nix,compress=zstd:3,noatime "$R1" /mnt/nix
+mount -o subvol=@log,compress=zstd:3,noatime "$R1" /mnt/var/log
+mount -o subvol=@snapshots,compress=zstd:3,noatime "$R1" /mnt/.snapshots
+mount -o subvol=@swap,noatime "$R1" /mnt/swap
+
+echo "STAGE: Generating configuration..."
+nixos-generate-config --root /mnt
+"#,
+                fast_disk = msg.fast_disk,
+                standard_disk = msg.standard_disk
+            );
+
+            let fallback_raid1_btrfs = format!(
+                "{{ config, pkgs, ... }}:\n\
+                 {{\n\
+                 \x20 imports = [ ./hardware-configuration.nix ];\n\
+                 \x20 networking.hostName = \"{hostname}\";\n\
+                 \x20 boot.loader.systemd-boot.enable = true;\n\
+                 \x20 boot.loader.efi.canTouchEfiVariables = true;\n\
+                 \x20 boot.initrd.supportedFilesystems = [ \"btrfs\" ];\n\
+                 \x20 services.openssh.enable = true;\n\
+                 \x20 services.earlyoom = {{ enable = true; freeMemThreshold = 5; freeSwapThreshold = 5; }};\n\
+                 \x20 services.fstrim.enable = true;\n\
+                 \x20 services.btrfs.autoScrub = {{ enable = true; interval = \"monthly\"; fileSystems = [ \"/\" ]; }};\n\
+                 \x20 zramSwap = {{ enable = true; algorithm = \"zstd\"; }};\n\
+                 \x20 users.users.{hostname} = {{\n\
+                 \x20   isNormalUser = true;\n\
+                 \x20   extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];\n\
+                 \x20   \n\
+                 \x20 }};\n\
+                 \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs ];\n\
+                 \x20 system.stateVersion = \"26.05\";\n\
+                 }}",
+                hostname = hostname,
+            );
+            script.push_str(&config_write_commands(
+                &msg.configuration_nix,
+                &fallback_raid1_btrfs,
+                &msg.flake_nix,
+                transaction_dir,
+            ));
+            script.push_str(&bootloader_patch_commands(&msg.disk));
+
+            script.push_str(&format!(
+                r#"
+echo "STAGE: Configuring swap..."
+fallocate -l 16G /mnt/swap/swapfile
+chmod 600 /mnt/swap/swapfile
+mkswap /mnt/swap/swapfile
+
+echo "STAGE: Installing NixOS..."
+echo "This may take several minutes..."
+nixos-install --no-root-passwd 2>&1
+
+echo "STAGE: Verifying installation..."
+ls /mnt/nix/store | wc -l | xargs -I{{}} echo "  {{}} store paths installed"
+btrfs filesystem show /mnt 2>/dev/null | head -5
+echo "  RAID1 status:"
+btrfs filesystem df /mnt 2>/dev/null
+
+echo ""
+echo "STAGE: FirstBreath"
+echo "=== Sovereign Birth Complete (btrfs RAID1) ==="
+echo "Data is mirrored across both disks."
+echo "Login as: {hostname} (use the password supplied during install)"
+echo "COMPLETE"
+"#,
+                hostname = hostname
+            ));
+            script
+        }
+
+        "raid1-mdadm" => {
+            // mdadm RAID1 mirror with btrfs on top
+            let mut script = format!(
+                r#"set -eo pipefail
+echo "=== Symthaea Sovereign Birth: mdadm RAID1 ==="
+
+DISK1="{fast_disk}"
+DISK2="{standard_disk}"
+
+echo "STAGE: Partitioning disks..."
+for disk in "$DISK1" "$DISK2"; do
+  umount -R /mnt 2>/dev/null || true
+  swapoff ${{disk}}* 2>/dev/null || true
+  wipefs -af "$disk" 2>/dev/null || true
+  sgdisk --zap-all "$disk"
+  sgdisk -n 1:0:+512M -t 1:EF00 -c 1:boot "$disk"
+  sgdisk -n 2:0:0 -t 2:FD00 -c 2:raid "$disk"
+done
+partprobe "$DISK1" "$DISK2" 2>/dev/null || true
+udevadm settle 2>/dev/null || true
+sleep 3
+
+if [ -b "${{DISK1}}p1" ]; then
+  BOOT1="${{DISK1}}p1"; MD1="${{DISK1}}p2"
+  BOOT2="${{DISK2}}p1"; MD2="${{DISK2}}p2"
+else
+  BOOT1="${{DISK1}}1"; MD1="${{DISK1}}2"
+  BOOT2="${{DISK2}}1"; MD2="${{DISK2}}2"
+fi
+
+# Step 2: Create mdadm RAID1
+echo "STAGE: Creating mdadm RAID1 mirror..."
+wipefs -af "$MD1" "$MD2" 2>/dev/null || true
+mdadm --create /dev/md0 --level=1 --raid-devices=2 --metadata=1.2 --run "$MD1" "$MD2"
+echo "  Array: /dev/md0"
+cat /proc/mdstat
+
+# Step 3: Format
+echo "STAGE: Formatting with btrfs..."
+mkfs.vfat -F 32 "$BOOT1"
+mkfs.btrfs -f -L nixos /dev/md0
+
+mount /dev/md0 /mnt
+btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@nix
+btrfs subvolume create /mnt/@log
+btrfs subvolume create /mnt/@snapshots
+btrfs subvolume create /mnt/@swap
+umount /mnt
+
+echo "STAGE: Mounting filesystems..."
+mount -o subvol=@,compress=zstd:3,noatime /dev/md0 /mnt
+mkdir -p /mnt/{{boot,home,nix,var/log,.snapshots,swap}}
+mount "$BOOT1" /mnt/boot
+mount -o subvol=@home,compress=zstd:3,noatime /dev/md0 /mnt/home
+mount -o subvol=@nix,compress=zstd:3,noatime /dev/md0 /mnt/nix
+mount -o subvol=@log,compress=zstd:3,noatime /dev/md0 /mnt/var/log
+mount -o subvol=@snapshots,compress=zstd:3,noatime /dev/md0 /mnt/.snapshots
+mount -o subvol=@swap,noatime /dev/md0 /mnt/swap
+
+echo "STAGE: Generating configuration..."
+nixos-generate-config --root /mnt
+
+# Save mdadm config
+mkdir -p /mnt/etc
+mdadm --detail --scan >> /mnt/etc/mdadm.conf
+"#,
+                fast_disk = msg.fast_disk,
+                standard_disk = msg.standard_disk
+            );
+
+            let fallback_raid1_mdadm = format!(
+                "{{ config, pkgs, ... }}:\n\
+                 {{\n\
+                 \x20 imports = [ ./hardware-configuration.nix ];\n\
+                 \x20 networking.hostName = \"{hostname}\";\n\
+                 \x20 boot.loader.systemd-boot.enable = true;\n\
+                 \x20 boot.loader.efi.canTouchEfiVariables = true;\n\
+                 \x20 boot.swraid = {{\n\
+                 \x20   enable = true;\n\
+                 \x20   mdadmConf = \"MAILADDR root\";\n\
+                 \x20 }};\n\
+                 \x20 services.openssh.enable = true;\n\
+                 \x20 services.earlyoom = {{ enable = true; freeMemThreshold = 5; freeSwapThreshold = 5; }};\n\
+                 \x20 services.fstrim.enable = true;\n\
+                 \x20 services.btrfs.autoScrub = {{ enable = true; interval = \"monthly\"; fileSystems = [ \"/\" ]; }};\n\
+                 \x20 zramSwap = {{ enable = true; algorithm = \"zstd\"; }};\n\
+                 \x20 users.users.{hostname} = {{\n\
+                 \x20   isNormalUser = true;\n\
+                 \x20   extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];\n\
+                 \x20   \n\
+                 \x20 }};\n\
+                 \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs mdadm ];\n\
+                 \x20 system.stateVersion = \"26.05\";\n\
+                 }}",
+                hostname = hostname,
+            );
+            script.push_str(&config_write_commands(
+                &msg.configuration_nix,
+                &fallback_raid1_mdadm,
+                &msg.flake_nix,
+                transaction_dir,
+            ));
+            script.push_str(&bootloader_patch_commands(&msg.disk));
+
+            script.push_str(&format!(
+                r#"
+echo "STAGE: Configuring swap..."
+fallocate -l 16G /mnt/swap/swapfile
+chmod 600 /mnt/swap/swapfile
+mkswap /mnt/swap/swapfile
+
+echo "STAGE: Installing NixOS..."
+nixos-install --no-root-passwd 2>&1
+
+echo "STAGE: Verifying installation..."
+ls /mnt/nix/store | wc -l | xargs -I{{}} echo "  {{}} store paths installed"
+cat /proc/mdstat
+
+echo ""
+echo "STAGE: FirstBreath"
+echo "=== Sovereign Birth Complete (mdadm RAID1) ==="
+echo "Data is mirrored. If one disk fails, the other continues."
+echo "Login as: {hostname} (use the password supplied during install)"
+echo "COMPLETE"
+"#,
+                hostname = hostname
+            ));
+            script
+        }
+
+        // ── Multi-disk RAID layouts ──
+        "raid5-mdadm" | "raid6-mdadm" | "raid10-mdadm" => {
+            let raid_level = match msg.layout.as_str() {
+                "raid5-mdadm" => "5",
+                "raid6-mdadm" => "6",
+                "raid10-mdadm" => "10",
+                _ => unreachable!(),
+            };
+            let min_disks: usize = match raid_level {
+                "5" => 3,
+                "6" | "10" => 4,
+                _ => 3,
+            };
+            // Collect all disks: primary disk + extra_disks
+            let mut all_disks = vec![msg.disk.clone()];
+            all_disks.extend(msg.extra_disks.iter().cloned());
+            if all_disks.len() < min_disks {
+                return format!(
+                    "echo 'ERROR: RAID{} requires at least {} disks, got {}'; exit 1",
+                    raid_level,
+                    min_disks,
+                    all_disks.len()
+                );
+            }
+            let disk_list = all_disks.join(" ");
+            let n_disks = all_disks.len();
+
+            let mut script = format!(
+                r#"set -eo pipefail
+echo "=== Symthaea Sovereign Birth: RAID{level} (mdadm, {n} disks) ==="
+{boot_detect}
+
+# Step 1: Wipe all disks and create partitions
+echo "STAGE: Partitioning {n} disks..."
+for DISK in {disks}; do
+  umount -R /mnt 2>/dev/null || true
+  wipefs -af "$DISK" 2>/dev/null || true
+  sgdisk --zap-all "$DISK"
+  sgdisk -n 1:0:+512M -t 1:EF00 -c 1:boot "$DISK"
+  sgdisk -n 2:0:0 -t 2:FD00 -c 2:raid "$DISK"
+done
+partprobe 2>/dev/null || true
+udevadm settle 2>/dev/null || true
+sleep 3
+
+# Build partition list for mdadm
+RAID_PARTS=""
+BOOT_PART=""
+for DISK in {disks}; do
+  if [ -b "${{DISK}}p2" ]; then
+    RAID_PARTS="$RAID_PARTS ${{DISK}}p2"
+    [ -z "$BOOT_PART" ] && BOOT_PART="${{DISK}}p1"
+  else
+    RAID_PARTS="$RAID_PARTS ${{DISK}}2"
+    [ -z "$BOOT_PART" ] && BOOT_PART="${{DISK}}1"
+  fi
+done
+
+# Step 2: Create mdadm array
+echo "STAGE: Creating RAID{level} array with {n} disks..."
+mdadm --create /dev/md0 --level={level} --raid-devices={n} --metadata=1.2 --run $RAID_PARTS
+cat /proc/mdstat
+
+# Step 3: Format
+echo "STAGE: Formatting..."
+mkfs.vfat -F 32 "$BOOT_PART"
+mkfs.btrfs -f -L nixos /dev/md0
+
+# Step 4: Mount
+echo "STAGE: Mounting filesystems..."
+mount /dev/md0 /mnt
+btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@nix
+btrfs subvolume create /mnt/@log
+btrfs subvolume create /mnt/@swap
+umount /mnt
+mount -o subvol=@,compress=zstd:3,noatime /dev/md0 /mnt
+mkdir -p /mnt/{{boot,home,nix,var/log,swap,etc/nixos}}
+mount "$BOOT_PART" /mnt/boot
+mount -o subvol=@home,compress=zstd:3,noatime /dev/md0 /mnt/home
+mount -o subvol=@nix,compress=zstd:3,noatime /dev/md0 /mnt/nix
+mount -o subvol=@log,compress=zstd:3,noatime /dev/md0 /mnt/var/log
+
+# Step 5: Generate config + save mdadm
+echo "STAGE: Generating configuration..."
+nixos-generate-config --root /mnt
+mdadm --detail --scan >> /mnt/etc/mdadm.conf 2>/dev/null || true
+"#,
+                level = raid_level,
+                n = n_disks,
+                disks = disk_list,
+                boot_detect = boot_mode_detection()
+            );
+
+            let fallback_config = format!(
+                "{{ config, pkgs, ... }}:\n{{\n  imports = [ ./hardware-configuration.nix ];\n  \
+                 networking.hostName = \"{hostname}\";\n  \
+                 boot.loader.systemd-boot.enable = true;\n  \
+                 boot.loader.efi.canTouchEfiVariables = true;\n  \
+                 boot.swraid.enable = true;\n  \
+                 services.openssh.enable = true;\n  \
+                 users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" ];  }};\n  \
+                 system.stateVersion = \"26.05\";\n}}",
+                hostname = hostname
+            );
+            script.push_str(&config_write_commands(
+                &msg.configuration_nix,
+                &fallback_config,
+                &msg.flake_nix,
+                transaction_dir,
+            ));
+            script.push_str(&bootloader_patch_commands(&msg.disk));
+            script.push_str(
+                r#"
+echo "STAGE: Installing NixOS..."
+nixos-install --no-root-passwd 2>&1
+echo "STAGE: Verifying..."
+echo "COMPLETE"
+"#,
+            );
+            script
+        }
+
+        // ── ZFS multi-disk layouts ──
+        "zfs-mirror" | "zfs-raidz" | "zfs-raidz2" => {
+            let zfs_type = match msg.layout.as_str() {
+                "zfs-mirror" => "mirror",
+                "zfs-raidz" => "raidz",
+                "zfs-raidz2" => "raidz2",
+                _ => unreachable!(),
+            };
+            let min_disks: usize = match zfs_type {
+                "mirror" => 2,
+                "raidz" => 3,
+                "raidz2" => 4,
+                _ => 2,
+            };
+            let mut all_disks = vec![msg.disk.clone()];
+            all_disks.extend(msg.extra_disks.iter().cloned());
+            if all_disks.len() < min_disks {
+                return format!(
+                    "echo 'ERROR: ZFS {} requires at least {} disks, got {}'; exit 1",
+                    zfs_type,
+                    min_disks,
+                    all_disks.len()
+                );
+            }
+            let disk_list = all_disks.join(" ");
+            let n_disks = all_disks.len();
+
+            let mut script = format!(
+                r#"set -eo pipefail
+echo "=== Symthaea Sovereign Birth: ZFS {ztype} ({n} disks) ==="
+{boot_detect}
+
+# Step 1: Wipe all disks and create partitions
+echo "STAGE: Partitioning {n} disks..."
+ZFS_PARTS=""
+BOOT_PART=""
+for DISK in {disks}; do
+  umount -R /mnt 2>/dev/null || true
+  wipefs -af "$DISK" 2>/dev/null || true
+  sgdisk --zap-all "$DISK"
+  sgdisk -n 1:0:+512M -t 1:EF00 -c 1:boot "$DISK"
+  sgdisk -n 2:0:0 -t 2:BF00 -c 2:zfs "$DISK"
+  if [ -b "${{DISK}}p2" ]; then
+    ZFS_PARTS="$ZFS_PARTS ${{DISK}}p2"
+    [ -z "$BOOT_PART" ] && BOOT_PART="${{DISK}}p1"
+  else
+    ZFS_PARTS="$ZFS_PARTS ${{DISK}}2"
+    [ -z "$BOOT_PART" ] && BOOT_PART="${{DISK}}1"
+  fi
+done
+partprobe 2>/dev/null || true
+udevadm settle 2>/dev/null || true
+sleep 3
+
+# Step 2: Create ZFS pool
+echo "STAGE: Creating ZFS {ztype} pool..."
+HOSTID=$(head -c 4 /dev/urandom | od -An -tx4 | tr -d ' ')
+zpool create -f -o ashift=12 -o autotrim=on \
+  -O acltype=posixacl -O compression=zstd -O dnodesize=auto \
+  -O normalization=formD -O relatime=on -O xattr=sa \
+  -O mountpoint=none \
+  rpool {ztype} $ZFS_PARTS
+
+# Step 3: Create datasets
+echo "STAGE: Creating ZFS datasets..."
+zfs create -o mountpoint=legacy rpool/root
+zfs create -o mountpoint=legacy rpool/home
+zfs create -o mountpoint=legacy rpool/nix
+zfs create -o mountpoint=legacy rpool/var
+zfs create -o mountpoint=legacy rpool/var/log
+zfs create -V 8G rpool/swap
+mkswap /dev/zvol/rpool/swap
+
+# Step 4: Mount
+echo "STAGE: Mounting filesystems..."
+mkfs.vfat -F 32 "$BOOT_PART"
+mount -t zfs rpool/root /mnt
+mkdir -p /mnt/{{boot,home,nix,var/log,etc/nixos}}
+mount "$BOOT_PART" /mnt/boot
+mount -t zfs rpool/home /mnt/home
+mount -t zfs rpool/nix /mnt/nix
+mount -t zfs rpool/var /mnt/var
+mount -t zfs rpool/var/log /mnt/var/log
+
+# Step 5: Generate config
+echo "STAGE: Generating configuration..."
+nixos-generate-config --root /mnt
+"#,
+                ztype = zfs_type,
+                n = n_disks,
+                disks = disk_list,
+                boot_detect = boot_mode_detection()
+            );
+
+            let fallback_config = format!(
+                "{{ config, pkgs, ... }}:\n{{\n  imports = [ ./hardware-configuration.nix ];\n  \
+                 networking.hostName = \"{hostname}\";\n  \
+                 networking.hostId = \"$(head -c 4 /dev/urandom | od -An -tx4 | tr -d ' ')\";\n  \
+                 boot.loader.systemd-boot.enable = true;\n  \
+                 boot.loader.efi.canTouchEfiVariables = true;\n  \
+                 boot.supportedFilesystems = [ \"zfs\" ];\n  \
+                 services.zfs.autoScrub.enable = true;\n  \
+                 services.openssh.enable = true;\n  \
+                 users.users.{hostname} = {{ isNormalUser = true; extraGroups = [ \"wheel\" ];  }};\n  \
+                 system.stateVersion = \"26.05\";\n}}",
+                hostname = hostname
+            );
+            script.push_str(&config_write_commands(
+                &msg.configuration_nix,
+                &fallback_config,
+                &msg.flake_nix,
+                transaction_dir,
+            ));
+            script.push_str(&bootloader_patch_commands(&msg.disk));
+            script.push_str(
+                r#"
+echo "STAGE: Installing NixOS..."
+nixos-install --no-root-passwd 2>&1
+echo "STAGE: Verifying..."
+zpool status rpool
+echo "COMPLETE"
+"#,
+            );
+            script
+        }
+
+        _ => "echo 'Unknown install layout'; exit 1".to_string(),
+    }
+}
+
+/// Relay → Client message.
+#[derive(serde::Serialize)]
+struct RelayMessage {
+    #[serde(rename = "type")]
+    msg_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stream: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stage: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    percentage: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    phase: Option<String>,
+}
+
+impl RelayMessage {
+    fn authed() -> Self {
+        Self {
+            msg_type: "authed".into(),
+            data: None,
+            stream: None,
+            code: None,
+            message: Some("WebSocket authenticated".into()),
+            stage: None,
+            percentage: None,
+            phase: None,
+        }
+    }
+
+    fn output(data: &str, stream: &str) -> Self {
+        Self {
+            msg_type: "output".into(),
+            data: Some(data.into()),
+            stream: Some(stream.into()),
+            code: None,
+            message: None,
+            stage: None,
+            percentage: None,
+            phase: None,
+        }
+    }
+
+    fn progress(stage: &NixosAnywhereStage) -> Self {
+        Self {
+            msg_type: "progress".into(),
+            data: None,
+            stream: None,
+            code: None,
+            message: Some(format!("{:?}", stage)),
+            stage: Some(format!("{:?}", stage)),
+            percentage: Some(stage.percentage()),
+            phase: Some(stage.inoculation_phase().into()),
+        }
+    }
+
+    fn exit(code: i32) -> Self {
+        Self {
+            msg_type: "exit".into(),
+            data: None,
+            stream: None,
+            code: Some(code),
+            message: None,
+            stage: None,
+            percentage: None,
+            phase: None,
+        }
+    }
+
+    fn error(msg: &str) -> Self {
+        Self {
+            msg_type: "error".into(),
+            data: None,
+            stream: None,
+            code: None,
+            message: Some(msg.into()),
+            stage: None,
+            percentage: None,
+            phase: None,
+        }
+    }
+
+    fn disks(disks_json: &str) -> Self {
+        Self {
+            msg_type: "disks".into(),
+            data: Some(disks_json.into()),
+            stream: None,
+            code: None,
+            message: None,
+            stage: None,
+            percentage: None,
+            phase: None,
+        }
+    }
+
+    fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap_or_default()
+    }
+}
+
+/// Parsed disk info from lsblk.
+#[derive(Debug, serde::Serialize)]
+struct DiskInfo {
+    name: String,
+    size: String,
+    model: String,
+    transport: String, // nvme, sata, usb, virtio
+    disk_type: String, // disk, part, rom
+    removable: bool,
+}
+
+/// Parse lsblk --json output into structured disk info.
+fn parse_lsblk(json_str: &str) -> Vec<DiskInfo> {
+    let parsed: serde_json::Value = match serde_json::from_str(json_str) {
+        Ok(v) => v,
+        Err(_) => return Vec::new(),
+    };
+
+    let devices = match parsed.get("blockdevices").and_then(|b| b.as_array()) {
+        Some(arr) => arr,
+        None => return Vec::new(),
+    };
+
+    devices
+        .iter()
+        .filter_map(|dev| {
+            let dtype = dev.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            if dtype != "disk" {
+                return None;
+            }
+            let name = dev
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let size = dev
+                .get("size")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let model = dev
+                .get("model")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown")
+                .trim()
+                .to_string();
+            let tran = dev
+                .get("tran")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let rm = dev.get("rm").and_then(|v| v.as_bool()).unwrap_or(false);
+
+            Some(DiskInfo {
+                name: format!("/dev/{}", name),
+                size,
+                model,
+                transport: if tran.is_empty() {
+                    "unknown".into()
+                } else {
+                    tran
+                },
+                disk_type: dtype.into(),
+                removable: rm,
+            })
+        })
+        .collect()
+}
+
+type SharedTracker = Arc<Mutex<SessionTracker>>;
+type SharedMutationLock = Arc<Mutex<()>>;
+
+fn mutation_lock_busy_message() -> &'static str {
+    "Another consequential system mutation is already in progress; refusing concurrent execution."
+}
+
+async fn handle_connection(
+    stream: tokio::net::TcpStream,
+    peer_addr: String,
+    tracker: SharedTracker,
+    auth_token: Arc<String>,
+    mutation_lock: SharedMutationLock,
+    transaction_ledger: TransactionLedger,
+) {
+    // Upgrade to WebSocket with Origin header validation.
+    // Only allow connections from localhost, 127.0.0.1, or our known domains.
+    let origin_check = |req: &tungstenite::handshake::server::Request,
+                        resp: tungstenite::handshake::server::Response|
+     -> Result<
+        tungstenite::handshake::server::Response,
+        tungstenite::handshake::server::ErrorResponse,
+    > {
+        if let Some(origin) = req.headers().get("origin") {
+            let origin_str = origin.to_str().unwrap_or("");
+            let allowed = origin_is_allowed(origin_str);
+            if !allowed {
+                eprintln!(
+                    "[{}] Rejected WebSocket: disallowed Origin '{}'",
+                    peer_addr, origin_str
+                );
+                let mut resp = tungstenite::handshake::server::ErrorResponse::new(Some(
+                    "Forbidden origin".into(),
+                ));
+                *resp.status_mut() = tungstenite::http::StatusCode::FORBIDDEN;
+                return Err(resp);
+            }
+        }
+        // No Origin header = non-browser client (curl, relay tools) — allow
+        Ok(resp)
+    };
+
+    let ws_stream = match accept_hdr_async_with_config(
+        stream,
+        origin_check,
+        Some(relay_websocket_config()),
+    )
+    .await {
+        Ok(ws) => ws,
+        Err(e) => {
+            eprintln!("[{}] WebSocket upgrade failed: {}", peer_addr, e);
+            return;
+        }
+    };
+    handle_connection_ws(ws_stream, peer_addr, tracker, auth_token, mutation_lock, transaction_ledger).await;
+}
+
+/// Handle an already-upgraded WebSocket connection (works for both plain and TLS streams)
+const REQUEST_FINGERPRINT_VERSION: u16 = 2;
+
+fn build_install_transaction_payload(
+    message: &ClientMessage,
+    disk: &str,
+    hostname: &str,
+    username: &str,
+    target_machine_digest: &str,
+    user_password_commitment: Option<&str>,
+    luks_passphrase_commitment: Option<&str>,
+) -> Result<Vec<u8>, String> {
+    let payload = serde_json::json!({
+        "fingerprint_version": REQUEST_FINGERPRINT_VERSION,
+        "disk": disk,
+        "layout": &message.layout,
+        "fast_disk": &message.fast_disk,
+        "standard_disk": &message.standard_disk,
+        "extra_disks": &message.extra_disks,
+        "hostname": hostname,
+        "username": username,
+        "secure_boot": message.secure_boot,
+        "tpm2_unlock": message.tpm2_unlock,
+        "fido2_unlock": message.fido2_unlock,
+        "desktop": &message.desktop,
+        "gpu_driver": &message.gpu_driver,
+        "timezone": &message.timezone,
+        "keyboard": &message.keyboard,
+        "target_machine_digest": target_machine_digest,
+        "configuration_digest": blake3::hash(message.configuration_nix.as_bytes()).to_hex().to_string(),
+        "flake_digest": blake3::hash(message.flake_nix.as_bytes()).to_hex().to_string(),
+        "hardware_digest": blake3::hash(message.hardware_nix.as_bytes()).to_hex().to_string(),
+        "disko_digest": blake3::hash(message.disko_nix.as_bytes()).to_hex().to_string(),
+        "user_password_commitment": user_password_commitment,
+        "luks_passphrase_commitment": luks_passphrase_commitment,
+    });
+    serde_json::to_vec(&payload)
+        .map_err(|error| format!("Unable to serialize install transaction fingerprint: {error}"))
+}
+
+fn build_wifi_transaction_payload(
+    ledger: &TransactionLedger,
+    ssid: &str,
+    wifi_password: &str,
+    target_machine_digest: &str,
+) -> Result<Vec<u8>, String> {
+    let payload = serde_json::json!({
+        "fingerprint_version": REQUEST_FINGERPRINT_VERSION,
+        "security_mode": "wpa-psk",
+        "ssid": ssid,
+        "target_machine_digest": target_machine_digest,
+        "psk_commitment": ledger.secret_commitment("connect-wifi-psk", wifi_password),
+    });
+    serde_json::to_vec(&payload)
+        .map_err(|error| format!("Unable to serialize Wi-Fi transaction fingerprint: {error}"))
+}
+
+async fn admit_mutation_transaction<S>(
+    ws_tx: &mut futures_util::stream::SplitSink<tokio_tungstenite::WebSocketStream<S>, Message>,
+    ledger: &TransactionLedger,
+    mutation: MutationKind,
+    request_id: &str,
+    target_machine_digest: Option<&str>,
+    payload: &[u8],
+) -> Option<SystemTransaction>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    let target_machine_digest = match target_machine_digest {
+        Some(digest) => Some(digest.to_string()),
+        None => match machine_binding_digest_hex() {
+            Ok(digest) => Some(digest),
+            Err(error) => {
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::error(&format!(
+                            "Unable to establish authoritative target identity: {}",
+                            error
+                        ))
+                        .to_json(),
+                    ))
+                    .await;
+                return None;
+            }
+        },
+    };
+
+    let transaction = match SystemTransaction::begin(
+        mutation,
+        request_id,
+        target_machine_digest.as_deref(),
+        payload,
+    ) {
+        Ok(transaction) => transaction,
+        Err(error) => {
+            let _ = ws_tx
+                .send(Message::Text(
+                    RelayMessage::error(&format!(
+                        "Unable to establish secure system transaction: {}",
+                        error
+                    ))
+                    .to_json(),
+                ))
+                .await;
+            return None;
+        }
+    };
+
+    match ledger.admit(transaction) {
+        Ok(TransactionAdmission::New(transaction)) => Some(transaction),
+        Ok(TransactionAdmission::Replayed(receipt)) => {
+            let _ = ws_tx
+                .send(Message::Text(
+                    serde_json::json!({
+                        "type": "transaction_replay",
+                        "message": "Request was already completed; effect was not re-executed.",
+                        "transaction": receipt
+                    })
+                    .to_string(),
+                ))
+                .await;
+            None
+        }
+        Ok(TransactionAdmission::Indeterminate(receipt)) => {
+            let _ = ws_tx
+                .send(Message::Text(
+                    serde_json::json!({
+                        "type": "transaction_indeterminate",
+                        "message": "Request was previously admitted but its terminal effect is uncertain; refusing re-execution.",
+                        "transaction": receipt
+                    })
+                    .to_string(),
+                ))
+                .await;
+            None
+        }
+        Err(error) => {
+            let _ = ws_tx
+                .send(Message::Text(
+                    RelayMessage::error(&format!(
+                        "Transaction request identity conflict: {}",
+                        error
+                    ))
+                    .to_json(),
+                ))
+                .await;
+            None
+        }
+    }
+}
+
+/// Map a child-process result into the legacy numeric response code without
+/// turning an undurable completion into a false success. A missing code
+/// serializes as JSON null, forcing callers to honor the typed transaction
+/// outcome when the durable completion receipt could not be written.
+fn protocol_exit_code(child_exit_code: u32, outcome: TransactionOutcome) -> Option<u32> {
+    match outcome {
+        TransactionOutcome::ObservedSuccess => Some(0),
+        TransactionOutcome::Failed => Some(child_exit_code.max(1)),
+        TransactionOutcome::Indeterminate => None,
+    }
+}
+
+fn gc_completion_outcome(exit_code: Option<u32>) -> TransactionOutcome {
+    match exit_code {
+        Some(0) => TransactionOutcome::ObservedSuccess,
+        Some(_) => TransactionOutcome::Failed,
+        None => TransactionOutcome::Indeterminate,
+    }
+}
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ServiceAction {
+    Start,
+    Stop,
+    Restart,
+    Reload,
+    Enable,
+    Disable,
+}
+
+impl ServiceAction {
+    fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "start" => Ok(Self::Start),
+            "stop" => Ok(Self::Stop),
+            "restart" => Ok(Self::Restart),
+            "reload" => Ok(Self::Reload),
+            "enable" => Ok(Self::Enable),
+            "disable" => Ok(Self::Disable),
+            _ => Err(format!(
+                "Invalid service action '{value}'. Use: start, stop, restart, reload, enable, disable"
+            )),
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Start => "start",
+            Self::Stop => "stop",
+            Self::Restart => "restart",
+            Self::Reload => "reload",
+            Self::Enable => "enable",
+            Self::Disable => "disable",
+        }
+    }
+}
+
+async fn run_service_action(
+    action: ServiceAction,
+    service: &str,
+) -> Result<CmdResult, String> {
+    let mut command = trusted_typed_process("systemctl")?;
+    command.arg(action.as_str()).arg(format!("{service}.service"));
+    let output = command
+        .output()
+        .await
+        .map_err(|error| format!("unable to start typed systemctl action: {error}"))?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
+async fn verify_service_postcondition_typed(
+    action: ServiceAction,
+    service: &str,
+) -> Result<bool, String> {
+    let unit = format!("{service}.service");
+
+    let mut active_command = trusted_typed_process("systemctl")?;
+    active_command
+        .arg("show")
+        .arg("--property=ActiveState")
+        .arg("--value")
+        .arg(&unit);
+    let active_state = active_command
+        .output()
+        .await
+        .map_err(|error| format!("service postcondition probe failed: {error}"))?;
+    if !active_state.status.success() {
+        return Err(format!(
+            "service postcondition probe exited with {}: {}",
+            active_state.status.code().unwrap_or(1),
+            String::from_utf8_lossy(&active_state.stderr)
+                .chars()
+                .take(200)
+                .collect::<String>()
+        ));
+    }
+
+    let mut unit_file_command = trusted_typed_process("systemctl")?;
+    unit_file_command
+        .arg("show")
+        .arg("--property=UnitFileState")
+        .arg("--value")
+        .arg(&unit);
+    let unit_file_state = unit_file_command
+        .output()
+        .await
+        .map_err(|error| format!("service enablement postcondition probe failed: {error}"))?;
+    if !unit_file_state.status.success() {
+        return Err(format!(
+            "service enablement postcondition probe exited with {}: {}",
+            unit_file_state.status.code().unwrap_or(1),
+            String::from_utf8_lossy(&unit_file_state.stderr)
+                .chars()
+                .take(200)
+                .collect::<String>()
+        ));
+    }
+
+    Ok(service_postcondition_met(
+        action.as_str(),
+        String::from_utf8_lossy(&active_state.stdout).trim(),
+        String::from_utf8_lossy(&unit_file_state.stdout).trim(),
+    ))
+}
+
+fn service_postcondition_met(
+    action: &str,
+    active_state: &str,
+    unit_file_state: &str,
+) -> bool {
+    match action {
+        "start" | "restart" | "reload" => active_state == "active",
+        "stop" => active_state != "active",
+        "enable" => unit_file_state == "enabled",
+        "disable" => unit_file_state == "disabled",
+        _ => false,
+    }
+}
+
+async fn verify_service_postcondition(action: &str, service: &str) -> Result<bool, String> {
+    let action = ServiceAction::parse(action)?;
+    verify_service_postcondition_typed(action, service).await
+}
+
+async fn create_btrfs_image_archive(image_dir: &str) -> Result<bool, String> {
+    async fn delete_snapshot(snapshot: &str) -> Result<(), String> {
+        let result = run_privileged_args("btrfs", &["subvolume", "delete", snapshot])
+            .await
+            .map_err(|error| format!("btrfs snapshot cleanup could not be observed: {error}"))?;
+        if result.exit_status != 0 {
+            return Err(format!(
+                "btrfs snapshot cleanup failed with exit {}: {}",
+                result.exit_status,
+                result.stderr.chars().take(500).collect::<String>()
+            ));
+        }
+        Ok(())
+    }
+
+    let snapshot = format!("{image_dir}/root-snapshot");
+    let archive = format!("{image_dir}/system.btrfs.zst");
+
+    let snapshot_result =
+        run_privileged_args("btrfs", &["subvolume", "snapshot", "-r", "/", &snapshot]).await?;
+    if snapshot_result.exit_status != 0 {
+        return Ok(false);
+    }
+
+    let archive_file = match create_private_runtime_file(&archive, 0o600) {
+        Ok(file) => file,
+        Err(error) => {
+            let cleanup = delete_snapshot(&snapshot).await;
+            return Err(format!(
+                "unable to create btrfs image archive: {error}; snapshot cleanup: {cleanup:?}"
+            ));
+        }
+    };
+
+    let mut sender = match trusted_typed_process("btrfs") {
+        Ok(command) => command,
+        Err(error) => {
+            let cleanup = delete_snapshot(&snapshot).await;
+            return Err(format!(
+                "unable to construct trusted btrfs send command: {error}; snapshot cleanup: {cleanup:?}"
+            ));
+        }
+    };
+    sender
+        .arg("send")
+        .arg(&snapshot)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+
+    let mut sender_child = match sender.spawn().await {
+        Ok(child) => child,
+        Err(error) => {
+            let _ = tokio::fs::remove_file(&archive).await;
+            let cleanup = delete_snapshot(&snapshot).await;
+            return Err(format!(
+                "unable to start btrfs send: {error}; snapshot cleanup: {cleanup:?}"
+            ));
+        }
+    };
+
+    let sender_stdout = match sender_child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            let _ = sender_child.kill().await;
+            let _ = sender_child.wait().await;
+            let cleanup = delete_snapshot(&snapshot).await;
+            let _ = tokio::fs::remove_file(&archive).await;
+            return Err(format!(
+                "btrfs send did not expose stdout; snapshot cleanup: {cleanup:?}"
+            ));
+        }
+    };
+
+    let mut encoder = match trusted_typed_process("zstd") {
+        Ok(command) => command,
+        Err(error) => {
+            let _ = sender_child.kill().await;
+            let _ = sender_child.wait().await;
+            let cleanup = delete_snapshot(&snapshot).await;
+            let _ = tokio::fs::remove_file(&archive).await;
+            return Err(format!(
+                "unable to construct trusted zstd encoder: {error}; snapshot cleanup: {cleanup:?}"
+            ));
+        }
+    };
+    encoder
+        .args(["-3", "-T0"])
+        .stdin(std::process::Stdio::from(sender_stdout))
+        .stdout(std::process::Stdio::from(archive_file))
+        .stderr(std::process::Stdio::piped());
+
+    let mut encoder_child = match encoder.spawn().await {
+        Ok(child) => child,
+        Err(error) => {
+            let _ = sender_child.kill().await;
+            let _ = sender_child.wait().await;
+            let cleanup = delete_snapshot(&snapshot).await;
+            let _ = tokio::fs::remove_file(&archive).await;
+            return Err(format!(
+                "unable to start zstd image encoding: {error}; snapshot cleanup: {cleanup:?}"
+            ));
+        }
+    };
+
+    let (sender_output, encoder_output) = tokio::join!(
+        sender_child.wait_with_output(),
+        encoder_child.wait_with_output()
+    );
+
+    let snapshot_cleanup = delete_snapshot(&snapshot).await;
+
+    let sender_output =
+        sender_output.map_err(|error| format!("btrfs send wait failed: {error}"))?;
+    let encoder_output =
+        encoder_output.map_err(|error| format!("zstd image encoding wait failed: {error}"))?;
+
+    if let Err(cleanup_error) = snapshot_cleanup {
+        let _ = tokio::fs::remove_file(&archive).await;
+        return Err(cleanup_error);
+    }
+
+    if !sender_output.status.success() || !encoder_output.status.success() {
+        let _ = tokio::fs::remove_file(&archive).await;
+        return Err(format!(
+            "btrfs image creation failed: send={:?}, zstd={:?}",
+            sender_output.status.code(),
+            encoder_output.status.code()
+        ));
+    }
+
+    let metadata = tokio::fs::metadata(&archive)
+        .await
+        .map_err(|error| format!("unable to inspect btrfs image archive: {error}"))?;
+    if metadata.len() == 0 {
+        let _ = tokio::fs::remove_file(&archive).await;
+        return Err("btrfs image archive is empty".into());
+    }
+
+    Ok(true)
+}
+
+async fn create_tar_image_archive(image_dir: &str) -> Result<(), String> {
+    let archive = format!("{image_dir}/system.tar.gz");
+    let archive_file = create_private_runtime_file(&archive, 0o600)
+        .map_err(|error| format!("unable to create tar image archive: {error}"))?;
+
+    let mut tar = trusted_typed_process("tar")?;
+    tar.args([
+        "-czf",
+        "-",
+        "--one-file-system",
+        "--exclude=/tmp",
+        "--exclude=/proc",
+        "--exclude=/sys",
+        "--exclude=/dev",
+        "--exclude=/run",
+        "/",
+    ])
+    .stdout(std::process::Stdio::from(archive_file))
+    .stderr(std::process::Stdio::piped());
+
+    let output = tar
+        .output()
+        .await
+        .map_err(|error| format!("unable to start tar image creation: {error}"))?;
+    if !output.status.success() {
+        let _ = tokio::fs::remove_file(&archive).await;
+        return Err(format!(
+            "tar image creation failed (exit {}): {}",
+            output.status.code().unwrap_or(1),
+            String::from_utf8_lossy(&output.stderr)
+                .chars()
+                .take(500)
+                .collect::<String>()
+        ));
+    }
+
+    let metadata = tokio::fs::metadata(&archive)
+        .await
+        .map_err(|error| format!("unable to inspect tar image archive: {error}"))?;
+    if metadata.len() == 0 {
+        let _ = tokio::fs::remove_file(&archive).await;
+        return Err("tar image archive is empty".into());
+    }
+
+    Ok(())
+}
+
+async fn copy_optional_image_sidecar(
+    image_dir: &str,
+    source: &str,
+    required: bool,
+) -> Result<(), String> {
+    use std::ffi::CString;
+    use std::io::copy;
+    use std::os::fd::{AsRawFd, FromRawFd};
+    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let source_file = match std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(source)
+    {
+        Ok(file) => file,
+        Err(error)
+            if error.kind() == std::io::ErrorKind::NotFound && !required =>
+        {
+            return Ok(());
+        }
+        Err(error) => {
+            return Err(format!(
+                "image sidecar source {source} is unavailable: {error}"
+            ))
+        }
+    };
+
+    let source_metadata = source_file.metadata().map_err(|error| {
+        format!(
+            "unable to inspect image sidecar source {source}: {error}"
+        )
+    })?;
+    if !source_metadata.is_file() {
+        if required {
+            return Err(format!(
+                "required image sidecar source {source} is not a regular file"
+            ));
+        }
+        return Ok(());
+    }
+
+    let name = std::path::Path::new(source)
+        .file_name()
+        .ok_or_else(|| format!("image sidecar source {source} has no filename"))?;
+    let name_c = CString::new(name.as_bytes())
+        .map_err(|_| format!("image sidecar source {source} contains an invalid filename"))?;
+
+    let destination_dir = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(image_dir)
+        .map_err(|error| {
+            format!(
+                "unable to open image namespace for sidecar installation: {error}"
+            )
+        })?;
+    let destination_fd = unsafe {
+        libc::openat(
+            destination_dir.as_raw_fd(),
+            name_c.as_ptr(),
+            libc::O_WRONLY
+                | libc::O_CREAT
+                | libc::O_EXCL
+                | libc::O_NOFOLLOW
+                | libc::O_CLOEXEC,
+            0o600,
+        )
+    };
+    if destination_fd < 0 {
+        return Err(format!(
+            "unable to create image sidecar destination {}: {}",
+            std::path::Path::new(image_dir).join(name.to_string_lossy()).display(),
+            std::io::Error::last_os_error()
+        ));
+    }
+    let mut destination_file = unsafe { std::fs::File::from_raw_fd(destination_fd) };
+    let mut source_reader = source_file;
+    if let Err(error) = copy(&mut source_reader, &mut destination_file) {
+        let _ = unsafe {
+            libc::unlinkat(
+                destination_dir.as_raw_fd(),
+                name_c.as_ptr(),
+                0,
+            )
+        };
+        return Err(format!(
+            "unable to copy image sidecar {source}: {error}"
+        ));
+    }
+    destination_file
+        .sync_all()
+        .map_err(|error| {
+            let _ = unsafe {
+                libc::unlinkat(destination_dir.as_raw_fd(), name_c.as_ptr(), 0)
+            };
+            format!("unable to synchronize image sidecar {source}: {error}")
+        })?;
+    destination_dir.sync_all().map_err(|error| {
+        let _ = unsafe {
+            libc::unlinkat(destination_dir.as_raw_fd(), name_c.as_ptr(), 0)
+        };
+        format!(
+            "unable to synchronize image namespace after sidecar {source}: {error}"
+        )
+    })?;
+
+    Ok(())
+}
+
+async fn write_installed_packages_sidecar(image_dir: &str) -> Result<(), String> {
+    let result = run_privileged_args("nix-env", &["-qa", "--installed"]).await?;
+    if result.exit_status != 0 {
+        return Ok(());
+    }
+    let destination = format!("{image_dir}/installed-packages.txt");
+    write_private_file(&destination, result.stdout.as_bytes(), 0o600)
+        .map_err(|error| format!("unable to stage installed package inventory: {error}"))
+}
+
+fn freeze_image_namespace_blocking(image_dir: &str) -> Result<(), String> {
+    use std::ffi::CString;
+    use std::os::fd::{AsRawFd, FromRawFd};
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(image_dir)
+        .map_err(|error| format!("unable to open image namespace for freezing: {error}"))?;
+    let dir_fd = directory.as_raw_fd();
+
+    for entry in std::fs::read_dir(image_dir)
+        .map_err(|error| format!("unable to enumerate image namespace: {error}"))?
+    {
+        let entry =
+            entry.map_err(|error| format!("unable to inspect image namespace entry: {error}"))?;
+        let name = entry.file_name();
+        let name_c = CString::new(name.as_encoded_bytes())
+            .map_err(|_| "image namespace contains a filename with NUL".to_string())?;
+
+        let fd = unsafe {
+            libc::openat(
+                dir_fd,
+                name_c.as_ptr(),
+                libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+            )
+        };
+        if fd < 0 {
+            return Err(format!(
+                "unable to open image namespace artifact {}: {}",
+                entry.path().display(),
+                std::io::Error::last_os_error()
+            ));
+        }
+        let file = unsafe { std::fs::File::from_raw_fd(fd) };
+        let metadata = file
+            .metadata()
+            .map_err(|error| format!("unable to inspect image namespace artifact: {error}"))?;
+        if !metadata.is_file() {
+            return Err(format!(
+                "image namespace contains non-regular artifact {}",
+                entry.path().display()
+            ));
+        }
+        file.set_permissions(std::fs::Permissions::from_mode(0o400))
+            .map_err(|error| {
+                format!(
+                    "unable to freeze image artifact {}: {error}",
+                    entry.path().display()
+                )
+            })?;
+    }
+
+    directory
+        .set_permissions(std::fs::Permissions::from_mode(0o500))
+        .map_err(|error| format!("unable to freeze image namespace permissions: {error}"))?;
+    directory
+        .sync_all()
+        .map_err(|error| format!("unable to synchronize frozen image namespace: {error}"))
+}
+
+async fn freeze_image_namespace(image_dir: String) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || freeze_image_namespace_blocking(&image_dir))
+        .await
+        .map_err(|error| format!("image namespace freeze task failed: {error}"))?
+}
+
+async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
+    let image_dir = validate_image_path(image_dir)?;
+
+    // Qualification is performed against exact opened inodes. This keeps the
+    // archive integrity probe from re-resolving a mutable pathname after the
+    // namespace has been checked.
+    let Some((configuration, configuration_commitment)) =
+        open_image_artifact_with_commitment(&image_dir, "configuration.nix").await?
+    else {
+        return Ok(false);
+    };
+    drop(configuration);
+    if configuration_commitment.size == 0 {
+        return Ok(false);
+    }
+
+    for artifact in ["system.btrfs.zst", "system.tar.gz"] {
+        let Some((file, commitment)) =
+            open_image_artifact_with_commitment(&image_dir, artifact).await?
+        else {
+            continue;
+        };
+
+        let check = if artifact == "system.btrfs.zst" {
+            run_privileged_args_with_stdin("zstd", &["-t", "-"], file).await
+        } else {
+            run_privileged_args_with_stdin("tar", &["-tzf", "-"], file).await
+        }
+        .map_err(|error| format!("image archive integrity probe failed: {error}"))?;
+
+        if check.exit_status == 0 && commitment.size > 0 {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+
+fn open_image_artifact_with_commitment_blocking(
+    image_dir: &str,
+    artifact_name: &str,
+) -> Result<Option<(std::fs::File, ArtifactCommitment)>, String> {
+    let image_dir = validate_image_path(image_dir)?;
+
+    if !matches!(
+        artifact_name,
+        "system.btrfs.zst" | "system.tar.gz" | "configuration.nix"
+    ) {
+        return Err(format!(
+            "unsupported image artifact commitment name: {artifact_name}"
+        ));
+    }
+
+    use std::ffi::CString;
+    use std::os::fd::{AsRawFd, FromRawFd};
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(&image_dir)
+        .map_err(|error| {
+            format!(
+                "unable to open image artifact directory {}: {error}",
+                image_dir
+            )
+        })?;
+    let directory_metadata = directory.metadata().map_err(|error| {
+        format!(
+            "unable to inspect image artifact directory {}: {error}",
+            image_dir
+        )
+    })?;
+    if !directory_metadata.file_type().is_dir() {
+        return Err("image artifact namespace is not a directory".into());
+    }
+    if !matches!(directory_metadata.permissions().mode() & 0o777, 0o700 | 0o500)
+        || directory_metadata.uid() != unsafe { libc::geteuid() }
+    {
+        return Err(
+            "image artifact namespace has unsafe ownership or permissions; require relay-owned 0700 or frozen 0500"
+                .into(),
+        );
+    }
+
+    let name = CString::new(artifact_name)
+        .map_err(|_| "image artifact name contains a NUL byte".to_string())?;
+    let fd = unsafe {
+        libc::openat(
+            directory.as_raw_fd(),
+            name.as_ptr(),
+            libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if fd < 0 {
+        let error = std::io::Error::last_os_error();
+        if error.kind() == std::io::ErrorKind::NotFound {
+            return Ok(None);
+        }
+        return Err(format!(
+            "unable to open image artifact {artifact_name} in {}: {error}",
+            image_dir
+        ));
+    }
+
+    let mut file = unsafe { std::fs::File::from_raw_fd(fd) };
+    let metadata = file.metadata().map_err(|error| {
+        format!(
+            "unable to inspect image artifact {} in {}: {error}",
+            artifact_name, image_dir
+        )
+    })?;
+    if !metadata.file_type().is_file() {
+        return Err(format!(
+            "image artifact {artifact_name} in {} is not a regular file",
+            image_dir
+        ));
+    }
+    if metadata.permissions().mode() & 0o777 != 0o400
+        || metadata.uid() != unsafe { libc::geteuid() }
+    {
+        return Err(format!(
+            "image artifact {artifact_name} has unsafe ownership or permissions; require relay-owned 0400"
+        ));
+    }
+    let expected_size = metadata.len();
+    if expected_size == 0 {
+        return Err(format!(
+            "image artifact {artifact_name} in {} is empty",
+            image_dir
+        ));
+    }
+
+    let mut hasher = blake3::Hasher::new();
+    let mut total = 0u64;
+    let mut buffer = [0u8; 1024 * 1024];
+    loop {
+        let read = file.read(&mut buffer).map_err(|error| {
+            format!(
+                "unable to hash image artifact {artifact_name} in {}: {error}",
+                image_dir
+            )
+        })?;
+        if read == 0 {
+            break;
+        }
+        total = total
+            .checked_add(read as u64)
+            .ok_or_else(|| {
+                format!(
+                    "image artifact {artifact_name} in {} size overflowed",
+                    image_dir
+                )
+            })?;
+        hasher.update(&buffer[..read]);
+    }
+    if total != expected_size {
+        return Err(format!(
+            "image artifact {artifact_name} in {} changed while being hashed (expected {} bytes, read {})",
+            image_dir, expected_size, total
+        ));
+    }
+
+    // Hashing consumed the descriptor. Rewind that exact descriptor so
+    // destructive restore can consume exactly the bytes just committed.
+    file.seek(SeekFrom::Start(0)).map_err(|error| {
+        format!(
+            "unable to rewind verified image artifact {artifact_name}: {error}"
+        )
+    })?;
+
+    Ok(Some((
+        file,
+        ArtifactCommitment {
+            name: artifact_name.to_string(),
+            size: total,
+            digest: hasher.finalize().to_hex().to_string(),
+        },
+    )))
+}
+
+fn read_image_artifact_commitment_blocking(
+    image_dir: &str,
+    artifact_name: &str,
+) -> Result<Option<ArtifactCommitment>, String> {
+    Ok(
+        open_image_artifact_with_commitment_blocking(image_dir, artifact_name)?
+            .map(|(_, commitment)| commitment),
+    )
+}
+
+async fn open_image_artifact_with_commitment(
+    image_dir: &str,
+    artifact_name: &str,
+) -> Result<Option<(std::fs::File, ArtifactCommitment)>, String> {
+    let image_dir = image_dir.to_string();
+    let artifact_name = artifact_name.to_string();
+    tokio::task::spawn_blocking(move || {
+        open_image_artifact_with_commitment_blocking(&image_dir, &artifact_name)
+    })
+    .await
+    .map_err(|error| format!("image artifact hashing task failed: {error}"))?
+}
+
+async fn image_artifact_commitment(
+    image_dir: &str,
+    artifact_name: &str,
+) -> Result<Option<ArtifactCommitment>, String> {
+    let image_dir = image_dir.to_string();
+    let artifact_name = artifact_name.to_string();
+    tokio::task::spawn_blocking(move || {
+        read_image_artifact_commitment_blocking(&image_dir, &artifact_name)
+    })
+    .await
+    .map_err(|error| format!("image artifact hashing task failed: {error}"))?
+}
+
+async fn commit_image_bundle(image_dir: &str) -> Result<(ArtifactCommitment, ArtifactCommitment), String> {
+    let mut archives = Vec::new();
+    for artifact_name in ["system.btrfs.zst", "system.tar.gz"] {
+        if let Some(commitment) = image_artifact_commitment(image_dir, artifact_name).await? {
+            archives.push(commitment);
+        }
+    }
+    let archive = match archives.as_slice() {
+        [commitment] => commitment.clone(),
+        [] => return Err("image completed without a supported archive artifact".into()),
+        _ => return Err("image namespace contains multiple supported archive artifacts".into()),
+    };
+
+    let configuration = image_artifact_commitment(image_dir, "configuration.nix")
+        .await?
+        .ok_or_else(|| "image completed without configuration.nix provenance".to_string())?;
+
+    Ok((archive, configuration))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RestoreArchiveFormat {
+    BtrfsZstd,
+    TarGzip,
+}
+
+fn restore_archive_format_for_commitment(
+    artifact_name: &str,
+) -> Result<RestoreArchiveFormat, String> {
+    match artifact_name {
+        "system.btrfs.zst" => Ok(RestoreArchiveFormat::BtrfsZstd),
+        "system.tar.gz" => Ok(RestoreArchiveFormat::TarGzip),
+        _ => Err(format!(
+            "image artifact commitment names unsupported restore artifact: {artifact_name}"
+        )),
+    }
+}
+
+fn bind_process_cwd_to_directory(
+    command: &mut tokio::process::Command,
+    directory: &std::fs::File,
+) -> Result<(), String> {
+    use std::os::fd::AsRawFd;
+
+    let fd = directory.as_raw_fd();
+    // SAFETY: the pre-exec hook performs only fchdir on a valid directory fd.
+    // The descriptor remains open until after spawn/exec and carries O_CLOEXEC.
+    unsafe {
+        command.pre_exec(move || {
+            if libc::fchdir(fd) == 0 {
+                Ok(())
+            } else {
+                Err(std::io::Error::last_os_error())
+            }
+        });
+    }
+    Ok(())
+}
+
+fn open_restore_target_directory() -> Result<std::fs::File, String> {
+    let directory = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open("/mnt")
+        .map_err(|error| format!("unable to open restore target directory /mnt: {error}"))?;
+
+    let metadata = directory
+        .metadata()
+        .map_err(|error| format!("unable to inspect restore target directory /mnt: {error}"))?;
+    if !metadata.is_dir() {
+        return Err("restore target /mnt is not a directory".into());
+    }
+
+    Ok(directory)
+}
+
+fn open_child_directory_at(
+    parent: &std::fs::File,
+    name: &str,
+) -> Result<std::fs::File, String> {
+    use std::ffi::CString;
+    use std::os::fd::{AsRawFd, FromRawFd};
+
+    let name = CString::new(name)
+        .map_err(|_| format!("restore directory component contains NUL: {name:?}"))?;
+    let fd = unsafe {
+        libc::openat(
+            parent.as_raw_fd(),
+            name.as_ptr(),
+            libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if fd < 0 {
+        return Err(format!(
+            "unable to open restore directory component {name:?}: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+
+    let directory = unsafe { std::fs::File::from_raw_fd(fd) };
+    let metadata = directory.metadata().map_err(|error| {
+        format!(
+            "unable to inspect restore directory component {name:?}: {error}"
+        )
+    })?;
+    if !metadata.is_dir() {
+        return Err(format!(
+            "restore directory component {name:?} is not a directory"
+        ));
+    }
+
+    Ok(directory)
+}
+
+fn open_restore_configuration_directory() -> Result<std::fs::File, String> {
+    let mnt = open_restore_target_directory()?;
+    let etc = open_child_directory_at(&mnt, "etc")?;
+    open_child_directory_at(&etc, "nixos")
+}
+
+
+async fn restore_verified_archive(
+    format: RestoreArchiveFormat,
+    input: std::fs::File,
+) -> Result<CmdResult, String> {
+    let restore_root = open_restore_target_directory()?;
+
+    let (stdout, stderr, exit_status) = match format {
+        RestoreArchiveFormat::TarGzip => {
+            let mut command = trusted_typed_process("tar")?;
+            command
+                .arg("--no-absolute-names")
+                .arg("-xzf")
+                .arg("-")
+                .arg("-C")
+                .arg(".")
+                .stdin(std::process::Stdio::from(input));
+            bind_process_cwd_to_directory(&mut command, &restore_root)?;
+            let output = command
+                .output()
+                .await
+                .map_err(|error| format!("unable to start typed tar restore: {error}"))?;
+            (
+                String::from_utf8_lossy(&output.stdout).to_string(),
+                String::from_utf8_lossy(&output.stderr).to_string(),
+                output.status.code().unwrap_or(1) as u32,
+            )
+        }
+        RestoreArchiveFormat::BtrfsZstd => {
+            let mut decoder = trusted_typed_process("zstd")?;
+            decoder
+                .arg("-d")
+                .stdin(std::process::Stdio::from(input))
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped());
+            bind_process_cwd_to_directory(&mut decoder, &restore_root)?;
+
+            let mut decoder_child = decoder
+                .spawn()
+                .map_err(|error| format!("unable to start typed zstd restore: {error}"))?;
+            let decoder_stdout = decoder_child
+                .stdout
+                .take()
+                .ok_or_else(|| "typed zstd restore did not expose stdout".to_string())?;
+
+            let mut receiver = trusted_typed_process("btrfs")?;
+            receiver
+                .arg("receive")
+                .arg(".")
+                .stdin(decoder_stdout)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped());
+            bind_process_cwd_to_directory(&mut receiver, &restore_root)?;
+
+            let mut receiver_child = match receiver.spawn() {
+                Ok(child) => child,
+                Err(error) => {
+                    let _ = decoder_child.kill().await;
+                    let _ = decoder_child.wait().await;
+                    return Err(format!("unable to start typed btrfs receive: {error}"));
+                }
+            };
+
+            let (receiver_output, decoder_output) = tokio::join!(
+                receiver_child.wait_with_output(),
+                decoder_child.wait_with_output()
+            );
+            let receiver_output = receiver_output
+                .map_err(|error| format!("typed btrfs receive wait failed: {error}"))?;
+            let decoder_output = decoder_output
+                .map_err(|error| format!("typed zstd restore wait failed: {error}"))?;
+
+            let mut stdout = String::from_utf8_lossy(&decoder_output.stdout).to_string();
+            stdout.push_str(&String::from_utf8_lossy(&receiver_output.stdout));
+            let mut stderr = String::from_utf8_lossy(&decoder_output.stderr).to_string();
+            stderr.push_str(&String::from_utf8_lossy(&receiver_output.stderr));
+
+            let exit_status = if decoder_output.status.success()
+                && receiver_output.status.success()
+            {
+                0
+            } else if receiver_output.status.code().unwrap_or(1) != 0 {
+                receiver_output.status.code().unwrap_or(1) as u32
+            } else {
+                decoder_output.status.code().unwrap_or(1) as u32
+            };
+            (stdout, stderr, exit_status)
+        }
+    };
+
+    // Keep the descriptor alive until all restore children have exited. The
+    // child processes used it only as a stable cwd capability.
+    drop(restore_root);
+
+    Ok(CmdResult {
+        stdout,
+        stderr,
+        exit_status,
+    })
+}
+
+
+fn find_configuration_swap_orphans(
+    target_dir_path: &std::path::Path,
+) -> Result<Vec<std::path::PathBuf>, String> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    let directory = match std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(target_dir_path)
+    {
+        Ok(directory) => directory,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => {
+            return Err(format!(
+                "unable to open configuration directory for orphan-swap scan: {error}"
+            ))
+        }
+    };
+
+    let mut orphans = Vec::new();
+    for entry in std::fs::read_dir(target_dir_path)
+        .map_err(|error| format!("unable to enumerate configuration directory: {error}"))?
+    {
+        let entry =
+            entry.map_err(|error| format!("unable to inspect configuration directory entry: {error}"))?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        const PREFIX: &str = ".configuration.nix.swap.";
+        if !name.starts_with(PREFIX) {
+            continue;
+        }
+        let suffix = &name[PREFIX.len()..];
+        if suffix.len() != 32 || !suffix.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(format!(
+                "configuration directory contains an invalid swap artifact name: {}",
+                entry.path().display()
+            ));
+        }
+
+        let metadata = std::fs::symlink_metadata(entry.path()).map_err(|error| {
+            format!(
+                "unable to inspect configuration swap artifact {}: {error}",
+                entry.path().display()
+            )
+        })?;
+        if !metadata.file_type().is_file() {
+            return Err(format!(
+                "configuration swap artifact {} is not a regular file",
+                entry.path().display()
+            ));
+        }
+        if metadata.uid() != unsafe { libc::geteuid() } {
+            return Err(format!(
+                "configuration swap artifact {} is not owned by the relay user",
+                entry.path().display()
+            ));
+        }
+        if metadata.permissions().mode() & 0o777 != 0o600 {
+            return Err(format!(
+                "configuration swap artifact {} has unsafe permissions {:04o}",
+                entry.path().display(),
+                metadata.permissions().mode() & 0o777
+            ));
+        }
+        orphans.push(entry.path());
+    }
+
+    drop(directory);
+    Ok(orphans)
+}
+
+fn ensure_no_orphan_configuration_swaps() -> Result<(), String> {
+    let orphans = find_configuration_swap_orphans(std::path::Path::new("/etc/nixos"))?;
+    if orphans.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "manual recovery required: {} orphaned configuration swap artifact(s) remain: {}",
+        orphans.len(),
+        orphans
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    ))
+}
+
+#[derive(Debug)]
+struct ConfigurationSwap {
+    target_dir: std::fs::File,
+    temp_name: String,
+}
+
+fn file_identity_at(
+    dir_fd: libc::c_int,
+    name: &std::ffi::CStr,
+) -> Result<FileIdentity, String> {
+    use std::os::fd::FromRawFd;
+    use std::os::unix::fs::MetadataExt;
+
+    let fd = unsafe {
+        libc::openat(
+            dir_fd,
+            name.as_ptr(),
+            libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if fd < 0 {
+        return Err(format!(
+            "unable to open configuration entry for identity check: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    let file = unsafe { std::fs::File::from_raw_fd(fd) };
+    let metadata = file.metadata().map_err(|error| {
+        format!("unable to inspect configuration entry identity: {error}")
+    })?;
+    if !metadata.file_type().is_file() {
+        return Err("configuration entry identity target is not a regular file".into());
+    }
+    Ok(FileIdentity {
+        device: metadata.dev(),
+        inode: metadata.ino(),
+    })
+}
+
+fn atomic_exchange_at(
+    dir_fd: libc::c_int,
+    first: &std::ffi::CString,
+    second: &std::ffi::CString,
+) -> Result<(), String> {
+    let result = unsafe {
+        libc::renameat2(
+            dir_fd,
+            first.as_ptr(),
+            dir_fd,
+            second.as_ptr(),
+            libc::RENAME_EXCHANGE,
+        )
+    };
+    if result != 0 {
+        Err(format!(
+            "atomic configuration exchange failed: {}",
+            std::io::Error::last_os_error()
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn replace_configuration_atomically_blocking(
+    target_dir_path: &std::path::Path,
+    transaction_id: &str,
+    expected_current: &[u8],
+    replacement: &[u8],
+) -> Result<ConfigurationSwap, String> {
+    use std::ffi::CString;
+    use std::io::Read;
+    use std::os::unix::fs::{AsRawFd, FromRawFd, OpenOptionsExt, PermissionsExt};
+    use std::os::unix::fs::MetadataExt;
+
+    if transaction_id.len() != 32
+        || !transaction_id.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err("configuration transaction identifier is invalid".into());
+    }
+
+    let target_dir = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(target_dir_path)
+        .map_err(|error| format!("unable to open configuration directory: {error}"))?;
+    let dir_fd = target_dir.as_raw_fd();
+
+    let final_name = "configuration.nix";
+    let final_c = CString::new(final_name).unwrap();
+    let current_fd = unsafe {
+        libc::openat(
+            dir_fd,
+            final_c.as_ptr(),
+            libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if current_fd < 0 {
+        return Err(format!(
+            "unable to open current configuration for guarded replacement: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    let mut current = unsafe { std::fs::File::from_raw_fd(current_fd) };
+    let metadata = current
+        .metadata()
+        .map_err(|error| format!("unable to inspect current configuration: {error}"))?;
+    if !metadata.is_file() {
+        return Err("current configuration is not a regular file".into());
+    }
+    let original_identity = FileIdentity {
+        device: metadata.dev(),
+        inode: metadata.ino(),
+    };
+    let mut observed = Vec::new();
+    current
+        .read_to_end(&mut observed)
+        .map_err(|error| format!("unable to read current configuration: {error}"))?;
+    if !configuration_bytes_match(&observed, expected_current) {
+        return Err(
+            "active configuration changed after transaction preparation; refusing stale overwrite"
+                .into(),
+        );
+    }
+
+    let temp_name = format!(".configuration.nix.swap.{transaction_id}");
+    let temp_c = CString::new(temp_name.as_str())
+        .map_err(|_| "configuration swap staging name contains NUL".to_string())?;
+
+    let temp_fd = unsafe {
+        libc::openat(
+            dir_fd,
+            temp_c.as_ptr(),
+            libc::O_WRONLY
+                | libc::O_CREAT
+                | libc::O_EXCL
+                | libc::O_NOFOLLOW
+                | libc::O_CLOEXEC,
+            0o600,
+        )
+    };
+    if temp_fd < 0 {
+        return Err(format!(
+            "unable to create configuration swap staging file: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    let mut temp = unsafe { std::fs::File::from_raw_fd(temp_fd) };
+    temp.set_permissions(std::fs::Permissions::from_mode(0o600))
+        .map_err(|error| format!("unable to protect configuration swap staging file: {error}"))?;
+    use std::io::Write as _;
+    temp.write_all(replacement)
+        .and_then(|_| temp.sync_all())
+        .map_err(|error| {
+            let _ = unsafe { libc::unlinkat(dir_fd, temp_c.as_ptr(), 0) };
+            format!("unable to synchronize configuration swap staging file: {error}")
+        })?;
+
+    let temp_metadata = temp
+        .metadata()
+        .map_err(|error| format!("unable to inspect configuration swap staging identity: {error}"))?;
+    let replacement_identity = FileIdentity {
+        device: temp_metadata.dev(),
+        inode: temp_metadata.ino(),
+    };
+
+    let observed_identity = file_identity_at(dir_fd, &final_c)?;
+    if observed_identity != original_identity {
+        let _ = unsafe { libc::unlinkat(dir_fd, temp_c.as_ptr(), 0) };
+        return Err(
+            "configuration target inode changed after verification; refusing atomic overwrite"
+                .into(),
+        );
+    }
+
+    // RENAME_EXCHANGE is itself the rollback handle: after the exchange,
+    // the old configuration inode remains at temp_name until the transaction
+    // is explicitly committed or reverted.
+    if let Err(error) = atomic_exchange_at(dir_fd, &temp_c, &final_c) {
+        let _ = unsafe { libc::unlinkat(dir_fd, temp_c.as_ptr(), 0) };
+        return Err(error);
+    }
+
+    target_dir
+        .sync_all()
+        .map_err(|error| format!("unable to synchronize configuration directory after swap: {error}"))?;
+
+    Ok(ConfigurationSwap {
+        target_dir,
+        temp_name,
+        original_identity,
+        replacement_identity,
+    })
+}
+
+fn finalize_configuration_swap_blocking(
+    swap: ConfigurationSwap,
+    commit: bool,
+) -> Result<(), String> {
+    use std::ffi::CString;
+    use std::os::unix::fs::AsRawFd;
+
+    let dir_fd = swap.target_dir.as_raw_fd();
+    let temp_c = CString::new(swap.temp_name.as_str())
+        .map_err(|_| "configuration swap temp name contains NUL".to_string())?;
+    let final_c = CString::new("configuration.nix").unwrap();
+
+    let unlink = |name: &std::ffi::CString| -> Result<(), String> {
+        let result = unsafe { libc::unlinkat(dir_fd, name.as_ptr(), 0) };
+        if result != 0 {
+            Err(format!(
+                "unable to remove configuration swap artifact: {}",
+                std::io::Error::last_os_error()
+            ))
+        } else {
+            Ok(())
+        }
+    };
+
+    let current_identity = file_identity_at(dir_fd, &final_c)?;
+    if current_identity != swap.replacement_identity {
+        return Err(
+            "configuration target inode changed before transaction finalization; preserving swap artifact"
+                .into(),
+        );
+    }
+
+    if commit {
+        // The temp path contains the old inode. Removing it commits the swap.
+        unlink(&temp_c)?;
+    } else {
+        // The temp path still contains the old inode. Exchange it back to restore
+        // the exact original file atomically, then remove the replacement inode.
+        atomic_exchange_at(dir_fd, &temp_c, &final_c)?;
+        let restored_identity = file_identity_at(dir_fd, &final_c)?;
+        if restored_identity != swap.original_identity {
+            return Err(
+                "configuration rollback restored an unexpected inode; preserving swap artifact"
+                    .into(),
+            );
+        }
+        unlink(&temp_c)?;
+    }
+
+    swap.target_dir
+        .sync_all()
+        .map_err(|error| format!("unable to synchronize configuration directory after swap finalization: {error}"))
+}
+
+async fn replace_configuration_atomically(
+    transaction_id: &str,
+    expected_current: Vec<u8>,
+    replacement: Vec<u8>,
+) -> Result<ConfigurationSwap, String> {
+    let transaction_id = transaction_id.to_string();
+    tokio::task::spawn_blocking(move || {
+        replace_configuration_atomically_blocking(
+            std::path::Path::new("/etc/nixos"),
+            &transaction_id,
+            &expected_current,
+            &replacement,
+        )
+    })
+    .await
+    .map_err(|error| format!("configuration replacement task failed: {error}"))?
+}
+
+async fn finalize_configuration_swap(
+    swap: ConfigurationSwap,
+    commit: bool,
+) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || finalize_configuration_swap_blocking(swap, commit))
+        .await
+        .map_err(|error| format!("configuration swap finalization task failed: {error}"))?
+}
+
+fn restore_verified_configuration_blocking(
+    input: std::fs::File,
+    transaction_id: &str,
+) -> Result<(), String> {
+    use std::ffi::CString;
+    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::io::{AsRawFd, FromRawFd};
+
+    if transaction_id.len() != 32
+        || !transaction_id.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err("restore transaction identifier is invalid".into());
+    }
+
+    let target_dir = open_restore_configuration_directory()?;
+
+    let temp_name = format!(".configuration.nix.restore.{transaction_id}");
+    let final_name = "configuration.nix";
+    let temp_c = CString::new(temp_name.as_str())
+        .map_err(|_| "restore configuration staging name contains a NUL byte".to_string())?;
+    let final_c = CString::new(final_name)
+        .map_err(|_| "restore configuration target name contains a NUL byte".to_string())?;
+    let dir_fd = target_dir.as_raw_fd();
+
+    let temp_fd = unsafe {
+        libc::openat(
+            dir_fd,
+            temp_c.as_ptr(),
+            libc::O_WRONLY
+                | libc::O_CREAT
+                | libc::O_EXCL
+                | libc::O_NOFOLLOW
+                | libc::O_CLOEXEC,
+            0o600,
+        )
+    };
+    if temp_fd < 0 {
+        return Err(format!(
+            "unable to create atomic restore configuration staging file {}: {}",
+            temp_name,
+            std::io::Error::last_os_error()
+        ));
+    }
+    let mut output = unsafe { std::fs::File::from_raw_fd(temp_fd) };
+    output
+        .set_permissions(std::fs::Permissions::from_mode(0o600))
+        .map_err(|error| {
+            let _ = unsafe { libc::unlinkat(dir_fd, temp_c.as_ptr(), 0) };
+            format!(
+                "unable to protect atomic restore configuration staging file {}: {error}",
+                temp_name
+            )
+        })?;
+
+    let copy_result = std::io::copy(&mut &input, &mut output)
+        .and_then(|_| output.sync_all())
+        .map_err(|error| {
+            format!(
+                "unable to copy verified configuration into staging file {}: {error}",
+                temp_name
+            )
+        });
+    if let Err(error) = copy_result {
+        drop(output);
+        let _ = unsafe { libc::unlinkat(dir_fd, temp_c.as_ptr(), 0) };
+        return Err(error);
+    }
+
+    if unsafe { libc::renameat(dir_fd, temp_c.as_ptr(), dir_fd, final_c.as_ptr()) } != 0 {
+        let error = std::io::Error::last_os_error();
+        drop(output);
+        let _ = unsafe { libc::unlinkat(dir_fd, temp_c.as_ptr(), 0) };
+        return Err(format!(
+            "unable to atomically install restored configuration {}: {error}",
+            final_name
+        ));
+    }
+
+    target_dir
+        .sync_all()
+        .map_err(|error| format!("unable to synchronize restored configuration directory: {error}"))
+}
+
+async fn restore_verified_configuration(
+    input: std::fs::File,
+    transaction_id: &str,
+) -> Result<(), String> {
+    let transaction_id = transaction_id.to_string();
+    tokio::task::spawn_blocking(move || {
+        restore_verified_configuration_blocking(input, &transaction_id)
+    })
+    .await
+    .map_err(|error| format!("configuration restore task failed: {error}"))?
+}
+
+async fn verify_image_artifact_commitment(
+    image_dir: &str,
+    expected: &ArtifactCommitment,
+) -> Result<(), String> {
+    open_verified_image_artifact(image_dir, expected)
+        .await
+        .map(|_| ())
+}
+
+async fn open_verified_image_artifact(
+    image_dir: &str,
+    expected: &ArtifactCommitment,
+) -> Result<std::fs::File, String> {
+    if !matches!(
+        expected.name.as_str(),
+        "system.btrfs.zst" | "system.tar.gz" | "configuration.nix"
+    ) {
+        return Err("image artifact commitment names an unsupported artifact".into());
+    }
+
+    let Some((file, actual)) =
+        open_image_artifact_with_commitment(image_dir, &expected.name).await?
+    else {
+        return Err(format!("committed image artifact {} is missing", expected.name));
+    };
+    if actual != *expected {
+        return Err(format!(
+            "image artifact commitment mismatch for {}: committed {} bytes / {}, observed {} bytes / {}",
+            expected.name,
+            expected.size,
+            expected.digest,
+            actual.size,
+            actual.digest
+        ));
+    }
+    Ok(file)
+}
+
+async fn verify_restored_image_postcondition(
+    expected_configuration: &ArtifactCommitment,
+) -> Result<bool, String> {
+    if expected_configuration.name != "configuration.nix"
+        || expected_configuration.size == 0
+        || expected_configuration.digest.len() != 64
+    {
+        return Err("restored configuration postcondition has invalid provenance".into());
+    }
+
+    let actual = read_restore_configuration_postcondition()
+        .await
+        .map_err(|error| format!("restored configuration postcondition probe failed: {error}"))?;
+    if actual.len() as u64 != expected_configuration.size {
+        return Ok(false);
+    }
+    let digest = blake3::hash(&actual).to_hex().to_string();
+    Ok(digest == expected_configuration.digest)
+}
+
+fn wifi_connection_observed(output: &str, profile_name: &str) -> bool {
+    output.lines().any(|line| {
+        let Some((name, device)) = line.split_once(':') else {
+            return false;
+        };
+        name == profile_name && !device.trim().is_empty()
+    })
+}
+
+async fn run_nmcli_add_wifi_profile(
+    profile_name: &str,
+    ssid: &str,
+) -> Result<CmdResult, String> {
+    let mut command = trusted_typed_process("nmcli")?;
+    command
+        .arg("connection")
+        .arg("add")
+        .arg("save")
+        .arg("no")
+        .arg("type")
+        .arg("wifi")
+        .arg("ifname")
+        .arg("*")
+        .arg("con-name")
+        .arg(profile_name)
+        .arg("ssid")
+        .arg(ssid)
+        .arg("wifi-sec.key-mgmt")
+        .arg("wpa-psk")
+        .arg("connection.autoconnect")
+        .arg("no");
+    let output = command
+        .output()
+        .await
+        .map_err(|error| format!("unable to start typed NetworkManager profile creation: {error}"))?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
+async fn run_nmcli_delete_wifi_profile(
+    profile_name: &str,
+) -> Result<CmdResult, String> {
+    let mut command = trusted_typed_process("nmcli")?;
+    command
+        .arg("connection")
+        .arg("delete")
+        .arg("id")
+        .arg(profile_name);
+    let output = command
+        .output()
+        .await
+        .map_err(|error| format!("unable to start typed NetworkManager profile cleanup: {error}"))?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
+fn wifi_profile_cleanup_succeeded(result: &Result<CmdResult, String>) -> bool {
+    match result {
+        Ok(result) => result.exit_status == 0 || result.exit_status == 10,
+        Err(_) => false,
+    }
+}
+
+async fn run_nmcli_wifi_connection_up(
+    profile_name: &str,
+    secret_path: &str,
+) -> Result<CmdResult, String> {
+    let mut command = trusted_typed_process("nmcli")?;
+    command
+        .arg("connection")
+        .arg("up")
+        .arg(profile_name)
+        .arg("passwd-file")
+        .arg(secret_path);
+    let output = command
+        .output()
+        .await
+        .map_err(|error| format!("unable to start typed NetworkManager activation: {error}"))?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
+async fn verify_wifi_connection(profile_name: &str) -> Result<bool, String> {
+    let mut command = trusted_typed_process("nmcli")?;
+    command
+        .arg("-t")
+        .arg("-f")
+        .arg("NAME,DEVICE")
+        .arg("connection")
+        .arg("show")
+        .arg("--active");
+    let output = command
+        .output()
+        .await
+        .map_err(|error| format!("Wi-Fi postcondition probe failed: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "Wi-Fi postcondition probe exited with {}: {}",
+            output.status.code().unwrap_or(1),
+            String::from_utf8_lossy(&output.stderr)
+                .chars()
+                .take(200)
+                .collect::<String>()
+        ));
+    }
+
+    Ok(wifi_connection_observed(
+        &String::from_utf8_lossy(&output.stdout),
+        profile_name,
+    ))
+}
+fn configuration_bytes_match(actual: &[u8], expected: &[u8]) -> bool {
+    blake3::hash(actual) == blake3::hash(expected)
+}
+
+fn read_regular_file_from_open_directory_blocking(
+    directory: &std::fs::File,
+    file_name: &str,
+) -> Result<Vec<u8>, String> {
+    use std::ffi::CString;
+    use std::io::Read as _;
+    use std::os::fd::{AsRawFd, FromRawFd};
+
+    let name = CString::new(file_name)
+        .map_err(|_| format!("postcondition filename contains NUL: {file_name:?}"))?;
+    let fd = unsafe {
+        libc::openat(
+            directory.as_raw_fd(),
+            name.as_ptr(),
+            libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if fd < 0 {
+        return Err(format!(
+            "unable to open postcondition file {}: {}",
+            file_name,
+            std::io::Error::last_os_error()
+        ));
+    }
+
+    let mut file = unsafe { std::fs::File::from_raw_fd(fd) };
+    let metadata = file.metadata().map_err(|error| {
+        format!("unable to inspect postcondition file {file_name}: {error}")
+    })?;
+    if !metadata.is_file() {
+        return Err(format!(
+            "postcondition file {file_name} is not a regular file"
+        ));
+    }
+    if metadata.len() > 16 * 1024 * 1024 {
+        return Err(format!(
+            "postcondition file {file_name} is unexpectedly large ({} bytes)",
+            metadata.len()
+        ));
+    }
+
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.read_to_end(&mut bytes)
+        .map_err(|error| format!("unable to read postcondition file {file_name}: {error}"))?;
+    Ok(bytes)
+}
+
+fn read_regular_file_bytes_at_blocking(
+    directory_path: &std::path::Path,
+    file_name: &str,
+) -> Result<Vec<u8>, String> {
+    let directory = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(directory_path)
+        .map_err(|error| {
+            format!(
+                "unable to open postcondition directory {}: {error}",
+                directory_path.display()
+            )
+        })?;
+
+    read_regular_file_from_open_directory_blocking(&directory, file_name).map_err(|error| {
+        format!(
+            "{} under {}",
+            error,
+            directory_path.display()
+        )
+    })
+}
+
+async fn read_regular_file_bytes_at(
+    directory_path: &std::path::Path,
+    file_name: &str,
+) -> Result<Vec<u8>, String> {
+    let directory_path = directory_path.to_path_buf();
+    let file_name = file_name.to_string();
+    tokio::task::spawn_blocking(move || {
+        read_regular_file_bytes_at_blocking(&directory_path, &file_name)
+    })
+    .await
+    .map_err(|error| format!("postcondition read task failed: {error}"))?
+}
+
+async fn read_restore_configuration_postcondition() -> Result<Vec<u8>, String> {
+    tokio::task::spawn_blocking(|| {
+        let directory = open_restore_configuration_directory()?;
+        read_regular_file_from_open_directory_blocking(&directory, "configuration.nix")
+    })
+    .await
+    .map_err(|error| format!("restore postcondition read task failed: {error}"))?
+}
+
+async fn verify_active_configuration(expected: &[u8]) -> Result<bool, String> {
+    let actual = read_regular_file_bytes_at(
+        std::path::Path::new("/etc/nixos"),
+        "configuration.nix",
+    )
+    .await
+    .map_err(|error| format!("active configuration postcondition probe failed: {error}"))?;
+    Ok(configuration_bytes_match(&actual, expected))
+}
+
+async fn verify_installed_configuration(expected: Option<&[u8]>) -> Result<bool, String> {
+    let actual = read_regular_file_bytes_at(
+        std::path::Path::new("/mnt/etc/nixos"),
+        "configuration.nix",
+    )
+    .await
+    .map_err(|error| format!("installed configuration postcondition probe failed: {error}"))?;
+    if actual.is_empty() {
+        return Ok(false);
+    }
+    match expected {
+        Some(expected) => Ok(configuration_bytes_match(&actual, expected)),
+        None => Ok(true),
+    }
+}
+fn validate_preservation_path(value: &str) -> Result<String, String> {
+    const PREFIX: &str = "/tmp/symthaea-preserve-";
+    let path = value.trim();
+    if path.len() != PREFIX.len() + 32
+        || !path.starts_with(PREFIX)
+        || !path[PREFIX.len()..].bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err("preservation directory is not a valid transaction-scoped path".into());
+    }
+    Ok(path.to_owned())
+}
+
+fn preservation_process_exists(name: &str) -> bool {
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return false;
+    };
+    entries.filter_map(Result::ok).any(|entry| {
+        let file_name = entry.file_name();
+        let pid = file_name.to_string_lossy();
+        if !pid.bytes().all(|byte| byte.is_ascii_digit()) {
+            return false;
+        }
+        std::fs::read_to_string(entry.path().join("comm"))
+            .map(|comm| comm.trim() == name)
+            .unwrap_or(false)
+    })
+}
+
+fn preservation_user_identity(username: &str) -> Result<Option<(u32, u32)>, String> {
+    let username = std::ffi::CString::new(username)
+        .map_err(|_| format!("preservation account name contains NUL: {username:?}"))?;
+    let mut pwd = unsafe { std::mem::zeroed::<libc::passwd>() };
+    let mut result = std::ptr::null_mut();
+    let mut buffer = vec![0u8; 4096];
+
+    loop {
+        let rc = unsafe {
+            libc::getpwnam_r(
+                username.as_ptr(),
+                &mut pwd,
+                buffer.as_mut_ptr() as *mut libc::c_char,
+                buffer.len(),
+                &mut result,
+            )
+        };
+        match rc {
+            0 => return Ok(result.as_ref().map(|entry| (entry.pw_uid, entry.pw_gid))),
+            libc::ERANGE => {
+                if buffer.len() >= 1024 * 1024 {
+                    return Err("preservation account lookup buffer exceeded 1 MiB".into());
+                }
+                buffer.resize(buffer.len() * 2, 0);
+            }
+            error => {
+                return Err(format!(
+                    "preservation account lookup for {username:?} failed with errno {error}"
+                ))
+            }
+        }
+    }
+}
+
+fn preservation_archive_component(value: &str) -> String {
+    let mut component: String = value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .take(80)
+        .collect();
+    if component.is_empty() {
+        component.push_str("image");
+    }
+    let digest = blake3::hash(value.as_bytes()).to_hex();
+    format!("{component}-{}", &digest[..8])
+}
+
+fn preservation_human_size(bytes: u64) -> String {
+    const UNITS: &[&str] = &["B", "KiB", "MiB", "GiB", "TiB"];
+    let mut value = bytes as f64;
+    let mut unit = 0usize;
+    while value >= 1024.0 && unit + 1 < UNITS.len() {
+        value /= 1024.0;
+        unit += 1;
+    }
+    if unit == 0 {
+        format!("{} B", bytes)
+    } else {
+        format!("{value:.1} {}", UNITS[unit])
+    }
+}
+
+async fn run_privileged_to_file(
+    program: &str,
+    args: &[&str],
+    output_path: &str,
+) -> Result<CmdResult, String> {
+    let mut command = trusted_typed_process(program)?;
+    let output_file = create_private_runtime_file(output_path, 0o600)
+        .map_err(|error| format!("unable to create preservation archive {output_path}: {error}"))?;
+
+    command.args(args);
+    command.stdout(std::process::Stdio::from(output_file));
+    command.stderr(std::process::Stdio::piped());
+
+    let output = command
+        .output()
+        .await
+        .map_err(|error| format!("unable to execute preservation archive command: {error}"))?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
+async fn run_privileged_pipeline_to_gzip(
+    program: &str,
+    args: &[&str],
+    output_path: &str,
+    identity: Option<(u32, u32)>,
+) -> Result<CmdResult, String> {
+    let mut producer = trusted_typed_process(program)?;
+    let mut gzip = trusted_typed_process("gzip")?;
+    let output_file = create_private_runtime_file(output_path, 0o600)
+        .map_err(|error| format!("unable to create preservation archive {output_path}: {error}"))?;
+
+    producer.args(args);
+    if let Some((uid, gid)) = identity {
+        producer.uid(uid);
+        producer.gid(gid);
+    }
+    producer
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+
+    let mut producer_child = producer
+        .spawn()
+        .await
+        .map_err(|error| format!("unable to start preservation producer: {error}"))?;
+    let producer_stdout = match producer_child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            let _ = producer_child.kill().await;
+            let _ = producer_child.wait().await;
+            let _ = tokio::fs::remove_file(output_path).await;
+            return Err("preservation producer did not expose stdout for gzip pipeline".into());
+        }
+    };
+
+    gzip.arg("-c")
+        .stdin(std::process::Stdio::from(producer_stdout))
+        .stdout(std::process::Stdio::from(output_file))
+        .stderr(std::process::Stdio::piped());
+
+    let mut gzip_child = match gzip.spawn().await {
+        Ok(child) => child,
+        Err(error) => {
+            let _ = producer_child.kill().await;
+            let _ = producer_child.wait().await;
+            let _ = tokio::fs::remove_file(output_path).await;
+            return Err(format!("unable to start preservation gzip stage: {error}"));
+        }
+    };
+
+    let (producer_result, gzip_result) = tokio::join!(
+        producer_child.wait_with_output(),
+        gzip_child.wait_with_output()
+    );
+    let producer_result =
+        producer_result.map_err(|error| format!("preservation producer wait failed: {error}"))?;
+    let gzip_result =
+        gzip_result.map_err(|error| format!("preservation gzip wait failed: {error}"))?;
+
+    if !producer_result.status.success() || !gzip_result.status.success() {
+        let _ = tokio::fs::remove_file(output_path).await;
+        return Err(format!(
+            "preservation pipeline failed: producer={:?}, gzip={:?}",
+            producer_result.status.code(),
+            gzip_result.status.code()
+        ));
+    }
+
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&producer_result.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&producer_result.stderr).to_string(),
+        exit_status: 0,
+    })
+}
+
+async fn validate_preservation_archive(path: &str) -> Result<u64, String> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    let metadata = tokio::fs::symlink_metadata(path)
+        .await
+        .map_err(|error| format!("preservation archive metadata failed: {error}"))?;
+    if !metadata.file_type().is_file()
+        || metadata.uid() != unsafe { libc::geteuid() }
+        || metadata.permissions().mode() & 0o077 != 0
+        || metadata.len() == 0
+    {
+        return Err(format!(
+            "preservation archive {path} failed ownership, permission, or size checks"
+        ));
+    }
+
+    let gzip = run_privileged_args("gzip", &["-t", "--", path])
+        .await
+        .map_err(|error| format!("preservation gzip integrity check failed: {error}"))?;
+    if gzip.exit_status != 0 {
+        return Err(format!("preservation archive {path} is not valid gzip"));
+    }
+    let tar = run_privileged_args("tar", &["-tzf", path])
+        .await
+        .map_err(|error| format!("preservation tar integrity check failed: {error}"))?;
+    if tar.exit_status != 0 {
+        return Err(format!("preservation archive {path} is not a valid tar archive"));
+    }
+    Ok(metadata.len())
+}
+
+async fn preservation_tar_archive(
+    archive_path: &str,
+    working_dir: &str,
+    member: &str,
+) -> Result<u64, String> {
+    let result = run_privileged_to_file(
+        "tar",
+        &["-czf", "-", "-C", working_dir, member],
+        archive_path,
+    )
+    .await?;
+    if result.exit_status != 0 {
+        let _ = tokio::fs::remove_file(archive_path).await;
+        return Err(format!(
+            "tar preservation failed for {member}: {}",
+            result.stderr.chars().take(500).collect::<String>()
+        ));
+    }
+    validate_preservation_archive(archive_path).await
+}
+
+async fn preserve_data_native(
+    backup_dir: &str,
+    transaction_dir: &str,
+) -> Result<serde_json::Value, String> {
+    let backup_dir = validate_preservation_path(backup_dir)?;
+    let mut items = Vec::new();
+
+    if let Ok(info) = run_privileged_args("docker", &["info"]).await {
+        if info.exit_status == 0 {
+            let images = run_privileged_args(
+                "docker",
+                &["images", "--format", "{{.Repository}}:{{.Tag}}"],
+            )
+            .await
+            .map_err(|error| format!("unable to enumerate Docker images: {error}"))?;
+            if images.exit_status != 0 {
+                return Err(format!(
+                    "Docker image inventory failed: {}",
+                    images.stderr.chars().take(500).collect::<String>()
+                ));
+            }
+
+            for image in images
+                .stdout
+                .lines()
+                .map(str::trim)
+                .filter(|image| !image.is_empty() && !image.contains("<none>"))
+                .take(20)
+            {
+                let archive = format!(
+                    "{backup_dir}/docker-{}.tar.gz",
+                    preservation_archive_component(image)
+                );
+                run_privileged_pipeline_to_gzip("docker", &["save", image], &archive, None)
+                    .await?;
+                let size = validate_preservation_archive(&archive).await?;
+                items.push(serde_json::json!({
+                    "type": "docker_image",
+                    "name": image,
+                    "size": preservation_human_size(size),
+                    "path": archive
+                }));
+            }
+        }
+    }
+
+    if preservation_process_exists("postgres") {
+        let identity = preservation_user_identity("postgres")?
+            .ok_or_else(|| "PostgreSQL is running but the postgres account is unavailable".to_string())?;
+        let archive = format!("{backup_dir}/postgresql-all.sql.gz");
+        run_privileged_pipeline_to_gzip("pg_dumpall", &[], &archive, Some(identity)).await?;
+        let size = validate_preservation_archive(&archive).await?;
+        items.push(serde_json::json!({
+            "type": "postgresql",
+            "name": "all databases",
+            "size": preservation_human_size(size),
+            "path": archive
+        }));
+    }
+
+    if preservation_process_exists("mysqld") {
+        let archive = format!("{backup_dir}/mysql-all.sql.gz");
+        run_privileged_pipeline_to_gzip(
+            "mysqldump",
+            &["--all-databases"],
+            &archive,
+            None,
+        )
+        .await?;
+        let size = validate_preservation_archive(&archive).await?;
+        items.push(serde_json::json!({
+            "type": "mysql",
+            "name": "all databases",
+            "size": preservation_human_size(size),
+            "path": archive
+        }));
+    }
+
+    for webdir in ["/var/www", "/srv/http", "/usr/share/nginx/html"] {
+        let path = std::path::Path::new(webdir);
+        if path.is_dir()
+            && std::fs::read_dir(path)
+                .map(|mut entries| entries.next().is_some())
+                .unwrap_or(false)
+        {
+            let parent = path.parent().unwrap_or(std::path::Path::new("/"));
+            let member = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .ok_or_else(|| format!("invalid preservation web path {webdir}"))?;
+            let archive = format!("{backup_dir}/{member}.tar.gz");
+            let size =
+                preservation_tar_archive(&archive, parent.to_str().unwrap_or("/"), member).await?;
+            items.push(serde_json::json!({
+                "type": "webdata",
+                "name": webdir,
+                "size": preservation_human_size(size),
+                "path": archive
+            }));
+        }
+    }
+
+    if std::path::Path::new("/var/spool/cron").is_dir() {
+        let archive = format!("{backup_dir}/crontabs.tar.gz");
+        let size = preservation_tar_archive(&archive, "/var/spool", "cron").await?;
+        items.push(serde_json::json!({
+            "type": "crontabs",
+            "name": "all crontabs",
+            "size": "small",
+            "path": archive
+        }));
+    }
+
+    let mut ssh_sources = Vec::new();
+    if std::path::Path::new("/root/.ssh").is_dir() {
+        ssh_sources.push("/root/.ssh".to_string());
+    }
+    if let Ok(entries) = std::fs::read_dir("/home") {
+        for entry in entries.flatten() {
+            let path = entry.path().join(".ssh");
+            if path.is_dir() {
+                ssh_sources.push(path.to_string_lossy().into_owned());
+            }
+        }
+    }
+    if !ssh_sources.is_empty() {
+        let list_path = format!("{transaction_dir}/ssh-sources");
+        let mut encoded = Vec::new();
+        for path in &ssh_sources {
+            encoded.extend_from_slice(path.as_bytes());
+            encoded.push(0);
+        }
+        write_private_file(&list_path, &encoded, 0o600)
+            .map_err(|error| format!("unable to stage SSH preservation manifest: {error}"))?;
+        let archive = format!("{backup_dir}/ssh-keys.tar.gz");
+        let result = run_privileged_to_file(
+            "tar",
+            &["-czf", "-", "--null", "--files-from", &list_path],
+            &archive,
+        )
+        .await?;
+        let _ = tokio::fs::remove_file(&list_path).await;
+        if result.exit_status != 0 {
+            let _ = tokio::fs::remove_file(&archive).await;
+            return Err(format!(
+                "SSH preservation failed: {}",
+                result.stderr.chars().take(500).collect::<String>()
+            ));
+        }
+        let size = validate_preservation_archive(&archive).await?;
+        items.push(serde_json::json!({
+            "type": "ssh_keys",
+            "name": "SSH keys and config",
+            "size": "small",
+            "path": archive
+        }));
+    }
+
+    let etc_archive = format!("{backup_dir}/etc-backup.tar.gz");
+    let etc_size = preservation_tar_archive(&etc_archive, "/", "etc").await?;
+    items.push(serde_json::json!({
+        "type": "system_config",
+        "name": "/etc",
+        "size": preservation_human_size(etc_size),
+        "path": etc_archive
+    }));
+
+    let home_size = match run_privileged_args("du", &["-sh", "/home"]).await {
+        Ok(result) if result.exit_status == 0 => result
+            .stdout
+            .split_whitespace()
+            .next()
+            .unwrap_or("unknown")
+            .to_string(),
+        _ => "unknown".to_string(),
+    };
+    items.push(serde_json::json!({
+        "type": "home_dirs",
+        "name": format!("/home ({home_size})"),
+        "size": home_size,
+        "path": "not backed up — requires explicit user-directed preservation"
+    }));
+
+    let total_size = match run_privileged_args("du", &["-sh", &backup_dir]).await {
+        Ok(result) if result.exit_status == 0 => result.stdout.split_whitespace().next().unwrap_or("unknown").to_string(),
+        _ => "unknown".to_string(),
+    };
+
+    Ok(serde_json::json!({
+        "backup_dir": backup_dir,
+        "items": items,
+        "total_size": total_size
+    }))
+}
+
+async fn verify_preservation_artifacts(backup_dir: &str) -> Result<bool, String> {
+    let path = validate_preservation_path(backup_dir)?;
+
+    use std::os::unix::fs::MetadataExt;
+    let dir = tokio::fs::symlink_metadata(&path)
+        .await
+        .map_err(|error| format!("preservation directory postcondition probe failed: {error}"))?;
+    if !dir.is_dir() {
+        return Err("preservation destination is not a directory".into());
+    }
+    let mode = dir.mode() & 0o777;
+    if mode != 0o700 {
+        return Err(format!(
+            "preservation directory has unsafe mode {:04o}; require 0700",
+            mode
+        ));
+    }
+    if dir.uid() != unsafe { libc::geteuid() } {
+        return Err("preservation directory is not owned by the relay process user".into());
+    }
+
+    // /etc is always an attempted preservation artifact. A terminal success
+    // is meaningful only if that archive exists and passes both compression
+    // and archive-format integrity checks.
+    let etc_archive = std::path::Path::new(&path).join("etc-backup.tar.gz");
+    let etc_metadata = tokio::fs::metadata(&etc_archive)
+        .await
+        .map_err(|error| format!("required /etc preservation artifact is missing: {error}"))?;
+    if !etc_metadata.is_file() || etc_metadata.len() == 0 {
+        return Ok(false);
+    }
+
+    for entry in std::fs::read_dir(&path)
+        .map_err(|error| format!("preservation directory enumeration failed: {error}"))?
+    {
+        let entry = entry.map_err(|error| format!("preservation directory entry failed: {error}"))?;
+        let metadata = std::fs::symlink_metadata(entry.path())
+            .map_err(|error| format!("preservation artifact metadata failed: {error}"))?;
+        if !metadata.file_type().is_file() {
+            return Ok(false);
+        }
+
+        let mode = metadata.mode() & 0o777;
+        if mode & 0o077 != 0 || metadata.uid() != unsafe { libc::geteuid() } {
+            return Ok(false);
+        }
+
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !(name.ends_with(".tar.gz") || name.ends_with(".sql.gz")) {
+            return Ok(false);
+        }
+        if metadata.len() == 0 {
+            return Ok(false);
+        }
+
+        let archive = entry.path().to_string_lossy().to_string();
+        let gzip_check = run_privileged_args("gzip", &["-t", "--", &archive])
+            .await
+            .map_err(|error| format!("preservation gzip integrity probe failed: {error}"))?;
+        if gzip_check.exit_status != 0 {
+            return Ok(false);
+        }
+        if name.ends_with(".tar.gz") {
+            let tar_check = run_privileged_args("tar", &["-tzf", &archive])
+                .await
+                .map_err(|error| format!("preservation tar integrity probe failed: {error}"))?;
+            if tar_check.exit_status != 0 {
+                return Ok(false);
+            }
+        }
+    }
+
+    Ok(true)
+}
+
+
+
+fn parse_generation_link(value: &str) -> Option<u64> {
+    let value = value.trim().rsplit('/').next()?;
+    let suffix = value.strip_prefix("system-")?.strip_suffix("-link")?;
+    suffix.parse::<u64>().ok()
+}
+
+async fn current_system_generation() -> Result<u64, String> {
+    let link = tokio::fs::read_link("/nix/var/nix/profiles/system")
+        .await
+        .map_err(|error| format!("active generation probe failed: {error}"))?;
+    let link = link.to_string_lossy();
+    parse_generation_link(&link)
+        .ok_or_else(|| "active system profile has an invalid generation link".into())
+}
+
+fn finalize_transaction(
+    ledger: &TransactionLedger,
+    transaction: &SystemTransaction,
+    observed_outcome: TransactionOutcome,
+    peer_addr: &str,
+) -> TransactionOutcome {
+    match ledger.mark_completed(transaction, observed_outcome) {
+        Ok(()) => observed_outcome,
+        Err(error) => {
+            eprintln!(
+                "[{}] Transaction {} completion journal failed: {}",
+                peer_addr, transaction.transaction_id, error
+            );
+            TransactionOutcome::Indeterminate
+        }
+    }
+}
+
+fn finalize_transaction_with_artifacts(
+    ledger: &TransactionLedger,
+    transaction: &SystemTransaction,
+    observed_outcome: TransactionOutcome,
+    artifact_commitment: ArtifactCommitment,
+    configuration_commitment: ArtifactCommitment,
+    peer_addr: &str,
+) -> TransactionOutcome {
+    match ledger.mark_completed_with_image_artifacts(
+        transaction,
+        observed_outcome,
+        Some(artifact_commitment),
+        Some(configuration_commitment),
+    ) {
+        Ok(()) => observed_outcome,
+        Err(error) => {
+            eprintln!(
+                "[{}] Transaction {} completion journal with artifact failed: {}",
+                peer_addr, transaction.transaction_id, error
+            );
+            TransactionOutcome::Indeterminate
+        }
+    }
+}
+
+fn install_process_command_matches(transaction_id: &str, cmdline: &[u8]) -> bool {
+    if transaction_id.len() != 32
+        || !transaction_id.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return false;
+    }
+    let expected_script = match transaction_artifact_dir_path(transaction_id) {
+        Ok(path) => path.join("install.sh"),
+        Err(_) => return false,
+    };
+    let expected_script = expected_script.to_string_lossy();
+    cmdline
+        .split(|byte| *byte == 0)
+        .any(|arg| arg == expected_script.as_bytes())
+}
+
+async fn install_process_is_alive(transaction_id: &str) -> bool {
+    if transaction_id.len() != 32
+        || !transaction_id.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return false;
+    }
+    let pid_path = match transaction_artifact_dir_path(transaction_id) {
+        Ok(path) => path.join("install.pid"),
+        Err(_) => return false,
+    };
+    let pid_text = match read_private_small_file(pid_path.to_str().unwrap(), 128) {
+        Ok(value) => value,
+        Err(_) => return false,
+    };
+    let (pid, expected_start_time) = match parse_process_identity(&pid_text) {
+        Some(identity) => identity,
+        None => return false,
+    };
+    let pid = match i32::try_from(pid) {
+        Ok(pid) if pid > 0 => pid,
+        _ => return false,
+    };
+
+    let proc_root = format!("/proc/{pid}");
+    let cmdline = match tokio::fs::read(format!("{proc_root}/cmdline")).await {
+        Ok(value) => value,
+        Err(_) => return false,
+    };
+    if !install_process_command_matches(transaction_id, &cmdline) {
+        return false;
+    }
+
+    // A zombie can still satisfy kill(pid, 0), but it is no longer executing
+    // the install. Treat it as not running and let the recovery state remain
+    // uncertain until a terminal journal event exists.
+    if let Ok(status) = tokio::fs::read_to_string(format!("{proc_root}/status")).await {
+        if status
+            .lines()
+            .any(|line| line.starts_with("State:") && line.contains("(zombie)"))
+        {
+            return false;
+        }
+    } else {
+        return false;
+    }
+
+    process_id_is_alive(pid as u32, expected_start_time)
+}
+
+async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin>(
+    ws_stream: tokio_tungstenite::WebSocketStream<S>,
+    peer_addr: String,
+    tracker: SharedTracker,
+    auth_token: Arc<String>,
+    mutation_lock: SharedMutationLock,
+    transaction_ledger: TransactionLedger,
+) {
+    let (mut ws_tx, mut ws_rx) = ws_stream.split();
+    let mut authed = false;
+
+    eprintln!("[{}] WebSocket connected", peer_addr);
+
+    while let Some(msg) = ws_rx.next().await {
+        let msg = match msg {
+            Ok(Message::Text(t)) => t,
+            Ok(Message::Close(_)) => break,
+            Ok(_) => continue,
+            Err(e) => {
+                eprintln!("[{}] WebSocket error: {}", peer_addr, e);
+                break;
+            }
+        };
+
+        let client_msg: ClientMessage = match serde_json::from_str(&msg) {
+            Ok(m) => m,
+            Err(e) => {
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::error(&format!("Invalid JSON: {}", e)).to_json(),
+                    ))
+                    .await;
+                continue;
+            }
+        };
+
+        // Auth gate: require an explicit `"auth"` action with the correct token.
+        // This prevents CSWSH-style attacks against ws://127.0.0.1:* services.
+        // Origin header validated during WebSocket upgrade (handle_connection).
+        // Token auth provides the primary security boundary.
+        if !authed {
+            // Check if this IP is blocked due to too many failed auth attempts
+            if tracker.lock().await.is_blocked(&peer_addr) {
+                eprintln!(
+                    "[{}] Blocked after too many failed auth attempts",
+                    peer_addr
+                );
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::error("Too many failed auth attempts. Try again later.")
+                            .to_json(),
+                    ))
+                    .await;
+                break;
+            }
+
+            if client_msg.action.as_str() == "auth" {
+                // Constant-time comparison prevents timing side-channel attacks
+                if !client_msg.token.is_empty() && token_eq(&client_msg.token, &auth_token) {
+                    authed = true;
+                    let _ = ws_tx
+                        .send(Message::Text(RelayMessage::authed().to_json()))
+                        .await;
+                    continue;
+                }
+
+                // Record failed auth attempt for rate limiting
+                tracker.lock().await.record_failed_auth(&peer_addr);
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::error("Unauthorized: invalid relay token").to_json(),
+                    ))
+                    .await;
+                break;
+            } else {
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::error(
+                            "Unauthorized: send {\"action\":\"auth\",\"token\":...} first",
+                        )
+                        .to_json(),
+                    ))
+                    .await;
+                break;
+            }
+        }
+
+        match client_msg.action.as_str() {
+            "connect" => {
+                // Rate limit: 1 session per IP
+                {
+                    let mut t = tracker.lock().await;
+                    if !t.try_acquire(&peer_addr) {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(
+                                    "Rate limited: only 1 active session per IP allowed",
+                                )
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                }
+
+                // No SSH needed — relay runs directly on the target machine
+                eprintln!("[{}] Connection acknowledged (local mode)", peer_addr);
+                let _ = ws_tx
+                    .send(Message::Text(
+                        serde_json::json!({
+                            "type": "connected",
+                            "message": "Connected to target (local relay)"
+                        })
+                        .to_string(),
+                    ))
+                    .await;
+            }
+
+            // Intentionally disabled: this relay is not a general-purpose RCE gateway.
+            "exec" => {
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::error(
+                            "Unsupported action: 'exec' is disabled. Use typed actions like 'install', 'probe_hardware', etc.",
+                        )
+                        .to_json(),
+                    ))
+                    .await;
+            }
+
+            "discover_disks" => {
+                eprintln!("[{}] Discovering disks...", peer_addr);
+                match run_privileged_args("lsblk", &["--json", "-o", "NAME,SIZE,MODEL,TYPE,TRAN,RM", "-b"]).await {
+                    Ok(result) if result.exit_status == 0 => {
+                        let disks = parse_lsblk(&result.stdout);
+                        let disks_json =
+                            serde_json::to_string(&disks).unwrap_or_else(|_| "[]".into());
+                        eprintln!("[{}] Found {} disks", peer_addr, disks.len());
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::disks(&disks_json).to_json()))
+                            .await;
+                    }
+                    Ok(result) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "lsblk failed (exit {}): {}",
+                                    result.exit_status,
+                                    result.stderr.chars().take(200).collect::<String>()
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Disk discovery failed: {}", e))
+                                    .to_json(),
+                            ))
+                            .await;
+                    }
+                }
+            }
+
+            "check_install_status" => {
+                let receipt = match transaction_ledger.lookup(&client_msg.request_id) {
+                    Ok(Some(receipt)) => receipt,
+                    Ok(None) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "install_status",
+                                    "data": serde_json::json!({"status": "none"}).to_string()
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to read transaction recovery state: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                if receipt.mutation != MutationKind::Install {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error("Request id does not identify an install transaction")
+                                .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                let status = match receipt.outcome {
+                    TransactionOutcome::ObservedSuccess => "complete",
+                    TransactionOutcome::Failed => "failed",
+                    TransactionOutcome::Indeterminate => {
+                        if install_process_is_alive(&receipt.transaction_id).await {
+                            "running"
+                        } else {
+                            "uncertain"
+                        }
+                    }
+                };
+
+                let _ = ws_tx
+                    .send(Message::Text(
+                        serde_json::json!({
+                            "type": "install_status",
+                            "data": serde_json::json!({
+                                "status": status,
+                                "transaction_id": receipt.transaction_id,
+                                "request_id": receipt.request_id,
+                            }).to_string(),
+                            "transaction": receipt
+                        })
+                        .to_string(),
+                    ))
+                    .await;
+            }
+
+            "install" => {
+                // ── Validate ALL user inputs before they reach shell commands ──
+                let disk = if client_msg.disk.is_empty() {
+                    "/dev/sda".to_string()
+                } else {
+                    match validate_disk_path(&client_msg.disk) {
+                        Ok(d) => d,
+                        Err(e) => {
+                            let _ = ws_tx
+                                .send(Message::Text(RelayMessage::error(&e).to_json()))
+                                .await;
+                            continue;
+                        }
+                    }
+                };
+                let hostname = match validate_hostname_relay(&client_msg.hostname) {
+                    Ok(h) => h,
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let username = if client_msg.username.is_empty() {
+                    "user".to_string()
+                } else {
+                    match validate_username(&client_msg.username) {
+                        Ok(u) => u,
+                        Err(e) => {
+                            let _ = ws_tx
+                                .send(Message::Text(RelayMessage::error(&e).to_json()))
+                                .await;
+                            continue;
+                        }
+                    }
+                };
+
+                if let Err(error) = validate_install_layout(&client_msg.layout) {
+                    let _ = ws_tx
+                        .send(Message::Text(RelayMessage::error(&error).to_json()))
+                        .await;
+                    continue;
+                }
+                let requires_luks = client_msg.layout == "single-luks";
+                if requires_luks {
+                    if client_msg.luks_passphrase.is_empty() {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(
+                                    "LUKS2 disk encryption requires a non-empty passphrase",
+                                )
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                    if client_msg.luks_passphrase.len() > 4096
+                        || client_msg.luks_passphrase.contains('\0')
+                    {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(
+                                    "LUKS2 passphrase is invalid or exceeds the 4096-byte limit",
+                                )
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                }
+
+                // Validate optional fields that reach shell/Nix config
+                if !client_msg.timezone.is_empty() {
+                    if let Err(e) = sanitize_input(&client_msg.timezone, "timezone", true) {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
+                        continue;
+                    }
+                }
+                if !client_msg.keyboard.is_empty() {
+                    if let Err(e) = sanitize_input(&client_msg.keyboard, "keyboard", false) {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
+                        continue;
+                    }
+                }
+                if !client_msg.desktop.is_empty() {
+                    if let Err(e) = sanitize_input(&client_msg.desktop, "desktop", false) {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
+                        continue;
+                    }
+                }
+                if !client_msg.gpu_driver.is_empty() {
+                    if let Err(e) = sanitize_input(&client_msg.gpu_driver, "gpu_driver", false) {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
+                        continue;
+                    }
+                }
+                if !client_msg.fast_disk.is_empty() {
+                    if let Err(e) = validate_disk_path(&client_msg.fast_disk) {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
+                        continue;
+                    }
+                }
+                if !client_msg.standard_disk.is_empty() {
+                    if let Err(e) = validate_disk_path(&client_msg.standard_disk) {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
+                        continue;
+                    }
+                }
+
+                // Validate extra disks for RAID/ZFS multi-disk layouts.
+                // An invalid member rejects the entire request rather than
+                // being skipped by an inner-loop continue.
+                if let Err(error) = validate_extra_disks(&client_msg.extra_disks) {
+                    let _ = ws_tx
+                        .send(Message::Text(RelayMessage::error(&error).to_json()))
+                        .await;
+                    continue;
+                }
+                if let Err(error) = validate_install_disk_topology(&client_msg) {
+                    let _ = ws_tx
+                        .send(Message::Text(RelayMessage::error(&error).to_json()))
+                        .await;
+                    continue;
+                }
+
+                // Authoritative target architecture check. Browser-generated flakes
+                // currently default to x86_64-linux; never silently realize one on a
+                // different machine architecture.
+                let target_arch = match run_privileged_args("uname", &["-m"]).await {
+                    Ok(result) if result.exit_status == 0 => result.stdout.trim().to_string(),
+                    Ok(result) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to determine target architecture (exit {})",
+                                    result.exit_status
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to determine target architecture: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let target_system = match target_arch.as_str() {
+                    "x86_64" => "x86_64-linux",
+                    "aarch64" => "aarch64-linux",
+                    "armv7l" => "armv7l-linux",
+                    other => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unsupported target architecture: {}",
+                                    other
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                if let Some(system) = extract_explicit_nix_system(&client_msg.flake_nix) {
+                    if system != target_system {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Architecture mismatch: target is {}, but the supplied flake targets {}",
+                                    target_system, system
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                }
+
+                // Bind the request to the authoritative target identity observed by the
+                // browser. The raw machine-id never crosses the relay boundary.
+                let target_machine_digest = match machine_binding_digest_hex() {
+                    Ok(digest) => digest,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to establish target machine identity: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                if client_msg.target_machine_digest != target_machine_digest {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(
+                                "Target identity changed or was not established by the hardware probe; re-probe before installing.",
+                            )
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                // Install is a consequential mutation. Refuse concurrent mutations rather than
+                // queueing them invisibly behind a stale browser request.
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                // Bind the authenticated request to a typed transaction identity. Passwords and
+                // LUKS secrets are represented only by the surrounding secure session, never in this digest.
+                let user_password_commitment = (!client_msg.user_password.is_empty()).then(|| {
+                    transaction_ledger.secret_commitment(
+                        "install-user-password",
+                        &client_msg.user_password,
+                    )
+                });
+                let luks_passphrase_commitment = (!client_msg.luks_passphrase.is_empty()).then(|| {
+                    transaction_ledger.secret_commitment(
+                        "install-luks-passphrase",
+                        &client_msg.luks_passphrase,
+                    )
+                });
+                let install_payload_bytes = match build_install_transaction_payload(
+                    &client_msg,
+                    &disk,
+                    &hostname,
+                    &username,
+                    &target_machine_digest,
+                    user_password_commitment.as_deref(),
+                    luks_passphrase_commitment.as_deref(),
+                ) {
+                    Ok(bytes) => bytes,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&error).to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
+                    MutationKind::Install,
+                    &client_msg.request_id,
+                    Some(&target_machine_digest),
+                    &install_payload_bytes,
+                ).await else {
+                    continue;
+                };
+                eprintln!("[{}] {}", peer_addr, transaction.log_line());
+
+                // Generate session-isolated log path (CRITICAL-4: prevents cross-session log tampering)
+                // The transaction ID is the sole durable and filesystem identity
+                // for this mutation's asynchronous artifact namespace.
+                let process_id = transaction.transaction_id.as_str();
+                let transaction_dir = match create_transaction_artifact_dir(process_id) {
+                    Ok(path) => path,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to create transaction artifact namespace: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let log_path = format!("{transaction_dir}/install.log");
+                let script_path = format!("{transaction_dir}/install.sh");
+                let status_path = format!("{transaction_dir}/install.status");
+                let pid_path = format!("{transaction_dir}/install.pid");
+
+                // The whole asynchronous install evidence namespace is private
+                // to this transaction. Other local users cannot replace status,
+                // PID, log, script, or staged configuration paths from /tmp.
+                let config_staging_dir = format!("{transaction_dir}/config");
+                if let Err(error) = tokio::fs::create_dir_all(&config_staging_dir).await {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Unable to create transaction config staging namespace: {}",
+                                error
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
+                    continue;
+                }
+                // Stage browser-supplied configuration through one private, synchronized
+                // descriptor. Failure is fatal rather than being swallowed by an ignored chmod/write.
+                if !client_msg.configuration_nix.is_empty() {
+                    let config_path = format!("{}/configuration.nix", config_staging_dir);
+                    if let Err(error) =
+                        write_private_file(&config_path, client_msg.configuration_nix.as_bytes(), 0o600)
+                    {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to stage configuration.nix safely: {error}"
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        continue;
+                    }
+                }
+                // Stage flake.nix if provided.
+                if !client_msg.flake_nix.is_empty() {
+                    let flake_path = format!("{}/flake.nix", config_staging_dir);
+                    if let Err(error) =
+                        write_private_file(&flake_path, client_msg.flake_nix.as_bytes(), 0o600)
+                    {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to stage flake.nix safely: {error}"
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        continue;
+                    }
+                }
+
+                // Fully automated install — generates and executes the entire
+                // partition → format → install → configure sequence.
+                // The user only clicked "Deploy" in the browser.
+                // All inputs are validated above before reaching generate_install_script.
 
                 // SECURITY: Validate browser-supplied Nix config with pure-eval
                 // (no network, no filesystem access, no builtins.exec)
@@ -86,3 +6433,6365 @@
                 if client_msg.tpm2_unlock {
                     if let Some(pos) = script.rfind("echo \"COMPLETE\"") {
                         script.insert_str(pos, tpm2_postinstall());
+                    } else {
+                        script.push_str(tpm2_postinstall());
+                    }
+                }
+                if client_msg.fido2_unlock {
+                    if let Some(pos) = script.rfind("echo \"COMPLETE\"") {
+                        script.insert_str(pos, fido2_postinstall());
+                    } else {
+                        script.push_str(fido2_postinstall());
+                    }
+                }
+
+                // Version-control the final generated configuration after all optional
+                // boot/security post-install mutations have been applied. This keeps
+                // the initial config commit aligned with the actual installed state.
+                if let Some(pos) = script.rfind("echo \"COMPLETE\"") {
+                    script.insert_str(pos, git_init_config());
+                }
+
+                // Set user password via temp file (avoids shell injection)
+                if !client_msg.user_password.is_empty() {
+                    // SECURITY: reject passwords containing newlines (breaks chpasswd format)
+                    if client_msg.user_password.contains('\n')
+                        || client_msg.user_password.contains('\r')
+                    {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error("Password must not contain newlines").to_json(),
+                            ))
+                            .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        continue;
+                    }
+                    let pw_file = format!("{transaction_dir}/user-password");
+                    // Write the secret through the filesystem API instead of
+                    // embedding it in a shell command. This keeps the password
+                    // out of the relay child-process argument list.
+                    // Create with mode 0600 from the beginning so the secret is
+                    // never briefly exposed under a permissive umask.
+                    let mut pw_file_handle = match std::fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .mode(0o600)
+                        .open(&pw_file)
+                    {
+                        Ok(file) => file,
+                        Err(error) => {
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    RelayMessage::error(&format!("Failed to stage password: {}", error)).to_json(),
+                                ))
+                                .await;
+                            remove_transaction_artifact_dir(&transaction_dir);
+                            continue;
+                        }
+                    };
+                    if let Err(error) = pw_file_handle.write_all(client_msg.user_password.as_bytes()) {
+                        drop(pw_file_handle);
+                        let _ = tokio::fs::remove_file(&pw_file).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Failed to stage password: {}", error)).to_json(),
+                            ))
+                            .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        continue;
+                    }
+                    drop(pw_file_handle);
+                    let username = username.as_str();
+                    let pw_script = format!(
+                        r#"
+# ── Set User Password ──
+echo "STAGE: Setting user password..."
+if [ ! -f {pw_file} ]; then
+    echo "ERROR: staged user password is missing."
+    exit 1
+fi
+PW=$(cat {pw_file})
+if ! echo "{username}:$PW" | chroot /mnt chpasswd 2>/dev/null; then
+    echo "ERROR: failed to set the requested user password."
+    exit 1
+fi
+echo "  User password set."
+"#,
+                        pw_file = pw_file,
+                        username = username
+                    );
+                    if let Some(pos) = script.rfind("echo \"COMPLETE\"") {
+                        script.insert_str(pos, &pw_script);
+                    } else {
+                        script.push_str(&pw_script);
+                    }
+                }
+
+                // All staged secrets are cleaned up if the install fails before their
+                // normal post-install steps. Paths are transaction-scoped and derived
+                // entirely from the validated transaction identifier.
+                let mut staged_secret_paths = Vec::<String>::new();
+                if !client_msg.user_password.is_empty() {
+                    staged_secret_paths.push(format!("{transaction_dir}/user-password"));
+                }
+
+                if requires_luks {
+                    let luks_key_path = format!("{transaction_dir}/luks-passphrase");
+                    let mut luks_file = match std::fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .mode(0o600)
+                        .open(&luks_key_path)
+                    {
+                        Ok(file) => file,
+                        Err(error) => {
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    RelayMessage::error(&format!("Failed to stage LUKS2 passphrase: {}", error)).to_json(),
+                                ))
+                                .await;
+                            remove_transaction_artifact_dir(&transaction_dir);
+                            continue;
+                        }
+                    };
+                    if let Err(error) = luks_file.write_all(client_msg.luks_passphrase.as_bytes()) {
+                        drop(luks_file);
+                        let _ = cleanup_sensitive_file(&luks_key_path);
+                        let _ = cleanup_sensitive_file(&format!("{transaction_dir}/user-password"));
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Failed to stage LUKS2 passphrase: {}", error)).to_json(),
+                            ))
+                            .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        continue;
+                    }
+                    if let Err(error) = luks_file.sync_all() {
+                        drop(luks_file);
+                        let _ = tokio::fs::remove_file(&luks_key_path).await;
+                        let _ = tokio::fs::remove_file(format!("{transaction_dir}/user-password")).await;
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Failed to flush LUKS2 passphrase: {}", error)).to_json(),
+                            ))
+                            .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        continue;
+                    }
+                    drop(luks_file);
+                    staged_secret_paths.push(luks_key_path);
+                }
+
+                eprintln!(
+                    "[{}] Starting automated {} install on {} (transaction {})",
+                    peer_addr,
+                    if client_msg.layout.is_empty() {
+                        "single"
+                    } else {
+                        &client_msg.layout
+                    },
+                    &disk,
+                    transaction.transaction_id
+                );
+
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::progress(&NixosAnywhereStage::Connecting).to_json(),
+                    ))
+                    .await;
+
+                // Write the install script directly to disk (no heredoc).
+                // SECURITY: Direct file write eliminates SCRIPTEOF heredoc injection.
+                if let Err(error) = write_private_file(&script_path, script.as_bytes(), 0o700) {
+                    for secret_path in &staged_secret_paths {
+                        let _ = cleanup_sensitive_file(secret_path);
+                    }
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!("Failed to write script: {}", error))
+                                .to_json(),
+                        ))
+                        .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
+                    continue;
+                }
+
+                // Upload verification is now a filesystem observation, not a shell
+                // expression whose pathname has to cross another parser.
+                match std::fs::metadata(&script_path) {
+                    Ok(metadata)
+                        if metadata.is_file()
+                            && (metadata.permissions().mode() & 0o111) != 0 =>
+                    {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::output("Install script uploaded.", "stdout")
+                                    .to_json(),
+                            ))
+                            .await;
+                    }
+                    Ok(metadata) => {
+                        for secret_path in &staged_secret_paths {
+                            let _ = tokio::fs::remove_file(secret_path).await;
+                        }
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Failed to upload script: {} (mode {:04o}, regular_file={})",
+                                    script_path,
+                                    metadata.permissions().mode() & 0o777,
+                                    metadata.is_file()
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        continue;
+                    }
+                    Err(error) => {
+                        for secret_path in &staged_secret_paths {
+                            let _ = tokio::fs::remove_file(secret_path).await;
+                        }
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Upload verification failed: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        continue;
+                    }
+                }
+
+                if let Err(error) = spawn_privileged_background_script(
+                    &script_path,
+                    &log_path,
+                    &status_path,
+                    &pid_path,
+                )
+                .await
+                {
+                    for secret_path in &staged_secret_paths {
+                        let _ = tokio::fs::remove_file(secret_path).await;
+                    }
+                    let _ = tokio::fs::remove_file(&script_path).await;
+                    let _ = tokio::fs::remove_file(&log_path).await;
+                    let _ = tokio::fs::remove_file(&status_path).await;
+                    let _ = tokio::fs::remove_file(&pid_path).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Install launch failed: {}",
+                                error
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::output("Installation started. Streaming output...", "stdout")
+                            .to_json(),
+                    ))
+                    .await;
+
+                // Poll the transaction log directly through the filesystem API.
+                // No shell is needed to count or tail a transaction-owned log.
+                let mut last_lines = 0usize;
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+                    if let Ok(bytes) = tokio::fs::read(&log_path).await {
+                        let text = String::from_utf8_lossy(&bytes);
+                        let lines: Vec<&str> = text.lines().collect();
+                        if lines.len() >= last_lines {
+                            for line in &lines[last_lines..] {
+                                if line.trim().is_empty() {
+                                    continue;
+                                }
+
+                                if line.starts_with("STAGE: ") {
+                                    let stage_text = &line[7..];
+                                    let stage = if stage_text.contains("Prepar")
+                                        || stage_text.contains("environment")
+                                    {
+                                        NixosAnywhereStage::Connecting
+                                    } else if stage_text.contains("Partition") {
+                                        NixosAnywhereStage::Partitioning
+                                    } else if stage_text.contains("Format")
+                                        || stage_text.contains("btrfs")
+                                        || stage_text.contains("subvol")
+                                    {
+                                        NixosAnywhereStage::Partitioning
+                                    } else if stage_text.contains("Mount") {
+                                        NixosAnywhereStage::Partitioning
+                                    } else if stage_text.contains("Generat")
+                                        || stage_text.contains("config")
+                                    {
+                                        NixosAnywhereStage::Configuring
+                                    } else if stage_text.contains("Install") {
+                                        NixosAnywhereStage::Installing
+                                    } else if stage_text.contains("swap")
+                                        || stage_text.contains("Verif")
+                                    {
+                                        NixosAnywhereStage::Configuring
+                                    } else if stage_text.contains("FirstBreath") {
+                                        NixosAnywhereStage::Complete
+                                    } else {
+                                        NixosAnywhereStage::Installing
+                                    };
+
+                                    let _ = ws_tx
+                                        .send(Message::Text(
+                                            RelayMessage::progress(&stage).to_json(),
+                                        ))
+                                        .await;
+                                }
+
+                                if let Some(stage) = parse_stage(line) {
+                                    let _ = ws_tx
+                                        .send(Message::Text(
+                                            RelayMessage::progress(&stage).to_json(),
+                                        ))
+                                        .await;
+                                }
+
+                                let _ = ws_tx
+                                    .send(Message::Text(
+                                        RelayMessage::output(line, "stdout").to_json(),
+                                    ))
+                                    .await;
+
+                                if line.contains("COMPLETE") {
+                                    complete = true;
+                                }
+                            }
+                            last_lines = lines.len();
+                        }
+                    }
+
+                    // Completion is defined only by a durable status value or
+                    // by the disappearance of the exact transaction child PID.
+                    if read_transaction_status(&status_path)
+                        .await
+                        .ok()
+                        .flatten()
+                        .is_some()
+                    {
+                        break;
+                    }
+                    let identity = read_private_small_file(&pid_path, 128)
+                        .ok()
+                        .and_then(|text| parse_process_identity(&text));
+                    let (pid, start_time) = identity.unwrap_or((0, 0));
+                    if !process_id_is_alive(pid, start_time) {
+                        break;
+                    }
+                }
+
+                let install_exit_code = read_transaction_status(&status_path)
+                    .await
+                    .ok()
+                    .flatten();
+                let (mut exit_code, mut observed_outcome) = match install_exit_code {
+                    Some(0) => match verify_installed_configuration(
+                        (!client_msg.configuration_nix.is_empty())
+                            .then_some(client_msg.configuration_nix.as_bytes()),
+                    )
+                    .await
+                    {
+                        Ok(true) => (0, TransactionOutcome::ObservedSuccess),
+                        Ok(false) => {
+                            eprintln!(
+                                "[{}] {} install returned 0 but the installed configuration post-state did not match",
+                                peer_addr, transaction.log_line()
+                            );
+                            (1, TransactionOutcome::Indeterminate)
+                        }
+                        Err(error) => {
+                            eprintln!(
+                                "[{}] {} installed configuration postcondition probe failed: {}",
+                                peer_addr, transaction.log_line(), error
+                            );
+                            (1, TransactionOutcome::Indeterminate)
+                        }
+                    },
+                    Some(code) => (code, TransactionOutcome::Failed),
+                    None => (1, TransactionOutcome::Indeterminate),
+                };
+                let secret_cleanup = cleanup_sensitive_files(&staged_secret_paths);
+                if let Err(error) = &secret_cleanup {
+                    eprintln!(
+                        "[{}] {} staged install secret cleanup failed: {}",
+                        peer_addr,
+                        transaction.log_line(),
+                        error
+                    );
+                }
+
+                let secret_cleanup = cleanup_sensitive_files(&staged_secret_paths);
+                if let Err(error) = &secret_cleanup {
+                    eprintln!(
+                        "[{}] {} staged install secret cleanup failed: {}",
+                        peer_addr,
+                        transaction.log_line(),
+                        error
+                    );
+                    exit_code = 1;
+                    observed_outcome = TransactionOutcome::Indeterminate;
+                }
+
+                let outcome = finalize_transaction(
+                    &transaction_ledger,
+                    &transaction,
+                    observed_outcome,
+                    &peer_addr,
+                );
+                let _ = ws_tx
+                    .send(Message::Text(
+                        serde_json::json!({
+                            "type": "exit",
+                            "code": protocol_exit_code(exit_code, outcome),
+                            "transaction": transaction.receipt(outcome)
+                        })
+                        .to_string(),
+                    ))
+                    .await;
+
+                // SECURITY: Clean up temporary files containing sensitive data
+                let _ = tokio::fs::remove_file(&script_path).await;
+                let _ = tokio::fs::remove_file(&log_path).await;
+                let _ = tokio::fs::remove_file(&status_path).await;
+                let _ = tokio::fs::remove_file(&pid_path).await;
+                remove_transaction_artifact_dir(&transaction_dir);
+                eprintln!(
+                    "[{}] Transaction {} artifact namespace cleaned up",
+                    peer_addr, transaction.transaction_id
+                );
+
+            // ── Comprehensive hardware probe ──
+            // ── Pre-install validation checklist ──
+            "pre_install_check" => {
+                eprintln!("[{}] Running pre-install checks...", peer_addr);
+                let disk = client_msg.disk.clone();
+                let check_script = format!(
+                    r#"DISK="$1"
+
+echo '{{"checks": ['
+
+# 1. EFI vs BIOS
+if [ -d /sys/firmware/efi ]; then
+  echo '{{"name":"boot_mode","status":"pass","detail":"EFI/UEFI detected — systemd-boot will be used"}},'
+else
+  echo '{{"name":"boot_mode","status":"warn","detail":"Legacy BIOS detected — GRUB will be used (limited features)"}},'
+fi
+
+# 2. RAM check
+RAM_MB=$(free -m | awk '/Mem:/{{print $2}}')
+if [ "$RAM_MB" -ge 4096 ]; then
+  echo "{{"name":"ram","status":"pass","detail":"${{RAM_MB}}MB RAM — sufficient for any desktop"}},"
+elif [ "$RAM_MB" -ge 2048 ]; then
+  echo "{{"name":"ram","status":"warn","detail":"${{RAM_MB}}MB RAM — use XFCE or Sway for best performance"}},"
+else
+  echo "{{"name":"ram","status":"fail","detail":"${{RAM_MB}}MB RAM — insufficient for graphical desktop. CLI-only recommended"}},"
+fi
+
+# 3. Disk health (SMART)
+if command -v smartctl >/dev/null 2>&1 && [ -n "{disk_arg}" ]; then
+  SMART=$(smartctl -H "{disk_arg}" 2>/dev/null | grep -i "overall" | head -1)
+  if echo "$SMART" | grep -qi "PASSED\|OK"; then
+    echo '{{"name":"disk_health","status":"pass","detail":"SMART: disk healthy"}},'
+  elif [ -z "$SMART" ]; then
+    echo '{{"name":"disk_health","status":"warn","detail":"SMART not supported on this disk"}},'
+  else
+    echo "{{"name":"disk_health","status":"fail","detail":"SMART WARNING: $SMART"}},"
+  fi
+else
+  echo '{{"name":"disk_health","status":"warn","detail":"smartctl not available"}},'
+fi
+
+# 4. BitLocker detection
+BL_FOUND=false
+for PART in $(blkid -o device "{disk_arg}"* 2>/dev/null); do
+  if blkid "$PART" 2>/dev/null | grep -qi bitlocker; then
+    BL_FOUND=true
+    echo "{{"name":"bitlocker","status":"warn","detail":"BitLocker detected on $PART — have your recovery key ready"}},"
+  fi
+done
+if [ "$BL_FOUND" = false ]; then
+  echo '{{"name":"bitlocker","status":"pass","detail":"No BitLocker encryption detected"}},'
+fi
+
+# 5. Free space (for alongside mode)
+FREE_SECTORS=$(sgdisk -p "{disk_arg}" 2>/dev/null | awk '/Total free space/{{print $5}}' || echo "0")
+FREE_GB=$((FREE_SECTORS * 512 / 1073741824))
+if [ "$FREE_GB" -ge 40 ]; then
+  echo "{{"name":"free_space","status":"pass","detail":"${{FREE_GB}}GB free — sufficient for NixOS"}},"
+elif [ "$FREE_GB" -ge 20 ]; then
+  echo "{{"name":"free_space","status":"warn","detail":"${{FREE_GB}}GB free — tight. Consider freeing more space"}},"
+else
+  echo "{{"name":"free_space","status":"fail","detail":"${{FREE_GB}}GB free — insufficient for dual-boot. Shrink existing partitions first"}},"
+fi
+
+# 6. Existing OS detection
+OS_LIST=""
+for PART in $(lsblk -rno NAME,FSTYPE "{disk_arg}" 2>/dev/null | awk '$2~/ntfs|ext4|btrfs|xfs/{{print "/dev/"$1}}'); do
+  MOUNT_DIR=$(mktemp -d)
+  if mount -o ro "$PART" "$MOUNT_DIR" 2>/dev/null; then
+    if [ -d "$MOUNT_DIR/Windows/System32" ]; then
+      OS_LIST="$OS_LIST Windows,"
+    elif [ -f "$MOUNT_DIR/etc/os-release" ]; then
+      OS_NAME=$(grep PRETTY_NAME "$MOUNT_DIR/etc/os-release" | cut -d'"' -f2)
+      OS_LIST="$OS_LIST $OS_NAME,"
+    fi
+    umount "$MOUNT_DIR" 2>/dev/null
+  fi
+  rmdir "$MOUNT_DIR" 2>/dev/null
+done
+if [ -n "$OS_LIST" ]; then
+  echo "{{"name":"existing_os","status":"info","detail":"Detected:$OS_LIST"}},"
+else
+  echo '{{"name":"existing_os","status":"pass","detail":"No existing OS detected on this disk"}},'
+fi
+
+# 7. Network connectivity
+if ping -c1 -W3 cache.nixos.org >/dev/null 2>&1; then
+  echo '{{"name":"network","status":"pass","detail":"Network OK — can reach NixOS cache"}}'
+else
+  echo '{{"name":"network","status":"fail","detail":"Cannot reach cache.nixos.org — install will fail without internet"}}'
+fi
+
+echo ']}}'
+"#,
+                    disk_arg = "$DISK"
+                );
+                let preflight_id = random_operation_id().unwrap_or_else(|_| {
+                    // This is only a temporary namespace identity; refusing to reuse a
+                    // fixed pathname is safer than proceeding if the CSPRNG is unavailable.
+                    std::process::abort();
+                });
+                let preflight_path =
+                    format!("/tmp/nixforhumanity-preflight-{preflight_id}.sh");
+
+                if let Err(error) = write_private_file(
+                    &preflight_path,
+                    check_script.as_bytes(),
+                    0o700,
+                ) {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Unable to stage pre-install check safely: {error}"
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                let check_result = run_privileged_script_with_args(
+                    &preflight_path,
+                    &[&disk],
+                )
+                .await;
+                let _ = tokio::fs::remove_file(&preflight_path).await;
+
+                match check_result {
+                    Ok(result) if result.exit_status == 0 => {
+                        let _ = ws_tx
+                            .send(Message::Text(format!(
+                                "{{\"type\":\"checklist\",\"data\":{}}}",
+                                result.stdout.trim()
+                            )))
+                            .await;
+                    }
+                    Ok(result) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Pre-install check failed: {}",
+                                    result.stderr
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Pre-install check error: {}", e))
+                                    .to_json(),
+                            ))
+                            .await;
+                    }
+                }
+            }
+
+            "probe_hardware" => {
+                eprintln!("[{}] Probing hardware...", peer_addr);
+
+                // Run comprehensive hardware discovery script
+                let probe_script = r#"
+echo '{'
+
+# Block devices with full details
+echo '"block_devices":'
+lsblk -J -o NAME,SIZE,TYPE,TRAN,FSTYPE,UUID,LABEL,MOUNTPOINT,MODEL,SERIAL 2>/dev/null || echo '{"blockdevices":[]}'
+
+# EFI state
+echo ',"efi_available":'
+[ -d /sys/firmware/efi ] && echo 'true' || echo 'false'
+
+echo ',"secure_boot":'
+bootctl status 2>/dev/null | grep -q "Secure Boot: enabled" && echo 'true' || echo 'false'
+
+echo ',"setup_mode":'
+bootctl status 2>/dev/null | grep -q "Setup Mode: setup" && echo 'true' || echo 'false'
+
+# TPM
+echo ',"tpm2_available":'
+[ -e /dev/tpmrm0 ] && echo 'true' || echo 'false'
+
+# Architecture (for Apple Silicon detection)
+echo ',"arch": "'$(uname -m)'"'
+
+# Apple hardware detection
+echo ',"apple_hardware":'
+dmidecode -s system-manufacturer 2>/dev/null | grep -qi apple && echo 'true' || echo 'false'
+
+# BitLocker detection
+echo ',"bitlocker_detected":'
+blkid 2>/dev/null | grep -qi bitlocker && echo 'true' || echo 'false'
+
+echo ',"bitlocker_devices": ['
+FIRST=true
+for dev in $(blkid 2>/dev/null | grep -i bitlocker | cut -d: -f1); do
+  [ "$FIRST" = true ] && FIRST=false || echo ','
+  echo "\"$dev\""
+done
+echo ']'
+
+# LUKS detection
+echo ',"luks_devices": ['
+FIRST=true
+for dev in $(blkid -t TYPE=crypto_LUKS -o device 2>/dev/null); do
+  [ "$FIRST" = true ] && FIRST=false || echo ','
+  echo "\"$dev\""
+done
+echo ']'
+
+# LVM detection
+echo ',"lvm_volume_groups": ['
+FIRST=true
+vgs --noheadings -o vg_name 2>/dev/null | tr -d ' ' | while read vg; do
+  [ -z "$vg" ] && continue
+  [ "$FIRST" = true ] && FIRST=false || echo ','
+  echo "\"$vg\""
+done
+echo ']'
+
+# mdadm RAID detection
+echo ',"mdadm_arrays": ['
+FIRST=true
+mdadm --examine --scan 2>/dev/null | while read line; do
+  [ -z "$line" ] && continue
+  [ "$FIRST" = true ] && FIRST=false || echo ','
+  echo "\"$(echo "$line" | sed 's/"/\\"/g')\""
+done
+echo ']'
+
+# ZFS pool detection
+echo ',"zfs_pools": ['
+FIRST=true
+zpool import 2>/dev/null | grep 'pool:' | awk '{print $2}' | while read pool; do
+  [ -z "$pool" ] && continue
+  [ "$FIRST" = true ] && FIRST=false || echo ','
+  echo "\"$pool\""
+done
+echo ']'
+
+# btrfs multi-device
+echo ',"btrfs_multidevice": ['
+FIRST=true
+btrfs filesystem show 2>/dev/null | grep "Label:" | while read line; do
+  [ "$FIRST" = true ] && FIRST=false || echo ','
+  echo "\"$(echo "$line" | sed 's/"/\\"/g')\""
+done
+echo ']'
+
+# EFI boot entries (existing operating systems)
+echo ',"efi_boot_entries": ['
+FIRST=true
+efibootmgr 2>/dev/null | grep '^Boot[0-9]' | while read line; do
+  [ "$FIRST" = true ] && FIRST=false || echo ','
+  echo "\"$(echo "$line" | sed 's/"/\\"/g')\""
+done
+echo ']'
+
+# Detected operating systems via os-prober or manual scan
+echo ',"detected_os": ['
+FIRST=true
+# Try os-prober first
+if command -v os-prober >/dev/null 2>&1; then
+  os-prober 2>/dev/null | while IFS=: read dev name loader type; do
+    [ -z "$dev" ] && continue
+    [ "$FIRST" = true ] && FIRST=false || echo ','
+    printf '{"device":"%s","name":"%s","type":"%s"}' "$dev" "$name" "$type"
+  done
+fi
+# Also scan for Windows and Linux on mounted/mountable filesystems
+for part in $(lsblk -rno NAME,FSTYPE 2>/dev/null | awk '$2 ~ /ntfs|ext4|btrfs|xfs/ {print $1}'); do
+  tmpdir=$(mktemp -d 2>/dev/null) || continue
+  if mount -o ro /dev/$part $tmpdir 2>/dev/null; then
+    if [ -d "$tmpdir/Windows/System32" ]; then
+      [ "$FIRST" = true ] && FIRST=false || echo ','
+      printf '{"device":"/dev/%s","name":"Windows","type":"windows"}' "$part"
+    elif [ -f "$tmpdir/etc/os-release" ]; then
+      osname=$(grep PRETTY_NAME "$tmpdir/etc/os-release" 2>/dev/null | cut -d= -f2 | tr -d '"')
+      [ "$FIRST" = true ] && FIRST=false || echo ','
+      printf '{"device":"/dev/%s","name":"%s","type":"linux"}' "$part" "$osname"
+    fi
+    umount $tmpdir 2>/dev/null
+  fi
+  rmdir $tmpdir 2>/dev/null
+done
+echo ']'
+
+# Free space on each disk (unpartitioned)
+echo ',"free_space": ['
+FIRST=true
+for disk in $(lsblk -dnro NAME,TYPE 2>/dev/null | awk '$2=="disk" {print $1}'); do
+  free=$(sgdisk -p /dev/$disk 2>/dev/null | grep "Total free space" | awk '{print $5, $6}')
+  [ -z "$free" ] && continue
+  [ "$FIRST" = true ] && FIRST=false || echo ','
+  printf '{"device":"/dev/%s","free":"%s"}' "$disk" "$free"
+done
+echo ']'
+
+# ── GPU Detection ──
+echo ',"gpu": {'
+GPU_VENDOR="unknown"
+GPU_MODEL="unknown"
+GPU_DRIVER="modesetting"
+GPU_LINE=$(lspci 2>/dev/null | grep -iE 'VGA|3D|Display' | head -1)
+if echo "$GPU_LINE" | grep -qi nvidia; then
+  GPU_VENDOR="nvidia"
+  GPU_MODEL=$(echo "$GPU_LINE" | sed 's/.*: //')
+  GPU_DRIVER="nvidia"
+elif echo "$GPU_LINE" | grep -qi "amd\|radeon\|ati"; then
+  GPU_VENDOR="amd"
+  GPU_MODEL=$(echo "$GPU_LINE" | sed 's/.*: //')
+  GPU_DRIVER="amdgpu"
+elif echo "$GPU_LINE" | grep -qi intel; then
+  GPU_VENDOR="intel"
+  GPU_MODEL=$(echo "$GPU_LINE" | sed 's/.*: //')
+  GPU_DRIVER="modesetting"
+fi
+# Check for hybrid graphics (Optimus / switchable)
+GPU_COUNT=$(lspci 2>/dev/null | grep -ciE 'VGA|3D|Display')
+HYBRID=false
+[ "$GPU_COUNT" -gt 1 ] && HYBRID=true
+printf '"vendor":"%s","model":"%s","driver":"%s","hybrid":%s,"count":%d' \
+  "$GPU_VENDOR" "$(echo "$GPU_MODEL" | sed 's/"/\\"/g')" "$GPU_DRIVER" "$HYBRID" "$GPU_COUNT"
+echo '}'
+
+# ── WiFi Detection ──
+echo ',"wifi": {'
+WIFI_AVAILABLE=false
+WIFI_IFACE=""
+WIFI_NETWORKS="[]"
+# Check for wireless interfaces
+WIFI_IFACE=$(iw dev 2>/dev/null | awk '/Interface/{print $2}' | head -1)
+if [ -z "$WIFI_IFACE" ]; then
+  WIFI_IFACE=$(ls /sys/class/net 2>/dev/null | while read iface; do
+    [ -d "/sys/class/net/$iface/wireless" ] && echo "$iface" && break
+  done)
+fi
+if [ -n "$WIFI_IFACE" ]; then
+  WIFI_AVAILABLE=true
+  # Scan for networks (needs root)
+  WIFI_NETWORKS=$(nmcli -t -f SSID,SIGNAL,SECURITY device wifi list 2>/dev/null | head -20 | awk -F: '{printf "{\"ssid\":\"%s\",\"signal\":%s,\"security\":\"%s\"},", $1, ($2=="" ? "0" : $2), $3}' | sed 's/,$//' || echo "")
+  [ -n "$WIFI_NETWORKS" ] && WIFI_NETWORKS="[$WIFI_NETWORKS]" || WIFI_NETWORKS="[]"
+fi
+printf '"available":%s,"interface":"%s","networks":%s' "$WIFI_AVAILABLE" "$WIFI_IFACE" "$WIFI_NETWORKS"
+echo '}'
+
+# ── Timezone / Locale Detection ──
+echo ',"locale": {'
+# Try to detect timezone from system or IP geolocation
+TZ_DETECTED=$(cat /etc/timezone 2>/dev/null || timedatectl show --property=Timezone --value 2>/dev/null || echo "")
+if [ -z "$TZ_DETECTED" ]; then
+  # Fallback: IP geolocation (requires internet)
+  TZ_DETECTED=$(curl -s --connect-timeout 3 "http://ip-api.com/line/?fields=timezone" 2>/dev/null || echo "UTC")
+fi
+[ -z "$TZ_DETECTED" ] && TZ_DETECTED="UTC"
+LANG_DETECTED=$(echo $LANG 2>/dev/null | cut -d. -f1)
+[ -z "$LANG_DETECTED" ] && LANG_DETECTED="en_US"
+KB_LAYOUT=$(cat /etc/vconsole.conf 2>/dev/null | grep KEYMAP | cut -d= -f2 || echo "us")
+[ -z "$KB_LAYOUT" ] && KB_LAYOUT="us"
+printf '"timezone":"%s","language":"%s","keyboard":"%s"' "$TZ_DETECTED" "$LANG_DETECTED" "$KB_LAYOUT"
+echo '}'
+
+# ── Safety: Active server detection ──
+# Scores risk factors. High score = likely production server, block install.
+echo ',"safety": {'
+
+RISK_SCORE=0
+RISK_REASONS='['
+RISK_FIRST=true
+
+add_risk() {
+  local points=$1
+  local reason=$2
+  RISK_SCORE=$((RISK_SCORE + points))
+  [ "$RISK_FIRST" = true ] && RISK_FIRST=false || RISK_REASONS="$RISK_REASONS,"
+  RISK_REASONS="$RISK_REASONS\"$reason\""
+}
+
+# HIGH: Running containers (production workloads)
+CONTAINERS=$(docker ps -q 2>/dev/null | wc -l)
+[ "$CONTAINERS" -gt 0 ] && add_risk 40 "Docker: $CONTAINERS running containers"
+PODS=$(kubectl get pods --all-namespaces --no-headers 2>/dev/null | wc -l)
+[ "$PODS" -gt 0 ] && add_risk 50 "Kubernetes: $PODS running pods"
+
+# HIGH: Database services running
+pgrep -x postgres >/dev/null 2>&1 && add_risk 40 "PostgreSQL is running"
+pgrep -x mysqld >/dev/null 2>&1 && add_risk 40 "MySQL is running"
+pgrep -x mongod >/dev/null 2>&1 && add_risk 40 "MongoDB is running"
+pgrep -x redis-server >/dev/null 2>&1 && add_risk 30 "Redis is running"
+
+# HIGH: Web servers with active listeners
+pgrep -x nginx >/dev/null 2>&1 && add_risk 35 "nginx is running"
+pgrep -x apache2 >/dev/null 2>&1 && add_risk 35 "Apache is running"
+pgrep -x caddy >/dev/null 2>&1 && add_risk 35 "Caddy is running"
+
+# MEDIUM: Active server ports
+for port in 80 443 3306 5432 8080 8443 27017; do
+  ss -tlnp 2>/dev/null | grep -q ":$port " && add_risk 15 "Port $port is listening"
+done
+
+# MEDIUM: Multiple logged-in users
+USER_COUNT=$(who 2>/dev/null | awk '{print $1}' | sort -u | wc -l)
+[ "$USER_COUNT" -gt 1 ] && add_risk 20 "$USER_COUNT users currently logged in"
+
+# MEDIUM: High uptime (relied-on system)
+UPTIME_DAYS=$(awk '{print int($1/86400)}' /proc/uptime 2>/dev/null)
+[ "$UPTIME_DAYS" -gt 30 ] && add_risk 15 "Uptime: ${UPTIME_DAYS} days"
+[ "$UPTIME_DAYS" -gt 180 ] && add_risk 15 "Uptime: ${UPTIME_DAYS} days (long-running)"
+
+# MEDIUM: Server-like hostname
+HOSTNAME=$(hostname 2>/dev/null)
+echo "$HOSTNAME" | grep -qiE 'prod|srv|server|db|web|api|node|master|worker|k8s|kube' && add_risk 25 "Hostname '$HOSTNAME' looks like a server"
+
+# MEDIUM: Cloud instance
+curl -s --connect-timeout 1 http://169.254.169.254/ >/dev/null 2>&1 && add_risk 25 "Cloud instance metadata endpoint detected"
+
+# MEDIUM: Running VMs
+LIBVIRT_VMS=$(virsh list --all --name 2>/dev/null | grep -v '^$' | wc -l)
+[ "$LIBVIRT_VMS" -gt 0 ] && add_risk 20 "$LIBVIRT_VMS libvirt VMs defined"
+QEMU_PROCS=$(pgrep -c qemu-system 2>/dev/null || echo 0)
+[ "$QEMU_PROCS" -gt 0 ] && add_risk 20 "$QEMU_PROCS QEMU VMs running"
+
+# LOW: Application data directories
+[ -d /var/www ] && add_risk 10 "/var/www exists (web server data)"
+[ -d /opt ] && [ "$(ls -A /opt 2>/dev/null)" ] && add_risk 10 "/opt has application data"
+[ -d /srv ] && [ "$(ls -A /srv 2>/dev/null)" ] && add_risk 5 "/srv has data"
+
+# LOW: Many SSH keys (shared server)
+KEY_COUNT=$(wc -l < /root/.ssh/authorized_keys 2>/dev/null || echo 0)
+[ "$KEY_COUNT" -gt 3 ] && add_risk 15 "$KEY_COUNT SSH authorized keys (shared access)"
+
+# LOW: Server-class hardware
+dmidecode -t chassis 2>/dev/null | grep -qi "rack\|blade\|server" && add_risk 15 "Server-class chassis detected"
+dmidecode -t memory 2>/dev/null | grep -qi "error correction.*multi-bit ecc" && add_risk 10 "ECC memory detected"
+[ -e /dev/ipmi0 ] && add_risk 15 "IPMI/BMC interface detected"
+
+# Determine safety level
+RISK_REASONS="$RISK_REASONS]"
+if [ $RISK_SCORE -ge 50 ]; then
+  SAFETY_LEVEL="blocked"
+  SAFETY_MSG="This system appears to be an active server. Installation is BLOCKED to prevent data loss."
+elif [ $RISK_SCORE -ge 25 ]; then
+  SAFETY_LEVEL="warning"
+  SAFETY_MSG="This system shows signs of active use. Please confirm this is not a production system."
+elif [ $RISK_SCORE -ge 10 ]; then
+  SAFETY_LEVEL="caution"
+  SAFETY_MSG="Minor server indicators detected. Proceed with awareness."
+else
+  SAFETY_LEVEL="clear"
+  SAFETY_MSG="No active server indicators detected. Safe to proceed."
+fi
+
+printf '"level":"%s","score":%d,"message":"%s","reasons":%s' \
+  "$SAFETY_LEVEL" "$RISK_SCORE" "$SAFETY_MSG" "$RISK_REASONS"
+echo '}'
+
+# Chromebook detection
+echo ',"chromebook":{'
+echo '"detected":'
+(dmidecode -s system-manufacturer 2>/dev/null | grep -qi "google" || [ -e /dev/cros_ec ] || grep -qi "chromebook" /sys/class/dmi/id/product_name 2>/dev/null) && echo 'true,' || echo 'false,'
+echo '"firmware":'
+if [ -d /sys/firmware/efi ]; then echo '"uefi",'
+elif grep -qi depthcharge /proc/cmdline 2>/dev/null; then echo '"depthcharge",'
+else echo '"bios",'
+fi
+echo '"emmc":'
+lsblk -ndo TRAN 2>/dev/null | grep -q mmc && echo 'true' || echo 'false'
+echo '}'
+
+echo '}'
+"#;
+
+                match run_cmd(probe_script).await {
+                    Ok(result) if result.exit_status == 0 => {
+                        eprintln!("[{}] Hardware probe complete", peer_addr);
+                        // Strip ANSI escape codes and control chars that corrupt JSON,
+                        // then inject the non-secret target identity digest using the exact
+                        // machine-binding domain shared with standalone Nixward.
+                        let clean: String = result
+                            .stdout
+                            .chars()
+                            .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
+                            .collect();
+                        let clean = match serde_json::from_str::<serde_json::Value>(&clean) {
+                            Ok(mut value) => {
+                                if let Some(object) = value.as_object_mut() {
+                                    match machine_binding_digest_hex() {
+                                        Ok(digest) => {
+                                            object.insert(
+                                                "target_machine_digest".to_string(),
+                                                serde_json::Value::String(digest),
+                                            );
+                                        }
+                                        Err(error) => {
+                                            let _ = ws_tx
+                                                .send(Message::Text(
+                                                    RelayMessage::error(&format!(
+                                                        "Unable to establish target machine identity: {}",
+                                                        error
+                                                    ))
+                                                    .to_json(),
+                                                ))
+                                                .await;
+                                            continue;
+                                        }
+                                    }
+                                }
+                                match serde_json::to_string(&value) {
+                                    Ok(value) => value,
+                                    Err(error) => {
+                                        let _ = ws_tx
+                                            .send(Message::Text(
+                                                RelayMessage::error(&format!(
+                                                    "Unable to serialize hardware evidence: {}",
+                                                    error
+                                                ))
+                                                .to_json(),
+                                            ))
+                                            .await;
+                                        continue;
+                                    }
+                                }
+                            }
+                            Err(error) => {
+                                let _ = ws_tx
+                                    .send(Message::Text(
+                                        RelayMessage::error(&format!(
+                                            "Hardware probe produced invalid JSON: {}",
+                                            error
+                                        ))
+                                        .to_json(),
+                                    ))
+                                    .await;
+                                continue;
+                            }
+                        };
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "hardware_probe",
+                                    "data": clean
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                    }
+                    Ok(result) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Hardware probe failed (exit {}): {}",
+                                    result.exit_status,
+                                    result.stderr.chars().take(300).collect::<String>()
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Hardware probe failed: {}", e))
+                                    .to_json(),
+                            ))
+                            .await;
+                    }
+                }
+            }
+
+            // ── Scan existing OS for installed applications ──
+            "scan_apps" => {
+                eprintln!("[{}] Scanning apps on existing OS...", peer_addr);
+
+                // Step 1: Detect what OS partitions exist and mount read-only
+                let scan_script = r#"
+echo '['
+FIRST=true
+
+# Find and mount Windows/macOS/Linux partitions read-only
+for part in $(lsblk -rno NAME,FSTYPE 2>/dev/null | awk '$2 ~ /ntfs|hfsplus|apfs|ext4|btrfs|xfs/ {print $1}'); do
+  MOUNTPOINT=$(mktemp -d /tmp/appscan-XXXXX 2>/dev/null) || continue
+  FS=$(lsblk -rno FSTYPE /dev/$part 2>/dev/null)
+
+  mounted=false
+  case "$FS" in
+    ntfs)
+      ntfs-3g -o ro /dev/$part $MOUNTPOINT 2>/dev/null && mounted=true
+      # Alternative: mount -t ntfs3 -o ro /dev/$part $MOUNTPOINT 2>/dev/null && mounted=true
+      ;;
+    *)
+      mount -o ro /dev/$part $MOUNTPOINT 2>/dev/null && mounted=true
+      ;;
+  esac
+
+  if [ "$mounted" = true ]; then
+    # Windows scan
+    if [ -d "$MOUNTPOINT/Program Files" ]; then
+      for dir in "$MOUNTPOINT/Program Files"/* "$MOUNTPOINT/Program Files (x86)"/*; do
+        [ -d "$dir" ] || continue
+        name=$(basename "$dir")
+        case "$name" in
+          "Common Files"|"WindowsApps"|"Windows Defender"*|"Windows NT"|"Windows Photo Viewer"|"Windows Sidebar"|"Uninstall Information"|"Reference Assemblies"|"MSBuild"|"dotnet"|"ModifiableWindowsApps") continue ;;
+        esac
+        [ "$FIRST" = true ] && FIRST=false || echo ','
+        printf '{"name":"%s","path":"%s","source":"windows","category":""}' \
+          "$(echo "$name" | sed 's/"/\\"/g')" \
+          "/dev/$part"
+      done
+    fi
+
+    # macOS scan
+    if [ -d "$MOUNTPOINT/Applications" ]; then
+      for app in "$MOUNTPOINT/Applications"/*.app; do
+        [ -d "$app" ] || continue
+        name=$(basename "$app" .app)
+        [ "$FIRST" = true ] && FIRST=false || echo ','
+        printf '{"name":"%s","path":"%s","source":"macos","category":""}' \
+          "$(echo "$name" | sed 's/"/\\"/g')" \
+          "/dev/$part"
+      done
+      # Homebrew
+      for cellar in "$MOUNTPOINT/usr/local/Cellar" "$MOUNTPOINT/opt/homebrew/Cellar"; do
+        [ -d "$cellar" ] || continue
+        for pkg in "$cellar"/*/; do
+          name=$(basename "$pkg")
+          [ "$FIRST" = true ] && FIRST=false || echo ','
+          printf '{"name":"%s","path":"%s","source":"homebrew","category":""}' \
+            "$(echo "$name" | sed 's/"/\\"/g')" \
+            "/dev/$part"
+        done
+      done
+    fi
+
+    # Linux scan
+    if [ -f "$MOUNTPOINT/etc/os-release" ]; then
+      # Scan common app directories
+      for bin in "$MOUNTPOINT/usr/bin"/*; do
+        [ -f "$bin" ] || continue
+        name=$(basename "$bin")
+        # Only include well-known GUI apps
+        case "$name" in
+          firefox|chrome|chromium|code|gimp|inkscape|blender|obs|vlc|spotify|discord|slack|zoom|telegram*|signal*|steam|lutris|thunderbird|libreoffice|kdenlive|krita|audacity|filezilla|qbittorrent|keepassxc|bitwarden)
+            [ "$FIRST" = true ] && FIRST=false || echo ','
+            printf '{"name":"%s","path":"%s","source":"linux","category":""}' "$name" "/dev/$part"
+            ;;
+        esac
+      done
+      # Flatpak
+      if [ -d "$MOUNTPOINT/var/lib/flatpak/app" ]; then
+        for app in "$MOUNTPOINT/var/lib/flatpak/app"/*/; do
+          name=$(basename "$app")
+          [ "$FIRST" = true ] && FIRST=false || echo ','
+          printf '{"name":"%s","path":"%s","source":"flatpak","category":""}' \
+            "$(echo "$name" | sed 's/"/\\"/g')" \
+            "/dev/$part"
+        done
+      fi
+    fi
+
+    umount $MOUNTPOINT 2>/dev/null
+  fi
+  rmdir $MOUNTPOINT 2>/dev/null
+done
+
+echo ']'
+"#;
+
+                match run_cmd(scan_script).await {
+                    Ok(result) if result.exit_status == 0 => {
+                        eprintln!("[{}] App scan complete", peer_addr);
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "app_scan",
+                                    "data": result.stdout
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                    }
+                    Ok(result) => {
+                        // Partial results are OK — some partitions may fail to mount
+                        eprintln!(
+                            "[{}] App scan partial (exit {})",
+                            peer_addr, result.exit_status
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "app_scan",
+                                    "data": result.stdout,
+                                    "warning": result.stderr.chars().take(200).collect::<String>()
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("App scan failed: {}", e)).to_json(),
+                            ))
+                            .await;
+                    }
+                }
+            }
+
+            // ── Deep scan: dotfiles, config, personal data for migration + welcome ──
+            "deep_scan" => {
+                eprintln!("[{}] Deep scanning for migration data...", peer_addr);
+
+                let deep_scan_script = r#"
+echo '{'
+
+# ── Git Configuration ──
+echo '"git": {'
+FIRST_GIT=true
+for home in /home/* /root; do
+  [ -f "$home/.gitconfig" ] || continue
+  [ "$FIRST_GIT" = true ] && FIRST_GIT=false || true
+  NAME=$(git config -f "$home/.gitconfig" user.name 2>/dev/null || echo "")
+  EMAIL=$(git config -f "$home/.gitconfig" user.email 2>/dev/null || echo "")
+  EDITOR=$(git config -f "$home/.gitconfig" core.editor 2>/dev/null || echo "")
+  MERGE=$(git config -f "$home/.gitconfig" pull.rebase 2>/dev/null || echo "")
+  ALIASES=$(git config -f "$home/.gitconfig" --get-regexp alias 2>/dev/null | wc -l)
+  printf '"name":"%s","email":"%s","editor":"%s","prefers_rebase":%s,"alias_count":%d' \
+    "$NAME" "$EMAIL" "$EDITOR" \
+    "$([ "$MERGE" = "true" ] && echo true || echo false)" \
+    "$ALIASES"
+done
+echo '}'
+
+# ── Shell Configuration ──
+echo ',"shell": {'
+SHELL_TYPE="bash"
+ALIAS_COUNT=0
+CUSTOM_FUNCTIONS=0
+for home in /home/* /root; do
+  if [ -f "$home/.zshrc" ]; then
+    SHELL_TYPE="zsh"
+    ALIAS_COUNT=$(grep -c "^alias " "$home/.zshrc" 2>/dev/null || echo 0)
+    CUSTOM_FUNCTIONS=$(grep -c "^function \|^[a-z_]*() " "$home/.zshrc" 2>/dev/null || echo 0)
+    # Check for oh-my-zsh or other frameworks
+    grep -q "oh-my-zsh" "$home/.zshrc" 2>/dev/null && SHELL_TYPE="zsh-omz"
+    grep -q "starship" "$home/.zshrc" 2>/dev/null && SHELL_TYPE="zsh-starship"
+  elif [ -f "$home/.bashrc" ]; then
+    ALIAS_COUNT=$(grep -c "^alias " "$home/.bashrc" 2>/dev/null || echo 0)
+    CUSTOM_FUNCTIONS=$(grep -c "^function \|^[a-z_]*() " "$home/.bashrc" 2>/dev/null || echo 0)
+  fi
+done
+printf '"type":"%s","alias_count":%d,"custom_functions":%d' \
+  "$SHELL_TYPE" "$ALIAS_COUNT" "$CUSTOM_FUNCTIONS"
+echo '}'
+
+# ── SSH Keys & Config ──
+echo ',"ssh": {'
+KEY_COUNT=0
+HOST_COUNT=0
+for home in /home/* /root; do
+  [ -d "$home/.ssh" ] || continue
+  KC=$(ls "$home/.ssh/"*.pub 2>/dev/null | wc -l)
+  KEY_COUNT=$((KEY_COUNT + KC))
+  [ -f "$home/.ssh/config" ] && HOST_COUNT=$(grep -c "^Host " "$home/.ssh/config" 2>/dev/null || echo 0)
+done
+printf '"key_count":%d,"host_count":%d,"has_agent_config":%s' \
+  "$KEY_COUNT" "$HOST_COUNT" \
+  "$(grep -rq "AddKeysToAgent" /home/*/.ssh/config /root/.ssh/config 2>/dev/null && echo true || echo false)"
+echo '}'
+
+# ── Editor Configurations ──
+echo ',"editors": {'
+EDITORS="["
+FIRST_ED=true
+for home in /home/* /root; do
+  # VS Code
+  if [ -d "$home/.config/Code" ] || [ -d "$home/.vscode" ]; then
+    [ "$FIRST_ED" = true ] && FIRST_ED=false || EDITORS="$EDITORS,"
+    EXT_COUNT=$(ls "$home/.vscode/extensions" 2>/dev/null | wc -l || echo 0)
+    EDITORS="$EDITORS{\"name\":\"vscode\",\"extensions\":$EXT_COUNT}"
+  fi
+  # Neovim
+  if [ -d "$home/.config/nvim" ]; then
+    [ "$FIRST_ED" = true ] && FIRST_ED=false || EDITORS="$EDITORS,"
+    EDITORS="$EDITORS{\"name\":\"neovim\",\"has_config\":true}"
+  fi
+  # Vim
+  if [ -f "$home/.vimrc" ]; then
+    [ "$FIRST_ED" = true ] && FIRST_ED=false || EDITORS="$EDITORS,"
+    PLUGIN_COUNT=$(grep -c "Plug \|Plugin \|NeoBundle " "$home/.vimrc" 2>/dev/null || echo 0)
+    EDITORS="$EDITORS{\"name\":\"vim\",\"plugin_count\":$PLUGIN_COUNT}"
+  fi
+  # Emacs
+  if [ -d "$home/.emacs.d" ] || [ -f "$home/.emacs" ]; then
+    [ "$FIRST_ED" = true ] && FIRST_ED=false || EDITORS="$EDITORS,"
+    EDITORS="$EDITORS{\"name\":\"emacs\",\"has_config\":true}"
+  fi
+done
+echo "\"detected\":$EDITORS]}"
+
+# ── Desktop / Window Manager ──
+echo ',"current_desktop": {'
+DE="unknown"
+WM="unknown"
+# Check for desktop config dirs
+for home in /home/*; do
+  [ -d "$home/.config/hypr" ] && WM="hyprland"
+  [ -d "$home/.config/sway" ] && WM="sway"
+  [ -d "$home/.config/i3" ] && WM="i3"
+  [ -d "$home/.config/awesome" ] && WM="awesome"
+  [ -d "$home/.config/gnome-session" ] && DE="gnome"
+  [ -d "$home/.config/plasma-workspace" ] && DE="kde"
+  [ -d "$home/.config/xfce4" ] && DE="xfce"
+done
+printf '"de":"%s","wm":"%s"' "$DE" "$WM"
+echo '}'
+
+# ── Browser Data ──
+echo ',"browsers": {'
+BROWSERS="["
+FIRST_BR=true
+for home in /home/*; do
+  # Firefox
+  if [ -d "$home/.mozilla/firefox" ]; then
+    [ "$FIRST_BR" = true ] && FIRST_BR=false || BROWSERS="$BROWSERS,"
+    PROFILES=$(ls -d "$home/.mozilla/firefox"/*.default* 2>/dev/null | wc -l)
+    BOOKMARKS=0
+    for prof in "$home/.mozilla/firefox"/*.default*/; do
+      [ -f "$prof/places.sqlite" ] && BOOKMARKS=$((BOOKMARKS + $(sqlite3 "$prof/places.sqlite" "SELECT COUNT(*) FROM moz_bookmarks" 2>/dev/null || echo 0)))
+    done
+    BROWSERS="$BROWSERS{\"name\":\"firefox\",\"profiles\":$PROFILES,\"bookmarks\":$BOOKMARKS}"
+  fi
+  # Chrome/Chromium
+  for chrome_dir in "$home/.config/google-chrome" "$home/.config/chromium"; do
+    [ -d "$chrome_dir" ] || continue
+    [ "$FIRST_BR" = true ] && FIRST_BR=false || BROWSERS="$BROWSERS,"
+    BNAME=$(basename "$chrome_dir")
+    BROWSERS="$BROWSERS{\"name\":\"$BNAME\",\"has_profile\":true}"
+  done
+done
+echo "\"detected\":$BROWSERS]}"
+
+# ── Docker / Development Environment ──
+echo ',"development": {'
+DOCKER_IMAGES=0
+DOCKER_COMPOSE_FILES=0
+VENVS=0
+NODE_PROJECTS=0
+RUST_PROJECTS=0
+command -v docker >/dev/null 2>&1 && DOCKER_IMAGES=$(docker images -q 2>/dev/null | wc -l)
+DOCKER_COMPOSE_FILES=$(find /home -name "docker-compose.yml" -o -name "compose.yml" 2>/dev/null | wc -l)
+VENVS=$(find /home -maxdepth 4 -name "pyvenv.cfg" 2>/dev/null | wc -l)
+NODE_PROJECTS=$(find /home -maxdepth 4 -name "package.json" -not -path "*/node_modules/*" 2>/dev/null | wc -l)
+RUST_PROJECTS=$(find /home -maxdepth 4 -name "Cargo.toml" -not -path "*/target/*" 2>/dev/null | wc -l)
+printf '"docker_images":%d,"compose_files":%d,"python_venvs":%d,"node_projects":%d,"rust_projects":%d' \
+  "$DOCKER_IMAGES" "$DOCKER_COMPOSE_FILES" "$VENVS" "$NODE_PROJECTS" "$RUST_PROJECTS"
+echo '}'
+
+# ── Music / Creative Tools ──
+echo ',"creative": {'
+HAS_AUDIO_PROJECTS=false
+HAS_DAW_CONFIG=false
+for home in /home/*; do
+  [ -d "$home/.config/ardour" ] && HAS_DAW_CONFIG=true
+  [ -d "$home/.config/LMMS" ] && HAS_DAW_CONFIG=true
+  [ -d "$home/.config/Bitwig" ] && HAS_DAW_CONFIG=true
+  [ -d "$home/Music" ] && [ "$(ls -A "$home/Music" 2>/dev/null)" ] && HAS_AUDIO_PROJECTS=true
+done
+printf '"has_daw_config":%s,"has_audio_projects":%s' "$HAS_DAW_CONFIG" "$HAS_AUDIO_PROJECTS"
+echo '}'
+
+# ── User Identity ──
+echo ',"identity": {'
+USERNAME=""
+FULLNAME=""
+AVATAR_EXISTS=false
+for home in /home/*; do
+  u=$(basename "$home")
+  [ "$u" = "lost+found" ] && continue
+  USERNAME="$u"
+  FULLNAME=$(getent passwd "$u" 2>/dev/null | cut -d: -f5 | cut -d, -f1)
+  [ -f "$home/.face" ] || [ -f "$home/.face.icon" ] && AVATAR_EXISTS=true
+  break
+done
+printf '"username":"%s","fullname":"%s","has_avatar":%s' \
+  "$USERNAME" "$FULLNAME" "$AVATAR_EXISTS"
+echo '}'
+
+echo '}'
+"#;
+
+                match run_cmd(deep_scan_script).await {
+                    Ok(result) => {
+                        eprintln!("[{}] Deep scan complete", peer_addr);
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "deep_scan",
+                                    "data": result.stdout
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Deep scan failed: {}", e)).to_json(),
+                            ))
+                            .await;
+                    }
+                }
+            }
+
+            // ── Data preservation before wipe ──
+            "preserve_data" => {
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {error}"
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
+                    MutationKind::PreserveData,
+                    &client_msg.request_id,
+                    None,
+                    b"preserve-data-before-wipe",
+                )
+                .await else {
+                    continue;
+                };
+
+                let backup_dir =
+                    format!("/tmp/symthaea-preserve-{}", transaction.transaction_id);
+                let transaction_dir = match create_transaction_artifact_dir(
+                    &transaction.transaction_id
+                ) {
+                    Ok(path) => path,
+                    Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Preservation transaction namespace unavailable: {error}"),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                if let Err(error) = create_private_directory(&backup_dir) {
+                    remove_transaction_artifact_dir(&transaction_dir);
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type":"exit",
+                                "code":protocol_exit_code(1, outcome),
+                                "data":format!("Preservation destination unavailable: {error}"),
+                                "transaction":transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                eprintln!(
+                    "[{}] {} Preserving data before wipe...",
+                    peer_addr,
+                    transaction.log_line()
+                );
+
+                match preserve_data_native(&backup_dir, &transaction_dir).await {
+                    Ok(data) => match verify_preservation_artifacts(&backup_dir).await {
+                        Ok(true) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::ObservedSuccess,
+                                &peer_addr,
+                            );
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type": "data_preserved",
+                                        "data": serde_json::to_string(&data)
+                                            .unwrap_or_else(|_| "{}".into()),
+                                        "transaction": transaction.receipt(outcome),
+                                        "exit_code": protocol_exit_code(0, outcome)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                        }
+                        Ok(false) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Indeterminate,
+                                &peer_addr,
+                            );
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type": "exit",
+                                        "code": protocol_exit_code(1, outcome),
+                                        "data": "Preservation artifacts failed native postcondition verification.",
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                        }
+                        Err(error) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Indeterminate,
+                                &peer_addr,
+                            );
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type": "exit",
+                                        "code": protocol_exit_code(1, outcome),
+                                        "data": format!("Preservation postcondition failed: {error}"),
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                        }
+                    },
+                    Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Data preservation failed: {error}"),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                    }
+                }
+
+                remove_transaction_artifact_dir(&transaction_dir);
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // Post-install NixOS management actions
+            // ═══════════════════════════════════════════════════════
+            "list_generations" => {
+                eprintln!("[{}] Listing generations...", peer_addr);
+                match run_privileged_args(
+                    "nix-env",
+                    &["--list-generations", "-p", "/nix/var/nix/profiles/system"],
+                )
+                .await
+                {
+                    Ok(r) if r.exit_status == 0 => {
+                        let generations: Vec<serde_json::Value> = r
+                            .stdout
+                            .lines()
+                            .filter_map(|line| {
+                                let fields: Vec<&str> = line.split_whitespace().collect();
+                                if fields.len() < 4 {
+                                    return None;
+                                }
+                                let number = fields[0].parse::<u64>().ok()?;
+                                Some(serde_json::json!({
+                                    "number": number,
+                                    "date": format!("{} {} {}", fields[1], fields[2], fields[3]),
+                                    "current": line.contains("(current)")
+                                }))
+                            })
+                            .collect();
+                        let data =
+                            serde_json::to_string(&generations).unwrap_or_else(|_| "[]".into());
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({"type":"generations","data":data}).to_string(),
+                            ))
+                            .await;
+                    }
+                    Ok(r) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Failed (exit {}): {}",
+                                    r.exit_status,
+                                    r.stderr.chars().take(200).collect::<String>()
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&format!("Failed: {}", e)).to_json()))
+                            .await;
+                    }
+                }
+            }
+
+            "rollback" => {
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
+                    MutationKind::Rollback,
+                    &client_msg.request_id,
+                    None,
+                    b"nixos-rebuild switch --rollback",
+                ).await else {
+                    continue;
+                };
+                let previous_generation = match current_system_generation().await {
+                    Ok(generation) => generation,
+                    Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Rollback pre-state unavailable: {}", error),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                eprintln!(
+                    "[{}] {} Rolling back from generation {}...",
+                    peer_addr,
+                    transaction.log_line(),
+                    previous_generation
+                );
+                match run_privileged_args("nixos-rebuild", &["switch", "--rollback"]).await {
+                    Ok(r) => {
+                        let observed_outcome = if r.exit_status == 0 {
+                            match current_system_generation().await {
+                                Ok(generation) if generation < previous_generation => {
+                                    TransactionOutcome::ObservedSuccess
+                                }
+                                Ok(generation) => {
+                                    eprintln!(
+                                        "[{}] {} rollback returned 0 but active generation is {} (pre-state {})",
+                                        peer_addr, transaction.log_line(), generation, previous_generation
+                                    );
+                                    TransactionOutcome::Indeterminate
+                                }
+                                Err(error) => {
+                                    eprintln!(
+                                        "[{}] {} rollback post-state probe failed: {}",
+                                        peer_addr, transaction.log_line(), error
+                                    );
+                                    TransactionOutcome::Indeterminate
+                                }
+                            }
+                        } else {
+                            TransactionOutcome::Failed
+                        };
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            observed_outcome,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":protocol_exit_code(r.exit_status, outcome),"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
+                    }
+                    Err(e) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Rollback execution could not be observed: {}", e),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                    }
+                }
+            }
+
+            "switch_generation" => {
+                let r#gen = &client_msg.command;
+                let requested_generation = match r#gen.parse::<u64>() {
+                    Ok(generation) => generation,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error("Generation number is out of range").to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
+                    MutationKind::SwitchGeneration,
+                    &client_msg.request_id,
+                    None,
+                    r#gen.as_bytes(),
+                ).await else {
+                    continue;
+                };
+                eprintln!("[{}] {} Switching to generation {}...", peer_addr, transaction.log_line(), r#gen);
+                let generation_result = run_privileged_args(
+                    "nix-env",
+                    &["--switch-generation", r#gen, "-p", "/nix/var/nix/profiles/system"],
+                )
+                .await;
+
+                match generation_result {
+                    Ok(generation_result) if generation_result.exit_status != 0 => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({
+                            "type":"exit",
+                            "code": protocol_exit_code(generation_result.exit_status, outcome),
+                            "data": generation_result.stdout.chars().take(2000).collect::<String>(),
+                            "transaction": transaction.receipt(outcome)
+                        }).to_string())).await;
+                    }
+                    Ok(generation_result) => {
+                        // The generation pointer has moved at this point. Activation is
+                        // therefore a second consequential effect: any activation failure
+                        // is indeterminate rather than an ordinary child failure.
+                        match run_privileged_args(
+                            "/nix/var/nix/profiles/system/bin/switch-to-configuration",
+                            &["switch"],
+                        )
+                        .await
+                        {
+                            Ok(activation_result) => {
+                                let observed_outcome = if activation_result.exit_status == 0 {
+                                    match current_system_generation().await {
+                                        Ok(generation) if generation == requested_generation => {
+                                            TransactionOutcome::ObservedSuccess
+                                        }
+                                        Ok(generation) => {
+                                            eprintln!(
+                                                "[{}] {} switch returned 0 but generation {} is current, requested {}",
+                                                peer_addr, transaction.log_line(), generation, r#gen
+                                            );
+                                            TransactionOutcome::Indeterminate
+                                        }
+                                        Err(error) => {
+                                            eprintln!(
+                                                "[{}] {} generation post-state probe failed: {}",
+                                                peer_addr, transaction.log_line(), error
+                                            );
+                                            TransactionOutcome::Indeterminate
+                                        }
+                                    }
+                                } else {
+                                    TransactionOutcome::Indeterminate
+                                };
+                                let response_code =
+                                    if observed_outcome == TransactionOutcome::ObservedSuccess {
+                                        0
+                                    } else {
+                                        1
+                                    };
+                                let data = if activation_result.stdout.is_empty() {
+                                    activation_result.stderr.chars().take(2000).collect::<String>()
+                                } else {
+                                    activation_result.stdout.chars().take(2000).collect::<String>()
+                                };
+                                let outcome = finalize_transaction(
+                                    &transaction_ledger,
+                                    &transaction,
+                                    observed_outcome,
+                                    &peer_addr,
+                                );
+                                let _ = ws_tx.send(Message::Text(serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(response_code, outcome),
+                                    "data": data,
+                                    "transaction": transaction.receipt(outcome)
+                                }).to_string())).await;
+                            }
+                            Err(error) => {
+                                let outcome = finalize_transaction(
+                                    &transaction_ledger,
+                                    &transaction,
+                                    TransactionOutcome::Indeterminate,
+                                    &peer_addr,
+                                );
+                                let _ = ws_tx
+                                    .send(Message::Text(
+                                        serde_json::json!({
+                                            "type":"exit",
+                                            "code": protocol_exit_code(1, outcome),
+                                            "data": format!("Generation activation could not be observed after the generation pointer moved: {}", error),
+                                            "transaction": transaction.receipt(outcome)
+                                        })
+                                        .to_string(),
+                                    ))
+                                    .await;
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Generation selection could not be observed: {}", error),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                    }
+                }
+
+            "list_services" => {
+                eprintln!("[{}] Listing services...", peer_addr);
+                match run_privileged_args(
+                    "systemctl",
+                    &[
+                        "list-units",
+                        "--type=service",
+                        "--all",
+                        "--no-pager",
+                        "--plain",
+                        "--no-legend",
+                    ],
+                )
+                .await
+                {
+                    Ok(r) if r.exit_status == 0 => {
+                        let services: Vec<serde_json::Value> = r
+                            .stdout
+                            .lines()
+                            .filter_map(|line| {
+                                let fields: Vec<&str> = line.split_whitespace().collect();
+                                if fields.len() < 4 || !fields[0].ends_with(".service") {
+                                    return None;
+                                }
+                                Some(serde_json::json!({
+                                    "name": fields[0].trim_end_matches(".service"),
+                                    "active": fields[2],
+                                    "sub": fields[3],
+                                    "desc": fields.get(4..).map(|rest| rest.join(" ")).unwrap_or_default()
+                                }))
+                            })
+                            .collect();
+                        let data =
+                            serde_json::to_string(&services).unwrap_or_else(|_| "[]".into());
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({"type":"services","data":data}).to_string(),
+                            ))
+                            .await;
+                    }
+                    Ok(r) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Failed (exit {}): {}",
+                                    r.exit_status,
+                                    r.stderr.chars().take(200).collect::<String>()
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&format!("Failed: {}", e)).to_json()))
+                            .await;
+                    }
+                }
+            }
+
+            "service_action" => {
+                let action = match ServiceAction::parse(&client_msg.command) {
+                    Ok(action) => action,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&error).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let service = &client_msg.hostname;
+                // Validate service name to prevent shell injection
+                let service = match sanitize_input(service, "service name", false) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let transaction_payload = format!("{}:{}", action.as_str(), service);
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
+                    MutationKind::ServiceAction,
+                    &client_msg.request_id,
+                    None,
+                    transaction_payload.as_bytes(),
+                ).await else {
+                    continue;
+                };
+                eprintln!(
+                    "[{}] {} {} {}...",
+                    peer_addr,
+                    transaction.log_line(),
+                    action.as_str(),
+                    service
+                );
+                match run_service_action(action, &service).await {
+                    Ok(r) if r.exit_status == 0 => {
+                        let observed_outcome = match verify_service_postcondition_typed(action, &service).await {
+                            Ok(true) => TransactionOutcome::ObservedSuccess,
+                            Ok(false) => {
+                                eprintln!(
+                                    "[{}] {} service postcondition did not match requested action",
+                                    peer_addr, transaction.log_line()
+                                );
+                                TransactionOutcome::Indeterminate
+                            }
+                            Err(error) => {
+                                eprintln!(
+                                    "[{}] {} service postcondition probe failed: {}",
+                                    peer_addr, transaction.log_line(), error
+                                );
+                                TransactionOutcome::Indeterminate
+                            }
+                        };
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            observed_outcome,
+                            &peer_addr,
+                        );
+                        let data = if outcome == TransactionOutcome::ObservedSuccess {
+                            r.stdout
+                        } else {
+                            format!(
+                                "{}\nService action completed with exit code 0, but requested post-state was not durably observed.",
+                                r.stdout
+                            )
+                        };
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({
+                            "type":"exit",
+                            "code":protocol_exit_code(r.exit_status, outcome),
+                            "data":data,
+                            "transaction":transaction.receipt(outcome)
+                        }).to_string())).await;
+                    }
+                    Ok(r) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({
+                            "type":"exit",
+                            "code":protocol_exit_code(r.exit_status, outcome),
+                            "data":r.stdout,
+                            "transaction":transaction.receipt(outcome)
+                        }).to_string())).await;
+                    }
+                    Err(e) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Service action execution could not be observed: {}", e),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                    }
+                }
+            }
+
+            "gc_analyze" => {
+                eprintln!("[{}] Analyzing nix store...", peer_addr);
+                let script = r#"
+STORE_SIZE=$(du -sb /nix/store 2>/dev/null | awk '{print $1}')
+DEAD_COUNT=$(nix-store --gc --print-dead 2>/dev/null | wc -l)
+ROOT_COUNT=$(nix-store --gc --print-roots 2>/dev/null | wc -l)
+GEN_COUNT=$(nix-env --list-generations -p /nix/var/nix/profiles/system 2>/dev/null | wc -l)
+PATH_COUNT=$(ls /nix/store 2>/dev/null | wc -l)
+if [ "$PATH_COUNT" -gt 0 ] && [ "$DEAD_COUNT" -gt 0 ]; then
+    RECLAIMABLE=$(( DEAD_COUNT * (STORE_SIZE / PATH_COUNT) ))
+else
+    RECLAIMABLE=0
+fi
+printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"generations":%s}' \
+    "${STORE_SIZE:-0}" "${RECLAIMABLE:-0}" "${DEAD_COUNT:-0}" "${ROOT_COUNT:-0}" "${GEN_COUNT:-0}"
+"#;
+                match run_cmd(script).await {
+                    Ok(r) if r.exit_status == 0 => {
+                        let clean: String = r
+                            .stdout
+                            .chars()
+                            .filter(|c| !c.is_control() || *c == '\n')
+                            .collect();
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({"type":"gc_analysis","data":clean}).to_string(),
+                            ))
+                            .await;
+                    }
+                    Ok(r) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Analysis failed: {}",
+                                    &r.stderr[..r.stderr.len().min(200)]
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Analysis failed: {}", e)).to_json(),
+                            ))
+                            .await;
+                    }
+                }
+            }
+
+            "gc_collect" => {
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
+                    MutationKind::GcCollect,
+                    &client_msg.request_id,
+                    None,
+                    b"nix-collect-garbage:delete-older-than-30d",
+                ).await else {
+                    continue;
+                };
+                eprintln!("[{}] {} Starting garbage collection...", peer_addr, transaction.log_line());
+                let transaction_dir = match create_transaction_artifact_dir(&transaction.transaction_id) {
+                    Ok(path) => path,
+                    Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("GC artifact namespace unavailable: {}", error),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let gc_log = format!("{transaction_dir}/gc.log");
+                let gc_status = format!("{transaction_dir}/gc.status");
+                let gc_pid = format!("{transaction_dir}/gc.pid");
+                let mut gc_command = trusted_typed_process("nix-collect-garbage")?;
+                gc_command.args(["-d", "--delete-older-than", "30d"]);
+                if let Err(error) = spawn_privileged_background_process(
+                    gc_command,
+                    &gc_log,
+                    &gc_status,
+                    &gc_pid,
+                )
+                .await
+                {
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type":"exit",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!("GC launch could not be observed: {}", error),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
+                    continue;
+                }
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::output("Garbage collection started...", "stdout").to_json(),
+                    ))
+                    .await;
+                let mut last_lines = 0usize;
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    if let Ok(bytes) = tokio::fs::read(&gc_log).await {
+                        let text = String::from_utf8_lossy(&bytes);
+                        let lines: Vec<&str> = text.lines().collect();
+                        if lines.len() >= last_lines {
+                            for line in &lines[last_lines..] {
+                                if !line.trim().is_empty() {
+                                    let _ = ws_tx
+                                        .send(Message::Text(
+                                            RelayMessage::output(line, "stdout").to_json(),
+                                        ))
+                                        .await;
+                                }
+                            }
+                            last_lines = lines.len();
+                        }
+                    }
+
+                    if read_transaction_status(&gc_status)
+                        .await
+                        .ok()
+                        .flatten()
+                        .is_some()
+                    {
+                        break;
+                    }
+                    let identity = read_private_small_file(&gc_pid, 128)
+                        .ok()
+                        .and_then(|text| parse_process_identity(&text));
+                    let (pid, start_time) = identity.unwrap_or((0, 0));
+                    if !process_id_is_alive(pid, start_time) {
+                        break;
+                    }
+                }
+
+                let gc_exit_code = read_transaction_status(&gc_status)
+                    .await
+                    .ok()
+                    .flatten();
+                let observed_outcome = gc_completion_outcome(gc_exit_code);
+                let outcome = finalize_transaction(
+                    &transaction_ledger,
+                    &transaction,
+                    observed_outcome,
+                    &peer_addr,
+                );
+                let _ = ws_tx
+                    .send(Message::Text(
+                        serde_json::json!({
+                            "type":"exit",
+                            "code": protocol_exit_code(gc_exit_code, outcome),
+                            "transaction":transaction.receipt(outcome)
+                        }).to_string(),
+                    ))
+                    .await;
+                let _ = tokio::fs::remove_file(&gc_log).await;
+                let _ = tokio::fs::remove_file(&gc_status).await;
+                let _ = tokio::fs::remove_file(&gc_pid).await;
+                remove_transaction_artifact_dir(&transaction_dir);
+            }
+
+            "diagnose" => {
+                eprintln!("[{}] Running diagnostics...", peer_addr);
+                let script = r#"
+echo '{"internet":{'
+echo '"ping":'
+ping -c 1 -W 3 8.8.8.8 >/dev/null 2>&1 && echo 'true,' || echo 'false,'
+echo '"dns":'
+(host cache.nixos.org >/dev/null 2>&1 || nslookup cache.nixos.org >/dev/null 2>&1 || getent hosts cache.nixos.org >/dev/null 2>&1) && echo 'true,' || echo 'false,'
+echo '"nix_cache":'
+curl -s --max-time 5 https://cache.nixos.org/nix-cache-info >/dev/null 2>&1 && echo 'true,' || echo 'false,'
+echo '"resolv_conf":"'$(cat /etc/resolv.conf 2>/dev/null | grep nameserver | head -3 | tr '\n' ' ')'",'
+echo '"ip_route":"'$(ip route get 8.8.8.8 2>/dev/null | head -1)'"'
+echo '},'
+echo '"nix":{'
+echo '"channels":"'$(nix-channel --list 2>/dev/null | tr '\n' ' ')'",'
+echo '"store_paths":'$(ls /nix/store 2>/dev/null | wc -l)','
+echo '"nixos_install":'$(which nixos-install >/dev/null 2>&1 && echo 'true' || echo 'false')
+echo '},'
+echo '"mounts":"'$(mount | grep /mnt | tr '\n' ' ')'"'
+echo '}'
+"#;
+                match run_cmd(script).await {
+                    Ok(r) => {
+                        let clean: String = r
+                            .stdout
+                            .chars()
+                            .filter(|c| !c.is_control() || *c == '\n')
+                            .collect();
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({"type":"diagnose","data":clean}).to_string(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Diagnose failed: {}", e)).to_json(),
+                            ))
+                            .await;
+                    }
+                }
+            }
+
+            "read_config" => {
+                eprintln!("[{}] Reading config...", peer_addr);
+                match tokio::fs::read_to_string("/etc/nixos/configuration.nix").await {
+                    Ok(data) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({"type":"config","data":data}).to_string(),
+                            ))
+                            .await;
+                    }
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Cannot read /etc/nixos/configuration.nix: {error}"))
+                                    .to_json(),
+                            ))
+                            .await;
+                    }
+                }
+            }
+
+            "write_config" => {
+                if client_msg.configuration_nix.is_empty() {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error("Missing configuration_nix").to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {error}"
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                if let Err(error) = ensure_no_orphan_configuration_swaps() {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Configuration recovery fence is active: {error}"
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
+                    MutationKind::WriteConfig,
+                    &client_msg.request_id,
+                    None,
+                    client_msg.configuration_nix.as_bytes(),
+                )
+                .await else {
+                    continue;
+                };
+
+                let transaction_dir = match create_transaction_artifact_dir(&transaction.transaction_id) {
+                    Ok(path) => path,
+                    Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Configuration transaction namespace unavailable: {error}"),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let candidate_path = format!("{transaction_dir}/configuration.nix");
+                if let Err(error) =
+                    write_private_file(&candidate_path, client_msg.configuration_nix.as_bytes(), 0o600)
+                {
+                    remove_transaction_artifact_dir(&transaction_dir);
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Failed,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type":"exit",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!("Configuration staging failed: {error}"),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                match run_privileged_args("nix-instantiate", &["--parse", &candidate_path]).await {
+                    Ok(result) if result.exit_status == 0 => {}
+                    Ok(result) => {
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(result.exit_status, outcome),
+                                    "data": format!(
+                                        "Invalid Nix configuration: {}",
+                                        result.stderr.chars().take(2000).collect::<String>()
+                                    ),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                    Err(error) => {
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Configuration validation could not be observed: {error}"),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                }
+
+                let expected_current = match tokio::fs::read("/etc/nixos/configuration.nix").await {
+                    Ok(bytes) => bytes,
+                    Err(error) => {
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Configuration pre-state unavailable: {error}"),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let swap = match replace_configuration_atomically(
+                    &transaction.transaction_id,
+                    expected_current,
+                    client_msg.configuration_nix.as_bytes().to_vec(),
+                )
+                .await
+                {
+                    Ok(swap) => swap,
+                    Err(error) => {
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        let outcome = if error.contains("changed after transaction preparation") {
+                            TransactionOutcome::Failed
+                        } else {
+                            TransactionOutcome::Indeterminate
+                        };
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Configuration atomic replacement refused: {error}"),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::output(
+                            &format!(
+                                "Configuration installed atomically; rebuilding system (transaction {})...",
+                                transaction.transaction_id
+                            ),
+                            "stdout",
+                        )
+                        .to_json(),
+                    ))
+                    .await;
+
+                let rebuild_result = run_privileged_args("nixos-rebuild", &["switch"]).await;
+
+                let (exit_code, observed_outcome, retain_swap) = match rebuild_result {
+                    Ok(result) if result.exit_status == 0 => {
+                        match verify_active_configuration(client_msg.configuration_nix.as_bytes()).await {
+                            Ok(true) => match finalize_configuration_swap(swap, true).await {
+                                Ok(()) => (0, TransactionOutcome::ObservedSuccess, false),
+                                Err(error) => {
+                                    eprintln!(
+                                        "[{}] {} configuration swap cleanup failed after successful rebuild: {}",
+                                        peer_addr,
+                                        transaction.log_line(),
+                                        error
+                                    );
+                                    (1, TransactionOutcome::Indeterminate, false)
+                                }
+                            },
+                            Ok(false) => {
+                                eprintln!(
+                                    "[{}] {} rebuild returned 0 but requested configuration was not observed",
+                                    peer_addr,
+                                    transaction.log_line()
+                                );
+                                match finalize_configuration_swap(swap, false).await {
+                                    Ok(()) => (1, TransactionOutcome::Indeterminate, false),
+                                    Err(error) => {
+                                        eprintln!(
+                                            "[{}] {} configuration rollback after failed postcondition failed: {}",
+                                            peer_addr,
+                                            transaction.log_line(),
+                                            error
+                                        );
+                                        (1, TransactionOutcome::Indeterminate, true)
+                                    }
+                                }
+                            }
+                            Err(error) => {
+                                eprintln!(
+                                    "[{}] {} configuration postcondition could not be observed; preserving swap artifacts: {}",
+                                    peer_addr,
+                                    transaction.log_line(),
+                                    error
+                                );
+                                (1, TransactionOutcome::Indeterminate, true)
+                            }
+                        }
+                    }
+                    Ok(result) => match finalize_configuration_swap(swap, false).await {
+                        Ok(()) => (
+                            result.exit_status,
+                            TransactionOutcome::Failed,
+                            false,
+                        ),
+                        Err(error) => {
+                            eprintln!(
+                                "[{}] {} configuration rollback after rebuild failure failed: {}",
+                                peer_addr,
+                                transaction.log_line(),
+                                error
+                            );
+                            (1, TransactionOutcome::Indeterminate, true)
+                        }
+                    },
+                    Err(error) => match finalize_configuration_swap(swap, false).await {
+                        Ok(()) => (
+                            1,
+                            TransactionOutcome::Failed,
+                            false,
+                        ),
+                        Err(rollback_error) => {
+                            eprintln!(
+                                "[{}] {} configuration rollback after rebuild launch error failed: {}",
+                                peer_addr,
+                                transaction.log_line(),
+                                rollback_error
+                            );
+                            (1, TransactionOutcome::Indeterminate, true)
+                        }
+                    },
+                };
+
+                if !retain_swap {
+                    remove_transaction_artifact_dir(&transaction_dir);
+                } else {
+                    eprintln!(
+                        "[{}] {} preserving transaction artifact namespace for manual recovery",
+                        peer_addr,
+                        transaction.log_line()
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(
+                                "Configuration outcome is indeterminate; swap artifacts were preserved for recovery."
+                            )
+                            .to_json(),
+                        ))
+                        .await;
+                }
+
+                let outcome = finalize_transaction(
+                    &transaction_ledger,
+                    &transaction,
+                    observed_outcome,
+                    &peer_addr,
+                );
+                let _ = ws_tx
+                    .send(Message::Text(
+                        serde_json::json!({
+                            "type":"exit",
+                            "code": protocol_exit_code(exit_code, outcome),
+                            "transaction": transaction.receipt(outcome)
+                        })
+                        .to_string(),
+                    ))
+                    .await;
+            }
+
+            // ── PXE / Network Boot ──
+            "netboot_info" => {
+                eprintln!("[{}] Querying netboot info...", peer_addr);
+                let script = r#"
+                    KERNEL=$(ls /nix/store/*/bzImage 2>/dev/null | head -1)
+                    INITRD=$(ls /nix/store/*/initrd 2>/dev/null | head -1)
+                    IP=$(ip -4 route get 1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -1)
+                    if [ -z "$KERNEL" ] || [ -z "$INITRD" ]; then
+                        echo '{"error":"NixOS kernel/initrd not found in nix store. Build the ISO first."}'
+                    else
+                        printf '{"kernel":"%s","initrd":"%s","ip":"%s","dnsmasq_hint":"dhcp-boot=pxelinux.0,,%s","pixiecore_hint":"pixiecore boot %s %s"}' \
+                            "$KERNEL" "$INITRD" "$IP" "$IP" "$KERNEL" "$INITRD"
+                    fi
+                "#;
+                match run_cmd(script).await {
+                    Ok(r) if r.exit_status == 0 => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "netboot_info",
+                                    "data": r.stdout.trim()
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                    }
+                    Ok(r) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("netboot_info failed: {}", r.stderr))
+                                    .to_json(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("netboot_info error: {}", e))
+                                    .to_json(),
+                            ))
+                            .await;
+                    }
+                }
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // Tier 3: Disk cloning & Machine inventory
+            // ═══════════════════════════════════════════════════════
+            "create_image" => {
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {error}"
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let target_machine_digest = match machine_binding_digest_hex() {
+                    Ok(digest) => digest,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to establish target machine identity: {error}"
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
+                    MutationKind::CreateImage,
+                    &client_msg.request_id,
+                    Some(&target_machine_digest),
+                    b"create-system-image",
+                )
+                .await else {
+                    continue;
+                };
+
+                let image_dest =
+                    format!("/tmp/nixforhumanity-image-{}", transaction.transaction_id);
+                eprintln!(
+                    "[{}] {} Creating system image at {}...",
+                    peer_addr,
+                    transaction.log_line(),
+                    image_dest
+                );
+
+                if let Err(error) = create_private_directory(&image_dest) {
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type":"exit",
+                                "code":protocol_exit_code(1, outcome),
+                                "data":format!("Unable to create image namespace: {error}"),
+                                "transaction":transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::output(
+                            &format!(
+                                "Creating system image (transaction {})...",
+                                transaction.transaction_id
+                            ),
+                            "stdout",
+                        )
+                        .to_json(),
+                    ))
+                    .await;
+
+                let archive_result = match create_btrfs_image_archive(&image_dest).await {
+                    Ok(true) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::output(
+                                    "Created and archived btrfs snapshot.",
+                                    "stdout",
+                                )
+                                .to_json(),
+                            ))
+                            .await;
+                        Ok(())
+                    }
+                    Ok(false) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::output(
+                                    "btrfs snapshot unavailable; using tar fallback.",
+                                    "stdout",
+                                )
+                                .to_json(),
+                            ))
+                            .await;
+                        create_tar_image_archive(&image_dest).await
+                    }
+                    Err(error) => Err(error),
+                };
+
+                if let Err(error) = archive_result {
+                    eprintln!(
+                        "[{}] {} image creation failed: {}",
+                        peer_addr,
+                        transaction.log_line(),
+                        error
+                    );
+                    let _ = std::fs::remove_dir_all(&image_dest);
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Failed,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type":"exit",
+                                "code":protocol_exit_code(1, outcome),
+                                "data":format!("Image creation failed: {error}"),
+                                "transaction":transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                let mut sidecar_error = None;
+                for (source, required) in [
+                    ("/etc/nixos/configuration.nix", true),
+                    ("/etc/nixos/hardware-configuration.nix", false),
+                    ("/etc/nixos/flake.nix", false),
+                    ("/etc/nixos/flake.lock", false),
+                ] {
+                    if let Err(error) =
+                        copy_optional_image_sidecar(&image_dest, source, required).await
+                    {
+                        sidecar_error = Some(error);
+                        break;
+                    }
+                }
+                if let Some(error) = sidecar_error {
+                    eprintln!(
+                        "[{}] {} image sidecar staging failed: {}",
+                        peer_addr,
+                        transaction.log_line(),
+                        error
+                    );
+                    let _ = std::fs::remove_dir_all(&image_dest);
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type":"exit",
+                                "code":protocol_exit_code(1, outcome),
+                                "data":format!("Image sidecar staging failed: {error}"),
+                                "transaction":transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                // Inventory is informational in the existing image schema.
+                if let Err(error) = write_installed_packages_sidecar(&image_dest).await {
+                    eprintln!(
+                        "[{}] {} installed package inventory unavailable: {}",
+                        peer_addr,
+                        transaction.log_line(),
+                        error
+                    );
+                }
+
+                if let Err(error) = freeze_image_namespace(image_dest.clone()).await {
+                    eprintln!(
+                        "[{}] {} image namespace freeze failed: {}",
+                        peer_addr,
+                        transaction.log_line(),
+                        error
+                    );
+                    let _ = std::fs::remove_dir_all(&image_dest);
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type":"exit",
+                                "code":protocol_exit_code(1, outcome),
+                                "data":format!("Image freeze failed: {error}"),
+                                "transaction":transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                match verify_image_artifact(&image_dest).await {
+                    Ok(true) => match commit_image_bundle(&image_dest).await {
+                        Ok((archive, configuration)) => {
+                            let outcome = finalize_transaction_with_artifacts(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::ObservedSuccess,
+                                archive.clone(),
+                                configuration.clone(),
+                                &peer_addr,
+                            );
+                            let durable = if outcome == TransactionOutcome::ObservedSuccess {
+                                Some((archive, configuration))
+                            } else {
+                                None
+                            };
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type":"exit",
+                                        "code":protocol_exit_code(0, outcome),
+                                        "transaction":transaction.receipt_with_image_artifacts(
+                                            outcome,
+                                            durable.as_ref().map(|(archive, _)| archive.clone()),
+                                            durable.as_ref().map(|(_, configuration)| configuration.clone()),
+                                        )
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                        }
+                        Err(error) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Indeterminate,
+                                &peer_addr,
+                            );
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type":"exit",
+                                        "code":protocol_exit_code(1, outcome),
+                                        "data":format!("Image commitment failed: {error}"),
+                                        "transaction":transaction.receipt(outcome)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                        }
+                    },
+                    Ok(false) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code":protocol_exit_code(1, outcome),
+                                    "data":"Image postcondition did not qualify the produced artifact.",
+                                    "transaction":transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                    }
+                    Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code":protocol_exit_code(1, outcome),
+                                    "data":format!("Image postcondition failed: {error}"),
+                                    "transaction":transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                    }
+                }
+            }
+
+            "restore_image" => {
+                let image_path = match validate_image_path(&client_msg.command) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&e).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(mutation_lock_busy_message()).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                if let Err(error) = ensure_no_orphan_configuration_swaps() {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Configuration recovery fence is active: {error}"
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                let target_machine_digest = match machine_binding_digest_hex() {
+                    Ok(digest) => digest,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to establish target machine identity: {error}"
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
+                    MutationKind::RestoreImage,
+                    &client_msg.request_id,
+                    Some(&target_machine_digest),
+                    image_path.as_bytes(),
+                ).await else {
+                    continue;
+                };
+
+                let image_transaction_id = image_path
+                    .strip_prefix("/tmp/nixforhumanity-image-")
+                    .ok_or_else(|| "validated image path is outside the relay image namespace".to_string())
+                    .and_then(|value| {
+                        if value.len() == 32
+                            && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+                        {
+                            Ok(value)
+                        } else {
+                            Err("validated image path has an invalid transaction identity".into())
+                        }
+                    });
+
+                let image_transaction_id = match image_transaction_id {
+                    Ok(value) => value.to_owned(),
+                    Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "error",
+                                    "message": error,
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let image_artifact_commitment = match transaction_ledger.successful_image_artifact(
+                    &image_transaction_id,
+                    transaction.target_machine_digest.as_deref(),
+                ) {
+                    Ok(Some(commitment)) => commitment,
+                    Ok(None) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "error",
+                                    "message": "Image restore refused: creator transaction has no committed image artifact identity on this target.",
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                    Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "error",
+                                    "message": format!("Unable to establish image creator provenance: {}", error),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let image_archive_file =
+                    match open_verified_image_artifact(&image_path, &image_artifact_commitment)
+                        .await
+                    {
+                        Ok(file) => file,
+                        Err(error) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Failed,
+                                &peer_addr,
+                            );
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type": "error",
+                                        "message": format!(
+                                            "Image restore refused: committed artifact identity does not match the image namespace: {}",
+                                            error
+                                        ),
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                            continue;
+                        }
+                    };
+
+                let image_configuration_commitment =
+                    match transaction_ledger.successful_image_configuration(
+                        &image_transaction_id,
+                        transaction.target_machine_digest.as_deref(),
+                    ) {
+                        Ok(Some(commitment)) => commitment,
+                        Ok(None) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Failed,
+                                &peer_addr,
+                            );
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type": "error",
+                                        "message": "Image restore refused: creator transaction has no committed configuration identity.",
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                            continue;
+                        }
+                        Err(error) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Failed,
+                                &peer_addr,
+                            );
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type": "error",
+                                        "message": format!(
+                                            "Unable to establish image configuration provenance: {}",
+                                            error
+                                        ),
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                            continue;
+                        }
+                    };
+
+                if image_configuration_commitment.name != "configuration.nix" {
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Failed,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type": "error",
+                                "message": "Image restore refused: creator configuration commitment is invalid.",
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                let image_configuration_file =
+                    match open_verified_image_artifact(&image_path, &image_configuration_commitment)
+                        .await
+                    {
+                        Ok(file) => file,
+                        Err(error) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Failed,
+                                &peer_addr,
+                            );
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type": "error",
+                                        "message": format!(
+                                            "Image restore refused: committed configuration identity does not match the image namespace: {}",
+                                            error
+                                        ),
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                            continue;
+                        }
+                    };
+
+                eprintln!(
+                    "[{}] {} Restoring system image from {}...",
+                    peer_addr,
+                    transaction.log_line(),
+                    image_path
+                );
+                let restore_archive_format =
+                    restore_archive_format_for_commitment(&image_artifact_commitment.name)
+                        .expect("artifact commitment validator must accept only supported image artifacts");
+
+                let restore_result =
+                    restore_verified_archive(restore_archive_format, image_archive_file).await;
+
+                let (result, observed_outcome) = match restore_result {
+                    Ok(r) if r.exit_status == 0 => {
+                        match restore_verified_configuration(
+                            image_configuration_file,
+                            &transaction.transaction_id,
+                        )
+                        .await
+                        {
+                            Ok(()) => match verify_restored_image_postcondition(
+                                &image_configuration_commitment,
+                            )
+                            .await
+                            {
+                                Ok(true) => (r, TransactionOutcome::ObservedSuccess),
+                                Ok(false) => (r, TransactionOutcome::Failed),
+                                Err(error) => {
+                                    eprintln!(
+                                        "[{}] {} restore postcondition probe failed: {}",
+                                        peer_addr,
+                                        transaction.log_line(),
+                                        error
+                                    );
+                                    (r, TransactionOutcome::Indeterminate)
+                                }
+                            },
+                            Err(error) => {
+                                eprintln!(
+                                    "[{}] {} configuration restore from verified descriptor failed: {}",
+                                    peer_addr,
+                                    transaction.log_line(),
+                                    error
+                                );
+                                (r, TransactionOutcome::Indeterminate)
+                            }
+                        }
+                    }
+                    Ok(r) => (r, TransactionOutcome::Failed),
+                    Err(error) => {
+                        eprintln!(
+                            "[{}] {} typed image restore could not be started: {}",
+                            peer_addr,
+                            transaction.log_line(),
+                            error
+                        );
+                        (
+                            CmdResult {
+                                stdout: String::new(),
+                                stderr: error,
+                                exit_status: 1,
+                            },
+                            TransactionOutcome::Indeterminate,
+                        )
+                    }
+                };
+
+                let outcome = finalize_transaction(
+                    &transaction_ledger,
+                    &transaction,
+                    observed_outcome,
+                    &peer_addr,
+                );
+                let _ = ws_tx
+                    .send(Message::Text(
+                        serde_json::json!({
+                            "type":"exit",
+                            "code":protocol_exit_code(result.exit_status, outcome),
+                            "data":result.stdout,
+                            "transaction":transaction.receipt(outcome)
+                        })
+                        .to_string(),
+                    ))
+                    .await;
+            }
+
+            "list_images" => {
+                match run_cmd(
+                    "ls -la /tmp/nixforhumanity-image-* 2>/dev/null | head -20 || echo '[]'",
+                )
+                .await
+                {
+                    Ok(r) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({"type":"images","data":r.stdout}).to_string(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("List failed: {}", e)).to_json(),
+                            ))
+                            .await;
+                    }
+                }
+            }
+
+            "inventory" => {
+                eprintln!("[{}] Collecting inventory...", peer_addr);
+                let script = r#"
+echo '{'
+echo '"hostname":"'$(hostname)'",'
+echo '"nixos_version":"'$(nixos-version 2>/dev/null || echo unknown)'",'
+echo '"kernel":"'$(uname -r)'",'
+echo '"uptime":"'$(uptime -p 2>/dev/null || uptime)'",'
+echo '"cpu":"'$(grep 'model name' /proc/cpuinfo | head -1 | cut -d: -f2 | xargs)'",'
+echo '"cpu_cores":'$(nproc)','
+echo '"memory_gb":'$(awk '/MemTotal/ {printf "%.1f", $2/1024/1024}' /proc/meminfo)','
+echo '"disk_usage":"'$(df -h / | tail -1 | awk '{print $3"/"$2" ("$5")"}')'",'
+echo '"nix_store_gb":"'$(du -sh /nix/store 2>/dev/null | awk '{print $1}')'",'
+echo '"generations":'$(nix-env --list-generations -p /nix/var/nix/profiles/system 2>/dev/null | wc -l)','
+echo '"services_running":'$(systemctl list-units --type=service --state=running --no-pager --plain 2>/dev/null | grep -c '\.service')','
+echo '"services_failed":'$(systemctl list-units --type=service --state=failed --no-pager --plain 2>/dev/null | grep -c '\.service')','
+echo '"packages":'$(nix-store -qR /run/current-system 2>/dev/null | wc -l)','
+echo '"last_rebuild":"'$(stat -c %y /run/current-system 2>/dev/null | cut -d. -f1)'",'
+echo '"ip_addresses":['
+ip -4 addr show | grep inet | grep -v '127.0.0.1' | awk '{print "\"" $2 "\""}' | paste -sd, -
+echo ']'
+echo '}'
+"#;
+                match run_cmd(script).await {
+                    Ok(r) if r.exit_status == 0 => {
+                        let clean: String = r
+                            .stdout
+                            .chars()
+                            .filter(|c| !c.is_control() || *c == '\n')
+                            .collect();
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({"type":"inventory","data":clean}).to_string(),
+                            ))
+                            .await;
+                    }
+                    Ok(r) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Inventory failed: {}",
+                                    &r.stderr[..r.stderr.len().min(200)]
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Inventory failed: {}", e)).to_json(),
+                            ))
+                            .await;
+                    }
+                }
+            }
+
+            // ── WiFi scanning and connection ──
+            "scan_wifi" => {
+                eprintln!("[{}] Scanning WiFi...", peer_addr);
+                match run_privileged_args("nmcli", &["-t", "-f", "SSID,SIGNAL,SECURITY", "device", "wifi", "list"]).await
+                {
+                    Ok(r) if r.exit_status == 0 => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({"type": "wifi_list", "data": r.stdout})
+                                    .to_string(),
+                            ))
+                            .await;
+                    }
+                    Ok(r) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "WiFi scan failed: {}",
+                                    r.stderr.chars().take(200).collect::<String>()
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("WiFi scan failed: {}", e)).to_json(),
+                            ))
+                            .await;
+                    }
+                }
+            }
+
+            "connect_wifi" => {
+                // Wi-Fi connection is a consequential NetworkManager mutation.
+                let ssid = client_msg.hostname.trim().to_string();
+                let wifi_pw = client_msg.command.as_str();
+                if ssid.is_empty() {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error("Wi-Fi SSID is required").to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+                if wifi_pw.len() > 4096
+                    || wifi_pw.contains('\n')
+                    || wifi_pw.contains('\r')
+                    || wifi_pw.contains('\0')
+                {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(
+                                "Wi-Fi password is invalid or exceeds the 4096-byte limit",
+                            )
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+                let ssid = match sanitize_input(&ssid, "Wi-Fi SSID", true) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&error).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let _mutation_guard = match mutation_lock.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(mutation_lock_busy_message()).to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let _os_mutation_lease = match MutationLease::acquire() {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Another process currently owns the system mutation fence: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let target_machine_digest = match machine_binding_digest_hex() {
+                    Ok(digest) => digest,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to establish target machine identity: {}",
+                                    error
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let transaction_payload = match build_wifi_transaction_payload(
+                    &transaction_ledger,
+                    &ssid,
+                    &wifi_pw,
+                    &target_machine_digest,
+                ) {
+                    Ok(payload) => payload,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&error).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+                let Some(transaction) = admit_mutation_transaction(
+                    &mut ws_tx,
+                    &transaction_ledger,
+                    MutationKind::ConnectWifi,
+                    &client_msg.request_id,
+                    Some(&target_machine_digest),
+                    &transaction_payload,
+                ).await else {
+                    continue;
+                };
+
+                let secret_path =
+                    format!("/tmp/symthaea-wifi-{}.passwd", transaction.transaction_id);
+                let profile_name =
+                    format!("symthaea-relay-{}", transaction.transaction_id);
+                let secret = format!("802-11-wireless-security.psk:{wifi_pw}\n");
+                let mut secret_file = match std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .mode(0o600)
+                    .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+                    .open(&secret_path)
+                {
+                    Ok(file) => file,
+                    Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "wifi_result",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!(
+                                        "Failed to create protected Wi-Fi credential: {}",
+                                        error
+                                    ),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                if let Err(error) = secret_file
+                    .write_all(secret.as_bytes())
+                    .and_then(|_| secret_file.sync_all())
+                {
+                    drop(secret_file);
+                    let cleanup = cleanup_sensitive_file(&secret_path);
+                    let outcome = if cleanup.is_ok() {
+                        TransactionOutcome::Failed
+                    } else {
+                        TransactionOutcome::Indeterminate
+                    };
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type": "wifi_result",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": if outcome == TransactionOutcome::Failed {
+                                    format!("Failed to flush Wi-Fi credential: {}", error)
+                                } else {
+                                    format!(
+                                        "Failed to flush Wi-Fi credential and cleanup failed: {}",
+                                        cleanup.as_ref().err().unwrap()
+                                    )
+                                },
+                                "transaction": transaction.receipt(finalize_transaction(
+                                    &transaction_ledger,
+                                    &transaction,
+                                    outcome,
+                                    &peer_addr,
+                                ))
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    continue;
+                }
+                drop(secret_file);
+
+                eprintln!(
+                    "[{}] {} Connecting to Wi-Fi SSID {}",
+                    peer_addr,
+                    transaction.log_line(),
+                    ssid
+                );
+
+                // Create a non-persistent profile without putting the PSK in argv.
+                let add_result = run_nmcli_add_wifi_profile(&profile_name, &ssid).await;
+
+                match add_result {
+                    Ok(r) if r.exit_status == 0 => {}
+                    Ok(r) => {
+                        let profile_cleanup = run_nmcli_delete_wifi_profile(&profile_name).await;
+                        let secret_cleanup = cleanup_sensitive_file(&secret_path);
+                        let observed = if wifi_profile_cleanup_succeeded(&profile_cleanup)
+                            && secret_cleanup.is_ok()
+                        {
+                            TransactionOutcome::Failed
+                        } else {
+                            TransactionOutcome::Indeterminate
+                        };
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "wifi_result",
+                                    "code": protocol_exit_code(r.exit_status, observed),
+                                    "data": if observed == TransactionOutcome::Failed {
+                                        r.stderr.chars().take(400).collect::<String>()
+                                    } else {
+                                        format!(
+                                            "Wi-Fi profile creation failed and cleanup could not be fully observed: profile={:?}, secret={:?}",
+                                            profile_cleanup.as_ref().map(|v| v.exit_status),
+                                            secret_cleanup.as_ref().err()
+                                        )
+                                    },
+                                    "transaction": transaction.receipt(finalize_transaction(
+                                        &transaction_ledger,
+                                        &transaction,
+                                        observed,
+                                        &peer_addr,
+                                    ))
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                    Err(error) => {
+                        let secret_cleanup = cleanup_sensitive_file(&secret_path);
+                        let observed = if secret_cleanup.is_ok() {
+                            TransactionOutcome::Failed
+                        } else {
+                            TransactionOutcome::Indeterminate
+                        };
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "wifi_result",
+                                    "code": protocol_exit_code(1, observed),
+                                    "data": if observed == TransactionOutcome::Failed {
+                                        format!("Wi-Fi profile creation could not be started: {error}")
+                                    } else {
+                                        format!(
+                                            "Wi-Fi profile creation could not be started and credential cleanup failed: {}",
+                                            secret_cleanup.as_ref().err().unwrap()
+                                        )
+                                    },
+                                    "transaction": transaction.receipt(finalize_transaction(
+                                        &transaction_ledger,
+                                        &transaction,
+                                        observed,
+                                        &peer_addr,
+                                    ))
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                }
+
+                let result =
+                    run_nmcli_wifi_connection_up(&profile_name, &secret_path).await;
+                let cleanup_result = cleanup_sensitive_file(&secret_path);
+
+                let response = match result {
+                    Ok(r) if r.exit_status == 0 => {
+                        if let Err(cleanup_error) = cleanup_result {
+                            eprintln!(
+                                "[{}] {} Wi-Fi credential cleanup failed: {}",
+                                peer_addr,
+                                transaction.log_line(),
+                                cleanup_error
+                            );
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Indeterminate,
+                                &peer_addr,
+                            );
+                            serde_json::json!({
+                                "type": "wifi_result",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!(
+                                    "Wi-Fi activation succeeded, but credential cleanup could not be verified: {}",
+                                    cleanup_error
+                                ),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                        } else {
+                            match verify_wifi_connection(&profile_name).await {
+                                Ok(true) => {
+                                    let outcome = finalize_transaction(
+                                        &transaction_ledger,
+                                        &transaction,
+                                        TransactionOutcome::ObservedSuccess,
+                                        &peer_addr,
+                                    );
+                                    serde_json::json!({
+                                        "type": "wifi_result",
+                                        "code": protocol_exit_code(r.exit_status, outcome),
+                                        "data": "WiFi connected",
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                }
+                                Ok(false) => {
+                                    eprintln!(
+                                        "[{}] {} Wi-Fi command returned 0 but active connection was not observed",
+                                        peer_addr,
+                                        transaction.log_line()
+                                    );
+                                    let outcome = finalize_transaction(
+                                        &transaction_ledger,
+                                        &transaction,
+                                        TransactionOutcome::Indeterminate,
+                                        &peer_addr,
+                                    );
+                                    serde_json::json!({
+                                        "type": "wifi_result",
+                                        "code": protocol_exit_code(1, outcome),
+                                        "data": "Wi-Fi activation completed but the active connection was not durably observed.",
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                }
+                                Err(error) => {
+                                    eprintln!(
+                                        "[{}] {} Wi-Fi postcondition probe failed: {}",
+                                        peer_addr,
+                                        transaction.log_line(),
+                                        error
+                                    );
+                                    let outcome = finalize_transaction(
+                                        &transaction_ledger,
+                                        &transaction,
+                                        TransactionOutcome::Indeterminate,
+                                        &peer_addr,
+                                    );
+                                    serde_json::json!({
+                                        "type": "wifi_result",
+                                        "code": protocol_exit_code(1, outcome),
+                                        "data": format!("Wi-Fi postcondition probe failed: {}", error),
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                }
+                            }
+                        }
+                    }
+                    Ok(r) => {
+                        let profile_cleanup = run_nmcli_delete_wifi_profile(&profile_name).await;
+                        let outcome = if wifi_profile_cleanup_succeeded(&profile_cleanup)
+                            && cleanup_result.is_ok()
+                        {
+                            TransactionOutcome::Failed
+                        } else {
+                            TransactionOutcome::Indeterminate
+                        };
+                        serde_json::json!({
+                            "type": "wifi_result",
+                            "code": protocol_exit_code(1, outcome),
+                            "data": if outcome == TransactionOutcome::Failed {
+                                r.stderr.chars().take(400).collect::<String>()
+                            } else {
+                                format!(
+                                    "Wi-Fi activation failed and cleanup could not be fully observed: profile={:?}, secret={:?}, detail={}",
+                                    profile_cleanup.as_ref().map(|v| v.exit_status),
+                                    cleanup_result.as_ref().err(),
+                                    r.stderr.chars().take(300).collect::<String>()
+                                )
+                            },
+                            "transaction": transaction.receipt(finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                outcome,
+                                &peer_addr,
+                            ))
+                        })
+                    }
+                    Err(error) => {
+                        let profile_cleanup = run_nmcli_delete_wifi_profile(&profile_name).await;
+                        let outcome = if wifi_profile_cleanup_succeeded(&profile_cleanup)
+                            && cleanup_result.is_ok()
+                        {
+                            TransactionOutcome::Failed
+                        } else {
+                            TransactionOutcome::Indeterminate
+                        };
+                        serde_json::json!({
+                            "type": "wifi_result",
+                            "code": protocol_exit_code(1, outcome),
+                            "data": format!(
+                                "Wi-Fi activation failed and cleanup could not be fully observed: profile={:?}, secret={:?}, detail={}",
+                                profile_cleanup.as_ref().map(|v| v.exit_status),
+                                cleanup_result.as_ref().err(),
+                                error
+                            ),
+                            "transaction": transaction.receipt(finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                outcome,
+                                &peer_addr,
+                            ))
+                        })
+                    }
+                };
+
+                let _ = ws_tx.send(Message::Text(response.to_string())).await;
+            }
+
+            "search_packages" => {
+                let query = client_msg.command.trim();
+                if query.is_empty() {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error("Missing search query").to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+                eprintln!("[{}] Searching packages: {}", peer_addr, query);
+                // Keep the historical query policy while removing the shell parser
+                // from the package-search authority boundary.
+                let safe_query: String = query
+                    .chars()
+                    .filter(|c| {
+                        c.is_alphanumeric() || *c == '-' || *c == '_' || *c == '.' || *c == ' '
+                    })
+                    .take(100)
+                    .collect();
+                if safe_query.is_empty() {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error("Invalid search query").to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                let search_args = ["search", "nixpkgs", safe_query.as_str(), "--json"];
+                match run_privileged_args("nix", &search_args).await {
+                    Ok(r) if r.exit_status == 0 && !r.stdout.trim().is_empty() => {
+                        let mut results = Vec::new();
+                        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&r.stdout) {
+                            if let Some(obj) = parsed.as_object() {
+                                for (attr, info) in obj.iter().take(30) {
+                                    let pname =
+                                        info.get("pname").and_then(|v| v.as_str()).unwrap_or("");
+                                    let desc = info
+                                        .get("description")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("");
+                                    results.push(serde_json::json!({
+                                        "attr": attr.rsplit('.').next().unwrap_or(attr),
+                                        "pname": pname,
+                                        "description": desc
+                                    }));
+                                }
+                            }
+                        }
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "packages",
+                                    "data": results
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                    }
+                    Ok(r) => {
+                        let pattern = format!(".*{}.*", safe_query);
+                        let fallback_args = ["-qaP", &pattern];
+                        match run_privileged_args("nix-env", &fallback_args).await {
+                            Ok(r2) if r2.exit_status == 0 && !r2.stdout.trim().is_empty() => {
+                                let mut results = Vec::new();
+                                for line in r2.stdout.lines().take(30) {
+                                    let parts: Vec<&str> =
+                                        line.splitn(2, char::is_whitespace).collect();
+                                    if let Some(attr) = parts.first() {
+                                        results.push(serde_json::json!({
+                                            "attr": attr.rsplit('.').next().unwrap_or(attr),
+                                            "pname": parts.get(1).unwrap_or(&""),
+                                            "description": ""
+                                        }));
+                                    }
+                                }
+                                let _ = ws_tx
+                                    .send(Message::Text(
+                                        serde_json::json!({
+                                            "type": "packages",
+                                            "data": results
+                                        })
+                                        .to_string(),
+                                    ))
+                                    .await;
+                            }
+                            _ => {
+                                let _ = ws_tx
+                                    .send(Message::Text(
+                                        RelayMessage::error(&format!(
+                                            "Package search returned no results: {}",
+                                            r.stderr.chars().take(200).collect::<String>()
+                                        ))
+                                        .to_json(),
+                                    ))
+                                    .await;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!("Search failed: {}", e)).to_json(),
+                            ))
+                            .await;
+                    }
+                }
+            }
+
+            "validate_packages" => {
+                let packages_str = &client_msg.command;
+                if packages_str.is_empty() {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error("No packages to validate").to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+                eprintln!("[{}] Validating packages...", peer_addr);
+
+                let packages: Vec<&str> = packages_str
+                    .split(',')
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                let mut valid = Vec::new();
+                let mut invalid = Vec::new();
+                let mut suggestions: Vec<String> = Vec::new();
+
+                for pkg in &packages {
+                    // Sanitize: strip shell-dangerous characters
+                    let pkg_clean: String = pkg
+                        .chars()
+                        .filter(|c| !matches!(c, '\'' | ';' | '"' | '`' | '$' | '|' | '&'))
+                        .collect();
+                    if pkg_clean.is_empty() {
+                        continue;
+                    }
+
+                    // Check if package exists in nixpkgs via nix eval
+                    let attr = format!("nixpkgs#{}", pkg_clean);
+                    match run_privileged_args("nix", &["eval", &attr, "--json"]).await {
+                        Ok(r) if r.exit_status == 0 => {
+                            valid.push(pkg_clean.clone());
+                        }
+                        Ok(_) => {
+                            invalid.push(pkg_clean.clone());
+                            // Try to find similar packages.
+                            if let Ok(sr) =
+                                run_privileged_args("nix", &["search", "nixpkgs", &pkg_clean, "--json"]).await {
+                                    if !sr.stdout.is_empty() && sr.stdout.trim() != "{}" {
+                                        // Extract first few attribute names from JSON
+                                        if let Ok(val) =
+                                            serde_json::from_str::<serde_json::Value>(&sr.stdout)
+                                        {
+                                            if let Some(obj) = val.as_object() {
+                                                let alts: Vec<String> = obj
+                                                    .keys()
+                                                    .take(3)
+                                                    .map(|k| {
+                                                        k.rsplit('.')
+                                                            .next()
+                                                            .unwrap_or(k)
+                                                            .to_string()
+                                                    })
+                                                    .collect();
+                                                if !alts.is_empty() {
+                                                    suggestions.push(format!(
+                                                        "{}: try {}",
+                                                        pkg_clean,
+                                                        alts.join(", ")
+                                                    ));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Err(_) => {
+                            invalid.push(pkg_clean);
+                        }
+                    }
+                }
+
+                let result = serde_json::json!({
+                    "type": "package_validation",
+                    "valid": valid,
+                    "invalid": invalid,
+                    "suggestions": suggestions
+                });
+                let _ = ws_tx.send(Message::Text(result.to_string())).await;
+            }
+
+            // ── nixpkgs Version Query ──
+            // Returns the nixpkgs channel version running on the target system.
+            // Used to detect stale package names in the app database.
+            "nixpkgs_version" => {
+                eprintln!("[{}] Querying nixpkgs version...", peer_addr);
+                let version = match run_privileged_args("nixos-version", &[]).await {
+                    Ok(r) if r.exit_status == 0 => r.stdout.trim().to_string(),
+                    _ => match run_privileged_args(
+                        "nix",
+                        &["eval", "nixpkgs#lib.version", "--raw"],
+                    )
+                    .await
+                    {
+                        Ok(r) if r.exit_status == 0 => r.stdout.trim().to_string(),
+                        _ => "unknown".to_string(),
+                    },
+                };
+                let _ = ws_tx
+                    .send(Message::Text(
+                        serde_json::json!({
+                            "type": "nixpkgs_version",
+                            "data": version
+                        })
+                        .to_string(),
+                    ))
+                    .await;
+            }
+
+            "disconnect" => {
+                eprintln!("[{}] Client disconnecting", peer_addr);
+                tracker.lock().await.release(&peer_addr);
+                break;
+            }
+
+            _ => {
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::error(&format!("Unknown action: {}", client_msg.action))
+                            .to_json(),
+                    ))
+                    .await;
+            }
+        }
+    }
+
+    // Cleanup
+    tracker.lock().await.release(&peer_addr);
+    eprintln!("[{}] WebSocket disconnected", peer_addr);
+}
+
+fn generate_auth_token() -> String {
+    let mut bytes = [0u8; 32];
+    if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
+        if f.read_exact(&mut bytes).is_ok() {
+            return bytes.iter().map(|b| format!("{:02x}", b)).collect();
+        }
+    }
+
+    // Fallback: only used if /dev/urandom is unavailable (should not happen on Linux/NixOS).
+    let seed = format!(
+        "{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    );
+    blake3::hash(seed.as_bytes()).to_hex().to_string()
+}
+
+fn usage() {
+    eprintln!("NixForHumanity WebSocket Relay (local mode)");
+    eprintln!("Usage:");
+    eprintln!("  ssh-relay [--port <port>] [--bind <addr>] [--token <token> | --token-file <path>] [--pxe [port]]");
+    eprintln!();
+    eprintln!("Options:");
+    eprintln!(
+        "  --pxe [port]   Also serve NixOS kernel+initrd over HTTP for PXE boot (default: 8080)"
+    );
+    eprintln!();
+    eprintln!("Security defaults:");
+    eprintln!("  - Binds to 127.0.0.1 only");
+    eprintln!("  - Requires an auth token over WebSocket (action: \"auth\")");
+    eprintln!("  - --token-file avoids exposing the bearer token in process arguments");
+    eprintln!("  - Executes commands locally (no SSH)");
+    eprintln!("  - 'exec' is disabled");
+}
+
+#[tokio::main]
+async fn main() {
+    let mut port: u16 = 8091;
+    let mut bind_addr: String = "127.0.0.1".into();
+    let mut token: Option<String> = None;
+    let mut token_file: Option<String> = None;
+    let mut pxe_port: Option<u16> = None;
+    let mut enable_tls = false;
+    let mut tls_cert_path: Option<String> = None;
+    let mut tls_key_path: Option<String> = None;
+
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--port" => {
+                if let Some(p) = args.next().and_then(|p| p.parse::<u16>().ok()) {
+                    port = p;
+                }
+            }
+            "--bind" => {
+                if let Some(a) = args.next() {
+                    bind_addr = a;
+                }
+            }
+            "--token" => token = args.next(),
+            "--token-file" => token_file = args.next(),
+            "--tls" => enable_tls = true,
+            "--tls-cert" => tls_cert_path = args.next(),
+            "--tls-key" => tls_key_path = args.next(),
+            "--pxe" => {
+                // Optional port argument: --pxe 9090  or just --pxe (defaults to 8080)
+                pxe_port = Some(
+                    args.next()
+                        .and_then(|p| p.parse::<u16>().ok())
+                        .unwrap_or(8080),
+                );
+            }
+            "--help" | "-h" => {
+                usage();
+                return;
+            }
+            _ => {}
+        }
+    }
+
+    if token.is_some() && token_file.is_some() {
+        eprintln!("ERROR: use either --token or --token-file, not both");
+        std::process::exit(2);
+    }
+    let token = match token_file.as_deref() {
+        Some(path) => match read_token_file(path) {
+            Ok(token) => token,
+            Err(error) => {
+                eprintln!("ERROR: {}", error);
+                std::process::exit(2);
+            }
+        },
+        None => token.unwrap_or_else(generate_auth_token),
+    };
+    if token.is_empty() {
+        eprintln!("ERROR: --token cannot be empty");
+        std::process::exit(2);
+    }
+    let auth_token = Arc::new(token);
+
+    let tracker: SharedTracker = Arc::new(Mutex::new(SessionTracker::new(1800))); // 30 min timeout
+    // Serialize consequential system mutations across all WebSocket connections owned by this relay.
+    // We refuse rather than queue so a stale request cannot silently execute later.
+    let mutation_lock: SharedMutationLock = Arc::new(Mutex::new(()));
+    let transaction_ledger = match TransactionLedger::open_default() {
+        Ok(ledger) => ledger,
+        Err(error) => {
+            eprintln!("ERROR: Cannot initialize transaction ledger: {}", error);
+            std::process::exit(1);
+        }
+    };
+
+    if let Err(error) = ensure_no_orphan_configuration_swaps() {
+        eprintln!("ERROR: Configuration recovery fence: {}", error);
+        std::process::exit(1);
+    }
+
+    let addr = format!("{}:{}", bind_addr, port);
+    let listener = match TcpListener::bind(&addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("ERROR: Cannot bind to {}: {}", addr, e);
+            eprintln!("Another service may be using this port. Try: --port <other-port>");
+            std::process::exit(1);
+        }
+    };
+    // TLS setup
+    let tls_acceptor: Option<TlsAcceptor> = if enable_tls {
+        let (cert_pem, key_pem) = match (&tls_cert_path, &tls_key_path) {
+            (Some(cert), Some(key)) => {
+                let cert = std::fs::read_to_string(cert).expect("Cannot read TLS cert");
+                let key = std::fs::read_to_string(key).expect("Cannot read TLS key");
+                (cert, key)
+            }
+            _ => {
+                // Generate self-signed certificate
+                eprintln!("TLS: Generating self-signed certificate...");
+                let subject_alt_names = vec!["localhost".to_string(), bind_addr.clone()];
+                let cert = rcgen::generate_simple_self_signed(subject_alt_names)
+                    .expect("Failed to generate self-signed cert");
+                let cert_pem = cert.cert.pem();
+                let key_pem = cert.key_pair.serialize_pem();
+                // Save for QR code fingerprint
+                let fingerprint = {
+                    use std::io::Write;
+                    let der = cert.cert.der();
+                    let hash = blake3::hash(der.as_ref());
+                    let hex = hash.to_hex();
+                    hex[..16].to_string()
+                };
+                eprintln!("TLS: Certificate fingerprint: {}", fingerprint);
+                // Save cert to /run/sovereign/ for the QR code URL
+                let _ = std::fs::create_dir_all("/run/sovereign");
+                let _ = std::fs::write("/run/sovereign/tls-fingerprint", &fingerprint);
+                (cert_pem, key_pem)
+            }
+        };
+
+        let certs = rustls_pemfile::certs(&mut cert_pem.as_bytes())
+            .collect::<Result<Vec<_>, _>>()
+            .expect("Invalid TLS certificate");
+        let key = rustls_pemfile::private_key(&mut key_pem.as_bytes())
+            .expect("Invalid TLS key")
+            .expect("No TLS key found");
+
+        let config = ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(certs, key)
+            .expect("Invalid TLS config");
+
+        Some(TlsAcceptor::from(Arc::new(config)))
+    } else {
+        None
+    };
+
+    let scheme = if tls_acceptor.is_some() { "wss" } else { "ws" };
+    eprintln!("NixForHumanity Relay listening on {}://{}", scheme, addr);
+    eprintln!("  Mode: local (no SSH)");
+    eprintln!(
+        "  TLS: {}",
+        if tls_acceptor.is_some() {
+            "enabled (self-signed)"
+        } else {
+            "disabled (use --tls to enable)"
+        }
+    );
+    eprintln!(
+        "{}",
+        auth_token_banner(&auth_token, std::io::stderr().is_terminal())
+    );
+    eprintln!("  Protocol: auth → connect → (discover_disks/install/...) → disconnect");
+    eprintln!("  Session timeout: 30 minutes");
+    eprintln!("  Rate limit: 1 active session per IP");
+
+    // PXE mode: spawn a background HTTP server for kernel+initrd
+    if let Some(pxe_p) = pxe_port {
+        let pxe_bind = bind_addr.clone();
+        tokio::spawn(async move {
+            // Find kernel and initrd in the nix store
+            let kernel_result = run_cmd("ls /nix/store/*/bzImage 2>/dev/null | head -1").await;
+            let initrd_result = run_cmd("ls /nix/store/*/initrd 2>/dev/null | head -1").await;
+            let kernel_path = kernel_result
+                .ok()
+                .map(|r| r.stdout.trim().to_string())
+                .unwrap_or_default();
+            let initrd_path = initrd_result
+                .ok()
+                .map(|r| r.stdout.trim().to_string())
+                .unwrap_or_default();
+
+            if kernel_path.is_empty() || initrd_path.is_empty() {
+                eprintln!(
+                    "PXE: NixOS kernel/initrd not found in nix store. PXE server not started."
+                );
+                eprintln!("PXE: Build the ISO first: nix-build nix/installer-iso.nix");
+                return;
+            }
+
+            // Create a temp directory with symlinks and serve via python3
+            let setup_cmd = format!(
+                "TMPDIR=$(mktemp -d) && ln -sf '{}' \"$TMPDIR/bzImage\" && ln -sf '{}' \"$TMPDIR/initrd\" && echo \"$TMPDIR\"",
+                kernel_path, initrd_path
+            );
+            let tmpdir = match run_cmd(&setup_cmd).await {
+                Ok(r) if r.exit_status == 0 => r.stdout.trim().to_string(),
+                _ => {
+                    eprintln!("PXE: Failed to set up temp directory for serving");
+                    return;
+                }
+            };
+
+            eprintln!(
+                "PXE: Serving kernel+initrd on http://{}:{}",
+                pxe_bind, pxe_p
+            );
+            eprintln!("PXE:   kernel: {}", kernel_path);
+            eprintln!("PXE:   initrd: {}", initrd_path);
+            eprintln!(
+                "PXE: For dnsmasq, add: dhcp-boot=pxelinux.0,,{}:{}",
+                pxe_bind, pxe_p
+            );
+
+            // Serve the directory with python3
+            let serve_cmd = format!(
+                "cd '{}' && python3 -m http.server {} --bind {}",
+                tmpdir, pxe_p, pxe_bind
+            );
+            let _ = run_cmd(&serve_cmd).await;
+        });
+    }
+
+    while let Ok((stream, addr)) = listener.accept().await {
+        let peer = addr.ip().to_string();
+        let tracker = tracker.clone();
+        let auth = auth_token.clone();
+        let mutation_lock = mutation_lock.clone();
+
+        if let Some(ref acceptor) = tls_acceptor {
+            let acceptor = acceptor.clone();
+            tokio::spawn(async move {
+                match acceptor.accept(stream).await {
+                    Ok(tls_stream) => {
+                        // WebSocket upgrade over TLS stream (Origin validated in callback)
+                        let peer_ref = peer.clone();
+                        let origin_check = |req: &tungstenite::handshake::server::Request,
+                                            resp: tungstenite::handshake::server::Response|
+                         -> Result<
+                            tungstenite::handshake::server::Response,
+                            tungstenite::handshake::server::ErrorResponse,
+                        > {
+                            if let Some(origin) = req.headers().get("origin") {
+                                let o = origin.to_str().unwrap_or("");
+                                let ok = origin_is_allowed(o);
+                                if !ok {
+                                    eprintln!(
+                                        "[{}] Rejected TLS WebSocket: disallowed Origin '{}'",
+                                        peer_ref, o
+                                    );
+                                    let mut r = tungstenite::handshake::server::ErrorResponse::new(
+                                        Some("Forbidden origin".into()),
+                                    );
+                                    *r.status_mut() = tungstenite::http::StatusCode::FORBIDDEN;
+                                    return Err(r);
+                                }
+                            }
+                            Ok(resp)
+                        };
+                        let ws_stream = match accept_hdr_async_with_config(
+                            tls_stream,
+                            origin_check,
+                            Some(relay_websocket_config()),
+                        )
+                        .await {
+                            Ok(ws) => ws,
+                            Err(e) => {
+                                eprintln!("[{}] TLS WebSocket upgrade failed: {}", peer, e);
+                                return;
+                            }
+                        };
+                        handle_connection_ws(ws_stream, peer, tracker, auth, mutation_lock, transaction_ledger.clone()).await;
+                    }
+                    Err(e) => {
+                        eprintln!("[{}] TLS handshake failed: {}", peer, e);
+                    }
+                }
+            });
+        } else {
+            tokio::spawn(handle_connection(stream, peer, tracker, auth, mutation_lock, transaction_ledger.clone()));
+        }
+    }
+}
+
+// ── Security regression tests ──
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_install_message() -> ClientMessage {
+        ClientMessage {
+            action: "install".into(),
+            request_id: "request-test-000001".into(),
+            token: String::new(),
+            host: String::new(),
+            port: 22,
+            username: "operator".into(),
+            password: String::new(),
+            command: String::new(),
+            disk: "/dev/vda".into(),
+            layout: "single".into(),
+            fast_disk: "/dev/vdb".into(),
+            standard_disk: "/dev/vdc".into(),
+            hostname: "test-nixos".into(),
+            configuration_nix: "{ config, pkgs, ... }: { }".into(),
+            flake_nix: "inputs = { };".into(),
+            disko_nix: "disk-config".into(),
+            hardware_nix: "hardware-config".into(),
+            secure_boot: true,
+            tpm2_unlock: true,
+            fido2_unlock: false,
+            desktop: "gnome".into(),
+            gpu_driver: "amdgpu".into(),
+            timezone: "UTC".into(),
+            keyboard: "us".into(),
+            user_password: "user-secret".into(),
+            luks_passphrase: "luks-secret".into(),
+            extra_disks: vec!["/dev/vdd".into()],
+        }
+    }
+
+    #[tokio::test]
+    async fn privileged_command_environment_is_hermetic_and_deterministic() {
+        let result = run_cmd(
+            r#"printf 'HOME=%s\nNIX_CONFIG=%s\nNIXOS_NO_CHECK=%s\nLD_PRELOAD=%s\nLANG=%s\nLC_ALL=%s\nPATH=%s\n' "${HOME-unset}" "${NIX_CONFIG-unset}" "${NIXOS_NO_CHECK-unset}" "${LD_PRELOAD-unset}" "$LANG" "$LC_ALL" "$PATH""#,
+        )
+        .await
+        .expect("privileged command should run");
+
+        assert!(result.stdout.contains("HOME=unset\n"), "ambient HOME leaked: {}", result.stdout);
+        assert!(result.stdout.contains("NIX_CONFIG=unset\n"), "ambient NIX_CONFIG leaked: {}", result.stdout);
+        assert!(
+            result.stdout.contains("NIXOS_NO_CHECK=unset\n"),
+            "NIXOS_NO_CHECK must not cross the privileged boundary: {}",
+            result.stdout
+        );
+        assert!(result.stdout.contains("LD_PRELOAD=unset\n"), "LD_PRELOAD leaked: {}", result.stdout);
+        assert!(result.stdout.contains("LANG=C\n"), "locale must be deterministic: {}", result.stdout);
+        assert!(result.stdout.contains("LC_ALL=C\n"), "locale must be deterministic: {}", result.stdout);
+        assert!(
+            result.stdout.contains("/run/current-system/sw/bin"),
+            "trusted PATH missing: {}",
+            result.stdout
+        );
+    }
+
+    #[test]
+    fn install_fingerprint_changes_when_effect_input_changes() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-install-fingerprint-test-{name}.jsonl"));
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let target = "a".repeat(64);
+        let user_commitment =
+            ledger.secret_commitment("install-user-password", "user-secret");
+        let luks_commitment =
+            ledger.secret_commitment("install-luks-passphrase", "luks-secret");
+
+        let message = sample_install_message();
+        let p1 = build_install_transaction_payload(
+            &message,
+            &message.disk,
+            &message.hostname,
+            &message.username,
+            &target,
+            Some(&user_commitment),
+            Some(&luks_commitment),
+        )
+        .unwrap();
+
+        let mut changed = message;
+        changed.desktop = "plasma".into();
+        let p2 = build_install_transaction_payload(
+            &changed,
+            &changed.disk,
+            &changed.hostname,
+            &changed.username,
+            &target,
+            Some(&user_commitment),
+            Some(&luks_commitment),
+        )
+        .unwrap();
+
+        assert_ne!(p1, p2);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn install_fingerprint_binds_secret_commitments_without_raw_secrets() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-install-secret-fingerprint-{name}.jsonl"));
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let message = sample_install_message();
+        let target = "b".repeat(64);
+
+        let first_user =
+            ledger.secret_commitment("install-user-password", "user-secret");
+        let second_user =
+            ledger.secret_commitment("install-user-password", "different-secret");
+        let first = build_install_transaction_payload(
+            &message,
+            &message.disk,
+            &message.hostname,
+            &message.username,
+            &target,
+            Some(&first_user),
+            Some(ledger.secret_commitment("install-luks-passphrase", "luks-secret").as_str()),
+        )
+        .unwrap();
+        let second = build_install_transaction_payload(
+            &message,
+            &message.disk,
+            &message.hostname,
+            &message.username,
+            &target,
+            Some(&second_user),
+            Some(ledger.secret_commitment("install-luks-passphrase", "luks-secret").as_str()),
+        )
+        .unwrap();
+
+        assert_ne!(first, second);
+        let rendered = String::from_utf8_lossy(&first);
+        assert!(!rendered.contains("user-secret"));
+        assert!(!rendered.contains("luks-secret"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn wifi_fingerprint_binds_psk_without_storing_it() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-wifi-fingerprint-test-{name}.jsonl"));
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let target = "c".repeat(64);
+        let p1 =
+            build_wifi_transaction_payload(&ledger, "MyNet", "secret-one", &target).unwrap();
+        let p2 =
+            build_wifi_transaction_payload(&ledger, "MyNet", "secret-two", &target).unwrap();
+        assert_ne!(p1, p2);
+        assert!(!String::from_utf8_lossy(&p1).contains("secret-one"));
+        assert!(!String::from_utf8_lossy(&p1).contains("secret-two"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn install_recovery_identity_matches_transaction_artifact_shape() {
+        let transaction_id = "0123456789abcdef0123456789abcdef";
+        let cmdline = format!("/bin/bash\0/tmp/nixforhumanity-transaction-{transaction_id}/install.sh\0");
+        assert!(install_process_command_matches(transaction_id, cmdline.as_bytes()));
+        assert!(!install_process_command_matches(
+            transaction_id,
+            b"/bin/bash\0/tmp/nixforhumanity-transaction-1234/install.sh\0",
+        ));
+    }
+
+    #[test]
+    fn image_paths_are_strictly_transaction_scoped() {
+        assert!(validate_image_path("/tmp/nixforhumanity-image-0123456789abcdef0123456789abcdef").is_ok());
+        assert!(validate_image_path("/etc").is_err());
+        assert!(validate_image_path("/tmp/nixforhumanity-image-0123").is_err());
+        assert!(validate_image_path("/tmp/nixforhumanity-image-0123456789abcdef0123456789abcdeg").is_err());
+        assert!(validate_image_path("/tmp/nixforhumanity-image-0123456789abcdef/../etc").is_err());
+    }
+
+    #[test]
+    fn websocket_limits_are_bounded() {
+        let config = relay_websocket_config();
+        assert_eq!(config.max_message_size, Some(MAX_WS_MESSAGE_SIZE));
+        assert_eq!(config.max_frame_size, Some(MAX_WS_FRAME_SIZE));
+    }
+
+    #[test]
+    fn origin_policy_rejects_lookalike_hosts() {
+        assert!(origin_is_allowed("https://luminousdynamics.io"));
+        assert!(origin_is_allowed("https://app.luminousdynamics.io"));
+        assert!(origin_is_allowed("https://nixforhumanity.org"));
+        assert!(origin_is_allowed("http://localhost:8091"));
+        assert!(origin_is_allowed("https://127.0.0.1:8091"));
+
+        assert!(!origin_is_allowed("https://evil-luminousdynamics.io"));
+        assert!(!origin_is_allowed("https://luminousdynamics.io.attacker.example"));
+        assert!(!origin_is_allowed("https://evilnixforhumanity.org"));
+        assert!(!origin_is_allowed("https://luminousdynamics.io.evil.example"));
+        assert!(!origin_is_allowed("https://luminousdynamics.io/path"));
+        assert!(!origin_is_allowed("file:///tmp/installer.html"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn token_file_requires_private_owner_only_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-token-file-{}",
+            random_operation_id().unwrap()
+        ));
+        std::fs::write(&path, "secret-token\n").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert_eq!(read_token_file(path.to_str().unwrap()).unwrap(), "secret-token");
+
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
+        assert!(read_token_file(path.to_str().unwrap()).is_err());
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn noninteractive_auth_banner_redacts_token() {
+        let banner = auth_token_banner("super-secret-token", false);
+        assert!(!banner.contains("super-secret-token"));
+        assert!(banner.contains("fingerprint"));
+        assert_eq!(banner.len(), "  Auth token: <redacted; fingerprint >".len() + 16);
+    }
+
+    #[test]
+    fn interactive_auth_banner_preserves_bootstrap_token() {
+        let banner = auth_token_banner("super-secret-token", true);
+        assert!(banner.contains("super-secret-token"));
+        assert!(banner.starts_with("  Auth token: "));
+    }
+
+    #[test]
+    fn generation_probe_uses_profile_link_shape() {
+        assert_eq!(parse_generation_link("system-1-link"), Some(1));
+        assert_eq!(
+            parse_generation_link("/nix/var/nix/profiles/system-99-link"),
+            Some(99)
+        );
+    }
+
+    #[test]
+    fn generation_link_parser_preserves_u64_boundary() {
+        assert_eq!(parse_generation_link("system-18446744073709551615-link"), Some(u64::MAX));
+        assert_eq!(parse_generation_link("system-18446744073709551616-link"), None);
+    }
+
+    #[test]
+    fn generation_link_parser_rejects_ambiguous_or_invalid_links() {
+        assert_eq!(parse_generation_link("system-42-link\n"), Some(42));
+        assert_eq!(parse_generation_link("/nix/var/nix/profiles/system-7-link"), Some(7));
+        assert_eq!(parse_generation_link("system--link"), None);
+        assert_eq!(parse_generation_link("system-7"), None);
+        assert_eq!(parse_generation_link("system-7-link-attacker"), None);
+    }
+
+    #[test]
+    fn configuration_swap_is_atomic_and_commit_removes_old_inode_aliases() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-config-swap-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let target = dir.join("configuration.nix");
+        let old = b"{ config = old; }\n";
+        let new = b"{ config = new; }\n";
+        std::fs::write(&target, old).unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        let swap = replace_configuration_atomically_blocking(
+            &dir,
+            &transaction_id,
+            old,
+            new,
+        )
+        .unwrap();
+
+        assert_eq!(std::fs::read(&target).unwrap(), new);
+        assert_eq!(
+            std::fs::read(
+                dir.join(&swap.temp_name)
+            ).unwrap(),
+            old
+        );
+        finalize_configuration_swap_blocking(swap, true).unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), new);
+
+        let entries: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0], std::ffi::OsString::from("configuration.nix"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn configuration_swap_rolls_back_to_exact_original_inode_content() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-config-rollback-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let target = dir.join("configuration.nix");
+        let old = b"{ config = old; }\n";
+        let new = b"{ config = new; }\n";
+        std::fs::write(&target, old).unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        let swap = replace_configuration_atomically_blocking(
+            &dir,
+            &transaction_id,
+            old,
+            new,
+        )
+        .unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), new);
+
+        finalize_configuration_swap_blocking(swap, false).unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), old);
+
+        let entries: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0], std::ffi::OsString::from("configuration.nix"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn configuration_swap_refuses_unexpected_inode_interposition() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-config-interposition-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let target = dir.join("configuration.nix");
+        let old = b"{ config = old; }
+";
+        let new = b"{ config = new; }
+";
+        std::fs::write(&target, old).unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        let swap = replace_configuration_atomically_blocking(&dir, &transaction_id, old, new)
+            .unwrap();
+
+        std::fs::remove_file(&target).unwrap();
+        std::fs::write(&target, b"{ config = interposed; }
+").unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        let error = finalize_configuration_swap_blocking(swap, true)
+            .expect_err("commit must refuse an unexpected target inode");
+        assert!(error.contains("inode changed before transaction finalization"));
+        assert_eq!(
+            std::fs::read(&target).unwrap(),
+            b"{ config = interposed; }
+"
+        );
+        assert!(
+            dir.join(format!(".configuration.nix.swap.{transaction_id}"))
+                .exists(),
+            "old inode must remain available for manual recovery"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn configuration_swap_rejects_stale_pre_state_without_mutating_target() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-config-stale-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let target = dir.join("configuration.nix");
+        std::fs::write(&target, b"{ config = actual; }\n").unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        let error = replace_configuration_atomically_blocking(
+            &dir,
+            &transaction_id,
+            b"{ config = stale; }\n",
+            b"{ config = replacement; }\n",
+        )
+        .expect_err("stale pre-state must refuse replacement");
+        assert!(error.contains("stale overwrite"));
+        assert_eq!(
+            std::fs::read(&target).unwrap(),
+            b"{ config = actual; }\n"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn transaction_status_rejects_malformed_terminal_evidence() {
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-status-evidence-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+
+        let status = dir.join("status");
+        std::fs::write(&status, b"not-an-exit-code\n").unwrap();
+        std::fs::set_permissions(
+            &status,
+            std::os::unix::fs::PermissionsExt::from_mode(0o600),
+        )
+        .unwrap();
+
+        let result = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(read_transaction_status(status.to_str().unwrap()));
+        assert_eq!(
+            result.unwrap_err().kind(),
+            std::io::ErrorKind::InvalidData
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn wifi_password_limit_is_four_kib() {
+        let valid = "x".repeat(4096);
+        let invalid = "x".repeat(4097);
+        assert!(valid.len() <= 4096);
+        assert!(invalid.len() > 4096);
+    }
+
+    #[test]
+    fn wifi_profile_cleanup_treats_missing_profile_as_success() {
+        let missing = Ok(CmdResult {
+            stdout: String::new(),
+            stderr: "Connection profile not found".into(),
+            exit_status: 10,
+        });
+        let failed = Ok(CmdResult {
+            stdout: String::new(),
+            stderr: "permission denied".into(),
+            exit_status: 4,
+        });
+
+        assert!(wifi_profile_cleanup_succeeded(&missing));
+        assert!(!wifi_profile_cleanup_succeeded(&failed));
+        assert!(!wifi_profile_cleanup_succeeded(&Err(
+            "spawn failure".into()
+        )));
+    }
+
+    #[test]
+    fn restore_configuration_directory_walk_rejects_symlink_components() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let id = random_operation_id().unwrap();
+        let root = std::env::temp_dir().join(format!("nixforhumanity-restore-walk-{id}"));
+        let mnt = root.join("mnt");
+        let etc = mnt.join("etc");
+        let nixos = etc.join("nixos");
+        std::fs::create_dir_all(&nixos).unwrap();
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::fs::set_permissions(&mnt, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::fs::set_permissions(&etc, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::fs::set_permissions(&nixos, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let root_fd = std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(&mnt)
+            .unwrap();
+        let etc_fd = open_child_directory_at(&root_fd, "etc").unwrap();
+        let nixos_fd = open_child_directory_at(&etc_fd, "nixos").unwrap();
+        assert!(nixos_fd.metadata().unwrap().is_dir());
+
+        drop(nixos_fd);
+        drop(etc_fd);
+        drop(root_fd);
+
+        let evil = mnt.join("etc-link");
+        std::os::unix::fs::symlink(&nixos, &evil).unwrap();
+        let error = open_child_directory_at(
+            &std::fs::OpenOptions::new()
+                .read(true)
+                .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+                .open(&mnt)
+                .unwrap(),
+            "etc-link",
+        )
+        .expect_err("symlinked restore component must be rejected");
+        assert!(error.contains("unable to open restore directory component"));
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn restore_child_cwd_is_bound_to_open_target_directory() {
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-restore-cwd-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+
+        let directory = std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(&dir)
+            .unwrap();
+
+        let mut command = tokio::process::Command::new("/bin/pwd");
+        bind_process_cwd_to_directory(&mut command, &directory).unwrap();
+
+        let output = command.output().await.unwrap();
+        assert!(output.status.success(), "pwd failed: {:?}", output.status);
+        let observed = String::from_utf8(output.stdout).unwrap();
+        assert_eq!(observed.trim_end(), dir.to_string_lossy());
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn image_sidecar_copy_rejects_source_symlinks() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "nixforhumanity-sidecar-copy-{transaction_id}"
+        ));
+        let image_dir = root.join("image");
+        let source = root.join("configuration.nix");
+        std::fs::create_dir_all(&image_dir).unwrap();
+        std::fs::set_permissions(
+            &root,
+            std::fs::Permissions::from_mode(0o700),
+        )
+        .unwrap();
+        std::fs::set_permissions(
+            &image_dir,
+            std::fs::Permissions::from_mode(0o700),
+        )
+        .unwrap();
+
+        std::os::unix::fs::symlink("/etc/passwd", &source).unwrap();
+        let error = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(copy_optional_image_sidecar(
+                image_dir.to_str().unwrap(),
+                source.to_str().unwrap(),
+                true,
+            ))
+            .expect_err("sidecar source symlink must be rejected");
+        assert!(
+            error.contains("unavailable") || error.contains("Too many levels"),
+            "unexpected symlink rejection: {error}"
+        );
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn image_namespace_freeze_rejects_symlinks_and_binds_modes() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-freeze-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let artifact = dir.join("configuration.nix");
+        std::fs::write(&artifact, b"config").unwrap();
+        std::fs::set_permissions(&artifact, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        freeze_image_namespace_blocking(dir.to_str().unwrap()).unwrap();
+        assert_eq!(
+            std::fs::metadata(&artifact).unwrap().permissions().mode() & 0o777,
+            0o400
+        );
+        assert_eq!(
+            std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777,
+            0o500
+        );
+
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let symlink = dir.join("attacker");
+        std::os::unix::fs::symlink("/etc/passwd", &symlink).unwrap();
+        let error = freeze_image_namespace_blocking(dir.to_str().unwrap())
+            .expect_err("image freeze must reject symlink artifacts");
+        assert!(error.contains("unable to open image namespace artifact") || error.contains("non-regular"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn transaction_status_reader_rejects_symlink_sidecars() {
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!("nixforhumanity-status-{transaction_id}"));
+        std::fs::create_dir(&dir).unwrap();
+
+        let real = dir.join("real-status");
+        let status = dir.join("status");
+        std::fs::write(&real, b"0\n").unwrap();
+        std::os::unix::fs::symlink(&real, &status).unwrap();
+
+        let error = read_transaction_status(status.to_str().unwrap())
+            .await
+            .expect_err("status observer must not follow a symlink");
+        assert!(
+            matches!(
+                error.raw_os_error(),
+                Some(libc::ELOOP) | Some(libc::ENOENT)
+            ),
+            "unexpected symlink rejection error: {error}"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn process_liveness_requires_matching_start_time() {
+        let pid = std::process::id();
+        let start_time = read_process_start_time_ticks(pid).unwrap();
+        assert!(process_id_is_alive(pid, start_time));
+        assert!(
+            !process_id_is_alive(pid, start_time.wrapping_add(1)),
+            "same PID with a different process start time must be treated as non-identical"
+        );
+    }
+
+    #[test]
+    fn preservation_service_identity_returns_uid_and_gid() {
+        let root = preservation_user_identity("root")
+            .expect("root account lookup should succeed")
+            .expect("root account should exist");
+        assert_eq!(root.0, 0);
+        assert_eq!(root.1, 0);
+        assert!(preservation_user_identity("definitely-no-such-preservation-user")
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn preservation_archive_component_is_safe_and_stable() {
+        let component = preservation_archive_component("registry.example/image:tag/$danger");
+        assert!(component.starts_with("registry.example_image_tag__danger-"));
+        assert!(component.len() <= 89);
+        assert_eq!(
+            component,
+            preservation_archive_component("registry.example/image:tag/$danger")
+        );
+        assert!(!component.contains('/'));
+        assert!(!component.contains(':'));
+        assert!(!component.contains('$'));
+    }
+
+    #[test]
+    fn typed_executor_accepts_only_trusted_program_identities() {
+        assert_eq!(
+            trusted_typed_executable("nix-env").unwrap().as_ref(),
+            "/run/current-system/sw/bin/nix-env"
+        );
+        assert_eq!(
+            trusted_typed_executable(
+                "/nix/var/nix/profiles/system/bin/switch-to-configuration"
+            )
+            .unwrap()
+            .as_ref(),
+            "/nix/var/nix/profiles/system/bin/switch-to-configuration"
+        );
+        assert!(trusted_typed_executable("sh").is_err());
+        assert!(trusted_typed_executable("/tmp/attacker").is_err());
+        assert!(
+            trusted_typed_executable(
+                "/nix/var/nix/profiles/system/bin/switch-to-configuration-helper"
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn sensitive_cleanup_zeroes_and_removes_secret_material() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!("nixforhumanity-secret-cleanup-{id}"));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let secret = dir.join("secret");
+        std::fs::write(&secret, b"very-secret-credential").unwrap();
+        std::fs::set_permissions(&secret, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        cleanup_sensitive_file(secret.to_str().unwrap()).unwrap();
+        assert!(!secret.exists());
+
+        let symlink = dir.join("symlink");
+        std::os::unix::fs::symlink("/etc/passwd", &symlink).unwrap();
+        assert!(cleanup_sensitive_file(symlink.to_str().unwrap()).is_err());
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn trusted_script_open_rejects_symlinks_and_unsafe_modes() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!("nixforhumanity-script-{id}"));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let script = dir.join("preflight.sh");
+        std::fs::write(&script, b"echo test\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        assert!(open_trusted_script(script.to_str().unwrap()).is_ok());
+
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(open_trusted_script(script.to_str().unwrap()).is_err());
+
+        std::fs::remove_file(&script).unwrap();
+        std::os::unix::fs::symlink("/etc/passwd", &script).unwrap();
+        assert!(open_trusted_script(script.to_str().unwrap()).is_err());
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn worker_liveness_rejects_same_pid_with_wrong_start_time() {
+        let pid = std::process::id();
+        let actual = read_process_start_time_ticks(pid).unwrap();
+        assert!(process_id_is_alive(pid, actual));
+        assert!(!process_id_is_alive(pid, actual.wrapping_add(1)));
+    }
+
+    #[test]
+    fn process_identity_parser_requires_pid_and_start_time() {
+        assert_eq!(
+            parse_process_identity("1234:5678\n"),
+            Some((1234, 5678))
+        );
+        assert_eq!(parse_process_identity("1234"), None);
+        assert_eq!(parse_process_identity("0:5678"), None);
+        assert_eq!(parse_process_identity("1234:not-a-number"), None);
+        assert_eq!(parse_process_identity("garbage:5678"), None);
+    }
+
+    #[test]
+    fn orphan_configuration_swaps_are_detected_and_require_private_regular_files() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = "0123456789abcdef0123456789abcdef";
+        let dir = std::env::temp_dir().join("nixforhumanity-orphan-swap-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        assert!(find_configuration_swap_orphans(&dir).unwrap().is_empty());
+
+        let swap = dir.join(format!(".configuration.nix.swap.{transaction_id}"));
+        std::fs::write(&swap, b"old-config").unwrap();
+        std::fs::set_permissions(&swap, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        let orphans = find_configuration_swap_orphans(&dir).unwrap();
+        assert_eq!(orphans, vec![swap.clone()]);
+
+        std::fs::remove_file(&swap).unwrap();
+        std::os::unix::fs::symlink("/etc/passwd", &swap).unwrap();
+        let error = find_configuration_swap_orphans(&dir)
+            .expect_err("swap symlink must fail closed");
+        assert!(error.contains("is not a regular file"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn configuration_postcondition_digest_is_exact() {
+        let expected = b"{ config = true; }\n";
+        assert!(configuration_bytes_match(expected, expected));
+        assert!(!configuration_bytes_match(expected, b"{ config = false; }\n"));
+    }
+
+    #[test]
+    fn configuration_postcondition_requires_exact_requested_bytes() {
+        assert!(configuration_bytes_match(b"line1\nline2\n", b"line1\nline2\n"));
+        assert!(!configuration_bytes_match(b"line1\n", b"line1\r\n"));
+        assert!(!configuration_bytes_match(b"nix-config-a", b"nix-config-b"));
+    }
+
+    #[test]
+    fn wifi_arguments_are_passed_as_literal_values() {
+        let ssid = "Cafe;$(touch /tmp/pwned)";
+        let profile = "symthaea-relay-0123456789abcdef0123456789abcdef";
+        let secret_path = "/tmp/symthaea-wifi-0123456789abcdef0123456789abcdef.passwd";
+        assert_eq!(ssid, "Cafe;$(touch /tmp/pwned)");
+        assert!(profile.starts_with("symthaea-relay-"));
+        assert!(secret_path.starts_with("/tmp/symthaea-wifi-"));
+    }
+
+    #[test]
+    fn wifi_postcondition_requires_exact_active_profile_and_device() {
+        let profile = "symthaea-relay-0123456789abcdef0123456789abcdef";
+        let active = format!("{}:wlan0\nother-profile:eth0\n", profile);
+        assert!(wifi_connection_observed(&active, profile));
+        assert!(!wifi_connection_observed("other-profile:wlan0\n", profile));
+        assert!(!wifi_connection_observed(&format!("{}:\n", profile), profile));
+        assert!(!wifi_connection_observed(&format!("{}:wlan0-attacker\n", profile), "other"));
+    }
+
+    #[tokio::test]
+    async fn image_postcondition_requires_configuration_sidecar() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-image-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let path = dir.join("system.tar.gz");
+        let archive_path = path.to_string_lossy().replace('\\', "\\\\'");
+        let create = run_cmd(&format!(
+            "tar -czf '{}' --files-from /dev/null",
+            archive_path
+        ))
+        .await
+        .unwrap();
+        assert_eq!(create.exit_status, 0);
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        assert!(
+            !verify_image_artifact(dir.to_str().unwrap())
+                .await
+                .unwrap(),
+            "archive-only images must not qualify without configuration provenance"
+        );
+
+        let configuration = dir.join("configuration.nix");
+        std::fs::write(&configuration, "{ config = true; }\n").unwrap();
+        std::fs::set_permissions(
+            &configuration,
+            std::fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
+        assert!(verify_image_artifact(dir.to_str().unwrap()).await.unwrap());
+
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(
+            verify_image_artifact(dir.to_str().unwrap()).is_err(),
+            "world-readable image directories must not qualify"
+        );
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        std::fs::write(&path, b"not a tar archive").unwrap();
+        assert!(!verify_image_artifact(dir.to_str().unwrap()).await.unwrap());
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn image_artifact_commitment_detects_exact_byte_changes() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-image-{}",
+            transaction_id
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let archive = dir.join("system.tar.gz");
+        std::fs::write(&archive, b"image-artifact-v1").unwrap();
+        std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        let commitment = commit_image_artifact(dir.to_str().unwrap()).await.unwrap();
+        assert_eq!(commitment.name, "system.tar.gz");
+        assert_eq!(commitment.size, b"image-artifact-v1".len() as u64);
+        verify_image_artifact_commitment(dir.to_str().unwrap(), &commitment)
+            .await
+            .unwrap();
+
+        std::fs::write(&archive, b"image-artifact-v2").unwrap();
+        assert!(
+            verify_image_artifact_commitment(dir.to_str().unwrap(), &commitment)
+                .await
+                .is_err(),
+            "restores must reject byte changes after image creation"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn restore_artifact_selection_is_bound_to_commitment_name() {
+        for (name, expected_fragment, forbidden) in [
+            (
+                "system.btrfs.zst",
+                "zstd -d - | btrfs receive /mnt/",
+                "system.tar.gz",
+            ),
+            ("system.tar.gz", "tar -xzf - -C /mnt/", "system.btrfs.zst"),
+        ] {
+            let step = restore_artifact_step_for_committed_archive(name).unwrap();
+            assert!(step.contains(expected_fragment));
+            assert!(!step.contains(forbidden));
+            assert!(
+                !step.contains("/tmp/nixforhumanity-image-"),
+                "restore must consume the already-open verified artifact, not reopen its pathname"
+            );
+        }
+        assert!(restore_artifact_step_for_committed_archive("unknown").is_err());
+    }
+
+    #[test]
+    fn restore_archive_format_is_bound_to_committed_artifact() {
+        assert_eq!(
+            restore_archive_format_for_commitment("system.btrfs.zst").unwrap(),
+            RestoreArchiveFormat::BtrfsZstd
+        );
+        assert_eq!(
+            restore_archive_format_for_commitment("system.tar.gz").unwrap(),
+            RestoreArchiveFormat::TarGzip
+        );
+        assert!(restore_archive_format_for_commitment("unknown").is_err());
+    }
+
+    #[test]
+    fn private_runtime_file_rejects_symlink_alias() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!("nixforhumanity-runtime-{transaction_id}"));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let target = dir.join("target");
+        let alias = dir.join("runtime");
+        std::fs::write(&target, b"original").unwrap();
+        std::os::unix::fs::symlink(&target, &alias).unwrap();
+
+        let error = create_private_runtime_file(alias.to_str().unwrap(), 0o600)
+            .expect_err("O_NOFOLLOW runtime creation must reject symlink aliases");
+        assert!(
+            matches!(error.raw_os_error(), Some(libc::ELOOP | libc::EEXIST))
+                || error.kind() == std::io::ErrorKind::AlreadyExists,
+            "unexpected symlink rejection error: {error}"
+        );
+        assert_eq!(std::fs::read(&target).unwrap(), b"original");
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn background_process_status_writer_survives_path_replacement() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::os::unix::process::CommandExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-status-fd-race-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let log = dir.join("worker.log");
+        let status = dir.join("worker.status");
+        let pid = dir.join("worker.pid");
+        let original = dir.join("worker.status.original");
+        let attacker = dir.join("worker.status.attacker");
+
+        let mut command = tokio::process::Command::new("/bin/sleep");
+        command.arg("1");
+        let _pid = spawn_privileged_background_process(
+            command,
+            log.to_str().unwrap(),
+            status.to_str().unwrap(),
+            pid.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+
+        std::fs::rename(&status, &original).unwrap();
+        std::fs::write(&attacker, b"attacker").unwrap();
+        std::fs::File::create(&status).unwrap();
+
+        tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            loop {
+                let contents = std::fs::read_to_string(&original).unwrap();
+                if contents.trim() == "0" {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("descriptor-bound status writer should complete");
+
+        assert_eq!(
+            std::fs::read_to_string(&attacker).unwrap(),
+            "attacker"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&status).unwrap(),
+            ""
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn background_process_status_uses_original_inode_after_path_rename() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!("nixforhumanity-status-fd-{transaction_id}"));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let log = dir.join("worker.log");
+        let status = dir.join("worker.status");
+        let pid = dir.join("worker.pid");
+
+        let mut command = trusted_typed_process("echo").unwrap();
+        command.arg("status-fd");
+
+        let _child_pid = spawn_privileged_background_process(
+            command,
+            log.to_str().unwrap(),
+            status.to_str().unwrap(),
+            pid.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+
+        let renamed = dir.join("worker.status.moved");
+        std::fs::rename(&status, &renamed).unwrap();
+
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if read_transaction_status(renamed.to_str().unwrap())
+                    .await
+                    .unwrap()
+                    .is_some()
+                {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("completion status should reach the original inode after pathname rename");
+
+        assert_eq!(
+            read_transaction_status(renamed.to_str().unwrap())
+                .await
+                .unwrap(),
+            Some(0)
+        );
+        assert!(
+            !status.exists(),
+            "the replacement pathname must not receive completion evidence"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn background_process_records_exact_pid_status_and_output() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!("nixforhumanity-worker-{transaction_id}"));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let log = dir.join("worker.log");
+        let status = dir.join("worker.status");
+        let pid = dir.join("worker.pid");
+
+        let mut command = trusted_typed_process("echo").unwrap();
+        command.arg("worker-output");
+        let child_pid = spawn_privileged_background_process(
+            command,
+            log.to_str().unwrap(),
+            status.to_str().unwrap(),
+            pid.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+
+        assert!(child_pid > 0);
+        let identity = parse_process_identity(
+            &std::fs::read_to_string(&pid).unwrap(),
+        )
+        .expect("background worker PID file must bind PID to process start time");
+        assert_eq!(identity.0, child_pid);
+        assert!(identity.1 > 0);
+        assert_eq!(
+            std::fs::metadata(&log).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if read_transaction_status(status.to_str().unwrap())
+                    .await
+                    .unwrap()
+                    .is_some()
+                {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("worker exit status should become durable");
+
+        assert_eq!(read_transaction_status(status.to_str().unwrap()).await.unwrap(), Some(0));
+        let output = std::fs::read_to_string(&log).unwrap();
+        assert!(output.contains("worker-output"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn configuration_restore_consumes_stdin_and_replaces_target_atomically() {
+        let step = restore_configuration_from_verified_stdin();
+        assert!(step.contains("cat > \"$CONFIG_TMP\""));
+        assert!(step.contains("mv -f -- \"$CONFIG_TMP\" /mnt/etc/nixos/configuration.nix"));
+        assert!(!step.contains("/tmp/nixforhumanity-image-"));
+    }
+
+    #[tokio::test]
+    async fn verified_image_artifact_descriptor_survives_source_replacement() {
+        use std::io::Write as _;
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-image-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let archive = dir.join("system.tar.gz");
+        let bytes = b"verified-archive-bytes";
+        std::fs::write(&archive, bytes).unwrap();
+        std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o400)).unwrap();
+
+        let (file, commitment) = open_image_artifact_with_commitment_blocking(
+            dir.to_str().unwrap(),
+            "system.tar.gz",
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(commitment.size, bytes.len() as u64);
+
+        // Simulate a pathname replacement after provenance verification. The
+        // already-open descriptor must remain bound to the original inode.
+        std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let mut replacement = std::fs::OpenOptions::new().write(true).truncate(true).open(&archive).unwrap();
+        replacement.write_all(b"replacement-bytes").unwrap();
+        drop(replacement);
+        std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o400)).unwrap();
+
+        let output = run_privileged_args_with_stdin("cat", &[], file).await.unwrap();
+        assert_eq!(output.exit_status, 0);
+        assert_eq!(output.stdout.as_bytes(), bytes);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn image_bundle_commitment_includes_frozen_configuration_sidecar() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-image-{}",
+            transaction_id
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o500)).unwrap();
+
+        let archive = dir.join("system.tar.gz");
+        let configuration = dir.join("configuration.nix");
+        std::fs::write(&archive, b"archive-bytes").unwrap();
+        std::fs::write(&configuration, b"{ config = true; }\n").unwrap();
+        std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o400)).unwrap();
+        std::fs::set_permissions(
+            &configuration,
+            std::fs::Permissions::from_mode(0o400),
+        )
+        .unwrap();
+
+        let (archive_commitment, configuration_commitment) =
+            commit_image_bundle(dir.to_str().unwrap()).await.unwrap();
+        assert_eq!(archive_commitment.name, "system.tar.gz");
+        assert_eq!(configuration_commitment.name, "configuration.nix");
+
+        verify_image_artifact_commitment(dir.to_str().unwrap(), &archive_commitment)
+            .await
+            .unwrap();
+        verify_image_artifact_commitment(
+            dir.to_str().unwrap(),
+            &configuration_commitment,
+        )
+        .await
+        .unwrap();
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn image_artifact_commitment_requires_one_supported_archive() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-image-{}",
+            transaction_id
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        for name in ["system.btrfs.zst", "system.tar.gz"] {
+            let path = dir.join(name);
+            std::fs::write(path, b"artifact").unwrap();
+            std::fs::set_permissions(
+                dir.join(name),
+                std::fs::Permissions::from_mode(0o600),
+            )
+            .unwrap();
+        }
+
+        let error = commit_image_artifact(dir.to_str().unwrap())
+            .await
+            .expect_err("ambiguous image namespace must not be committed");
+        assert!(error.contains("multiple supported archive artifacts"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn service_action_is_typed_and_preserves_literal_service_identity() {
+        assert_eq!(ServiceAction::parse("restart").unwrap(), ServiceAction::Restart);
+        assert!(ServiceAction::parse("restart; touch /tmp/pwned").is_err());
+
+        let service = "foo;$(touch /tmp/pwned)";
+        let unit = format!("{service}.service");
+        assert_eq!(unit, "foo;$(touch /tmp/pwned).service");
+    }
+
+    #[test]
+    fn service_postconditions_match_requested_native_state() {
+        assert!(service_postcondition_met("start", "active", "disabled"));
+        assert!(service_postcondition_met("restart", "active", "enabled"));
+        assert!(service_postcondition_met("reload", "active", "enabled"));
+        assert!(!service_postcondition_met("start", "inactive", "enabled"));
+        assert!(service_postcondition_met("stop", "inactive", "enabled"));
+        assert!(!service_postcondition_met("stop", "active", "enabled"));
+        assert!(service_postcondition_met("enable", "inactive", "enabled"));
+        assert!(!service_postcondition_met("enable", "active", "disabled"));
+        assert!(service_postcondition_met("disable", "inactive", "disabled"));
+        assert!(!service_postcondition_met("disable", "inactive", "enabled"));
+    }
+
+    #[test]
+    fn protocol_exit_code_fails_closed_on_indeterminate_completion() {
+        assert_eq!(
+            protocol_exit_code(0, TransactionOutcome::ObservedSuccess),
+            Some(0)
+        );
+        assert_eq!(
+            protocol_exit_code(23, TransactionOutcome::Failed),
+            Some(23)
+        );
+        assert_eq!(
+            protocol_exit_code(0, TransactionOutcome::Failed),
+            Some(1),
+            "a failed transaction must never expose a success code"
+        );
+        assert_eq!(
+            protocol_exit_code(0, TransactionOutcome::Indeterminate),
+            None,
+            "uncertain completion must not expose a false success code"
+        );
+        assert_eq!(
+            protocol_exit_code(23, TransactionOutcome::Indeterminate),
+            None,
+            "uncertain completion must not masquerade as an ordinary child failure"
+        );
+    }    
+    #[test]
+    fn gc_completion_outcome_distinguishes_failure_from_missing_evidence() {
+        assert_eq!(
+            gc_completion_outcome(Some(0)),
+            TransactionOutcome::ObservedSuccess
+        );
+        assert_eq!(
+            gc_completion_outcome(Some(1)),
+            TransactionOutcome::Failed
+        );
+        assert_eq!(
+            gc_completion_outcome(Some(42)),
+            TransactionOutcome::Failed
+        );
+        assert_eq!(
+            gc_completion_outcome(None),
+            TransactionOutcome::Indeterminate
+        );
+    }
+
+    #[test]
+    fn transaction_ids_are_random_and_not_clock_derived() {
+        let first = SystemTransaction::begin(MutationKind::Rollback, "relay-test-a-00000001", None, b"rollback").unwrap();
+        let second = SystemTransaction::begin(MutationKind::Rollback, "relay-test-b-00000001", None, b"rollback").unwrap();
+        assert_ne!(first.transaction_id, second.transaction_id);
+        assert_eq!(first.request_digest, second.request_digest);
+        assert_eq!(first.transaction_id.len(), 32);
+    }
+
+    #[test]
+    fn install_process_identity_matches_only_its_transaction_script() {
+        let request_id = "0123456789abcdef0123456789abcdef";
+        let exact = format!(
+            "bash\0/tmp/nixforhumanity-transaction-{request_id}/install.sh\0"
+        );
+        let other = b"bash\0/tmp/nixforhumanity-transaction-ffffffffffffffffffffffffffffffff/install.sh\0";
+        let lookalike = format!(
+            "bash\0/tmp/symthaea-install-{request_id}-attacker.sh\0"
+        );
+        assert!(install_process_command_matches(request_id, exact.as_bytes()));
+        assert!(!install_process_command_matches(request_id, other));
+        assert!(!install_process_command_matches(request_id, lookalike.as_bytes()));
+        assert!(!install_process_command_matches("not-a-valid-id", exact.as_bytes()));
+    }
+
+    #[test]
+    fn mutation_lock_rejects_concurrent_acquisition() {
+        let lock: SharedMutationLock = Arc::new(Mutex::new(()));
+        let first = lock.try_lock().expect("first mutation lock should succeed");
+        assert!(lock.try_lock().is_err(), "second mutation must be rejected, not queued");
+        drop(first);
+        assert!(lock.try_lock().is_ok());
+    }
+
+    // ── sanitize_heredoc ──
+
+    #[test]
+    fn heredoc_strips_exact_delimiter() {
+        let input = "line1\nNIXCONF\nline3\n";
+        let result = sanitize_heredoc(input, "NIXCONF");
+        assert!(!result.contains("\nNIXCONF\n"));
+        assert!(result.contains("line1"));
+        assert!(result.contains("line3"));
+    }
+
+    #[test]
+    fn heredoc_preserves_partial_match() {
+        let input = "NIXCONF_EXTRA = true;\nreal content\n";
+        let result = sanitize_heredoc(input, "NIXCONF");
+        assert!(result.contains("NIXCONF_EXTRA"));
+        assert!(result.contains("real content"));
+    }
+
+    #[test]
+    fn heredoc_strips_indented_delimiter() {
+        // trim() is applied, so "  NIXCONF  " should be stripped
+        let input = "line1\n  NIXCONF  \nline3\n";
+        let result = sanitize_heredoc(input, "NIXCONF");
+        assert!(result.contains("line1"));
+        assert!(result.contains("line3"));
+        // The delimiter line itself should be gone
+        let lines: Vec<&str> = result.lines().collect();
+        assert!(lines.iter().all(|l| l.trim() != "NIXCONF"));
+    }
+
+    #[test]
+    fn heredoc_strips_multiple_delimiters() {
+        let input = "a\nSCRIPTEOF\nb\nSCRIPTEOF\nc\n";
+        let result = sanitize_heredoc(input, "SCRIPTEOF");
+        assert!(result.contains("a"));
+        assert!(result.contains("b"));
+        assert!(result.contains("c"));
+        assert!(!result.lines().any(|l| l.trim() == "SCRIPTEOF"));
+    }
+
+    #[test]
+    fn heredoc_empty_input() {
+        assert_eq!(sanitize_heredoc("", "NIXCONF"), "");
+    }
+
+    // ── validate_disk_path ──
+
+    #[test]
+    fn disk_valid_sda() {
+        assert!(validate_disk_path("/dev/sda").is_ok());
+    }
+
+    #[test]
+    fn disk_valid_nvme() {
+        assert!(validate_disk_path("/dev/nvme0n1").is_ok());
+    }
+
+    #[test]
+    fn disk_valid_vda() {
+        assert!(validate_disk_path("/dev/vda").is_ok());
+    }
+
+    #[test]
+    fn disk_valid_mmcblk() {
+        assert!(validate_disk_path("/dev/mmcblk0").is_ok());
+    }
+
+    #[test]
+    fn disk_rejects_no_dev_prefix() {
+        assert!(validate_disk_path("/tmp/sda").is_err());
+    }
+
+    #[test]
+    fn disk_rejects_path_traversal() {
+        assert!(validate_disk_path("/dev/../etc/passwd").is_err());
+    }
+
+    #[test]
+    fn disk_rejects_null() {
+        assert!(validate_disk_path("/dev/null").is_err());
+    }
+
+    #[test]
+    fn disk_rejects_urandom() {
+        assert!(validate_disk_path("/dev/urandom").is_err());
+    }
+
+    #[test]
+    fn extra_disk_validation_rejects_invalid_member_instead_of_skipping_it() {
+        let extra_disks = vec![
+            "/dev/vdb".to_string(),
+            "/dev/../../etc/passwd".to_string(),
+            "/dev/vdc".to_string(),
+        ];
+        let error = validate_extra_disks(&extra_disks)
+            .expect_err("an invalid extra disk must reject the entire collection");
+        assert!(error.contains("Invalid extra disk"));
+    }
+
+    #[test]
+    fn install_layout_rejects_shell_breakout_payloads() {
+        assert!(validate_install_layout("single").is_ok());
+        assert!(validate_install_layout("").is_ok());
+        let error = validate_install_layout("single'; touch /tmp/pwned; #")
+            .expect_err("unknown layout must be rejected before script generation");
+        assert!(error.contains("Unsupported install layout"));
+    }
+
+    #[test]
+    fn install_disk_topology_rejects_duplicate_primary_and_extra_disk() {
+        let message = ClientMessage {
+            action: "install".into(),
+            request_id: String::new(),
+            token: String::new(),
+            host: String::new(),
+            port: 22,
+            username: "testuser".into(),
+            password: String::new(),
+            command: String::new(),
+            disk: "/dev/sda".into(),
+            layout: "raid5-mdadm".into(),
+            fast_disk: String::new(),
+            standard_disk: String::new(),
+            hostname: "test".into(),
+            configuration_nix: String::new(),
+            flake_nix: String::new(),
+            disko_nix: String::new(),
+            hardware_nix: String::new(),
+            secure_boot: false,
+            tpm2_unlock: false,
+            fido2_unlock: false,
+            desktop: "none".into(),
+            gpu_driver: "none".into(),
+            timezone: "UTC".into(),
+            keyboard: "us".into(),
+            user_password: String::new(),
+            luks_passphrase: String::new(),
+            target_machine_digest: String::new(),
+            extra_disks: vec!["/dev/sda".into(), "/dev/sdb".into()],
+        };
+        let error = validate_install_disk_topology(&message)
+            .expect_err("duplicate physical disk assignments must fail closed");
+        assert!(error.contains("reuses disk"));
+    }
+
+    #[test]
+    fn install_disk_topology_requires_distinct_dual_disks() {
+        let message = ClientMessage {
+            action: "install".into(),
+            request_id: String::new(),
+            token: String::new(),
+            host: String::new(),
+            port: 22,
+            username: "testuser".into(),
+            password: String::new(),
+            command: String::new(),
+            disk: "/dev/sda".into(),
+            layout: "dual".into(),
+            fast_disk: "/dev/nvme0n1".into(),
+            standard_disk: "/dev/nvme0n1".into(),
+            hostname: "test".into(),
+            configuration_nix: String::new(),
+            flake_nix: String::new(),
+            disko_nix: String::new(),
+            hardware_nix: String::new(),
+            secure_boot: false,
+            tpm2_unlock: false,
+            fido2_unlock: false,
+            desktop: "none".into(),
+            gpu_driver: "none".into(),
+            timezone: "UTC".into(),
+            keyboard: "us".into(),
+            user_password: String::new(),
+            luks_passphrase: String::new(),
+            target_machine_digest: String::new(),
+            extra_disks: Vec::new(),
+        };
+        let error = validate_install_disk_topology(&message)
+            .expect_err("dual layout must not reuse one disk for both roles");
+        assert!(error.contains("distinct disks"));
+    }
+
+    #[test]
+    fn disk_rejects_unknown_prefix() {
+        assert!(validate_disk_path("/dev/zz0").is_err());
+    }
+
+    #[test]
+    fn disk_rejects_empty() {
+        assert!(validate_disk_path("/dev/").is_err());
+    }
+
+    #[test]
+    fn disk_trims_whitespace() {
+        assert_eq!(validate_disk_path("  /dev/sda  ").unwrap(), "/dev/sda");
+    }
+
+    // ── token_eq (constant-time comparison) ──
+
+    #[test]
+    fn token_eq_same() {
+        assert!(token_eq("sovereign", "sovereign"));
+    }
+
+    #[test]
+    fn token_eq_different() {
+        assert!(!token_eq("sovereign", "Sovereign"));
+    }
+
+    #[test]
+    fn token_eq_different_length() {
+        assert!(!token_eq("short", "longer_token"));
+    }
+
+    // ── sanitize_input ──
+
+    #[test]
+    fn sanitize_allows_valid() {
+        assert!(sanitize_input("my-host.name", "hostname", false).is_ok());
+    }
+
+    #[test]
+    fn sanitize_rejects_semicolon() {
+        assert!(sanitize_input("foo;rm -rf /", "field", false).is_err());
+    }
+
+    #[test]
+    fn sanitize_rejects_backtick() {
+        assert!(sanitize_input("foo`id`", "field", false).is_err());
+    }
+
+    #[test]
+    fn sanitize_allows_slash_when_enabled() {
+        assert!(sanitize_input("America/Chicago", "tz", true).is_ok());
+    }
+
+    #[test]
+    fn sanitize_rejects_slash_when_disabled() {
+        assert!(sanitize_input("America/Chicago", "tz", false).is_err());
+    }
+
+    // ── validate_hostname_relay ──
+
+    #[test]
+    fn hostname_valid() {
+        assert_eq!(validate_hostname_relay("my-host").unwrap(), "my-host");
+    }
+
+    #[test]
+    fn hostname_defaults_empty() {
+        assert_eq!(validate_hostname_relay("").unwrap(), "guardian");
+    }
+
+    #[test]
+    fn hostname_rejects_special_chars() {
+        assert!(validate_hostname_relay("host;evil").is_err());
+    }
+
+    #[test]
+    fn hostname_rejects_too_long() {
+        let long = "a".repeat(64);
+        assert!(validate_hostname_relay(&long).is_err());
+    }
+
+    // ── Generated config secret hygiene ──
+
+    #[test]
+    fn machine_binding_digest_matches_stable_domain_and_normalization() {
+        let first = machine_binding_digest_hex_for("machine-a\n").unwrap();
+        let second = machine_binding_digest_hex_for("machine-a").unwrap();
+        let other = machine_binding_digest_hex_for("machine-b").unwrap();
+        assert_eq!(first, second);
+        assert_eq!(first.len(), 64);
+        assert!(first.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()));
+        assert_ne!(first, other);
+        assert!(machine_binding_digest_hex_for("").is_err());
+        assert!(machine_binding_digest_hex_for("x\0y").is_err());
+    }
+
+    fn transaction_artifact_namespace_is_private_and_collision_fail_closed() {
+        let transaction_id = random_operation_id().expect("CSPRNG transaction ID should be available");
+        assert!(transaction_artifact_dir_path(&transaction_id).is_ok());
+        assert!(transaction_artifact_dir_path("too-short").is_err());
+        assert!(transaction_artifact_dir_path("0123456789abcdef0123456789abcdeg").is_err());
+
+        let path = create_transaction_artifact_dir(&transaction_id)
+            .expect("fresh transaction artifact namespace should be creatable");
+        let metadata = std::fs::metadata(&path).expect("artifact directory should exist");
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        assert!(metadata.is_dir());
+        assert_eq!(metadata.permissions().mode() & 0o777, 0o700);
+        assert_eq!(metadata.uid(), unsafe { libc::geteuid() });
+
+        // Cleanup is restricted to the transaction namespace shape; arbitrary
+        // paths are never accepted by the recursive cleanup helper.
+        let sentinel = std::env::temp_dir().join("symthaea-artifact-cleanup-sentinel");
+        std::fs::write(&sentinel, b"must-survive").unwrap();
+        remove_transaction_artifact_dir(sentinel.to_str().unwrap());
+        assert!(sentinel.exists());
+        let _ = std::fs::remove_file(&sentinel);
+
+        let error = create_transaction_artifact_dir(&transaction_id)
+            .expect_err("reusing a transaction artifact namespace must fail closed");
+        assert!(error.contains("already exists"));
+
+        std::fs::create_dir_all(format!("{path}/config")).unwrap();
+        std::fs::write(format!("{path}/config/staged-secret"), b"secret").unwrap();
+        remove_transaction_artifact_dir(&path);
+        assert!(!std::path::Path::new(&path).exists());
+    }
+
+
+    #[test]
+    fn transaction_config_staging_is_nested_under_private_namespace() {
+        let commands = config_write_commands(
+            "browser-config",
+            "fallback-config",
+            "",
+            "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef",
+        );
+        assert!(commands.contains(
+            "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef/config/configuration.nix"
+        ));
+        assert!(commands.contains(
+            "rm -rf /tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef/config"
+        ));
+        assert!(!commands.contains(
+            "rm -rf /tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef\n"
+        ));
+    }
+
+    #[test]
+    fn single_luks_script_uses_transaction_scoped_keyfile_not_secret_text() {
+        let message = ClientMessage {
+            action: "install".into(),
+            request_id: String::new(),
+            token: String::new(),
+            host: String::new(),
+            port: 22,
+            username: "testuser".into(),
+            password: String::new(),
+            command: "legacy-command-field-must-not-be-used".into(),
+            disk: "/dev/vda".into(),
+            layout: "single-luks".into(),
+            fast_disk: String::new(),
+            standard_disk: String::new(),
+            hostname: "test-nixos".into(),
+            configuration_nix: String::new(),
+            flake_nix: String::new(),
+            disko_nix: String::new(),
+            hardware_nix: String::new(),
+            secure_boot: false,
+            tpm2_unlock: false,
+            fido2_unlock: false,
+            desktop: "none".into(),
+            gpu_driver: "none".into(),
+            timezone: "UTC".into(),
+            keyboard: "us".into(),
+            user_password: String::new(),
+            luks_passphrase: "not-embedded-secret".into(),
+            extra_disks: Vec::new(),
+        };
+        let script = generate_install_script(
+            &message,
+            "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef",
+        );
+        assert!(script.contains("/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef/luks-passphrase"));
+        assert!(!script.contains("not-embedded-secret"));
+        assert!(!script.contains("legacy-command-field-must-not-be-used"));
+        assert!(script.contains("if [ ! -s \"$LUKS_KEYFILE\" ]"));
+    }
+
+    #[test]
+    fn fallback_install_configs_do_not_embed_placeholder_passwords() {
+        let layouts = [
+            "alongside",
+            "single",
+            "single-zfs",
+            "single-luks",
+            "dual",
+            "raid1-btrfs",
+            "raid1-mdadm",
+            "raid5-mdadm",
+            "raid6-mdadm",
+            "raid10-mdadm",
+            "zfs-mirror",
+            "zfs-raidz",
+            "zfs-raidz2",
+        ];
+        for layout in layouts {
+            let message = ClientMessage {
+                action: "install".into(),
+                request_id: String::new(),
+                token: String::new(),
+                host: String::new(),
+                port: 22,
+                username: "testuser".into(),
+                password: String::new(),
+                command: String::new(),
+                disk: "/dev/vda".into(),
+                layout: layout.into(),
+                fast_disk: String::new(),
+                standard_disk: String::new(),
+                hostname: "test-nixos".into(),
+                configuration_nix: String::new(),
+                flake_nix: String::new(),
+                disko_nix: String::new(),
+                hardware_nix: String::new(),
+                secure_boot: false,
+                tpm2_unlock: false,
+                fido2_unlock: false,
+                desktop: "none".into(),
+                gpu_driver: "none".into(),
+                timezone: "UTC".into(),
+                keyboard: "us".into(),
+                user_password: String::new(),
+                extra_disks: Vec::new(),
+            };
+            let script = generate_install_script(
+                &message,
+                "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef",
+            );
+            assert!(
+                !script.contains("initialPassword"),
+                "layout {layout} embedded an initialPassword in generated config"
+            );
+            assert!(
+                !script.contains("changeme"),
+                "layout {layout} retained a placeholder secret"
+            );
+        }
+    }
+
+    // ── Target architecture contract ──
+
+    #[test]
+    fn extracts_explicit_nix_system() {
+        assert_eq!(
+            extract_explicit_nix_system(
+                "outputs = { self, nixpkgs }: { nixosConfigurations.host = nixpkgs.lib.nixosSystem { system = \"aarch64-linux\"; }; };"
+            ),
+            Some("aarch64-linux")
+        );
+        assert_eq!(extract_explicit_nix_system("outputs = { };"), None);
+    }
+
+    // ── Secret-boundary regressions ──
+
+    #[test]
+    fn relay_rejects_unsafe_usernames_before_shell_construction() {
+        assert!(validate_username("operator").is_ok());
+        assert!(validate_username("operator;rm").is_err());
+    }
+
+    // ── config_write_commands (heredoc safety) ──
+
+    #[test]
+    fn config_write_strips_nixconf_delimiter() {
+        let malicious = "{ config }\nNIXCONF\nrm -rf /\n";
+        let result = config_write_commands_heredoc(malicious, "", "");
+        assert!(!result.contains("\nNIXCONF\nrm -rf /"));
+        // Should still contain the closing delimiter exactly once as the heredoc terminator
+        assert_eq!(result.matches("NIXCONF").count(), 2); // opening + closing
+    }
+
+    #[test]
+    fn config_write_strips_flakeeof_delimiter() {
+        let malicious = "{ inputs }\nFLAKEEOF\nrm -rf /\n";
+        let result = config_write_commands_heredoc("", "", malicious);
+        assert!(!result.contains("\nFLAKEEOF\nrm -rf /"));
+    }
+}
