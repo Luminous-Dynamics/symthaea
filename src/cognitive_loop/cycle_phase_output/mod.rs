@@ -192,34 +192,14 @@ impl CognitiveLoopService {
                 .collect()
         };
 
-        // Refresh the observational viability signals after all cycle phases have settled.
-        // This keeps the exported metadata aligned with the same cycle's canonical stats.
-        let viability_cycle = self.fep.viability_fabric.state().cycle;
-        self.fep.viability_fabric.observe_variable(
-            "thermodynamic_load",
-            super::super::viability_fabric::ViabilitySignal::new(
-                self.thermodynamic_load as f64,
-                1.0,
-                viability_cycle,
-                "cognitive_loop::thermodynamic_load",
-            ),
-            super::super::viability_fabric::ViabilityBand {
-                preferred: (0.0, 0.70),
-                tolerated: (0.0, 0.90),
-                critical: (0.0, 1.0),
-            },
-            None,
+        // Refresh through FepModule so the exported view has one integration owner.
+        self.fep.viability_fabric.refresh_viability(
+            self.fep.viability_fabric.state().cycle,
+            self.thermodynamic_load as f64,
+            self.stats.avg_prediction_error as f64,
+            self.prediction_confidence,
         );
-        self.fep.viability_fabric.state_mut().prediction_errors.world =
-            (self.stats.avg_prediction_error as f64).clamp(0.0, 1.0);
-        let trust_floor = 0.4_f64;
-        self.fep.viability_fabric.state_mut().prediction_errors.model_confidence =
-            if self.prediction_confidence < trust_floor {
-                ((trust_floor - self.prediction_confidence) / trust_floor).clamp(0.0, 1.0)
-            } else {
-                0.0
-            };
-        metadata.viability = self.fep.viability_fabric.state().telemetry();
+        metadata.viability = self.fep.viability_telemetry();
 
         metadata.cycle_duration_us = cycle_start.elapsed().as_micros() as u64;
 
