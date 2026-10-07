@@ -57,6 +57,18 @@ pub struct VulkanBarrierRequirement {
     pub kind: DependencyKind,
 }
 
+impl VulkanBarrierRequirement {
+    /// RAW and WAW hazards require memory availability/visibility; WAR only
+    /// requires execution ordering. Keeping this distinction explicit prevents
+    /// a later backend implementation from over- or under-synchronizing.
+    pub const fn requires_memory_dependency(&self) -> bool {
+        matches!(
+            self.kind,
+            DependencyKind::ReadAfterWrite | DependencyKind::WriteAfterWrite
+        )
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VulkanSubmission {
     pub node_id: u32,
@@ -445,6 +457,32 @@ mod tests {
                 DependencyEdge::new(2, 3, r, crate::DependencyKind::ReadAfterWrite),
             ],
         ).unwrap()
+    }
+
+    #[test]
+    fn barrier_kind_exposes_memory_dependency_requirement() {
+        let r = resource();
+        let raw = VulkanBarrierRequirement {
+            from: 1,
+            to: 2,
+            resource: r.clone(),
+            kind: DependencyKind::ReadAfterWrite,
+        };
+        let war = VulkanBarrierRequirement {
+            from: 1,
+            to: 2,
+            resource: r.clone(),
+            kind: DependencyKind::WriteAfterRead,
+        };
+        let waw = VulkanBarrierRequirement {
+            from: 1,
+            to: 2,
+            resource: r,
+            kind: DependencyKind::WriteAfterWrite,
+        };
+        assert!(raw.requires_memory_dependency());
+        assert!(!war.requires_memory_dependency());
+        assert!(waw.requires_memory_dependency());
     }
 
     #[test]
