@@ -1533,31 +1533,29 @@ fn measure_shifted_harvest_validation_mae(
     total / states.len() as f64
 }
 
-fn measure_invariant_anchor_mae(predictor: &FepWorldModelPredictor<'_>) -> (f64, f64) {
+fn measure_invariant_anchor_profile(
+    predictor: &FepWorldModelPredictor<'_>,
+) -> Vec<f64> {
     let states = regime_shift_validation_states();
     if states.is_empty() {
-        return (0.0, 0.0);
+        return Vec::new();
     }
 
-    let mut total = 0.0;
-    let mut count = 0u64;
-    let mut max_regression = 0.0f64;
-
-    for state in states {
-        for action in MicroAction::ALL {
-            if action == MicroAction::Harvest {
-                continue;
-            }
-
-            let actual = transition(state, action);
-            let error = predictor.predict(state, action).mean_absolute_delta(actual);
-            total += error;
-            count = count.saturating_add(1);
-            max_regression = max_regression.max(error);
-        }
-    }
-
-    (total / count.max(1) as f64, max_regression)
+    MicroAction::ALL
+        .into_iter()
+        .filter(|action| *action != MicroAction::Harvest)
+        .map(|action| {
+            states
+                .iter()
+                .map(|state| {
+                    predictor
+                        .predict(*state, action)
+                        .mean_absolute_delta(transition(*state, action))
+                })
+                .sum::<f64>()
+                / states.len() as f64
+        })
+        .collect()
 }
 
 /// Measure adaptation latency after changing one explicitly revisable environment fact.
@@ -1595,8 +1593,15 @@ fn evaluate_regime_shift_adaptation(
             REGIME_SHIFT_HARVEST_YIELD_SCALE,
         );
 
+    let initial_invariant_anchor_profile =
+        measure_invariant_anchor_profile(&predictor);
     let initial_invariant_anchor_mean_mae =
-        measure_invariant_anchor_mae(&predictor).0;
+        if initial_invariant_anchor_profile.is_empty() {
+            0.0
+        } else {
+            initial_invariant_anchor_profile.iter().sum::<f64>()
+                / initial_invariant_anchor_profile.len() as f64
+        };
 
     let target_error = pre_revision_shifted_validation_mae
         * REGIME_SHIFT_TARGET_ERROR_FRACTION;
@@ -1606,35 +1611,26 @@ fn evaluate_regime_shift_adaptation(
         None
     };
 
-    let mut world = MicroWorld::new(scenario.initial, REGIME_SHIFT_MAX_UPDATES);
     let mut events = Vec::new();
     let mut update_count = 0u64;
-    let mut state_digest_seed = scenario.initial;
+    let mut stream_state = scenario.initial;
 
-    while !world.done() && update_count < REGIME_SHIFT_MAX_UPDATES {
-        let cycle = world.observe().cycle;
+    while stream_state.is_viable() && update_count < REGIME_SHIFT_MAX_UPDATES {
+        let cycle = stream_state.cycle;
         let action = ADAPTATION_SCHEDULE[update_count as usize % ADAPTATION_SCHEDULE.len()];
-        let before = world.observe();
-
-        let after = if action == MicroAction::Harvest {
+        let before = stream_state;
+        let after =
             transition_with_harvest_yield_scale(
                 before,
                 action,
                 REGIME_SHIFT_HARVEST_YIELD_SCALE,
-            )
-        } else {
-            transition_with_harvest_yield_scale(
-                before,
-                action,
-                REGIME_SHIFT_HARVEST_YIELD_SCALE,
-            )
-        };
+            );
 
-        world.perturb(super::viability_micro_world::MicroPerturbation::ProgressLoss(0.0));
-        let _ = state_digest_seed;
-        predictor.observe_transition(before, action, after);
-        state_digest_seed = after;
-        update_count = update_count.saturating_add(1);
+        if action == MicroAction::Harvest {
+            predictor.observe_transition(before, action, after);
+            update_count = update_count.saturating_add(1);
+        }
+        stream_state = after;
         let shifted_validation_mae = measure_shifted_harvest_validation_mae(
             &predictor,
             &validation_states,
@@ -1646,9 +1642,27 @@ fn evaluate_regime_shift_adaptation(
             (shifted_validation_mae / pre_revision_shifted_validation_mae).clamp(0.0, 1.0)
         };
 
-        let (invariant_anchor_mean_mae, _) = measure_invariant_anchor_mae(&predictor);
+        let current_invariant_anchor_profile =
+            measure_invariant_anchor_profile(&predictor);
+        let invariant_anchor_mean_mae =
+            if current_invariant_anchor_profile.is_empty() {
+                0.0
+            } else {
+                current_invariant_anchor_profile.iter().sum::<f64>()
+                    / current_invariant_anchor_profile.len() as f64
+            };
+        let invariant_anchor_regressions = current_invariant_anchor_profile
+            .iter()
+            .zip(initial_invariant_anchor_profile.iter())
+            .map(|(current, initial)| current - initial)
+            .collect::<Vec<_>>();
         let invariant_anchor_regression =
             invariant_anchor_mean_mae - initial_invariant_anchor_mean_mae;
+        let invariant_anchor_max_regression =
+            invariant_anchor_regressions
+                .iter()
+                .copied()
+                .fold(0.0f64, f64::max);
 
         if revision_latency_updates.is_none()
             && shifted_validation_mae <= target_error
@@ -1665,9 +1679,7 @@ fn evaluate_regime_shift_adaptation(
             shifted_validation_error_fraction,
             invariant_anchor_mean_mae,
             invariant_anchor_regression,
-            invariant_anchor_max_regression: (invariant_anchor_mean_mae
-                - initial_invariant_anchor_mean_mae)
-                .max(0.0),
+            invariant_anchor_max_regression,
         });
 
         let _ = world.step(action);
