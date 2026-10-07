@@ -59,8 +59,9 @@ const TRAJECTORY_HISTORY_CAP: usize = 16;
 /// The discrete transition `s' = A * s` is converted to continuous dynamics:
 /// `ds/dt = (A * s - s) / tau`
 ///
-/// This is the standard continuous-time embedding of a discrete Markov chain
-/// (matrix exponential: `exp(t * (A-I)/tau)` recovers the discrete step at `t=tau`).
+/// This is a continuous relaxation toward the discrete transition field.
+/// It does not, in general, equal one discrete transition at `t=tau`; for
+/// a constant target the state has moved by `1 - exp(-t/tau)` of the gap.
 pub struct GenerativeModelOde {
     /// Transition matrix for the selected action (row-major: transition[from][to]).
     transition: Vec<Vec<f64>>,
