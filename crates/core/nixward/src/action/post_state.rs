@@ -1086,6 +1086,8 @@ impl NixPostStateReceiptV1 {
         h.update(POST_STATE_RECEIPT_DOMAIN_V1);
         put_str(&mut h, &self.action_intent_digest);
         put_str(&mut h, &self.authorization_record_digest);
+        put_opt_str(&mut h, self.approval_request_id.as_deref());
+        put_opt_str(&mut h, self.approval_projection_digest.as_deref());
         put_str(&mut h, &self.effect_digest);
         put_str(&mut h, &self.target_unit);
         put_u64(&mut h, self.authorized_generation);
