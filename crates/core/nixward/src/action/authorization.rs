@@ -1507,6 +1507,8 @@ mod tests {
             &"11".repeat(32),
             &"22".repeat(32),
             &"44".repeat(32),
+            ":1.42",
+            "0123456789abcdef0123456789abcdef",
             Some("33".repeat(16)),
             1_000,
         )
