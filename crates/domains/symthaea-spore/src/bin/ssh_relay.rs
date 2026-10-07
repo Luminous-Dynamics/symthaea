@@ -1453,35 +1453,21 @@ mount "{boot}" /mnt/boot
 
 /// Generate a shell snippet that patches configuration.nix with system config (DE, GPU, locale).
 /// Appended after the configuration.nix heredoc in each layout.
-fn system_config_patch(msg: &ClientMessage) -> String {
-    let sys_config = generate_system_config(msg);
-    if sys_config.trim().is_empty() {
+fn system_config_patch(msg: &ClientMessage, transaction_dir: &str) -> String {
+    if generate_system_config(msg).trim().is_empty() {
         return String::new();
     }
-    // Write a supplementary config file instead of patching inline —
-    // avoids fragile heredoc-in-command-substitution shell constructs.
+
+    let staged = format!("{transaction_dir}/config/system-config.nix");
     format!(
         r#"
-# Write supplementary system config (DE, GPU, locale, networking)
-cat > /mnt/etc/nixos/system-config.nix << 'SYSPATCH'
-{{ config, pkgs, ... }}:
-{{
-  # ── System Configuration (NixForHumanity) ──
-{sys_config}
-  # Audio (PipeWire)
-  services.pulseaudio.enable = false;
-  security.rtkit.enable = true;
-  services.pipewire = {{ enable = true; alsa.enable = true; pulse.enable = true; }};
-
-  # Nix settings
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
-  nix.gc = {{ automatic = true; dates = "weekly"; options = "--delete-older-than 30d"; }};
-}}
-SYSPATCH
-# Add import to configuration.nix
-sed -i 's|imports = \[|imports = [ ./system-config.nix|' /mnt/etc/nixos/configuration.nix 2>/dev/null || echo "  (config patch: manual import needed)"
+# Install supplementary system configuration from the transaction-private staging file.
+cp "{staged}" /mnt/etc/nixos/system-config.nix
+# Add import to configuration.nix. The source path is fixed; all browser-derived
+# configuration content remains in the staged file, not in this shell source.
+sed -i 's|imports = [|imports = [ ./system-config.nix|' /mnt/etc/nixos/configuration.nix 2>/dev/null ||   echo "  (config patch: manual import needed)"
 "#,
-        sys_config = sys_config,
+        staged = staged,
     )
 }
 
@@ -6356,6 +6342,33 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     }
                 }
 
+                // Stage the server-generated system module before the install plan is
+                // assembled. This keeps client-derived Nix source out of shell text.
+                if client_msg.configuration_nix.is_empty()
+                    && !generate_system_config(&client_msg).trim().is_empty()
+                {
+                    let system_config_path =
+                        format!("{config_staging_dir}/system-config.nix");
+                    let system_config = format!(
+                        "{{ config, pkgs, ... }}:\n{{\n  # ── System Configuration (NixForHumanity) ──\n{}  # Audio (PipeWire)\n  services.pulseaudio.enable = false;\n  security.rtkit.enable = true;\n  services.pipewire = {{ enable = true; alsa.enable = true; pulse.enable = true; }};\n\n  # Nix settings\n  nix.settings.experimental-features = [ \"nix-command\" \"flakes\" ];\n  nix.gc = {{ automatic = true; dates = \"weekly\"; options = \"--delete-older-than 30d\"; }};\n}}\n",
+                        format!("{}\n", generate_system_config(&client_msg))
+                    );
+                    if let Err(error) =
+                        write_private_file(&system_config_path, system_config.as_bytes(), 0o600)
+                    {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to stage generated system configuration safely: {error}"
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        continue;
+                    }
+                }
+
                 // Fully automated install — generates and executes the entire
                 // partition → format → install → configure sequence.
                 // The user only clicked "Deploy" in the browser.
@@ -6428,7 +6441,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 // Patch configuration.nix with DE/GPU/locale — but only if the browser
                 // didn't supply a full configuration.nix (which already has everything).
                 if client_msg.configuration_nix.is_empty() {
-                    let patch = system_config_patch(&client_msg);
+                    let patch = system_config_patch(&client_msg, transaction_dir);
                     if !patch.is_empty() {
                         if let Some(pos) = script.find("STAGE: Configuring swap") {
                             script.insert_str(pos, &patch);
@@ -12885,6 +12898,25 @@ mod tests {
         assert!(!result.contains("\nNIXCONF\nrm -rf /"));
         // Should still contain the closing delimiter exactly once as the heredoc terminator
         assert_eq!(result.matches("NIXCONF").count(), 2); // opening + closing
+    }
+
+    #[test]
+    fn system_config_patch_uses_transaction_staging_not_inline_client_source() {
+        let mut message = sample_install_message();
+        message.configuration_nix.clear();
+        message.timezone = "Europe/Berlin".into();
+        message.keyboard = "de".into();
+        message.desktop = "gnome".into();
+        let patch = system_config_patch(
+            &message,
+            "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef",
+        );
+        assert!(patch.contains(
+            "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef/config/system-config.nix"
+        ));
+        assert!(patch.contains("sed -i"));
+        assert!(!patch.contains("Europe/Berlin"));
+        assert!(!patch.contains("services.xserver.desktopManager.gnome.enable"));
     }
 
     #[test]
