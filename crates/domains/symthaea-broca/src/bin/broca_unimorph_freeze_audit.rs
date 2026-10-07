@@ -240,8 +240,9 @@ fn main() -> Result<()> {
         );
     }
 
+    let ci_provenance = collect_ci_provenance();
     println!(
-        "BROCA_UNIMORPH_FREEZE_AUDIT PASS artifact_bytes={} artifact_blake3={} git_blob={} selection_blake3={} records={} rows_bytes={} compiler_revision={} parser_revision={} build_context_revision={}",
+        "BROCA_UNIMORPH_FREEZE_AUDIT PASS artifact_bytes={} artifact_blake3={} git_blob={} selection_blake3={} records={} rows_bytes={} compiler_revision={} parser_revision={} build_context_revision={} ci_provenance={}",
         artifact.len(),
         actual_b3,
         actual_blob,
@@ -251,6 +252,7 @@ fn main() -> Result<()> {
         symthaea_broca::UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION,
         symthaea_broca::UNIMORPH_TSV_SOURCE_PARSER_REVISION,
         symthaea_broca::UNIMORPH_TSV_COMPILER_BUILD_CONTEXT_REVISION,
+        ci_provenance,
     );
     Ok(())
 }
@@ -406,6 +408,28 @@ fn git_blob_sha1(bytes: &[u8]) -> Result<String> {
     let digest = String::from_utf8(output.stdout)
         .context("git hash-object emitted non-UTF-8 output")?;
     Ok(digest.trim().to_owned())
+}
+
+fn collect_ci_provenance() -> String {
+    let fields = [
+        ("actions", std::env::var("GITHUB_ACTIONS").unwrap_or_else(|_| "unknown".into())),
+        ("run_id", std::env::var("GITHUB_RUN_ID").unwrap_or_else(|_| "unknown".into())),
+        ("run_attempt", std::env::var("GITHUB_RUN_ATTEMPT").unwrap_or_else(|_| "unknown".into())),
+        ("workflow", std::env::var("GITHUB_WORKFLOW").unwrap_or_else(|_| "unknown".into())),
+        ("workflow_ref", std::env::var("GITHUB_WORKFLOW_REF").unwrap_or_else(|_| "unknown".into())),
+        ("workflow_sha", std::env::var("GITHUB_WORKFLOW_SHA").unwrap_or_else(|_| "unknown".into())),
+        ("sha", std::env::var("GITHUB_SHA").unwrap_or_else(|_| "unknown".into())),
+        ("ref", std::env::var("GITHUB_REF").unwrap_or_else(|_| "unknown".into())),
+        ("runner_os", std::env::var("RUNNER_OS").unwrap_or_else(|_| "unknown".into())),
+        ("runner_arch", std::env::var("RUNNER_ARCH").unwrap_or_else(|_| "unknown".into())),
+        ("image_os", std::env::var("ImageOS").unwrap_or_else(|_| "unknown".into())),
+        ("image_version", std::env::var("ImageVersion").unwrap_or_else(|_| "unknown".into())),
+    ];
+    fields
+        .into_iter()
+        .map(|(key, value)| format!("{key}={}", value.replace(' ', "_")))
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn recompute_selection_digest(slices: &[MorphophonologicalSourceSlice]) -> String {
