@@ -2032,6 +2032,34 @@ impl NeurosemanticRemediationImpactArtifact {
                     );
                 }
 
+                let selection_trace_bytes = statistical_execution_bytes
+                    .iter()
+                    .copied()
+                    .find(|candidate| content_hash(candidate) == execution.selection_trace_hash)
+                    .ok_or_else(|| {
+                        "neurosemantic remediation statistical selection trace is missing"
+                            .to_string()
+                    })?;
+                let selection_trace =
+                    NeurosemanticRemediationStatisticalSelectionTraceArtifact::from_json_bytes(
+                        selection_trace_bytes,
+                    )?;
+                if selection_trace.fingerprint()? != execution.selection_trace_hash
+                    || selection_trace.sampling_frame_hash != execution.sampling_frame_hash
+                    || selection_trace.selection_procedure_ref != execution.selection_procedure_ref
+                    || selection_trace.sample_size as usize
+                        != execution.selected_subject_artifact_hashes.len()
+                    || sorted_hashes(&selection_trace.selected_subject_artifact_hashes)
+                        != sorted_hashes(&execution.selected_subject_artifact_hashes)
+                    || selection_trace.study_protocol_hash != self.study_protocol_hash
+                    || selection_trace.execution_revision != self.execution_revision
+                {
+                    return Err(
+                        "neurosemantic remediation statistical selection trace binding mismatch"
+                            .into(),
+                    );
+                }
+
                 let sampling_frame_bytes = statistical_sampling_frame_bytes
                     .iter()
                     .copied()
@@ -2045,6 +2073,15 @@ impl NeurosemanticRemediationImpactArtifact {
                         sampling_frame_bytes,
                     )?;
                 if sampling_frame.fingerprint()? != execution.sampling_frame_hash
+                    || execution.selection_procedure_ref
+                        != NEUROSEMANTIC_REMEDIATION_SIMPLE_RANDOM_WITHOUT_REPLACEMENT_PROCEDURE_REF
+                    || selection_trace.selection_procedure_ref
+                        != NEUROSEMANTIC_REMEDIATION_SIMPLE_RANDOM_WITHOUT_REPLACEMENT_PROCEDURE_REF
+                    || replay_simple_random_without_replacement(
+                        &sampling_frame.member_artifact_hashes,
+                        selection_trace.sample_size as usize,
+                        selection_trace.randomization_seed_u64,
+                    )? != selection_trace.selected_subject_artifact_hashes
                     || execution
                         .selected_subject_artifact_hashes
                         .iter()
@@ -2151,10 +2188,15 @@ impl NeurosemanticRemediationImpactArtifact {
                             .iter()
                             .map(|item| item.subject_artifact_hash.as_str())
                             .collect();
+                        let frame_size = sampling_frame.member_artifact_hashes.len() as u64;
+                        let sample_size = execution.selected_subject_artifact_hashes.len() as u64;
+                        let common_factor = gcd_u64(frame_size, sample_size);
+                        let expected_numerator = sample_size / common_factor;
+                        let expected_denominator = frame_size / common_factor;
                         if inclusion_members != frame_members
                             || execution.inclusion_probabilities.iter().any(|item| {
-                                item.probability_numerator == 0
-                                    || item.probability_numerator > item.probability_denominator
+                                item.probability_numerator != expected_numerator
+                                    || item.probability_denominator != expected_denominator
                             })
                         {
                             return Err(
@@ -5724,6 +5766,23 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn remediation_statistical_selection_trace_replays_deterministically() {
+        let frame = vec![
+            content_hash(b"subject-1"),
+            content_hash(b"subject-2"),
+            content_hash(b"subject-3"),
+            content_hash(b"subject-4"),
+        ];
+        let first = replay_simple_random_without_replacement(&frame, 2, 42).unwrap();
+        let second = replay_simple_random_without_replacement(&frame, 2, 42).unwrap();
+        let alternate = replay_simple_random_without_replacement(&frame, 2, 43).unwrap();
+        assert_eq!(first, second);
+        assert_ne!(first, alternate);
+        assert_eq!(first.len(), 2);
+        assert!(first.iter().all(|member| frame.contains(member)));
     }
 
     #[test]
