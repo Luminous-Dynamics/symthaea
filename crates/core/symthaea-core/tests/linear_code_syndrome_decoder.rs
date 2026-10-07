@@ -522,6 +522,153 @@ fn small_fixture_full_coset_distance_spectrum_is_syndrome_difference_invariant()
     );
 }
 
+
+#[test]
+fn small_fixture_exact_fiber_difference_identity_holds_for_every_anchor() {
+    let mut buckets: [Vec<u8>; 64] = std::array::from_fn(|_| Vec::new());
+
+    for mask in 0u16..256 {
+        let byte = mask as u8;
+        let syndrome = canonical_boundary_syndrome(byte) as usize;
+        buckets[syndrome].push(byte);
+    }
+
+    assert!(buckets.iter().all(|bucket| bucket.len() == 4));
+
+    let mut identities = 0usize;
+    let mut differences = 0usize;
+
+    for left in 0..64usize {
+        for right in 0..64usize {
+            let mut expected = [false; 256];
+            for &word in &buckets[left ^ right] {
+                expected[word as usize] = true;
+            }
+
+            for &anchor in &buckets[left] {
+                let mut observed = [false; 256];
+                for &right_word in &buckets[right] {
+                    let difference = anchor ^ right_word;
+                    assert!(
+                        !observed[difference as usize],
+                        "difference fiber contained a duplicate element: left={left} right={right} anchor={anchor:#x}"
+                    );
+                    observed[difference as usize] = true;
+                    differences += 1;
+                }
+
+                assert_eq!(
+                    observed, expected,
+                    "anchored difference fiber diverged from syndrome XOR target: left={left} right={right} anchor={anchor:#x} target={}",
+                    left ^ right
+                );
+                assert_eq!(
+                    observed.iter().filter(|&&present| present).count(),
+                    4
+                );
+                identities += 1;
+            }
+        }
+    }
+
+    assert_eq!(identities, 64 * 64 * 4);
+    assert_eq!(differences, 64 * 64 * 4 * 4);
+
+    println!(
+        "SYNDROME_FIBER_DIFFERENCE=syndromes=64;fiber_size=4;ordered_fiber_pairs=4096;anchors=16384;xor_differences={differences};exact_difference_sets=true;translation_bijection=true"
+    );
+}
+
+#[test]
+fn small_fixture_walsh_fibers_have_exact_dual_support_and_parseval() {
+    let mut buckets: [Vec<u8>; 64] = std::array::from_fn(|_| Vec::new());
+
+    for mask in 0u16..256 {
+        let byte = mask as u8;
+        let syndrome = canonical_boundary_syndrome(byte) as usize;
+        buckets[syndrome].push(byte);
+    }
+
+    assert!(buckets.iter().all(|bucket| bucket.len() == 4));
+
+    // The dual support is derived independently from the two hand-specified
+    // generators by checking the defining dot-product equations for every
+    // ambient character. It does not use the production parity-check matrix.
+    const CANONICAL_GENERATORS: [u8; 2] = [0b1111_0000, 0b0000_1111];
+    let mut dual_support = [false; 256];
+    for character in 0u16..256 {
+        let character = character as u8;
+        dual_support[character as usize] = CANONICAL_GENERATORS
+            .iter()
+            .all(|&generator| (character & generator).count_ones() % 2 == 0);
+    }
+
+    assert_eq!(
+        dual_support
+            .iter()
+            .filter(|&&supported| supported)
+            .count(),
+        64
+    );
+
+    let mut supported_coefficients = 0usize;
+    let mut vanished_coefficients = 0usize;
+    let mut coefficient_evaluations = 0usize;
+    let mut total_parseval_energy = 0usize;
+
+    for bucket in &buckets {
+        let anchor = bucket[0];
+        let mut parseval_energy = 0usize;
+
+        for character in 0u16..256 {
+            let character = character as u8;
+            let coefficient = bucket.iter().fold(0i32, |sum, &word| {
+                if (character & word).count_ones() % 2 == 0 {
+                    sum + 1
+                } else {
+                    sum - 1
+                }
+            });
+            let supported = dual_support[character as usize];
+            coefficient_evaluations += 1;
+            parseval_energy += (coefficient * coefficient) as usize;
+
+            if supported {
+                let expected = if (character & anchor).count_ones() % 2 == 0 {
+                    4
+                } else {
+                    -4
+                };
+                assert_eq!(
+                    coefficient, expected,
+                    "supported Walsh coefficient had wrong affine phase: syndrome={} character={character:#x}",
+                    canonical_boundary_syndrome(anchor)
+                );
+                assert_eq!(coefficient.abs(), 4);
+                supported_coefficients += 1;
+            } else {
+                assert_eq!(
+                    coefficient, 0,
+                    "non-dual character had nonzero Walsh coefficient: character={character:#x}"
+                );
+                vanished_coefficients += 1;
+            }
+        }
+
+        assert_eq!(parseval_energy, 1024);
+        total_parseval_energy += parseval_energy;
+    }
+
+    assert_eq!(supported_coefficients, 64 * 64);
+    assert_eq!(vanished_coefficients, 64 * 192);
+    assert_eq!(coefficient_evaluations, 64 * 256);
+    assert_eq!(total_parseval_energy, 64 * 1024);
+
+    println!(
+        "WALSH_DUAL_FIBER=syndromes=64;fiber_size=4;dual_support=64;supported_coefficients={supported_coefficients};vanished_coefficients={vanished_coefficients};coefficient_evaluations={coefficient_evaluations};per_fiber_parseval=1024;total_parseval={total_parseval_energy};affine_phase_exact=true;independent_dual_oracle=true"
+    );
+}
+
 #[test]
 fn small_fixture_production_syndrome_matches_independent_oracle_and_is_linear() {
     let code = boundary_code();

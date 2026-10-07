@@ -243,6 +243,32 @@ jobs:
           test -n "$LEDGER"
           printf "syndrome_quotient_spectrum=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
 
+      - name: Capture exact syndrome fiber difference closure
+        id: fiber_difference
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            small_fixture_exact_fiber_difference_identity_holds_for_every_anchor -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SYNDROME_FIBER_DIFFERENCE=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^SYNDROME_FIBER_DIFFERENCE=//p')"
+          test -n "$LEDGER"
+          printf "syndrome_fiber_difference=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture Walsh dual-fiber structure
+        id: walsh_dual_fiber
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            small_fixture_walsh_fibers_have_exact_dual_support_and_parseval -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^WALSH_DUAL_FIBER=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^WALSH_DUAL_FIBER=//p')"
+          test -n "$LEDGER"
+          printf "walsh_dual_fiber=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
       - name: Capture syndrome/coset invariant ledger
         id: coset_invariants
         run: |
@@ -373,7 +399,11 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
           HDC Linear-Code Bounded Decoder Qualification
           =============================================
-          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v9
+          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v10
+          github_run_id=${{ github.run_id }}
+          github_run_attempt=${{ github.run_attempt }}
+          github_workflow_sha=${{ github.workflow_sha }}
+          workflow_ref=${{ github.workflow_ref }}
           event_name=${{ github.event_name }}
           exact_head=${{ steps.head.outputs.sha }}
           event_head_ref=${{ steps.head.outputs.source_ref }}
@@ -406,6 +436,10 @@ jobs:
           syndrome_quotient_metric=${{ steps.quotient_metric.outputs.syndrome_quotient_metric }}
           quotient_spectrum_status=${{ steps.quotient_spectrum.outcome }}
           syndrome_quotient_spectrum=${{ steps.quotient_spectrum.outputs.syndrome_quotient_spectrum }}
+          syndrome_fiber_difference_status=${{ steps.fiber_difference.outcome }}
+          syndrome_fiber_difference=${{ steps.fiber_difference.outputs.syndrome_fiber_difference }}
+          walsh_dual_fiber_status=${{ steps.walsh_dual_fiber.outcome }}
+          walsh_dual_fiber=${{ steps.walsh_dual_fiber.outputs.walsh_dual_fiber }}
           fixed_syndrome_spec=${{ steps.fixed_syndrome_spec.outputs.fixed_syndrome_spec }}
           syndrome_coset_ledger=${{ steps.coset_invariants.outputs.syndrome_coset_ledger }}
           minimum_syndrome_multiplicity_status=${{ steps.multiplicity_invariant.outcome }}
@@ -421,7 +455,7 @@ jobs:
           runner_arch=${{ steps.runner.outputs.runner_arch }}
           runner_image=${{ steps.runner.outputs.runner_image }}
           runner_image_version=${{ steps.runner.outputs.runner_image_version }}
-          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.fixed_syndrome_spec.outcome == 'success' && steps.quotient_metric.outcome == 'success' && steps.quotient_spectrum.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.fixed_syndrome_spec.outcome == 'success' && steps.quotient_metric.outcome == 'success' && steps.quotient_spectrum.outcome == 'success' && steps.fiber_difference.outcome == 'success' && steps.walsh_dual_fiber.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
           random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
           random_syndrome_sweep=${{ steps.random_sweep.outputs.random_syndrome_sweep }}
@@ -430,9 +464,40 @@ jobs:
           EOF
 
       - name: Upload qualification receipt
+        id: upload_receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hdc-linear-code-bounded-decoder-${{ steps.head.outputs.sha }}
           path: hdc-linear-code-evidence
           if-no-files-found: error
+
+
+      - name: Publish artifact provenance summary
+        if: always() && steps.upload_receipt.outcome == 'success'
+        env:
+          EXACT_HEAD: ${{ steps.head.outputs.sha }}
+          PARENT_HEAD: ${{ steps.head.outputs.parent_sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          ARTIFACT_ID: ${{ steps.upload_receipt.outputs.artifact-id }}
+          ARTIFACT_URL: ${{ steps.upload_receipt.outputs.artifact-url }}
+          ARTIFACT_DIGEST: ${{ steps.upload_receipt.outputs.artifact-digest }}
+        run: |
+          test -n "$ARTIFACT_ID"
+          test -n "$ARTIFACT_URL"
+          test -n "$ARTIFACT_DIGEST"
+          {
+            echo "## HDC qualification artifact provenance"
+            echo "- exact_head: \`$EXACT_HEAD\`"
+            echo "- parent_head: \`$PARENT_HEAD\`"
+            echo "- github.run_id: \`$RUN_ID\`"
+            echo "- github.run_attempt: \`$RUN_ATTEMPT\`"
+            echo "- github.workflow_sha: \`$WORKFLOW_SHA\`"
+            echo "- github.workflow_ref: \`$WORKFLOW_REF\`"
+            echo "- artifact_id: \`$ARTIFACT_ID\`"
+            echo "- artifact_digest: \`$ARTIFACT_DIGEST\`"
+            echo "- artifact_url: $ARTIFACT_URL"
+          } >> "$GITHUB_STEP_SUMMARY"
