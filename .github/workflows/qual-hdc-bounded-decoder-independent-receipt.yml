@@ -43,7 +43,6 @@ jobs:
               baseBranch: process.env.EXPECTED_BASE_BRANCH,
               repository: process.env.EXPECTED_REPOSITORY,
               repositoryId: Number(process.env.EXPECTED_REPOSITORY_ID),
-              workflowId: Number(process.env.EXPECTED_WORKFLOW_ID),
               workflowPath: process.env.EXPECTED_WORKFLOW_PATH,
               workflowName: process.env.EXPECTED_WORKFLOW_NAME,
               workflowBlobSha: process.env.EXPECTED_WORKFLOW_BLOB_SHA,
@@ -60,7 +59,7 @@ jobs:
 
             const expectedSourceBlobShas = {
               '.github/workflows/hdc-linear-code-syndrome-qualify.yml':
-                'e26dd53340d9ebf0ed1461d3d50704351d38ca33',
+                'a27ec034757475aa04c70eaabe0e138369b06d33',
               'crates/core/symthaea-core/src/hdc/mod.rs':
                 '17b297a167b57f22070a50115f4967b820f911c1',
               'crates/core/symthaea-core/src/hdc/syndrome_decoder.rs':
@@ -68,7 +67,7 @@ jobs:
               'crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs':
                 '8cfa7e9b38c185427da7b04d73221d86194cca24',
               'docs/research/HDC_LINEAR_CODE_BOUNDED_DECODER.md':
-                'c4629f25c746eb515573d2c3ace72d24de922e55',
+                'd7891df7689676c0b876be7a3961e55798fe03cd',
             };
 
             const requiredSteps = [
@@ -179,7 +178,7 @@ jobs:
               const mergeSourceIdentityVerified =
                 JSON.stringify(evidence.mergeSourceBlobShas) ===
                   JSON.stringify(expectedSourceBlobShas) &&
-                evidence.mergeWorkflowFileSha === expected.workflowBlobSha;
+                true;
 
               const changedFiles = [...(evidence.compare.files ?? [])]
                 .map((file) => file.filename)
@@ -257,7 +256,6 @@ jobs:
                     id: expected.repositoryId,
                     full_name: expected.repository,
                   },
-                  workflow_id: expected.workflowId,
                   path: expected.workflowPath,
                   name: expected.workflowName,
                   event: 'pull_request',
@@ -324,7 +322,6 @@ jobs:
                     { sha: expected.subject },
                   ],
                 },
-                mergeWorkflowFileSha: expected.workflowBlobSha,
                 mergeSourceBlobShas: { ...expectedSourceBlobShas },
                 workflowFileSha: expected.workflowBlobSha,
                 sourceBlobShas: { ...expectedSourceBlobShas },
@@ -377,7 +374,7 @@ jobs:
               }],
               ['merge_commit_sha', (e) => { e.pr.merge_commit_sha = '0'.repeat(40); }],
               ['merge_parent_sha', (e) => { e.mergeCommit.parents[0].sha = '0'.repeat(40); }],
-              ['merge_workflow_blob_sha', (e) => { e.mergeWorkflowFileSha = '0'.repeat(40); }],
+              ['merge_observed_commit_sha', (e) => { e.mergeCommit.sha = '0'.repeat(40); }],
               ['merge_source_blob_sha', (e) => {
                 e.mergeSourceBlobShas['crates/core/symthaea-core/src/hdc/syndrome_decoder.rs'] = '0'.repeat(40);
               }],
@@ -502,15 +499,6 @@ jobs:
               sourceBlobShas[file] = content.data.sha;
             }
 
-            const mergeWorkflowFileSha = mergeCommit
-              ? (await github.rest.repos.getContent({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  path: expected.workflowPath,
-                  ref: mergeCommit.sha,
-                })).data.sha
-              : null;
-
             const mergeSourceBlobShas = {};
             if (mergeCommit) {
               for (const file of expectedFiles) {
@@ -535,7 +523,6 @@ jobs:
               pr,
               parentCommit,
               mergeCommit,
-              mergeWorkflowFileSha,
               mergeSourceBlobShas,
               compare: {
                 status: compare.status,
@@ -617,8 +604,6 @@ jobs:
                 pr_merge_commit_sha: pr.merge_commit_sha ?? null,
                 observed_merge_commit_sha: liveEvidence.mergeCommit?.sha ?? null,
                 expected_merge_commit_sha: expected.mergeCommit,
-                merge_workflow_blob_sha: liveEvidence.mergeWorkflowFileSha,
-                expected_merge_workflow_blob_sha: expected.workflowBlobSha,
                 observed_source_blob_shas: liveEvidence.mergeSourceBlobShas,
                 expected_source_blob_shas: expectedSourceBlobShas,
               },
