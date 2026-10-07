@@ -157,6 +157,20 @@ pub fn token_eq(a: &str, b: &str) -> bool {
 /// rnix-parser for syntax validation.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn validate_nix_pure_eval(nix_content: &str) -> Result<(), String> {
+    const MAX_NIX_PREFLIGHT_BYTES: usize = 256 * 1024;
+
+    if nix_content.is_empty() {
+        return Err("Nix expression cannot be empty".into());
+    }
+    if nix_content.len() > MAX_NIX_PREFLIGHT_BYTES {
+        return Err(format!(
+            "Nix expression exceeds the {} KiB preflight limit",
+            MAX_NIX_PREFLIGHT_BYTES / 1024
+        ));
+    }
+    if nix_content.as_bytes().contains(&0) {
+        return Err("Nix expression contains a NUL byte".into());
+    }
     use std::process::Command;
 
     const TRUSTED_PATH: &str =
@@ -243,6 +257,18 @@ mod tests {
     #[test]
     fn heredoc_empty_input() {
         assert_eq!(sanitize_heredoc("", "NIXCONF"), "");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn nix_pure_eval_rejects_unbounded_or_nul_input_before_process_spawn() {
+        let oversized = "x".repeat(256 * 1024 + 1);
+        let error = validate_nix_pure_eval(&oversized).expect_err("oversized input must fail closed");
+        assert!(error.contains("preflight limit"));
+
+        let nul_error =
+            validate_nix_pure_eval("1\0").expect_err("NUL-containing input must fail closed");
+        assert!(nul_error.contains("NUL"));
     }
 
     // ── validate_disk_path ──
