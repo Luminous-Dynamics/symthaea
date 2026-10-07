@@ -1187,6 +1187,12 @@ fn main() -> Result<(), String> {
             )
             .is_err()
     };
+    let remediation_metric_direction_mismatch_blocked = {
+        let mut forged = measurement.clone();
+        forged.metric_definitions[0].direction =
+            NeurosemanticRemediationMetricDirection::HigherIsBetter;
+        forged.validate().is_err()
+    };
     let remediation_uncertainty_substitution_blocked = {
         let mut forged = uncertainty_computation.clone();
         forged.lower_numerator = 0;
@@ -1912,6 +1918,7 @@ fn main() -> Result<(), String> {
         "remediation_observation_scope_substitution_blocked": remediation_observation_scope_substitution_blocked,
         "remediation_computation_substitution_blocked": remediation_computation_substitution_blocked,
         "remediation_uncertainty_substitution_blocked": remediation_uncertainty_substitution_blocked,
+        "remediation_metric_direction_mismatch_blocked": remediation_metric_direction_mismatch_blocked,
         "remediation_uncertainty_point_estimate_binding_blocked": remediation_uncertainty_point_estimate_binding_blocked,
         "remediation_uncertainty_assumptions_substitution_blocked": remediation_uncertainty_assumptions_substitution_blocked,
         "remediation_observation_population_substitution_blocked": remediation_observation_population_substitution_blocked,
