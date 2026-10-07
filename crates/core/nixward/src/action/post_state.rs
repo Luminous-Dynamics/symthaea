@@ -134,6 +134,11 @@ impl NixSystemdJobEvidenceV1 {
             return Err(NixPostStateErrorV1::InvalidJobObjectPath);
         }
         require_nonempty(&self.result, "systemd job result")?;
+        if let Some(observed) = self.observed_job_type
+            && observed != self.job_type
+        {
+            return Err(NixPostStateErrorV1::JobTypeMismatch);
+        }
         Ok(())
     }
 
@@ -1621,6 +1626,8 @@ pub enum NixPostStateErrorV1 {
     InvalidJobUnit,
     #[error("invalid systemd job object path")]
     InvalidJobObjectPath,
+    #[error("observed systemd JobType does not match the expected typed operation")]
+    JobTypeMismatch,
     #[error("invalid stability window")]
     InvalidStabilityWindow,
     #[error("stability window is too short")]
