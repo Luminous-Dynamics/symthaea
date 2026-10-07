@@ -11546,6 +11546,14 @@ mod tests {
     }
 
     #[test]
+    fn worker_liveness_rejects_same_pid_with_wrong_start_time() {
+        let pid = std::process::id();
+        let actual = read_process_start_time_ticks(pid).unwrap();
+        assert!(process_id_is_alive(pid, actual));
+        assert!(!process_id_is_alive(pid, actual.wrapping_add(1)));
+    }
+
+    #[test]
     fn process_identity_parser_requires_pid_and_start_time() {
         assert_eq!(
             parse_process_identity("1234:5678\n"),
