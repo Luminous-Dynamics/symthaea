@@ -328,6 +328,9 @@ pub struct NeurosemanticRemediationUncertaintyComputationArtifact {
     pub scale: u32,
     pub confidence_level_bps: u16,
     pub method_ref: String,
+    /// Content-addressed assumptions statement used by the uncertainty procedure.
+    pub assumptions_hash: String,
+    pub assumptions_ref: String,
     pub execution_revision: String,
 }
 
@@ -347,6 +350,8 @@ impl NeurosemanticRemediationUncertaintyComputationArtifact {
             || self.confidence_level_bps == 0
             || self.confidence_level_bps > 10_000
             || !valid_identifier(&self.method_ref)
+            || !valid_blake3_digest(&self.assumptions_hash)
+            || !valid_identifier(&self.assumptions_ref)
             || !valid_execution_revision(&self.execution_revision)
         {
             return Err("neurosemantic remediation uncertainty computation fields are invalid".into());
@@ -1167,6 +1172,7 @@ impl NeurosemanticRemediationImpactArtifact {
         observation_set_bytes: &[&[u8]],
         population_manifest_bytes: &[&[u8]],
         uncertainty_computation_bytes: &[&[u8]],
+        uncertainty_assumption_bytes: &[&[u8]],
     ) -> Result<(), String> {
         self.validate()?;
         let measurement = self.verify_measurement_artifact_bytes(measurement_bytes)?;
@@ -1176,6 +1182,7 @@ impl NeurosemanticRemediationImpactArtifact {
 
         let mut seen_computation_hashes = BTreeSet::new();
         let mut seen_metric_refs = BTreeSet::new();
+
         for bytes in computation_bytes {
             let computation = NeurosemanticRemediationMetricComputationArtifact::from_json_bytes(bytes)?;
             let computation_hash = computation.fingerprint()?;
@@ -1290,7 +1297,13 @@ impl NeurosemanticRemediationImpactArtifact {
                     .ok_or_else(|| "neurosemantic remediation uncertainty computation is missing".to_string())?;
                 let uncertainty =
                     NeurosemanticRemediationUncertaintyComputationArtifact::from_json_bytes(uncertainty_bytes)?;
-                if uncertainty.fingerprint()? != *uncertainty_computation_artifact_hash
+                let assumptions_bytes = uncertainty_assumption_bytes
+                    .iter()
+                    .copied()
+                    .find(|candidate| content_hash(candidate) == uncertainty.assumptions_hash)
+                    .ok_or_else(|| "neurosemantic remediation uncertainty assumptions are missing".to_string())?;
+                if content_hash(assumptions_bytes) != uncertainty.assumptions_hash
+                    || uncertainty.fingerprint()? != *uncertainty_computation_artifact_hash
                     || uncertainty.metric_ref != computation.metric_ref
                     || uncertainty.metric_definition_hash != computation.metric_definition_hash
                     || uncertainty.observation_set_hash != computation.observation_set_hash
@@ -4663,6 +4676,60 @@ mod tests {
             ],
         };
         assert!(set.validate("worst-subgroup-gap").is_err());
+    }
+
+    #[test]
+    fn remediation_uncertainty_computation_is_typed_and_bound() {
+        let metric_definition = NeurosemanticRemediationMetricDefinition {
+            schema_version: NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
+            metric_ref: "metric-uncertainty".into(),
+            kind: NeurosemanticRemediationMeasurementKind::Forgetfulness,
+            estimand_ref: "forgetfulness-on-forget-set".into(),
+            scope_ref: "forget-set-v1".into(),
+            unit_ref: "proportion".into(),
+            aggregation_ref: "per-item-rate".into(),
+            direction: NeurosemanticRemediationMetricDirection::DescriptiveOnly,
+        };
+        let observation_set_hash = content_hash(b"observation-set-uncertainty");
+        let assumptions_hash = content_hash(b"synthetic-structural-assumptions");
+        let artifact = NeurosemanticRemediationUncertaintyComputationArtifact {
+            schema_version: NEUROSEMANTIC_REMEDIATION_UNCERTAINTY_COMPUTATION_SCHEMA_VERSION,
+            uncertainty_ref: "uncertainty-typed".into(),
+            metric_ref: metric_definition.metric_ref.clone(),
+            metric_definition_hash: metric_definition.fingerprint().unwrap(),
+            observation_set_hash,
+            point_estimate_numerator: 0,
+            point_estimate_scale: 4,
+            lower_numerator: -1,
+            upper_numerator: 1,
+            scale: 4,
+            confidence_level_bps: 9_500,
+            method_ref: "synthetic-structural-interval-v1".into(),
+            assumptions_hash,
+            assumptions_ref: "synthetic-structural-assumptions-v1".into(),
+            execution_revision: "8".repeat(40),
+        };
+        assert!(artifact.validate().is_ok());
+        let bytes = serde_json::to_vec(&artifact).unwrap();
+        assert_eq!(
+            NeurosemanticRemediationUncertaintyComputationArtifact::from_json_bytes(&bytes).unwrap(),
+            artifact
+        );
+
+        let mut legacy = artifact.clone();
+        legacy.schema_version = 0;
+        assert!(
+            NeurosemanticRemediationUncertaintyComputationArtifact::from_json_bytes(
+                &serde_json::to_vec(&legacy).unwrap()
+            )
+            .is_err()
+        );
+
+        let mut assumptions_invalid = artifact.clone();
+        assumptions_invalid.assumptions_hash.clear();
+        assert!(assumptions_invalid.validate().is_err());
+
+        let _ = metric_definition;
     }
 
     #[test]
