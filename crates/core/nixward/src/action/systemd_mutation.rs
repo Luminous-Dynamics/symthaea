@@ -271,7 +271,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn governed_dispatch_api_requires_manager_owner_and_bus_epoch() {
         let _method =
             NixSystemdLifecycleMutationTransportV1::dispatch_lifecycle_for_manager_owner_and_bus_id;
