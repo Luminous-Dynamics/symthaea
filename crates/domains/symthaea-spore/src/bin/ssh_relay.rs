@@ -13,7 +13,7 @@
 
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
-use std::io::{IsTerminal, Read, Write};
+use std::io::{IsTerminal, Read, Seek, SeekFrom, Write};
 use std::os::unix::fs::OpenOptionsExt;
 use std::sync::Arc;
 use std::time::Instant;
@@ -46,8 +46,8 @@ struct CmdResult {
     pub exit_status: u32,
 }
 
-async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
-    // Use /bin/sh (POSIX, always available) as fallback if bash isn't in PATH
+fn privileged_shell_command(cmd: &str) -> tokio::process::Command {
+    // Use /bin/sh (POSIX, always available) as fallback if bash isn't in PATH.
     let shell = if std::path::Path::new("/bin/bash").exists() {
         "/bin/bash"
     } else if std::path::Path::new("/run/current-system/sw/bin/bash").exists() {
@@ -79,6 +79,29 @@ async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
     // Keep text-processing and diagnostics deterministic across hosts.
     command.env("LANG", "C");
     command.env("LC_ALL", "C");
+    command
+}
+
+async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
+    let output = privileged_shell_command(cmd).output().await?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
+/// Execute a privileged shell command with an already-open artifact as stdin.
+///
+/// The caller should open and verify the artifact first, then pass that exact
+/// descriptor here. This prevents restore from hashing one pathname and later
+/// reopening a different file for the destructive operation.
+async fn run_cmd_with_stdin(
+    cmd: &str,
+    input: std::fs::File,
+) -> Result<CmdResult, std::io::Error> {
+    let mut command = privileged_shell_command(cmd);
+    command.stdin(std::process::Stdio::from(input));
     let output = command.output().await?;
     Ok(CmdResult {
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
@@ -2984,10 +3007,10 @@ async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
     Ok(false)
 }
 
-fn read_image_artifact_commitment_blocking(
+fn open_image_artifact_with_commitment_blocking(
     image_dir: &str,
     artifact_name: &str,
-) -> Result<Option<ArtifactCommitment>, String> {
+) -> Result<Option<(std::fs::File, ArtifactCommitment)>, String> {
     let image_dir = validate_image_path(image_dir)?;
 
     if !matches!(
@@ -3096,11 +3119,46 @@ fn read_image_artifact_commitment_blocking(
         ));
     }
 
-    Ok(Some(ArtifactCommitment {
-        name: artifact_name.to_string(),
-        size: total,
-        digest: hasher.finalize().to_hex().to_string(),
-    }))
+    // Hashing consumed the descriptor. Rewind that same descriptor so the
+    // destructive restore consumes exactly the bytes we just committed.
+    file.seek(SeekFrom::Start(0)).map_err(|error| {
+        format!(
+            "unable to rewind verified image artifact {}: {error}",
+            path.display()
+        )
+    })?;
+
+    Ok(Some((
+        file,
+        ArtifactCommitment {
+            name: artifact_name.to_string(),
+            size: total,
+            digest: hasher.finalize().to_hex().to_string(),
+        },
+    )))
+}
+
+fn read_image_artifact_commitment_blocking(
+    image_dir: &str,
+    artifact_name: &str,
+) -> Result<Option<ArtifactCommitment>, String> {
+    Ok(
+        open_image_artifact_with_commitment_blocking(image_dir, artifact_name)?
+            .map(|(_, commitment)| commitment),
+    )
+}
+
+async fn open_image_artifact_with_commitment(
+    image_dir: &str,
+    artifact_name: &str,
+) -> Result<Option<(std::fs::File, ArtifactCommitment)>, String> {
+    let image_dir = image_dir.to_string();
+    let artifact_name = artifact_name.to_string();
+    tokio::task::spawn_blocking(move || {
+        open_image_artifact_with_commitment_blocking(&image_dir, &artifact_name)
+    })
+    .await
+    .map_err(|error| format!("image artifact hashing task failed: {error}"))?
 }
 
 async fn image_artifact_commitment(
@@ -3140,13 +3198,27 @@ async fn verify_image_artifact_commitment(
     image_dir: &str,
     expected: &ArtifactCommitment,
 ) -> Result<(), String> {
-    if !matches!(expected.name.as_str(), "system.btrfs.zst" | "system.tar.gz") {
+    open_verified_image_artifact(image_dir, expected)
+        .await
+        .map(|_| ())
+}
+
+async fn open_verified_image_artifact(
+    image_dir: &str,
+    expected: &ArtifactCommitment,
+) -> Result<std::fs::File, String> {
+    if !matches!(
+        expected.name.as_str(),
+        "system.btrfs.zst" | "system.tar.gz" | "configuration.nix"
+    ) {
         return Err("image artifact commitment names an unsupported artifact".into());
     }
 
-    let actual = image_artifact_commitment(image_dir, &expected.name)
-        .await?
-        .ok_or_else(|| format!("committed image artifact {} is missing", expected.name))?;
+    let Some((file, actual)) =
+        open_image_artifact_with_commitment(image_dir, &expected.name).await?
+    else {
+        return Err(format!("committed image artifact {} is missing", expected.name));
+    };
     if actual != *expected {
         return Err(format!(
             "image artifact commitment mismatch for {}: committed {} bytes / {}, observed {} bytes / {}",
@@ -3157,44 +3229,31 @@ async fn verify_image_artifact_commitment(
             actual.digest
         ));
     }
-    Ok(())
+    Ok(file)
 }
 
-async fn verify_restored_image_postcondition(image_dir: &str) -> Result<bool, String> {
-    let image_dir = validate_image_path(image_dir)?;
+async fn verify_restored_image_postcondition(
+    expected_configuration: &ArtifactCommitment,
+) -> Result<bool, String> {
+    if expected_configuration.name != "configuration.nix"
+        || expected_configuration.size == 0
+        || expected_configuration.digest.len() != 64
+    {
+        return Err("restored configuration postcondition has invalid provenance".into());
+    }
+
     let target = tokio::fs::symlink_metadata("/mnt/etc/nixos/configuration.nix")
         .await
         .map_err(|error| format!("restored configuration postcondition probe failed: {error}"))?;
-    if !target.file_type().is_file() || target.len() == 0 {
+    if !target.file_type().is_file() || target.len() != expected_configuration.size {
         return Ok(false);
     }
-
-    let expected_path = std::path::Path::new(&image_dir).join("configuration.nix");
-    let expected = match tokio::fs::symlink_metadata(&expected_path).await {
-        Ok(metadata) if metadata.file_type().is_file() && metadata.len() > 0 => {
-            Some(
-                tokio::fs::read(&expected_path)
-                    .await
-                    .map_err(|error| format!("restored source configuration probe failed: {error}"))?,
-            )
-        }
-        Ok(_) => return Ok(false),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-        Err(error) => {
-            return Err(format!(
-                "restored source configuration metadata probe failed: {error}"
-            ))
-        }
-    };
 
     let actual = tokio::fs::read("/mnt/etc/nixos/configuration.nix")
         .await
         .map_err(|error| format!("restored configuration read failed: {error}"))?;
-
-    let expected = expected.ok_or_else(|| {
-        "restored image is missing mandatory configuration provenance sidecar".to_string()
-    })?;
-    Ok(configuration_bytes_match(&actual, &expected))
+    let digest = blake3::hash(&actual).to_hex().to_string();
+    Ok(digest == expected_configuration.digest)
 }
 
 fn wifi_connection_observed(output: &str, profile_name: &str) -> bool {
@@ -7425,30 +7484,34 @@ echo "COMPLETE"
                     }
                 };
 
-                if let Err(error) =
-                    verify_image_artifact_commitment(&image_path, &image_artifact_commitment).await
-                {
-                    let outcome = finalize_transaction(
-                        &transaction_ledger,
-                        &transaction,
-                        TransactionOutcome::Failed,
-                        &peer_addr,
-                    );
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            serde_json::json!({
-                                "type": "error",
-                                "message": format!(
-                                    "Image restore refused: committed artifact identity does not match the image namespace: {}",
-                                    error
-                                ),
-                                "transaction": transaction.receipt(outcome)
-                            })
-                            .to_string(),
-                        ))
-                        .await;
-                    continue;
-                }
+                let image_archive_file =
+                    match open_verified_image_artifact(&image_path, &image_artifact_commitment)
+                        .await
+                    {
+                        Ok(file) => file,
+                        Err(error) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Failed,
+                                &peer_addr,
+                            );
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type": "error",
+                                        "message": format!(
+                                            "Image restore refused: committed artifact identity does not match the image namespace: {}",
+                                            error
+                                        ),
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                            continue;
+                        }
+                    };
 
                 let image_configuration_commitment =
                     match transaction_ledger.successful_image_configuration(
@@ -7520,11 +7583,9 @@ echo "COMPLETE"
                 }
 
                 if let Err(error) =
-                    verify_image_artifact_commitment(
-                        &image_path,
-                        &image_configuration_commitment,
-                    )
-                    .await
+                    open_verified_image_artifact(&image_path, &image_configuration_commitment)
+                        .await
+                        .map(|_| ())
                 {
                     let outcome = finalize_transaction(
                         &transaction_ledger,
@@ -7555,12 +7616,12 @@ echo "COMPLETE"
                     image_path
                 );
                 let restore_artifact_step = match image_artifact_commitment.name.as_str() {
-                    "system.btrfs.zst" => format!(
-                        "echo \"Restoring committed btrfs snapshot...\"; zstd -d \"{image_path}/system.btrfs.zst\" | btrfs receive /mnt/ 2>&1"
-                    ),
-                    "system.tar.gz" => format!(
-                        "echo \"Restoring committed tar archive...\"; tar -xzf \"{image_path}/system.tar.gz\" -C /mnt/ 2>&1"
-                    ),
+                    "system.btrfs.zst" => {
+                        "echo \"Restoring committed btrfs snapshot...\"; zstd -d - | btrfs receive /mnt/ 2>&1"
+                    }
+                    "system.tar.gz" => {
+                        "echo \"Restoring committed tar archive...\"; tar -xzf - -C /mnt/ 2>&1"
+                    }
                     _ => {
                         unreachable!("artifact commitment validator must accept only supported image artifacts")
                     }
@@ -7570,9 +7631,7 @@ echo "COMPLETE"
 set -eo pipefail
 echo "STAGE: Restoring system image..."
 {restore_artifact_step}
-if [ -f "{path}/configuration.nix" ]; then
-    cp "{path}/configuration.nix" /mnt/etc/nixos/
-fi
+cp "{path}/configuration.nix" /mnt/etc/nixos/
 if [ -f "{path}/hardware-configuration.nix" ]; then
     cp "{path}/hardware-configuration.nix" /mnt/etc/nixos/
 fi
@@ -7583,10 +7642,10 @@ echo "COMPLETE"
                     restore_artifact_step = restore_artifact_step
                 );
 
-                match run_cmd(&script).await {
+                match run_cmd_with_stdin(&script, image_archive_file).await {
                     Ok(r) => {
                         let observed_outcome = if r.exit_status == 0 {
-                            match verify_restored_image_postcondition(&image_path).await {
+                            match verify_restored_image_postcondition(&image_configuration_commitment).await {
                                 Ok(true) => TransactionOutcome::ObservedSuccess,
                                 Ok(false) => TransactionOutcome::Failed,
                                 Err(error) => {
