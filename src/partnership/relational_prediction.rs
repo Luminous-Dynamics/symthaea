@@ -1611,7 +1611,7 @@ impl ForecastInferenceBinding {
             relational_loss_differentials_blake3: qualification
                 .relational_loss_differentials_blake3
                 .clone(),
-            dependence_profile_blake3: forecast_loss_dependence_profile_digest(dependence),
+            dependence_profile_blake3,
             dependence_max_lag_within_origin: dependence.max_lag,
             dependence_max_lag_across_origins: 0,
             origin_count: 1,
@@ -1731,7 +1731,6 @@ impl ForecastInferenceBinding {
         let expected_dependence =
             qualification.relational_loss_dependence(self.dependence_max_lag_within_origin)?;
         if expected_dependence != *dependence
-            || self.dependence_profile_blake3 != forecast_loss_dependence_profile_digest(dependence)
             || self.dependence_max_lag_within_origin != dependence.max_lag
         {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
@@ -1839,11 +1838,13 @@ impl ForecastInferenceSelectionReceipt {
         decision_path_id: impl Into<String>,
     ) -> Result<Self, RelationalPredictionError> {
         let binding = ForecastInferenceBinding::from_single(plan, qualification, dependence)?;
+        dependence.validate()?;
+        let dependence_profile_blake3 = forecast_loss_dependence_profile_digest(dependence);
         Self::from_binding(
             &binding,
             plan,
             qualification.qualification_identity_blake3.as_str(),
-            dependence,
+            dependence_profile_blake3,
             decision_path_id,
         )
     }
@@ -1855,11 +1856,13 @@ impl ForecastInferenceSelectionReceipt {
         decision_path_id: impl Into<String>,
     ) -> Result<Self, RelationalPredictionError> {
         let binding = ForecastInferenceBinding::from_rolling(plan, qualification, dependence)?;
+        dependence.validate()?;
+        let dependence_profile_blake3 = rolling_forecast_loss_dependence_profile_digest(dependence);
         Self::from_binding(
             &binding,
             plan,
             qualification.qualification_identity_blake3.as_str(),
-            dependence,
+            dependence_profile_blake3,
             decision_path_id,
         )
     }
@@ -1868,7 +1871,7 @@ impl ForecastInferenceSelectionReceipt {
         binding: &ForecastInferenceBinding,
         plan: &ForecastInferencePlan,
         qualification_identity_blake3: &str,
-        dependence: &ForecastLossDependenceProfile,
+        dependence_profile_blake3: String,
         decision_path_id: impl Into<String>,
     ) -> Result<Self, RelationalPredictionError> {
         let mut receipt = Self {
@@ -1929,8 +1932,6 @@ impl ForecastInferenceSelectionReceipt {
         self.validate()?;
         binding.validate()?;
         plan.validate_against_qualification(qualification_identity_blake3)?;
-        dependence.validate()?;
-
         if self.analysis_level != binding.analysis_level
             || self.binding_blake3 != binding.binding_blake3
             || self.qualification_identity_blake3 != qualification_identity_blake3
