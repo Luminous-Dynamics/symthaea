@@ -198,9 +198,13 @@ prediction; the deterministic oracle answers the same query through the real tra
 The report measures:
 
 - total, valid, and invalid query counts plus sequence length;
+- mean path MAE across all intermediate query steps, over valid answers only;
 - mean terminal-state MAE over valid answers only;
 - mean minimum-viability-margin error over valid answers only;
 - survival-decision agreement across all queries.
+
+The query bank is only scoreable when at least one valid answer exists. An all-invalid query population
+therefore cannot masquerade as a valid zero-error result.
 
 Invalid/non-finite model answers are explicit disagreements, remain in the total query count, and
 are never converted into synthetic error values. This prevents invalid forecasts from both
@@ -284,6 +288,8 @@ This matters because a single favorable held-out scenario can be explained by sc
 | All leave-one-out folds beat persistence | stronger evidence of cross-scenario predictive structure, still limited to the benchmark family |
 | Counterfactual query error is high while scheduled-trajectory error is low | the model may fit observed trajectories without supporting broader environment-level reasoning |
 | Counterfactual survival agreement is poor | the model's composed predictions are not reliable enough to support viability judgments away from the observed path |
+| Counterfactual path error is high while terminal error is modest | intermediate model dynamics may be wrong even when endpoint error partly cancels |
+| The query bank has zero valid answers | the world-model interface is not scoreable; do not interpret zero numerical error as success |
 
 No single metric is a synthetic-organism detector.
 
