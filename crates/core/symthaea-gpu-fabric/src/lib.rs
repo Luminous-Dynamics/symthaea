@@ -653,15 +653,15 @@ mod tests {
 
     #[test]
     fn backend_claims_are_fail_closed() {
+        let plan = OperationPlan::new(GpuOperation::HdcBindXor { dimensions: 8 });
         let mut receipt = ExecutionReceipt {
             version: RECEIPT_VERSION,
             backend: BackendKind::CpuReference,
             accelerated: true,
-            operation: GpuOperation::HdcBindXor { dimensions: 8 },
+            operation: plan.operation,
             plan_digest: String::new(),
             kernel_id: HDC_BIND_XOR_KERNEL_ID.to_owned(),
-            semantic_kernel_digest: GpuOperation::HdcBindXor { dimensions: 8 }
-                .semantic_kernel_digest(),
+            semantic_kernel_digest: plan.operation.semantic_kernel_digest(),
             implementation_digest: None,
             device_identity: None,
             driver_identity: None,
@@ -670,7 +670,6 @@ mod tests {
             output_digest: "x".to_owned(),
             determinism: DeterminismMode::Strict,
         };
-        let plan = OperationPlan::new(GpuOperation::HdcBindXor { dimensions: 8 });
         assert!(matches!(
             receipt.verify_plan(&plan),
             Err(ReceiptError::AccelerationClaimMismatch)
