@@ -94,6 +94,8 @@ pub enum VulkanBarrierReceiptError {
     NodeCount,
     #[error("barrier count mismatch")]
     BarrierCount,
+    #[error("resource count mismatch")]
+    ResourceCount,
     #[error("resource digest mismatch for {0}")]
     ResourceDigest(ResourceId),
 }
@@ -136,7 +138,9 @@ impl VulkanBarrierExecutionReceipt {
         if self.node_count != schedule.nodes.len() as u32 { return Err(VulkanBarrierReceiptError::NodeCount); }
         let count = plan.submissions.iter().map(|s| s.barriers.len() as u32).sum::<u32>();
         if self.barrier_count != count { return Err(VulkanBarrierReceiptError::BarrierCount); }
-        if self.resource_digests.len() != final_resources.len() { return Err(VulkanBarrierReceiptError::BarrierCount); }
+        if self.resource_digests.len() != final_resources.len() {
+            return Err(VulkanBarrierReceiptError::ResourceCount);
+        }
         for (resource, digest) in &self.resource_digests {
             let actual = final_resources.get(resource).map(resource_digest)
                 .ok_or_else(|| VulkanBarrierReceiptError::ResourceDigest(resource.clone()))?;
@@ -414,6 +418,7 @@ struct WorkloadBuffer {
     buffer: vk::Buffer,
     memory: vk::DeviceMemory,
     allocation_size: vk::DeviceSize,
+    storage_size: vk::DeviceSize,
     coherent: bool,
 }
 
