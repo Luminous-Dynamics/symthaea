@@ -1029,7 +1029,7 @@ fn rfc9942_outer_detached_payload_binds_inner_inclusion_and_outer_signature() {
     let outer_signature = signer.sign(&rng, &outer_tbs).unwrap().as_ref().to_vec();
     let expected_outer_signature_sha256: [u8; 32] =
         sha2::Sha256::digest(&outer_signature).into();
-    let outer = Rfc9942SignatureWithReceipts::from_cbor(
+    let outer = Rfc9942SignatureWithReceipts::from_cbor(&outer_wire(
         &collection,
         &outer_signature,
     ))
