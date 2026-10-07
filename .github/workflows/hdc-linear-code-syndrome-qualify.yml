@@ -536,6 +536,9 @@ jobs:
           parent_head_required=164d6b94d12bb72a902bdc2164d25cd540d3ba7f
           source_repo=${{ steps.head.outputs.source_repo }}
           source_repo_id=${{ steps.head.outputs.source_repo_id }}
+          canonical_repo=Luminous-Dynamics/symthaea
+          live_run_pr_head_repo_name=${{ steps.head.outputs.live_run_pr_head_repo_name }}
+          live_run_pr_base_repo_name=${{ steps.head.outputs.live_run_pr_base_repo_name }}
           event_repo_id=${{ steps.head.outputs.event_repo_id }}
           current_repo_id=${{ steps.head.outputs.current_repo_id }}
           live_run_repo_id=${{ steps.head.outputs.live_run_repo_id }}
@@ -609,7 +612,10 @@ jobs:
           runner_image=${{ steps.runner.outputs.runner_image }}
           runner_image_version=${{ steps.runner.outputs.runner_image_version }}
           workflow_definition_status=${{ steps.head.outputs.workflow_definition_match == 'true' && 'matched' || 'mismatch' }}
-          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.generator_basis_equivariance.outcome == 'success' && steps.composed_metamorphic.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.fixed_syndrome_spec.outcome == 'success' && steps.quotient_metric.outcome == 'success' && steps.quotient_spectrum.outcome == 'success' && steps.spectrum_adversary.outcome == 'success' && steps.coordinate_permutation.outcome == 'success' && steps.fiber_difference.outcome == 'success' && steps.walsh_dual_fiber.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          artifact_refetch_status=${{ steps.artifact_revalidate.outcome }}
+          artifact_refetch_match=${{ steps.artifact_revalidate.outputs.artifact_refetch_match }}
+          artifact_refetch_digest=${{ steps.artifact_revalidate.outputs.artifact_refetch_digest }}
+          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.generator_basis_equivariance.outcome == 'success' && steps.composed_metamorphic.outcome == 'success' && steps.artifact_revalidate.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.fixed_syndrome_spec.outcome == 'success' && steps.quotient_metric.outcome == 'success' && steps.quotient_spectrum.outcome == 'success' && steps.spectrum_adversary.outcome == 'success' && steps.coordinate_permutation.outcome == 'success' && steps.fiber_difference.outcome == 'success' && steps.walsh_dual_fiber.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
           random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
           random_syndrome_sweep=${{ steps.random_sweep.outputs.random_syndrome_sweep }}
@@ -622,10 +628,45 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hdc-linear-code-bounded-decoder-${{ steps.head.outputs.sha }}
+          name: hdc-linear-code-bounded-decoder-${{ steps.head.outputs.sha }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: hdc-linear-code-evidence
           if-no-files-found: error
 
+      - name: Revalidate uploaded artifact provenance
+        id: artifact_revalidate
+        if: always() && steps.upload_receipt.outcome == "success"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXACT_HEAD: ${{ steps.head.outputs.sha }}
+          RUN_ID: ${{ github.run_id }}
+          ARTIFACT_ID: ${{ steps.upload_receipt.outputs.artifact-id }}
+          EXPECTED_NAME: hdc-linear-code-bounded-decoder-${{ steps.head.outputs.sha }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          EXPECTED_REPO_ID: 1136141775
+        run: |
+          test -n "$ARTIFACT_ID"
+          ARTIFACT_JSON="$(gh api --method GET -H "Accept: application/vnd.github+json" "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}")"
+          REFETCH_ID="$(printf "%s" "$ARTIFACT_JSON" | jq -r ".id")"
+          REFETCH_NAME="$(printf "%s" "$ARTIFACT_JSON" | jq -r ".name")"
+          REFETCH_REPO_ID="$(printf "%s" "$ARTIFACT_JSON" | jq -r ".workflow_run.repository_id")"
+          REFETCH_RUN_ID="$(printf "%s" "$ARTIFACT_JSON" | jq -r ".workflow_run.id")"
+          REFETCH_HEAD_SHA="$(printf "%s" "$ARTIFACT_JSON" | jq -r ".workflow_run.head_sha")"
+          REFETCH_HEAD_REPO_ID="$(printf "%s" "$ARTIFACT_JSON" | jq -r ".workflow_run.head_repository_id")"
+          REFETCH_DIGEST="$(printf "%s" "$ARTIFACT_JSON" | jq -r ".digest")"
+          test "$REFETCH_ID" = "$ARTIFACT_ID"
+          test "$REFETCH_NAME" = "$EXPECTED_NAME"
+          test "$REFETCH_REPO_ID" = "$EXPECTED_REPO_ID"
+          test "$REFETCH_RUN_ID" = "$RUN_ID"
+          test "$REFETCH_HEAD_SHA" = "$EXACT_HEAD"
+          test "$REFETCH_HEAD_REPO_ID" = "$EXPECTED_REPO_ID"
+          test -n "$REFETCH_DIGEST"
+          echo "artifact_refetch_id=$REFETCH_ID" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_name=$REFETCH_NAME" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_repo_id=$REFETCH_REPO_ID" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_run_id=$REFETCH_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_head_sha=$REFETCH_HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_head_repo_id=$REFETCH_HEAD_REPO_ID" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_digest=$REFETCH_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_match=true" >> "$GITHUB_OUTPUT"
       - name: Publish artifact provenance summary
         if: always() && steps.upload_receipt.outcome == 'success'
         env:
