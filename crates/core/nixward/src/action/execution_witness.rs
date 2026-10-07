@@ -21,12 +21,33 @@ pub(crate) struct NixLiveExecutionWitnessV1 {
     pre_state_identity: Option<String>,
     service_definition_content_digest: Option<String>,
     pre_invocation_id: Option<String>,
+    dispatch_executable_path: Option<String>,
+    dispatch_executable_digest: Option<String>,
+}
+
+/// Concrete immutable executable identity used by the authorized dispatcher.
+///
+/// This type is transient and deliberately non-serializable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NixDispatchExecutableIdentityV1 {
+    pub(crate) path: String,
+    pub(crate) digest: String,
+}
+
+impl NixDispatchExecutableIdentityV1 {
+    pub(crate) fn new(path: String, digest: String) -> Result<Self, String> {
+        if path.is_empty() || digest.len() != 64 || !digest.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err("invalid dispatch executable identity".to_string());
+        }
+        Ok(Self { path, digest })
+    }
 }
 
 impl NixLiveExecutionWitnessV1 {
     /// Mint provenance after the executor has completed final pre-dispatch checks.
     pub(crate) fn from_live_authority(
         authority: &NixLocalExecutionAuthorityV1,
+        dispatch_executable: Option<&NixDispatchExecutableIdentityV1>,
     ) -> Result<Self, String> {
         let action_intent_digest = authority
             .action_intent_digest()
@@ -47,6 +68,8 @@ impl NixLiveExecutionWitnessV1 {
                 .map(str::to_owned),
             pre_invocation_id: authority
                 .service_effect_context_pre_invocation_id(),
+            dispatch_executable_path: dispatch_executable.map(|value| value.path.clone()),
+            dispatch_executable_digest: dispatch_executable.map(|value| value.digest.clone()),
         })
     }
 
@@ -90,6 +113,16 @@ impl NixLiveExecutionWitnessV1 {
             pre_state_identity,
             service_definition_content_digest,
             pre_invocation_id,
+            dispatch_executable_path: None,
+            dispatch_executable_digest: None,
         }
+    }
+
+    pub(crate) fn dispatch_executable_path(&self) -> Option<&str> {
+        self.dispatch_executable_path.as_deref()
+    }
+
+    pub(crate) fn dispatch_executable_digest(&self) -> Option<&str> {
+        self.dispatch_executable_digest.as_deref()
     }
 }
