@@ -160,6 +160,22 @@ def list_head_runs(head_sha: str) -> list[dict[str, Any]]:
     ).get("workflow_runs", [])
 
 
+def list_pr_files(pr_number: int) -> list[dict[str, Any]]:
+    files: list[dict[str, Any]] = []
+    for page in range(1, 31):
+        page_files = api_request(
+            "GET",
+            f"/pulls/{pr_number}/files",
+            query={"per_page": "100", "page": str(page)},
+        )
+        if not isinstance(page_files, list):
+            raise VerificationError(f"unexpected pull-request file-list response on page {page}")
+        files.extend(page_files)
+        if len(page_files) < 100:
+            return files
+    raise VerificationError("pull-request file list exceeded the independent verifier's 3000-file safety bound")
+
+
 def latest_required_runs(head_sha: str) -> dict[str, dict[str, Any] | None]:
     runs = list_head_runs(head_sha)
     result: dict[str, dict[str, Any] | None] = {}
@@ -307,13 +323,9 @@ def main() -> int:
             "merge_commit_sha": pr.get("merge_commit_sha"),
         }
 
-        changed = api_request(
-            "GET",
-            f"/compare/{pr['base']['sha']}...{pr['head']['sha']}",
-        )
         changed_files = sorted(
             (item.get("filename"), item.get("status"))
-            for item in changed.get("files", [])
+            for item in list_pr_files(pr_number)
         )
 
         relevant_files = [
