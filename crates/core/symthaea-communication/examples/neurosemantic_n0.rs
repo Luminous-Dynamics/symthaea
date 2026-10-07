@@ -1251,6 +1251,7 @@ fn main() -> Result<(), String> {
                 &observation_set_byte_refs,
                 &population_manifest_byte_refs,
                 &[bytes.as_slice()],
+                &uncertainty_assumption_byte_refs,
             )
             .is_err()
     };
@@ -1265,6 +1266,7 @@ fn main() -> Result<(), String> {
                 &observation_set_byte_refs,
                 &population_manifest_byte_refs,
                 &[bytes.as_slice()],
+                &uncertainty_assumption_byte_refs,
             )
             .is_err()
     };
