@@ -154,6 +154,7 @@ pub struct HolochainEvidenceAnchor {
 pub enum HolochainProjectionError {
     ZeroDigest,
     InvalidReceiptSelection,
+    UnaddressableDependency(&'static str),
     FieldTooLarge(&'static str),
 }
 
@@ -173,6 +174,9 @@ impl HolochainEvidenceAnchor {
                 return Err(HolochainProjectionError::ZeroDigest);
             }
         }
+        if self.parent_evidence_digest.is_some() && self.parent_action_hash.is_none() {
+            return Err(HolochainProjectionError::UnaddressableDependency("parent_evidence"));
+        }
         if let Some(root) = self.vds_root {
             if root == [0; 32] {
                 return Err(HolochainProjectionError::ZeroDigest);
@@ -180,6 +184,9 @@ impl HolochainEvidenceAnchor {
         }
         if let Some(selection) = &self.receipt_selection {
             selection.validate()?;
+        }
+        if self.receipt_selection.is_some() && self.selection_decision_action_hash.is_none() {
+            return Err(HolochainProjectionError::UnaddressableDependency("selection_decision"));
         }
         Ok(())
     }
@@ -339,6 +346,22 @@ mod tests {
         assert_eq!(
             invalid.validate(),
             Err(HolochainProjectionError::ZeroDigest)
+        );
+    }
+
+    #[test]
+    fn claimed_durable_dependencies_must_be_addressable() {
+        let mut invalid = anchor();
+        invalid.parent_action_hash = None;
+        assert_eq!(
+            invalid.validate(),
+            Err(HolochainProjectionError::UnaddressableDependency("parent_evidence"))
+        );
+        let mut invalid_selection = anchor();
+        invalid_selection.selection_decision_action_hash = None;
+        assert_eq!(
+            invalid_selection.validate(),
+            Err(HolochainProjectionError::UnaddressableDependency("selection_decision"))
         );
     }
 
