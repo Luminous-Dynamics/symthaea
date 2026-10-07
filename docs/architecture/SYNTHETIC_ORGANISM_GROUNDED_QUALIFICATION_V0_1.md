@@ -216,6 +216,29 @@ update; worsening on it is evidence of adaptation-induced forgetting.
 
 A negative or zero improvement is valid evidence too. The benchmark must not assume that adaptation succeeds.
 
+### Cumulative adaptation and differential retention
+
+The qualification also runs the perturbation sequence through a single cloned world model rather than resetting the model for each shock.
+
+For each shock in order, the stream:
+
+1. scores the new shock before the update;
+2. scores the nearby held-out neighbor before the update;
+3. re-scores every previously learned shock transition before the current update;
+4. applies exactly one observed transition update for the new shock;
+5. re-scores the new shock and nearby neighbor;
+6. re-scores every previously learned shock transition after the current update;
+7. re-scores the complete invariant anchor action set against its pre-stream baseline.
+
+The sequential report therefore retains two distinct retention surfaces:
+
+- **invariant retention**: regression of the anchor action set against the pre-stream model;
+- **acquired-knowledge retention**: whether later updates damage shock transitions that were already learned earlier in the same stream.
+
+It also retains per-shock receipts containing the exact cycle, action, and shock-state digest. The prior-shock retention rate is computed only over shocks that have already received an update, so the first shock has a retention rate of 1.0 by construction because there is no prior learned shock to regress.
+
+This is a stronger continual-adaptation test than independent shock folds, but it is still bounded: the stream contains only the deterministic perturbations authored by the benchmark scenario, and the transition law is not changed between shocks.
+
 ### Procedurally generated held-out transfer
 
 The qualification layer also evaluates a deterministic procedural family that is never used for
@@ -383,6 +406,9 @@ anchor. The per-shock receipts preserve this distinction instead of hiding it be
 | Any invariant-anchor action regresses after shock adaptation | adaptation is causing measurable regression/forgetting in at least one previously learned dynamic |
 | Shock and neighbor improve while the complete anchor action set remains stable | strongest current local evidence for useful, non-destructive adaptation |
 | Shock error does not improve after the update | the observed error is not yet producing effective model correction |
+| Cumulative shock updates improve new shocks but later updates regress prior shocks | continual adaptation is causing interference with previously acquired environment-specific knowledge |
+| Cumulative anchors regress while prior shocks remain stable | adaptation may preserve recent task-specific knowledge while damaging the longer-lived invariant layer |
+| Prior-shock retention remains stable and the invariant anchor remains stable across the stream | stronger evidence of non-destructive cumulative adaptation, still limited to this deterministic stream |
 
 No single metric is a synthetic-organism detector.
 
@@ -408,8 +434,10 @@ A future green qualification should report all of:
 15. environment-level counterfactual query-bank results, including path error and changed-channel F1;
 16. procedurally generated held-out transfer results and procedural-family manifest digest;
 17. prediction-error adaptation response, including per-shock receipts, same-transition correction,
-neighboring-probe transfer, and anchor regression;
-18. trace/invariant verification where action evidence is recorded.
+neighboring-probe transfer, and isolated anchor regression;
+18. cumulative adaptation response, including per-shock receipts, prior-shock retention, and
+pre-stream invariant-anchor retention;
+19. trace/invariant verification where action evidence is recorded.
 
 Queued CI is not a pass.
 
@@ -439,8 +467,8 @@ The current qualification gate is empirical execution of the complete protocol:
 
 with separate measurements for one-step error, discrete multi-step error, continuous extrapolation
 error, policy-induced distribution-shift error, confidence calibration, planning regret, survival,
-recovery, the completed leave-one-scenario-out transfer matrix, and procedurally generated held-out
-transfer.
+recovery, the completed leave-one-scenario-out transfer matrix, procedurally generated held-out
+transfer, isolated shock response, and cumulative adaptation/retention.
 
 A dedicated CI job runs the qualification module directly. The branch should not be considered
 qualified until that job has completed successfully for the exact candidate commit; queued or
