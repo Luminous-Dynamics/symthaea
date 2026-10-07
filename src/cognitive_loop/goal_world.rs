@@ -185,6 +185,11 @@ impl WorldModelBridge {
         self.action_deltas.len()
     }
 
+    /// Dimension of the grounded level-0 state used by action-conditioned prediction.
+    pub fn state_dimension(&self) -> usize {
+        self.level_dims.first().copied().unwrap_or(0)
+    }
+
 impl WorldModelBridge {
     /// Update with sensory input (level 0)
     pub fn update_sensory(&mut self, input: &[f32]) {
