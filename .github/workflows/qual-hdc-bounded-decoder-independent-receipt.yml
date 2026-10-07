@@ -3,7 +3,7 @@ name: QUAL HDC bounded decoder independent run receipt
 on:
   workflow_run:
     workflows:
-      - HDC Linear-Code Bounded Decoder Qualification
+      - QUAL HDC bounded decoder trusted runner
     types:
       - completed
 
@@ -20,17 +20,16 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # pinned
         env:
           EXPECTED_PR: "6803"
-          EXPECTED_SUBJECT: "f4974fff42b32217f7414706deda866463b0519d"
+          EXPECTED_SUBJECT: "69316cf3533cf87a5548226294ed227ec2acf602"
           EXPECTED_PARENT: "164d6b94d12bb72a902bdc2164d25cd540d3ba7f"
           EXPECTED_BRANCH: "research/hdc-linear-code-bounded-decoder-v2"
           EXPECTED_BASE_BRANCH: "research/hdc-linear-code-recovery-design-v1"
           EXPECTED_REPOSITORY: "Luminous-Dynamics/symthaea"
           EXPECTED_REPOSITORY_ID: "1136141775"
-          EXPECTED_WORKFLOW_ID: "375128913"
-          EXPECTED_WORKFLOW_PATH: ".github/workflows/hdc-linear-code-syndrome-qualify.yml"
-          EXPECTED_WORKFLOW_NAME: "HDC Linear-Code Bounded Decoder Qualification"
-          EXPECTED_WORKFLOW_BLOB_SHA: "e26dd53340d9ebf0ed1461d3d50704351d38ca33"
-          EXPECTED_MERGE_COMMIT: "88ee32b89574803b765d31fce06b043f23efae38"
+          EXPECTED_WORKFLOW_PATH: ".github/workflows/qual-hdc-bounded-decoder-trusted-runner.yml"
+          EXPECTED_WORKFLOW_NAME: "QUAL HDC bounded decoder trusted runner"
+          EXPECTED_WORKFLOW_BLOB_SHA: "f42b9c2f565a157dc32fb21c024caf4ff0ee0c31"
+          EXPECTED_MERGE_COMMIT: "ba71a42730ddc651fae7c2c0550512c1d5296487"
         with:
           script: |
             const fs = require('fs');
@@ -125,7 +124,7 @@ jobs:
 
               const exactStepSurface =
                 jobs.length === 1 &&
-                jobs[0].name === 'Exact-head bounded syndrome qualification' &&
+                jobs[0].name === 'Trusted exact-head bounded syndrome qualification' &&
                 firstJobSteps.length === requiredSteps.length &&
                 JSON.stringify(firstJobSteps.map((step) => step.name)) ===
                   JSON.stringify(requiredSteps);
@@ -158,7 +157,7 @@ jobs:
                 artifact.workflow_run?.id === evidence.run.id &&
                 artifact.workflow_run?.repository_id === expected.repositoryId &&
                 artifact.workflow_run?.head_repository_id === expected.repositoryId &&
-                artifact.workflow_run?.head_sha === expected.subject &&
+                artifact.workflow_run?.head_sha === expected.mergeCommit &&
                 typeof artifact.digest === 'string' &&
                 artifact.digest.startsWith('sha256:');
 
@@ -194,13 +193,12 @@ jobs:
                   Number(evidence.run.head_repository?.id) === expected.repositoryId &&
                   evidence.run.head_repository?.full_name === expected.repository,
                 run_identity:
-                  evidence.run.workflow_id === expected.workflowId &&
                   evidence.run.path === expected.workflowPath &&
                   evidence.run.name === expected.workflowName &&
                   evidence.run.event === 'pull_request' &&
                   evidence.run.conclusion === 'success' &&
                   evidence.run.head_branch === expected.branch &&
-                  evidence.run.head_sha === expected.subject,
+                  evidence.run.head_sha === expected.mergeCommit,
                 pr_identity:
                   evidence.pr.number === expected.pr &&
                   evidence.pr.head.ref === expected.branch &&
@@ -332,7 +330,7 @@ jobs:
                 sourceBlobShas: { ...expectedSourceBlobShas },
                 jobs: [
                   {
-                    name: 'Exact-head bounded syndrome qualification',
+                    name: 'Trusted exact-head bounded syndrome qualification',
                     steps: requiredSteps.map((name) => ({ name, conclusion: 'success' })),
                   },
                 ],
@@ -351,7 +349,7 @@ jobs:
                       id: runId,
                       repository_id: expected.repositoryId,
                       head_repository_id: expected.repositoryId,
-                      head_sha: expected.subject,
+                      head_sha: expected.mergeCommit,
                     },
                   },
                 ],
@@ -456,11 +454,11 @@ jobs:
               pull_number: expected.pr,
             })).data;
 
-            const mergeCommit = pr.merge_commit_sha
+            const mergeCommit = run.head_sha
               ? (await github.rest.repos.getCommit({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  ref: pr.merge_commit_sha,
+                  ref: run.head_sha,
                 })).data
               : null;
 
@@ -562,7 +560,7 @@ jobs:
             const liveEvaluation = evaluate(liveEvidence);
 
             const receipt = {
-              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v3',
+              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v4',
               qualification_result:
                 adversarialCorpusPassed && liveEvaluation.qualificationResult === 'PASS'
                   ? 'PASS'
@@ -582,7 +580,8 @@ jobs:
               },
               subject: {
                 pr_number: expected.pr,
-                head_sha: run.head_sha,
+                head_sha: expected.subject,
+                merge_sha: run.head_sha,
                 head_branch: run.head_branch,
                 base_branch: pr.base.ref,
                 base_sha: pr.base.sha,
@@ -650,6 +649,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hdc-linear-code-bounded-decoder-independent-run-receipt
-          path: ${{ runner.temp }}/HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V2.json
+          path: ${{ runner.temp }}/HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V3.json
           if-no-files-found: error
           retention-days: 90
