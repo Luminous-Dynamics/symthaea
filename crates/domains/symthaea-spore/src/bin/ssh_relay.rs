@@ -849,17 +849,16 @@ fn git_init_config() -> &'static str {
     r#"
 # ── Git-Initialize NixOS Config ──
 echo "STAGE: Initializing config version control..."
-if command -v git >/dev/null 2>&1 || [ -f /mnt/nix/store/*/bin/git ]; then
-  GIT=$(command -v git 2>/dev/null || ls /mnt/nix/store/*/bin/git 2>/dev/null | head -1)
-  chroot /mnt /bin/sh -c '
-    cd /etc/nixos
-    if [ ! -d .git ]; then
-      git init
-      git add -A
-      git commit -m "Initial NixOS configuration — Sovereign Inoculation"
+if chroot /mnt git --version >/dev/null 2>&1; then
+  if [ ! -d /mnt/etc/nixos/.git ]; then
+    if chroot /mnt git -C /etc/nixos init 2>/dev/null       && chroot /mnt git -C /etc/nixos add -A 2>/dev/null       && chroot /mnt git -C /etc/nixos commit -m "Initial NixOS configuration — Sovereign Inoculation" 2>/dev/null; then
       echo "  Config versioned at /etc/nixos/.git"
+    else
+      echo "  Git init skipped (initial commit failed)"
     fi
-  ' 2>/dev/null || echo "  Git init skipped (git not available yet)"
+  fi
+else
+  echo "  Git init skipped (git not available yet)"
 fi
 "#
 }
@@ -897,20 +896,22 @@ if [ "$SETUP_MODE" = "0" ]; then
   echo "WARNING: Enter BIOS, clear Secure Boot keys, then re-run key enrollment."
 fi
 
-# Create Secure Boot keys on the installed system
-chroot /mnt /bin/sh -c '
-  if command -v sbctl >/dev/null 2>&1; then
-    sbctl create-keys 2>/dev/null || echo "Keys may already exist"
-    if [ "'"$SETUP_MODE"'" = "1" ]; then
-      sbctl enroll-keys --microsoft 2>/dev/null && echo "Secure Boot keys enrolled (with Microsoft CA)" || echo "Key enrollment failed — enroll manually after first boot"
+# Create Secure Boot keys on the installed system without spawning a nested shell.
+if chroot /mnt sbctl --version >/dev/null 2>&1; then
+  chroot /mnt sbctl create-keys 2>/dev/null || echo "Keys may already exist"
+  if [ "$SETUP_MODE" = "1" ]; then
+    if chroot /mnt sbctl enroll-keys --microsoft 2>/dev/null; then
+      echo "Secure Boot keys enrolled (with Microsoft CA)"
     else
-      echo "Skipping key enrollment — firmware not in Setup Mode"
-      echo "After first boot: sudo sbctl enroll-keys --microsoft"
+      echo "Key enrollment failed — enroll manually after first boot"
     fi
   else
-    echo "sbctl not found — install it and run: sbctl create-keys && sbctl enroll-keys --microsoft"
+    echo "Skipping key enrollment — firmware not in Setup Mode"
+    echo "After first boot: sudo sbctl enroll-keys --microsoft"
   fi
-'
+else
+  echo "sbctl not found — install it and run: sbctl create-keys && sbctl enroll-keys --microsoft"
+fi
 echo "  Secure Boot keys created at /etc/secureboot/"
 "#
 }
