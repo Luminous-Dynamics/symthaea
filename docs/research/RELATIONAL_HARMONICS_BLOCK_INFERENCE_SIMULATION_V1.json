@@ -1,107 +1,12 @@
 {
   "schema": "relational-prediction-block-inference-simulation/v1",
-  "status": "research-diagnostic-only",
-  "generated_artifact_sha256": "01ac0ec64b8d17292ba2162fb9f9d9f06b840a5494ebace3502b6d609a817043",
-  "candidate_statistic": {
-    "estimand": "E[origin_mean(loss_context - loss_relational)]",
-    "statistic": "sqrt(O) * mean(D_o) / sqrt(Bartlett_LRV(D_o))",
-    "null_bootstrap": "center origin means, then moving-block bootstrap over origin index",
-    "tail": "one-sided upper tail",
-    "not_a_formal_p_value": true
-  },
-  "null_distinction": {
-    "coefficient_null": "beta_relational = 0",
-    "coefficient_null_is_not_equal_risk_in_finite_sample": true,
-    "equal_risk_targets_are_dgp_only": true,
-    "calibration_method": "separate DGP-only calibration audit; no confirmatory data used"
-  },
-  "geometry": {
-    "alpha": 0.05,
-    "bartlett_lag": 3,
-    "bootstrap_reps": 199,
-    "monte_carlo_reps": 120,
-    "gap_samples": 4,
-    "horizon": 1,
-    "origin_count": 24,
-    "ridge_lambda": 1e-8,
-    "step_samples": 16,
-    "test_samples": 16,
-    "train_samples": 48
-  },
-  "overlap": {
-    "formula": "1 + floor((train_samples - 1) / step_samples)",
-    "training_overlap_span_origins": 3,
-    "sensitivity_block_lengths": [3, 6]
-  },
-  "rng": "SplitMix64 + Rademacher innovations; pinned algorithm in research harness",
-  "calibration_audit": [
-    {"scenario": "iid", "beta_relational": 0.08, "mean_D": 0.00008945212641624589, "se_mean_D": 0.00010658106882329532, "z": 0.8392871961581833},
-    {"scenario": "ar05", "beta_relational": 0.088, "mean_D": -0.00009372118313379804, "se_mean_D": 0.00010812421431227437, "z": -0.8667918072645704},
-    {"scenario": "ar08", "beta_relational": 0.126, "mean_D": -0.00031018654573355584, "se_mean_D": 0.0003008296882430374, "z": -1.0311035046008124},
-    {"scenario": "ar05-heteroskedastic", "beta_relational": 0.1125, "mean_D": -0.00001377104011340907, "se_mean_D": 0.00018818114159400623, "z": -0.0731797033260606}
-  ],
-  "scenarios": [
-    {
-      "scenario": "iid-coefficient-null",
-      "rho": 0.0,
-      "heteroskedastic": false,
-      "beta_relational": [0.0, 0.0, 0.0],
-      "mean_origin_mean_differential": -0.001887641838957537,
-      "block_lengths": [
-        {"block_length": 3, "reject_count": 0, "empirical_size": 0.0, "empirical_se_of_size": 0.0},
-        {"block_length": 6, "reject_count": 0, "empirical_size": 0.0, "empirical_se_of_size": 0.0}
-      ]
-    },
-    {
-      "scenario": "iid-equal-risk-calibrated",
-      "rho": 0.0,
-      "heteroskedastic": false,
-      "beta_relational": [0.08, 0.08, 0.08],
-      "mean_origin_mean_differential": -0.00011619962687836053,
-      "block_lengths": [
-        {"block_length": 3, "reject_count": 6, "empirical_size": 0.05, "empirical_se_of_size": 0.019895560643855538},
-        {"block_length": 6, "reject_count": 14, "empirical_size": 0.11666666666666667, "empirical_se_of_size": 0.029305226433117632}
-      ]
-    },
-    {
-      "scenario": "ar05-equal-risk-calibrated",
-      "rho": 0.5,
-      "heteroskedastic": false,
-      "beta_relational": [0.088, 0.088, 0.088],
-      "mean_origin_mean_differential": -0.0001356853708546783,
-      "block_lengths": [
-        {"block_length": 3, "reject_count": 3, "empirical_size": 0.025, "empirical_se_of_size": 0.014252192813739226},
-        {"block_length": 6, "reject_count": 6, "empirical_size": 0.05, "empirical_se_of_size": 0.019895560643855538}
-      ]
-    },
-    {
-      "scenario": "ar08-equal-risk-calibrated",
-      "rho": 0.8,
-      "heteroskedastic": false,
-      "beta_relational": [0.126, 0.126, 0.126],
-      "mean_origin_mean_differential": -0.000061643708180659,
-      "block_lengths": [
-        {"block_length": 3, "reject_count": 8, "empirical_size": 0.06666666666666667, "empirical_se_of_size": 0.02277100170213244},
-        {"block_length": 6, "reject_count": 11, "empirical_size": 0.09166666666666666, "empirical_se_of_size": 0.026341331415491148}
-      ]
-    },
-    {
-      "scenario": "ar05-heteroskedastic-equal-risk-calibrated",
-      "rho": 0.5,
-      "heteroskedastic": true,
-      "beta_relational": [0.1125, 0.1125, 0.1125],
-      "mean_origin_mean_differential": -0.00012509520297694,
-      "block_lengths": [
-        {"block_length": 3, "reject_count": 6, "empirical_size": 0.05, "empirical_se_of_size": 0.019895560643855538},
-        {"block_length": 6, "reject_count": 11, "empirical_size": 0.09166666666666666, "empirical_se_of_size": 0.026341331415491148}
-      ]
-    }
-  ],
-  "interpretation": {
-    "approval": false,
-    "finding": "After correcting the DGP calibration, the design-derived L=3 candidate is broadly near nominal in this pilot while L=6 is systematically more liberal.",
-    "coefficient_null_finding": "The coefficient-null produces a negative finite-sample mean loss differential, demonstrating that zero incremental coefficients are not the same as equal forecast risk for the estimated nested methods.",
-    "next_methodological_candidate": "restricted-DGP nested rolling bootstrap with dependence-preserving error resampling and full refitting at every rolling origin",
-    "do_not_promote": true
+  "status": "superseded-unverified",
+  "reason": "The prior numerical size tables were not independently executed in the present verification loop and must not be treated as observed evidence.",
+  "replacement": "docs/research/RELATIONAL_HARMONICS_ORACLE_RESTRICTED_DGP_REFIT_BOOTSTRAP_EXECUTED_V2.json",
+  "scientific_boundary": {
+    "not_a_validity_proof": true,
+    "formal_inference": false,
+    "applicability": "not-approved-for-execution",
+    "selection": "stop-assumption-failure"
   }
 }
