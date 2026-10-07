@@ -19027,6 +19027,18 @@ name = "symthaea-geodesy"
 version = "0.1.0"
 
 [[package]]
+name = "symthaea-gpu-fabric"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "blake3",
+ "naga 27.0.3",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "symthaea-graph-theory"
 version = "0.1.0"
 
