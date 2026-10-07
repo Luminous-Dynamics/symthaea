@@ -11,7 +11,9 @@ on:
       - "crates/domains/symthaea-swarm/tests/rfc9942_semantic_qualification.rs"
       - "crates/domains/symthaea-swarm/fuzz/**"
       - "crates/domains/symthaea-swarm/src/rfc9942_selection.rs"
+      - "crates/domains/symthaea-swarm/src/holochain_projection.rs"
       - "crates/domains/symthaea-swarm/tests/rfc9942_receipt_selection.rs"
+      - "crates/domains/symthaea-swarm/tests/rfc9942_holochain_projection.rs"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/es256-cose-qualification.yml"
@@ -86,6 +88,8 @@ jobs:
         run: cargo test -p symthaea-swarm --features semantic-receipts --test rfc9942_es256_interop
       - name: Run RFC 9942 receipt-selection qualification
         run: cargo test -p symthaea-swarm --features semantic-receipts --test rfc9942_receipt_selection
+      - name: Run Holochain evidence projection qualification
+        run: cargo test -p symthaea-swarm --features semantic-receipts --test rfc9942_holochain_projection
 
   fuzz-build:
     name: ES256 COSE fuzz target build
