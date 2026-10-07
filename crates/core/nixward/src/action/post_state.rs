@@ -20,6 +20,7 @@ use super::authorization::{
     NixExecutionAuthorizationRecordV1,
 };
 use super::execution_witness::NixLiveExecutionWitnessV1;
+use super::execution_witness::NixLiveExecutionWitnessV1;
 use super::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use super::service_state::{
     ServiceActiveStateV1, ServiceLoadStateV1, ServiceUnitFileStateV1,
