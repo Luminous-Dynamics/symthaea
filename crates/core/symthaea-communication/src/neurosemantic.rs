@@ -415,6 +415,228 @@ pub enum NeurosemanticRemediationStatisticalDependenceModel {
     Unknown,
 }
 
+/// One exact inclusion-probability record for a target frame member.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationSamplingInclusionProbability {
+    pub subject_artifact_hash: String,
+    pub probability_numerator: u64,
+    pub probability_denominator: u64,
+}
+
+impl NeurosemanticRemediationSamplingInclusionProbability {
+    fn validate(&self) -> Result<(), String> {
+        if !valid_blake3_digest(&self.subject_artifact_hash)
+            || self.probability_denominator == 0
+            || self.probability_numerator == 0
+            || self.probability_numerator > self.probability_denominator
+        {
+            return Err(
+                "neurosemantic remediation sampling inclusion probability is invalid".into(),
+            );
+        }
+        Ok(())
+    }
+}
+
+/// Frozen sampling frame used by a statistical execution.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationStatisticalSamplingFrameArtifact {
+    pub schema_version: u16,
+    pub frame_ref: String,
+    pub source_dataset_manifest_hash: String,
+    pub member_artifact_hashes: Vec<String>,
+}
+
+pub const NEUROSEMANTIC_REMEDIATION_STATISTICAL_SAMPLING_FRAME_SCHEMA_VERSION: u16 = 1;
+
+impl NeurosemanticRemediationStatisticalSamplingFrameArtifact {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version
+            != NEUROSEMANTIC_REMEDIATION_STATISTICAL_SAMPLING_FRAME_SCHEMA_VERSION
+            || !valid_identifier(&self.frame_ref)
+            || !valid_blake3_digest(&self.source_dataset_manifest_hash)
+            || self.member_artifact_hashes.is_empty()
+            || self.member_artifact_hashes.len() > MAX_NEUROSEMANTIC_REMEDIATION_OBSERVATIONS
+            || self.member_artifact_hashes.iter().any(|hash| !valid_blake3_digest(hash))
+        {
+            return Err("neurosemantic remediation statistical sampling frame fields are invalid".into());
+        }
+        let unique_members: BTreeSet<&str> =
+            self.member_artifact_hashes.iter().map(String::as_str).collect();
+        if unique_members.len() != self.member_artifact_hashes.len() {
+            return Err(
+                "neurosemantic remediation statistical sampling frame contains duplicate members"
+                    .into(),
+            );
+        }
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic remediation statistical sampling frame JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let artifact: Self = serde_json::from_slice(bytes).map_err(|error| {
+            format!("neurosemantic remediation statistical sampling frame JSON: {error}")
+        })?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn fingerprint(&self) -> Result<String, String> {
+        self.validate()?;
+        let mut canonical = self.clone();
+        canonical.member_artifact_hashes.sort();
+        Ok(content_hash(&serde_json::to_vec(&canonical).map_err(|error| {
+            format!("neurosemantic remediation statistical sampling frame serialization: {error}")
+        })?))
+    }
+}
+
+/// One execution-time binding between an observed subject and a dependence group.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationStatisticalDependenceAssignment {
+    pub subject_artifact_hash: String,
+    #[serde(default)]
+    pub dependence_group_ref: Option<String>,
+}
+
+impl NeurosemanticRemediationStatisticalDependenceAssignment {
+    fn validate(&self) -> Result<(), String> {
+        if !valid_blake3_digest(&self.subject_artifact_hash)
+            || self.dependence_group_ref
+                .as_ref()
+                .is_some_and(|group| !valid_identifier(group))
+        {
+            return Err(
+                "neurosemantic remediation statistical dependence assignment fields are invalid"
+                    .into(),
+            );
+        }
+        Ok(())
+    }
+}
+
+pub const NEUROSEMANTIC_REMEDIATION_STATISTICAL_EXECUTION_SCHEMA_VERSION: u16 = 1;
+
+/// Content-addressed execution evidence for the declared statistical design.
+///
+/// The verifier checks a concrete sampling frame, selected members, inclusion probabilities,
+/// and dependence assignments against the exact observation set. This makes execution
+/// coherence machine-checkable without claiming that the frame covers the intended real-world
+/// target or that a declared randomization procedure was honestly executed.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationStatisticalExecutionArtifact {
+    pub schema_version: u16,
+    pub execution_ref: String,
+    pub design_ref: String,
+    pub metric_ref: String,
+    pub metric_definition_hash: String,
+    pub observation_set_hash: String,
+    pub sampling_frame_hash: String,
+    pub selected_subject_artifact_hashes: Vec<String>,
+    pub inclusion_probabilities: Vec<NeurosemanticRemediationSamplingInclusionProbability>,
+    pub selection_procedure_ref: String,
+    pub dependence_model: NeurosemanticRemediationStatisticalDependenceModel,
+    pub dependence_assignments: Vec<NeurosemanticRemediationStatisticalDependenceAssignment>,
+    pub study_protocol_hash: String,
+    pub execution_revision: String,
+}
+
+impl NeurosemanticRemediationStatisticalExecutionArtifact {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version
+            != NEUROSEMANTIC_REMEDIATION_STATISTICAL_EXECUTION_SCHEMA_VERSION
+            || !valid_identifier(&self.execution_ref)
+            || !valid_identifier(&self.design_ref)
+            || !valid_identifier(&self.metric_ref)
+            || !valid_blake3_digest(&self.metric_definition_hash)
+            || !valid_blake3_digest(&self.observation_set_hash)
+            || !valid_blake3_digest(&self.sampling_frame_hash)
+            || self.selected_subject_artifact_hashes.is_empty()
+            || self.selected_subject_artifact_hashes.len() > MAX_NEUROSEMANTIC_REMEDIATION_OBSERVATIONS
+            || self.selected_subject_artifact_hashes.iter().any(|hash| !valid_blake3_digest(hash))
+            || !valid_identifier(&self.selection_procedure_ref)
+            || self.dependence_assignments.is_empty()
+            || self.dependence_assignments.len() > MAX_NEUROSEMANTIC_REMEDIATION_OBSERVATIONS
+            || !valid_blake3_digest(&self.study_protocol_hash)
+            || !valid_execution_revision(&self.execution_revision)
+        {
+            return Err("neurosemantic remediation statistical execution fields are invalid".into());
+        }
+
+        let selected: BTreeSet<&str> = self
+            .selected_subject_artifact_hashes
+            .iter()
+            .map(String::as_str)
+            .collect();
+        if selected.len() != self.selected_subject_artifact_hashes.len() {
+            return Err(
+                "neurosemantic remediation statistical execution contains duplicate selected subjects"
+                    .into(),
+            );
+        }
+
+        let mut inclusion_members = BTreeSet::new();
+        for inclusion in &self.inclusion_probabilities {
+            inclusion.validate()?;
+            if !inclusion_members.insert(inclusion.subject_artifact_hash.as_str()) {
+                return Err(
+                    "neurosemantic remediation statistical execution contains duplicate inclusion probabilities"
+                        .into(),
+                );
+            }
+        }
+
+        let mut dependence_members = BTreeSet::new();
+        for assignment in &self.dependence_assignments {
+            assignment.validate()?;
+            if !dependence_members.insert(assignment.subject_artifact_hash.as_str()) {
+                return Err(
+                    "neurosemantic remediation statistical execution contains duplicate dependence assignments"
+                        .into(),
+                );
+            }
+        }
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic remediation statistical execution JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let artifact: Self = serde_json::from_slice(bytes).map_err(|error| {
+            format!("neurosemantic remediation statistical execution JSON: {error}")
+        })?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn fingerprint(&self) -> Result<String, String> {
+        self.validate()?;
+        let mut canonical = self.clone();
+        canonical.selected_subject_artifact_hashes.sort();
+        canonical.inclusion_probabilities.sort_by(|left, right| {
+            left.subject_artifact_hash
+                .cmp(&right.subject_artifact_hash)
+        });
+        canonical.dependence_assignments.sort_by(|left, right| {
+            left.subject_artifact_hash
+                .cmp(&right.subject_artifact_hash)
+                .then_with(|| left.dependence_group_ref.cmp(&right.dependence_group_ref))
+        });
+        Ok(content_hash(&serde_json::to_vec(&canonical).map_err(|error| {
+            format!("neurosemantic remediation statistical execution serialization: {error}")
+        })?))
+    }
+}
+
 /// Content-addressed statistical-design contract for an uncertainty calculation.
 ///
 /// This makes method applicability explicit and independently checkable. It records what
