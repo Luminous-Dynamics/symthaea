@@ -65,6 +65,10 @@ impl ReceiptSelectionContext {
     pub fn from_decision(
         decision: &crate::rfc9942_selection::ReceiptSelectionDecision,
     ) -> Result<Self, HolochainProjectionError> {
+        decision
+            .validate()
+            .map_err(|_| HolochainProjectionError::InvalidReceiptSelection)?;
+
         let selected_index = decision
             .selected_index
             .ok_or(HolochainProjectionError::InvalidReceiptSelection)?;
