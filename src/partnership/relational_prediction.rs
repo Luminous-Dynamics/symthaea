@@ -1873,6 +1873,8 @@ pub struct ForecastInferenceSelectionReceipt {
     pub selected_dependence_spec_sha256: String,
     pub selected_resampling_method_id: String,
     pub selected_resampling_spec_sha256: String,
+    pub selected_small_sample_policy_id: String,
+    pub selected_multiplicity_policy_id: String,
     pub selection_blake3: String,
 }
 
