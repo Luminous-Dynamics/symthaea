@@ -68,12 +68,18 @@ fn read_required(path: &Path) -> Vec<u8> {
 
 fn rustc_identity() -> Vec<u8> {
     let rustc = env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
-    Command::new(&rustc)
+    let output = Command::new(&rustc)
         .arg("--version")
         .arg("--verbose")
         .output()
-        .unwrap_or_else(|error| panic!("failed to execute rustc for compiler identity: {error}"))
-        .stdout
+        .unwrap_or_else(|error| panic!("failed to execute rustc for compiler identity: {error}"));
+    if !output.status.success() {
+        panic!(
+            "rustc identity command failed with status {}",
+            output.status
+        );
+    }
+    output.stdout
 }
 
 fn cargo_feature_identity() -> Vec<u8> {
