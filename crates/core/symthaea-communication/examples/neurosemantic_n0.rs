@@ -2341,6 +2341,13 @@ fn main() -> Result<(), String> {
         .verify_derivation_provenance_record_bytes(&derivation_record_bytes)
         .map(|record| record.output_artifact_hash == message.packet.payload_hash)
         .unwrap_or(false);
+    let derivation_lineage_input_alias_blocked = {
+        let mut aliased = derivation_lineage_record.clone();
+        aliased.input_artifact_refs =
+            vec!["synthetic-input-logical-a".into(), "synthetic-input-logical-b".into()];
+        aliased.input_artifact_hashes[1] = aliased.input_artifact_hashes[0].clone();
+        aliased.validate().is_err()
+    };
     let mut malformed_derivation_lineage = derivation_lineage_record.clone();
     malformed_derivation_lineage.execution_revision = "placeholder".into();
     let malformed_derivation_bytes =
@@ -2702,6 +2709,7 @@ fn main() -> Result<(), String> {
         "derivation_provenance_hash_valid": derivation_provenance_hash_valid,
         "derivation_provenance_mismatch_blocked": derivation_provenance_mismatch_blocked,
         "derivation_lineage_structured": derivation_lineage_structured,
+        "derivation_lineage_input_alias_blocked": derivation_lineage_input_alias_blocked,
         "malformed_derivation_lineage_blocked": malformed_derivation_lineage_blocked,
         "derivation_input_artifact_verified": derivation_input_artifact_verified,
         "derivation_input_artifact_mismatch_blocked": derivation_input_artifact_mismatch_blocked,
