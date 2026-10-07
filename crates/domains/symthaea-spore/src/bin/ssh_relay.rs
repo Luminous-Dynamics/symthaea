@@ -2936,9 +2936,9 @@ async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
         return Err("image destination is not a directory".into());
     }
     let mode = dir.mode() & 0o777;
-    if mode != 0o700 || dir.uid() != unsafe { libc::geteuid() } {
+    if !matches!(mode, 0o700 | 0o500) || dir.uid() != unsafe { libc::geteuid() } {
         return Err(format!(
-            "image destination has unsafe ownership or mode {:04o}; require relay-owned 0700",
+            "image destination has unsafe ownership or mode {:04o}; require relay-owned 0700 or frozen 0500",
             mode
         ));
     }
