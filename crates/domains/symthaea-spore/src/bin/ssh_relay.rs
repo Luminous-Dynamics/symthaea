@@ -1500,36 +1500,6 @@ sed -i 's|imports = \[|imports = [ ./system-config.nix|' /mnt/etc/nixos/configur
 /// By writing files directly via the filesystem API, there is no shell
 /// interpolation, no heredoc delimiter to escape, and no injection vector.
 /// The relay runs on the target machine, so direct file writes are possible.
-async fn write_config_files(
-    browser_config: &str,
-    fallback_config: &str,
-    browser_flake: &str,
-) -> Result<(), String> {
-    // Ensure target directory exists
-    tokio::fs::create_dir_all("/mnt/etc/nixos")
-        .await
-        .map_err(|e| format!("Failed to create /mnt/etc/nixos: {}", e))?;
-
-    // configuration.nix
-    let config_body = if browser_config.is_empty() {
-        fallback_config
-    } else {
-        browser_config
-    };
-    tokio::fs::write("/mnt/etc/nixos/configuration.nix", config_body)
-        .await
-        .map_err(|e| format!("Failed to write configuration.nix: {}", e))?;
-
-    // flake.nix (only if the browser supplied one)
-    if !browser_flake.is_empty() {
-        tokio::fs::write("/mnt/etc/nixos/flake.nix", browser_flake)
-            .await
-            .map_err(|e| format!("Failed to write flake.nix: {}", e))?;
-    }
-
-    Ok(())
-}
-
 /// Write NixOS configs by copying pre-staged files from /tmp (no heredoc for user input).
 /// Falls back to heredoc only for server-generated fallback configs (safe: not user-controlled).
 fn config_write_commands(
@@ -1565,11 +1535,12 @@ fn config_write_commands(
         ));
     }
 
-    out.push_str(&format!("rm -rf {}\n", staging));
+    // Rust owns transaction namespace cleanup after the worker completes.
     out
 }
 
 /// Legacy heredoc-based config writing (kept for tests and fallback reference).
+#[cfg(test)]
 fn config_write_commands_heredoc(
     browser_config: &str,
     fallback_config: &str,
