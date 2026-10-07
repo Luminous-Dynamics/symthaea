@@ -433,6 +433,8 @@ pub struct GroundedWorldModelQualificationReport {
     pub learning_response: LearningResponseReport,
     /// Cumulative adaptation stream with explicit prior-shock and invariant-anchor retention.
     pub sequential_learning_response: SequentialLearningResponseReport,
+    /// Prediction-error changepoint detection before regime adaptation.
+    pub change_detection: ChangeDetectionReport,
     /// Adaptation latency for a deliberate change in one revisable environment fact.
     pub regime_shift_adaptation: RegimeShiftAdaptationReport,
 
@@ -559,6 +561,77 @@ pub struct SequentialLearningResponseReport {
     pub anchor_regression_event_rate: f64,
     pub prior_shock_retention_rate: f64,
     pub max_prior_shock_regression: f64,
+}
+
+/// Per-observation receipt for deterministic prediction-error change detection.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChangeDetectionEvent {
+    pub observation_ordinal: u64,
+    pub state_digest: u64,
+    pub residual_mae: f64,
+    pub cusum_score: f64,
+    pub detected: bool,
+}
+
+/// Prediction-error change detector report.
+///
+/// The detector is intentionally separated from adaptation: it observes residuals but never
+/// updates the world model. A nominal control stream measures false alarms before the shifted
+/// regime is evaluated.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChangeDetectionReport {
+    pub baseline_sample_count: u64,
+    pub baseline_residual_mean: f64,
+    pub cusum_allowance: f64,
+    pub cusum_threshold: f64,
+    pub nominal_control_events: Vec<ChangeDetectionEvent>,
+    pub shifted_regime_events: Vec<ChangeDetectionEvent>,
+    pub nominal_false_alarm: bool,
+    pub shifted_regime_detected: bool,
+    pub detection_observation: Option<u64>,
+    pub detection_delay_observations: Option<u64>,
+}
+
+impl ChangeDetectionReport {
+    pub fn is_populated(&self) -> bool {
+        self.baseline_sample_count > 0
+            && !self.nominal_control_events.is_empty()
+            && !self.shifted_regime_events.is_empty()
+    }
+
+    pub fn is_scoreable(&self) -> bool {
+        self.is_populated()
+            && self.baseline_residual_mean.is_finite()
+            && self.cusum_allowance.is_finite()
+            && self.cusum_allowance > 0.0
+            && self.cusum_threshold.is_finite()
+            && self.cusum_threshold > 0.0
+            && self.nominal_control_events.iter().all(|event| {
+                event.state_digest != 0
+                    && event.residual_mae.is_finite()
+                    && event.cusum_score.is_finite()
+            })
+            && self.shifted_regime_events.iter().all(|event| {
+                event.state_digest != 0
+                    && event.residual_mae.is_finite()
+                    && event.cusum_score.is_finite()
+            })
+            && (!self.nominal_false_alarm
+                || self
+                    .nominal_control_events
+                    .iter()
+                    .any(|event| event.detected))
+            && (self.shifted_regime_detected
+                == self
+                    .shifted_regime_events
+                    .iter()
+                    .any(|event| event.detected))
+            && self.detection_observation.map_or(
+                true,
+                |observation| observation > 0 && observation <= self.shifted_regime_events.len() as u64,
+            )
+            && self.detection_delay_observations == self.detection_observation
+    }
 }
 
 /// Per-update receipt for adaptation to an intentionally changed environmental regime.
@@ -1500,6 +1573,133 @@ fn evaluate_sequential_learning_response(
         anchor_regression_event_rate: anchor_regression_event_count as f64 / count,
         prior_shock_retention_rate,
         max_prior_shock_regression,
+    }
+}
+
+const CHANGE_DETECTION_CONTROL_STEPS: u64 = 8;
+const CHANGE_DETECTION_SHIFT_STEPS: u64 = 8;
+const CHANGE_DETECTION_MIN_ALLOWANCE: f64 = 0.001;
+const CHANGE_DETECTION_MIN_THRESHOLD: f64 = 0.01;
+
+fn change_detection_control_states() -> Vec<MicroWorldObservation> {
+    procedural_held_out_scenarios()
+        .into_iter()
+        .skip(4)
+        .take(4)
+        .map(|scenario| scenario.initial)
+        .collect()
+}
+
+fn change_detector_parameters(
+    predictor: &FepWorldModelPredictor<'_>,
+) -> (f64, f64, f64, Vec<MicroWorldObservation>) {
+    let states = change_detection_control_states();
+    let residuals = states
+        .iter()
+        .map(|state| {
+            predictor
+                .predict(*state, MicroAction::Harvest)
+                .mean_absolute_delta(transition(*state, MicroAction::Harvest))
+        })
+        .collect::<Vec<_>>();
+    let sample_count = residuals.len().max(1);
+    let baseline_mean = residuals.iter().sum::<f64>() / sample_count as f64;
+    let allowance = (baseline_mean * 0.25).max(CHANGE_DETECTION_MIN_ALLOWANCE);
+    let threshold = (baseline_mean * 3.0).max(CHANGE_DETECTION_MIN_THRESHOLD);
+    (baseline_mean, allowance, threshold, states)
+}
+
+fn run_change_detector(
+    predictor: &FepWorldModelPredictor<'_>,
+    states: &[MicroWorldObservation],
+    steps: u64,
+    harvest_yield_scale: f64,
+) -> Vec<ChangeDetectionEvent> {
+    if states.is_empty() || steps == 0 {
+        return Vec::new();
+    }
+
+    let mut events = Vec::with_capacity(steps as usize);
+    let (_, allowance, threshold, _) = change_detector_parameters(predictor);
+    let baseline_mean = change_detector_parameters(predictor).0;
+    let mut cusum = 0.0;
+
+    for ordinal in 1..=steps {
+        let state = states[((ordinal - 1) as usize) % states.len()];
+        let actual =
+            transition_with_harvest_yield_scale(state, MicroAction::Harvest, harvest_yield_scale);
+        let residual_mae = predictor
+            .predict(state, MicroAction::Harvest)
+            .mean_absolute_delta(actual);
+        cusum = (cusum + residual_mae - baseline_mean - allowance).max(0.0);
+        let detected = cusum >= threshold;
+
+        events.push(ChangeDetectionEvent {
+            observation_ordinal: ordinal,
+            state_digest: state.digest(),
+            residual_mae,
+            cusum_score: cusum,
+            detected,
+        });
+
+        if detected {
+            break;
+        }
+    }
+
+    events
+}
+
+/// Detect a prediction-error changepoint before adaptation.
+///
+/// The detector uses nominal residuals as a fixed reference and a one-sided CUSUM against
+/// increases in prediction error. A no-shift nominal control is evaluated for false alarms;
+/// only after that control is recorded is the shifted regime evaluated. No model update occurs
+/// during detection, so the detector cannot manufacture the evidence it is supposed to observe.
+fn evaluate_change_detection(
+    base_model: &super::goal_world::WorldModelBridge,
+) -> ChangeDetectionReport {
+    let mut model = base_model.clone();
+    let predictor = FepWorldModelPredictor {
+        bridge: &mut model,
+    };
+
+    let (baseline_mean, allowance, threshold, control_states) =
+        change_detector_parameters(&predictor);
+
+    let nominal_control_events =
+        run_change_detector(
+            &predictor,
+            &control_states,
+            CHANGE_DETECTION_CONTROL_STEPS,
+            1.0,
+        );
+    let nominal_false_alarm = nominal_control_events.iter().any(|event| event.detected);
+
+    let shifted_regime_events =
+        run_change_detector(
+            &predictor,
+            &control_states,
+            CHANGE_DETECTION_SHIFT_STEPS,
+            REGIME_SHIFT_HARVEST_YIELD_SCALE,
+        );
+    let detection_observation = shifted_regime_events
+        .iter()
+        .find(|event| event.detected)
+        .map(|event| event.observation_ordinal);
+    let shifted_regime_detected = detection_observation.is_some();
+
+    ChangeDetectionReport {
+        baseline_sample_count: control_states.len() as u64,
+        baseline_residual_mean: baseline_mean,
+        cusum_allowance: allowance,
+        cusum_threshold: threshold,
+        nominal_control_events,
+        shifted_regime_events,
+        nominal_false_alarm,
+        shifted_regime_detected,
+        detection_observation,
+        detection_delay_observations: detection_observation,
     }
 }
 
@@ -2620,6 +2820,8 @@ impl FepModule {
         let sequential_learning_response =
             evaluate_sequential_learning_response(predictor.bridge, held_out, held_out_cycles);
 
+        let change_detection = evaluate_change_detection(predictor.bridge);
+
         let regime_shift_adaptation =
             evaluate_regime_shift_adaptation(predictor.bridge, held_out);
 
@@ -2658,6 +2860,7 @@ impl FepModule {
             procedural_held_out_transfer,
             learning_response,
             sequential_learning_response,
+            change_detection,
             regime_shift_adaptation,
             persistence_closed_loop_survived: persistence_closed_loop.survived,
             persistence_closed_loop_mean_oracle_horizon_regret:
@@ -3001,6 +3204,31 @@ mod tests {
         assert!((0.0..=1.0).contains(&report.neighbor_improvement_rate));
         assert!((0.0..=1.0).contains(&report.anchor_regression_rate));
         assert!(report.max_anchor_regression.is_finite());
+    }
+
+    #[test]
+    fn change_detection_is_populated_and_separated_from_adaptation() {
+        let model = super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let report = evaluate_change_detection(&model);
+
+        assert!(report.is_populated());
+        assert!(report.is_scoreable());
+        assert!(!report.nominal_control_events.is_empty());
+        assert!(!report.shifted_regime_events.is_empty());
+        assert_eq!(
+            report.shifted_regime_detected,
+            report
+                .shifted_regime_events
+                .iter()
+                .any(|event| event.detected)
+        );
+        assert_eq!(
+            report.nominal_false_alarm,
+            report
+                .nominal_control_events
+                .iter()
+                .any(|event| event.detected)
+        );
     }
 
     #[test]
