@@ -170,6 +170,109 @@ impl NixSystemdLifecycleMutationTransportV1 {
         Ok(job_path)
     }
 
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct NixSystemdUnitFileOperationResultV1 {
+        pub carries_install_info: Option<bool>,
+        pub changes: Vec<NixSystemdUnitFileChangeV1>,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct NixSystemdUnitFileChangeV1 {
+        pub change_type: String,
+        pub filename: String,
+        pub destination: String,
+    }
+
+    pub async fn enable_unit_file_for_manager_owner_and_bus_id(
+        &self,
+        unit: &str,
+        manager_owner: &str,
+        expected_bus_id: &str,
+    ) -> Result<NixSystemdUnitFileOperationResultV1, NixSystemdMutationTransportErrorV1> {
+        let unit = validate_unit_file_name(unit)?;
+        self.verify_manager_epoch(manager_owner, expected_bus_id).await?;
+
+        let manager = Proxy::new(
+            &self.connection,
+            manager_owner,
+            SYSTEMD_MANAGER_PATH,
+            SYSTEMD_MANAGER_INTERFACE,
+        )
+        .await?;
+
+        let (carries_install_info, changes): (bool, Vec<(String, String, String)>) = manager
+            .call(
+                "EnableUnitFiles",
+                &(vec![unit], false, false),
+            )
+            .await?;
+
+        Ok(NixSystemdUnitFileOperationResultV1 {
+            carries_install_info: Some(carries_install_info),
+            changes: validate_unit_file_changes(changes)?,
+        })
+    }
+
+    pub async fn disable_unit_file_for_manager_owner_and_bus_id(
+        &self,
+        unit: &str,
+        manager_owner: &str,
+        expected_bus_id: &str,
+    ) -> Result<NixSystemdUnitFileOperationResultV1, NixSystemdMutationTransportErrorV1> {
+        let unit = validate_unit_file_name(unit)?;
+        self.verify_manager_epoch(manager_owner, expected_bus_id).await?;
+
+        let manager = Proxy::new(
+            &self.connection,
+            manager_owner,
+            SYSTEMD_MANAGER_PATH,
+            SYSTEMD_MANAGER_INTERFACE,
+        )
+        .await?;
+
+        let changes: Vec<(String, String, String)> = manager
+            .call(
+                "DisableUnitFiles",
+                &(vec![unit], false),
+            )
+            .await?;
+
+        Ok(NixSystemdUnitFileOperationResultV1 {
+            carries_install_info: None,
+            changes: validate_unit_file_changes(changes)?,
+        })
+    }
+
+    async fn verify_manager_epoch(
+        &self,
+        manager_owner: &str,
+        expected_bus_id: &str,
+    ) -> Result<(), NixSystemdMutationTransportErrorV1> {
+        validate_manager_owner(manager_owner)?;
+        validate_bus_id(expected_bus_id)?;
+
+        let bus = Proxy::new(
+            &self.connection,
+            DBUS_DESTINATION,
+            DBUS_PATH,
+            DBUS_INTERFACE,
+        )
+        .await?;
+
+        let current_owner: String = bus
+            .call("GetNameOwner", &(SYSTEMD_DESTINATION,))
+            .await?;
+        if current_owner != manager_owner {
+            return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
+        }
+
+        let current_bus_id: String = bus.call("GetId", &()).await?;
+        validate_bus_id(&current_bus_id)?;
+        if current_bus_id != expected_bus_id {
+            return Err(NixSystemdMutationTransportErrorV1::BusIncarnationChanged);
+        }
+        Ok(())
+    }
     pub fn method_name(
         operation: NixServiceOperationKindV1,
     ) -> Result<&'static str, NixSystemdMutationTransportErrorV1> {
