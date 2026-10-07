@@ -39,6 +39,8 @@ const NULL_EVIDENCE_SCHEMA: &str = "relational-prediction-null-evidence/v2";
 const FEATURE_SCHEMA: &str = "relational-prediction-features/v1";
 const MODEL_SCHEMA: &str = "linear-ridge-standardized-v1";
 const DEPENDENCE_PROFILE_SCHEMA: &str = "relational-prediction-loss-dependence/v1";
+const QUALIFICATION_SCHEMA: &str = "relational-prediction-qualification/v1";
+const ROLLING_QUALIFICATION_SCHEMA: &str = "relational-prediction-rolling-qualification/v1";
 
 /// A future outcome paired with features available strictly before that outcome.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1936,7 +1938,7 @@ impl RollingOriginRelationalPredictionQualification {
                     || null_trace.config != held_out_config
                     || null_trace.requested_surrogate_count != self.surrogate_count
                     || null_trace.source_slice_start != expected_start
-                    || null_trace.qualification_input_blake3 != self.evaluation_input_blake3
+                    || null_trace.qualification_input_blake3 != self.qualification_identity_blake3
                     || (null_trace.observed_relational_mse - expected_mse).abs() > 1e-12
                 {
                     return Err(RelationalPredictionError::InvalidSplit);
@@ -1986,6 +1988,117 @@ impl RollingOriginRelationalPredictionQualification {
         Ok(profile)
     }
 
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+
+        let origin_scores = self
+            .observed
+            .segments
+            .iter()
+            .enumerate()
+            .map(|(origin_index, segment)| {
+                let scores = PredictionFeatureSet::all()
+                    .into_iter()
+                    .map(|feature_set| {
+                        let score = segment.score(feature_set);
+                        serde_json::json!({
+                            "feature_set": feature_set_name(feature_set),
+                            "parameter_count": score.parameter_count,
+                            "train_samples": score.train_samples,
+                            "test_samples": score.test_samples,
+                            "mean_absolute_error": score.mean_absolute_error,
+                            "mean_squared_error": score.mean_squared_error
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                serde_json::json!({
+                    "origin_index": origin_index,
+                    "source_slice_start": self.origin_starts[origin_index],
+                    "scores": scores,
+                    "minimum_outcome_horizon": segment.minimum_outcome_horizon,
+                    "maximum_outcome_horizon": segment.maximum_outcome_horizon
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let differentials = self
+            .relational_loss_differentials
+            .iter()
+            .map(|differential| {
+                serde_json::json!({
+                    "origin_index": differential.origin_index,
+                    "sample_index": differential.sample_index,
+                    "feature_time": differential.feature_time,
+                    "outcome_time": differential.outcome_time,
+                    "observed_outcome": differential.observed_outcome,
+                    "non_relational_squared_error": differential.non_relational_squared_error,
+                    "relational_squared_error": differential.relational_squared_error,
+                    "loss_differential": differential.loss_differential
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let null_families = [
+            ("CircularShift", &self.circular_shift_nulls),
+            ("FeatureDecoupling", &self.feature_decoupling_nulls),
+            ("IncrementalRelationalShift", &self.incremental_relational_nulls),
+        ];
+
+        let nulls = null_families
+            .into_iter()
+            .map(|(family, traces)| {
+                let values = traces
+                    .iter()
+                    .map(|trace| {
+                        let json = trace.to_json()?;
+                        serde_json::from_str::<serde_json::Value>(&json)
+                            .map_err(|_| RelationalPredictionError::ModelFitFailed)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok::<_, RelationalPredictionError>(serde_json::json!({
+                    "family": family,
+                    "traces": values
+                }))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(serde_json::json!({
+            "schema": ROLLING_QUALIFICATION_SCHEMA,
+            "level": "rolling-origin",
+            "provenance": {
+                "protocol_id": &self.provenance.protocol_id,
+                "source_data_sha256": &self.provenance.source_data_sha256,
+                "software_commit_sha": &self.provenance.software_commit_sha
+            },
+            "rolling_config": {
+                "first_origin": self.config.first_origin,
+                "train_samples": self.config.train_samples,
+                "test_samples": self.config.test_samples,
+                "gap_samples": self.config.gap_samples,
+                "origin_count": self.config.origin_count,
+                "step_samples": self.config.step_samples,
+                "forecast_horizon": self.config.forecast_horizon,
+                "ridge_lambda": self.config.ridge_lambda
+            },
+            "surrogate_count": self.surrogate_count,
+            "evaluation_input_blake3": &self.evaluation_input_blake3,
+            "qualification_identity_blake3": &self.qualification_identity_blake3,
+            "relational_loss_differentials_blake3": &self.relational_loss_differentials_blake3,
+            "origin_starts": &self.origin_starts,
+            "mean_mse": {
+                "persistence": self.observed.mean_persistence_mse,
+                "isolated_agents": self.observed.mean_isolated_agents_mse,
+                "common_driver": self.observed.mean_common_driver_mse,
+                "synchrony_only": self.observed.mean_synchrony_only_mse,
+                "non_relational_context": self.observed.mean_non_relational_context_mse,
+                "relational_augmented": self.observed.mean_relational_augmented_mse,
+                "relational_profile": self.observed.mean_relational_profile_mse
+            },
+            "origins": origin_scores,
+            "relational_loss_differentials": differentials,
+            "nulls": nulls
+        }).to_string())
+    }
     pub fn verify_against_samples(
         &self,
         samples: &[RelationalPredictionSample],
@@ -2119,6 +2232,16 @@ impl RollingOriginRelationalPredictionQualification {
             config,
             surrogate_count,
         );
+
+        for nulls in [
+            &mut circular_shift_nulls,
+            &mut feature_decoupling_nulls,
+            &mut incremental_relational_nulls,
+        ] {
+            for null_trace in nulls {
+                null_trace.qualification_input_blake3 = qualification_identity_blake3.clone();
+            }
+        }
 
         let qualification = Self {
             provenance,
@@ -2284,9 +2407,9 @@ pub struct PredictionNullSummary {
     /// This is the null-local replay commitment. It deliberately remains
     /// distinct from the parent qualification commitment below.
     pub evaluation_input_blake3: String,
-    /// Parent qualification commitment. Compound qualification bundles bind
-    /// every retained null trace to one shared exact source/configuration
-    /// identity. Standalone null traces initialize this to their local
+    /// Parent qualification identity commitment. Compound qualification bundles
+    /// bind every retained null trace to one shared exact source/configuration/
+    /// provenance identity. Standalone null traces initialize this to their local
     /// evaluation-input commitment until embedded in a parent bundle.
     pub qualification_input_blake3: String,
     pub status: EvidenceStatus,
@@ -2720,7 +2843,7 @@ impl HeldOutRelationalPredictionQualification {
                 || null_trace.status != EvidenceStatus::Proxy
                 || null_trace.config != self.config
                 || null_trace.requested_surrogate_count != self.surrogate_count
-                || null_trace.qualification_input_blake3 != self.evaluation_input_blake3
+                || null_trace.qualification_input_blake3 != self.qualification_identity_blake3
                 || (null_trace.observed_relational_mse - expected_mse).abs() > 1e-12
             {
                 return Err(RelationalPredictionError::InvalidSplit);
@@ -2730,6 +2853,81 @@ impl HeldOutRelationalPredictionQualification {
         Ok(())
     }
 
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+
+        let scores = PredictionFeatureSet::all()
+            .into_iter()
+            .map(|feature_set| {
+                let score = self.observed.score(feature_set);
+                serde_json::json!({
+                    "feature_set": feature_set_name(feature_set),
+                    "parameter_count": score.parameter_count,
+                    "train_samples": score.train_samples,
+                    "test_samples": score.test_samples,
+                    "mean_absolute_error": score.mean_absolute_error,
+                    "mean_squared_error": score.mean_squared_error
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let differentials = self
+            .relational_loss_differentials
+            .iter()
+            .map(|differential| {
+                serde_json::json!({
+                    "origin_index": differential.origin_index,
+                    "sample_index": differential.sample_index,
+                    "feature_time": differential.feature_time,
+                    "outcome_time": differential.outcome_time,
+                    "observed_outcome": differential.observed_outcome,
+                    "non_relational_squared_error": differential.non_relational_squared_error,
+                    "relational_squared_error": differential.relational_squared_error,
+                    "loss_differential": differential.loss_differential
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let nulls = [
+            ("CircularShift", &self.circular_shift_null),
+            ("FeatureDecoupling", &self.feature_decoupling_null),
+            ("IncrementalRelationalShift", &self.incremental_relational_null),
+        ]
+        .into_iter()
+        .map(|(family, trace)| {
+            let json = trace.to_json()?;
+            let value = serde_json::from_str::<serde_json::Value>(&json)
+                .map_err(|_| RelationalPredictionError::ModelFitFailed)?;
+            Ok::<_, RelationalPredictionError>(serde_json::json!({
+                "family": family,
+                "trace": value
+            }))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(serde_json::json!({
+            "schema": QUALIFICATION_SCHEMA,
+            "level": "single-holdout",
+            "provenance": {
+                "protocol_id": &self.provenance.protocol_id,
+                "source_data_sha256": &self.provenance.source_data_sha256,
+                "software_commit_sha": &self.provenance.software_commit_sha
+            },
+            "config": {
+                "train_samples": self.config.train_samples,
+                "test_samples": self.config.test_samples,
+                "gap_samples": self.config.gap_samples,
+                "ridge_lambda": self.config.ridge_lambda
+            },
+            "surrogate_count": self.surrogate_count,
+            "evaluation_input_blake3": &self.evaluation_input_blake3,
+            "qualification_identity_blake3": &self.qualification_identity_blake3,
+            "relational_loss_differentials_blake3": &self.relational_loss_differentials_blake3,
+            "scores": scores,
+            "relational_loss_differentials": differentials,
+            "nulls": nulls
+        }).to_string())
+    }
     pub fn verify_against_samples(
         &self,
         samples: &[RelationalPredictionSample],
@@ -2808,6 +3006,10 @@ impl HeldOutRelationalPredictionQualification {
             config,
             surrogate_count,
         );
+
+        circular_shift_null.qualification_input_blake3 = qualification_identity_blake3.clone();
+        feature_decoupling_null.qualification_input_blake3 = qualification_identity_blake3.clone();
+        incremental_relational_null.qualification_input_blake3 = qualification_identity_blake3.clone();
 
         let qualification = Self {
             provenance,
@@ -4768,17 +4970,23 @@ mod tests {
 
         let expected_digest = evaluation_input_digest(&samples, config());
         assert_eq!(qualification.evaluation_input_blake3, expected_digest);
+        let expected_qualification_identity = single_qualification_identity_digest(
+            &qualification.evaluation_input_blake3,
+            &qualification.provenance,
+            config(),
+            qualification.surrogate_count,
+        );
         assert_eq!(
             qualification.circular_shift_null.qualification_input_blake3,
-            expected_digest
+            expected_qualification_identity
         );
         assert_eq!(
             qualification.feature_decoupling_null.qualification_input_blake3,
-            expected_digest
+            expected_qualification_identity
         );
         assert_eq!(
             qualification.incremental_relational_null.qualification_input_blake3,
-            expected_digest
+            expected_qualification_identity
         );
         qualification.validate().unwrap();
 
@@ -4797,6 +5005,61 @@ mod tests {
             tampered_null.validate(),
             Err(RelationalPredictionError::InvalidSplit)
         );
+    }
+
+    #[test]
+    fn qualification_rejects_null_from_different_provenance_identity() {
+        let samples = build_samples(0.5);
+        let config = config();
+
+        let qualification_a = HeldOutRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            12,
+            provenance(),
+        )
+        .unwrap();
+
+        let mut alternate_provenance = provenance();
+        alternate_provenance.source_data_sha256 =
+            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210".to_string();
+        let qualification_b = HeldOutRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            12,
+            alternate_provenance,
+        )
+        .unwrap();
+
+        let mut tampered = qualification_a.clone();
+        tampered.circular_shift_null.qualification_input_blake3 =
+            qualification_b.circular_shift_null.qualification_input_blake3.clone();
+
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn qualification_serializes_committed_loss_vector_and_identity() {
+        let samples = build_samples(0.5);
+        let qualification = HeldOutRelationalPredictionQualification::compute(
+            &samples,
+            config(),
+            12,
+            provenance(),
+        )
+        .unwrap();
+
+        let json = qualification.to_json().unwrap();
+        assert!(json.contains(QUALIFICATION_SCHEMA));
+        assert!(json.contains("qualification_identity_blake3"));
+        assert!(json.contains("relational_loss_differentials_blake3"));
+        assert!(json.contains("relational_loss_differentials"));
+        assert!(json.contains("CircularShift"));
+        assert!(json.contains("FeatureDecoupling"));
+        assert!(json.contains("IncrementalRelationalShift"));
     }
 
     #[test]
@@ -5611,7 +5874,7 @@ mod tests {
                 .chain(&qualification.feature_decoupling_nulls)
                 .chain(&qualification.incremental_relational_nulls)
                 .all(|trace| trace.qualification_input_blake3
-                    == qualification.evaluation_input_blake3)
+                    == qualification.qualification_identity_blake3)
         );
         assert_eq!(qualification.circular_shift_nulls[0].source_slice_start, config.first_origin);
         assert_eq!(
@@ -5679,6 +5942,38 @@ mod tests {
             tampered.validate(),
             Err(RelationalPredictionError::InvalidEvidenceInputDigest)
         );
+    }
+
+    #[test]
+    fn rolling_qualification_serializes_committed_loss_vector_and_identity() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+
+        let qualification = RollingOriginRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            8,
+            provenance(),
+        )
+        .unwrap();
+
+        let json = qualification.to_json().unwrap();
+        assert!(json.contains(ROLLING_QUALIFICATION_SCHEMA));
+        assert!(json.contains("qualification_identity_blake3"));
+        assert!(json.contains("relational_loss_differentials_blake3"));
+        assert!(json.contains("origin_starts"));
+        assert!(json.contains("CircularShift"));
+        assert!(json.contains("FeatureDecoupling"));
+        assert!(json.contains("IncrementalRelationalShift"));
     }
 
     #[test]
