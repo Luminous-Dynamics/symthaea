@@ -74,7 +74,7 @@ pub fn url_values_equivalent(left: &str, right: &str) -> Result<bool, url::Parse
     Ok(left == right)
 }
 
-fn is_hex_digest(value: &str) -> bool {
+fn is_lower_hex_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
@@ -107,7 +107,7 @@ fn validate_sha256_multibase(
     let digest = decode_sha256_multibase(value)?;
     if let Some(expected) = expected_hex_digest {
         let actual = hex::encode(digest);
-        if !is_hex_digest(expected) || !actual.eq_ignore_ascii_case(expected) {
+        if !is_lower_hex_digest(expected) || !actual.eq_ignore_ascii_case(expected) {
             return Err(VerificationFailure::ControllerDocumentIntegrityMismatch {
                 expected: expected.to_owned(),
                 actual,
@@ -131,7 +131,7 @@ impl ControllerDocumentIntegrityPolicy {
     pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
         match self {
             Self::Unpinned => Ok(()),
-            Self::Sha256Digest(expected) if is_hex_digest(expected) => Ok(()),
+            Self::Sha256Digest(expected) if is_lower_hex_digest(expected) => Ok(()),
             Self::Sha256Digest(_) => Err(VerificationFailure::Structural(
                 "expected controller document digest must be a 64-character hexadecimal digest"
                     .into(),
@@ -158,7 +158,7 @@ impl ControllerDocumentIntegrityAttestation {
     ) -> Result<Self, VerificationFailure> {
         policy.validate_structure()?;
         let actual_digest = actual_digest.into();
-        if !is_hex_digest(&actual_digest) {
+        if !is_lower_hex_digest(&actual_digest) {
             return Err(VerificationFailure::Structural(
                 "controller document digest must be a 64-character hexadecimal digest".into(),
             ));
@@ -194,11 +194,11 @@ impl ControllerDocumentIntegrityAttestation {
 
     pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
         match self {
-            Self::Unpinned { actual_digest } if is_hex_digest(actual_digest) => Ok(()),
+            Self::Unpinned { actual_digest } if is_lower_hex_digest(actual_digest) => Ok(()),
             Self::Sha256Digest {
                 expected_digest,
                 actual_digest,
-            } if is_hex_digest(expected_digest) && actual_digest == expected_digest => Ok(()),
+            } if is_lower_hex_digest(expected_digest) && actual_digest == expected_digest => Ok(()),
             Self::Unpinned { .. } | Self::Sha256Digest { .. } => {
                 Err(VerificationFailure::Structural(
                     "controller document integrity attestation is malformed".into(),
@@ -507,7 +507,7 @@ impl ControllerDocumentDereferenceAttestation {
         }
         self.source.validate_structure()?;
         parse_timestamp("controller document resolved at", &self.resolved_at)?;
-        if !is_hex_digest(&self.document_digest) {
+        if !is_lower_hex_digest(&self.document_digest) {
             return Err(VerificationFailure::Structural(
                 "controller document dereference digest must be a 64-character hexadecimal digest"
                     .into(),
@@ -1180,7 +1180,7 @@ impl VerificationMethodResolution {
             .expect("verification relationship member set is serializable");
         let relationship_methods_digest = crate::sha256_hex(&bytes);
 
-        if !is_hex_digest(&controller_document_digest) {
+        if !is_lower_hex_digest(&controller_document_digest) {
             return Err(VerificationFailure::Structural(
                 "controller document digest must be a 64-character hexadecimal digest".into(),
             ));
@@ -1190,7 +1190,7 @@ impl VerificationMethodResolution {
                 "verification method type must be non-empty".into(),
             ));
         }
-        if !is_hex_digest(&verification_method_material_digest) {
+        if !is_lower_hex_digest(&verification_method_material_digest) {
             return Err(VerificationFailure::Structural(
                 "verification method material digest must be a 64-character hexadecimal digest"
                     .into(),
@@ -1249,7 +1249,7 @@ impl VerificationMethodResolution {
                 "verification method type must be non-empty".into(),
             ));
         }
-        if !is_hex_digest(&self.verification_method_material_digest) {
+        if !is_lower_hex_digest(&self.verification_method_material_digest) {
             return Err(VerificationFailure::Structural(
                 "verification method material digest must be a 64-character hexadecimal digest"
                     .into(),
@@ -1354,12 +1354,12 @@ impl VerificationMethodResolution {
                 "relationship methods digest does not match member set".into(),
             ));
         }
-        if !is_hex_digest(&self.relationship_methods_digest) {
+        if !is_lower_hex_digest(&self.relationship_methods_digest) {
             return Err(VerificationFailure::Structural(
                 "relationship methods digest must be a 64-character hexadecimal digest".into(),
             ));
         }
-        if !is_hex_digest(&self.controller_document_digest) {
+        if !is_lower_hex_digest(&self.controller_document_digest) {
             return Err(VerificationFailure::Structural(
                 "controller document digest must be a 64-character hexadecimal digest".into(),
             ));
@@ -1561,7 +1561,7 @@ impl VerificationRequest {
         digest: impl Into<String>,
     ) -> Result<Self, VerificationFailure> {
         let digest = digest.into();
-        if !is_hex_digest(&digest) {
+        if !is_lower_hex_digest(&digest) {
             return Err(VerificationFailure::Structural(
                 "expected transformed document digest must be a 64-character hexadecimal digest"
                     .into(),
@@ -1618,12 +1618,12 @@ impl VerificationRequest {
                 "unsupported verification request schema version".into(),
             ));
         }
-        if !is_hex_digest(&self.claim_representation_digest) {
+        if !is_lower_hex_digest(&self.claim_representation_digest) {
             return Err(VerificationFailure::Structural(
                 "claim representation digest must be a 64-character hexadecimal digest".into(),
             ));
         }
-        if !is_hex_digest(&self.statement_digest) {
+        if !is_lower_hex_digest(&self.statement_digest) {
             return Err(VerificationFailure::Structural(
                 "statement digest must be a 64-character hexadecimal digest".into(),
             ));
@@ -1649,7 +1649,7 @@ impl VerificationRequest {
             .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
         self.expected_verification_relationship.validate_structure()?;
         if let Some(digest) = &self.expected_transformed_document_digest {
-            if !is_hex_digest(digest) {
+            if !is_lower_hex_digest(digest) {
                 return Err(VerificationFailure::Structural(
                     "expected transformed document digest must be a 64-character hexadecimal digest"
                         .into(),
@@ -1781,7 +1781,7 @@ impl CryptographicVerificationReceipt {
         if !resolution.matches_request(request) {
             return Err(VerificationFailure::ResolutionRequestMismatch);
         }
-        if !is_hex_digest(&self.claim_representation_digest)
+        if !is_lower_hex_digest(&self.claim_representation_digest)
             || self.claim_representation_digest != request.claim_representation_digest
         {
             return Err(VerificationFailure::Structural(
@@ -1789,7 +1789,7 @@ impl CryptographicVerificationReceipt {
                     .into(),
             ));
         }
-        if !is_hex_digest(&self.statement_digest) || self.statement_digest != request.statement_digest
+        if !is_lower_hex_digest(&self.statement_digest) || self.statement_digest != request.statement_digest
         {
             return Err(VerificationFailure::Structural(
                 "cryptographic receipt statement identity does not match request".into(),
@@ -1815,7 +1815,7 @@ impl CryptographicVerificationReceipt {
             });
         }
         if let Some(digest) = &self.expected_transformed_document_digest {
-            if !is_hex_digest(digest) {
+            if !is_lower_hex_digest(digest) {
                 return Err(VerificationFailure::Structural(
                     "cryptographic receipt expected transformed document digest must be a 64-character hexadecimal digest"
                         .into(),
@@ -1859,7 +1859,7 @@ impl CryptographicVerificationReceipt {
             ("cryptographic input digest", self.cryptographic_input_digest.as_str()),
             ("proof digest", self.proof_digest.as_str()),
         ] {
-            if !is_hex_digest(value) {
+            if !is_lower_hex_digest(value) {
                 return Err(VerificationFailure::Structural(format!(
                     "{name} must be a 64-character hexadecimal digest"
                 )));
@@ -2105,7 +2105,7 @@ impl VerificationEvidence {
         self.cryptographic_verification
             .validate_against(&request, &self.resolution)?;
 
-        if !is_hex_digest(&self.controller_document_digest) {
+        if !is_lower_hex_digest(&self.controller_document_digest) {
             return Err(VerificationFailure::Structural(
                 "controller document digest must be a 64-character hexadecimal digest".into(),
             ));
@@ -3928,6 +3928,18 @@ mod tests {
             .clone();
 
         assert_ne!(base.evidence_digest(), rebound.evidence_digest());
+    }
+
+    #[test]
+    fn sha256_digest_admission_rejects_uppercase_hex() {
+        let uppercase = "AB".repeat(32);
+        assert!(!is_lower_hex_digest(&uppercase));
+
+        assert!(matches!(
+            ControllerDocumentIntegrityPolicy::Sha256Digest(uppercase).validate_structure(),
+            Err(VerificationFailure::Structural(message))
+                if message.contains("64-character hexadecimal digest")
+        ));
     }
 
     #[test]
