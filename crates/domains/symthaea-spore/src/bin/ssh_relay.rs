@@ -4374,20 +4374,6 @@ async fn open_verified_image_artifact(
     Ok(file)
 }
 
-fn restore_configuration_from_verified_stdin() -> &'static str {
-    r#"set -euo pipefail
-CONFIG_TMP=$(mktemp /mnt/etc/nixos/.configuration.nix.restore.XXXXXX)
-cleanup() {
-    rm -f -- "$CONFIG_TMP"
-}
-trap cleanup EXIT
-cat > "$CONFIG_TMP"
-chmod 600 "$CONFIG_TMP"
-mv -f -- "$CONFIG_TMP" /mnt/etc/nixos/configuration.nix
-trap - EXIT
-"# 
-}
-
 async fn verify_restored_image_postcondition(
     expected_configuration: &ArtifactCommitment,
 ) -> Result<bool, String> {
@@ -8599,6 +8585,18 @@ echo '}'
                         continue;
                     }
                 };
+                if let Err(error) = ensure_no_orphan_configuration_swaps() {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Configuration recovery fence is active: {error}"
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
                 let Some(transaction) = admit_mutation_transaction(
                     &mut ws_tx,
                     &transaction_ledger,
