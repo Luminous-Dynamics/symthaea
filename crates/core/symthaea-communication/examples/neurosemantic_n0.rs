@@ -869,7 +869,7 @@ fn main() -> Result<(), String> {
         upper_numerator: 1,
         scale: 4,
         confidence_level_bps: 9_500,
-        method_ref: "wilson-interval-v1".into(),
+        method_ref: "synthetic-structural-interval-v1".into(),
         execution_revision: execution_revision.clone(),
     };
     let uncertainty_computation_bytes =
@@ -917,7 +917,7 @@ fn main() -> Result<(), String> {
                     upper_numerator: 1,
                     scale: 4,
                     confidence_level_bps: 9_500,
-                    uncertainty_method_ref: "wilson-interval-v1".into(),
+                    uncertainty_method_ref: "synthetic-structural-interval-v1".into(),
                     uncertainty_computation_artifact_hash: uncertainty_computation.fingerprint()?,
                 },
                 eligible_sample_count: 2,
@@ -1245,7 +1245,7 @@ fn main() -> Result<(), String> {
                 upper_numerator: 1,
                 scale: 4,
                 confidence_level_bps: 9_500,
-                uncertainty_method_ref: "wilson-interval-v1".into(),
+                uncertainty_method_ref: "synthetic-structural-interval-v1".into(),
             };
         let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
         remediation_impact.verify_measurement_artifact_bytes(&bytes).is_err()
