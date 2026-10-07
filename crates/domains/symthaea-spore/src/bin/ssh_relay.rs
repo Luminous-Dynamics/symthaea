@@ -3657,7 +3657,7 @@ async fn copy_optional_image_sidecar(
     required: bool,
 ) -> Result<(), String> {
     use std::ffi::CString;
-    use std::io::{copy, Read, Write};
+    use std::io::copy;
     use std::os::fd::{AsRawFd, FromRawFd};
     use std::os::unix::ffi::OsStrExt;
     use std::os::unix::fs::OpenOptionsExt;
@@ -10803,6 +10803,45 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn image_sidecar_copy_rejects_source_symlinks() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "nixforhumanity-sidecar-copy-{transaction_id}"
+        ));
+        let image_dir = root.join("image");
+        let source = root.join("configuration.nix");
+        std::fs::create_dir_all(&image_dir).unwrap();
+        std::fs::set_permissions(
+            &root,
+            std::fs::Permissions::from_mode(0o700),
+        )
+        .unwrap();
+        std::fs::set_permissions(
+            &image_dir,
+            std::fs::Permissions::from_mode(0o700),
+        )
+        .unwrap();
+
+        std::os::unix::fs::symlink("/etc/passwd", &source).unwrap();
+        let error = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(copy_optional_image_sidecar(
+                image_dir.to_str().unwrap(),
+                source.to_str().unwrap(),
+                true,
+            ))
+            .expect_err("sidecar source symlink must be rejected");
+        assert!(
+            error.contains("unavailable") || error.contains("Too many levels"),
+            "unexpected symlink rejection: {error}"
+        );
+
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
