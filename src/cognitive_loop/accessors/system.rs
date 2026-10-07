@@ -38,7 +38,7 @@ impl CognitiveLoopService {
 
         /// Read-only viability state. The current integration is observational.
         pub fn viability_state(&self) -> &super::super::viability_fabric::ViabilityState {
-            self.viability.state()
+            self.fep.viability_fabric.state()
         }
 
         /// Current homeostatic regulation recommendation.
@@ -47,7 +47,7 @@ impl CognitiveLoopService {
         pub fn viability_regulation(
             &self,
         ) -> super::super::viability_fabric::RegulationDecision {
-            self.viability
+            self.fep.viability_fabric
                 .regulation_decision(super::super::viability_fabric::RegulationThresholds::default())
         }
 
