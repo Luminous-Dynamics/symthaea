@@ -23,6 +23,222 @@ use super::viability_micro_world::{
     MicroWorldObservation, MicroWorldPredictor, MicroWorldScenario, PersistencePredictor,
 };
 
+use crate::dynamics::ode_solvers::{
+    OdeConfig, OdeResult, OdeSolver, OdeSolverEngine, OdeSystem,
+};
+use symthaea_fep::{GenerativeModel, HiddenState};
+
+/// Common action-conditioned transition contract used by both learned and generative
+/// transition models.
+///
+/// The interface is deliberately representation-neutral: callers provide a continuous
+/// state vector and receive the model's one-step expected state. A model may optionally
+/// expose action-level confidence when it has an evidence-bearing confidence signal.
+pub trait ActionConditionedTransitionModel {
+    fn state_dimension(&self) -> usize;
+    fn action_count(&self) -> usize;
+
+    fn predict_next_state(&self, state: &[f64], action: usize) -> Option<Vec<f64>>;
+
+    fn action_confidence(&self, _action: usize) -> Option<f64> {
+        None
+    }
+}
+
+impl ActionConditionedTransitionModel for super::goal_world::WorldModelBridge {
+    fn state_dimension(&self) -> usize {
+        64
+    }
+
+    fn action_count(&self) -> usize {
+        self.action_samples(usize::MAX)
+            .map(|_| 0)
+            .unwrap_or_else(|| {
+                // The bridge intentionally does not expose its private action-vector length.
+                // Qualification therefore validates action indices through the prediction call.
+                64
+            })
+    }
+
+    fn predict_next_state(&self, state: &[f64], action: usize) -> Option<Vec<f64>> {
+        if state.len() != 64 {
+            return None;
+        }
+
+        let input: Vec<f32> = state.iter().map(|&value| value as f32).collect();
+        self.predict_action(action, &input)
+            .map(|predicted| predicted.into_iter().map(|value| value as f64).collect())
+    }
+
+    fn action_confidence(&self, action: usize) -> Option<f64> {
+        self.action_confidence(action).map(|value| value as f64)
+    }
+}
+
+impl ActionConditionedTransitionModel for GenerativeModel {
+    fn state_dimension(&self) -> usize {
+        self.state_dim
+    }
+
+    fn action_count(&self) -> usize {
+        self.num_actions
+    }
+
+    fn predict_next_state(&self, state: &[f64], action: usize) -> Option<Vec<f64>> {
+        if state.len() != self.state_dim || action >= self.num_actions {
+            return None;
+        }
+
+        let hidden = HiddenState {
+            mean: state.to_vec(),
+            precision: vec![1.0; self.state_dim],
+            mode_probs: vec![1.0],
+            current_mode: 0,
+        };
+
+        Some(symthaea_fep::GenerativeModel::predict_next_state(
+            self, &hidden, action,
+        )
+        .mean)
+    }
+}
+
+/// Continuous extension of an action-conditioned discrete transition model.
+///
+/// The field is explicitly defined as:
+///
+/// ds/dt = (F(s,a) - s) / tau
+///
+/// For a delta model, F(s,a)=s+delta, so the field becomes a constant action-specific
+/// velocity. This is a qualification adapter, not an assertion that this extension is
+/// the only scientifically valid continuous-time realization.
+pub struct ActionConditionedTransitionOde<'a, M: ActionConditionedTransitionModel + ?Sized> {
+    pub model: &'a M,
+    pub action: usize,
+    pub tau: f64,
+    pub dim: usize,
+}
+
+impl<'a, M: ActionConditionedTransitionModel + ?Sized>
+    ActionConditionedTransitionOde<'a, M>
+{
+    pub fn new(model: &'a M, action: usize, tau: f64) -> Option<Self> {
+        let dim = model.state_dimension();
+        if dim == 0
+            || action >= model.action_count()
+            || !tau.is_finite()
+            || tau <= 0.0
+        {
+            return None;
+        }
+
+        Some(Self {
+            model,
+            action,
+            tau,
+            dim,
+        })
+    }
+}
+
+impl<M: ActionConditionedTransitionModel + ?Sized> OdeSystem
+    for ActionConditionedTransitionOde<'_, M>
+{
+    fn dimension(&self) -> usize {
+        self.dim
+    }
+
+    fn evaluate(&self, _t: f64, state: &[f64], derivative: &mut [f64]) {
+        let Some(next) = self.model.predict_next_state(state, self.action) else {
+            derivative.fill(0.0);
+            return;
+        };
+
+        if next.len() != self.dim {
+            derivative.fill(0.0);
+            return;
+        }
+
+        for i in 0..self.dim {
+            derivative[i] = (next[i] - state[i]) / self.tau;
+        }
+    }
+}
+
+/// Result of a continuous trajectory rollout through a shared transition model.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ContinuousTransitionRollout {
+    pub action: usize,
+    pub horizon_seconds: f64,
+    pub tau: f64,
+    pub ode_steps: usize,
+    pub initial_state: Vec<f64>,
+    pub one_step_prediction: Vec<f64>,
+    pub terminal_state: Vec<f64>,
+    pub action_confidence: Option<f64>,
+}
+
+/// Roll a single action through the shared transition interface using the existing
+/// Dormand-Prince ODE engine.
+///
+/// This function is intentionally isolated from runtime policy. Its purpose is to test
+/// whether a model that predicts one-step consequences also supports coherent continuous
+/// extrapolation.
+pub fn roll_transition_model_trajectory<M: ActionConditionedTransitionModel + ?Sized>(
+    model: &M,
+    state: &[f64],
+    action: usize,
+    horizon_seconds: f64,
+    tau: f64,
+    max_steps: usize,
+) -> Option<ContinuousTransitionRollout> {
+    if state.len() != model.state_dimension()
+        || !horizon_seconds.is_finite()
+        || horizon_seconds <= 0.0
+        || max_steps == 0
+    {
+        return None;
+    }
+
+    let one_step_prediction = model.predict_next_state(state, action)?;
+    if one_step_prediction.len() != state.len()
+        || one_step_prediction.iter().any(|value| !value.is_finite())
+    {
+        return None;
+    }
+
+    let ode_config = OdeConfig {
+        solver: OdeSolver::DormandPrince,
+        dt: 0.01,
+        tolerance: 1e-4,
+        max_step: (horizon_seconds / 5.0).max(1e-6),
+        min_step: 1e-8,
+        max_iterations: max_steps,
+    };
+    let solver = OdeSolverEngine::new(ode_config, state.len());
+    let ode_system = ActionConditionedTransitionOde::new(model, action, tau)?;
+
+    let result: OdeResult =
+        solver.solve(&ode_system, state, (0.0, horizon_seconds));
+
+    let terminal_state = result
+        .states
+        .last()
+        .cloned()
+        .filter(|values| values.len() == state.len())?;
+
+    Some(ContinuousTransitionRollout {
+        action,
+        horizon_seconds,
+        tau,
+        ode_steps: result.times.len(),
+        initial_state: state.to_vec(),
+        one_step_prediction,
+        terminal_state,
+        action_confidence: model.action_confidence(action),
+    })
+}
+
 /// Confidence calibration statistics for continuous one-step state forecasts.
 ///
 /// realized_accuracy = 1 - MAE is valid here because every micro-world state channel
