@@ -1507,6 +1507,14 @@ impl NixOSExecutor {
             };
         }
 
+        if !self.dry_run && matches!(&command, NixOSCommand::Service { .. }) {
+            return ExecutionResult::Blocked {
+                reason: "typed Service effects must use the governed manager-bound D-Bus dispatch path"
+                    .to_string(),
+                safety_level: safety,
+            };
+        }
+
         let (cmd, args) = command.to_command();
 
         match &basis {
