@@ -119,6 +119,10 @@ pub struct Rfc9942VerifiedReceipt {
     algorithm_id: i64,
     vds_id: u64,
     proof: Rfc9942VerifiedProof,
+    /// SHA-256 fingerprint of the exact COSE payload bytes authenticated by the
+    /// Receipt signature. For RFC 9942 inclusion this is the proof-derived
+    /// Merkle root; for consistency it is the newer Merkle root.
+    payload_sha256: [u8; 32],
     /// SHA-256 fingerprint of the exact public key bytes used to authenticate
     /// the Receipt. This prevents downstream policy code from confusing an
     /// otherwise identical proof authenticated under a different trust root.
@@ -136,6 +140,7 @@ impl Rfc9942VerifiedReceipt {
     pub const fn algorithm_id(&self) -> i64 { self.algorithm_id }
     pub const fn vds_id(&self) -> u64 { self.vds_id }
     pub const fn proof(&self) -> Rfc9942VerifiedProof { self.proof }
+    pub const fn payload_sha256(&self) -> [u8; 32] { self.payload_sha256 }
     pub const fn verification_key_sha256(&self) -> [u8; 32] { self.verification_key_sha256 }
     pub const fn protected_header_sha256(&self) -> [u8; 32] { self.protected_header_sha256 }
     pub const fn external_aad_sha256(&self) -> [u8; 32] { self.external_aad_sha256 }
@@ -477,6 +482,7 @@ impl Rfc9942ReceiptEnvelope {
     fn verified_state(
         &self,
         proof: Rfc9942VerifiedProof,
+        payload: &[u8],
         public_key: &[u8],
         external_aad: &[u8],
     ) -> Rfc9942VerifiedReceipt {
@@ -484,6 +490,7 @@ impl Rfc9942ReceiptEnvelope {
             algorithm_id: self.algorithm_id,
             vds_id: self.vds_id,
             proof,
+            payload_sha256: sha256(payload),
             verification_key_sha256: sha256(public_key),
             protected_header_sha256: sha256(&self.protected_header_bytes()),
             external_aad_sha256: sha256(external_aad),
@@ -695,16 +702,21 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<Rfc9942VerifiedReceipt, Rfc9942VdpError> {
-        let (proof_index, head, signature_payload) = match (&self.payload, detached_payload) {
-            (Rfc9942ReceiptPayload::Attached(_), Some(_)) => {
-                return Err(Rfc9942VdpError::InvalidStructure);
-            }
-            (Rfc9942ReceiptPayload::Attached(_), None) => {
-                let root = self.payload.attached_root().ok_or(Rfc9942VdpError::InvalidPayloadLength)?;
-                let (proof_index, head) = self.vdp.verify_inclusion_with_payload_index(candidate_entry, &root)?;
-                (proof_index, head, None)
-            }
-            (Rfc9942ReceiptPayload::Detached, supplied) => {
+        let (proof_index, head, signature_payload, authenticated_payload) =
+            match (&self.payload, detached_payload) {
+                (Rfc9942ReceiptPayload::Attached(_), Some(_)) => {
+                    return Err(Rfc9942VdpError::InvalidStructure);
+                }
+                (Rfc9942ReceiptPayload::Attached(_), None) => {
+                    let root = self
+                        .payload
+                        .attached_root()
+                        .ok_or(Rfc9942VdpError::InvalidPayloadLength)?;
+                    let (proof_index, head) =
+                        self.vdp.verify_inclusion_with_payload_index(candidate_entry, &root)?;
+                    (proof_index, head, None, root)
+                }
+                (Rfc9942ReceiptPayload::Detached, supplied) => {
                 // Inclusion proof verification derives the root first. A
                 // caller-supplied detached payload, when present, must equal
                 // that derived root byte-for-byte before signature checking.
@@ -715,18 +727,23 @@ impl Rfc9942ReceiptEnvelope {
                         return Err(Rfc9942VdpError::NoMatchingProof);
                     }
                 }
-                let root = head.root();
-                (proof_index, head, Some(root))
-            }
-        };
+                    let root = head.root();
+                    (proof_index, head, Some(root), root)
+                }
+            };
 
-        self.verify_es256(public_key, external_aad, signature_payload.as_ref().map(|root| root.as_slice()))?;
+        self.verify_es256(
+            public_key,
+            external_aad,
+            signature_payload.as_ref().map(|root| root.as_slice()),
+        )?;
         Ok(self.verified_state(
             Rfc9942VerifiedProof::Inclusion {
                 proof_index,
                 head,
                 candidate_leaf: leaf_hash(candidate_entry),
             },
+            &authenticated_payload,
             public_key,
             external_aad,
         ))
@@ -756,6 +773,7 @@ impl Rfc9942ReceiptEnvelope {
             self.vdp.verify_consistency_with_payload_index(older, payload)?;
         Ok(self.verified_state(
             Rfc9942VerifiedProof::Consistency { proof_index, older, newer },
+            payload,
             public_key,
             external_aad,
         ))
