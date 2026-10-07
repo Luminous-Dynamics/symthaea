@@ -12,7 +12,9 @@ use thiserror::Error;
 mod vulkan;
 
 #[cfg(feature = "vulkan")]
-pub use vulkan::{VULKAN_HDC_XOR_WGSL, VulkanDeviceIdentity, VulkanError, VulkanExecutor};
+pub use vulkan::{
+    VULKAN_HDC_XOR_WGSL, VulkanDeviceIdentity, VulkanDevicePolicy, VulkanError, VulkanExecutor,
+};
 
 pub const PLAN_VERSION: u16 = 1;
 pub const RECEIPT_VERSION: u16 = 1;
