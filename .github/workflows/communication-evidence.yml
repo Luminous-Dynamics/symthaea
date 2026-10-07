@@ -164,6 +164,7 @@ jobs:
           assert report["remediation_computation_substitution_blocked"] is True
           assert report["remediation_uncertainty_substitution_blocked"] is True
           assert report["remediation_uncertainty_point_estimate_binding_blocked"] is True
+          assert report["remediation_uncertainty_inference_scope_blocked"] is True
           assert report["remediation_uncertainty_assumptions_substitution_blocked"] is True
           assert report["remediation_wilson_uncertainty_numerically_recomputed"] is True
           assert report["remediation_metric_direction_mismatch_blocked"] is True
