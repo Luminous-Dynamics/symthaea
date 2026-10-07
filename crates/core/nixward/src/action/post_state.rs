@@ -803,6 +803,7 @@ impl NixPostStateReceiptV1 {
             observed_unit_file_state: observation.unit_file_state,
             observed_service_result: observation.service_result.clone(),
             systemd_manager_owner: manager_owner,
+            systemd_bus_id: observation.systemd_bus_id.clone(),
             pre_invocation_id: expectation.pre_invocation_id.clone(),
             post_invocation_id: observation.invocation_id.clone(),
             postcondition: assessment,
@@ -1193,6 +1194,7 @@ impl NixPostStateReceiptV1 {
         put_u8(&mut h, unit_file_state_tag(self.observed_unit_file_state));
         put_str(&mut h, &self.observed_service_result);
         put_str(&mut h, &self.systemd_manager_owner);
+        put_opt_str(&mut h, self.systemd_bus_id.as_deref());
         put_opt_str(&mut h, self.pre_invocation_id.as_deref());
         put_opt_str(&mut h, self.post_invocation_id.as_deref());
         put_u8(&mut h, assessment_tag(self.postcondition));
