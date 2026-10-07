@@ -349,6 +349,10 @@ impl PredictionEvidenceRecord {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
         }
 
+        if self.train_samples < 8 || self.test_samples < 4 {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
         if self.predictions.len() != self.test_samples
             || self.observed_outcomes.len() != self.test_samples
             || self.feature_times.len() != self.test_samples
@@ -2845,6 +2849,38 @@ mod tests {
             gap_samples: 4,
             ridge_lambda: 1e-8,
         }
+    }
+
+    #[test]
+    fn evidence_trace_rejects_undersized_training_or_test_windows() {
+        let samples = build_samples(0.5);
+        let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            provenance(),
+        )
+        .unwrap();
+
+        let mut tampered = evidence.records[0].clone();
+        tampered.train_samples = 7;
+        assert_eq!(
+            tampered.validate_trace(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
+        let mut tampered = evidence.records[0].clone();
+        tampered.test_samples = 3;
+        tampered.predictions.truncate(3);
+        tampered.observed_outcomes.truncate(3);
+        tampered.feature_times.truncate(3);
+        tampered.outcome_times.truncate(3);
+        if let Some(features) = tampered.test_features.get_mut(..3) {
+            tampered.test_features = features.to_vec();
+        }
+        assert_eq!(
+            tampered.validate_trace(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
     }
 
     #[test]
