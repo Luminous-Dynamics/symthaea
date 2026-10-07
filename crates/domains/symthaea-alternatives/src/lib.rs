@@ -24,7 +24,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 42;
+pub const SCHEMA_VERSION: u16 = 43;
 /// Assessment algorithm version.
 pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-v59";
 
@@ -1389,6 +1389,14 @@ pub struct CandidatePathway {
 }
 
 impl CandidatePathway {
+    /// Compute the canonical semantic digest committed by experimental designs.
+    ///
+    /// The digest covers candidate identity, pathway kind, functional performance,
+    /// operating capabilities, burdens, evidence, and candidate derivation lineage.
+    pub fn canonical_digest(&self) -> Result<String, AssessmentError> {
+        canonical_candidate_pathway_hash(self)
+    }
+
     /// Validate the candidate, performance values, burden intervals, evidence
     /// references, and evidence records.
     pub fn validate(&self) -> Result<(), AssessmentError> {
@@ -2506,6 +2514,11 @@ pub struct ExperimentalDesignProvenance {
     pub unresolved_uncertainty_refs: Vec<String>,
     /// Exact candidate identities included in the discrimination set.
     pub candidate_ids: Vec<String>,
+    /// Canonical semantic digest for each candidate identity in the discrimination set.
+    ///
+    /// This binds the design to the exact candidate pathway payload rather than
+    /// allowing a stable candidate ID to be silently reused for changed semantics.
+    pub candidate_digests: BTreeMap<String, String>,
     /// Typed candidate-discrimination targets.
     pub expected_discrimination: Vec<ExperimentalDiscriminationTarget>,
     /// Exact documented protocol identity.
@@ -2526,6 +2539,7 @@ impl ExperimentalDesignProvenance {
             || self.hypothesis_statement.is_empty()
             || self.unresolved_uncertainty_refs.is_empty()
             || self.candidate_ids.is_empty()
+            || self.candidate_digests.is_empty()
             || self.expected_discrimination.is_empty()
             || self.unresolved_uncertainty_refs.iter().any(String::is_empty)
             || self.candidate_ids.iter().any(String::is_empty)
@@ -2535,7 +2549,15 @@ impl ExperimentalDesignProvenance {
         let mut ids = self.candidate_ids.clone();
         ids.sort();
         ids.dedup();
-        if ids.len() != self.candidate_ids.len() {
+        if ids.len() != self.candidate_ids.len()
+            || self
+                .candidate_digests
+                .iter()
+                .any(|(id, digest)| !ids.binary_search(id).is_ok() || digest.is_empty())
+            || ids
+                .iter()
+                .any(|id| self.candidate_digests.get(id).is_none_or(String::is_empty))
+        {
             return Err(AssessmentError::InvalidExperimentalDesign);
         }
 
@@ -3184,6 +3206,15 @@ pub enum AssessmentError {
         /// Unit declared by the stopping criterion.
         actual_unit: String,
     },
+    /// An experimental design carries a different semantic digest for a candidate.
+    ExperimentalDesignCandidateDigestMismatch {
+        /// Candidate identity whose semantics drifted.
+        candidate_id: String,
+        /// Canonical digest computed from the supplied candidate.
+        expected_digest: String,
+        /// Digest committed by the experimental design.
+        actual_digest: String,
+    },
     /// An experimental design references a candidate not present in the assessment.
     ExperimentalDesignCandidateMissing(String),
     /// An experimental design uses a comparison basis not declared by the assessment requirement.
@@ -3559,6 +3590,14 @@ impl std::fmt::Display for AssessmentError {
                 f,
                 "evidence {evidence_id} measurand {actual_measurand_id} does not match target measurand {expected_measurand_id}"
             ),
+            Self::ExperimentalDesignCandidateDigestMismatch {
+                candidate_id,
+                expected_digest,
+                actual_digest,
+            } => write!(
+                f,
+                "experimental design candidate {candidate_id} digest {actual_digest} does not match canonical candidate digest {expected_digest}"
+            ),
             Self::ExperimentalDesignCandidateMissing(id) => write!(
                 f,
                 "experimental design references candidate {id} not present in assessment"
@@ -3788,10 +3827,22 @@ impl AlternativesEngine {
         experimental_design.validate_against(requirement)?;
 
         for candidate_id in &experimental_design.candidate_ids {
-            if !candidates.iter().any(|candidate| &candidate.id == candidate_id) {
+            let Some(candidate) = candidates.iter().find(|candidate| &candidate.id == candidate_id) else {
                 return Err(AssessmentError::ExperimentalDesignCandidateMissing(
                     candidate_id.clone(),
                 ));
+            };
+            let expected_digest = candidate.canonical_digest()?;
+            let actual_digest = experimental_design
+                .candidate_digests
+                .get(candidate_id)
+                .expect("validated candidate digest binding exists");
+            if actual_digest != &expected_digest {
+                return Err(AssessmentError::ExperimentalDesignCandidateDigestMismatch {
+                    candidate_id: candidate_id.clone(),
+                    expected_digest,
+                    actual_digest: actual_digest.clone(),
+                });
             }
         }
 
@@ -4544,6 +4595,32 @@ fn canonical_requirement_hash(requirement: &FunctionalRequirement) -> Result<Str
     Ok(hasher.finalize().to_hex().to_string())
 }
 
+fn canonical_candidate_pathway_hash(candidate: &CandidatePathway) -> Result<String, AssessmentError> {
+    let mut canonical = candidate.clone();
+    canonical.evidence.sort_by(|a, b| a.id.cmp(&b.id));
+    for record in &mut canonical.evidence {
+        if let Some(uncertainty) = &mut record.uncertainty {
+            uncertainty
+                .component_refs
+                .sort_by(|a, b| a.component_id.cmp(&b.component_id));
+        }
+    }
+    for estimate in canonical.performance.values_mut() {
+        estimate.evidence_ids.sort();
+    }
+    for estimate in canonical.operating_capabilities.values_mut() {
+        estimate.evidence_ids.sort();
+    }
+    for estimate in canonical.burdens.values_mut() {
+        estimate.evidence_ids.sort();
+    }
+    let bytes = serde_json::to_vec(&canonical).map_err(|_| AssessmentError::NonFinite)?;
+    let mut hasher = Hasher::new();
+    hasher.update(b"symthaea:candidate-pathway:v1\n");
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
 fn canonical_candidate_evidence_hash(candidate: &CandidatePathway) -> Result<String, AssessmentError> {
     let mut evidence = candidate.evidence.clone();
     evidence.sort_by(|a, b| a.id.cmp(&b.id));
@@ -4857,6 +4934,22 @@ mod tests {
         uncertainty.binding_digest =
             canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
         uncertainty
+    }
+
+    fn fixture_candidate_digests(
+        candidates: &[CandidatePathway],
+        ids: &[&str],
+    ) -> BTreeMap<String, String> {
+        ids.iter()
+            .map(|id| {
+                let digest = candidates
+                    .iter()
+                    .find(|candidate| candidate.id == *id)
+                    .and_then(|candidate| candidate.canonical_digest().ok())
+                    .unwrap_or_else(|| format!("missing-candidate-digest:{id}"));
+                ((*id).to_string(), digest)
+            })
+            .collect()
     }
 
     fn fixture_requirement() -> FunctionalRequirement {
@@ -7724,6 +7817,7 @@ mod tests {
             hypothesis_statement: "A direct measurement can discriminate the unresolved water-burden intervals of the selected frontier candidates.".into(),
             unresolved_uncertainty_refs: vec!["uncertainty:direct-substitute:Water".into()],
             candidate_ids: vec!["direct-substitute".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, ["direct-substitute", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "water-discrimination".into(),
             measurand_id: "fixture-measurand:Water".into(),
@@ -7785,6 +7879,7 @@ mod tests {
             hypothesis_statement: "Test.".into(),
             unresolved_uncertainty_refs: vec!["u".into()],
             candidate_ids: vec!["does-not-exist".into(), "does-not-exist-2".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, ["does-not-exist", "does-not-exist-2"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "invalid-target".into(),
             measurand_id: "fixture-measurand:Water".into(),
@@ -7865,6 +7960,7 @@ mod tests {
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u2".into(), "u1".into()],
             candidate_ids: vec!["process-substitute".into(), "product-redesign".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, ["process-substitute", "product-redesign"]),
             expected_discrimination: vec![target_b.clone(), target_a.clone()],
             protocol: ExperimentalProtocolRef {
                 protocol_id: "protocol".into(),
@@ -7927,6 +8023,7 @@ mod tests {
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
             candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, ["product-redesign", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
                 measurand_id: "fixture-measurand:Water".into(),
@@ -7983,6 +8080,7 @@ mod tests {
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
             candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, ["product-redesign", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
                 measurand_id: "fixture-measurand:Water".into(),
@@ -8033,6 +8131,7 @@ mod tests {
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
             candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, ["product-redesign", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
                 measurand_id: "fixture-measurand:Water".into(),
@@ -8084,6 +8183,7 @@ mod tests {
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
             candidate_ids: vec!["direct-substitute".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, ["direct-substitute", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
             measurand_id: "fixture-measurand:Water".into(),
@@ -8177,6 +8277,7 @@ mod tests {
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
             candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, ["product-redesign", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
             measurand_id: "fixture-measurand:Water".into(),
@@ -8251,6 +8352,7 @@ mod tests {
             hypothesis_statement: "A measurement distinguishes the selected alternatives.".into(),
             unresolved_uncertainty_refs: vec!["uncertainty:water".into()],
             candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, ["product-redesign", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
                 measurand_id: observed_measurand.clone(),
@@ -8320,6 +8422,7 @@ mod tests {
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
             candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, ["product-redesign", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
                 measurand_id: "fixture-measurand:Water".into(),
@@ -8398,6 +8501,7 @@ mod tests {
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
             candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, ["product-redesign", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
                 measurand_id: "fixture-measurand:Water".into(),
