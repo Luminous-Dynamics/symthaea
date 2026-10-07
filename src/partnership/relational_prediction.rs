@@ -1952,13 +1952,18 @@ impl ForecastInferenceSelectionReceipt {
             || !is_hex_digest(&self.dependence_profile_blake3, 64)
             || self.method_selection_rule_id.trim().is_empty()
             || !is_hex_digest(&self.method_selection_rule_spec_sha256, 64)
-            || self.decision_path_id.trim().is_empty()
+            || !matches!(
+                self.decision_path_id.as_str(),
+                "nested-fixed-horizon-bootstrap" | "stop-assumption-failure"
+            )
             || self.selected_procedure_id.trim().is_empty()
             || !is_hex_digest(&self.selected_procedure_spec_sha256, 64)
             || self.selected_dependence_method_id.trim().is_empty()
             || !is_hex_digest(&self.selected_dependence_spec_sha256, 64)
             || self.selected_resampling_method_id.trim().is_empty()
             || !is_hex_digest(&self.selected_resampling_spec_sha256, 64)
+            || self.selected_small_sample_policy_id.trim().is_empty()
+            || self.selected_multiplicity_policy_id.trim().is_empty()
             || !is_hex_digest(&self.selection_blake3, 64)
         {
             return Err(RelationalPredictionError::InvalidSplit);
