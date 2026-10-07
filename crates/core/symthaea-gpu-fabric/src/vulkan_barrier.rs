@@ -471,11 +471,7 @@ fn record_barriers(
     for req in requirements {
         if req.requires_memory_dependency() {
             let buffer = buffers.get(&req.resource).ok_or(VulkanBarrierError::MissingResource(req.resource.clone()))?;
-            let (src_access, dst_access) = match req.kind {
-                DependencyKind::ReadAfterWrite => (vk::AccessFlags2::SHADER_STORAGE_WRITE, vk::AccessFlags2::SHADER_STORAGE_READ),
-                DependencyKind::WriteAfterWrite => (vk::AccessFlags2::SHADER_STORAGE_WRITE, vk::AccessFlags2::SHADER_STORAGE_WRITE),
-                DependencyKind::WriteAfterRead => (vk::AccessFlags2::empty(), vk::AccessFlags2::SHADER_STORAGE_WRITE),
-            };
+            let (src_access, dst_access) = barrier_access_masks(req.kind);
             buffer_barriers.push(vk::BufferMemoryBarrier2::default()
                 .src_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
                 .src_access_mask(src_access)
@@ -680,18 +676,45 @@ fn resource_digest(value: &BinaryHypervector) -> String {
     h.finalize().to_hex().to_string()
 }
 
+fn barrier_access_masks(kind: DependencyKind) -> (vk::AccessFlags2, vk::AccessFlags2) {
+    match kind {
+        DependencyKind::ReadAfterWrite => (
+            vk::AccessFlags2::SHADER_STORAGE_WRITE,
+            vk::AccessFlags2::SHADER_STORAGE_READ,
+        ),
+        DependencyKind::WriteAfterRead => (
+            vk::AccessFlags2::empty(),
+            vk::AccessFlags2::empty(),
+        ),
+        DependencyKind::WriteAfterWrite => (
+            vk::AccessFlags2::SHADER_STORAGE_WRITE,
+            vk::AccessFlags2::SHADER_STORAGE_WRITE,
+        ),
+    }
+}
+
 fn barrier_lowering_digest(plan: &VulkanSyncPlan) -> String {
     let mut h = Hasher::new();
-    h.update(b"symthaea.gpu-fabric.vulkan-barrier-lowering.v1\0");
+    h.update(b"symthaea.gpu-fabric.vulkan-barrier-lowering.v2\0");
     h.update(b"src-stage:compute-shader\0");
     h.update(b"dst-stage:compute-shader\0");
-    h.update(b"raw-src-access:shader-storage-write\0");
-    h.update(b"raw-dst-access:shader-storage-read\0");
-    h.update(b"waw-src-access:shader-storage-write\0");
-    h.update(b"waw-dst-access:shader-storage-write\0");
-    h.update(b"war-access:empty\0");
     h.update(b"range-policy:rounded-storage-bytes\0");
     h.update(b"queue-family:ignored\0");
+
+    for kind in [
+        DependencyKind::ReadAfterWrite,
+        DependencyKind::WriteAfterRead,
+        DependencyKind::WriteAfterWrite,
+    ] {
+        h.update(&[match kind {
+            DependencyKind::ReadAfterWrite => 1,
+            DependencyKind::WriteAfterRead => 2,
+            DependencyKind::WriteAfterWrite => 3,
+        }]);
+        let (src_access, dst_access) = barrier_access_masks(kind);
+        h.update(&src_access.as_raw().to_le_bytes());
+        h.update(&dst_access.as_raw().to_le_bytes());
+    }
 
     for submission in &plan.submissions {
         for barrier in &submission.barriers {
@@ -811,6 +834,31 @@ mod tests {
         initial.insert(mid, BinaryHypervector::zeros(32));
         initial.insert(out, BinaryHypervector::zeros(32));
         (graph, schedule, plan, initial)
+    }
+
+    #[test]
+    fn barrier_access_policy_matches_vulkan_hazards() {
+        assert_eq!(
+            barrier_access_masks(DependencyKind::ReadAfterWrite),
+            (
+                vk::AccessFlags2::SHADER_STORAGE_WRITE,
+                vk::AccessFlags2::SHADER_STORAGE_READ,
+            )
+        );
+        assert_eq!(
+            barrier_access_masks(DependencyKind::WriteAfterWrite),
+            (
+                vk::AccessFlags2::SHADER_STORAGE_WRITE,
+                vk::AccessFlags2::SHADER_STORAGE_WRITE,
+            )
+        );
+        assert_eq!(
+            barrier_access_masks(DependencyKind::WriteAfterRead),
+            (
+                vk::AccessFlags2::empty(),
+                vk::AccessFlags2::empty(),
+            )
+        );
     }
 
     #[test]
