@@ -58,6 +58,20 @@ jobs:
             exit 1
           fi
 
+      - name: Record qualification environment
+        working-directory: .ci/gpu-fabric-workspace
+        run: |
+          {
+            echo "commit=$GITHUB_SHA"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            echo "runner_name=$RUNNER_NAME"
+            rustc -Vv
+            cargo -V
+            echo "--- vulkaninfo --summary ---"
+            vulkaninfo --summary
+          } > qualification-environment.txt
+
       - name: Compile barrier workload harness
         working-directory: .ci/gpu-fabric-workspace
         run: cargo test --locked --features vulkan --lib
@@ -65,3 +79,15 @@ jobs:
       - name: Execute real workload barrier qualification
         working-directory: .ci/gpu-fabric-workspace
         run: cargo test --locked --features vulkan --lib -- --ignored --nocapture
+
+      - name: Upload immutable qualification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: gpu-fabric-vulkan-barrier-qualification-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            .ci/gpu-fabric-workspace/Cargo.lock
+            .ci/gpu-fabric-workspace/dependency-lock.sha256
+            .ci/gpu-fabric-workspace/metadata.json
+            .ci/gpu-fabric-workspace/qualification-environment.txt
