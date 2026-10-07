@@ -2990,7 +2990,10 @@ fn read_image_artifact_commitment_blocking(
 ) -> Result<Option<ArtifactCommitment>, String> {
     let image_dir = validate_image_path(image_dir)?;
 
-    if !matches!(artifact_name, "system.btrfs.zst" | "system.tar.gz") {
+    if !matches!(
+        artifact_name,
+        "system.btrfs.zst" | "system.tar.gz" | "configuration.nix"
+    ) {
         return Err(format!(
             "unsupported image artifact commitment name: {artifact_name}"
         ));
@@ -3050,11 +3053,11 @@ fn read_image_artifact_commitment_blocking(
             path.display()
         ));
     }
-    if metadata.permissions().mode() & 0o077 != 0
+    if metadata.permissions().mode() & 0o777 != 0o400
         || metadata.uid() != unsafe { libc::geteuid() }
     {
         return Err(format!(
-            "image artifact {} has unsafe ownership or permissions",
+            "image artifact {} has unsafe ownership or permissions; require relay-owned 0400",
             path.display()
         ));
     }
@@ -7041,6 +7044,11 @@ cp /etc/nixos/hardware-configuration.nix "$DEST/" 2>/dev/null || true
 cp /etc/nixos/flake.nix "$DEST/" 2>/dev/null || true
 cp /etc/nixos/flake.lock "$DEST/" 2>/dev/null || true
 nix-env -qa --installed 2>/dev/null > "$DEST/installed-packages.txt" || true
+
+# Freeze the committed image namespace. The relay UID cannot mutate committed
+# files between provenance verification and restore.
+find "$DEST" -maxdepth 1 -type f -exec chmod 400 -- {} +
+chmod 500 "$DEST"
 
 echo "STAGE: Image complete"
 echo "Image saved to: $DEST"
