@@ -1734,14 +1734,15 @@ impl DaemonState {
                                 // and promoted it to a live execution-authority object.
                                 // execute_authorized verifies the exact command identity
                                 // and consumes that authority object by value.
-                                let (result, receipt) = match (&cmd, execution_authority) {
-                                    (
-                                        nixward::action::executor::NixOSCommand::Service { .. },
-                                        Some(authority),
-                                    ) => executor
+                                let is_service = matches!(
+                                    &cmd,
+                                    nixward::action::executor::NixOSCommand::Service { .. }
+                                );
+                                let (result, receipt) = match (is_service, execution_authority) {
+                                    (true, Some(authority)) => executor
                                         .execute_authorized_service_with_receipt(cmd, authority)
                                         .await,
-                                    (_, Some(authority)) => {
+                                    (false, Some(authority)) => {
                                         (executor.execute_authorized(cmd, authority).await, None)
                                     }
                                     (_, None) => (
