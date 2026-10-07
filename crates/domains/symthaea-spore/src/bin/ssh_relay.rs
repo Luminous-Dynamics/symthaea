@@ -9181,7 +9181,7 @@ echo '}'
                             "$KERNEL" "$INITRD" "$IP" "$IP" "$KERNEL" "$INITRD"
                     fi
                 "#;
-                match run_cmd(script).await {
+                match run_privileged_script_source(script, &[]).await {
                     Ok(r) if r.exit_status == 0 => {
                         let _ = ws_tx
                             .send(Message::Text(
@@ -9964,7 +9964,7 @@ ip -4 addr show | grep inet | grep -v '127.0.0.1' | awk '{print "\"" $2 "\""}' |
 echo ']'
 echo '}'
 "#;
-                match run_cmd(script).await {
+                match run_privileged_script_source(script, &[]).await {
                     Ok(r) if r.exit_status == 0 => {
                         let clean: String = r
                             .stdout
