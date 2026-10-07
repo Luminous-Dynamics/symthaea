@@ -179,6 +179,36 @@ The same run separately calibrates confidence only on planner-selected actions. 
 stricter than aggregate held-out calibration because selection can preferentially expose overconfident
 model errors.
 
+### Environment-level counterfactual queries
+
+The frozen qualification layer now includes a deterministic query bank inspired by
+environment-level world-model evaluation.
+
+For each scenario, it creates four probe states:
+
+- the exact scenario initial state;
+- a threat-spike intervention;
+- an integrity-damage intervention;
+- an energy-drain intervention.
+
+From each probe state it evaluates every length-three action sequence (4 × 6³ = 864 queries per
+scenario). The model must answer the entire sequence by repeatedly composing its frozen transition
+prediction; the deterministic oracle answers the same query through the real transition function.
+
+The report measures:
+
+- query count and sequence length;
+- mean terminal-state MAE;
+- mean minimum-viability-margin error across the sequence;
+- survival-decision agreement.
+
+Invalid/non-finite model answers are treated as disagreements rather than omitted samples.
+
+This is intentionally different from scheduled-trajectory replay: it asks the model to answer
+counterfactual intervention queries from states it did not receive as its normal scheduled path.
+That makes the benchmark a stronger test of whether the learned transition model supports a usable
+environment model rather than only memorizing observed action/state pairs.
+
 ### Planning quality
 
 The horizon-aware policy already computes deterministic oracle horizon regret.
@@ -250,6 +280,8 @@ This matters because a single favorable held-out scenario can be explained by sc
 | Leave-one-out transfer varies sharply by held-out scenario | generalization is scenario-dependent; report the worst fold rather than only the mean |
 | Mean transfer improves but one or more folds regress | the learned model has useful structure with a remaining environment-specific blind spot |
 | All leave-one-out folds beat persistence | stronger evidence of cross-scenario predictive structure, still limited to the benchmark family |
+| Counterfactual query error is high while scheduled-trajectory error is low | the model may fit observed trajectories without supporting broader environment-level reasoning |
+| Counterfactual survival agreement is poor | the model's composed predictions are not reliable enough to support viability judgments away from the observed path |
 
 No single metric is a synthetic-organism detector.
 
@@ -272,7 +304,8 @@ A future green qualification should report all of:
 12. persistence comparator;
 13. held-out transfer;
 14. leave-one-scenario-out transfer matrix and worst-fold result;
-15. trace/invariant verification where action evidence is recorded.
+15. environment-level counterfactual query-bank results;
+16. trace/invariant verification where action evidence is recorded.
 
 Queued CI is not a pass.
 
