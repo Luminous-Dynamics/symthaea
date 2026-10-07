@@ -63,6 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          ref: ${{ env.BROCA_QUALIFICATION_HEAD_SHA }}
           persist-credentials: false
       - name: Verify runner-provided Rust bootstrap
         run: |
@@ -71,8 +72,6 @@ jobs:
           BROCA_RUSTUP_VERSION=$(rustup --version)
           echo "$BROCA_RUSTUP_VERSION"
           echo "BROCA_RUSTUP_VERSION=$BROCA_RUSTUP_VERSION" >> "$GITHUB_ENV"
-
-          ref: ${{ env.BROCA_QUALIFICATION_HEAD_SHA }}
 
       - name: Verify qualification action pins
         run: |
@@ -152,6 +151,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          ref: ${{ env.BROCA_QUALIFICATION_HEAD_SHA }}
           persist-credentials: false
       - name: Verify runner-provided Rust bootstrap
         run: |
@@ -160,8 +160,6 @@ jobs:
           BROCA_RUSTUP_VERSION=$(rustup --version)
           echo "$BROCA_RUSTUP_VERSION"
           echo "BROCA_RUSTUP_VERSION=$BROCA_RUSTUP_VERSION" >> "$GITHUB_ENV"
-
-          ref: ${{ env.BROCA_QUALIFICATION_HEAD_SHA }}
 
       - name: Verify qualification action pins
         run: |
