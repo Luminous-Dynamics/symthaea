@@ -1279,6 +1279,7 @@ mod tests {
             completion_expected: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
             completion_observed: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
             vulkan_api_version: VULKAN_API_VERSION,
+            physical_device_api_version: VULKAN_API_VERSION,
         };
         receipt.barrier_lowering_digest = String::from("tampered");
 
@@ -1320,6 +1321,7 @@ mod tests {
             completion_expected: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
             completion_observed: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
             vulkan_api_version: VULKAN_API_VERSION,
+            physical_device_api_version: VULKAN_API_VERSION,
         };
 
         storage_sizes.insert(ResourceId::new("mid").unwrap(), 8);
@@ -1364,6 +1366,7 @@ mod tests {
             completion_expected: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
             completion_observed: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
             vulkan_api_version: VULKAN_API_VERSION,
+            physical_device_api_version: VULKAN_API_VERSION,
         };
         receipt.barrier_digest = String::from("tampered");
 
