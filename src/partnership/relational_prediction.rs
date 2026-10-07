@@ -1454,6 +1454,17 @@ impl ForecastInferencePlan {
         Ok(())
     }
 
+    pub fn validate_against_qualification(
+        &self,
+        qualification_identity_blake3: &str,
+    ) -> Result<(), RelationalPredictionError> {
+        self.validate()?;
+        if self.qualification_identity_blake3 != qualification_identity_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
+    }
+
     pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
         self.validate()?;
         Ok(serde_json::json!({
@@ -4758,6 +4769,32 @@ mod tests {
                 assert!(pair[1].feature_time > pair[0].outcome_time);
             }
         }
+    }
+
+    #[test]
+    fn inference_plan_rejects_cross_qualification_binding() {
+        let identity_a = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        let identity_b = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
+        let plan = ForecastInferencePlan::new(
+            0.5,
+            identity_a,
+            "nested-forecast-bootstrap-v1",
+            identity_b,
+            "loss-dependence-bartlett-v1",
+            identity_a,
+            "moving-block-bootstrap-v1",
+            identity_b,
+            "small-sample-conservative-v1",
+            "single-primary-comparison-v1",
+            0.05,
+            identity_a,
+        )
+        .unwrap();
+        plan.validate_against_qualification(identity_a).unwrap();
+        assert_eq!(
+            plan.validate_against_qualification(identity_b),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
     }
 
     #[test]
