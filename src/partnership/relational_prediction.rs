@@ -1898,9 +1898,10 @@ impl PredictionNullSummary {
             self.feature_set,
             self.requested_surrogate_count,
         );
-        if expected != self.evaluation_input_blake3
-            || evaluation_input_digest(samples, config) != self.qualification_input_blake3
-        {
+        // Standalone replay verifies the null-local commitment only.
+        // The parent qualification commitment may legitimately differ after
+        // this trace is embedded in a compound or rolling qualification bundle.
+        if expected != self.evaluation_input_blake3 {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
         }
 
@@ -3367,8 +3368,6 @@ mod tests {
         assert!(json.contains(EVIDENCE_SCHEMA));
         assert!(json.contains(FEATURE_SCHEMA));
         assert!(json.contains(MODEL_SCHEMA));
-        assert!(json.contains(NULL_EVIDENCE_SCHEMA));
-        assert!(json.contains("qualification_input_blake3"));
         assert!(json.contains("RelationalAugmented"));
         assert!(json.contains("predictions"));
         assert!(json.contains("test_features"));
@@ -4463,6 +4462,24 @@ mod tests {
     }
 
     #[test]
+    fn null_trace_json_uses_v2_parent_binding_schema() {
+        let samples = build_samples(0.5);
+        let trace = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config(),
+            PredictionNullFamily::IncrementalRelationalShift,
+            PredictionFeatureSet::RelationalAugmented,
+            8,
+        )
+        .unwrap();
+
+        let json = trace.to_json().unwrap();
+        assert!(json.contains(NULL_EVIDENCE_SCHEMA));
+        assert!(json.contains("evaluation_input_blake3"));
+        assert!(json.contains("qualification_input_blake3"));
+    }
+
+    #[test]
     fn null_trace_parent_binding_does_not_replace_local_replay_commitment() {
         let samples = build_samples(0.5);
         let config = config();
@@ -4477,13 +4494,21 @@ mod tests {
         .unwrap();
 
         let local_digest = trace.evaluation_input_blake3.clone();
-        assert_eq!(trace.qualification_input_blake3, evaluation_input_digest(&samples, config));
+        assert_eq!(
+            trace.qualification_input_blake3,
+            evaluation_input_digest(&samples, config)
+        );
+
         trace.qualification_input_blake3 =
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string();
 
-        assert_eq!(trace.validate_trace(), Ok(()));
+        // Parent rebinding must not affect standalone replay of this exact
+        // null trace against its origin-local source slice.
+        trace.validate_trace().unwrap();
         trace.verify_against_samples(&samples, config).unwrap();
         assert_eq!(trace.evaluation_input_blake3, local_digest);
+    }
+
     }
 
     #[test]
