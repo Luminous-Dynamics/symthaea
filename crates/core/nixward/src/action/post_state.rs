@@ -600,7 +600,7 @@ impl NixPostStateReceiptV1 {
         )
     }
 
-    pub(crate) fn build_proven_from_live_execution_witness(
+    pub fn build_proven_from_live_execution_witness(
         intent: &NixActionIntentV1,
         authorization: &NixExecutionAuthorizationRecordV1,
         expectation: &NixServicePostStateExpectationV1,
