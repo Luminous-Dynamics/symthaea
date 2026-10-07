@@ -12,24 +12,24 @@ The model is:
 4. Declare an explicit comparison scale (unit + functional/lifecycle scope + exact methodology/comparability basis identity) for every burden dimension; candidates cannot define their own cohort.
 5. Represent functional-performance values as evidence-linked, scoped measurements tied to the exact comparison/test basis rather than bare claims.
 6. Require quantitative evidence linked to a burden, performance, or operating estimate to declare the same unit as that estimate; missing evidence units fail closed.
-6. Declare the physical operating envelope explicitly and bind its evidence to the exact engineering/test basis; a candidate must demonstrate coverage of the required ranges.
-7. Keep multi-axis burdens separate.
-8. Evaluate hard constraints fail-closed.
-9. Compute a conservative Pareto frontier without an aggregate sustainability score.
-10. Preserve evidence kind, confidence, canonical authority identity, artifact identity/digest, optional source-admission reference, contradictions, validity windows, observation time, and derivation lineage.
-11. Derive an explicit qualification ceiling from evidence actually linked to every burden dimension and every required functional metric; higher global states additionally require tier-consistent functional and operating evidence.
-12. Emit a deterministic assessment receipt, including the assessment timestamp and exact freshness policy when supplied.
-13. Require reproducible derivation metadata for simulated/derived evidence.
-14. Intersect eligibility across every required function while keeping each requirement assessment separate and auditable.
-15. Carry externally qualified source-admission references without verifying or upgrading them inside Symthaea.
-16. Identify a conservative next-measurement target from unresolved uncertainty.
-17. Carry explicit experimental-design provenance when a proposed measurement is actually specified: hypothesis, targeted uncertainty identities, candidate discrimination set, exact protocol identity/basis, and stopping criteria.
-18. Require usable evidence coverage for every burden dimension before a candidate can remain Pareto-eligible; the `EvidenceSupported` qualification tier requires substantive supported evidence across every burden dimension.
-19. Require admitted lifecycle-assessed support across every burden dimension before the `LifecycleQualified` tier can be reached; a single lifecycle-assessed surface cannot promote a candidate whose other dimensions rely on different evidence classes.
-20. An uncertainty reference requires observation provenance when attached to evidence; uncertainty cannot be detached from the observation identity, record digest, measurand, procedure, and calibration-chain context it purports to describe.
-21. Quantitative estimate evidence-reference collections are set-like and must not contain duplicate evidence IDs; duplicate references fail closed rather than creating receipt-distinct but semantically redundant inputs.
-22. Experimental designs bind each candidate ID to a canonical pathway-semantic digest. Evidence/provenance is intentionally excluded from that pre-experiment semantic digest because it is an evolving surface separately committed by the assessment receipt; changing the declared pathway semantics after design creation fails closed.
-23. Lifecycle and manufacturing qualification require distinct admitted authorities on the tier-defining evidence class itself; unrelated evidence from a second authority cannot substitute for independent lifecycle or manufacturing observations.
+7. Declare the physical operating envelope explicitly and bind its evidence to the exact engineering/test basis; a candidate must demonstrate coverage of the required ranges.
+8. Keep multi-axis burdens separate.
+9. Evaluate hard constraints fail-closed.
+10. Compute a conservative Pareto frontier without an aggregate sustainability score.
+11. Preserve evidence kind, confidence, canonical authority identity, artifact identity/digest, optional source-admission reference, contradictions, validity windows, observation time, and derivation lineage.
+12. Derive an explicit qualification ceiling from evidence actually linked to every burden dimension and every required functional metric; higher global states additionally require tier-consistent functional and operating evidence.
+13. Emit a deterministic assessment receipt, including the assessment timestamp and exact freshness policy when supplied.
+14. Require reproducible derivation metadata for simulated/derived evidence.
+15. Intersect eligibility across every required function while keeping each requirement assessment separate and auditable.
+16. Carry externally qualified source-admission references without verifying or upgrading them inside Symthaea.
+17. Identify a conservative next-measurement target from unresolved uncertainty.
+18. Carry explicit experimental-design provenance when a proposed measurement is actually specified: hypothesis, targeted uncertainty identities, candidate discrimination set, exact protocol identity/basis, and stopping criteria.
+19. Require usable evidence coverage for every burden dimension before a candidate can remain Pareto-eligible; the `EvidenceSupported` qualification tier requires substantive supported evidence across every burden dimension.
+20. Require admitted lifecycle-assessed support across every burden dimension before the `LifecycleQualified` tier can be reached; a single lifecycle-assessed surface cannot promote a candidate whose other dimensions rely on different evidence classes.
+21. An uncertainty reference requires observation provenance when attached to evidence; uncertainty cannot be detached from the observation identity, record digest, measurand, procedure, and calibration-chain context it purports to describe.
+22. Quantitative estimate evidence-reference collections are set-like and must not contain duplicate evidence IDs; duplicate references fail closed rather than creating receipt-distinct but semantically redundant inputs.
+23. Experimental designs bind each candidate ID to a canonical pathway-semantic digest. Evidence/provenance is intentionally excluded from that pre-experiment semantic digest because it is an evolving surface separately committed by the assessment receipt; changing the declared pathway semantics after design creation fails closed.
+24. Lifecycle and manufacturing qualification require distinct admitted authorities on the tier-defining evidence class itself; unrelated evidence from a second authority cannot substitute for independent lifecycle or manufacturing observations.
 
 Authority diversity is authority-scoped: multiple artifacts or rotated issuer keys under one authority do not become distinct authority groups. Only externally admitted authorities count toward higher qualification tiers. This is still not proof of epistemic or organizational independence, and the identity/admission contract is not an authenticity proof; Mycelix admission/attestation remains the authority boundary for source control. The requirement is bound to an exact subject/profile/revision/digest so the same generic function cannot be silently reused for a different BOM, product, or design revision. The design is intended to compose later with Mycelix manufacturing/BOM/routing records and a federated evidence graph, while remaining independent of Holochain versioning. The Pareto frontier is a candidate comparison set, not a recommendation or deployment authorization. Functional performance and operating capabilities use conservative intervals rather than midpoint-based pass/fail. A required operating envelope must be fully covered; partial temperature/pressure/load coverage is unresolved or failed rather than extrapolated. Time-bounded evidence is ignored by timeless assessments and evaluated only when the caller supplies an explicit assessment timestamp.
 
@@ -45,7 +45,7 @@ Freshness is deliberately separate from validity. An evidence record may remain 
 This temporal model follows a provenance-friendly boundary: W3C PROV treats entity lifetimes, generation, use, and invalidation as time-aware provenance events, so validity and recency should not be collapsed into an opaque source label. The JRC Safe and Sustainable by Design guidance likewise describes alternatives assessment as iterative and tiered as data availability and research knowledge increase.
 
 
-Global qualification states are tier-consistent. Field qualification requires field-observed support across all burden dimensions and across every required functional/operating evidence surface; continuous monitoring applies the corresponding monitoring requirement. Manufacturing qualification likewise requires manufacturing-scale observations across every burden dimension. This prevents a candidate from being promoted by a strong burden dataset while its actual functional qualification remains at a lower evidence tier.
+Global qualification states are tier-consistent. Lifecycle and manufacturing qualification are driven by their tier-specific burden evidence and admitted-authority requirements; they do not additionally require an unrelated lower-tier evidence kind on the burden surface. Independent supported functional and operating evidence is still required before any higher qualification state can be reached. Field qualification requires field-observed support across all burden dimensions and across every required functional/operating evidence surface; continuous monitoring applies the corresponding monitoring requirement. Manufacturing qualification likewise requires manufacturing-scale observations across every burden dimension. This prevents a candidate from being promoted by a strong burden dataset while its actual functional qualification remains at a lower evidence tier.
 
 
 ## Comparability boundary
