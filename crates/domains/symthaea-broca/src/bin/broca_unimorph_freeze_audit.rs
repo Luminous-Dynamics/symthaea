@@ -29,7 +29,9 @@ const EXPECTED_RAW_URI: &str =
     "https://raw.githubusercontent.com/unimorph/eng/66e0e9e8e2dcd196da081a25a48e5c1fe3d8b49b/eng";
 const EXPECTED_COMMIT: &str = "66e0e9e8e2dcd196da081a25a48e5c1fe3d8b49b";
 const EXPECTED_BLOB_SHA: &str = "8eae5ed242e87e50f6bd182133277f50fe93cef3";
-const EXPECTED_README_BLOB_SHA: &str = "197564dd6bb45b2bcdad08428446ad2a5db6138d";
+const EXPECTED_README_BLOB_SHA: &str = "197564dd6bb45b2bcdad08446ad2a5db6138d";
+const EXPECTED_README_URI: &str =
+    "https://raw.githubusercontent.com/unimorph/eng/66e0e9e8e2dcd196da081a25a48e5c1fe3d8b49b/README.md";
 const EXPECTED_LICENSE: &str = "CC BY-SA 3.0";
 const EXPECTED_SOURCE: &str = "Wikipedia";
 const EXPECTED_ARTIFACT_BLAKE3: &str =
@@ -134,6 +136,22 @@ fn main() -> Result<()> {
         || !SNAPSHOT_MANIFEST.contains(&format!("- License: {EXPECTED_LICENSE}"))
     {
         bail!("checked-in UniMorph snapshot manifest disagrees with its frozen identity constants");
+    }
+
+    let readme = fetch_artifact(EXPECTED_README_URI)
+        .context("failed to download immutable UniMorph README for attribution verification")?;
+    let actual_readme_blob = git_blob_sha1(&readme)?;
+    if actual_readme_blob != EXPECTED_README_BLOB_SHA {
+        bail!(
+            "frozen UniMorph README Git blob mismatch: expected {}, got {}",
+            EXPECTED_README_BLOB_SHA,
+            actual_readme_blob
+        );
+    }
+    let readme_text = std::str::from_utf8(&readme)
+        .context("frozen UniMorph README is not UTF-8")?;
+    if !readme_text.contains(EXPECTED_SOURCE) || !readme_text.contains(EXPECTED_LICENSE) {
+        bail!("immutable UniMorph README does not contain the expected source/license attribution");
     }
 
     let artifact = fetch_artifact(uri)?;
@@ -255,7 +273,10 @@ fn verify_checked_in_manifests() -> Result<()> {
     }
 
     if !SNAPSHOT_MANIFEST.contains(EXPECTED_RAW_URI) {
-        bail!("snapshot manifest does not contain the immutable raw URI");
+        bail!("snapshot manifest does not contain the immutable raw artifact URI");
+    }
+    if !SNAPSHOT_MANIFEST.contains(EXPECTED_README_BLOB_SHA) {
+        bail!("snapshot manifest does not contain the expected immutable README blob");
     }
 
     for required in [
