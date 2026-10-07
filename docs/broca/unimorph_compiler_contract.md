@@ -161,3 +161,8 @@ The freeze audit archives both a human-readable `audit.txt` and a machine-readab
 The qualification jobs also perform a shell-level preflight immediately after the pinned checkout and before the pinned toolchain/cache actions. It fails closed unless every `uses:` reference is a full 40-hex commit SHA and the exact approved seven-reference set is present. The freeze auditor independently re-parses those references and records them in `receipt.json` as an additional execution-boundary check.
 
 The CI-native dependency versions are exposed as `BROCA_NATIVE_PACKAGE_CONTEXT` before any Cargo build and are explicitly registered with Cargo via `rerun-if-env-changed`. This prevents a warm target from retaining a previously generated compiler-context identity after the host's native package state changes.
+
+
+## Signed qualification evidence
+
+The freeze-audit job generates a structured `receipt.json`, then creates a GitHub artifact attestation for that exact receipt and preserves the resulting attestation bundle as part of the downloadable evidence artifact. GitHub documents artifact attestations as signed provenance claims linking a subject to its workflow/build context, and documents offline verification of attestations. The attestation is limited to the freeze-audit job through job-scoped `id-token`, `attestations`, and `artifact-metadata` permissions; the other Broca jobs remain `contents: read` only.
