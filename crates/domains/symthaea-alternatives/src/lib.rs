@@ -2009,6 +2009,37 @@ impl CandidatePathway {
                         })
                 })
         });
+        let lifecycle_distinct_authority_sources = self
+            .burdens
+            .values()
+            .flat_map(|estimate| {
+                self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+            })
+            .filter(|e| {
+                e.source.admission.is_some()
+                    && e.kind == EvidenceKind::LifecycleAssessed
+                    && e.stance == EvidenceStance::Supports
+                    && e.confidence >= 0.7
+            })
+            .filter_map(|e| e.source.admitted_authority_group_id())
+            .collect::<BTreeSet<_>>()
+            .len();
+        let manufacturing_distinct_authority_sources = self
+            .burdens
+            .values()
+            .flat_map(|estimate| {
+                self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+            })
+            .filter(|e| {
+                e.source.admission.is_some()
+                    && e.kind == EvidenceKind::ManufacturingObserved
+                    && e.stance == EvidenceStance::Supports
+                    && e.confidence >= 0.7
+            })
+            .filter_map(|e| e.source.admitted_authority_group_id())
+            .collect::<BTreeSet<_>>()
+            .len();
+
         let field_distinct_authority_sources = self
             .burdens
             .values()
@@ -2119,13 +2150,13 @@ impl CandidatePathway {
         {
             QualificationState::FieldQualified
         } else if any_supported_measurement
-            && distinct_authority_sources >= 2
+            && manufacturing_distinct_authority_sources >= 2
             && has_all_dimension_evidence
             && all_dimensions_manufacturing_observed
         {
             QualificationState::ManufacturingQualified
         } else if any_supported_measurement
-            && distinct_authority_sources >= 2
+            && lifecycle_distinct_authority_sources >= 2
             && has_all_dimension_evidence
             && all_dimensions_lifecycle_assessed
         {
@@ -7591,6 +7622,47 @@ mod tests {
     }
 
     #[test]
+    fn lifecycle_tier_requires_two_admitted_lifecycle_authorities() {
+        let lifecycle_a = evidence(
+            "lca-a",
+            "lca-authority-a",
+            EvidenceKind::LifecycleAssessed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let reported_b = evidence(
+            "reported-b",
+            "reported-authority-b",
+            EvidenceKind::Reported,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut c = candidate(
+            "single-lifecycle-authority",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![lifecycle_a, reported_b],
+        );
+        for (dimension, estimate) in &mut c.burdens {
+            estimate.evidence_ids = if *dimension == Dimension::Hazard {
+                vec!["lca-a".into(), "reported-b".into()]
+            } else {
+                vec!["lca-a".into()]
+            };
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
+    }
+
+    #[test]
     fn partial_lifecycle_evidence_cannot_raise_lifecycle_tier() {
         let lifecycle = evidence(
             "lca",
@@ -7627,6 +7699,47 @@ mod tests {
                 vec!["obs-a".into()]
             } else {
                 vec!["obs-b".into()]
+            };
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
+    }
+
+    #[test]
+    fn manufacturing_tier_requires_two_admitted_manufacturing_authorities() {
+        let manufacturing_a = evidence(
+            "manufacturing-a",
+            "manufacturing-authority-a",
+            EvidenceKind::ManufacturingObserved,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let reported_b = evidence(
+            "reported-b",
+            "reported-authority-b",
+            EvidenceKind::Reported,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut c = candidate(
+            "single-manufacturing-authority",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![manufacturing_a, reported_b],
+        );
+        for (dimension, estimate) in &mut c.burdens {
+            estimate.evidence_ids = if *dimension == Dimension::Hazard {
+                vec!["manufacturing-a".into(), "reported-b".into()]
+            } else {
+                vec!["manufacturing-a".into()]
             };
         }
 
