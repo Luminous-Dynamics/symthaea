@@ -82,7 +82,7 @@ A dependency whose producer and consumer share a logical queue relies on submiss
 The plan contains no Vulkan handles, device claims, or completion receipt. It is a lowering artifact only. Actual `VkQueue`, timeline semaphore, `VkSemaphoreSubmitInfo`, and `vkQueueSubmit2` binding remains a runtime/device layer.
 ## Real Vulkan synchronization qualification
 
-The `VulkanSyncRuntime` binds a `VulkanSyncPlan` to actual Vulkan 1.3
+The `SingleQueueVulkanSyncRuntime` binds a `VulkanSyncPlan` to actual Vulkan 1.3
 timeline semaphores and `vkQueueSubmit2`, then waits on and queries the
 resulting timeline values from the host.
 
@@ -94,3 +94,8 @@ queue execution.
 The qualification workflow installs the Vulkan validation layer and runs the
 ignored real-device test separately from ordinary unit tests. A skipped or
 queued workflow is not treated as a qualification result.
+The runtime returns a synchronization execution receipt containing the
+sync-plan digest, submitted-node count, expected final timeline values,
+observed final timeline values, and Vulkan API version. The receipt can be
+verified independently against the lowering plan and is not an acceleration
+receipt.
