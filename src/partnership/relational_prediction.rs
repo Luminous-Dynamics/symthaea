@@ -1367,6 +1367,7 @@ impl RollingOriginRelationalPredictionQualification {
                     || null_trace.status != EvidenceStatus::Proxy
                     || null_trace.config != held_out_config
                     || null_trace.requested_surrogate_count != self.surrogate_count
+                    || null_trace.source_slice_start != expected_start
                     || null_trace.qualification_input_blake3 != self.evaluation_input_blake3
                     || (null_trace.observed_relational_mse - expected_mse).abs() > 1e-12
                 {
@@ -1462,28 +1463,31 @@ impl RollingOriginRelationalPredictionQualification {
                 ridge_lambda: config.ridge_lambda,
             };
 
-            circular_shift_nulls.push(PredictionNullSummary::compute_for_feature_set(
+            circular_shift_nulls.push(PredictionNullSummary::compute_for_feature_set_at_start(
                 segment,
                 held_out_config,
                 PredictionNullFamily::CircularShift,
                 PredictionFeatureSet::RelationalAugmented,
                 surrogate_count,
+                start,
             )?);
 
-            feature_decoupling_nulls.push(PredictionNullSummary::compute_for_feature_set(
+            feature_decoupling_nulls.push(PredictionNullSummary::compute_for_feature_set_at_start(
                 segment,
                 held_out_config,
                 PredictionNullFamily::FeatureDecoupling,
                 PredictionFeatureSet::RelationalAugmented,
                 surrogate_count,
+                start,
             )?);
 
-            incremental_relational_nulls.push(PredictionNullSummary::compute_for_feature_set(
+            incremental_relational_nulls.push(PredictionNullSummary::compute_for_feature_set_at_start(
                 segment,
                 held_out_config,
                 PredictionNullFamily::IncrementalRelationalShift,
                 PredictionFeatureSet::RelationalAugmented,
                 surrogate_count,
+                start,
             )?);
         }
 
@@ -1663,8 +1667,12 @@ pub struct PredictionNullSummary {
     pub minimum_surrogate_mse: f64,
     pub exceedance_count: usize,
     pub exceedance_fraction: f64,
+    /// Absolute source-sample index at which this null trace's retained
+    /// evaluator slice begins. Standalone traces use zero; rolling traces use
+    /// the corresponding absolute origin start.
+    pub source_slice_start: usize,
     /// Commitment over the exact samples, holdout configuration, null family,
-    /// feature family, and requested surrogate count.
+    /// feature family, requested surrogate count, and source-slice start.
     ///
     /// This is the null-local replay commitment. It deliberately remains
     /// distinct from the parent qualification commitment below.
@@ -1700,6 +1708,24 @@ impl PredictionNullSummary {
         feature_set: PredictionFeatureSet,
         surrogate_count: usize,
     ) -> Result<Self, RelationalPredictionError> {
+        Self::compute_for_feature_set_at_start(
+            samples,
+            config,
+            family,
+            feature_set,
+            surrogate_count,
+            0,
+        )
+    }
+
+    fn compute_for_feature_set_at_start(
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+        family: PredictionNullFamily,
+        feature_set: PredictionFeatureSet,
+        surrogate_count: usize,
+        source_slice_start: usize,
+    ) -> Result<Self, RelationalPredictionError> {
         validate_samples(samples)?;
         config.validate(samples.len())?;
         validate_null_family_shape(family, &config)?;
@@ -1710,8 +1736,14 @@ impl PredictionNullSummary {
         }
 
         let observed = fit_and_score(samples, &config, feature_set)?;
-        let evaluation_input_blake3 =
-            prediction_null_input_digest(samples, config, family, feature_set, surrogate_count);
+        let evaluation_input_blake3 = prediction_null_input_digest(
+            samples,
+            config,
+            family,
+            feature_set,
+            surrogate_count,
+            source_slice_start,
+        );
 
         let capacity = config
             .train_samples
@@ -1759,6 +1791,7 @@ impl PredictionNullSummary {
             requested_surrogate_count: surrogate_count,
             surrogate_count: count,
             observed_relational_mse: observed.mean_squared_error,
+            source_slice_start,
             surrogate_shifts,
             surrogate_mse,
             minimum_surrogate_mse,
@@ -1778,6 +1811,7 @@ impl PredictionNullSummary {
             "model_schema": MODEL_SCHEMA,
             "family": null_family_name(self.family),
             "feature_set": feature_set_name(self.feature_set),
+            "source_slice_start": self.source_slice_start,
             "config": {
                 "train_samples": self.config.train_samples,
                 "test_samples": self.config.test_samples,
@@ -1897,6 +1931,7 @@ impl PredictionNullSummary {
             self.family,
             self.feature_set,
             self.requested_surrogate_count,
+            self.source_slice_start,
         );
         // Standalone replay verifies the null-local commitment only.
         // The parent qualification commitment may legitimately differ after
@@ -2029,6 +2064,9 @@ impl HeldOutRelationalPredictionQualification {
 
         for (expected_family, null_trace) in nulls {
             null_trace.validate_trace()?;
+            if null_trace.source_slice_start != 0 {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
             if null_trace.family != expected_family
                 || null_trace.feature_set != PredictionFeatureSet::RelationalAugmented
                 || null_trace.status != EvidenceStatus::Proxy
@@ -2606,6 +2644,7 @@ fn prediction_null_input_digest(
     family: PredictionNullFamily,
     feature_set: PredictionFeatureSet,
     requested_surrogate_count: usize,
+    source_slice_start: usize,
 ) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"relational-prediction-null-input/v1");
@@ -2617,6 +2656,7 @@ fn prediction_null_input_digest(
     hasher.update(null_family_name(family).as_bytes());
     hasher.update(feature_set_name(feature_set).as_bytes());
     update_usize(&mut hasher, requested_surrogate_count);
+    update_usize(&mut hasher, source_slice_start);
     hasher.finalize().to_hex().to_string()
 }
 
@@ -4494,6 +4534,7 @@ mod tests {
         .unwrap();
 
         let local_digest = trace.evaluation_input_blake3.clone();
+        assert_eq!(trace.source_slice_start, 0);
         assert_eq!(
             trace.qualification_input_blake3,
             evaluation_input_digest(&samples, config)
@@ -4575,6 +4616,11 @@ mod tests {
                 .all(|trace| trace.qualification_input_blake3
                     == qualification.evaluation_input_blake3)
         );
+        assert_eq!(qualification.circular_shift_nulls[0].source_slice_start, config.first_origin);
+        assert_eq!(
+            qualification.circular_shift_nulls[1].source_slice_start,
+            config.first_origin + config.step_samples
+        );
 
         let mut tampered = qualification.clone();
         tampered.incremental_relational_nulls[2].qualification_input_blake3 =
@@ -4582,6 +4628,13 @@ mod tests {
 
         assert_eq!(
             tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
+        let mut swapped = qualification.clone();
+        swapped.circular_shift_nulls.swap(0, 1);
+        assert_eq!(
+            swapped.validate(),
             Err(RelationalPredictionError::InvalidSplit)
         );
     }
