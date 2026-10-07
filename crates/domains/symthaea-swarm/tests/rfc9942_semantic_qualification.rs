@@ -916,20 +916,7 @@ fn rfc9942_outer_detached_payload_binds_inner_inclusion_and_outer_signature() {
         state.receipt_placement(),
         symthaea_swarm::semantic_evidence_vds::Rfc9942ReceiptPlacement::Unprotected
     );
-    let protected_outer = signed_outer(&receipt, b"candidate", true);
-    let protected_state = protected_outer
-        .verify_es256_inclusion_receipt_state(0, &key, &key, &[], &[], None)
-        .unwrap();
-    assert_eq!(
-        protected_state.receipt().protected_header_sha256(),
-        expected_receipt_header_fingerprint
-    );
-    assert_ne!(
-        state.outer_protected_header_sha256(),
-        protected_state.outer_protected_header_sha256(),
-        "moving receipts into the protected bucket must change the authenticated header provenance"
-    );
-    assert_eq!(protected_state.receipt_index(), 0);
+    assert_eq!(state.receipt_index(), 0);
     assert_eq!(
         state.receipt().proof().inclusion_head(),
         Some(head)
@@ -1185,6 +1172,20 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
         state.receipt_placement(),
         symthaea_swarm::semantic_evidence_vds::Rfc9942ReceiptPlacement::Unprotected
     );
+    let protected_outer = signed_outer(&receipt, b"candidate", true);
+    let protected_state = protected_outer
+        .verify_es256_inclusion_receipt_state(0, &key, &key, &[], &[], None)
+        .unwrap();
+    assert_eq!(
+        protected_state.receipt().protected_header_sha256(),
+        expected_receipt_header_fingerprint
+    );
+    assert_ne!(
+        state.outer_protected_header_sha256(),
+        protected_state.outer_protected_header_sha256(),
+        "moving receipts into the protected bucket must change the authenticated header provenance"
+    );
+    assert_eq!(protected_state.receipt_index(), 0);
     let mut candidate_digest = Vec::new();
     candidate_digest.extend_from_slice(b"candidate");
     let expected_payload_sha256: [u8; 32] = sha2::Sha256::digest(&candidate_digest).into();
