@@ -434,7 +434,6 @@ pub struct ViabilityFabric {
     max_outcomes: usize,
     max_pending_predictions: usize,
     highest_action_id: u64,
-            pre_state_digest: 1,
 }
 
 /// Cycle-level telemetry view of the viability fabric.
@@ -520,7 +519,6 @@ impl ViabilityFabric {
             max_outcomes,
             max_pending_predictions: max_outcomes.max(1).min(4096),
             highest_action_id: 0,
-            pre_state_digest: 1,
         }
     }
 
@@ -711,7 +709,6 @@ impl ViabilityFabric {
     pub fn cancel_prediction(
         &mut self,
         action_id: u64,
-            pre_state_digest: 1,
         cancellation_cycle: u64,
         reason: impl Into<String>,
         evidence_refs: Vec<String>,
