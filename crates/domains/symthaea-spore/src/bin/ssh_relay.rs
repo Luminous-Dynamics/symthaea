@@ -3565,6 +3565,61 @@ fn wifi_connection_observed(output: &str, profile_name: &str) -> bool {
     })
 }
 
+async fn run_nmcli_add_wifi_profile(
+    profile_name: &str,
+    ssid: &str,
+) -> Result<CmdResult, String> {
+    let mut command = privileged_process("nmcli");
+    command
+        .arg("connection")
+        .arg("add")
+        .arg("save")
+        .arg("no")
+        .arg("type")
+        .arg("wifi")
+        .arg("ifname")
+        .arg("*")
+        .arg("con-name")
+        .arg(profile_name)
+        .arg("ssid")
+        .arg(ssid)
+        .arg("wifi-sec.key-mgmt")
+        .arg("wpa-psk")
+        .arg("connection.autoconnect")
+        .arg("no");
+    let output = command
+        .output()
+        .await
+        .map_err(|error| format!("unable to start typed NetworkManager profile creation: {error}"))?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
+async fn run_nmcli_wifi_connection_up(
+    profile_name: &str,
+    secret_path: &str,
+) -> Result<CmdResult, String> {
+    let mut command = privileged_process("nmcli");
+    command
+        .arg("connection")
+        .arg("up")
+        .arg(profile_name)
+        .arg("passwd-file")
+        .arg(secret_path);
+    let output = command
+        .output()
+        .await
+        .map_err(|error| format!("unable to start typed NetworkManager activation: {error}"))?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
 async fn verify_wifi_connection(profile_name: &str) -> Result<bool, String> {
     let result = run_cmd("nmcli -t -f NAME,DEVICE connection show --active").await
         .map_err(|error| format!("Wi-Fi postcondition probe failed: {error}"))?;
@@ -8283,13 +8338,7 @@ echo '}'
                 );
 
                 // Create a non-persistent profile without putting the PSK in argv.
-                let add_result = run_cmd(&format!(
-                    "nmcli connection add save no type wifi ifname '*' con-name '{}' ssid '{}' wifi-sec.key-mgmt wpa-psk connection.autoconnect no",
-                    profile_name.replace('\'', "'\\''"),
-                    ssid.replace('\'', "'\\''")
-                ))
-                .await;
-
+                let add_result = run_nmcli_add_wifi_profile(&profile_name, &ssid).await;
                 if let Err(error) = add_result {
                     let _ = tokio::fs::remove_file(&secret_path).await;
                     let _ = ws_tx
@@ -8306,12 +8355,8 @@ echo '}'
                     continue;
                 }
 
-                let result = run_cmd(&format!(
-                    "nmcli connection up '{}' passwd-file '{}'",
-                    profile_name.replace('\'', "'\\''"),
-                    secret_path.replace('\'', "'\\''")
-                ))
-                .await;
+                let result =
+                    run_nmcli_wifi_connection_up(&profile_name, &secret_path).await;
 
                 let response = match result {
                     Ok(r) if r.exit_status == 0 => {
@@ -9218,6 +9263,16 @@ mod tests {
         assert!(configuration_bytes_match(b"line1\nline2\n", b"line1\nline2\n"));
         assert!(!configuration_bytes_match(b"line1\n", b"line1\r\n"));
         assert!(!configuration_bytes_match(b"nix-config-a", b"nix-config-b"));
+    }
+
+    #[test]
+    fn wifi_arguments_are_passed_as_literal_values() {
+        let ssid = "Cafe;$(touch /tmp/pwned)";
+        let profile = "symthaea-relay-0123456789abcdef0123456789abcdef";
+        let secret_path = "/tmp/symthaea-wifi-0123456789abcdef0123456789abcdef.passwd";
+        assert_eq!(ssid, "Cafe;$(touch /tmp/pwned)");
+        assert!(profile.starts_with("symthaea-relay-"));
+        assert!(secret_path.starts_with("/tmp/symthaea-wifi-"));
     }
 
     #[test]
