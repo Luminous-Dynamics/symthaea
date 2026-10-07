@@ -339,6 +339,18 @@ The report retains:
 
 This matters because a single favorable held-out scenario can be explained by scenario-specific familiarity, initialization, or perturbation alignment. The leave-one-out matrix tests whether predictive structure transfers across the benchmark family rather than merely across one chosen split.
 
+## Continual-retention interpretation
+
+Recent 2026 continual-world-model work argues that retention should be stratified by what is expected to
+remain invariant: adaptation should revise stale environment-specific knowledge while protecting
+long-lived dynamics, and evaluation should report revision and invariant-retention behavior jointly rather
+than collapsing them into one forgetting score. citeturn248481academia18
+
+This protocol therefore treats the deterministic transition law as the invariant layer. The adaptation
+experiment records per-shock correction and separately records regression of a previously learned anchor
+transition. A successful result should improve the newly observed shock without materially damaging the
+anchor. The per-shock receipts preserve this distinction instead of hiding it behind an aggregate average.
+
 ## Interpretation matrix
 
 | Observation | Interpretation |
