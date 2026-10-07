@@ -553,8 +553,8 @@ mod tests {
         let now = wall_ms();
         let command = restart_command("nginx.service");
 
-        let installed = runtime
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &runtime,
                 &intent("nginx.service"),
                 &command,
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -599,8 +599,8 @@ mod tests {
         )
         .unwrap();
 
-        let a = runtime
-            .create_pending_request(
+        let a = create_pending_service_request(
+            &runtime,
                 &intent_a,
                 &command_a,
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -608,8 +608,8 @@ mod tests {
                 UnixMillisV1::new(now + 60_000),
             )
             .unwrap();
-        let b = runtime
-            .create_pending_request(
+        let b = create_pending_service_request(
+            &runtime,
                 &intent_b,
                 &command_b,
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -667,8 +667,8 @@ mod tests {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
-        let installed = runtime
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &runtime,
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -693,8 +693,8 @@ mod tests {
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
         let action = intent("nginx.service");
-        let first = runtime
-            .create_pending_request(
+        let first = create_pending_service_request(
+            &runtime,
                 &action,
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -703,8 +703,8 @@ mod tests {
             )
             .unwrap();
         let first_projection = first.operator_projection().unwrap();
-        let second = runtime
-            .create_pending_request(
+        let second = create_pending_service_request(
+            &runtime,
                 &action,
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -735,8 +735,8 @@ mod tests {
         let runtime_path = parent.path().join("runtime");
         let first = LocalApprovalRuntimeV1::bind_in(&runtime_path).unwrap();
         let now = wall_ms();
-        let installed = first
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &first,
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -762,8 +762,8 @@ mod tests {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
-        let installed = runtime
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &runtime,
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -815,8 +815,8 @@ mod tests {
         let now = wall_ms();
         let action = intent("nginx.service");
 
-        let first = runtime
-            .create_pending_request(
+        let first = create_pending_service_request(
+            &runtime,
                 &action,
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -826,8 +826,8 @@ mod tests {
             .unwrap();
         let first_projection = first.operator_projection().unwrap();
 
-        let second = runtime
-            .create_pending_request(
+        let second = create_pending_service_request(
+            &runtime,
                 &action,
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -878,8 +878,8 @@ mod tests {
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
 
-        let installed = runtime
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &runtime,
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -907,8 +907,8 @@ mod tests {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
-        let installed = runtime
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &runtime,
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -964,8 +964,8 @@ mod tests {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
-        let installed = runtime
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &runtime,
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -992,8 +992,8 @@ mod tests {
         let now = wall_ms();
         let action = intent("nginx.service");
 
-        let first = runtime
-            .create_pending_request(
+        let first = create_pending_service_request(
+            &runtime,
                 &action,
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -1003,8 +1003,8 @@ mod tests {
             .unwrap();
         let first_id = first.request_id().to_string();
 
-        let second = runtime
-            .create_pending_request(
+        let second = create_pending_service_request(
+            &runtime,
                 &action,
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -1039,8 +1039,8 @@ mod tests {
             LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap(),
         );
         let now = wall_ms();
-        let installed = runtime
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &runtime,
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -1071,8 +1071,8 @@ mod tests {
         let runtime_path = parent.path().join("runtime");
         let first = LocalApprovalRuntimeV1::bind_in(&runtime_path).unwrap();
         let now = wall_ms();
-        let installed = first
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &first,
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -1116,8 +1116,8 @@ mod tests {
         let now = wall_ms();
         let action = intent("nginx.service");
 
-        let first = runtime
-            .create_pending_request(
+        let first = create_pending_service_request(
+            &runtime,
                 &action,
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -1127,8 +1127,8 @@ mod tests {
             .unwrap();
         let first_submission = submission_for(&first, LocalApprovalDecisionKindV1::Approved);
 
-        let second = runtime
-            .create_pending_request(
+        let second = create_pending_service_request(
+            &runtime,
                 &action,
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
