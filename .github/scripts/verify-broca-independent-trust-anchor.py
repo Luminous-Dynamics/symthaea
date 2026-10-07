@@ -115,10 +115,11 @@ TRUST_ANCHOR_SHA = env_required("TRUST_ANCHOR_SHA")
 TRIGGER_RUN_ID = int(env_required("TRIGGER_RUN_ID"))
 TRIGGER_RUN_NAME = env_required("TRIGGER_RUN_NAME")
 TRIGGER_RUN_EVENT = env_required("TRIGGER_RUN_EVENT")
+TRIGGER_ACTIVITY_TYPE = env_required("TRIGGER_ACTIVITY_TYPE")
 TRIGGER_RUN_REPOSITORY_ID = int(env_required("TRIGGER_RUN_REPOSITORY_ID"))
 TRIGGER_RUN_HEAD_SHA = env_required("TRIGGER_RUN_HEAD_SHA")
 TRIGGER_RUN_HEAD_BRANCH = env_required("TRIGGER_RUN_HEAD_BRANCH")
-TRIGGER_RUN_CONCLUSION = env_required("TRIGGER_RUN_CONCLUSION")
+TRIGGER_RUN_CONCLUSION = os.environ.get("TRIGGER_RUN_CONCLUSION", "").strip()
 TRIGGER_RUN_ATTEMPT = int(env_required("TRIGGER_RUN_ATTEMPT"))
 
 
@@ -492,6 +493,7 @@ def main() -> int:
         },
         "trigger": {
             "repository_id": TRIGGER_RUN_REPOSITORY_ID,
+            "activity_type": TRIGGER_ACTIVITY_TYPE,
             "run_id": TRIGGER_RUN_ID,
             "run_attempt": TRIGGER_RUN_ATTEMPT,
             "run_name": TRIGGER_RUN_NAME,
@@ -506,6 +508,10 @@ def main() -> int:
     try:
         if TRIGGER_RUN_EVENT != "pull_request":
             raise StaleError(f"triggering event is not pull_request: {TRIGGER_RUN_EVENT!r}")
+        if TRIGGER_ACTIVITY_TYPE not in {"requested", "in_progress", "completed"}:
+            raise StaleError(
+                f"unexpected workflow_run activity type: {TRIGGER_ACTIVITY_TYPE!r}"
+            )
 
         trigger_run = api_request("GET", f"/actions/runs/{TRIGGER_RUN_ID}")
         if (
@@ -517,12 +523,33 @@ def main() -> int:
             or trigger_run.get("head_sha") != TRIGGER_RUN_HEAD_SHA
             or trigger_run.get("head_branch") != TRIGGER_RUN_HEAD_BRANCH
             or trigger_run.get("run_attempt") != TRIGGER_RUN_ATTEMPT
-            or trigger_run.get("conclusion") != TRIGGER_RUN_CONCLUSION
+            or (
+                TRIGGER_ACTIVITY_TYPE == "completed"
+                and trigger_run.get("conclusion") != TRIGGER_RUN_CONCLUSION
+            )
             or not trigger_run.get("workflow_id")
         ):
             raise StaleError(
                 "workflow_run event payload does not match authoritative GitHub run state"
             )
+
+        if TRIGGER_ACTIVITY_TYPE in {"requested", "in_progress"}:
+            receipt["qualification_result"] = "WAITING"
+            receipt["verification"]["error"] = (
+                f"required workflow entered {TRIGGER_ACTIVITY_TYPE}; "
+                "clearing any prior trust status until completion is independently verified"
+            )
+            post_status(
+                TRIGGER_RUN_HEAD_SHA,
+                "pending",
+                "Independent Broca trust anchor waiting on workflow completion",
+                target_url,
+            )
+            print(
+                f"WAITING: required workflow activity is {TRIGGER_ACTIVITY_TYPE}",
+                file=sys.stderr,
+            )
+            return 0
 
         associated = api_request(
             "GET",
