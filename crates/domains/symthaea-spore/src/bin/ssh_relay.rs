@@ -6886,13 +6886,11 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                 let gc_log = format!("{transaction_dir}/gc.log");
                 let gc_status = format!("{transaction_dir}/gc.status");
                 let gc_pid = format!("{transaction_dir}/gc.pid");
-                if let Err(error) = run_cmd(&format!(
-                    "rm -f -- {} {} {} && touch {} {} {} && chmod 600 {} {} {}",
-                    gc_log, gc_status, gc_pid,
-                    gc_log, gc_status, gc_pid,
-                    gc_log, gc_status, gc_pid
-                ))
-                .await {
+                if let Err(error) = prepare_transaction_runtime(
+                    &gc_log,
+                    &gc_status,
+                    &gc_pid,
+                ) {
                     let outcome = finalize_transaction(
                         &transaction_ledger,
                         &transaction,
@@ -6913,11 +6911,17 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                     remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
-                if let Err(error) = run_cmd(&format!(
-                    "(nix-collect-garbage -d --delete-older-than 30d > {} 2>&1; rc=$?; printf '%s\\n' "$rc" > {}) & printf '%s\\n' "$!" > {}",
-                    gc_log, gc_status, gc_pid
-                ))
-                .await {
+
+                let mut gc_command = privileged_process("nix-collect-garbage");
+                gc_command.args(["-d", "--delete-older-than", "30d"]);
+                if let Err(error) = spawn_privileged_background_process(
+                    gc_command,
+                    &gc_log,
+                    &gc_status,
+                    &gc_pid,
+                )
+                .await
+                {
                     let outcome = finalize_transaction(
                         &transaction_ledger,
                         &transaction,
@@ -6937,56 +6941,54 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                         .await;
                     remove_transaction_artifact_dir(&transaction_dir);
                     continue;
-                };
+                }
                 let _ = ws_tx
                     .send(Message::Text(
                         RelayMessage::output("Garbage collection started...", "stdout").to_json(),
                     ))
                     .await;
-                let mut last_lines = 0u64;
+                let mut last_lines = 0usize;
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                    if let Ok(result) = run_cmd(&format!(
-                        "wc -l < {} 2>/dev/null && tail -n +{} {} 2>/dev/null",
-                        gc_log,
-                        last_lines + 1,
-                        gc_log
-                    ))
-                    .await
-                    {
-                        if result.exit_status == 0 {
-                            let lines: Vec<&str> = result.stdout.lines().collect();
-                            if let Some(first) = lines.first() {
-                                if let Ok(total) = first.trim().parse::<u64>() {
-                                    for line in &lines[1..] {
-                                        if !line.trim().is_empty() {
-                                            let _ = ws_tx
-                                                .send(Message::Text(
-                                                    RelayMessage::output(line, "stdout").to_json(),
-                                                ))
-                                                .await;
-                                        }
-                                    }
-                                    last_lines = total;
+                    if let Ok(bytes) = tokio::fs::read(&gc_log).await {
+                        let text = String::from_utf8_lossy(&bytes);
+                        let lines: Vec<&str> = text.lines().collect();
+                        if lines.len() >= last_lines {
+                            for line in &lines[last_lines..] {
+                                if !line.trim().is_empty() {
+                                    let _ = ws_tx
+                                        .send(Message::Text(
+                                            RelayMessage::output(line, "stdout").to_json(),
+                                        ))
+                                        .await;
                                 }
                             }
+                            last_lines = lines.len();
                         }
                     }
-                    if let Ok(check) = run_cmd(&format!(
-                        "test -s {} || ! kill -0 \"$(cat {} 2>/dev/null)\" 2>/dev/null",
-                        gc_status, gc_pid
-                    ))
-                    .await
+
+                    if read_transaction_status(&gc_status)
+                        .await
+                        .ok()
+                        .flatten()
+                        .is_some()
                     {
-                        if check.exit_status == 0 {
-                            break;
-                        }
+                        break;
+                    }
+                    let pid = tokio::fs::read_to_string(&gc_pid)
+                        .await
+                        .ok()
+                        .and_then(|text| text.trim().parse::<u32>().ok())
+                        .unwrap_or(0);
+                    if !process_id_is_alive(pid) {
+                        break;
                     }
                 }
-                let gc_exit_code = match run_cmd(&format!("cat {} 2>/dev/null", gc_status)).await {
-                    Ok(result) if result.exit_status == 0 => result.stdout.trim().parse::<u32>().ok(),
-                    _ => None,
-                };
+
+                let gc_exit_code = read_transaction_status(&gc_status)
+                    .await
+                    .ok()
+                    .flatten();
                 let observed_outcome = gc_completion_outcome(gc_exit_code);
                 let outcome = finalize_transaction(
                     &transaction_ledger,
@@ -7003,10 +7005,9 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                         }).to_string(),
                     ))
                     .await;
-                let _ = tokio::fs::remove_file(&script_path).await;
-                let _ = tokio::fs::remove_file(&log_path).await;
-                let _ = tokio::fs::remove_file(&status_path).await;
-                let _ = tokio::fs::remove_file(&pid_path).await;
+                let _ = tokio::fs::remove_file(&gc_log).await;
+                let _ = tokio::fs::remove_file(&gc_status).await;
+                let _ = tokio::fs::remove_file(&gc_pid).await;
                 remove_transaction_artifact_dir(&transaction_dir);
             }
 
