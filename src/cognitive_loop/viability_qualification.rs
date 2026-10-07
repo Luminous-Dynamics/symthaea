@@ -581,7 +581,7 @@ pub struct ChangeDetectionEvent {
 /// The detector is intentionally separated from adaptation: it observes residuals but never
 /// updates the world model. A nominal control stream measures false alarms before the shifted
 /// regime is evaluated.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+///
 /// Episode-level receipt used to characterize detector operating behavior across
 /// independent held-out control and shift conditions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -679,6 +679,7 @@ impl ChangeDetectionOperatingCharacteristics {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChangeDetectionReport {
     pub baseline_sample_count: u64,
     pub baseline_residual_mean: f64,
