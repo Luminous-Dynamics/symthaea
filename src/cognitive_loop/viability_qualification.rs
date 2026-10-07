@@ -864,6 +864,18 @@ mod tests {
     }
 
     #[test]
+    fn horizon_confidence_decays_with_depth() {
+        let predictor = OraclePredictor;
+        let policy = HomeostaticPolicy;
+        let current = benchmark_scenarios()[0].initial;
+        let (_, _, rollout) = policy.choose_horizon(&predictor, current, 4, 0.8);
+
+        assert!(rollout.min_confidence < 1.0);
+        let expected = 0.85_f64.powi(3);
+        assert!((rollout.min_confidence - expected).abs() < 1e-12);
+    }
+
+    #[test]
     fn deliberately_overconfident_bad_predictions_are_miscalibrated() {
         #[derive(Debug, Default)]
         struct OverconfidentPersistence;
