@@ -1700,11 +1700,16 @@ fn rfc9942_verified_inclusion_state_preserves_duplicate_leaf_position() {
     let first_state = receipt
         .verify_es256_inclusion_state(candidate, &key, &[], None)
         .unwrap();
+    let mut candidate_leaf_input = Vec::with_capacity(1 + candidate.len());
+    candidate_leaf_input.push(0x00);
+    candidate_leaf_input.extend_from_slice(candidate);
+    let expected_candidate_leaf: [u8; 32] =
+        sha2::Sha256::digest(&candidate_leaf_input).into();
     assert_eq!(first_state.proof().proof_index(), 0);
     assert_eq!(first_state.proof().inclusion_leaf_index(), Some(0));
     assert_eq!(
         first_state.proof().inclusion_candidate_leaf(),
-        Some(leaf_hash(candidate))
+        Some(expected_candidate_leaf)
     );
 
     // With only the second valid proof available, the same candidate bytes
@@ -1741,7 +1746,7 @@ fn rfc9942_verified_inclusion_state_preserves_duplicate_leaf_position() {
     assert_eq!(second_state.proof().inclusion_leaf_index(), Some(2));
     assert_eq!(
         second_state.proof().inclusion_candidate_leaf(),
-        Some(leaf_hash(candidate))
+        Some(expected_candidate_leaf)
     );
 }
 
