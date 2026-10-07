@@ -1116,6 +1116,30 @@ impl NixOSExecutor {
         };
 
         let intent = authority.intent().clone();
+        let expected_manager_owner = match authority.service_manager_owner() {
+            Some(owner) if !owner.is_empty() => owner.to_string(),
+            _ => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: "Service authority has no bound systemd manager owner".to_string(),
+                        safety_level: command.safety_level(),
+                    },
+                    None,
+                );
+            }
+        };
+        let expected_bus_id = match authority.service_bus_id() {
+            Some(bus_id) if !bus_id.is_empty() => bus_id.to_string(),
+            _ => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: "Service authority has no bound D-Bus bus incarnation".to_string(),
+                        safety_level: command.safety_level(),
+                    },
+                    None,
+                );
+            }
+        };
         let expectation = match authority.service_post_state_expectation() {
             Ok(expectation) => expectation,
             Err(error) => {
@@ -1158,6 +1182,8 @@ impl NixOSExecutor {
                     unit,
                     expectation.authorized_generation,
                     completed_job,
+                    &expected_manager_owner,
+                    &expected_bus_id,
                     expectation.required_stability_us,
                 )
                 .await
