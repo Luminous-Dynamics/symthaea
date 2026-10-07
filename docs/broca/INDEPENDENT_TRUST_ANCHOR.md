@@ -42,6 +42,8 @@ The resulting control-plane chain is:
 
 `default-branch verifier -> API-only PR inspection -> exact PR head -> independent workflow/job checks -> trusted commit status`
 
+The verifier also self-audits the base-owned trust workflow definition at its trusted checkout SHA, including its exact Action pins, permissions, early-invalidation triggers, default-branch replay restriction, and manual-run input plumbing. This is an accidental-drift guard; repository branch/ruleset governance remains the ultimate external trust root.
+
 The trust anchor complements, rather than replaces, the Broca Feature Matrix's local compiler replay and artifact provenance checks.
 
 ## Claim ceiling
