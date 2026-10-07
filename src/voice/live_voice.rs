@@ -868,7 +868,7 @@ impl LiveVoice {
                 plan, frame, binding, &witness,
             )?;
         receipt.pronunciation_lexicon_evidence = pronunciation_lexicon_evidence;
-        receipt.pronunciation_lexicon_evidence_blake3 =
+        receipt.pronunciation_lexicon_evidence_blake3:
             hash_pronunciation_lexicon_evidence(&receipt.pronunciation_lexicon_evidence);
         receipt.verify_against_plan_and_current_resources(
             plan, frame, binding, &witness, &self.g2p
