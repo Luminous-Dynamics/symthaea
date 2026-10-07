@@ -107,6 +107,9 @@ pub use memory_bridge::*;
 pub mod goal_world;
 pub use goal_world::*;
 
+pub mod viability_qualification;
+pub use viability_qualification::*;
+
 pub mod types;
 pub(crate) use types::CycleState;
 pub use types::*;
