@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-fn is_hex_digest(value: &str) -> bool {
+fn is_lower_hex_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
@@ -254,7 +254,7 @@ impl CanonicalAdmissionReceipt {
         if frontier_ref.as_deref().is_some_and(|v| v.trim().is_empty()) {
             return Err("frontier reference must be non-empty when present");
         }
-        if !is_hex_digest(&provenance_snapshot_digest) {
+        if !is_lower_hex_digest(&provenance_snapshot_digest) {
             return Err("provenance snapshot digest must be a 64-character hexadecimal digest");
         }
         if validator_version != PROVENANCE_VALIDATOR_VERSION {
@@ -303,10 +303,10 @@ impl CanonicalAdmissionReceipt {
         if self.frontier_ref.as_deref().is_some_and(|v| v.trim().is_empty()) {
             return Err("frontier reference must be non-empty when present");
         }
-        if !is_hex_digest(&self.admitted_subject_digest) {
+        if !is_lower_hex_digest(&self.admitted_subject_digest) {
             return Err("admitted subject digest must be a 64-character hexadecimal digest");
         }
-        if !is_hex_digest(&self.provenance_snapshot_digest) {
+        if !is_lower_hex_digest(&self.provenance_snapshot_digest) {
             return Err("provenance snapshot digest must be a 64-character hexadecimal digest");
         }
         if self.validator_version != PROVENANCE_VALIDATOR_VERSION {
@@ -524,7 +524,7 @@ impl ProvenanceValidationReport {
         if self.snapshot_schema_version != PROVENANCE_SNAPSHOT_SCHEMA_VERSION {
             return Err("provenance validation schema version mismatch");
         }
-        if !is_hex_digest(&self.snapshot_digest) {
+        if !is_lower_hex_digest(&self.snapshot_digest) {
             return Err("provenance snapshot digest must be a 64-character hexadecimal digest");
         }
         if self.conforms != self.violations.is_empty() {
@@ -1210,6 +1210,23 @@ mod tests {
         };
         assert_eq!(relation.kind, ProvenanceRelationKind::RevisedFrom);
         assert!(relation.validate().is_ok());
+    }
+
+    #[test]
+    fn provenance_digest_metadata_rejects_uppercase_hex() {
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let mut validation =
+            ProvenanceValidationReport::from_relations(std::slice::from_ref(&relation));
+        validation.snapshot_digest = validation.snapshot_digest.to_ascii_uppercase();
+        assert_eq!(
+            validation.validate_metadata(),
+            Err("provenance snapshot digest must be a 64-character hexadecimal digest")
+        );
     }
 
     #[test]
