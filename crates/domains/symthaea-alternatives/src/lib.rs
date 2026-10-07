@@ -24,7 +24,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 47
+pub const SCHEMA_VERSION: u16 = 47;
 /// Assessment algorithm version.
 pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-v66";
 
@@ -532,6 +532,12 @@ pub struct MeasurementModelInputFrontierRef {
     pub frontier_revision: String,
     /// Digest of the exact authoritative model-input frontier.
     pub frontier_digest: String,
+    /// Exact measurement-model identity governed by this frontier.
+    pub measurement_model_id: String,
+    /// Revision of the exact measurement model governed by this frontier.
+    pub measurement_model_revision: String,
+    /// Digest of the exact measurement model governed by this frontier.
+    pub measurement_model_digest: String,
     /// Number of input quantities declared by the authoritative frontier.
     pub input_count: usize,
 }
@@ -542,6 +548,9 @@ impl MeasurementModelInputFrontierRef {
         if self.frontier_id.is_empty()
             || self.frontier_revision.is_empty()
             || self.frontier_digest.is_empty()
+            || self.measurement_model_id.is_empty()
+            || self.measurement_model_revision.is_empty()
+            || self.measurement_model_digest.is_empty()
             || self.input_count == 0
         {
             return Err(AssessmentError::InvalidMeasurementModelInputFrontier);
@@ -601,6 +610,21 @@ impl CalibrationTraceabilityTopology {
             return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
         }
         self.input_frontier.validate()?;
+        if self.input_frontier.measurement_model_id != self.measurement_model_id
+            || self.input_frontier.measurement_model_revision != self.measurement_model_revision
+            || self.input_frontier.measurement_model_digest != self.measurement_model_digest
+        {
+            return Err(
+                AssessmentError::CalibrationTraceabilityInputFrontierModelMismatch {
+                    topology_model_id: self.measurement_model_id.clone(),
+                    topology_model_revision: self.measurement_model_revision.clone(),
+                    topology_model_digest: self.measurement_model_digest.clone(),
+                    frontier_model_id: self.input_frontier.measurement_model_id.clone(),
+                    frontier_model_revision: self.input_frontier.measurement_model_revision.clone(),
+                    frontier_model_digest: self.input_frontier.measurement_model_digest.clone(),
+                },
+            );
+        }
         if self.input_bindings.is_empty() {
             return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
         }
@@ -3857,6 +3881,21 @@ pub enum AssessmentError {
         /// Actual topology model digest.
         actual_model_digest: String,
     },
+    /// The frontier reference is bound to a different measurement model than the topology.
+    CalibrationTraceabilityInputFrontierModelMismatch {
+        /// Topology measurement-model identity.
+        topology_model_id: String,
+        /// Topology measurement-model revision.
+        topology_model_revision: String,
+        /// Topology measurement-model digest.
+        topology_model_digest: String,
+        /// Frontier measurement-model identity.
+        frontier_model_id: String,
+        /// Frontier measurement-model revision.
+        frontier_model_revision: String,
+        /// Frontier measurement-model digest.
+        frontier_model_digest: String,
+    },
     /// The ordered linear calibration traversal contains a duplicate exact link.
     DuplicateCalibrationTraceabilityLink {
         /// Calibration record identity.
@@ -4388,6 +4427,17 @@ impl std::fmt::Display for AssessmentError {
             } => write!(
                 f,
                 "calibration traceability measurement model mismatch: expected {expected_model_id}/{expected_model_revision}/{expected_model_digest}, actual {actual_model_id}/{actual_model_revision}/{actual_model_digest}"
+            ),
+            Self::CalibrationTraceabilityInputFrontierModelMismatch {
+                topology_model_id,
+                topology_model_revision,
+                topology_model_digest,
+                frontier_model_id,
+                frontier_model_revision,
+                frontier_model_digest,
+            } => write!(
+                f,
+                "calibration traceability input frontier model {frontier_model_id}/{frontier_model_revision}/{frontier_model_digest} does not match topology model {topology_model_id}/{topology_model_revision}/{topology_model_digest}"
             ),
             Self::DuplicateCalibrationTraceabilityLink {
                 calibration_id,
@@ -8170,6 +8220,9 @@ mod tests {
                 frontier_id: "model-input-frontier-v1".into(),
                 frontier_revision: "r1".into(),
                 frontier_digest: input_frontier_digest,
+                measurement_model_id: "model-v1".into(),
+                measurement_model_revision: "r1".into(),
+                measurement_model_digest: "model-digest-v1".into(),
                 input_count: 1,
             },
             input_bindings: vec![CalibrationTraceabilityInputBinding {
@@ -8300,6 +8353,9 @@ mod tests {
                 frontier_id: "fixture-input-frontier-v1".into(),
                 frontier_revision: "v1".into(),
                 frontier_digest: input_frontier_digest,
+                measurement_model_id: "fixture-measurement-model-v1".into(),
+                measurement_model_revision: "v1".into(),
+                measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
                 input_count: 2,
             },
             input_bindings: vec![
@@ -8513,6 +8569,9 @@ mod tests {
                 frontier_id: "fixture-input-frontier-v1".into(),
                 frontier_revision: "v1".into(),
                 frontier_digest: input_frontier_digest,
+                measurement_model_id: "fixture-measurement-model-v1".into(),
+                measurement_model_revision: "v1".into(),
+                measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
                 input_count: 1,
             },
             input_bindings: vec![CalibrationTraceabilityInputBinding {
