@@ -1187,6 +1187,7 @@ pub fn evaluate_predictor<P: MicroWorldPredictor>(
             name: "nominal",
             initial: MicroWorld::default().observe(),
             schedule: &NOMINAL_SCHEDULE,
+            perturbations: &[],
         },
         max_cycles,
     )
@@ -1693,7 +1694,7 @@ mod tests {
     fn oracle_suite_is_zero_error() {
         struct Oracle;
         impl MicroWorldPredictor for Oracle {
-            fn predict(&mut self, state: MicroWorldObservation, action: MicroAction) -> MicroWorldObservation {
+            fn predict(&self, state: MicroWorldObservation, action: MicroAction) -> MicroWorldObservation {
                 transition(state, action)
             }
 
