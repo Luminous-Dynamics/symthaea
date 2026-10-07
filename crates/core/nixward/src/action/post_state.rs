@@ -2616,6 +2616,48 @@ mod tests {
     }
 
     #[test]
+    fn stability_sequence_cannot_be_rebound_to_another_dbus_incarnation() {
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut evidence = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+        evidence.samples[1].bus_id = Some("fedcba98765432100123456789abcdef".into());
+        evidence.sequence_digest = stability_sequence_digest(&evidence.samples).unwrap();
+        assert_eq!(
+            evidence.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::StabilityIdentityOrStateChanged
+        );
+    }
+
+    #[test]
+    fn receipt_rejects_dbus_incarnation_substitution() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.systemd_bus_id = Some("fedcba98765432100123456789abcdef".into());
+
+        let intent = contextual_intent(
+            NixServiceOperationKindV1::Start,
+            &exp.unit,
+            exp.authorized_generation,
+            exp.authorized_definition_content_digest.clone(),
+            exp.pre_invocation_id.clone(),
+            exp.required_stability_us,
+        );
+        let authorization = contextual_authorization(&intent);
+        assert_eq!(
+            receipt.verify_against(&intent, &authorization).unwrap_err(),
+            NixPostStateErrorV1::BusIncarnationMismatch
+        );
+    }
+
+    #[test]
     fn stability_sequence_cannot_be_rebound_to_another_manager_epoch() {
         let obs = observation(
             NixServiceOperationKindV1::Start,
