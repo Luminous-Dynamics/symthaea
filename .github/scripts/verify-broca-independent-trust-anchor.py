@@ -200,10 +200,44 @@ def latest_required_runs(head_sha: str) -> dict[str, dict[str, Any] | None]:
             if run.get("name") == name and run.get("head_sha") == head_sha
         ]
         candidates.sort(
-            key=lambda run: (run.get("updated_at", ""), run.get("id", 0))
+            key=lambda run: (
+                run.get("updated_at", ""),
+                run.get("id", 0),
+                run.get("run_attempt", 0),
+            )
         )
         result[name] = candidates[-1] if candidates else None
     return result
+
+
+def verify_trigger_is_current(
+    trigger_run: dict[str, Any],
+    latest_runs: dict[str, dict[str, Any] | None],
+) -> None:
+    if trigger_run.get("name") not in REQUIRED_WORKFLOWS:
+        raise VerificationError(
+            f"unexpected triggering workflow: {trigger_run.get('name')!r}"
+        )
+    latest = latest_runs.get(trigger_run["name"])
+    if latest is None:
+        raise WaitingError(
+            f"triggering workflow has no current exact-head run: {trigger_run['name']}"
+        )
+    same_execution = (
+        latest.get("id") == trigger_run.get("id")
+        and latest.get("run_attempt") == trigger_run.get("run_attempt")
+        and latest.get("head_sha") == trigger_run.get("head_sha")
+    )
+    if same_execution:
+        return
+    if latest.get("status") != "completed":
+        raise WaitingError(
+            f"newer exact-head {trigger_run['name']} run {latest.get('id')} is not completed"
+        )
+    raise StaleError(
+        f"triggering run {trigger_run.get('id')} attempt {trigger_run.get('run_attempt')} "
+        f"is superseded by exact-head run {latest.get('id')} attempt {latest.get('run_attempt')}"
+    )
 
 
 def verify_broca_jobs(run_id: int) -> dict[str, Any]:
@@ -658,6 +692,7 @@ def main() -> int:
         }
 
         workflow_runs = latest_required_runs(pr["head"]["sha"])
+        verify_trigger_is_current(trigger_run, workflow_runs)
         workflow_gate_states: dict[str, Any] = {}
         for name, run in workflow_runs.items():
             if run is None:
@@ -688,11 +723,6 @@ def main() -> int:
         assert broca_run is not None
         receipt["verification"]["workflow_gates"] = workflow_gate_states
         receipt["verification"]["broca_jobs"] = verify_broca_jobs(int(broca_run["id"]))
-
-        if TRIGGER_RUN_NAME not in REQUIRED_WORKFLOWS:
-            raise VerificationError(
-                f"unexpected triggering workflow: {TRIGGER_RUN_NAME!r}"
-            )
 
         workflow_paths = {
             "Broca Feature Matrix": ".github/workflows/broca-feature-matrix.yml",
