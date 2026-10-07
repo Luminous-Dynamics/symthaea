@@ -66,8 +66,10 @@ jobs:
           LIVE_RUN_PR_NUMBER="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].number else 0 end')"
           LIVE_RUN_PR_HEAD_SHA="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].head.sha else "" end')"
           LIVE_RUN_PR_HEAD_REPO_ID="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].head.repo.id else 0 end')"
+          LIVE_RUN_PR_HEAD_REPO_NAME="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].head.repo.full_name else "" end')"
           LIVE_RUN_PR_BASE_SHA="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].base.sha else "" end')"
           LIVE_RUN_PR_BASE_REPO_ID="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].base.repo.id else 0 end')"
+          LIVE_RUN_PR_BASE_REPO_NAME="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].base.repo.full_name else "" end')"
           test "$LIVE_RUN_REPO_ID" = "$CURRENT_REPO_ID"
           test "$LIVE_RUN_HEAD_SHA" = "$EVENT_HEAD_SHA"
           test "$LIVE_RUN_HEAD_REF" = "$EVENT_HEAD_REF"
@@ -75,6 +77,9 @@ jobs:
           test "$LIVE_RUN_WORKFLOW_PATH" = ".github/workflows/hdc-linear-code-syndrome-qualify.yml"
           test "$LIVE_RUN_WORKFLOW_NAME" = "HDC Linear-Code Bounded Decoder Qualification"
           test "$LIVE_RUN_EVENT" = "$GITHUB_EVENT_NAME"
+          if test "$GITHUB_EVENT_NAME" = "push"; then
+            test "$LIVE_RUN_PR_COUNT" -eq 0
+          fi
           test -n "$GITHUB_WORKFLOW_SHA"
           WORKFLOW_PATH=".github/workflows/hdc-linear-code-syndrome-qualify.yml"
           CHECKED_OUT_WORKFLOW_SHA256="$(sha256sum "$WORKFLOW_PATH" | cut -d" " -f1)"
@@ -89,8 +94,10 @@ jobs:
             test "$LIVE_RUN_PR_NUMBER" = "$GITHUB_EVENT_NUMBER"
             test "$LIVE_RUN_PR_HEAD_SHA" = "$EVENT_HEAD_SHA"
             test "$LIVE_RUN_PR_HEAD_REPO_ID" = "$EVENT_HEAD_REPO_ID"
+            test "$LIVE_RUN_PR_HEAD_REPO_NAME" = "$EVENT_HEAD_REPO"
             test "$LIVE_RUN_PR_BASE_SHA" = "$EVENT_BASE_SHA"
             test "$LIVE_RUN_PR_BASE_REPO_ID" = "$CURRENT_REPO_ID"
+            test "$LIVE_RUN_PR_BASE_REPO_NAME" = "$GITHUB_REPOSITORY"
           fi
           test "$ACTUAL_SHA" = "$EVENT_HEAD_SHA"
           git cat-file -e "${PARENT_SHA}^{commit}"
@@ -123,6 +130,8 @@ jobs:
           echo "live_run_workflow_path=$LIVE_RUN_WORKFLOW_PATH" >> "$GITHUB_OUTPUT"
           echo "live_run_workflow_name=$LIVE_RUN_WORKFLOW_NAME" >> "$GITHUB_OUTPUT"
           echo "live_run_event=$LIVE_RUN_EVENT" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_head_repo_name=$LIVE_RUN_PR_HEAD_REPO_NAME" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_base_repo_name=$LIVE_RUN_PR_BASE_REPO_NAME" >> "$GITHUB_OUTPUT"
           echo "workflow_sha=$GITHUB_WORKFLOW_SHA" >> "$GITHUB_OUTPUT"
           echo "workflow_ref=$GITHUB_WORKFLOW_REF" >> "$GITHUB_OUTPUT"
           echo "workflow_file_sha256=$CHECKED_OUT_WORKFLOW_SHA256" >> "$GITHUB_OUTPUT"
@@ -449,6 +458,18 @@ jobs:
           LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^GENERATOR_BASIS_EQUIVARIANCE=//p')"
           test -n "$LEDGER"
           printf "generator_basis_equivariance=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+      - name: Capture composed metamorphic invariance
+        id: composed_metamorphic
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            composed_basis_and_coordinate_metamorphisms_preserve_decoder_semantics -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^COMPOSED_METAMORPHIC_EQUIVARIANCE=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^COMPOSED_METAMORPHIC_EQUIVARIANCE=//p')"
+          test -n "$LEDGER"
+          printf "composed_metamorphic_equivariance=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
       - name: Capture random-code list and independent-oracle sweep
         id: random_list_oracle
         run: |
@@ -502,7 +523,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
           HDC Linear-Code Bounded Decoder Qualification
           =============================================
-          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v14
+          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v15
           github_run_id=${{ github.run_id }}
           github_run_attempt=${{ github.run_attempt }}
           github_workflow_sha=${{ github.workflow_sha }}
@@ -566,6 +587,8 @@ jobs:
           coordinate_permutation_equivariance=${{ steps.coordinate_permutation.outputs.coordinate_permutation_equivariance }}
           generator_basis_equivariance_status=${{ steps.generator_basis_equivariance.outcome }}
           generator_basis_equivariance=${{ steps.generator_basis_equivariance.outputs.generator_basis_equivariance }}
+          composed_metamorphic_status=${{ steps.composed_metamorphic.outcome }}
+          composed_metamorphic_equivariance=${{ steps.composed_metamorphic.outputs.composed_metamorphic_equivariance }}
           syndrome_fiber_difference_status=${{ steps.fiber_difference.outcome }}
           syndrome_fiber_difference=${{ steps.fiber_difference.outputs.syndrome_fiber_difference }}
           walsh_dual_fiber_status=${{ steps.walsh_dual_fiber.outcome }}
@@ -586,7 +609,7 @@ jobs:
           runner_image=${{ steps.runner.outputs.runner_image }}
           runner_image_version=${{ steps.runner.outputs.runner_image_version }}
           workflow_definition_status=${{ steps.head.outputs.workflow_definition_match == 'true' && 'matched' || 'mismatch' }}
-          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.generator_basis_equivariance.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.fixed_syndrome_spec.outcome == 'success' && steps.quotient_metric.outcome == 'success' && steps.quotient_spectrum.outcome == 'success' && steps.spectrum_adversary.outcome == 'success' && steps.coordinate_permutation.outcome == 'success' && steps.fiber_difference.outcome == 'success' && steps.walsh_dual_fiber.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.generator_basis_equivariance.outcome == 'success' && steps.composed_metamorphic.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.fixed_syndrome_spec.outcome == 'success' && steps.quotient_metric.outcome == 'success' && steps.quotient_spectrum.outcome == 'success' && steps.spectrum_adversary.outcome == 'success' && steps.coordinate_permutation.outcome == 'success' && steps.fiber_difference.outcome == 'success' && steps.walsh_dual_fiber.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
           random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
           random_syndrome_sweep=${{ steps.random_sweep.outputs.random_syndrome_sweep }}
