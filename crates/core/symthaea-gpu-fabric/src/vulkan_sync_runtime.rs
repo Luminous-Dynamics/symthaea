@@ -26,6 +26,8 @@ pub enum VulkanSyncRuntimeError {
     Vk(vk::Result),
     #[error("no Vulkan 1.3 compute device with synchronization2 and timeline semaphores")]
     NoQualifiedDevice,
+    #[error("logical queue id {0} exceeds the runtime bound")]
+    QueueLimitExceeded(u16),
     #[error("invalid synchronization plan: {0}")]
     Plan(crate::VulkanSyncError),
     #[error("missing logical queue {0}")]
@@ -176,9 +178,8 @@ impl VulkanSyncRuntime {
             }
         }
 
-        let mut final_values = Vec::new();
-        let mut final_semaphores = Vec::new();
-        for (queue, semaphore) in &self.semaphores {
+        let mut final_values = vec![0_u64; self.semaphores.len()];
+        for (queue, _) in &self.semaphores {
             let final_value = plan
                 .submissions
                 .iter()
@@ -186,16 +187,22 @@ impl VulkanSyncRuntime {
                 .map(|submission| submission.signal.value)
                 .max()
                 .unwrap_or(0);
-            if final_value != 0 {
+            final_values[usize::from(queue.get())] = final_value;
+        }
+
+        let mut final_semaphores = Vec::new();
+        let mut final_wait_values = Vec::new();
+        for (index, (_, semaphore)) in self.semaphores.iter().enumerate() {
+            if final_values[index] != 0 {
                 final_semaphores.push(*semaphore);
-                final_values.push(final_value);
+                final_wait_values.push(final_values[index]);
             }
         }
 
         if !final_semaphores.is_empty() {
             let wait_info = vk::SemaphoreWaitInfo::default()
                 .semaphores(&final_semaphores)
-                .values(&final_values);
+                .values(&final_wait_values);
             unsafe {
                 self.device
                     .wait_semaphores(&wait_info, u64::MAX)
@@ -228,7 +235,7 @@ impl VulkanSyncRuntime {
     fn ensure_semaphores(&mut self, queue_count: u16) -> Result<(), VulkanSyncRuntimeError> {
         while self.semaphores.len() < usize::from(queue_count) {
             let queue = VulkanQueueId::new(self.semaphores.len() as u16)
-                .map_err(|error| VulkanSyncRuntimeError::Plan(crate::VulkanSyncError::QueueLimitExceeded(error.to_string().parse().unwrap_or(u16::MAX))))?;
+                .map_err(|error| VulkanSyncRuntimeError::QueueLimitExceeded(error.get()))?;
             let mut type_info = vk::SemaphoreTypeCreateInfo::default()
                 .semaphore_type(vk::SemaphoreType::TIMELINE)
                 .initial_value(0);
