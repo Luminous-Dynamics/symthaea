@@ -101,7 +101,12 @@ The harness reports:
 
 - sample count;
 - ten-bin expected calibration error (ECE);
-- mean squared confidence/accuracy error.
+- mean squared confidence/accuracy error;
+- horizon-adjusted confidence inside counterfactual planning.
+
+Confidence must not be treated as constant across a long imagined trajectory. Recent world-model
+evaluation work likewise recommends separating one-step and multi-step rollout accuracy and treating
+uncertainty calibration as decision-relevant rather than decorative telemetry.
 
 These are operational calibration metrics for the forecast-confidence signal. They are not evidence
 that the confidence is a probability of a discrete event.
@@ -209,6 +214,10 @@ ds/dt = (F(s,a) - s) / tau
 For the WorldModelBridge delta model this becomes a constant action-specific velocity. It is an
 experimental numerical extension, not a claim that this is the unique or biologically correct
 continuous-time realization.
+
+Counterfactual confidence is also horizon-aware: each deeper simulated step receives the prior
+step confidence multiplied by a fixed 0.85 decay factor. This is a conservative engineering prior,
+not a learned probability law.
 
 The remaining qualification task is to measure:
 
