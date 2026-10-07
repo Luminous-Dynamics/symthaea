@@ -1651,6 +1651,100 @@ fn rfc9942_verified_state_records_selected_proof_index() {
 }
 
 
+
+#[test]
+fn rfc9942_verified_inclusion_state_preserves_duplicate_leaf_position() {
+    let candidate = b"duplicate";
+    let leaves = vec![
+        candidate.to_vec(),
+        b"middle".to_vec(),
+        candidate.to_vec(),
+    ];
+    let vds = Rfc9162Sha256Vds;
+    let head = vds.tree_head(&leaves);
+    let proof_at_zero = vds.inclusion_proof(&leaves, 0).unwrap().to_cbor();
+    let proof_at_two = vds.inclusion_proof(&leaves, 2).unwrap().to_cbor();
+
+    // The candidate bytes are identical at positions 0 and 2 and therefore
+    // have the same candidate-leaf hash. The proof itself carries the log
+    // position; verified state must preserve that position instead of
+    // collapsing the two semantic locations into one leaf identity.
+    let vdp_both = Rfc9942Vdp::new(
+        Rfc9942ProofKind::Inclusion,
+        vec![proof_at_zero.clone(), proof_at_two.clone()],
+    )
+    .unwrap();
+    let unsigned = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp_both.clone(),
+        Rfc9942ReceiptPayload::Attached(head.root()),
+        vec![0u8; 64],
+    )
+    .unwrap();
+    let rng = SystemRandom::new();
+    let signer = rfc8392_signing_key(&rng);
+    let signature = signer
+        .sign(&rng, &unsigned.signature1_tbs(&[], None).unwrap())
+        .unwrap()
+        .as_ref()
+        .to_vec();
+    let receipt = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp_both,
+        Rfc9942ReceiptPayload::Attached(head.root()),
+        signature,
+    )
+    .unwrap();
+    let key = rfc8392_public_key();
+
+    let first_state = receipt
+        .verify_es256_inclusion_state(candidate, &key, &[], None)
+        .unwrap();
+    assert_eq!(first_state.proof().proof_index(), 0);
+    assert_eq!(first_state.proof().inclusion_leaf_index(), Some(0));
+    assert_eq!(
+        first_state.proof().inclusion_candidate_leaf(),
+        Some(leaf_hash(candidate))
+    );
+
+    // With only the second valid proof available, the same candidate bytes
+    // and same tree head establish a different verified log position.
+    let vdp_second = Rfc9942Vdp::new(
+        Rfc9942ProofKind::Inclusion,
+        vec![proof_at_two],
+    )
+    .unwrap();
+    let unsigned_second = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp_second.clone(),
+        Rfc9942ReceiptPayload::Attached(head.root()),
+        vec![0u8; 64],
+    )
+    .unwrap();
+    let signature_second = signer
+        .sign(&rng, &unsigned_second.signature1_tbs(&[], None).unwrap())
+        .unwrap()
+        .as_ref()
+        .to_vec();
+    let receipt_second = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp_second,
+        Rfc9942ReceiptPayload::Attached(head.root()),
+        signature_second,
+    )
+    .unwrap();
+
+    let second_state = receipt_second
+        .verify_es256_inclusion_state(candidate, &key, &[], None)
+        .unwrap();
+    assert_eq!(second_state.proof().proof_index(), 0);
+    assert_eq!(second_state.proof().inclusion_leaf_index(), Some(2));
+    assert_eq!(
+        second_state.proof().inclusion_candidate_leaf(),
+        Some(leaf_hash(candidate))
+    );
+}
+
 #[test]
 fn rfc9942_consistency_state_records_selected_proof_index() {
     let leaves = vec![
