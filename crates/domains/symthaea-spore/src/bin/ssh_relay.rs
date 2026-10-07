@@ -10698,8 +10698,8 @@ mod tests {
         let root = preservation_user_identity("root")
             .expect("root account lookup should succeed")
             .expect("root account should exist");
-        assert!(root.0 <= u32::MAX);
-        assert!(root.1 <= u32::MAX);
+        assert_eq!(root.0, 0);
+        assert_eq!(root.1, 0);
         assert!(preservation_user_identity("definitely-no-such-preservation-user")
             .unwrap()
             .is_none());
