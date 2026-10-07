@@ -1609,8 +1609,8 @@ impl DaemonState {
                                 // cannot consume the only governed approval and then fall through
                                 // to a legacy authority path.
                                 let service_definition_content = match &cmd {
-                                    NixOSCommand::Service { unit, .. } => {
-                                        match capture_authoritative_service_definition_content(unit) {
+                                    NixOSCommand::Service { operation, unit } => {
+                                        match capture_authoritative_service_definition_content(*operation, unit) {
                                             Ok(content) => Some(content),
                                             Err(error) => {
                                                 eprintln!(
