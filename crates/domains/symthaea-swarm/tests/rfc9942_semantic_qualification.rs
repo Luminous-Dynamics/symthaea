@@ -1852,7 +1852,10 @@ fn rfc9942_verified_state_records_selected_proof_index() {
         .verify_es256_inclusion_state(candidate, &key, &[], None)
         .unwrap();
     assert_eq!(state.proof().proof_index(), 1);
+    let expected_proof_sha256: [u8; 32] =
+        sha2::Sha256::digest(&matching_proof).into();
     assert_eq!(state.proof().inclusion_head(), Some(head));
+    assert_eq!(state.proof_sha256(), expected_proof_sha256);
 }
 
 
