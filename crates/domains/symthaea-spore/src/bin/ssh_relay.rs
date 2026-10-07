@@ -119,6 +119,15 @@ fn privileged_script_command(path: &str) -> tokio::process::Command {
     command.arg(path);
     command
 }
+async fn run_privileged_script(path: &str) -> Result<CmdResult, std::io::Error> {
+    let output = privileged_script_command(path).output().await?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
 
 fn create_private_runtime_file(path: &str, mode: u32) -> Result<std::fs::File, std::io::Error> {
     std::fs::OpenOptions::new()
@@ -6104,6 +6113,30 @@ echo '}'
                 );
 
                 let backup_dir = format!("/tmp/symthaea-preserve-{}", transaction.transaction_id);
+                let transaction_dir = match create_transaction_artifact_dir(&transaction.transaction_id) {
+                    Ok(path) => path,
+                    Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Preservation script namespace unavailable: {error}"),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+                let preserve_script_path = format!("{transaction_dir}/preserve.sh");
                 let mut preserve_script = r#"
 set -euo pipefail
 umask 077
@@ -6221,7 +6254,31 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
 "#;
                 preserve_script = preserve_script.replace("__BACKUP_DIR__", &backup_dir);
 
-                match run_cmd(&preserve_script).await {
+                if let Err(error) =
+                    write_private_file(&preserve_script_path, preserve_script.as_bytes(), 0o700)
+                {
+                    remove_transaction_artifact_dir(&transaction_dir);
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type": "exit",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!("Preservation script staging failed: {error}"),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                match run_privileged_script(&preserve_script_path).await {
                     Ok(result) => {
                         let (response_code, observed_outcome) =
                             match verify_preservation_artifacts(&backup_dir).await {
@@ -6292,6 +6349,7 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                             .await;
                     }
                 }
+                remove_transaction_artifact_dir(&transaction_dir);
             }
 
             // ═══════════════════════════════════════════════════════
