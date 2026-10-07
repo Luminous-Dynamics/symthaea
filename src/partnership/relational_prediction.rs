@@ -1367,10 +1367,16 @@ const INFERENCE_BINDING_SCHEMA: &str = "relational-prediction-inference-binding/
 const INFERENCE_SELECTION_SCHEMA: &str = "relational-prediction-inference-selection/v1";
 const CANONICAL_INFERENCE_SELECTION_RULE_ID: &str = "relational-inference-selection-rule-v1";
 const CANONICAL_INFERENCE_SELECTION_RULE_SPEC_SHA256: &str =
-    "ec9545571ce96955041af773bed7eb76f7e3afacc33912754ac3b143c9c84542";
+    "aaed4c4086601986c75a739e90d1d9cad539eb18383d61f97301b32b7340ce6b";
 const CANONICAL_INFERENCE_SELECTION_PROCEDURE_ID: &str = "nested-forecast-bootstrap-v1";
 const CANONICAL_INFERENCE_SELECTION_DEPENDENCE_ID: &str = "loss-dependence-bartlett-v1";
 const CANONICAL_INFERENCE_SELECTION_RESAMPLING_ID: &str = "moving-block-bootstrap-v1";
+const CANONICAL_INFERENCE_SELECTION_PROCEDURE_SPEC_SHA256: &str =
+    "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4";
+const CANONICAL_INFERENCE_SELECTION_DEPENDENCE_SPEC_SHA256: &str =
+    "8b5195edb3c93a1c4a56d48c96732dfbd14c6e1299b5ac2cf53cef55ce37caf1";
+const CANONICAL_INFERENCE_SELECTION_RESAMPLING_SPEC_SHA256: &str =
+    "ba1886b0727d5ac1fd6b107486d20c68cc5775416cdfb8eeb1887df7e2be450b";
 const CANONICAL_INFERENCE_SELECTION_SMALL_SAMPLE_POLICY_ID: &str =
     "small-sample-conservative-v1";
 const CANONICAL_INFERENCE_SELECTION_MULTIPLICITY_POLICY_ID: &str =
@@ -1834,8 +1840,11 @@ impl ForecastInferenceSelectionPath {
             && plan.method_selection_rule_spec_sha256
                 == CANONICAL_INFERENCE_SELECTION_RULE_SPEC_SHA256
             && plan.procedure_id == CANONICAL_INFERENCE_SELECTION_PROCEDURE_ID
+            && plan.procedure_spec_sha256 == CANONICAL_INFERENCE_SELECTION_PROCEDURE_SPEC_SHA256
             && plan.dependence_method_id == CANONICAL_INFERENCE_SELECTION_DEPENDENCE_ID
+            && plan.dependence_spec_sha256 == CANONICAL_INFERENCE_SELECTION_DEPENDENCE_SPEC_SHA256
             && plan.resampling_method_id == CANONICAL_INFERENCE_SELECTION_RESAMPLING_ID
+            && plan.resampling_spec_sha256 == CANONICAL_INFERENCE_SELECTION_RESAMPLING_SPEC_SHA256
             && plan.small_sample_policy_id == CANONICAL_INFERENCE_SELECTION_SMALL_SAMPLE_POLICY_ID
             && plan.multiplicity_policy_id == CANONICAL_INFERENCE_SELECTION_MULTIPLICITY_POLICY_ID
         {
@@ -5522,11 +5531,11 @@ mod tests {
             CANONICAL_SELECTION_RULE_ID,
             CANONICAL_SELECTION_RULE_SPEC_SHA256,
             "nested-forecast-bootstrap-v1",
-            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+            "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4",
             "loss-dependence-bartlett-v1",
-            "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+            "8b5195edb3c93a1c4a56d48c96732dfbd14c6e1299b5ac2cf53cef55ce37caf1",
             "moving-block-bootstrap-v1",
-            "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            "ba1886b0727d5ac1fd6b107486d20c68cc5775416cdfb8eeb1887df7e2be450b",
             "small-sample-conservative-v1",
             "single-primary-comparison-v1",
             0.05,
@@ -5582,11 +5591,11 @@ mod tests {
             CANONICAL_SELECTION_RULE_ID,
             CANONICAL_SELECTION_RULE_SPEC_SHA256,
             "nested-forecast-bootstrap-v1",
-            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+            "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4",
             "loss-dependence-bartlett-v1",
-            "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+            "8b5195edb3c93a1c4a56d48c96732dfbd14c6e1299b5ac2cf53cef55ce37caf1",
             "moving-block-bootstrap-v1",
-            "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            "ba1886b0727d5ac1fd6b107486d20c68cc5775416cdfb8eeb1887df7e2be450b",
             "small-sample-conservative-v1",
             "single-primary-comparison-v1",
             0.05,
@@ -5677,7 +5686,7 @@ mod tests {
     #[test]
     fn inference_plan_rejects_cross_qualification_binding() {
         let identity_a = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-        let identity_b = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
+        let identity_b = "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4";
         let plan = ForecastInferencePlan::new(
             0.5,
             identity_a,
@@ -5725,6 +5734,65 @@ mod tests {
     }
 
     #[test]
+    fn inference_selection_path_rejects_unpinned_method_specs() {
+        fn canonical_plan() -> ForecastInferencePlan {
+            ForecastInferencePlan::new(
+                0.5,
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                CANONICAL_INFERENCE_SELECTION_RULE_ID,
+                CANONICAL_INFERENCE_SELECTION_RULE_SPEC_SHA256,
+                CANONICAL_INFERENCE_SELECTION_PROCEDURE_ID,
+                CANONICAL_INFERENCE_SELECTION_PROCEDURE_SPEC_SHA256,
+                CANONICAL_INFERENCE_SELECTION_DEPENDENCE_ID,
+                CANONICAL_INFERENCE_SELECTION_DEPENDENCE_SPEC_SHA256,
+                CANONICAL_INFERENCE_SELECTION_RESAMPLING_ID,
+                CANONICAL_INFERENCE_SELECTION_RESAMPLING_SPEC_SHA256,
+                CANONICAL_INFERENCE_SELECTION_SMALL_SAMPLE_POLICY_ID,
+                CANONICAL_INFERENCE_SELECTION_MULTIPLICITY_POLICY_ID,
+                0.05,
+                "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+            )
+            .unwrap()
+        }
+
+        let plan = canonical_plan();
+        assert_eq!(
+            ForecastInferenceSelectionPath::for_plan(&plan),
+            ForecastInferenceSelectionPath::NestedFixedHorizonBootstrap
+        );
+
+        let mut procedure_tampered = plan.clone();
+        procedure_tampered.procedure_spec_sha256 =
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string();
+        procedure_tampered.plan_blake3 = inference_plan_digest(&procedure_tampered);
+        procedure_tampered.validate().unwrap();
+        assert_eq!(
+            ForecastInferenceSelectionPath::for_plan(&procedure_tampered),
+            ForecastInferenceSelectionPath::StopAssumptionFailure
+        );
+
+        let mut dependence_tampered = plan.clone();
+        dependence_tampered.dependence_spec_sha256 =
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string();
+        dependence_tampered.plan_blake3 = inference_plan_digest(&dependence_tampered);
+        dependence_tampered.validate().unwrap();
+        assert_eq!(
+            ForecastInferenceSelectionPath::for_plan(&dependence_tampered),
+            ForecastInferenceSelectionPath::StopAssumptionFailure
+        );
+
+        let mut resampling_tampered = plan;
+        resampling_tampered.resampling_spec_sha256 =
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_string();
+        resampling_tampered.plan_blake3 = inference_plan_digest(&resampling_tampered);
+        resampling_tampered.validate().unwrap();
+        assert_eq!(
+            ForecastInferenceSelectionPath::for_plan(&resampling_tampered),
+            ForecastInferenceSelectionPath::StopAssumptionFailure
+        );
+    }
+
+    #[test]
     fn canonical_selection_rule_spec_is_exactly_pinned() {
         let spec = include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -5758,6 +5826,18 @@ mod tests {
         assert_eq!(
             value["selected_method_bundle"]["resampling_method_id"],
             "moving-block-bootstrap-v1"
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["procedure_spec_sha256"],
+            CANONICAL_INFERENCE_SELECTION_PROCEDURE_SPEC_SHA256
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["dependence_spec_sha256"],
+            CANONICAL_INFERENCE_SELECTION_DEPENDENCE_SPEC_SHA256
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["resampling_spec_sha256"],
+            CANONICAL_INFERENCE_SELECTION_RESAMPLING_SPEC_SHA256
         );
         assert_eq!(
             value["selected_method_bundle"]["small_sample_policy_id"],
@@ -5797,11 +5877,11 @@ mod tests {
             CANONICAL_SELECTION_RULE_ID,
             CANONICAL_SELECTION_RULE_SPEC_SHA256,
             "nested-forecast-bootstrap-v1",
-            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+            "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4",
             "loss-dependence-bartlett-v1",
-            "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+            "8b5195edb3c93a1c4a56d48c96732dfbd14c6e1299b5ac2cf53cef55ce37caf1",
             "moving-block-bootstrap-v1",
-            "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            "ba1886b0727d5ac1fd6b107486d20c68cc5775416cdfb8eeb1887df7e2be450b",
             "small-sample-conservative-v1",
             "single-primary-comparison-v1",
             0.05,
@@ -5903,11 +5983,11 @@ mod tests {
             CANONICAL_SELECTION_RULE_ID,
             CANONICAL_SELECTION_RULE_SPEC_SHA256,
             "nested-forecast-bootstrap-v1",
-            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+            "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4",
             "loss-dependence-bartlett-v1",
-            "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+            "8b5195edb3c93a1c4a56d48c96732dfbd14c6e1299b5ac2cf53cef55ce37caf1",
             "moving-block-bootstrap-v1",
-            "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            "ba1886b0727d5ac1fd6b107486d20c68cc5775416cdfb8eeb1887df7e2be450b",
             "small-sample-conservative-v1",
             "single-primary-comparison-v1",
             0.05,
@@ -6315,7 +6395,7 @@ mod tests {
 
         let mut tampered_null = qualification.clone();
         tampered_null.circular_shift_null.qualification_input_blake3 =
-            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210".to_string();
+            "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4".to_string();
         assert_eq!(
             tampered_null.validate(),
             Err(RelationalPredictionError::InvalidSplit)
@@ -6337,7 +6417,7 @@ mod tests {
 
         let mut alternate_provenance = provenance();
         alternate_provenance.source_data_sha256 =
-            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210".to_string();
+            "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4".to_string();
         let qualification_b = HeldOutRelationalPredictionQualification::compute(
             &samples,
             config,
@@ -7221,7 +7301,7 @@ mod tests {
 
         let mut tampered = qualification.clone();
         tampered.incremental_relational_nulls[2].qualification_input_blake3 =
-            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210".to_string();
+            "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4".to_string();
 
         assert_eq!(
             tampered.validate(),
@@ -7273,7 +7353,7 @@ mod tests {
 
         let mut tampered = qualification.clone();
         tampered.provenance.source_data_sha256 =
-            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210".to_string();
+            "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4".to_string();
 
         assert_eq!(
             tampered.validate(),
