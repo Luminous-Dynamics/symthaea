@@ -86,6 +86,26 @@ def main() -> None:
             if needle in body:
                 fail(f'mutation arm {name!r} contains forbidden shell boundary {needle!r}')
 
+    # The pre-install check is non-destructive, but it accepts a browser-selected
+    # disk. Keep that value out of generated shell source: the script must receive
+    # it only through argv.
+    preflight_start = arm_indexes.get("pre_install_check")
+    if preflight_start is None:
+        fail("pre_install_check arm census missing")
+    next_preflight = next(
+        (index for index, name in ordered if index > preflight_start),
+        len(lines),
+    )
+    preflight_body = "\n".join(lines[preflight_start:next_preflight])
+    if "run_cmd(" in preflight_body:
+        fail("pre_install_check still uses the shell-string executor")
+    if "run_privileged_script_with_args(" not in preflight_body:
+        fail("pre_install_check lost typed script argv execution")
+    if '"{disk}"' in preflight_body:
+        fail("pre_install_check interpolates the browser disk into shell source")
+    if '&[&disk]' not in preflight_body:
+        fail("pre_install_check no longer passes disk as a script argument")
+
     # Nested interpreters inside generated privileged scripts create a second
     # parsing authority underneath the already-controlled relay interpreter.
     # Keep this global because the relevant helpers live outside the mutation arms.
