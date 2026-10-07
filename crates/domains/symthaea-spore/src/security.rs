@@ -183,35 +183,16 @@ pub fn validate_nix_pure_eval(nix_content: &str) -> Result<(), String> {
     // command-boundary policy instead of inheriting ambient Nix configuration,
     // daemon/socket locations, user config directories, or dynamic-loader hooks.
     let mut command = Command::new(nix);
+    // Pure evaluation is still run with a hermetic process environment. The
+    // evaluator must never inherit caller-controlled Nix, shell, loader, proxy,
+    // or user-directory variables.
+    command.env_clear();
     command
         .args(["eval", "--pure-eval", "--expr", &expr])
         .env("PATH", TRUSTED_PATH)
-        .env("NIX_PATH", TRUSTED_NIX_PATH);
-    for variable in [
-        "NIX_CONFIG",
-        "NIX_USER_CONF_FILES",
-        "NIX_REMOTE",
-        "NIX_DAEMON_SOCKET_PATH",
-        "NIX_STORE_DIR",
-        "NIX_DATA_DIR",
-        "NIX_LOG_DIR",
-        "NIX_STATE_DIR",
-        "NIX_CONF_DIR",
-        "NIX_CONFIG_HOME",
-        "NIX_STATE_HOME",
-        "NIX_CACHE_HOME",
-        "XDG_CONFIG_HOME",
-        "XDG_STATE_HOME",
-        "XDG_CACHE_HOME",
-        "XDG_CONFIG_DIRS",
-        "NIX_IGNORE_SYMLINK_STORE",
-        "BASH_ENV",
-        "ENV",
-        "LD_PRELOAD",
-        "LD_LIBRARY_PATH",
-    ] {
-        command.env_remove(variable);
-    }
+        .env("NIX_PATH", TRUSTED_NIX_PATH)
+        .env("LANG", "C")
+        .env("LC_ALL", "C");
 
     let output = command
         .output()
