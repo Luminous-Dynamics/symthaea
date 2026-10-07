@@ -3945,7 +3945,10 @@ fn open_image_artifact_with_commitment_blocking(
         ));
     }
 
+    use std::ffi::CString;
+    use std::os::fd::{AsRawFd, FromRawFd};
     use std::os::unix::fs::PermissionsExt;
+
     let directory = std::fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
@@ -3974,45 +3977,52 @@ fn open_image_artifact_with_commitment_blocking(
         );
     }
 
-    let path = std::path::Path::new(&image_dir).join(artifact_name);
-    let mut file = match std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open(&path)
-    {
-        Ok(file) => file,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => {
-            return Err(format!(
-                "unable to open image artifact {}: {error}",
-                path.display()
-            ))
-        }
+    let name = CString::new(artifact_name)
+        .map_err(|_| "image artifact name contains a NUL byte".to_string())?;
+    let fd = unsafe {
+        libc::openat(
+            directory.as_raw_fd(),
+            name.as_ptr(),
+            libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
     };
+    if fd < 0 {
+        let error = std::io::Error::last_os_error();
+        if error.kind() == std::io::ErrorKind::NotFound {
+            return Ok(None);
+        }
+        return Err(format!(
+            "unable to open image artifact {artifact_name} in {}: {error}",
+            image_dir
+        ));
+    }
 
+    let mut file = unsafe { std::fs::File::from_raw_fd(fd) };
     let metadata = file.metadata().map_err(|error| {
         format!(
-            "unable to inspect image artifact {}: {error}",
-            path.display()
+            "unable to inspect image artifact {} in {}: {error}",
+            artifact_name, image_dir
         )
     })?;
     if !metadata.file_type().is_file() {
         return Err(format!(
-            "image artifact {} is not a regular file",
-            path.display()
+            "image artifact {artifact_name} in {} is not a regular file",
+            image_dir
         ));
     }
     if metadata.permissions().mode() & 0o777 != 0o400
         || metadata.uid() != unsafe { libc::geteuid() }
     {
         return Err(format!(
-            "image artifact {} has unsafe ownership or permissions; require relay-owned 0400",
-            path.display()
+            "image artifact {artifact_name} has unsafe ownership or permissions; require relay-owned 0400"
         ));
     }
     let expected_size = metadata.len();
     if expected_size == 0 {
-        return Err(format!("image artifact {} is empty", path.display()));
+        return Err(format!(
+            "image artifact {artifact_name} in {} is empty",
+            image_dir
+        ));
     }
 
     let mut hasher = blake3::Hasher::new();
@@ -4021,8 +4031,8 @@ fn open_image_artifact_with_commitment_blocking(
     loop {
         let read = file.read(&mut buffer).map_err(|error| {
             format!(
-                "unable to hash image artifact {}: {error}",
-                path.display()
+                "unable to hash image artifact {artifact_name} in {}: {error}",
+                image_dir
             )
         })?;
         if read == 0 {
@@ -4030,24 +4040,26 @@ fn open_image_artifact_with_commitment_blocking(
         }
         total = total
             .checked_add(read as u64)
-            .ok_or_else(|| format!("image artifact {} size overflowed", path.display()))?;
+            .ok_or_else(|| {
+                format!(
+                    "image artifact {artifact_name} in {} size overflowed",
+                    image_dir
+                )
+            })?;
         hasher.update(&buffer[..read]);
     }
     if total != expected_size {
         return Err(format!(
-            "image artifact {} changed while being hashed (expected {} bytes, read {})",
-            path.display(),
-            expected_size,
-            total
+            "image artifact {artifact_name} in {} changed while being hashed (expected {} bytes, read {})",
+            image_dir, expected_size, total
         ));
     }
 
-    // Hashing consumed the descriptor. Rewind that same descriptor so the
-    // destructive restore consumes exactly the bytes we just committed.
+    // Hashing consumed the descriptor. Rewind that exact descriptor so
+    // destructive restore can consume exactly the bytes just committed.
     file.seek(SeekFrom::Start(0)).map_err(|error| {
         format!(
-            "unable to rewind verified image artifact {}: {error}",
-            path.display()
+            "unable to rewind verified image artifact {artifact_name}: {error}"
         )
     })?;
 
