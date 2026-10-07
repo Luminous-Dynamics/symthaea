@@ -1701,6 +1701,18 @@ fn main() -> Result<(), String> {
             .is_err()
     };
 
+    let remediation_uncertainty_noncanonical_probability_blocked = {
+        let mut forged_execution = statistical_execution.clone();
+        forged_execution.inclusion_probabilities[0].probability_numerator = 2;
+        forged_execution.inclusion_probabilities[0].probability_denominator = 2;
+        let forged_bytes =
+            serde_json::to_vec(&forged_execution).map_err(|e| e.to_string())?;
+        symthaea_communication::NeurosemanticRemediationStatisticalExecutionArtifact::from_json_bytes(
+            &forged_bytes,
+        )
+        .is_err()
+    };
+
     let remediation_uncertainty_dependence_execution_blocked = {
         let mut forged_execution = statistical_execution.clone();
         forged_execution.dependence_model =
@@ -2534,6 +2546,8 @@ fn main() -> Result<(), String> {
             remediation_uncertainty_statistical_execution_substitution_blocked,
         "remediation_uncertainty_inclusion_probability_substitution_blocked":
             remediation_uncertainty_inclusion_probability_substitution_blocked,
+        "remediation_uncertainty_noncanonical_probability_blocked":
+            remediation_uncertainty_noncanonical_probability_blocked,
         "remediation_uncertainty_dependence_execution_blocked":
             remediation_uncertainty_dependence_execution_blocked,
         "remediation_uncertainty_assumptions_substitution_blocked": remediation_uncertainty_assumptions_substitution_blocked,
