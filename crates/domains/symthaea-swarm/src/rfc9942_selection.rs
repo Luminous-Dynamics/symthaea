@@ -508,8 +508,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
-    #[test]
     fn decision_validation_rejects_oversized_collection() {
         let mut decision = ReceiptSelectionDecision {
             collection_sha256: [1; 32],
@@ -535,6 +533,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn decision_validation_rejects_zero_candidate_digest() {
         let collection = collection();
         let mut decision = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
@@ -545,6 +544,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn decision_validation_rejects_mismatched_selected_digest() {
         let collection = collection();
         let mut decision = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
@@ -566,6 +566,82 @@ mod tests {
             decision.validate(),
             Err(ReceiptSelectionDecisionError::RejectedAfterSelection)
         );
+    }
+
+    #[test]
+    fn identity_mutations_change_or_fail_closed() {
+        let collection = collection();
+        let baseline = evaluate_priority_first_valid(
+            &collection,
+            |index, _| if index == 1 {
+                Ok(())
+            } else {
+                Err(Rfc9942VdpError::InvalidEs256Signature)
+            },
+        );
+        let baseline_digest = baseline.validated_digest().unwrap();
+
+        let mut rejection_reason = baseline.clone();
+        rejection_reason.candidates[0].status =
+            ReceiptSelectionCandidateStatus::Rejected(ReceiptSelectionRejection::NoMatchingProof);
+        assert_eq!(rejection_reason.validate(), Ok(()));
+        assert_ne!(rejection_reason.digest(), baseline_digest);
+
+        let mut policy = baseline.clone();
+        policy.policy_id = "rfc9942/priority-first-valid-v2";
+        assert_eq!(
+            policy.validated_digest(),
+            Err(ReceiptSelectionDecisionError::PolicyMismatch)
+        );
+        assert_ne!(policy.digest(), baseline_digest);
+
+        let mut policy_version = baseline.clone();
+        policy_version.policy_version = POLICY_VERSION + 1;
+        assert_eq!(
+            policy_version.validated_digest(),
+            Err(ReceiptSelectionDecisionError::PolicyMismatch)
+        );
+        assert_ne!(policy_version.digest(), baseline_digest);
+
+        let mut collection_digest = baseline.clone();
+        collection_digest.collection_sha256 = [0; 32];
+        assert_eq!(
+            collection_digest.validated_digest(),
+            Err(ReceiptSelectionDecisionError::CollectionDigestZero)
+        );
+        assert_ne!(collection_digest.digest(), baseline_digest);
+
+        let mut candidate_digest = baseline.clone();
+        candidate_digest.candidates[0].receipt_sha256 = [0; 32];
+        assert_eq!(
+            candidate_digest.validated_digest(),
+            Err(ReceiptSelectionDecisionError::CandidateDigestZero)
+        );
+        assert_ne!(candidate_digest.digest(), baseline_digest);
+
+        let mut selected_digest = baseline.clone();
+        selected_digest.selected_receipt_sha256 = Some([0xAB; 32]);
+        assert_eq!(
+            selected_digest.validated_digest(),
+            Err(ReceiptSelectionDecisionError::SelectedCandidateMismatch)
+        );
+        assert_ne!(selected_digest.digest(), baseline_digest);
+
+        let mut selected_index = baseline.clone();
+        selected_index.selected_index = Some(0);
+        assert_eq!(
+            selected_index.validated_digest(),
+            Err(ReceiptSelectionDecisionError::SelectedCandidateMismatch)
+        );
+        assert_ne!(selected_index.digest(), baseline_digest);
+
+        let mut candidate_result = baseline.clone();
+        candidate_result.candidates[0].status = ReceiptSelectionCandidateStatus::Selected;
+        assert_eq!(
+            candidate_result.validated_digest(),
+            Err(ReceiptSelectionDecisionError::SelectedCandidateMismatch)
+        );
+        assert_ne!(candidate_result.digest(), baseline_digest);
     }
 
     #[test]
