@@ -256,8 +256,16 @@ impl VulkanBarrierWorkloadRuntime {
         let instance_info = vk::InstanceCreateInfo::default().application_info(&app_info);
         let instance = unsafe { entry.create_instance(&instance_info, None).map_err(VulkanBarrierError::Vk)? };
 
+        let physical_devices = match unsafe { instance.enumerate_physical_devices() } {
+            Ok(devices) => devices,
+            Err(error) => {
+                unsafe { instance.destroy_instance(None); }
+                return Err(VulkanBarrierError::Vk(error));
+            }
+        };
+
         let mut selected = None;
-        for physical in unsafe { instance.enumerate_physical_devices().map_err(VulkanBarrierError::Vk)? } {
+        for physical in physical_devices {
             let props = unsafe { instance.get_physical_device_properties(physical) };
             if props.api_version < VULKAN_API_VERSION { continue; }
             let mut timeline = vk::PhysicalDeviceTimelineSemaphoreFeatures::default();
@@ -274,7 +282,13 @@ impl VulkanBarrierWorkloadRuntime {
             if let Some(family) = family { selected = Some((physical, family)); break; }
         }
 
-        let (physical, family) = selected.ok_or(VulkanBarrierError::NoQualifiedDevice)?;
+        let (physical, family) = match selected {
+            Some(value) => value,
+            None => {
+                unsafe { instance.destroy_instance(None); }
+                return Err(VulkanBarrierError::NoQualifiedDevice);
+            }
+        };
         let props = unsafe { instance.get_physical_device_properties(physical) };
         let memory_properties = unsafe { instance.get_physical_device_memory_properties(physical) };
 
@@ -294,24 +308,80 @@ impl VulkanBarrierWorkloadRuntime {
         };
         let queue = unsafe { device.get_device_queue(family, 0) };
 
-        let spirv = compile_spirv()?;
-        let shader = create_shader_module(&device, &spirv)?;
+        let spirv = compile_spirv().map_err(|error| {
+            unsafe {
+                device.destroy_device(None);
+                instance.destroy_instance(None);
+            }
+            error
+        })?;
+        let shader = match create_shader_module(&device, &spirv) {
+            Ok(shader) => shader,
+            Err(error) => {
+                unsafe {
+                    device.destroy_device(None);
+                    instance.destroy_instance(None);
+                }
+                return Err(error);
+            }
+        };
         let bindings = [
             vk::DescriptorSetLayoutBinding::default().binding(0).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).descriptor_count(1).stage_flags(vk::ShaderStageFlags::COMPUTE),
             vk::DescriptorSetLayoutBinding::default().binding(1).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).descriptor_count(1).stage_flags(vk::ShaderStageFlags::COMPUTE),
             vk::DescriptorSetLayoutBinding::default().binding(2).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).descriptor_count(1).stage_flags(vk::ShaderStageFlags::COMPUTE),
         ];
         let layout_info = vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings);
-        let descriptor_layout = unsafe { device.create_descriptor_set_layout(&layout_info, None).map_err(VulkanBarrierError::Vk)? };
+        let descriptor_layout = match unsafe {
+            device.create_descriptor_set_layout(&layout_info, None)
+        } {
+            Ok(layout) => layout,
+            Err(error) => {
+                unsafe {
+                    device.destroy_shader_module(shader, None);
+                    device.destroy_device(None);
+                    instance.destroy_instance(None);
+                }
+                return Err(VulkanBarrierError::Vk(error));
+            }
+        };
         let pipeline_layout_info = vk::PipelineLayoutCreateInfo::default().set_layouts(std::slice::from_ref(&descriptor_layout));
-        let pipeline_layout = unsafe { device.create_pipeline_layout(&pipeline_layout_info, None).map_err(VulkanBarrierError::Vk)? };
+        let pipeline_layout = match unsafe {
+            device.create_pipeline_layout(&pipeline_layout_info, None)
+        } {
+            Ok(layout) => layout,
+            Err(error) => {
+                unsafe {
+                    device.destroy_descriptor_set_layout(descriptor_layout, None);
+                    device.destroy_shader_module(shader, None);
+                    device.destroy_device(None);
+                    instance.destroy_instance(None);
+                }
+                return Err(VulkanBarrierError::Vk(error));
+            }
+        };
         let entry_point = CString::new("main").unwrap();
         let stage = vk::PipelineShaderStageCreateInfo::default().stage(vk::ShaderStageFlags::COMPUTE).module(shader).name(&entry_point);
         let pipeline_info = vk::ComputePipelineCreateInfo::default().stage(stage).layout(pipeline_layout);
         let pipeline = unsafe {
-            match device.create_compute_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pipeline_info), None) {
-                Ok(mut pipelines) => pipelines.pop().unwrap(),
-                Err((_, error)) => return Err(VulkanBarrierError::Vk(error)),
+            match device.create_compute_pipelines(
+                vk::PipelineCache::null(),
+                std::slice::from_ref(&pipeline_info),
+                None,
+            ) {
+                Ok(mut pipelines) => pipelines
+                    .pop()
+                    .expect("one compute pipeline was requested"),
+                Err((pipelines, error)) => {
+                    for pipeline in pipelines {
+                        device.destroy_pipeline(pipeline, None);
+                    }
+                    device.destroy_pipeline_layout(pipeline_layout, None);
+                    device.destroy_descriptor_set_layout(descriptor_layout, None);
+                    device.destroy_shader_module(shader, None);
+                    device.destroy_device(None);
+                    instance.destroy_instance(None);
+                    return Err(VulkanBarrierError::Vk(error));
+                }
             }
         };
         let command_pool_info = vk::CommandPoolCreateInfo::default().queue_family_index(family);
