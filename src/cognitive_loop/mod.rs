@@ -324,6 +324,7 @@ pub mod viability_fabric;
 pub use viability_fabric::{
     ActionOutcome, ActionPrediction, CognitiveResourceMode, LifecyclePhase,
     PredictionCancellation, PredictionErrorLedger, RegulationDecision, RegulationThresholds,
+    ViabilityTraceReceipt,
     ViabilityBand, ViabilityDelta, ViabilityFabric, ViabilitySignal, ViabilityState,
     ViabilityTelemetry, ViabilityVariable,
 };
