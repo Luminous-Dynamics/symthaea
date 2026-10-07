@@ -1115,8 +1115,12 @@ mod tests {
         let (_, _, rollout) = policy.choose_horizon(&predictor, current, 4, 0.8);
 
         assert!(rollout.min_confidence < 1.0);
-        let expected = 0.85_f64.powi(3);
+        let expected = DEFAULT_HORIZON_CONFIDENCE_DECAY.powi(3);
         assert!((rollout.min_confidence - expected).abs() < 1e-12);
+
+        let (_, _, custom_rollout) =
+            policy.choose_horizon_with_confidence_decay(&predictor, current, 4, 0.8, 0.5);
+        assert!((custom_rollout.min_confidence - 0.5_f64.powi(3)).abs() < 1e-12);
     }
 
     #[test]
