@@ -802,10 +802,6 @@ def main() -> int:
                 "Attest structured freeze receipt",
                 "Preserve attestation bundle",
                 "receipt.attestation.bundle.json",
-                "workflow_dispatch:",
-                "workflow_run_id:",
-                "TRUST_ANCHOR_MODE: $"+"{{ github.event_name }}",
-                "MANUAL_WORKFLOW_RUN_ID: $"+"{{ inputs.workflow_run_id }}",
             ],
             "Broca workflow",
         )
