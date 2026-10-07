@@ -72,6 +72,9 @@ improving a forecast statistic.
 
 Run the same closed-loop policy with the persistence predictor.
 
+The comparator uses the same actuator boundary and the same termination semantics, so an apparent
+gain cannot come from giving one predictor a more permissive execution path.
+
 This is a deliberately weak control. It is not an optimal controller and should not be described as
 one.
 
@@ -105,11 +108,15 @@ that the confidence is a probability of a discrete event.
 
 ### Survival
 
-A run survives when the final environment state remains viable:
+A run survives only when the final environment state remains viable **and** the policy loop did not
+terminate because the deterministic actuator rejected an action:
 
-energy > 0.08 && integrity > 0.08
+energy > 0.08 && integrity > 0.08 && no_execution_failure_termination
 
 The minimum actually observed viability margin is also retained.
+
+Rejected actions are closed as explicit prediction cancellations with execution-failure evidence;
+they are never converted into successful outcomes.
 
 ### Recovery
 
