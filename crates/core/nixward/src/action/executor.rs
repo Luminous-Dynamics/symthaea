@@ -1058,7 +1058,18 @@ impl NixOSExecutor {
 
         let dispatch_executable = match &command {
             NixOSCommand::Service { .. } if !self.dry_run => {
-                Some(resolve_systemctl_executable_identity()?)
+                match resolve_systemctl_executable_identity() {
+                    Ok(identity) => Some(identity),
+                    Err(reason) => {
+                        return (
+                            ExecutionResult::Blocked {
+                                reason,
+                                safety_level: safety,
+                            },
+                            None,
+                        );
+                    }
+                }
             }
             _ => None,
         };
