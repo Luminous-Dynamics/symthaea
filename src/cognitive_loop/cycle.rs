@@ -62,8 +62,14 @@ impl CognitiveLoopService {
         );
         self.viability.state_mut().prediction_errors.world =
             (self.stats.avg_prediction_error as f64).clamp(0.0, 1.0);
-        self.viability.state_mut().prediction_errors.model_confidence =
-            (1.0 - self.prediction_confidence).clamp(0.0, 1.0);
+        // Treat confidence below the established trust floor as regulation pressure;
+        // a neutral prior (0.5) is not itself a recovery condition.
+        let trust_floor = 0.4_f64;
+        self.viability.state_mut().prediction_errors.model_confidence = if self.prediction_confidence < trust_floor {
+            ((trust_floor - self.prediction_confidence) / trust_floor).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
 
         self.substrate_manager.tick_energy(&self.config);
         // Feed substrate energy data to ThermodynamicManager
