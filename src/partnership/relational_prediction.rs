@@ -4233,7 +4233,7 @@ fn rolling_qualification_identity_digest(
 
 fn inference_plan_digest(plan: &ForecastInferencePlan) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"relational-prediction-inference-plan/v1");
+    hasher.update(b"relational-prediction-inference-plan/v2");
     update_string(&mut hasher, feature_set_name(plan.primary_feature_set));
     update_string(&mut hasher, feature_set_name(plan.benchmark_feature_set));
     update_string(&mut hasher, &plan.loss);
