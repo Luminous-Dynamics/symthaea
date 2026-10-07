@@ -884,6 +884,7 @@ impl NixSystemdReadOnlyObserverV1 {
 
         let expected_unit = canonical_unit(unit)?;
         let manager_owner = self.systemd_manager_owner().await?;
+        let bus_id = self.dbus_bus_id().await?;
         let object_path = self.resolve_service_unit(&expected_unit).await?;
         let unit_properties = self
             .get_all_properties(&object_path, SYSTEMD_UNIT_INTERFACE)
@@ -892,8 +893,12 @@ impl NixSystemdReadOnlyObserverV1 {
             .get_all_properties(&object_path, SYSTEMD_SERVICE_INTERFACE)
             .await?;
         let post_manager_owner = self.systemd_manager_owner().await?;
+        let post_bus_id = self.dbus_bus_id().await?;
         if post_manager_owner != manager_owner {
             return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if post_bus_id != bus_id {
+            return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
         }
 
         let service_result =
@@ -910,6 +915,9 @@ impl NixSystemdReadOnlyObserverV1 {
             .await?;
         if definition_content.as_ref().manager_owner != manager_owner {
             return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if definition_content.as_ref().bus_id != bus_id {
+            return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
         }
         let definition_content_digest = definition_content
             .digest()
