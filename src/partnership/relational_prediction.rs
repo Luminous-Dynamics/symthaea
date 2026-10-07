@@ -1361,6 +1361,123 @@ impl Default for RollingOriginRelationalPredictionConfig {
     }
 }
 
+const INFERENCE_PLAN_SCHEMA: &str = "relational-prediction-inference-plan/v1";
+
+/// Frozen analysis contract for future inferential qualification.
+/// This specifies the inferential procedure and all supporting choices without
+/// executing inference. The plan digest makes later method substitution detectable.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ForecastInferencePlan {
+    pub primary_feature_set: PredictionFeatureSet,
+    pub benchmark_feature_set: PredictionFeatureSet,
+    pub loss: String,
+    pub forecast_horizon: f64,
+    pub origin_schedule_sha256: String,
+    pub procedure_id: String,
+    pub procedure_spec_sha256: String,
+    pub dependence_method_id: String,
+    pub dependence_spec_sha256: String,
+    pub resampling_method_id: String,
+    pub resampling_spec_sha256: String,
+    pub small_sample_policy_id: String,
+    pub multiplicity_policy_id: String,
+    pub alpha: f64,
+    pub qualification_identity_blake3: String,
+    pub plan_blake3: String,
+}
+
+impl ForecastInferencePlan {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        forecast_horizon: f64,
+        origin_schedule_sha256: impl Into<String>,
+        procedure_id: impl Into<String>,
+        procedure_spec_sha256: impl Into<String>,
+        dependence_method_id: impl Into<String>,
+        dependence_spec_sha256: impl Into<String>,
+        resampling_method_id: impl Into<String>,
+        resampling_spec_sha256: impl Into<String>,
+        small_sample_policy_id: impl Into<String>,
+        multiplicity_policy_id: impl Into<String>,
+        alpha: f64,
+        qualification_identity_blake3: impl Into<String>,
+    ) -> Result<Self, RelationalPredictionError> {
+        let mut plan = Self {
+            primary_feature_set: PredictionFeatureSet::RelationalAugmented,
+            benchmark_feature_set: PredictionFeatureSet::NonRelationalContext,
+            loss: "squared_error".to_string(),
+            forecast_horizon,
+            origin_schedule_sha256: origin_schedule_sha256.into(),
+            procedure_id: procedure_id.into(),
+            procedure_spec_sha256: procedure_spec_sha256.into(),
+            dependence_method_id: dependence_method_id.into(),
+            dependence_spec_sha256: dependence_spec_sha256.into(),
+            resampling_method_id: resampling_method_id.into(),
+            resampling_spec_sha256: resampling_spec_sha256.into(),
+            small_sample_policy_id: small_sample_policy_id.into(),
+            multiplicity_policy_id: multiplicity_policy_id.into(),
+            alpha,
+            qualification_identity_blake3: qualification_identity_blake3.into(),
+            plan_blake3: String::new(),
+        };
+        plan.plan_blake3 = inference_plan_digest(&plan);
+        plan.validate()?;
+        Ok(plan)
+    }
+
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        if self.primary_feature_set != PredictionFeatureSet::RelationalAugmented
+            || self.benchmark_feature_set != PredictionFeatureSet::NonRelationalContext
+            || self.loss != "squared_error"
+            || !self.forecast_horizon.is_finite()
+            || self.forecast_horizon <= 0.0
+            || !is_hex_digest(&self.origin_schedule_sha256, 64)
+            || self.procedure_id.trim().is_empty()
+            || !is_hex_digest(&self.procedure_spec_sha256, 64)
+            || self.dependence_method_id.trim().is_empty()
+            || !is_hex_digest(&self.dependence_spec_sha256, 64)
+            || self.resampling_method_id.trim().is_empty()
+            || !is_hex_digest(&self.resampling_spec_sha256, 64)
+            || self.small_sample_policy_id.trim().is_empty()
+            || self.multiplicity_policy_id.trim().is_empty()
+            || !self.alpha.is_finite()
+            || self.alpha <= 0.0
+            || self.alpha >= 1.0
+            || !is_hex_digest(&self.qualification_identity_blake3, 64)
+            || !is_hex_digest(&self.plan_blake3, 64)
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        if inference_plan_digest(self) != self.plan_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+        Ok(serde_json::json!({
+            "schema": INFERENCE_PLAN_SCHEMA,
+            "primary_feature_set": feature_set_name(self.primary_feature_set),
+            "benchmark_feature_set": feature_set_name(self.benchmark_feature_set),
+            "loss": &self.loss,
+            "forecast_horizon": self.forecast_horizon,
+            "origin_schedule_sha256": &self.origin_schedule_sha256,
+            "procedure_id": &self.procedure_id,
+            "procedure_spec_sha256": &self.procedure_spec_sha256,
+            "dependence_method_id": &self.dependence_method_id,
+            "dependence_spec_sha256": &self.dependence_spec_sha256,
+            "resampling_method_id": &self.resampling_method_id,
+            "resampling_spec_sha256": &self.resampling_spec_sha256,
+            "small_sample_policy_id": &self.small_sample_policy_id,
+            "multiplicity_policy_id": &self.multiplicity_policy_id,
+            "alpha": self.alpha,
+            "qualification_identity_blake3": &self.qualification_identity_blake3,
+            "plan_blake3": &self.plan_blake3
+        }).to_string())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct RollingOriginRelationalPredictionSummary {
     pub first_origin: usize,
@@ -3603,6 +3720,27 @@ fn rolling_qualification_identity_digest(
     update_f64(&mut hasher, config.forecast_horizon);
     update_f64(&mut hasher, config.ridge_lambda);
     update_usize(&mut hasher, surrogate_count);
+    hasher.finalize().to_hex().to_string()
+}
+
+fn inference_plan_digest(plan: &ForecastInferencePlan) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-inference-plan/v1");
+    update_string(&mut hasher, feature_set_name(plan.primary_feature_set));
+    update_string(&mut hasher, feature_set_name(plan.benchmark_feature_set));
+    update_string(&mut hasher, &plan.loss);
+    update_f64(&mut hasher, plan.forecast_horizon);
+    update_string(&mut hasher, &plan.origin_schedule_sha256);
+    update_string(&mut hasher, &plan.procedure_id);
+    update_string(&mut hasher, &plan.procedure_spec_sha256);
+    update_string(&mut hasher, &plan.dependence_method_id);
+    update_string(&mut hasher, &plan.dependence_spec_sha256);
+    update_string(&mut hasher, &plan.resampling_method_id);
+    update_string(&mut hasher, &plan.resampling_spec_sha256);
+    update_string(&mut hasher, &plan.small_sample_policy_id);
+    update_string(&mut hasher, &plan.multiplicity_policy_id);
+    update_f64(&mut hasher, plan.alpha);
+    update_string(&mut hasher, &plan.qualification_identity_blake3);
     hasher.finalize().to_hex().to_string()
 }
 
