@@ -2179,6 +2179,40 @@ mod tests {
     }
 
     #[test]
+    fn job_type_observation_is_optional_for_fast_completed_jobs() {
+        let mut evidence = NixSystemdJobEvidenceV1 {
+            id: 7,
+            job_type: NixSystemdJobTypeV1::Restart,
+            observed_job_type: None,
+            unit: "nginx.service".to_string(),
+            object_path: "/org/freedesktop/systemd1/job/7".to_string(),
+            result: "done".to_string(),
+            manager_owner: ":1.123".to_string(),
+        };
+        assert!(evidence.validate_shape().is_ok());
+
+        evidence.observed_job_type = Some(NixSystemdJobTypeV1::Restart);
+        assert!(evidence.validate_shape().is_ok());
+    }
+
+    #[test]
+    fn contradictory_observed_job_type_fails_closed() {
+        let evidence = NixSystemdJobEvidenceV1 {
+            id: 7,
+            job_type: NixSystemdJobTypeV1::Restart,
+            observed_job_type: Some(NixSystemdJobTypeV1::Start),
+            unit: "nginx.service".to_string(),
+            object_path: "/org/freedesktop/systemd1/job/7".to_string(),
+            result: "done".to_string(),
+            manager_owner: ":1.123".to_string(),
+        };
+        assert_eq!(
+            evidence.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::JobTypeMismatch
+        );
+    }
+
+    #[test]
     fn job_success_does_not_prove_wrong_post_state() {
         let receipt = build_receipt(
             &expectation(NixServiceOperationKindV1::Start),
