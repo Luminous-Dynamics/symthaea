@@ -846,9 +846,13 @@ pub fn run_homeostatic_agent_horizon<P: MicroWorldPredictor>(
 
     while !world.done() && steps < max_cycles {
         let before = world.observe();
-        let (action, predicted_terminal, rollout) =
+        let (action, _predicted_terminal, rollout) =
             policy.choose_horizon(predictor, before, horizon, discount);
         let action_id = steps + 1;
+        // The ledger records the forecast for the immediate action; the deeper rollout
+        // remains separate counterfactual evidence.
+        let predicted_first = predictor.predict(before, action);
+        let first_confidence = predictor.prediction_confidence(action);
 
         fabric.begin_cycle(before.cycle);
         fabric
@@ -858,19 +862,27 @@ pub fn run_homeostatic_agent_horizon<P: MicroWorldPredictor>(
                 cycle: before.cycle,
                 predicted_world_delta: Some(signed_delta_with_confidence(
                     before,
-                    predicted_terminal,
-                    rollout.min_confidence,
+                    predicted_first,
+                    first_confidence,
                 )),
-                predicted_self_delta: None,
-                predicted_goal_delta: None,
+                predicted_self_delta: Some(signed_internal_delta(
+                    before,
+                    predicted_first,
+                    first_confidence,
+                )),
+                predicted_goal_delta: Some(signed_goal_delta(
+                    before,
+                    predicted_first,
+                    first_confidence,
+                )),
                 authority_granted: true,
             })
             .expect("policy action id must be unique");
 
         let after = world.step(action);
-        let error = predictor
-            .predict(before, action)
-            .mean_absolute_delta(after);
+        // Score raw model error. Confidence belongs to policy gating, not to the
+        // measurement of whether the underlying model predicted the consequence.
+        let error = predicted_first.mean_absolute_delta(after);
         predictor.observe_transition(before, action, after);
 
         cumulative_error += error;
@@ -938,8 +950,10 @@ pub fn run_homeostatic_agent<P: MicroWorldPredictor>(
 
     while !world.done() && steps < max_cycles {
         let before = world.observe();
-        let (action, predicted) = policy.choose(predictor, before);
+        let (action, _predicted) = policy.choose(predictor, before);
         let action_id = steps + 1;
+        let predicted_raw = predictor.predict(before, action);
+        let prediction_confidence = predictor.prediction_confidence(action);
 
         fabric.begin_cycle(before.cycle);
         fabric
@@ -967,7 +981,7 @@ pub fn run_homeostatic_agent<P: MicroWorldPredictor>(
             .expect("policy action id must be unique");
 
         let after = world.step(action);
-        let error = predicted.mean_absolute_delta(after);
+        let error = predicted_raw.mean_absolute_delta(after);
         predictor.observe_transition(before, action, after);
         cumulative_error += error;
         steps += 1;
