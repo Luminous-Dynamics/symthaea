@@ -896,7 +896,7 @@ fn main() -> Result<(), String> {
             schema_version:
                 symthaea_communication::NEUROSEMANTIC_REMEDIATION_STATISTICAL_RANDOMNESS_COMMITMENT_SCHEMA_VERSION,
             commitment_ref: "synthetic-statistical-randomness-commitment-v2".into(),
-            selection_procedure_ref: "simple-random-without-replacement-v1".into(),
+            selection_procedure_ref: "simple-random-without-replacement-v2".into(),
             randomization_seed_hash: symthaea_communication::content_hash(
                 statistical_randomization_seed_hex.as_bytes(),
             ),
@@ -912,7 +912,7 @@ fn main() -> Result<(), String> {
                 symthaea_communication::NEUROSEMANTIC_REMEDIATION_STATISTICAL_SELECTION_TRACE_SCHEMA_VERSION,
             selection_ref: "synthetic-statistical-selection-v2".into(),
             sampling_frame_hash: statistical_sampling_frame.fingerprint()?,
-            selection_procedure_ref: "simple-random-without-replacement-v1".into(),
+            selection_procedure_ref: "simple-random-without-replacement-v2".into(),
             randomness_commitment_hash: statistical_randomness_commitment.fingerprint()?,
             randomization_seed_hex: statistical_randomization_seed_hex.clone(),
             sample_size: observation_sets[0].observations.len() as u32,
@@ -956,7 +956,7 @@ fn main() -> Result<(), String> {
                     }
                 })
                 .collect(),
-            selection_procedure_ref: "simple-random-without-replacement-v1".into(),
+            selection_procedure_ref: "simple-random-without-replacement-v2".into(),
             dependence_model:
                 symthaea_communication::NeurosemanticRemediationStatisticalDependenceModel::IndependentObservationUnits,
             dependence_assignments: observation_sets[0]
@@ -1808,7 +1808,7 @@ fn main() -> Result<(), String> {
                 schema_version:
                     symthaea_communication::NEUROSEMANTIC_REMEDIATION_STATISTICAL_RANDOMNESS_COMMITMENT_SCHEMA_VERSION,
                 commitment_ref: "synthetic-alternate-randomness-commitment-v2".into(),
-                selection_procedure_ref: "simple-random-without-replacement-v1".into(),
+                selection_procedure_ref: "simple-random-without-replacement-v2".into(),
                 randomization_seed_hash: symthaea_communication::content_hash(
                     format!("{:064x}", 43).as_bytes(),
                 ),
@@ -1870,7 +1870,7 @@ fn main() -> Result<(), String> {
                     symthaea_communication::NEUROSEMANTIC_REMEDIATION_STATISTICAL_SELECTION_TRACE_SCHEMA_VERSION,
                 selection_ref: "synthetic-alternate-selection-v2".into(),
                 sampling_frame_hash: statistical_sampling_frame.fingerprint()?,
-                selection_procedure_ref: "simple-random-without-replacement-v1".into(),
+                selection_procedure_ref: "simple-random-without-replacement-v2".into(),
                 randomness_commitment_hash: statistical_randomness_commitment.fingerprint()?,
                 randomization_seed_hex: statistical_randomization_seed_hex.clone(),
                 sample_size: 1,
