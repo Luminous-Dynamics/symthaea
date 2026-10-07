@@ -121,6 +121,21 @@ None means that margin was not recovered before the run ended.
 This prevents a system from receiving a recovery score merely for remaining above the absolute
 death boundary.
 
+### Continuous temporal extrapolation
+
+The shared transition-model interface can be extended through the existing Dormand-Prince engine.
+
+The qualification harness rolls a frozen action-conditioned model for 0.5 seconds with tau = 0.1,
+then compares its terminal state with five repeated deterministic oracle transitions from the same
+starting state.
+
+This metric answers a different question from one-step MAE:
+
+**does a model that predicts one consequence also compose that prediction coherently over time?**
+
+A large gap between one-step MAE and continuous-rollout MAE is evidence of temporal model mismatch,
+even when the one-step predictor looks strong.
+
 ### Planning quality
 
 The horizon-aware policy already computes deterministic oracle horizon regret.
@@ -142,6 +157,7 @@ not yet demonstrated robust predictive structure.
 | Observation | Interpretation |
 |---|---|
 | Training MAE falls, held-out MAE does not | adaptation may be memorizing scenario-specific dynamics |
+| One-step MAE improves, continuous-rollout MAE remains high | the learned transition does not compose coherently over the temporal horizon |
 | Held-out MAE improves, confidence ECE worsens | prediction improves but confidence is not calibrated |
 | Held-out MAE improves, survival does not | predictive knowledge is not causally reaching useful action selection |
 | Survival improves, oracle regret does not | hard-coded homeostatic biases may dominate the benefit |
@@ -191,8 +207,8 @@ The remaining qualification task is to measure:
 
 **learned discrete prediction → continuous trajectory rollout → actual deterministic consequence**
 
-with separate measurements for model error, confidence calibration, planning regret, survival, and
-recovery.
+with separate measurements for one-step model error, continuous extrapolation error, confidence
+calibration, planning regret, survival, and recovery.
 
 Only after that comparison is stable should the shared transition abstraction be considered for
 runtime policy coupling or viability-driven modulation.
