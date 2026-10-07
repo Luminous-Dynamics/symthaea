@@ -531,6 +531,19 @@ impl Rfc9942ReceiptEnvelope {
     pub fn signature(&self)->&[u8]{&self.signature}
     pub fn protected_header_bytes(&self)->Vec<u8>{self.protected_bytes.as_deref().map_or_else(||self.protected_header_cbor(),ToOwned::to_owned)}
 
+    pub fn unprotected_header_bytes(&self)->Vec<u8>{self.unprotected_bytes.as_deref().map_or_else(||self.unprotected_header_cbor(),ToOwned::to_owned)}
+
+    fn unprotected_header_cbor(&self)->Vec<u8>{
+        let mut out=Vec::new();
+        cbor_map_len(&mut out,(1+self.unprotected_extensions.len()) as u64);
+        cbor_int(&mut out,RFC9942_VDP_HEADER_LABEL);
+        out.extend_from_slice(&self.vdp.to_cbor());
+        for entry in &self.unprotected_extensions {
+            out.extend_from_slice(entry);
+        }
+        out
+    }
+
     fn verified_state(
         &self,
         proof: Rfc9942VerifiedProof,
@@ -548,11 +561,7 @@ impl Rfc9942ReceiptEnvelope {
             payload_mode,
             verification_key_sha256: sha256(public_key),
             protected_header_sha256: sha256(&self.protected_header_bytes()),
-            unprotected_header_sha256: sha256(
-                self.unprotected_bytes
-                    .as_deref()
-                    .unwrap_or(&[]),
-            ),
+            unprotected_header_sha256: sha256(&self.unprotected_header_bytes()),
             external_aad_sha256: sha256(external_aad),
             signature_sha256: sha256(&self.signature),
             proof_sha256,
@@ -1155,7 +1164,30 @@ impl Rfc9942SignatureWithReceipts {
         )
     }
 
-    /// Build the RFC 9052 `Sig_structure` bytes used by the outer
+    pub fn unprotected_header_bytes(&self) -> Vec<u8> {
+        self.unprotected_bytes.as_deref().map_or_else(
+            || {
+                let mut bytes = Vec::new();
+                cbor_map_len(
+                    &mut bytes,
+                    (self.unprotected_extensions.len()
+                        + usize::from(self.unprotected_receipts.is_some()))
+                        as u64,
+                );
+                if let Some(receipts) = &self.unprotected_receipts {
+                    cbor_int(&mut bytes, RFC9942_RECEIPTS_HEADER_LABEL);
+                    bytes.extend_from_slice(&receipts.to_cbor());
+                }
+                for entry in &self.unprotected_extensions {
+                    bytes.extend_from_slice(entry);
+                }
+                bytes
+            },
+            ToOwned::to_owned,
+        )
+    }
+
+    /// Build the RFC 9052 Sig_structure bytes used by the outer
     /// COSE_Sign1 signature. Detached payload resolution remains explicit.
     pub fn signature1_tbs(
         &self,
@@ -1360,11 +1392,7 @@ impl Rfc9942SignatureWithReceipts {
             },
             outer_verification_key_sha256: sha256(outer_public_key),
             outer_protected_header_sha256: sha256(&self.protected_header_bytes()),
-            outer_unprotected_header_sha256: sha256(
-                self.unprotected_bytes
-                    .as_deref()
-                    .unwrap_or(&[]),
-            ),
+            outer_unprotected_header_sha256: sha256(&self.unprotected_header_bytes()),
             outer_external_aad_sha256: sha256(outer_external_aad),
             outer_signature_sha256: sha256(&self.signature),
             receipt_collection_sha256,
