@@ -952,8 +952,16 @@ pub fn run_homeostatic_agent<P: MicroWorldPredictor>(
                     predicted,
                     predictor.prediction_confidence(action),
                 )),
-                predicted_self_delta: None,
-                predicted_goal_delta: None,
+                predicted_self_delta: Some(signed_internal_delta(
+                    before,
+                    predicted,
+                    predictor.prediction_confidence(action),
+                )),
+                predicted_goal_delta: Some(signed_goal_delta(
+                    before,
+                    predicted,
+                    predictor.prediction_confidence(action),
+                )),
                 authority_granted: true,
             })
             .expect("policy action id must be unique");
@@ -1081,8 +1089,16 @@ fn evaluate_predictor_scenario<P: MicroWorldPredictor>(
                 action_label: action.label().to_string(),
                 cycle: before.cycle,
                 predicted_world_delta: Some(predicted_world_delta),
-                predicted_self_delta: None,
-                predicted_goal_delta: None,
+                predicted_self_delta: Some(signed_internal_delta(
+                    before,
+                    predicted,
+                    predictor.prediction_confidence(action),
+                )),
+                predicted_goal_delta: Some(signed_goal_delta(
+                    before,
+                    predicted,
+                    predictor.prediction_confidence(action),
+                )),
                 authority_granted: true,
             })
             .expect("deterministic benchmark must insert unique prediction");
@@ -1214,6 +1230,28 @@ fn blend_prediction(
     .clamp()
 }
 
+fn signed_internal_delta(
+    before: MicroWorldObservation,
+    after: MicroWorldObservation,
+    confidence: f64,
+) -> ViabilityDelta {
+    ViabilityDelta::new(
+        (after.energy - before.energy) + (after.integrity - before.integrity),
+        confidence.clamp(0.0, 1.0),
+    )
+}
+
+fn signed_goal_delta(
+    before: MicroWorldObservation,
+    after: MicroWorldObservation,
+    confidence: f64,
+) -> ViabilityDelta {
+    ViabilityDelta::new(
+        after.progress - before.progress,
+        confidence.clamp(0.0, 1.0),
+    )
+}
+
 fn signed_delta(before: MicroWorldObservation, after: MicroWorldObservation) -> ViabilityDelta {
     signed_delta_with_confidence(before, after, 1.0)
 }
@@ -1271,6 +1309,19 @@ mod tests {
             predictor.model().action_error(MicroAction::Explore.index()),
             error_before
         );
+    }
+
+    #[test]
+    fn factorized_prediction_channels_preserve_signed_effects() {
+        let before = MicroWorld::default().observe();
+        let after = transition(before, MicroAction::Explore);
+        let internal = signed_internal_delta(before, after, 1.0);
+        let goal = signed_goal_delta(before, after, 1.0);
+
+        assert!(internal.value < 0.0);
+        assert!(goal.value > 0.0);
+        assert!(internal.is_valid());
+        assert!(goal.is_valid());
     }
 
     #[test]
