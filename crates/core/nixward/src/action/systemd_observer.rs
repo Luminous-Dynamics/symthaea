@@ -391,9 +391,17 @@ impl NixSystemdReadOnlyObserverV1 {
         let manager_owner = self.systemd_manager_owner().await?;
         let bus_id = self.dbus_bus_id().await?;
         let object_path = self.resolve_service_unit(&expected_unit).await?;
-        let (identity, need_daemon_reload, pre_invocation_id) = self
-            .read_definition_identity_and_invocation_id(&object_path, &expected_unit)
-            .await?;
+        let (identity, need_daemon_reload, pre_invocation_id) = if require_restart_invocation {
+            let (identity, need_daemon_reload, invocation_id) = self
+                .read_definition_identity_and_invocation_id(&object_path, &expected_unit)
+                .await?;
+            (identity, need_daemon_reload, invocation_id)
+        } else {
+            let (identity, need_daemon_reload) = self
+                .read_definition_identity(&object_path, &expected_unit)
+                .await?;
+            (identity, need_daemon_reload, None)
+        };
         if need_daemon_reload {
             return Err(NixSystemdObserverErrorV1::DefinitionNeedsDaemonReload);
         }
@@ -415,9 +423,17 @@ impl NixSystemdReadOnlyObserverV1 {
         let post_owner = self.systemd_manager_owner().await?;
         let post_bus_id = self.dbus_bus_id().await?;
         let post_object_path = self.resolve_service_unit(&expected_unit).await?;
-        let (post_identity, post_need_daemon_reload, post_invocation_id) = self
-            .read_definition_identity_and_invocation_id(&post_object_path, &expected_unit)
-            .await?;
+        let (post_identity, post_need_daemon_reload, post_invocation_id) = if require_restart_invocation {
+            let (identity, need_daemon_reload, invocation_id) = self
+                .read_definition_identity_and_invocation_id(&post_object_path, &expected_unit)
+                .await?;
+            (identity, need_daemon_reload, invocation_id)
+        } else {
+            let (identity, need_daemon_reload) = self
+                .read_definition_identity(&post_object_path, &expected_unit)
+                .await?;
+            (identity, need_daemon_reload, None)
+        };
         if post_need_daemon_reload {
             return Err(NixSystemdObserverErrorV1::DefinitionNeedsDaemonReload);
         }
@@ -477,10 +493,33 @@ impl NixSystemdReadOnlyObserverV1 {
         object_path: &OwnedObjectPath,
         expected_unit: &str,
     ) -> Result<(NixSystemdUnitDefinitionIdentityV1, bool), NixSystemdObserverErrorV1> {
-        let (identity, need_daemon_reload, _) = self
-            .read_definition_identity_and_invocation_id(object_path, expected_unit)
+        validate_unit_object_path(object_path)?;
+        let properties = self
+            .get_all_properties(object_path, SYSTEMD_UNIT_INTERFACE)
             .await?;
+        let identity = build_definition_identity_from_properties(&properties, expected_unit)?;
+        let need_daemon_reload =
+            required_bool(&properties, SYSTEMD_UNIT_INTERFACE, "NeedDaemonReload")?;
         Ok((identity, need_daemon_reload))
+    }
+
+    async fn read_definition_identity_and_invocation_id(
+        &self,
+        object_path: &OwnedObjectPath,
+        expected_unit: &str,
+    ) -> Result<
+        (NixSystemdUnitDefinitionIdentityV1, bool, Option<String>),
+        NixSystemdObserverErrorV1,
+    > {
+        validate_unit_object_path(object_path)?;
+        let properties = self
+            .get_all_properties(object_path, SYSTEMD_UNIT_INTERFACE)
+            .await?;
+        let identity = build_definition_identity_from_properties(&properties, expected_unit)?;
+        let need_daemon_reload =
+            required_bool(&properties, SYSTEMD_UNIT_INTERFACE, "NeedDaemonReload")?;
+        let invocation_id = required_invocation_id(&properties)?;
+        Ok((identity, need_daemon_reload, invocation_id))
     }
 
     async fn read_definition_identity_and_invocation_id(
