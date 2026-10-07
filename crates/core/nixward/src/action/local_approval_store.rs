@@ -342,6 +342,8 @@ pub struct ConsumedLocalApprovalDecisionV1 {
     transport_instance_ref: String,
     peer_observed_at_unix_ms: u64,
     consumed_at_unix_ms: u64,
+    request_created_at_unix_ms: u64,
+    request_expires_at_unix_ms: u64,
 }
 
 impl ConsumedLocalApprovalDecisionV1 {
@@ -417,6 +419,8 @@ impl ConsumedLocalApprovalDecisionV1 {
             transport_instance_ref: verified_peer.audit_evidence().transport_instance_ref.clone(),
             peer_observed_at_unix_ms: peer_observed_at,
             consumed_at_unix_ms: evaluated_at,
+            request_created_at_unix_ms: request.created_at_unix_ms,
+            request_expires_at_unix_ms: request.expires_at_unix_ms,
         })
     }
 
@@ -455,6 +459,16 @@ impl ConsumedLocalApprovalDecisionV1 {
     pub fn consumed_at(&self) -> UnixMillisV1 {
         UnixMillisV1::new(self.consumed_at_unix_ms)
     }
+
+    /// Original request creation time, preserved from the exact pending request.
+    pub fn request_created_at(&self) -> UnixMillisV1 {
+        UnixMillisV1::new(self.request_created_at_unix_ms)
+    }
+
+    /// Original request expiry time, preserved from the exact pending request.
+    pub fn request_expires_at(&self) -> UnixMillisV1 {
+        UnixMillisV1::new(self.request_expires_at_unix_ms)
+    }
 }
 
 impl std::fmt::Debug for ConsumedLocalApprovalDecisionV1 {
@@ -468,6 +482,8 @@ impl std::fmt::Debug for ConsumedLocalApprovalDecisionV1 {
             .field("transport_instance_ref", &self.transport_instance_ref)
             .field("peer_observed_at_unix_ms", &self.peer_observed_at_unix_ms)
             .field("consumed_at_unix_ms", &self.consumed_at_unix_ms)
+            .field("request_created_at_unix_ms", &self.request_created_at_unix_ms)
+            .field("request_expires_at_unix_ms", &self.request_expires_at_unix_ms)
             .finish_non_exhaustive()
     }
 }
