@@ -509,6 +509,9 @@ pub struct NeurosemanticRemediationUncertaintyComputationArtifact {
 
 impl NeurosemanticRemediationUncertaintyComputationArtifact {
     pub fn validate(&self) -> Result<(), String> {
+        let scale_factor = 10_i64
+            .checked_pow(self.scale)
+            .ok_or_else(|| "neurosemantic remediation uncertainty scale is out of range".to_string())?;
         if self.schema_version != NEUROSEMANTIC_REMEDIATION_UNCERTAINTY_COMPUTATION_SCHEMA_VERSION
             || !valid_identifier(&self.uncertainty_ref)
             || !valid_identifier(&self.metric_ref)
@@ -517,6 +520,8 @@ impl NeurosemanticRemediationUncertaintyComputationArtifact {
             || self.point_estimate_scale > 12
             || self.scale > 12
             || self.lower_numerator > self.upper_numerator
+            || self.lower_numerator < 0
+            || self.upper_numerator > scale_factor
             || self.point_estimate_numerator < self.lower_numerator
             || self.point_estimate_numerator > self.upper_numerator
             || self.scale != self.point_estimate_scale
@@ -5186,7 +5191,7 @@ mod tests {
             observation_set_hash,
             point_estimate_numerator: 0,
             point_estimate_scale: 4,
-            lower_numerator: -1,
+            lower_numerator: 0,
             upper_numerator: 1,
             scale: 4,
             confidence_level_bps: 9_500,
@@ -5216,6 +5221,13 @@ mod tests {
         let mut assumptions_invalid = artifact.clone();
         assumptions_invalid.assumptions_hash.clear();
         assert!(assumptions_invalid.validate().is_err());
+
+        let mut out_of_domain = artifact.clone();
+        out_of_domain.lower_numerator = -1;
+        assert!(out_of_domain.validate().is_err());
+        out_of_domain.lower_numerator = 0;
+        out_of_domain.upper_numerator = 10_001;
+        assert!(out_of_domain.validate().is_err());
 
         let _ = metric_definition;
     }
