@@ -119,12 +119,21 @@ pub struct Rfc9942VerifiedReceipt {
     algorithm_id: i64,
     vds_id: u64,
     proof: Rfc9942VerifiedProof,
+    /// SHA-256 fingerprint of the exact public key bytes used to authenticate
+    /// the Receipt. This prevents downstream policy code from confusing an
+    /// otherwise identical proof authenticated under a different trust root.
+    verification_key_sha256: [u8; 32],
+    /// SHA-256 fingerprint of the exact external AAD authenticated by COSE.
+    /// An empty AAD therefore remains distinguishable from another context.
+    external_aad_sha256: [u8; 32],
 }
 
 impl Rfc9942VerifiedReceipt {
     pub const fn algorithm_id(&self) -> i64 { self.algorithm_id }
     pub const fn vds_id(&self) -> u64 { self.vds_id }
     pub const fn proof(&self) -> Rfc9942VerifiedProof { self.proof }
+    pub const fn verification_key_sha256(&self) -> [u8; 32] { self.verification_key_sha256 }
+    pub const fn external_aad_sha256(&self) -> [u8; 32] { self.external_aad_sha256 }
 }
 
 /// Where RFC 9942 header parameter 394 was carried on the outer
@@ -146,6 +155,8 @@ pub enum Rfc9942ReceiptPlacement {
 pub struct Rfc9942VerifiedSignatureWithReceipt {
     outer_algorithm_id: i64,
     outer_payload_sha256: [u8; 32],
+    outer_verification_key_sha256: [u8; 32],
+    outer_external_aad_sha256: [u8; 32],
     receipt_index: usize,
     receipt_placement: Rfc9942ReceiptPlacement,
     receipt: Rfc9942VerifiedReceipt,
@@ -154,6 +165,8 @@ pub struct Rfc9942VerifiedSignatureWithReceipt {
 impl Rfc9942VerifiedSignatureWithReceipt {
     pub const fn outer_algorithm_id(&self) -> i64 { self.outer_algorithm_id }
     pub const fn outer_payload_sha256(&self) -> [u8; 32] { self.outer_payload_sha256 }
+    pub const fn outer_verification_key_sha256(&self) -> [u8; 32] { self.outer_verification_key_sha256 }
+    pub const fn outer_external_aad_sha256(&self) -> [u8; 32] { self.outer_external_aad_sha256 }
     pub const fn receipt_index(&self) -> usize { self.receipt_index }
     pub const fn receipt_placement(&self) -> Rfc9942ReceiptPlacement { self.receipt_placement }
     pub const fn receipt(&self) -> Rfc9942VerifiedReceipt { self.receipt }
@@ -454,11 +467,18 @@ impl Rfc9942ReceiptEnvelope {
     pub fn signature(&self)->&[u8]{&self.signature}
     pub fn protected_header_bytes(&self)->Vec<u8>{self.protected_bytes.as_deref().map_or_else(||self.protected_header_cbor(),ToOwned::to_owned)}
 
-    fn verified_state(&self, proof: Rfc9942VerifiedProof) -> Rfc9942VerifiedReceipt {
+    fn verified_state(
+        &self,
+        proof: Rfc9942VerifiedProof,
+        public_key: &[u8],
+        external_aad: &[u8],
+    ) -> Rfc9942VerifiedReceipt {
         Rfc9942VerifiedReceipt {
             algorithm_id: self.algorithm_id,
             vds_id: self.vds_id,
             proof,
+            verification_key_sha256: sha256(public_key),
+            external_aad_sha256: sha256(external_aad),
         }
     }
 
@@ -693,11 +713,15 @@ impl Rfc9942ReceiptEnvelope {
         };
 
         self.verify_es256(public_key, external_aad, signature_payload.as_ref().map(|root| root.as_slice()))?;
-        Ok(self.verified_state(Rfc9942VerifiedProof::Inclusion {
-            proof_index,
-            head,
-            candidate_leaf: leaf_hash(candidate_entry),
-        }))
+        Ok(self.verified_state(
+            Rfc9942VerifiedProof::Inclusion {
+                proof_index,
+                head,
+                candidate_leaf: leaf_hash(candidate_entry),
+            },
+            public_key,
+            external_aad,
+        ))
     }
 
     /// Return a single semantic verification capability for a consistency
@@ -722,7 +746,11 @@ impl Rfc9942ReceiptEnvelope {
         self.vdp.validate_vds_id(self.vds_id)?;
         let (proof_index, newer) =
             self.vdp.verify_consistency_with_payload_index(older, payload)?;
-        Ok(self.verified_state(Rfc9942VerifiedProof::Consistency { proof_index, older, newer }))
+        Ok(self.verified_state(
+            Rfc9942VerifiedProof::Consistency { proof_index, older, newer },
+            public_key,
+            external_aad,
+        ))
     }
 
     pub fn signature1_tbs(
@@ -1200,6 +1228,8 @@ impl Rfc9942SignatureWithReceipts {
         Ok(Rfc9942VerifiedSignatureWithReceipt {
             outer_algorithm_id: self.protected_algorithm_id()?,
             outer_payload_sha256: sha256(payload),
+            outer_verification_key_sha256: sha256(outer_public_key),
+            outer_external_aad_sha256: sha256(outer_external_aad),
             receipt_index,
             receipt_placement: placement,
             receipt: verified_receipt,
