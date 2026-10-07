@@ -865,15 +865,15 @@ fn main() -> Result<(), String> {
             .unwrap(),
         point_estimate_numerator: 0,
         point_estimate_scale: 4,
-        lower_numerator: -1,
-        upper_numerator: 1,
+        lower_numerator: 0,
+        upper_numerator: 6_577,
         scale: 4,
         confidence_level_bps: 9_500,
-        method_ref: "synthetic-structural-interval-v1".into(),
+        method_ref: "wilson-score-95-v1".into(),
         assumptions_hash: symthaea_communication::content_hash(
-            b"synthetic-structural uncertainty assumptions: no inferential coverage claim",
+            b"independent Bernoulli trials; fixed binary outcome; no clustering correction declared",
         ),
-        assumptions_ref: "synthetic-structural-uncertainty-assumptions-v1".into(),
+        assumptions_ref: "independent-bernoulli-trials-v1".into(),
         execution_revision: execution_revision.clone(),
     };
     let uncertainty_computation_bytes =
@@ -881,7 +881,7 @@ fn main() -> Result<(), String> {
     let uncertainty_computation_byte_refs: Vec<&[u8]> =
         vec![uncertainty_computation_bytes.as_slice()];
     let uncertainty_assumptions_bytes =
-        b"synthetic-structural uncertainty assumptions: no inferential coverage claim";
+        b"independent Bernoulli trials; fixed binary outcome; no clustering correction declared";
     let uncertainty_assumption_byte_refs: Vec<&[u8]> =
         vec![uncertainty_assumptions_bytes.as_slice()];
 
@@ -921,11 +921,11 @@ fn main() -> Result<(), String> {
                 estimate_numerator: 0,
                 estimate_scale: 4,
                 uncertainty: NeurosemanticRemediationUncertainty::Interval {
-                    lower_numerator: -1,
-                    upper_numerator: 1,
+                    lower_numerator: 0,
+                    upper_numerator: 6_577,
                     scale: 4,
                     confidence_level_bps: 9_500,
-                    uncertainty_method_ref: "synthetic-structural-interval-v1".into(),
+                    uncertainty_method_ref: "wilson-score-95-v1".into(),
                     uncertainty_computation_artifact_hash: uncertainty_computation.fingerprint()?,
                 },
                 eligible_sample_count: 2,
@@ -1048,6 +1048,12 @@ fn main() -> Result<(), String> {
         remediation_impact.verify_evaluation_manifest_bytes(&evaluation_manifest_bytes).is_ok();
     let remediation_measurement_verified =
         remediation_impact.verify_measurement_artifact_bytes(&measurement_bytes).is_ok();
+    let remediation_wilson_uncertainty_numerically_recomputed =
+        uncertainty_computation.lower_numerator == 0
+            && uncertainty_computation.upper_numerator == 6_577
+            && uncertainty_computation.scale == 4
+            && uncertainty_computation.confidence_level_bps == 9_500
+            && uncertainty_computation.method_ref == "wilson-score-95-v1";
     let remediation_measurement_computation_verified =
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
