@@ -7189,8 +7189,7 @@ echo '}'
                         let _ = ws_tx
                             .send(Message::Text(
                                 RelayMessage::error(&format!(
-                                    "Another process currently owns the system mutation fence: {}",
-                                    error
+                                    "Another process currently owns the system mutation fence: {error}"
                                 ))
                                 .to_json(),
                             ))
@@ -7198,6 +7197,7 @@ echo '}'
                         continue;
                     }
                 };
+
                 let Some(transaction) = admit_mutation_transaction(
                     &mut ws_tx,
                     &transaction_ledger,
@@ -7205,17 +7205,16 @@ echo '}'
                     &client_msg.request_id,
                     None,
                     b"preserve-data-before-wipe",
-                ).await else {
+                )
+                .await else {
                     continue;
                 };
-                eprintln!(
-                    "[{}] {} Preserving data before wipe...",
-                    peer_addr,
-                    transaction.log_line()
-                );
 
-                let backup_dir = format!("/tmp/symthaea-preserve-{}", transaction.transaction_id);
-                let transaction_dir = match create_transaction_artifact_dir(&transaction.transaction_id) {
+                let backup_dir =
+                    format!("/tmp/symthaea-preserve-{}", transaction.transaction_id);
+                let transaction_dir = match create_transaction_artifact_dir(
+                    &transaction.transaction_id
+                ) {
                     Ok(path) => path,
                     Err(error) => {
                         let outcome = finalize_transaction(
@@ -7229,7 +7228,7 @@ echo '}'
                                 serde_json::json!({
                                     "type": "exit",
                                     "code": protocol_exit_code(1, outcome),
-                                    "data": format!("Preservation script namespace unavailable: {error}"),
+                                    "data": format!("Preservation transaction namespace unavailable: {error}"),
                                     "transaction": transaction.receipt(outcome)
                                 })
                                 .to_string(),
@@ -7238,127 +7237,8 @@ echo '}'
                         continue;
                     }
                 };
-                let preserve_script_path = format!("{transaction_dir}/preserve.sh");
-                let mut preserve_script = r#"
-set -euo pipefail
-umask 077
-BACKUP_DIR="__BACKUP_DIR__"
-mkdir -m 700 "$BACKUP_DIR"
-echo '{"backup_dir":"'"$BACKUP_DIR"'","items":['
-FIRST=true
 
-# Docker images
-if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-  IMAGES=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep -v '<none>' | head -20)
-  if [ -n "$IMAGES" ]; then
-    echo "$IMAGES" | while read -r img; do
-      [ "$FIRST" = true ] && FIRST=false || echo ','
-      IMAGE_FILE="$BACKUP_DIR/docker-$(echo "$img" | tr '/:' '_').tar.gz"
-      echo "  Saving Docker image: $img" >&2
-      docker save "$img" | gzip > "$IMAGE_FILE"
-      test -s "$IMAGE_FILE"
-      gzip -t -- "$IMAGE_FILE"
-      tar -tzf "$IMAGE_FILE" >/dev/null
-      SIZE=$(du -h "$IMAGE_FILE" | cut -f1)
-      printf '{"type":"docker_image","name":"%s","size":"%s","path":"%s"}' "$img" "$SIZE" "$IMAGE_FILE"
-    done
-  fi
-fi
-
-# PostgreSQL databases
-if command -v pg_dumpall >/dev/null 2>&1 && pgrep -x postgres >/dev/null 2>&1; then
-  echo "  Dumping PostgreSQL databases..." >&2
-  PG_ARCHIVE="$BACKUP_DIR/postgresql-all.sql.gz"
-  su - postgres -c "pg_dumpall" 2>/dev/null | gzip > "$PG_ARCHIVE"
-  test -s "$PG_ARCHIVE"
-  gzip -t -- "$PG_ARCHIVE"
-  SIZE=$(du -h "$PG_ARCHIVE" | cut -f1)
-  [ "$FIRST" = true ] && FIRST=false || echo ','
-  printf '{"type":"postgresql","name":"all databases","size":"%s","path":"%s"}' "$SIZE" "$PG_ARCHIVE"
-fi
-
-# MySQL databases
-if command -v mysqldump >/dev/null 2>&1 && pgrep -x mysqld >/dev/null 2>&1; then
-  echo "  Dumping MySQL databases..." >&2
-  MYSQL_ARCHIVE="$BACKUP_DIR/mysql-all.sql.gz"
-  mysqldump --all-databases 2>/dev/null | gzip > "$MYSQL_ARCHIVE"
-  test -s "$MYSQL_ARCHIVE"
-  gzip -t -- "$MYSQL_ARCHIVE"
-  SIZE=$(du -h "$MYSQL_ARCHIVE" | cut -f1)
-  [ "$FIRST" = true ] && FIRST=false || echo ','
-  printf '{"type":"mysql","name":"all databases","size":"%s","path":"%s"}' "$SIZE" "$MYSQL_ARCHIVE"
-fi
-
-# Web server content
-for webdir in /var/www /srv/http /usr/share/nginx/html; do
-  if [ -d "$webdir" ] && [ "$(ls -A "$webdir" 2>/dev/null)" ]; then
-    echo "  Backing up $webdir..." >&2
-    WEB_ARCHIVE="$BACKUP_DIR/$(basename "$webdir").tar.gz"
-    tar czf "$WEB_ARCHIVE" -C "$(dirname "$webdir")" "$(basename "$webdir")"
-    test -s "$WEB_ARCHIVE"
-    gzip -t -- "$WEB_ARCHIVE"
-    tar -tzf "$WEB_ARCHIVE" >/dev/null
-    SIZE=$(du -h "$WEB_ARCHIVE" | cut -f1)
-    [ "$FIRST" = true ] && FIRST=false || echo ','
-    printf '{"type":"webdata","name":"%s","size":"%s","path":"%s"}' "$webdir" "$SIZE" "$WEB_ARCHIVE"
-  fi
-done
-
-# Crontabs
-if [ -d /var/spool/cron ]; then
-  CRONTAB_ARCHIVE="$BACKUP_DIR/crontabs.tar.gz"
-  tar czf "$CRONTAB_ARCHIVE" /var/spool/cron
-  test -s "$CRONTAB_ARCHIVE"
-  gzip -t -- "$CRONTAB_ARCHIVE"
-  tar -tzf "$CRONTAB_ARCHIVE" >/dev/null
-  [ "$FIRST" = true ] && FIRST=false || echo ','
-  printf '{"type":"crontabs","name":"all crontabs","size":"small","path":"%s"}' "$CRONTAB_ARCHIVE"
-fi
-
-# SSH keys and config
-SSH_LIST="$BACKUP_DIR/.ssh-sources"
-: > "$SSH_LIST"
-if [ -d /root/.ssh ]; then
-  printf '%s\0' /root/.ssh >> "$SSH_LIST"
-fi
-for home in /home/*; do
-  [ -d "$home/.ssh" ] && printf '%s\0' "$home/.ssh" >> "$SSH_LIST"
-done
-if [ -s "$SSH_LIST" ]; then
-  SSH_ARCHIVE="$BACKUP_DIR/ssh-keys.tar.gz"
-  tar czf "$SSH_ARCHIVE" --null --files-from="$SSH_LIST"
-  test -s "$SSH_ARCHIVE"
-  gzip -t -- "$SSH_ARCHIVE"
-  tar -tzf "$SSH_ARCHIVE" >/dev/null
-  [ "$FIRST" = true ] && FIRST=false || echo ','
-  printf '{"type":"ssh_keys","name":"SSH keys and config","size":"small","path":"%s"}' "$SSH_ARCHIVE"
-fi
-rm -f -- "$SSH_LIST"
-
-# /etc (system config) — required for terminal preservation success.
-ETC_ARCHIVE="$BACKUP_DIR/etc-backup.tar.gz"
-tar czf "$ETC_ARCHIVE" /etc
-test -s "$ETC_ARCHIVE"
-gzip -t -- "$ETC_ARCHIVE"
-tar -tzf "$ETC_ARCHIVE" >/dev/null
-SIZE=$(du -h "$ETC_ARCHIVE" | cut -f1)
-[ "$FIRST" = true ] && FIRST=false || echo ','
-printf '{"type":"system_config","name":"/etc","size":"%s","path":"%s"}' "$SIZE" "$ETC_ARCHIVE"
-
-# Home directories are intentionally not auto-archived.
-HOME_SIZE=$(du -sh /home 2>/dev/null | cut -f1 || printf 'unknown')
-[ "$FIRST" = true ] && FIRST=false || echo ','
-printf '{"type":"home_dirs","name":"/home (%s)","size":"%s","path":"not backed up — requires explicit user-directed preservation"}' "$HOME_SIZE" "$HOME_SIZE"
-
-# Summary
-TOTAL_SIZE=$(du -sh "$BACKUP_DIR")
-echo '],"total_size":"'"$TOTAL_SIZE"'"}'
-"#;
-                preserve_script = preserve_script.replace("__BACKUP_DIR__", &backup_dir);
-
-                if let Err(error) =
-                    write_private_file(&preserve_script_path, preserve_script.as_bytes(), 0o700)
-                {
+                if let Err(error) = create_private_directory(&backup_dir) {
                     remove_transaction_artifact_dir(&transaction_dir);
                     let outcome = finalize_transaction(
                         &transaction_ledger,
@@ -7369,10 +7249,10 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                     let _ = ws_tx
                         .send(Message::Text(
                             serde_json::json!({
-                                "type": "exit",
-                                "code": protocol_exit_code(1, outcome),
-                                "data": format!("Preservation script staging failed: {error}"),
-                                "transaction": transaction.receipt(outcome)
+                                "type":"exit",
+                                "code":protocol_exit_code(1, outcome),
+                                "data":format!("Preservation destination unavailable: {error}"),
+                                "transaction":transaction.receipt(outcome)
                             })
                             .to_string(),
                         ))
@@ -7380,77 +7260,94 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                     continue;
                 }
 
-                match run_privileged_script(&preserve_script_path).await {
-                    Ok(result) => {
-                        let (response_code, observed_outcome) =
-                            match verify_preservation_artifacts(&backup_dir).await {
-                                Ok(true) if result.exit_status == 0 => {
-                                    (0, TransactionOutcome::ObservedSuccess)
-                                }
-                                Ok(false) => {
-                                    eprintln!(
-                                        "[{}] {} preservation command returned success but native artifact verification failed",
-                                        peer_addr,
-                                        transaction.log_line()
-                                    );
-                                    (1, TransactionOutcome::Failed)
-                                }
-                                Err(error) => {
-                                    eprintln!(
-                                        "[{}] {} preservation postcondition probe failed: {}",
-                                        peer_addr,
-                                        transaction.log_line(),
-                                        error
-                                    );
-                                    (1, TransactionOutcome::Indeterminate)
-                                }
-                            };
+                eprintln!(
+                    "[{}] {} Preserving data before wipe...",
+                    peer_addr,
+                    transaction.log_line()
+                );
+
+                match preserve_data_native(&backup_dir, &transaction_dir).await {
+                    Ok(data) => match verify_preservation_artifacts(&backup_dir).await {
+                        Ok(true) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::ObservedSuccess,
+                                &peer_addr,
+                            );
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type": "data_preserved",
+                                        "data": serde_json::to_string(&data)
+                                            .unwrap_or_else(|_| "{}".into()),
+                                        "transaction": transaction.receipt(outcome),
+                                        "exit_code": protocol_exit_code(0, outcome)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                        }
+                        Ok(false) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Indeterminate,
+                                &peer_addr,
+                            );
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type": "exit",
+                                        "code": protocol_exit_code(1, outcome),
+                                        "data": "Preservation artifacts failed native postcondition verification.",
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                        }
+                        Err(error) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Indeterminate,
+                                &peer_addr,
+                            );
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type": "exit",
+                                        "code": protocol_exit_code(1, outcome),
+                                        "data": format!("Preservation postcondition failed: {error}"),
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                        }
+                    },
+                    Err(error) => {
                         let outcome = finalize_transaction(
                             &transaction_ledger,
                             &transaction,
-                            if result.exit_status == 0 {
-                                observed_outcome
-                            } else {
-                                TransactionOutcome::Failed
-                            },
+                            TransactionOutcome::Failed,
                             &peer_addr,
                         );
-                        eprintln!(
-                            "[{}] {} Data preservation completed with {:?}",
-                            peer_addr,
-                            transaction.log_line(),
-                            outcome
-                        );
                         let _ = ws_tx
                             .send(Message::Text(
                                 serde_json::json!({
-                                    "type": "data_preserved",
-                                    "data": result.stdout,
-                                    "transaction": transaction.receipt(outcome),
-                                    "exit_code": protocol_exit_code(response_code, outcome)
-                                })
-                                .to_string(),
-                            ))
-                            .await;
-                    }
-                    Err(e) => {
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                serde_json::json!({
-                                    "type": "error",
-                                    "message": format!("Data preservation failed: {}", e),
-                                    "transaction": transaction.receipt(finalize_transaction(
-                                        &transaction_ledger,
-                                        &transaction,
-                                        TransactionOutcome::Indeterminate,
-                                        &peer_addr,
-                                    ))
+                                    "type": "exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Data preservation failed: {error}"),
+                                    "transaction": transaction.receipt(outcome)
                                 })
                                 .to_string(),
                             ))
                             .await;
                     }
                 }
+
                 remove_transaction_artifact_dir(&transaction_dir);
             }
 
