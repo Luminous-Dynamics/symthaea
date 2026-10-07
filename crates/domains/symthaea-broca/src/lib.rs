@@ -138,12 +138,16 @@ pub use species_learning::MemoryConsolidator;
 pub use lexical_binding::{
     AgreementConstraint, ConstituentDependency, GrammaticalFunction, LanguageRuleBinding,
     LanguageRuleStatus, LexemeBinding, LexicalBindingError, LexicalMorphosyntacticBinding,
-    LexicalSource, MorphologicalFeature, MorphophonologicalDerivationStep,
+    LexicalSource, MorphologicalFeature, MorphophonologicalCompilationWitness,
+    MorphophonologicalCompilationWitnessError, MorphophonologicalDerivationStep,
+    MorphophonologicalSourceSlice,
     MorphophonologicalDerivationWitness, MorphophonologicalDerivationWitnessError,
     MorphophonologicalResourceEvidence, MorphophonologicalResourceEvidenceError,
     MorphophonologicalResourceOrigin, MorphophonologicalRule, MorphophonologicalRuleOperation,
-    MorphophonologicalRuleSet, MorphophonologicalRuleSetError, MORPHOPHONOLOGICAL_DERIVATION_WITNESS_VERSION,
-    MORPHOPHONOLOGICAL_RULE_SELECTION_POLICY, MORPHOPHONOLOGICAL_RULE_SET_VERSION,
+    MorphophonologicalRuleSet, MorphophonologicalRuleSetError,
+    MORPHOPHONOLOGICAL_COMPILATION_WITNESS_VERSION,
+    MORPHOPHONOLOGICAL_DERIVATION_WITNESS_VERSION, MORPHOPHONOLOGICAL_RULE_SELECTION_POLICY,
+    MORPHOPHONOLOGICAL_RULE_SET_VERSION,
     LEXICAL_MORPHOSYNTACTIC_BINDING_VERSION,
 };
 pub use linguistic_frame::{
