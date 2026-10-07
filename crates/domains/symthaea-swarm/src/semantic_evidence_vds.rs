@@ -764,7 +764,7 @@ impl Rfc9942ReceiptEnvelope {
                 candidate_leaf: leaf_hash(candidate_entry),
             },
             &authenticated_payload,
-            match self.payload {
+            match &self.payload {
                 Rfc9942ReceiptPayload::Attached(_) => Rfc9942PayloadMode::Attached,
                 Rfc9942ReceiptPayload::Detached => Rfc9942PayloadMode::Detached,
             },
@@ -1279,7 +1279,7 @@ impl Rfc9942SignatureWithReceipts {
         Ok(Rfc9942VerifiedSignatureWithReceipt {
             outer_algorithm_id: self.protected_algorithm_id()?,
             outer_payload_sha256: sha256(payload),
-            outer_payload_mode: match self.payload {
+            outer_payload_mode: match &self.payload {
                 Rfc9942SignaturePayload::Attached(_) => Rfc9942PayloadMode::Attached,
                 Rfc9942SignaturePayload::Detached => Rfc9942PayloadMode::Detached,
             },
