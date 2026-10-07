@@ -209,6 +209,11 @@ pub struct GroundedWorldModelQualificationReport {
     pub held_out_confidence_calibration: ConfidenceCalibration,
     pub held_out_survived_fixed_schedule: bool,
 
+    pub persistence_closed_loop_survived: bool,
+    pub persistence_closed_loop_mean_oracle_horizon_regret: f64,
+    pub persistence_recovery_rate: f64,
+    pub persistence_mean_recovery_steps: f64,
+
     pub closed_loop_survived: bool,
     pub closed_loop_steps: u64,
     pub closed_loop_prediction_mae: f64,
@@ -224,12 +229,17 @@ pub struct GroundedWorldModelQualificationReport {
 }
 
 impl GroundedWorldModelQualificationReport {
-    pub fn transfer_passes(&self) -> bool {
+    pub fn transfer_beats_persistence(&self) -> bool {
         self.held_out_predictor_mae < self.held_out_baseline_mae
     }
 
-    pub fn recovery_passes(&self) -> bool {
+    pub fn all_perturbations_recovered(&self) -> bool {
         self.recovery_rate >= 1.0
+    }
+
+    pub fn policy_regret_beats_persistence(&self) -> bool {
+        self.closed_loop_mean_oracle_horizon_regret
+            < self.persistence_closed_loop_mean_oracle_horizon_regret
     }
 }
 
@@ -376,10 +386,22 @@ impl FepModule {
         let training = &scenarios[0];
         let held_out = &scenarios[1];
 
-        self.world_model.reset();
+        let mut persistence = PersistencePredictor::default();
+        let persistence_closed_loop = run_homeostatic_agent_horizon_scenario(
+            &mut persistence,
+            held_out,
+            held_out_cycles,
+            policy_horizon,
+            policy_discount,
+        );
+        let (_, persistence_recovery_rate, persistence_mean_recovery_steps) =
+            measure_recovery(held_out, &persistence_closed_loop.actions, held_out_cycles);
 
+        // Qualification must never reset or retrain the production world model in place.
+        // Clone the exact current model so the experiment is isolated from runtime state.
+        let mut qualification_world_model = self.world_model.clone();
         let mut predictor = FepWorldModelPredictor {
-            bridge: &mut self.world_model,
+            bridge: &mut qualification_world_model,
         };
 
         let mut train_world = MicroWorld::new(training.initial, train_cycles);
@@ -429,6 +451,11 @@ impl FepModule {
             held_out_improvement_over_baseline: held_out_improvement,
             held_out_confidence_calibration: held_out_calibration,
             held_out_survived_fixed_schedule: held_out_survived,
+            persistence_closed_loop_survived: persistence_closed_loop.survived,
+            persistence_closed_loop_mean_oracle_horizon_regret:
+                persistence_closed_loop.mean_oracle_horizon_regret,
+            persistence_recovery_rate,
+            persistence_mean_recovery_steps,
             closed_loop_survived: closed_loop.survived,
             closed_loop_steps: closed_loop.steps,
             closed_loop_prediction_mae: if closed_loop.steps == 0 {
