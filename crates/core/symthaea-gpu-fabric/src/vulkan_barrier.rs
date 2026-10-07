@@ -98,6 +98,8 @@ pub enum VulkanBarrierReceiptError {
     ResourceCount,
     #[error("resource digest mismatch for {0}")]
     ResourceDigest(ResourceId),
+    #[error("missing concrete storage size for barrier resource {0}")]
+    MissingResourceStorageSize(ResourceId),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -152,7 +154,10 @@ impl VulkanBarrierExecutionReceipt {
                     .unwrap_or_else(|| ResourceId::new("<missing>").expect("static resource id")),
             ));
         }
-        if self.barrier_lowering_digest != barrier_lowering_digest(plan, &expected_storage_sizes) {
+        if self.barrier_lowering_digest
+            != barrier_lowering_digest(plan, &expected_storage_sizes)
+                .map_err(|resource| VulkanBarrierReceiptError::MissingResourceStorageSize(resource))?
+        {
             return Err(VulkanBarrierReceiptError::BarrierDigest);
         }
         if self.node_count != schedule.nodes.len() as u32 { return Err(VulkanBarrierReceiptError::NodeCount); }
@@ -444,7 +449,8 @@ impl VulkanBarrierWorkloadRuntime {
             schedule_digest: schedule.digest_hex().map_err(VulkanBarrierError::Schedule)?,
             sync_plan_digest: plan.digest_hex().map_err(|e| VulkanBarrierError::SyncPlan(e))?,
             barrier_digest: barrier_digest(plan),
-            barrier_lowering_digest: barrier_lowering_digest(plan, &storage_sizes),
+            barrier_lowering_digest: barrier_lowering_digest(plan, &storage_sizes)
+                .map_err(VulkanBarrierError::Receipt)?,
             node_count: schedule.nodes.len() as u32,
             barrier_count: plan.submissions.iter().map(|s| s.barriers.len() as u32).sum(),
             resource_digests: digests,
@@ -750,7 +756,7 @@ fn barrier_access_masks(kind: DependencyKind) -> (vk::AccessFlags2, vk::AccessFl
 fn barrier_lowering_digest(
     plan: &VulkanSyncPlan,
     resource_storage_sizes: &BTreeMap<ResourceId, u64>,
-) -> String {
+) -> Result<String, ResourceId> {
     let mut h = Hasher::new();
     h.update(b"symthaea.gpu-fabric.vulkan-barrier-lowering.v2\0");
     h.update(b"src-stage:compute-shader\0");
@@ -788,11 +794,11 @@ fn barrier_lowering_digest(
             let size = resource_storage_sizes
                 .get(&barrier.resource)
                 .copied()
-                .unwrap_or_default();
+                .ok_or_else(|| barrier.resource.clone())?;
             h.update(&size.to_le_bytes());
         }
     }
-    h.finalize().to_hex().to_string()
+    Ok(h.finalize().to_hex().to_string())
 }
 
 fn barrier_digest(plan: &VulkanSyncPlan) -> String {
@@ -928,7 +934,17 @@ mod tests {
     fn barrier_lowering_digest_is_distinct_from_semantic_barrier_digest() {
         let (_, _, plan, _) = fixture();
         assert_ne!(barrier_digest(&plan), barrier_lowering_digest(&plan));
-        assert!(!barrier_lowering_digest(&plan).is_empty());
+        assert!(!barrier_lowering_digest(&plan, &storage_sizes).unwrap().is_empty());
+    }
+
+    #[test]
+    fn barrier_lowering_digest_rejects_missing_resource_size() {
+        let (_, _, plan, _) = fixture();
+        let empty = BTreeMap::new();
+        assert_eq!(
+            barrier_lowering_digest(&plan, &empty).unwrap_err(),
+            ResourceId::new("mid").unwrap()
+        );
     }
 
     #[test]
@@ -1000,7 +1016,7 @@ mod tests {
             schedule_digest: schedule.digest_hex().unwrap(),
             sync_plan_digest: plan.digest_hex().unwrap(),
             barrier_digest: barrier_digest(&plan),
-            barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes),
+            barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
