@@ -1,6 +1,6 @@
 # UniMorph English 4.0 selected-record manifest
 
-This manifest is a deterministic compiler-input selection from unimorph_eng_4_snapshot_manifest.md.
+This document is the human-readable projection of `unimorph_eng_4_selection_manifest.json`. The JSON manifest is the machine-authoritative compiler-input selection; this Markdown document must remain an exact reviewable presentation of the same records and commitment.
 
 ## Frozen source
 
