@@ -1883,7 +1883,6 @@ impl ForecastInferenceSelectionReceipt {
         plan: &ForecastInferencePlan,
         qualification: &HeldOutRelationalPredictionQualification,
         dependence: &ForecastLossDependenceProfile,
-        decision_path_id: impl Into<String>,
     ) -> Result<Self, RelationalPredictionError> {
         let binding = ForecastInferenceBinding::from_single(plan, qualification, dependence)?;
         dependence.validate()?;
@@ -1893,7 +1892,6 @@ impl ForecastInferenceSelectionReceipt {
             plan,
             qualification.qualification_identity_blake3.as_str(),
             &dependence_profile_blake3,
-            decision_path_id,
         )
     }
 
@@ -1901,7 +1899,6 @@ impl ForecastInferenceSelectionReceipt {
         plan: &ForecastInferencePlan,
         qualification: &RollingOriginRelationalPredictionQualification,
         dependence: &RollingForecastLossDependenceProfile,
-        decision_path_id: impl Into<String>,
     ) -> Result<Self, RelationalPredictionError> {
         let binding = ForecastInferenceBinding::from_rolling(plan, qualification, dependence)?;
         dependence.validate()?;
@@ -1911,7 +1908,6 @@ impl ForecastInferenceSelectionReceipt {
             plan,
             qualification.qualification_identity_blake3.as_str(),
             &dependence_profile_blake3,
-            decision_path_id,
         )
     }
 
