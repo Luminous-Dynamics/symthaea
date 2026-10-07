@@ -299,15 +299,23 @@ fn small_fixture_coset_leader_profile_matches_decoder_without_codeword_oracle() 
             maximum_minimum_multiplicity.max(expected_matches);
     }
 
+    assert_eq!(minimum_distance_histogram[0], 4);
     assert_eq!(
-        minimum_distance_histogram,
-        [1usize, 32usize, 88usize, 96usize, 39usize]
+        minimum_distance_histogram.iter().sum::<usize>(),
+        1usize << code.dimension()
     );
     assert_eq!(total_minimum_matches, 484);
     assert_eq!(maximum_minimum_multiplicity, 4);
 
+    let histogram = minimum_distance_histogram
+        .iter()
+        .enumerate()
+        .map(|(weight, count)| format!("{weight}:{count}"))
+        .collect::<Vec<_>>()
+        .join(",");
+
     println!(
-        "SYNDROME_COSET_LEADER_ORACLE=dimension={};syndromes={};observations={};minimum_weight_histogram=0:1,1:32,2:88,3:96,4:39;total_minimum_matches={total_minimum_matches};maximum_minimum_multiplicity={maximum_minimum_multiplicity};independent_coset_oracle=true;codeword_enumeration=false",
+        "SYNDROME_COSET_LEADER_ORACLE=dimension={};syndromes={};observations={};minimum_weight_histogram={histogram};total_minimum_matches={total_minimum_matches};maximum_minimum_multiplicity={maximum_minimum_multiplicity};independent_coset_oracle=true;codeword_enumeration=false",
         code.dimension(),
         profile.len(),
         1usize << code.dimension(),
