@@ -1493,6 +1493,50 @@ mod tests {
     }
 
     #[test]
+    fn horizon_policy_improves_stressed_recovery_without_changing_oracle() {
+        struct Oracle;
+        impl MicroWorldPredictor for Oracle {
+            fn predict(
+                &self,
+                state: MicroWorldObservation,
+                action: MicroAction,
+            ) -> MicroWorldObservation {
+                transition(state, action)
+            }
+
+            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
+                1.0
+            }
+        }
+
+        let stressed = benchmark_scenarios()
+            .into_iter()
+            .find(|scenario| scenario.name == "stressed")
+            .expect("stressed scenario exists");
+
+        let mut reactive_oracle = Oracle;
+        let mut horizon_oracle = Oracle;
+        let reactive =
+            run_homeostatic_agent_scenario(&mut reactive_oracle, &stressed, 32);
+        let horizon = run_homeostatic_agent_horizon_scenario(
+            &mut horizon_oracle,
+            &stressed,
+            32,
+            4,
+            0.8,
+        );
+
+        assert!(reactive.survived);
+        assert!(horizon.survived);
+        assert_eq!(reactive.perturbations_applied, 2);
+        assert_eq!(horizon.perturbations_applied, 2);
+        assert!(horizon.final_integrity > reactive.final_integrity);
+        assert!(horizon.final_progress > reactive.final_progress);
+        assert!(horizon.min_actual_viability_margin.is_finite());
+        assert!(reactive.min_actual_viability_margin.is_finite());
+    }
+
+    #[test]
     fn oracle_horizon_runner_survives_and_records_rollout_evidence() {
         struct Oracle;
         impl MicroWorldPredictor for Oracle {
