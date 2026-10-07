@@ -1,0 +1,50 @@
+{
+  "schema": "relational-prediction-restricted-dgp-bootstrap-candidate/v2",
+  "candidate_id": "restricted-dgp-nested-rolling-bootstrap-v2",
+  "status": "candidate-not-approved",
+  "null_hierarchy": {
+    "structural_null": "beta_relational = 0",
+    "forecast_accuracy_null": "E[D_o] = 0",
+    "finite_sample_non_equivalence": true,
+    "structural_null_role": "diagnostic"
+  },
+  "risk_null": {
+    "form": "Delta(kappa) = A*kappa^2 + B*kappa + C",
+    "root_condition": "Delta(kappa_0) = 0",
+    "root_selection": "must be predeclared and independent of observed confirmatory effect"
+  },
+  "bootstrap": {
+    "generate_null_series": true,
+    "full_rolling_refit": true,
+    "training_only_standardization": true,
+    "fixed_ridge": true,
+    "reuse_observed_fits": false
+  },
+  "feature_conditioning": {
+    "candidate": "conditional-on-observed-features",
+    "approval_gate": "justify exogeneity/conditioning or replace with joint feature/outcome DGP"
+  },
+  "dependence": {
+    "required_covariances": [
+      "training/training",
+      "test/test",
+      "training/test"
+    ],
+    "rolling_training_overlap": "must be preserved exactly"
+  },
+  "diagnostic_layers": [
+    "coefficient-null",
+    "finite-sample-risk-null",
+    "local-alternative-power"
+  ],
+  "decision": {
+    "applicability": "not-approved-for-execution",
+    "selection": "stop-assumption-failure",
+    "formal_p_value": false,
+    "formal_confidence_interval": false
+  },
+  "references": [
+    "Clark and McCracken (2015), DOI 10.1016/j.jeconom.2014.06.016",
+    "Doko Tchatoka and Haque (2023), DOI 10.1002/for.2987"
+  ]
+}
