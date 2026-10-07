@@ -391,7 +391,7 @@ impl RegulationDecision {
 
 /// Minimal orchestration container. Existing organs own their domain logic; this fabric
 /// only records typed observations and action/prediction relationships.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ViabilityFabric {
     state: ViabilityState,
     pending_predictions: BTreeMap<u64, ActionPrediction>,
@@ -400,6 +400,12 @@ pub struct ViabilityFabric {
     max_outcomes: usize,
     max_pending_predictions: usize,
     highest_action_id: u64,
+}
+
+impl Default for ViabilityFabric {
+    fn default() -> Self {
+        Self::new(1024)
+    }
 }
 
 impl ViabilityFabric {
@@ -805,6 +811,22 @@ mod tests {
         };
         let decision = RegulationDecision::from_pressure(0.5, thresholds);
         assert_eq!(decision.mode, CognitiveResourceMode::Recovery);
+    }
+
+    #[test]
+    fn default_fabric_has_working_prediction_capacity() {
+        let mut fabric = ViabilityFabric::default();
+        fabric.begin_cycle(1);
+        let prediction = ActionPrediction {
+            action_id: 1,
+            action_label: "default".to_string(),
+            cycle: 1,
+            predicted_world_delta: None,
+            predicted_self_delta: None,
+            predicted_goal_delta: None,
+            authority_granted: false,
+        };
+        assert!(fabric.predict_action(prediction).is_ok());
     }
 
     #[test]
