@@ -11709,7 +11709,6 @@ mod tests {
 
 
     #[test]
-    #[test]
     fn transaction_config_staging_is_nested_under_private_namespace() {
         let commands = config_write_commands(
             "browser-config",
@@ -11726,23 +11725,6 @@ mod tests {
         assert!(!commands.contains(
             "rm -rf /tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef\n"
         ));
-    }
-
-    fn cleanup_trap_contains_no_nested_shell_quotes() {
-        let paths = [
-            "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef/user-password",
-            "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef/luks-passphrase",
-        ];
-        let cleanup = paths
-            .iter()
-            .map(|path| format!("rm -f -- {}", path))
-            .collect::<Vec<_>>()
-            .join("; ");
-        let trap = format!("trap '{}' EXIT", cleanup);
-        assert!(trap.contains(
-            "rm -f -- /tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef/user-password"
-        ));
-        assert!(!trap.contains("rm -f '/tmp"));
     }
 
     #[test]
