@@ -479,6 +479,8 @@ pub struct PolicyInducedShiftReport {
     pub min_actual_viability_margin: f64,
     pub execution_failures: usize,
     pub terminated_on_execution_failure: bool,
+    /// Confidence calibration restricted to actions actually selected by the frozen policy.
+    pub planner_selected_confidence_calibration: ConfidenceCalibration,
     /// Ratio against the frozen fixed-schedule held-out predictor MAE.
     pub shift_error_ratio: f64,
 }
@@ -707,6 +709,7 @@ fn evaluate_policy_induced_shift<P: MicroWorldPredictor>(
     let mut min_actual_viability_margin = f64::INFINITY;
     let mut execution_failures = 0usize;
     let mut terminated_on_execution_failure = false;
+    let mut selected_calibration = CalibrationAccumulator::default();
 
     while !world.done() && steps < max_cycles {
         for (cycle, perturbation) in scenario.perturbations {
@@ -720,6 +723,7 @@ fn evaluate_policy_induced_shift<P: MicroWorldPredictor>(
             policy.choose_horizon(predictor, before, policy_horizon, policy_discount);
 
         let predicted = predictor.predict(before, action);
+        let confidence = predictor.prediction_confidence(action).clamp(0.0, 1.0);
         let baseline = persistence.predict(before, action);
 
         let after = match world.try_step(action) {
@@ -731,8 +735,10 @@ fn evaluate_policy_induced_shift<P: MicroWorldPredictor>(
             }
         };
 
-        predictor_error += predicted.mean_absolute_delta(after);
+        let prediction_mae = predicted.mean_absolute_delta(after);
+        predictor_error += prediction_mae;
         baseline_error += baseline.mean_absolute_delta(after);
+        selected_calibration.record(confidence, prediction_mae);
         min_actual_viability_margin = min_actual_viability_margin.min(
             after.energy.min(after.integrity) - 0.08,
         );
@@ -766,6 +772,7 @@ fn evaluate_policy_induced_shift<P: MicroWorldPredictor>(
         },
         execution_failures,
         terminated_on_execution_failure,
+        planner_selected_confidence_calibration: selected_calibration.finish(),
         shift_error_ratio: shift_ratio,
     }
 }
