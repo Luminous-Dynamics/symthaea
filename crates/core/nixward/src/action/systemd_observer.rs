@@ -1463,6 +1463,7 @@ fn stability_sample_from_observation(
         definition_digest: observation
             .definition_digest()
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?,
+        definition_content_digest: observation.definition_content_digest.clone(),
         state_digest: observation
             .state_digest()
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?,
@@ -1481,6 +1482,7 @@ fn build_observation_from_properties(
     manager_owner: &str,
     service_result: &str,
     properties: &HashMap<String, OwnedValue>,
+    definition_content_digest: &str,
     job: Option<NixSystemdJobEvidenceV1>,
 ) -> Result<NixServicePostStateObservationV1, NixSystemdObserverErrorV1> {
     for property in REQUIRED_UNIT_PROPERTIES {
@@ -1562,6 +1564,7 @@ fn build_observation_from_properties(
         observed_generation: generation,
         unit_object_path: unit_object_path.as_str().to_string(),
         definition_identity,
+        definition_content_digest: definition_content_digest.to_string(),
         load_state,
         active_state,
         sub_state,
