@@ -5906,7 +5906,9 @@ mod tests {
             commitment_ref: "commitment-randomness-1".into(),
             selection_procedure_ref:
                 NEUROSEMANTIC_REMEDIATION_SIMPLE_RANDOM_WITHOUT_REPLACEMENT_PROCEDURE_REF.into(),
-            randomization_seed_hash: content_hash(&42u64.to_le_bytes()),
+            randomization_seed_hash: content_hash(
+                format!("{:064x}", 42).as_bytes(),
+            ),
             study_protocol_hash: content_hash(b"protocol"),
             execution_revision: "a".repeat(40),
         };
@@ -5920,11 +5922,20 @@ mod tests {
         );
         assert_eq!(commitment.fingerprint().unwrap(), content_hash(&bytes));
 
-        let mut stale = commitment.clone();
-        stale.schema_version = 0;
+        let mut stale_v1 = commitment.clone();
+        stale_v1.schema_version = 1;
         assert!(
             NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact::from_json_bytes(
-                &serde_json::to_vec(&stale).unwrap()
+                &serde_json::to_vec(&stale_v1).unwrap()
+            )
+            .is_err()
+        );
+
+        let mut malformed_seed = commitment.clone();
+        malformed_seed.randomization_seed_hash.clear();
+        assert!(
+            NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact::from_json_bytes(
+                &serde_json::to_vec(&malformed_seed).unwrap()
             )
             .is_err()
         );
@@ -5938,9 +5949,14 @@ mod tests {
             content_hash(b"subject-3"),
             content_hash(b"subject-4"),
         ];
-        let first = replay_simple_random_without_replacement(&frame, 2, 42).unwrap();
-        let second = replay_simple_random_without_replacement(&frame, 2, 42).unwrap();
-        let alternate = replay_simple_random_without_replacement(&frame, 2, 43).unwrap();
+        let first_seed = format!("{:064x}", 42);
+        let second_seed = format!("{:064x}", 42);
+        let alternate_seed = format!("{:064x}", 43);
+        let first = replay_simple_random_without_replacement(&frame, 2, &first_seed).unwrap();
+        let second = replay_simple_random_without_replacement(&frame, 2, &second_seed).unwrap();
+        let alternate =
+            replay_simple_random_without_replacement(&frame, 2, &alternate_seed).unwrap();
+        assert!(valid_randomization_seed_hex(&first_seed));
         assert_eq!(first, second);
         assert_ne!(first, alternate);
         assert_eq!(first.len(), 2);
