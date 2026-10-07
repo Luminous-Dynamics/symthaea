@@ -3629,11 +3629,25 @@ mod tests {
     fn qualification_binds_provenance_identity() {
         let samples = build_samples(0.5);
         let qualification =
-            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12, provenance())
-                .unwrap();
+            HeldOutRelationalPredictionQualification::compute(
+                &samples,
+                config(),
+                12,
+                provenance(),
+            )
+            .unwrap();
 
         qualification.validate().unwrap();
         assert_eq!(qualification.provenance, provenance());
+        assert_eq!(
+            qualification.qualification_identity_blake3,
+            single_qualification_identity_digest(
+                &qualification.evaluation_input_blake3,
+                &qualification.provenance,
+                config(),
+                qualification.surrogate_count,
+            )
+        );
 
         let mut tampered = qualification.clone();
         tampered.provenance.software_commit_sha =
@@ -4183,8 +4197,13 @@ mod tests {
         };
 
         let qualification =
-            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8, provenance())
-                .unwrap();
+            RollingOriginRelationalPredictionQualification::compute(
+                &samples,
+                config,
+                8,
+                provenance(),
+            )
+            .unwrap();
         qualification.validate().unwrap();
         assert_eq!(qualification.origin_starts, vec![0, 8, 16, 24]);
         assert_eq!(
@@ -4283,6 +4302,15 @@ mod tests {
 
         qualification.validate().unwrap();
         assert_eq!(qualification.provenance, provenance());
+        assert_eq!(
+            qualification.qualification_identity_blake3,
+            rolling_qualification_identity_digest(
+                &qualification.evaluation_input_blake3,
+                &qualification.provenance,
+                config,
+                qualification.surrogate_count,
+            )
+        );
 
         let mut tampered = qualification.clone();
         tampered.provenance.source_data_sha256 =
