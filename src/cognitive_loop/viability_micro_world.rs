@@ -1466,7 +1466,7 @@ fn signed_delta_with_confidence(
         after.energy - before.energy
             + (after.integrity - before.integrity)
             + (after.knowledge - before.knowledge)
-            + (after.threat - before.threat)
+            - (after.threat - before.threat)
             + (after.progress - before.progress),
         confidence.clamp(0.0, 1.0),
     )
@@ -1570,6 +1570,16 @@ mod tests {
             predictor.model().action_error(MicroAction::Explore.index()),
             error_before
         );
+    }
+
+    #[test]
+    fn aggregate_world_delta_treats_threat_as_harm() {
+        let before = MicroWorld::default().observe();
+        let mut after = before;
+        after.threat = before.threat + 0.2;
+
+        let delta = signed_delta_with_confidence(before, after, 1.0);
+        assert!(delta.value < 0.0);
     }
 
     #[test]
