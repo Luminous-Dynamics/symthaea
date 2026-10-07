@@ -710,8 +710,9 @@ fn evaluate_procedural_held_out_transfer(
     let mut folds = Vec::with_capacity(scenarios.len());
 
     for scenario in &scenarios {
+        let mut fold_model = model.clone();
         let predictor = FepWorldModelPredictor {
-            bridge: &mut model.clone(),
+            bridge: &mut fold_model,
         };
         let (steps, baseline_mae, predictor_mae, improvement, survived) =
             evaluate_frozen_procedural_scenario(&predictor, scenario, test_cycles);
