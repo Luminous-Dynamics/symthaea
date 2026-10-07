@@ -1300,6 +1300,7 @@ impl RollingOriginRelationalPredictionQualification {
                     || null_trace.status != EvidenceStatus::Proxy
                     || null_trace.config != held_out_config
                     || null_trace.requested_surrogate_count != self.surrogate_count
+                    || null_trace.evaluation_input_blake3 != self.evaluation_input_blake3
                     || (null_trace.observed_relational_mse - expected_mse).abs() > 1e-12
                 {
                     return Err(RelationalPredictionError::InvalidSplit);
@@ -1804,6 +1805,8 @@ pub struct HeldOutRelationalPredictionQualification {
     pub config: HeldOutRelationalPredictionConfig,
     /// Requested surrogate count used for every null family.
     pub surrogate_count: usize,
+    /// Commitment over the exact source sample sequence and holdout configuration.
+    pub evaluation_input_blake3: String,
     pub observed: HeldOutRelationalPredictionSummary,
     pub circular_shift_null: PredictionNullSummary,
     pub feature_decoupling_null: PredictionNullSummary,
@@ -1813,7 +1816,8 @@ pub struct HeldOutRelationalPredictionQualification {
 impl HeldOutRelationalPredictionQualification {
     pub fn validate(&self) -> Result<(), RelationalPredictionError> {
         validate_held_out_config_shape(&self.config)?;
-        if self.surrogate_count == 0
+        if !is_hex_digest(&self.evaluation_input_blake3, 64)
+            || self.surrogate_count == 0
             || self.observed.status != EvidenceStatus::Measured
             || self.observed.train_samples != self.config.train_samples
             || self.observed.test_samples != self.config.test_samples
@@ -1894,6 +1898,7 @@ impl HeldOutRelationalPredictionQualification {
                 || null_trace.status != EvidenceStatus::Proxy
                 || null_trace.config != self.config
                 || null_trace.requested_surrogate_count != self.surrogate_count
+                || null_trace.evaluation_input_blake3 != self.evaluation_input_blake3
                 || (null_trace.observed_relational_mse - expected_mse).abs() > 1e-12
             {
                 return Err(RelationalPredictionError::InvalidSplit);
@@ -1911,6 +1916,9 @@ impl HeldOutRelationalPredictionQualification {
         self.validate()?;
         if config != self.config {
             return Err(RelationalPredictionError::InvalidSplit);
+        }
+        if evaluation_input_digest(samples, config) != self.evaluation_input_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
         }
         let recomputed = Self::compute(samples, config, self.surrogate_count)?;
         if recomputed != *self {
@@ -1950,6 +1958,7 @@ impl HeldOutRelationalPredictionQualification {
         let qualification = Self {
             config,
             surrogate_count,
+            evaluation_input_blake3: evaluation_input_digest(samples, config),
             observed,
             circular_shift_null,
             feature_decoupling_null,
@@ -3440,6 +3449,33 @@ mod tests {
     }
 
     #[test]
+    fn qualification_binds_compound_input_commitment() {
+        let samples = build_samples(0.5);
+        let qualification =
+            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
+
+        let expected_digest = evaluation_input_digest(&samples, config());
+        assert_eq!(qualification.evaluation_input_blake3, expected_digest);
+        qualification.validate().unwrap();
+
+        let mut tampered_top_level = qualification.clone();
+        tampered_top_level.evaluation_input_blake3 =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string();
+        assert_eq!(
+            tampered_top_level.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
+        let mut tampered_null = qualification.clone();
+        tampered_null.circular_shift_null.evaluation_input_blake3 =
+            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210".to_string();
+        assert_eq!(
+            tampered_null.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
     fn qualification_binds_surrogate_count() {
         let samples = build_samples(0.5);
         let qualification =
@@ -3991,6 +4027,35 @@ mod tests {
 
         let mut tampered = qualification.clone();
         tampered.observed.mean_relational_augmented_mse += 0.01;
+
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn rolling_qualification_binds_null_input_commitments() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+
+        let qualification =
+            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8)
+                .unwrap();
+        qualification.validate().unwrap();
+
+        let mut tampered = qualification.clone();
+        tampered.incremental_relational_nulls[2].evaluation_input_blake3 =
+            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210".to_string();
 
         assert_eq!(
             tampered.validate(),
