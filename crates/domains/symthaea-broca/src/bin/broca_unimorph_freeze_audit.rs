@@ -314,6 +314,18 @@ fn verify_qualification_workflow_pins() -> Result<Vec<String>> {
         bail!("qualification workflow contains a non-canonical action revision");
     }
 
+    if QUALIFICATION_WORKFLOW.matches("permissions:").count() != 1
+        || !QUALIFICATION_WORKFLOW.contains("permissions:\n  contents: read")
+    {
+        bail!("qualification workflow permissions are not the approved read-only policy");
+    }
+    if QUALIFICATION_WORKFLOW.matches("persist-credentials: false").count() != 2 {
+        bail!("qualification workflow checkout credentials policy is not fail-closed");
+    }
+    if QUALIFICATION_WORKFLOW.matches("toolchain: 1.96.0").count() != 2 {
+        bail!("qualification workflow does not select Rust 1.96.0 in both jobs");
+    }
+
     Ok(refs)
 }
 
