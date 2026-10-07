@@ -469,7 +469,7 @@ pub struct LearningResponseEvent {
     pub anchor_mean_mae_before_update: f64,
     pub anchor_mean_mae_after_update: f64,
     pub anchor_mean_regression: f64,
-    /// Worst single-action regression across the anchor set.
+    /// Worst single-action regression across the anchor set for this shock.
     pub anchor_max_regression: f64,
 }
 
@@ -495,7 +495,7 @@ pub struct LearningResponseReport {
     pub mean_anchor_mae_after_update: f64,
     pub mean_anchor_regression: f64,
     /// Worst single invariant-probe regression observed across all shock folds.
-    pub mean_anchor_max_regression: f64,
+    pub max_anchor_regression: f64,
     pub anchor_regression_rate: f64,
 }
 
@@ -921,7 +921,7 @@ fn evaluate_learning_response(
     let mut anchor_mean_mae_before = 0.0;
     let mut anchor_mean_mae_after = 0.0;
     let mut anchor_mean_regressions = 0.0;
-    let mut anchor_max_regression = 0.0;
+    let mut worst_anchor_regression = 0.0;
     let mut anchor_regression_count = 0u64;
 
     for (shock_state, action) in &shock_states {
@@ -999,7 +999,7 @@ fn evaluate_learning_response(
             .sum::<f64>()
             / anchor_count;
         let anchor_mean_regression = anchor_mean_after - anchor_mean_before;
-        let anchor_max_regression = anchor_after_metrics
+        let event_max_anchor_regression = anchor_after_metrics
             .iter()
             .map(|(_, before, after)| after - before)
             .fold(0.0f64, f64::max);
@@ -1010,12 +1010,12 @@ fn evaluate_learning_response(
         anchor_mean_mae_before += anchor_mean_before;
         anchor_mean_mae_after += anchor_mean_after;
         anchor_mean_regressions += anchor_mean_regression;
-        anchor_max_regression = anchor_max_regression.max(anchor_max_regression);
+        worst_anchor_regression = worst_anchor_regression.max(event_max_anchor_regression);
         if neighbor_improvement > 1e-12 {
             neighbor_improvement_count =
                 neighbor_improvement_count.saturating_add(1);
         }
-        if anchor_mean_regression > 1e-12 || anchor_max_regression > 1e-12 {
+        if anchor_mean_regression > 1e-12 || event_max_anchor_regression > 1e-12 {
             anchor_regression_count =
                 anchor_regression_count.saturating_add(1);
         }
@@ -1033,7 +1033,7 @@ fn evaluate_learning_response(
             anchor_mean_mae_before_update: anchor_mean_before,
             anchor_mean_mae_after_update: anchor_mean_after,
             anchor_mean_regression,
-            anchor_max_regression,
+            anchor_max_regression: event_max_anchor_regression,
         });
     }
 
@@ -1072,7 +1072,7 @@ fn evaluate_learning_response(
         mean_anchor_mae_before_update: anchor_mean_mae_before / count,
         mean_anchor_mae_after_update: anchor_mean_mae_after / count,
         mean_anchor_regression: anchor_mean_regressions / count,
-        mean_anchor_max_regression: anchor_max_regression,
+        max_anchor_regression: worst_anchor_regression,
         anchor_regression_rate: anchor_regression_count as f64 / count,
     }
 }
@@ -2329,7 +2329,7 @@ mod tests {
             report.mean_anchor_mae_before_update,
             report.mean_anchor_mae_after_update,
             report.mean_anchor_regression,
-            report.mean_anchor_max_regression,
+            report.max_anchor_regression,
             report.anchor_regression_rate,
         ] {
             assert!(value.is_finite());
