@@ -839,8 +839,17 @@ mod tests {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
+        let bare_intent = NixActionIntentV1::from_command(
+            "machine:workstation",
+            Some(
+                "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=1111111111111111111111111111111111111111111111111111111111111111"
+                    .to_string(),
+            ),
+            &restart_command("nginx.service"),
+        )
+        .unwrap();
         let result = runtime.create_pending_request(
-            &intent("nginx.service"),
+            &bare_intent,
             &restart_command("nginx.service"),
             RequiredApprovalProfileV1::SameUidProcessV1,
             UnixMillisV1::new(now.saturating_sub(1_000)),
