@@ -32,7 +32,7 @@ GitHub documents that `workflow_run` workflows execute from the default branch. 
 
 The verifier deliberately does not consume or execute artifacts from the triggering workflow. This follows GitHub's security guidance that artifacts from preceding workflows must be treated as untrusted data.
 
-For the rare case where all required runs completed before this trust-anchor workflow existed on the default branch, the same verifier exposes a constrained `workflow_dispatch` replay. The caller supplies only a workflow-run ID; the base-owned verifier fetches the authoritative run record, requires a completed same-repository pull-request run, and still subjects its head to the independent snapshot and all exact-head gate checks.
+For the rare case where all required runs completed before this trust-anchor workflow existed on the default branch, the same verifier exposes a constrained `workflow_dispatch` replay. The caller supplies only a workflow-run ID; the base-owned verifier fetches the authoritative run record, requires a completed same-repository pull-request run, and still subjects its head to the independent snapshot and all exact-head gate checks. The workflow itself refuses manual execution from any ref other than the repository's current default branch, because GitHub permits API-driven dispatches against other refs after the workflow has run once.
 
 The workflow also observes `requested` and `in_progress` activity types. Those early events publish a pending commit status, invalidating any earlier success before a new qualifying run can complete. GitHub documents these activity types for `workflow_run`; `requested` is not emitted for a re-run, so `in_progress` remains the early invalidation path for re-runs.
 
