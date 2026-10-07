@@ -156,6 +156,7 @@ pub enum NixSystemdObserverErrorV1 {
 pub struct NixSystemdJobRemovedWatcherV1 {
     manager_owner: String,
     bus_id: String,
+    connection: zbus::Connection,
     stream: zbus::SignalStream<'static>,
 }
 
@@ -178,6 +179,15 @@ impl NixSystemdJobRemovedWatcherV1 {
         &self.bus_id
     }
 
+    async fn current_bus_id(
+        connection: &zbus::Connection,
+    ) -> Result<String, NixSystemdObserverErrorV1> {
+        let bus = zbus::Proxy::new(connection, DBUS_DESTINATION, DBUS_PATH, DBUS_INTERFACE).await?;
+        let id: String = bus.call("GetId", &()).await?;
+        validate_bus_id_shape(&id)?;
+        Ok(id)
+    }
+
     /// Consume this one-shot watcher and accept only the exact JobRemoved
     /// tuple belonging to the captured live Job and manager incarnation.
     pub async fn await_job_removed(
@@ -195,6 +205,10 @@ impl NixSystemdJobRemovedWatcherV1 {
 
         let result = tokio::time::timeout(timeout, async {
             while let Some(message) = self.stream.next().await {
+                let current_bus_id = Self::current_bus_id(&self.connection).await?;
+                if current_bus_id != self.bus_id {
+                    return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
+                }
                 validate_manager_signal_sender(&message, &self.manager_owner)?;
                 let removed = decode_job_removed(&message)?;
                 if removed.id == expected.id
@@ -639,6 +653,7 @@ impl NixSystemdReadOnlyObserverV1 {
         Ok(NixSystemdJobRemovedWatcherV1 {
             manager_owner,
             bus_id,
+            connection: self.connection.clone(),
             stream,
         })
     }
