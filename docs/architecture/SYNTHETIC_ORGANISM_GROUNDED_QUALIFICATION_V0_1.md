@@ -296,13 +296,17 @@ Counterfactual confidence is also horizon-aware: each deeper simulated step rece
 step confidence multiplied by a fixed 0.85 decay factor. This is a conservative engineering prior,
 not a learned probability law.
 
-The remaining qualification task is to measure:
+The current qualification gate is empirical execution of the complete protocol:
 
 **learned discrete prediction → continuous trajectory rollout → actual deterministic consequence**
 
 with separate measurements for one-step error, discrete multi-step error, continuous extrapolation
 error, policy-induced distribution-shift error, confidence calibration, planning regret, survival,
-recovery, and cross-scenario transfer.
+recovery, and the completed leave-one-scenario-out transfer matrix.
+
+A dedicated CI job runs the qualification module directly. The branch should not be considered
+qualified until that job has completed successfully for the exact candidate commit; queued or
+pending execution is not evidence.
 
 Only after that comparison is stable should the shared transition abstraction be considered for
 runtime policy coupling or viability-driven modulation.
