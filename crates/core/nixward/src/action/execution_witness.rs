@@ -16,6 +16,7 @@ use super::authorization::NixLocalExecutionAuthorityV1;
 #[derive(Debug, PartialEq, Eq)]
 pub struct NixLiveExecutionWitnessV1 {
     action_intent_digest: String,
+    authorization_record_digest: String,
     approval_request_id: String,
     projection_digest: String,
     pre_state_identity: Option<String>,
@@ -31,6 +32,11 @@ impl NixLiveExecutionWitnessV1 {
         let action_intent_digest = authority
             .action_intent_digest()
             .map_err(|error| format!("cannot derive execution provenance intent: {error}"))?;
+        let authorization_record_digest = authority
+            .authorization_record_digest()
+            .map_err(|error| {
+                format!("cannot derive execution authorization record provenance: {error}")
+            })?;
         let approval_request_id = authority.approval_request_id().to_string();
         let projection_digest = authority.projection_digest().to_string();
         if approval_request_id.is_empty() || projection_digest.is_empty() {
@@ -39,6 +45,7 @@ impl NixLiveExecutionWitnessV1 {
 
         Ok(Self {
             action_intent_digest,
+            authorization_record_digest,
             approval_request_id,
             projection_digest,
             pre_state_identity: authority.pre_state_identity().map(str::to_owned),
@@ -50,33 +57,38 @@ impl NixLiveExecutionWitnessV1 {
         })
     }
 
-    pub(crate) fn action_intent_digest(&self) -> &str {
+    pub fn action_intent_digest(&self) -> &str {
         &self.action_intent_digest
     }
 
-    pub(crate) fn approval_request_id(&self) -> &str {
+    pub fn authorization_record_digest(&self) -> &str {
+        &self.authorization_record_digest
+    }
+
+    pub fn approval_request_id(&self) -> &str {
         &self.approval_request_id
     }
 
-    pub(crate) fn projection_digest(&self) -> &str {
+    pub fn projection_digest(&self) -> &str {
         &self.projection_digest
     }
 
-    pub(crate) fn pre_state_identity(&self) -> Option<&str> {
+    pub fn pre_state_identity(&self) -> Option<&str> {
         self.pre_state_identity.as_deref()
     }
 
-    pub(crate) fn service_definition_content_digest(&self) -> Option<&str> {
+    pub fn service_definition_content_digest(&self) -> Option<&str> {
         self.service_definition_content_digest.as_deref()
     }
 
-    pub(crate) fn pre_invocation_id(&self) -> Option<&str> {
+    pub fn pre_invocation_id(&self) -> Option<&str> {
         self.pre_invocation_id.as_deref()
     }
 
     #[cfg(test)]
     pub(crate) fn for_test(
         action_intent_digest: impl Into<String>,
+        authorization_record_digest: impl Into<String>,
         approval_request_id: impl Into<String>,
         projection_digest: impl Into<String>,
         pre_state_identity: Option<String>,
@@ -85,6 +97,7 @@ impl NixLiveExecutionWitnessV1 {
     ) -> Self {
         Self {
             action_intent_digest: action_intent_digest.into(),
+            authorization_record_digest: authorization_record_digest.into(),
             approval_request_id: approval_request_id.into(),
             projection_digest: projection_digest.into(),
             pre_state_identity,
