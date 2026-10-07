@@ -38,6 +38,33 @@ impl CognitiveLoopService {
     pub fn cycle(&mut self, input: &str) -> CycleResult {
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
+
+        // Viability Fabric is observational at this stage: it records canonical internal
+        // signals without changing the cognitive policy. This establishes a clean causal
+        // telemetry boundary before any homeostatic control influence is enabled.
+        let viability_cycle = self.stats.total_cycles as u64;
+        self.viability.begin_cycle(viability_cycle);
+        let resource_band = super::viability_fabric::ViabilityBand {
+            preferred: (0.0, 0.70),
+            tolerated: (0.0, 0.90),
+            critical: (0.0, 1.0),
+        };
+        self.viability.observe_variable(
+            "thermodynamic_load",
+            super::viability_fabric::ViabilitySignal::new(
+                self.thermodynamic_load as f64,
+                1.0,
+                viability_cycle,
+                "cognitive_loop::thermodynamic_load",
+            ),
+            resource_band,
+            None,
+        );
+        self.viability.state_mut().prediction_errors.world =
+            (self.stats.avg_prediction_error as f64).clamp(0.0, 1.0);
+        self.viability.state_mut().prediction_errors.model_confidence =
+            (1.0 - self.prediction_confidence).clamp(0.0, 1.0);
+
         self.substrate_manager.tick_energy(&self.config);
         // Feed substrate energy data to ThermodynamicManager
         self.thermodynamic_mgr.set_energy(
