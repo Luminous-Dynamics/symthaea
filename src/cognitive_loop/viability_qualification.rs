@@ -19,9 +19,9 @@ use serde::{Deserialize, Serialize};
 
 use super::fep_module::FepModule;
 use super::viability_micro_world::{
-    benchmark_scenarios, run_homeostatic_agent_horizon_scenario, MicroAction, MicroWorld,
-    transition, MicroWorldObservation, MicroWorldPredictor, MicroWorldScenario,
-    PersistencePredictor,
+    benchmark_manifest_digest, benchmark_scenarios, run_homeostatic_agent_horizon_scenario,
+    MicroAction, MicroWorld, transition, MicroWorldObservation, MicroWorldPredictor,
+    MicroWorldScenario, PersistencePredictor,
 };
 
 use crate::dynamics::ode_solvers::{
@@ -391,6 +391,12 @@ impl MicroWorldPredictor for FepWorldModelPredictor<'_> {
 /// Result of the grounded world-model qualification experiment.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GroundedWorldModelQualificationReport {
+    /// Stable digest of the complete scenario family used by this qualification.
+    pub benchmark_manifest_digest: u64,
+    /// Stable digest of the scenario used for adaptation.
+    pub training_scenario_manifest_digest: u64,
+    /// Stable digest of the primary frozen scenario used for transfer.
+    pub held_out_scenario_manifest_digest: u64,
     pub training_scenario: &'static str,
     pub held_out_scenario: &'static str,
 
@@ -434,6 +440,42 @@ pub struct GroundedWorldModelQualificationReport {
     pub mean_recovery_steps: f64,
 }
 
+/// Leave-one-scenario-out transfer fold.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CrossScenarioTransferFold {
+    pub training_scenario: &'static str,
+    pub held_out_scenario: &'static str,
+    pub training_scenario_manifest_digest: u64,
+    pub held_out_scenario_manifest_digest: u64,
+    pub train_steps: u64,
+    pub held_out_steps: u64,
+    pub baseline_mae: f64,
+    pub predictor_mae: f64,
+    pub improvement_over_baseline: f64,
+}
+
+impl CrossScenarioTransferFold {
+    pub fn beat_persistence(&self) -> bool {
+        self.predictor_mae < self.baseline_mae
+    }
+}
+
+/// Frozen leave-one-scenario-out transfer across the complete benchmark family.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CrossScenarioTransferReport {
+    pub benchmark_manifest_digest: u64,
+    pub folds: Vec<CrossScenarioTransferFold>,
+    pub mean_improvement_over_baseline: f64,
+    pub worst_improvement_over_baseline: f64,
+    pub held_out_beats_persistence_rate: f64,
+}
+
+impl CrossScenarioTransferReport {
+    pub fn all_folds_beat_persistence(&self) -> bool {
+        !self.folds.is_empty() && self.folds.iter().all(CrossScenarioTransferFold::beat_persistence)
+    }
+}
+
 /// Accuracy profile for a frozen model as the temporal prediction horizon increases.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HorizonQualificationPoint {
@@ -448,8 +490,19 @@ pub struct HorizonQualificationPoint {
 }
 
 impl HorizonQualificationPoint {
-    pub fn has_temporal_degradation(&self) -> bool {
+    /// Whether the continuous relaxation rollout is worse than one-step prediction.
+    pub fn has_continuous_temporal_degradation(&self) -> bool {
         self.mean_terminal_mae > self.mean_one_step_mae
+    }
+
+    /// Whether repeated frozen discrete prediction is worse than one-step prediction.
+    pub fn has_discrete_temporal_degradation(&self) -> bool {
+        self.mean_discrete_terminal_mae > self.mean_one_step_mae
+    }
+
+    /// Backward-compatible alias; prefer the channel-explicit methods above.
+    pub fn has_temporal_degradation(&self) -> bool {
+        self.has_continuous_temporal_degradation()
     }
 }
 
@@ -569,6 +622,111 @@ fn evaluate_frozen_scenario<P: MicroWorldPredictor>(
         calibration.finish(),
         world.observe().is_viable(),
     )
+}
+
+/// Train an isolated copy of the exact starting world model on one scenario.
+///
+/// No caller-visible FEP state is modified. Each fold begins from the same base model,
+/// which prevents cross-fold learning leakage.
+fn train_world_model_clone(
+    base_model: &super::goal_world::WorldModelBridge,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+) -> (super::goal_world::WorldModelBridge, u64) {
+    let mut model = base_model.clone();
+    let mut predictor = FepWorldModelPredictor { bridge: &mut model };
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let mut steps = 0u64;
+
+    while !world.done() && steps < max_cycles {
+        for (cycle, perturbation) in scenario.perturbations {
+            if *cycle == steps {
+                world.perturb(*perturbation);
+            }
+        }
+
+        let before = world.observe();
+        let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+        let _ = predictor.predict(before, action);
+        let after = world.step(action);
+        predictor.observe_transition(before, action, after);
+        steps = steps.saturating_add(1);
+    }
+
+    drop(predictor);
+    (model, steps)
+}
+
+/// Evaluate complete leave-one-scenario-out transfer without learning during any
+/// held-out fold. The production world model remains untouched.
+fn evaluate_cross_scenario_transfer(
+    base_model: &super::goal_world::WorldModelBridge,
+    train_cycles: u64,
+    test_cycles: u64,
+) -> CrossScenarioTransferReport {
+    let scenarios = benchmark_scenarios();
+    let mut folds = Vec::with_capacity(
+        scenarios.len().saturating_mul(scenarios.len().saturating_sub(1)),
+    );
+
+    for (train_index, training) in scenarios.iter().enumerate() {
+        let (mut trained_model, train_steps) =
+            train_world_model_clone(base_model, training, train_cycles);
+
+        for (held_out_index, held_out) in scenarios.iter().enumerate() {
+            if held_out_index == train_index {
+                continue;
+            }
+
+            let predictor = FepWorldModelPredictor {
+                bridge: &mut trained_model,
+            };
+            let (held_out_steps, baseline_mae, predictor_mae, improvement, _, _) =
+                evaluate_frozen_scenario(&predictor, held_out, test_cycles);
+
+            folds.push(CrossScenarioTransferFold {
+                training_scenario: training.name,
+                held_out_scenario: held_out.name,
+                training_scenario_manifest_digest: training.manifest_digest(),
+                held_out_scenario_manifest_digest: held_out.manifest_digest(),
+                train_steps,
+                held_out_steps,
+                baseline_mae,
+                predictor_mae,
+                improvement_over_baseline: improvement,
+            });
+        }
+    }
+
+    let denominator = folds.len().max(1) as f64;
+    let mean_improvement_over_baseline =
+        folds.iter().map(|fold| fold.improvement_over_baseline).sum::<f64>()
+            / denominator;
+    let worst_improvement_over_baseline = folds
+        .iter()
+        .map(|fold| fold.improvement_over_baseline)
+        .fold(f64::INFINITY, f64::min);
+    let held_out_beats_persistence_rate = if folds.is_empty() {
+        0.0
+    } else {
+        folds.iter().filter(|fold| fold.beat_persistence()).count() as f64
+            / folds.len() as f64
+    };
+
+    CrossScenarioTransferReport {
+        benchmark_manifest_digest: benchmark_manifest_digest(),
+        folds,
+        mean_improvement_over_baseline,
+        worst_improvement_over_baseline: if denominator == 1.0
+            && mean_improvement_over_baseline == 0.0
+            && scenarios.len() < 2
+        {
+            0.0
+        } else {
+            worst_improvement_over_baseline
+        },
+        held_out_beats_persistence_rate,
+    }
 }
 
 const QUALIFICATION_HORIZONS: [usize; 4] = [1, 2, 4, 8];
@@ -1082,6 +1240,9 @@ impl FepModule {
         let scenarios = benchmark_scenarios();
         let training = &scenarios[0];
         let held_out = &scenarios[1];
+        let manifest_digest = benchmark_manifest_digest();
+        let cross_scenario_transfer =
+            evaluate_cross_scenario_transfer(&self.world_model, train_cycles, held_out_cycles);
 
         let mut persistence = PersistencePredictor::default();
         let persistence_closed_loop = run_homeostatic_agent_horizon_scenario(
@@ -1163,6 +1324,10 @@ impl FepModule {
             measure_recovery(held_out, &closed_loop.actions, held_out_cycles);
 
         GroundedWorldModelQualificationReport {
+            benchmark_manifest_digest: manifest_digest,
+            training_scenario_manifest_digest: training.manifest_digest(),
+            held_out_scenario_manifest_digest: held_out.manifest_digest(),
+            cross_scenario_transfer,
             training_scenario: training.name,
             held_out_scenario: held_out.name,
             train_steps,
@@ -1360,6 +1525,59 @@ mod tests {
         assert!((report.top1_agreement - 1.0).abs() < 1e-12);
         assert!((report.pairwise_agreement - 1.0).abs() < 1e-12);
         assert!(report.decision_structure_present());
+    }
+
+    #[test]
+    fn benchmark_manifest_digest_is_stable_and_scenarios_are_distinct() {
+        let scenarios = benchmark_scenarios();
+        let first = benchmark_manifest_digest();
+        let second = benchmark_manifest_digest();
+
+        assert_eq!(first, second);
+        assert_ne!(first, 0);
+        let mut digests = scenarios
+            .iter()
+            .map(MicroWorldScenario::manifest_digest)
+            .collect::<Vec<_>>();
+        digests.sort_unstable();
+        digests.dedup();
+        assert_eq!(digests.len(), scenarios.len());
+    }
+
+    #[test]
+    fn leave_one_out_transfer_covers_every_cross_scenario_pair() {
+        let model = super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let scenarios = benchmark_scenarios();
+        let report = evaluate_cross_scenario_transfer(&model, 4, 4);
+
+        assert_eq!(
+            report.folds.len(),
+            scenarios.len() * (scenarios.len() - 1)
+        );
+        assert_eq!(report.benchmark_manifest_digest, benchmark_manifest_digest());
+        assert!(report.folds.iter().all(|fold| {
+            fold.training_scenario != fold.held_out_scenario
+                && fold.train_steps > 0
+                && fold.held_out_steps > 0
+        }));
+        assert!((0.0..=1.0).contains(&report.held_out_beats_persistence_rate));
+        assert!(report.worst_improvement_over_baseline <= report.mean_improvement_over_baseline);
+    }
+
+    #[test]
+    fn temporal_degradation_metrics_name_their_prediction_channel() {
+        let point = HorizonQualificationPoint {
+            horizon_steps: 4,
+            samples: 1,
+            mean_one_step_mae: 0.10,
+            mean_terminal_mae: 0.20,
+            mean_discrete_terminal_mae: 0.30,
+            terminal_to_one_step_error_ratio: 2.0,
+        };
+
+        assert!(point.has_continuous_temporal_degradation());
+        assert!(point.has_discrete_temporal_degradation());
+        assert!(point.has_temporal_degradation());
     }
 
     #[test]
