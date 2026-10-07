@@ -154,6 +154,10 @@ pub struct Rfc9942VerifiedReceipt {
     /// SHA-256 fingerprint of the exact COSE signature bytes that verified this Receipt.
     /// This preserves wire-level signature identity beyond the TBS inputs alone.
     signature_sha256: [u8; 32],
+    /// SHA-256 fingerprint of the exact selected VDP proof bytes that were verified.
+    /// Proofs are carried in the unprotected header, so this is provenance rather
+    /// than a replacement for the signature-authenticated payload binding.
+    proof_sha256: [u8; 32],
 }
 
 impl Rfc9942VerifiedReceipt {
@@ -166,6 +170,7 @@ impl Rfc9942VerifiedReceipt {
     pub const fn protected_header_sha256(&self) -> [u8; 32] { self.protected_header_sha256 }
     pub const fn external_aad_sha256(&self) -> [u8; 32] { self.external_aad_sha256 }
     pub const fn signature_sha256(&self) -> [u8; 32] { self.signature_sha256 }
+    pub const fn proof_sha256(&self) -> [u8; 32] { self.proof_sha256 }
 }
 
 /// Where RFC 9942 header parameter 394 was carried on the outer
@@ -518,6 +523,7 @@ impl Rfc9942ReceiptEnvelope {
         proof: Rfc9942VerifiedProof,
         payload: &[u8],
         payload_mode: Rfc9942PayloadMode,
+        proof_sha256: [u8; 32],
         public_key: &[u8],
         external_aad: &[u8],
     ) -> Rfc9942VerifiedReceipt {
@@ -528,9 +534,11 @@ impl Rfc9942ReceiptEnvelope {
             payload_sha256: sha256(payload),
             payload_mode,
             verification_key_sha256: sha256(public_key),
+            proof_sha256,
             protected_header_sha256: sha256(&self.protected_header_bytes()),
             external_aad_sha256: sha256(external_aad),
             signature_sha256: sha256(&self.signature),
+            proof_sha256,
         }
     }
 
@@ -804,6 +812,7 @@ impl Rfc9942ReceiptEnvelope {
                 Rfc9942ReceiptPayload::Attached(_) => Rfc9942PayloadMode::Attached,
                 Rfc9942ReceiptPayload::Detached => Rfc9942PayloadMode::Detached,
             },
+            sha256(&self.vdp.proofs[proof_index]),
             public_key,
             external_aad,
         ))
@@ -835,6 +844,7 @@ impl Rfc9942ReceiptEnvelope {
             Rfc9942VerifiedProof::Consistency { proof_index, older, newer },
             payload,
             Rfc9942PayloadMode::Detached,
+            sha256(&self.vdp.proofs[proof_index]),
             public_key,
             external_aad,
         ))
