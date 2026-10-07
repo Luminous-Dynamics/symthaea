@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Write};
-use std::os::fd::AsRawFd;
+use std::os::fd::{AsRawFd, FromRawFd};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 
@@ -43,19 +43,80 @@ impl MutationLease {
     }
 
     fn acquire_at(path: &Path) -> Result<Self, String> {
-        let file = OpenOptions::new()
-            .create(true)
+        use std::ffi::CString;
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+        let parent = path.parent().ok_or_else(|| {
+            format!("OS mutation lock {} has no parent directory", path.display())
+        })?;
+        let name = path.file_name().ok_or_else(|| {
+            format!("OS mutation lock {} has no final component", path.display())
+        })?;
+        let name = CString::new(name.as_encoded_bytes()).map_err(|_| {
+            format!("OS mutation lock {} contains an invalid filename", path.display())
+        })?;
+
+        // Bind lock admission to the descriptor for the trusted parent
+        // namespace. This prevents a writable/replaced parent path from
+        // redirecting two processes to different lock files.
+        let parent_dir = OpenOptions::new()
             .read(true)
-            .write(true)
-            .mode(0o600)
-            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-            .open(path)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(parent)
             .map_err(|error| {
                 format!(
-                    "unable to open OS mutation lock {}: {error}",
-                    path.display()
+                    "unable to open OS mutation lock parent {}: {error}",
+                    parent.display()
                 )
             })?;
+        let parent_metadata = parent_dir.metadata().map_err(|error| {
+            format!(
+                "unable to inspect OS mutation lock parent {}: {error}",
+                parent.display()
+            )
+        })?;
+        if !parent_metadata.file_type().is_dir() {
+            return Err(format!(
+                "OS mutation lock parent {} is not a directory",
+                parent.display()
+            ));
+        }
+        let parent_mode = parent_metadata.permissions().mode() & 0o777;
+        if parent_mode & 0o022 != 0 {
+            return Err(format!(
+                "OS mutation lock parent {} is writable by group or other ({:04o})",
+                parent.display(),
+                parent_mode
+            ));
+        }
+        let parent_uid = parent_metadata.uid();
+        let euid = unsafe { libc::geteuid() };
+        if parent_uid != 0 && parent_uid != euid {
+            return Err(format!(
+                "OS mutation lock parent {} is not owned by root or relay process user",
+                parent.display()
+            ));
+        }
+
+        let fd = unsafe {
+            libc::openat(
+                parent_dir.as_raw_fd(),
+                name.as_ptr(),
+                libc::O_RDWR
+                    | libc::O_CREAT
+                    | libc::O_NOFOLLOW
+                    | libc::O_CLOEXEC,
+                0o600,
+            )
+        };
+        if fd < 0 {
+            return Err(format!(
+                "unable to open OS mutation lock {}: {}",
+                path.display(),
+                std::io::Error::last_os_error()
+            ));
+        }
+        let file = unsafe { File::from_raw_fd(fd) };
         let metadata = file.metadata().map_err(|error| {
             format!(
                 "unable to inspect OS mutation lock {}: {error}",
@@ -68,27 +129,25 @@ impl MutationLease {
                 path.display()
             ));
         }
-        {
-            use std::os::unix::fs::{MetadataExt, PermissionsExt};
-            let mode = metadata.permissions().mode() & 0o777;
-            if mode != 0o600 {
-                return Err(format!(
-                    "OS mutation lock {} has unsafe permissions {:04o}; require 0600",
-                    path.display(),
-                    mode
-                ));
-            }
-            if metadata.uid() != unsafe { libc::geteuid() } {
-                return Err(format!(
-                    "OS mutation lock {} is not owned by relay process user",
-                    path.display()
-                ));
-            }
+
+        let mode = metadata.permissions().mode() & 0o777;
+        if mode != 0o600 {
+            return Err(format!(
+                "OS mutation lock {} has unsafe permissions {:04o}",
+                path.display(),
+                mode
+            ));
+        }
+        if metadata.uid() != euid {
+            return Err(format!(
+                "OS mutation lock {} is not owned by relay process user",
+                path.display()
+            ));
         }
 
-        // SAFETY: the file descriptor is valid for the lifetime of file, and
-        // the kernel releases the lock when the descriptor closes. LOCK_NB
-        // makes admission fail closed rather than queueing.
+        // SAFETY: the descriptor is held for the entire lease. Linux flock()
+        // locks are associated with the open file description, so the lease
+        // remains bound to this exact lock inode while it is held.
         let result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
         if result == 0 {
             Ok(Self { file })
@@ -107,6 +166,7 @@ impl MutationLease {
                 ))
             }
         }
+    }
     }
 }
 
@@ -1238,47 +1298,51 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
 
     #[test]
-    fn mutation_lock_rejects_symlink_and_unsafe_permissions() {
+    fn mutation_lock_binds_to_private_parent_namespace() {
         let name = random_operation_id().unwrap();
-        let target =
-            std::env::temp_dir().join(format!("symthaea-mutation-lock-target-{name}.lock"));
-        let path =
-            std::env::temp_dir().join(format!("symthaea-mutation-lock-link-{name}.lock"));
-        std::fs::write(&target, b"").unwrap();
-        std::os::unix::fs::symlink(&target, &path).unwrap();
-        let error = MutationLease::acquire_at(&path)
-            .expect_err("symlinked mutation lock must fail closed");
-        assert!(error.contains("unable to open OS mutation lock"));
-        let _ = std::fs::remove_file(&path);
-        let _ = std::fs::remove_file(&target);
-
-        let unsafe_path =
-            std::env::temp_dir().join(format!("symthaea-mutation-lock-permissions-{name}.lock"));
-        std::fs::write(&unsafe_path, b"").unwrap();
+        let dir = std::env::temp_dir().join(format!("symthaea-lock-parent-{name}"));
+        std::fs::create_dir(&dir).unwrap();
         std::fs::set_permissions(
-            &unsafe_path,
-            std::os::unix::fs::PermissionsExt::from_mode(0o640),
+            &dir,
+            std::os::unix::fs::PermissionsExt::from_mode(0o700),
         )
         .unwrap();
-        let error = MutationLease::acquire_at(&unsafe_path)
-            .expect_err("group-readable mutation lock must fail closed");
-        assert!(error.contains("unsafe permissions"));
-        let _ = std::fs::remove_file(unsafe_path);
-    }
 
-    #[test]
-    fn mutation_lock_rejects_second_file_description() {
-        let name = random_operation_id().unwrap();
-        let path = std::env::temp_dir().join(format!("symthaea-mutation-lock-test-{name}.lock"));
-        let first = MutationLease::acquire_at(&path).unwrap();
-        let second = MutationLease::acquire_at(&path);
+        let target = dir.join("target.lock");
+        let symlink = dir.join("symlink.lock");
+        std::fs::write(&target, b"").unwrap();
+        std::os::unix::fs::symlink(&target, &symlink).unwrap();
+
+        let error = MutationLease::acquire_at(&symlink)
+            .expect_err("symlinked mutation lock must fail closed");
+        assert!(error.contains("unable to open OS mutation lock"));
+
+        let lease = MutationLease::acquire_at(&target).unwrap();
+        let second = MutationLease::acquire_at(&target);
         assert!(
             matches!(second, Err(message) if message.contains("already held")),
             "second owner must fail closed: {second:?}"
         );
-        drop(first);
-        assert!(MutationLease::acquire_at(&path).is_ok());
-        let _ = std::fs::remove_file(&path);
+        drop(lease);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn mutation_lock_rejects_group_or_other_writable_parent() {
+        let name = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!("symthaea-lock-unsafe-parent-{name}"));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(
+            &dir,
+            std::os::unix::fs::PermissionsExt::from_mode(0o777),
+        )
+        .unwrap();
+        let path = dir.join("lock");
+        let error = MutationLease::acquire_at(&path)
+            .expect_err("unsafe lock parent must fail closed");
+        assert!(error.contains("writable by group or other"));
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
