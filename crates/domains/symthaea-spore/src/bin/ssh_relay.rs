@@ -3019,10 +3019,13 @@ fn read_image_artifact_commitment_blocking(
     if !directory_metadata.file_type().is_dir() {
         return Err("image artifact namespace is not a directory".into());
     }
-    if directory_metadata.permissions().mode() & 0o777 != 0o700
+    if !matches!(directory_metadata.permissions().mode() & 0o777, 0o700 | 0o500)
         || directory_metadata.uid() != unsafe { libc::geteuid() }
     {
-        return Err("image artifact namespace has unsafe ownership or permissions".into());
+        return Err(
+            "image artifact namespace has unsafe ownership or permissions; require relay-owned 0700 or frozen 0500"
+                .into(),
+        );
     }
 
     let path = std::path::Path::new(&image_dir).join(artifact_name);
