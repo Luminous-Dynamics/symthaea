@@ -8611,7 +8611,7 @@ echo '}'
                     continue;
                 }
 
-                let mut search_args = vec!["search", "nixpkgs", safe_query.as_str(), "--json"];
+                let search_args = ["search", "nixpkgs", safe_query.as_str(), "--json"];
                 match run_privileged_args("nix", &search_args).await {
                     Ok(r) if r.exit_status == 0 && !r.stdout.trim().is_empty() => {
                         let mut results = Vec::new();
