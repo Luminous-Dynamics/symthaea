@@ -1639,11 +1639,14 @@ fn detached_inclusion_state_derives_and_binds_root() {
         sig,
     ).unwrap();
 
+    let state = receipt
+        .verify_es256_inclusion_state(candidate, &key, &[], None)
+        .unwrap();
     assert_eq!(
-        receipt.verify_es256_inclusion_state(candidate, &key, &[], None)
-            .unwrap().proof().inclusion_head(),
-        Some(head)
+        state.payload_mode(),
+        symthaea_swarm::semantic_evidence_vds::Rfc9942PayloadMode::Detached
     );
+    assert_eq!(state.proof().inclusion_head(), Some(head));
     assert!(
         receipt.verify_es256_inclusion_state(candidate, &key, &[], Some(&root)).is_ok()
     );
