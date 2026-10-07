@@ -1732,7 +1732,6 @@ pub enum MorphophonologicalDerivationWitnessError {
     SourceArtifactDigestMismatch,
     InvalidDerivedWitness,
 }
-}
 
 impl std::fmt::Display for MorphophonologicalDerivationWitnessError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
