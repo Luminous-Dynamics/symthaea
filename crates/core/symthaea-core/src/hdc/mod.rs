@@ -299,6 +299,7 @@ pub mod unified_network_phi; // Phi measurement and validation for HdcLtcUnified
 pub mod config; // Centralized HDC configuration (runtime dimension management)
 pub mod projection;
 pub mod unified_hv; // Unified hypervector types (ContinuousHV) // Learned projection layers for dimension conversion
+pub mod materialized_hv; // Deterministic resident-vs-regenerated HV research primitive
 
 // Grid encoding for 2D spatial reasoning (ARC-style puzzles)
 pub mod binary_grid_encoder;
