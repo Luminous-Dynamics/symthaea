@@ -564,6 +564,10 @@ impl NixLocalExecutionAuthorityV1 {
         self.intent.pre_state_identity.as_deref()
     }
 
+    pub(crate) fn intent(&self) -> &NixActionIntentV1 {
+        &self.intent
+    }
+
     pub(crate) fn approval_request_id(&self) -> &str {
         self.approval.request_id()
     }
