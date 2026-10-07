@@ -12,7 +12,9 @@
 use crate::action::authorization::NixLocalExecutionAuthorityV1;
 use crate::action::execution_witness::NixLiveExecutionWitnessV1;
 #[cfg(feature = "systemd-observer")]
-use crate::action::NixSystemdReadOnlyObserverV1;
+use crate::action::{
+    NixSystemdLifecycleMutationTransportV1, NixSystemdReadOnlyObserverV1,
+};
 use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use crate::action::service_manager::ServiceManager;
 use crate::action::service_state::NixServiceObservedStateV1;
@@ -20,6 +22,7 @@ use crate::traits::{ActionType, ConsciousnessThresholds, PhiAwareScoring};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::process::Stdio;
+use std::time::Duration;
 use tokio::process::Command;
 use tracing::{info, warn};
 
@@ -621,6 +624,38 @@ pub enum ExecutionResult {
     },
 }
 
+enum NixSystemdOperationLabel {
+    Start,
+    Stop,
+    Restart,
+    Reload,
+}
+
+impl From<NixServiceOperationKindV1> for NixSystemdOperationLabel {
+    fn from(value: NixServiceOperationKindV1) -> Self {
+        match value {
+            NixServiceOperationKindV1::Start => Self::Start,
+            NixServiceOperationKindV1::Stop => Self::Stop,
+            NixServiceOperationKindV1::Restart => Self::Restart,
+            NixServiceOperationKindV1::Reload => Self::Reload,
+            NixServiceOperationKindV1::Enable => Self::Start,
+            NixServiceOperationKindV1::Disable => Self::Stop,
+        }
+    }
+}
+
+impl std::fmt::Display for NixSystemdOperationLabel {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            Self::Start => "start",
+            Self::Stop => "stop",
+            Self::Restart => "restart",
+            Self::Reload => "reload",
+        };
+        formatter.write_str(value)
+    }
+}
+
 enum ExecutionBasisV1 {
     Phi {
         phi: f32,
@@ -998,6 +1033,48 @@ impl NixOSExecutor {
         let projection_digest = authority.projection_digest().to_string();
         let pre_state_identity = authority.pre_state_identity().map(str::to_owned);
 
+        if !self.dry_run && matches!(&command, NixOSCommand::Service { .. }) {
+            #[cfg(feature = "systemd-observer")]
+            {
+                let (result, witness) = self
+                    .execute_authorized_service_with_witness(
+                        &command,
+                        &authority,
+                        &intent_digest,
+                        &approval_request_id,
+                        &projection_digest,
+                    )
+                    .await;
+                self.record_authorized_execution(
+                    command,
+                    intent_digest,
+                    approval_request_id,
+                    projection_digest,
+                    pre_state_identity,
+                    &result,
+                );
+                return (result, witness);
+            }
+
+            #[cfg(not(feature = "systemd-observer"))]
+            {
+                let result = ExecutionResult::Blocked {
+                    reason: "typed Service execution requires the systemd read-only observer capability"
+                        .to_string(),
+                    safety_level: safety,
+                };
+                self.record_authorized_execution(
+                    command,
+                    intent_digest,
+                    approval_request_id,
+                    projection_digest,
+                    pre_state_identity,
+                    &result,
+                );
+                return (result, None);
+            }
+        }
+
         let witness = if self.dry_run {
             None
         } else {
@@ -1035,6 +1112,234 @@ impl NixOSExecutor {
             &result,
         );
         (result, witness)
+    }
+
+    #[cfg(feature = "systemd-observer")]
+    async fn execute_authorized_service_with_witness(
+        &mut self,
+        command: &NixOSCommand,
+        authority: &NixLocalExecutionAuthorityV1,
+        intent_digest: &str,
+        approval_request_id: &str,
+        projection_digest: &str,
+    ) -> (ExecutionResult, Option<NixLiveExecutionWitnessV1>) {
+        let NixOSCommand::Service { operation, unit } = command else {
+            return (
+                ExecutionResult::Blocked {
+                    reason: "internal Service execution helper received a non-Service command"
+                        .to_string(),
+                    safety_level: command.safety_level(),
+                },
+                None,
+            );
+        };
+
+        let operation = match NixServiceOperationV1::new(unit, *operation) {
+            Ok(operation) => operation,
+            Err(error) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!("invalid typed Service operation: {error}"),
+                        safety_level: command.safety_level(),
+                    },
+                    None,
+                );
+            }
+        };
+
+        let expected_manager_owner = match authority.service_manager_owner() {
+            Some(owner) if !owner.is_empty() => owner,
+            _ => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: "Service execution authority has no bound systemd manager owner"
+                            .to_string(),
+                        safety_level: command.safety_level(),
+                    },
+                    None,
+                );
+            }
+        };
+        let expected_bus_id = match authority.service_bus_id() {
+            Some(bus_id) if !bus_id.is_empty() => bus_id,
+            _ => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: "Service execution authority has no bound D-Bus bus incarnation"
+                            .to_string(),
+                        safety_level: command.safety_level(),
+                    },
+                    None,
+                );
+            }
+        };
+
+        let observer = match NixSystemdReadOnlyObserverV1::connect_system().await {
+            Ok(observer) => observer,
+            Err(error) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!("could not connect read-only systemd observer before dispatch: {error}"),
+                        safety_level: command.safety_level(),
+                    },
+                    None,
+                );
+            }
+        };
+
+        let watcher = match observer.arm_job_removed_watcher().await {
+            Ok(watcher) => watcher,
+            Err(error) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!("could not arm JobRemoved watcher before Service dispatch: {error}"),
+                        safety_level: command.safety_level(),
+                    },
+                    None,
+                );
+            }
+        };
+
+        if watcher.manager_owner() != expected_manager_owner {
+            return (
+                ExecutionResult::Blocked {
+                    reason: "armed JobRemoved watcher manager owner does not match Service authority"
+                        .to_string(),
+                    safety_level: command.safety_level(),
+                },
+                None,
+            );
+        }
+        if watcher.bus_id() != expected_bus_id {
+            return (
+                ExecutionResult::Blocked {
+                    reason: "armed JobRemoved watcher bus incarnation does not match Service authority"
+                        .to_string(),
+                    safety_level: command.safety_level(),
+                },
+                None,
+            );
+        }
+
+        let transport = match NixSystemdLifecycleMutationTransportV1::connect_system().await {
+            Ok(transport) => transport,
+            Err(error) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!("could not connect typed systemd mutation transport: {error}"),
+                        safety_level: command.safety_level(),
+                    },
+                    None,
+                );
+            }
+        };
+
+        let started_at = std::time::Instant::now();
+
+        // This is the last provenance mint before dispatch. The typed transport performs
+        // one more owner+bus check immediately before the actual D-Bus mutation call.
+        let witness = match NixLiveExecutionWitnessV1::from_live_authority(authority) {
+            Ok(witness) => witness,
+            Err(reason) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason,
+                        safety_level: command.safety_level(),
+                    },
+                    None,
+                );
+            }
+        };
+
+        let job_path = match transport
+            .dispatch_lifecycle_for_manager_owner_and_bus_id(
+                &operation,
+                expected_manager_owner,
+                expected_bus_id,
+            )
+            .await
+        {
+            Ok(job_path) => job_path,
+            Err(error) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!("typed Service dispatch refused: {error}"),
+                        safety_level: command.safety_level(),
+                    },
+                    None,
+                );
+            }
+        };
+
+        let job = match observer
+            .capture_dispatched_job(
+                &job_path,
+                *operation,
+                unit,
+                expected_manager_owner,
+                expected_bus_id,
+            )
+            .await
+        {
+            Ok(job) => job,
+            Err(error) => {
+                return (
+                    ExecutionResult::FailedNoRollback {
+                        error: format!(
+                            "Service dispatch returned a Job but correlation evidence could not be sealed: {error}"
+                        ),
+                        rollback_error: None,
+                    },
+                    Some(witness),
+                );
+            }
+        };
+
+        let timeout = Duration::from_secs(60);
+        let job_evidence = match watcher.await_job_removed(&job, timeout).await {
+            Ok(evidence) => evidence,
+            Err(error) => {
+                return (
+                    ExecutionResult::FailedNoRollback {
+                        error: format!(
+                            "Service dispatch JobRemoved evidence was not observed: {error}"
+                        ),
+                        rollback_error: None,
+                    },
+                    Some(witness),
+                );
+            }
+        };
+
+        let elapsed = started_at.elapsed().as_millis() as u64;
+        let result = if job_evidence.result == "done" {
+            ExecutionResult::Success {
+                stdout: format!(
+                    "systemd {} job {} completed for {}",
+                    NixSystemdOperationLabel::from(*operation),
+                    job_evidence.id,
+                    unit
+                ),
+                stderr: String::new(),
+                execution_time_ms: elapsed,
+            }
+        } else {
+            ExecutionResult::FailedNoRollback {
+                error: format!(
+                    "systemd {} job {} for {} finished with result {}",
+                    NixSystemdOperationLabel::from(*operation),
+                    job_evidence.id,
+                    unit,
+                    job_evidence.result
+                ),
+                rollback_error: None,
+            }
+        };
+
+        // Keep these explicit arguments named at the call site so the execution record's
+        // lineage remains visibly tied to the same live authority basis.
+        let _ = (intent_digest, approval_request_id, projection_digest);
+        (result, Some(witness))
     }
 
     /// Revalidate the state identity bound into live authority immediately before dispatch.
