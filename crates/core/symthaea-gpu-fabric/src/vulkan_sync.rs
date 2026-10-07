@@ -36,7 +36,7 @@ pub struct VulkanQueueAssignment {
     pub queue: VulkanQueueId,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct VulkanTimelineWait {
     pub producer_node: u32,
     pub producer_queue: VulkanQueueId,
