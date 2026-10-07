@@ -381,6 +381,17 @@ The report retains per-observation residuals, upper and lower cumulative CUSUM s
 direction, detection state, false-alarm state, detection observation, and detection delay. The detector parameters are frozen by protocol
 once the nominal residual reference has been established.
 
+The detector is also characterized across independent held-out episodes rather than accepted from a
+single control/shift pair. Four held-out nominal episodes estimate episode-level false-alarm rate;
+four shift magnitudes (0.60, 0.80, 1.20, 1.40 harvest-yield scale) are evaluated across the same
+held-out states, reporting detection rate, mean/worst detection delay, and polarity-specific
+direction accuracy. A deterministic gradual drift from 1.00 toward 0.60 is retained as a diagnostic
+because this detector is designed for abrupt changes, not as an additional pass/fail condition.
+
+This keeps the evidence boundary aligned with sequential change-detection practice: a single alarm
+is not treated as sufficient characterization, and false-alarm behavior and detection delay remain
+explicit operating quantities.
+
 This follows current changepoint-aware world-model work using prediction-error CUSUM to distinguish
 abrupt dynamics shifts from ordinary learning drift, and broader change-point literature that treats
 detection delay and false alarms as first-class evaluation quantities. See Yang (2026),
@@ -480,6 +491,9 @@ anchor. The per-shock receipts preserve this distinction instead of hiding it be
 | Nominal control fires while the shifted regime does not | the change detector has poor specificity/sensitivity for the configured residual signal and must not gate adaptation |
 | Shifted regime fires without a nominal false alarm | stronger evidence that persistent prediction error can distinguish this explicit regime change from the no-change control |
 | Detector reports an increase or decrease direction with stable control behavior | stronger evidence that the change signal is direction-aware rather than tied to a single residual polarity |
+| Episode-level false-alarm rate is low across held-out nominal states | stronger evidence that specificity is not an artifact of one favorable control trajectory |
+| Shift detection rate and delay remain stable across held-out shift magnitudes | stronger evidence that detection is not tuned only to the configured 60% yield case |
+| Gradual-drift diagnostic fires | evidence that the abrupt-shift detector may be sensitive to slow nonstationarity; investigate before using it as a gate |
 
 No single metric is a synthetic-organism detector.
 
@@ -494,7 +508,7 @@ A future green qualification should report all of:
 5. model and policy configuration;
 6. one-step and multi-horizon temporal prediction accuracy;
 7. policy-induced distribution-shift error;
-7. aggregate and planner-selected confidence calibration;
+8. aggregate and planner-selected confidence calibration;
 8. action-ranking agreement and exploitation gap;
 9. survival and minimum viability margin;
 10. perturbation recovery;
@@ -510,9 +524,12 @@ neighboring-probe transfer, and isolated anchor regression;
 pre-stream invariant-anchor retention;
 19. prediction-error change detection, including nominal-control false alarms, shifted-regime detection,
 per-observation residual, upper/lower-CUSUM, direction, and detection-delay receipts;
-20. regime-shift revision response, including pre/post shifted validation error, revision latency,
+20. changepoint operating characteristics across independent nominal and multi-magnitude shift episodes,
+including false-alarm episode rate, detection rate, polarity-specific direction rate, and mean/worst delay;
+21. gradual-drift diagnostic receipts, explicitly treated as a specificity diagnostic rather than an abrupt-shift pass criterion;
+22. regime-shift revision response, including pre/post shifted validation error, revision latency,
 per-update receipts, and invariant-anchor regression;
-21. trace/invariant verification where action evidence is recorded.
+23. trace/invariant verification where action evidence is recorded.
 
 Queued CI is not a pass.
 
