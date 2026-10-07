@@ -66,6 +66,23 @@ fn read_required(path: &Path) -> Vec<u8> {
     })
 }
 
+fn read_optional(path: &Path) -> Vec<u8> {
+    match fs::read(path) {
+        Ok(bytes) => {
+            let mut surface = path.to_string_lossy().as_bytes().to_vec();
+            surface.extend_from_slice(b"\0present\0");
+            surface.extend_from_slice(&bytes);
+            surface
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            format!("{}\\0absent", path.to_string_lossy()).into_bytes()
+        }
+        Err(error) => {
+            panic!("failed to read optional compiler identity input {}: {error}", path.display())
+        }
+    }
+}
+
 fn rustc_identity() -> Vec<u8> {
     let rustc = env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
     let output = Command::new(&rustc)
@@ -116,6 +133,8 @@ fn main() {
     println!("cargo:rerun-if-changed=../../../Cargo.toml");
     println!("cargo:rerun-if-changed=../../../Cargo.lock");
     println!("cargo:rerun-if-changed=../../../rust-toolchain.toml");
+    println!("cargo:rerun-if-changed=../../../.cargo/config.toml");
+    println!("cargo:rerun-if-changed=../../../.cargo/config");
     println!("cargo:rerun-if-env-changed=RUSTC");
     println!("cargo:rerun-if-env-changed=CARGO");
     println!("cargo:rerun-if-env-changed=RUSTC_WRAPPER");
@@ -152,6 +171,8 @@ fn main() {
     let workspace_manifest = read_required(&workspace_root.join("Cargo.toml"));
     let cargo_lock = read_required(&workspace_root.join("Cargo.lock"));
     let rust_toolchain = read_required(&workspace_root.join("rust-toolchain.toml"));
+    let cargo_config_toml = read_optional(&workspace_root.join(".cargo/config.toml"));
+    let cargo_config = read_optional(&workspace_root.join(".cargo/config"));
     let rustc_identity = rustc_identity();
     let cargo_identity = cargo_identity();
     let rustc_wrapper = env::var("RUSTC_WRAPPER").unwrap_or_default().into_bytes();
@@ -189,12 +210,14 @@ fn main() {
     // This is intentionally separate from compiler source identity: the same checked-in source
     // can have different dependency/toolchain semantics if its build context changes.
     let build_context_revision = domain_digest(
-        b"symthaea-broca-unimorph-compiler-build-context-revision-v3",
+        b"symthaea-broca-unimorph-compiler-build-context-revision-v4",
         &[
             &crate_manifest,
             &workspace_manifest,
             &cargo_lock,
             &rust_toolchain,
+            &cargo_config_toml,
+            &cargo_config,
             &rustc_identity,
             &cargo_identity,
             &rustc_wrapper,
