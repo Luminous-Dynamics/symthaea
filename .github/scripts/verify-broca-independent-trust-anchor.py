@@ -589,6 +589,12 @@ def main() -> int:
                 "persist-credentials: false",
                 "Verify locked dependency graph",
                 "cargo fetch --locked",
+                "Capture native toolchain context",
+                "BROCA_NATIVE_TOOLCHAIN_CONTEXT<<EOF",
+                "cc --version | head -n 1",
+                "clang --version | head -n 1",
+                "ld --version | head -n 1",
+                "ldd --version | head -n 1",
                 "Capture native package context",
                 "BROCA_NATIVE_PACKAGE_CONTEXT",
                 "BROCA_FREEZE_AUDIT_OUTPUT: target/broca-unimorph-freeze/receipt.json",
@@ -612,6 +618,14 @@ def main() -> int:
         if workflow.count("persist-credentials: false") != 2:
             raise VerificationError(
                 "Broca workflow checkout credential policy mismatch"
+            )
+        if workflow.count("Verify locked dependency graph") != 2:
+            raise VerificationError(
+                "Broca workflow dependency admission count mismatch"
+            )
+        if workflow.count("Capture native toolchain context") != 2:
+            raise VerificationError(
+                "Broca workflow native toolchain capture count mismatch"
             )
         if workflow.count("Capture native package context") != 2:
             raise VerificationError(
@@ -650,7 +664,10 @@ def main() -> int:
         require_fragments(
             build,
             [
-                "symthaea-broca-unimorph-compiler-build-context-revision-v7",
+                "symthaea-broca-unimorph-compiler-build-context-revision-v8",
+                "BROCA_RUSTUP_VERSION",
+                "BROCA_NATIVE_TOOLCHAIN_CONTEXT",
+                "rerun-if-env-changed=BROCA_NATIVE_TOOLCHAIN_CONTEXT",
                 "BROCA_NATIVE_PACKAGE_CONTEXT",
                 "rerun-if-env-changed=BROCA_NATIVE_PACKAGE_CONTEXT",
                 "BROCA_RUSTUP_VERSION",
