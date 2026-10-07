@@ -391,10 +391,16 @@ def main() -> int:
                 f"expected exactly one open same-repository PR for head {TRIGGER_RUN_HEAD_SHA}, got {len(candidates)}"
             )
 
+        if TRIGGER_RUN_CONCLUSION != "success":
+            raise VerificationError(
+                f"triggering workflow run did not succeed: {TRIGGER_RUN_CONCLUSION!r}"
+            )
+
         pr_number = int(candidates[0]["number"])
         pr = api_request("GET", f"/pulls/{pr_number}")
         if (
             pr.get("state") != "open"
+            or pr.get("draft") is not False
             or pr.get("head", {}).get("sha") != TRIGGER_RUN_HEAD_SHA
             or pr.get("head", {}).get("repo", {}).get("full_name") != REPOSITORY
         ):
@@ -639,6 +645,10 @@ def main() -> int:
             if run.get("status") != "completed":
                 raise WaitingError(
                     f"required workflow is not completed for exact head: {name}"
+                )
+            if run.get("head_sha") != pr["head"]["sha"]:
+                raise VerificationError(
+                    f"required workflow head mismatch for {name}: {run.get('head_sha')} != {pr['head']['sha']}"
                 )
             if run.get("conclusion") != "success":
                 raise VerificationError(
