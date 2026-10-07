@@ -5233,6 +5233,52 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn single_inference_binding_derives_and_enforces_schedule() {
+        let samples = build_samples(0.5);
+        let config = config();
+        let qualification = HeldOutRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            4,
+            provenance(),
+        )
+        .unwrap();
+
+        let schedule = single_origin_schedule_sha256(config, 0.5);
+        let plan = ForecastInferencePlan::new(
+            0.5,
+            schedule,
+            "nested-forecast-bootstrap-v1",
+            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+            "loss-dependence-bartlett-v1",
+            "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+            "moving-block-bootstrap-v1",
+            "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            "small-sample-conservative-v1",
+            "single-primary-comparison-v1",
+            0.05,
+            qualification.qualification_identity_blake3.clone(),
+        )
+        .unwrap();
+
+        let dependence = qualification.relational_loss_dependence(8).unwrap();
+        let binding =
+            ForecastInferenceBinding::from_single(&plan, &qualification, &dependence).unwrap();
+        binding.validate_against_single(&plan, &qualification, &dependence)
+            .unwrap();
+
+        let mut bad_plan = plan.clone();
+        bad_plan.origin_schedule_sha256 =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string();
+        bad_plan.plan_blake3 = inference_plan_digest(&bad_plan);
+        bad_plan.validate().unwrap();
+        assert_eq!(
+            binding.validate_against_single(&bad_plan, &qualification, &dependence),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
     fn inference_binding_binds_plan_qualification_loss_vector_and_dependence() {
         let samples = build_samples(0.5);
         let config = RollingOriginRelationalPredictionConfig {
