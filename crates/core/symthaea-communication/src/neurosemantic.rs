@@ -656,10 +656,11 @@ pub struct NeurosemanticRemediationStatisticalDesignArtifact {
     pub outcome_model_ref: String,
     pub study_protocol_hash: String,
     pub assumptions_hash: String,
+    pub statistical_execution_hash: String,
     pub execution_revision: String,
 }
 
-pub const NEUROSEMANTIC_REMEDIATION_STATISTICAL_DESIGN_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_REMEDIATION_STATISTICAL_DESIGN_SCHEMA_VERSION: u16 = 2;
 
 impl NeurosemanticRemediationStatisticalDesignArtifact {
     pub fn validate(&self) -> Result<(), String> {
@@ -672,6 +673,7 @@ impl NeurosemanticRemediationStatisticalDesignArtifact {
             || !valid_identifier(&self.outcome_model_ref)
             || !valid_blake3_digest(&self.study_protocol_hash)
             || !valid_blake3_digest(&self.assumptions_hash)
+            || !valid_blake3_digest(&self.statistical_execution_hash)
             || !valid_execution_revision(&self.execution_revision)
         {
             return Err("neurosemantic remediation statistical design fields are invalid".into());
@@ -1637,6 +1639,8 @@ impl NeurosemanticRemediationImpactArtifact {
         uncertainty_computation_bytes: &[&[u8]],
         uncertainty_assumption_bytes: &[&[u8]],
         statistical_design_bytes: &[&[u8]],
+        statistical_sampling_frame_bytes: &[&[u8]],
+        statistical_execution_bytes: &[&[u8]],
     ) -> Result<(), String> {
         self.validate()?;
         let measurement = self.verify_measurement_artifact_bytes(measurement_bytes)?;
@@ -1862,6 +1866,179 @@ impl NeurosemanticRemediationImpactArtifact {
                     || design.execution_revision != self.execution_revision
                 {
                     return Err("neurosemantic remediation statistical design binding mismatch".into());
+                }
+
+                let execution_bytes = statistical_execution_bytes
+                    .iter()
+                    .copied()
+                    .find(|candidate| content_hash(candidate) == design.statistical_execution_hash)
+                    .ok_or_else(|| {
+                        "neurosemantic remediation statistical execution evidence is missing"
+                            .to_string()
+                    })?;
+                let execution =
+                    NeurosemanticRemediationStatisticalExecutionArtifact::from_json_bytes(
+                        execution_bytes,
+                    )?;
+                if execution.fingerprint()? != design.statistical_execution_hash
+                    || execution.design_ref != design.design_ref
+                    || execution.metric_ref != computation.metric_ref
+                    || execution.metric_definition_hash != computation.metric_definition_hash
+                    || execution.observation_set_hash != computation.observation_set_hash
+                    || execution.study_protocol_hash != self.study_protocol_hash
+                    || execution.execution_revision != self.execution_revision
+                {
+                    return Err(
+                        "neurosemantic remediation statistical execution binding mismatch".into(),
+                    );
+                }
+
+                let sampling_frame_bytes = statistical_sampling_frame_bytes
+                    .iter()
+                    .copied()
+                    .find(|candidate| content_hash(candidate) == execution.sampling_frame_hash)
+                    .ok_or_else(|| {
+                        "neurosemantic remediation statistical sampling frame is missing"
+                            .to_string()
+                    })?;
+                let sampling_frame =
+                    NeurosemanticRemediationStatisticalSamplingFrameArtifact::from_json_bytes(
+                        sampling_frame_bytes,
+                    )?;
+                if sampling_frame.fingerprint()? != execution.sampling_frame_hash
+                    || execution
+                        .selected_subject_artifact_hashes
+                        .iter()
+                        .any(|hash| !sampling_frame.member_artifact_hashes.iter().any(|member| member == hash))
+                    || sorted_hashes(&execution.selected_subject_artifact_hashes)
+                        != sorted_hashes(
+                            &observation_set
+                                .observations
+                                .iter()
+                                .map(|observation| observation.subject_artifact_hash.clone())
+                                .collect::<Vec<_>>(),
+                        )
+                {
+                    return Err(
+                        "neurosemantic remediation statistical sampling execution does not match the observed population"
+                            .into(),
+                    );
+                }
+
+                let expected_source_dataset_manifest_hash = match computation.kind {
+                    NeurosemanticRemediationMeasurementKind::Forgetfulness
+                    | NeurosemanticRemediationMeasurementKind::RecoveryRisk
+                    | NeurosemanticRemediationMeasurementKind::RepresentationResidual
+                    | NeurosemanticRemediationMeasurementKind::UtilityImpact => {
+                        let population =
+                            NeurosemanticRemediationEvaluationSetManifest::from_json_bytes(population_bytes)?;
+                        population.source_dataset_manifest_hash
+                    }
+                    NeurosemanticRemediationMeasurementKind::FairnessImpact => {
+                        let split =
+                            NeurosemanticRemediationEvaluationSplitManifest::from_json_bytes(population_bytes)?;
+                        split.source_dataset_manifest_hash
+                    }
+                };
+                if sampling_frame.source_dataset_manifest_hash != expected_source_dataset_manifest_hash {
+                    return Err(
+                        "neurosemantic remediation statistical sampling frame source dataset mismatch"
+                            .into(),
+                    );
+                }
+
+                let observed_subjects: BTreeSet<&str> = observation_set
+                    .observations
+                    .iter()
+                    .map(|observation| observation.subject_artifact_hash.as_str())
+                    .collect();
+                let dependence_subjects: BTreeSet<&str> = execution
+                    .dependence_assignments
+                    .iter()
+                    .map(|assignment| assignment.subject_artifact_hash.as_str())
+                    .collect();
+                if dependence_subjects != observed_subjects {
+                    return Err(
+                        "neurosemantic remediation statistical dependence execution does not match observed subjects"
+                            .into(),
+                    );
+                }
+                match design.dependence_model {
+                    NeurosemanticRemediationStatisticalDependenceModel::IndependentObservationUnits => {
+                        if execution.dependence_model
+                            != NeurosemanticRemediationStatisticalDependenceModel::IndependentObservationUnits
+                            || execution
+                                .dependence_assignments
+                                .iter()
+                                .any(|assignment| assignment.dependence_group_ref.is_some())
+                        {
+                            return Err(
+                                "neurosemantic remediation statistical execution is not independent as declared"
+                                    .into(),
+                            );
+                        }
+                    }
+                    NeurosemanticRemediationStatisticalDependenceModel::Clustered
+                    | NeurosemanticRemediationStatisticalDependenceModel::RepeatedMeasures => {
+                        if execution.dependence_model != design.dependence_model
+                            || execution
+                                .dependence_assignments
+                                .iter()
+                                .any(|assignment| assignment.dependence_group_ref.is_none())
+                        {
+                            return Err(
+                                "neurosemantic remediation statistical execution does not evidence declared dependence"
+                                    .into(),
+                            );
+                        }
+                    }
+                    NeurosemanticRemediationStatisticalDependenceModel::Unknown => {
+                        return Err(
+                            "neurosemantic remediation statistical dependence model is unknown"
+                                .into(),
+                        );
+                    }
+                }
+
+                match design.sampling_design {
+                    NeurosemanticRemediationStatisticalSamplingDesign::ProbabilitySample => {
+                        let frame_members: BTreeSet<&str> = sampling_frame
+                            .member_artifact_hashes
+                            .iter()
+                            .map(String::as_str)
+                            .collect();
+                        let inclusion_members: BTreeSet<&str> = execution
+                            .inclusion_probabilities
+                            .iter()
+                            .map(|item| item.subject_artifact_hash.as_str())
+                            .collect();
+                        if inclusion_members != frame_members
+                            || execution.inclusion_probabilities.iter().any(|item| {
+                                item.probability_numerator == 0
+                                    || item.probability_numerator > item.probability_denominator
+                            })
+                        {
+                            return Err(
+                                "neurosemantic remediation probability-sample execution lacks complete positive inclusion probabilities"
+                                    .into(),
+                            );
+                        }
+                    }
+                    NeurosemanticRemediationStatisticalSamplingDesign::CensusOfTargetPopulation => {
+                        if sorted_hashes(&execution.selected_subject_artifact_hashes)
+                            != sorted_hashes(&sampling_frame.member_artifact_hashes)
+                            || execution.inclusion_probabilities.iter().any(|item| {
+                                item.probability_numerator != item.probability_denominator
+                            })
+                        {
+                            return Err(
+                                "neurosemantic remediation census execution does not match its frame"
+                                    .into(),
+                            );
+                        }
+                    }
+                    NeurosemanticRemediationStatisticalSamplingDesign::NonProbabilitySample
+                    | NeurosemanticRemediationStatisticalSamplingDesign::Unknown => {}
                 }
 
                 if uncertainty.method_ref == NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF {
@@ -5381,6 +5558,7 @@ mod tests {
             outcome_model_ref: "binary-failure-indicator-v1".into(),
             study_protocol_hash: content_hash(b"protocol"),
             assumptions_hash: content_hash(b"assumptions"),
+            statistical_execution_hash: content_hash(b"execution"),
             execution_revision: "a".repeat(40),
         };
         let bytes = serde_json::to_vec(&design).unwrap();
@@ -5394,6 +5572,62 @@ mod tests {
         legacy.schema_version = 0;
         assert!(
             NeurosemanticRemediationStatisticalDesignArtifact::from_json_bytes(
+                &serde_json::to_vec(&legacy).unwrap()
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn remediation_statistical_execution_artifact_is_bounded_and_canonical() {
+        let execution = NeurosemanticRemediationStatisticalExecutionArtifact {
+            schema_version: NEUROSEMANTIC_REMEDIATION_STATISTICAL_EXECUTION_SCHEMA_VERSION,
+            execution_ref: "execution-statistical-1".into(),
+            design_ref: "design-statistical-1".into(),
+            metric_ref: "metric-statistical-1".into(),
+            metric_definition_hash: content_hash(b"metric-definition"),
+            observation_set_hash: content_hash(b"observation-set"),
+            sampling_frame_hash: content_hash(b"sampling-frame"),
+            selected_subject_artifact_hashes: vec![content_hash(b"subject-1")],
+            inclusion_probabilities: vec![
+                NeurosemanticRemediationSamplingInclusionProbability {
+                    subject_artifact_hash: content_hash(b"subject-1"),
+                    probability_numerator: 1,
+                    probability_denominator: 2,
+                },
+            ],
+            selection_procedure_ref: "simple-random-without-replacement-v1".into(),
+            dependence_model:
+                NeurosemanticRemediationStatisticalDependenceModel::IndependentObservationUnits,
+            dependence_assignments: vec![
+                NeurosemanticRemediationStatisticalDependenceAssignment {
+                    subject_artifact_hash: content_hash(b"subject-1"),
+                    dependence_group_ref: None,
+                },
+            ],
+            study_protocol_hash: content_hash(b"protocol"),
+            execution_revision: "a".repeat(40),
+        };
+        let bytes = serde_json::to_vec(&execution).unwrap();
+        assert_eq!(
+            NeurosemanticRemediationStatisticalExecutionArtifact::from_json_bytes(&bytes).unwrap(),
+            execution
+        );
+        assert_eq!(execution.fingerprint().unwrap(), content_hash(&bytes));
+
+        let mut invalid_probability = execution.clone();
+        invalid_probability.inclusion_probabilities[0].probability_numerator = 0;
+        assert!(
+            NeurosemanticRemediationStatisticalExecutionArtifact::from_json_bytes(
+                &serde_json::to_vec(&invalid_probability).unwrap()
+            )
+            .is_err()
+        );
+
+        let mut legacy = execution.clone();
+        legacy.schema_version = 0;
+        assert!(
+            NeurosemanticRemediationStatisticalExecutionArtifact::from_json_bytes(
                 &serde_json::to_vec(&legacy).unwrap()
             )
             .is_err()
