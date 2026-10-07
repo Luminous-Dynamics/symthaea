@@ -449,13 +449,31 @@ async fn spawn_privileged_background_script(
 
 fn read_private_small_file(path: &str, max_bytes: usize) -> Result<String, std::io::Error> {
     use std::io::Read as _;
-    use std::os::unix::fs::OpenOptionsExt;
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 
     let mut file = std::fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(path)?;
     let metadata = file.metadata()?;
+    if !metadata.file_type().is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "private transaction sidecar is not a regular file",
+        ));
+    }
+    if metadata.uid() != unsafe { libc::geteuid() } {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "private transaction sidecar is not owned by the relay user",
+        ));
+    }
+    if metadata.permissions().mode() & 0o777 != 0o600 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "private transaction sidecar has unsafe permissions",
+        ));
+    }
     if metadata.len() > max_bytes as u64 {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
@@ -469,7 +487,22 @@ fn read_private_small_file(path: &str, max_bytes: usize) -> Result<String, std::
 
 async fn read_transaction_status(path: &str) -> Result<Option<u32>, std::io::Error> {
     match read_private_small_file(path, 128) {
-        Ok(contents) => Ok(contents.trim().parse::<u32>().ok()),
+        Ok(contents) => {
+            let trimmed = contents.trim();
+            if trimmed.is_empty() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "transaction status sidecar is empty",
+                ));
+            }
+            match trimmed.parse::<u32>() {
+                Ok(code) => Ok(Some(code)),
+                Err(_) => Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "transaction status sidecar is malformed",
+                )),
+            }
+        }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(error),
     }
@@ -10816,6 +10849,33 @@ mod tests {
         assert_eq!(
             std::fs::read(&target).unwrap(),
             b"{ config = actual; }\n"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn transaction_status_rejects_malformed_terminal_evidence() {
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-status-evidence-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+
+        let status = dir.join("status");
+        std::fs::write(&status, b"not-an-exit-code\n").unwrap();
+        std::fs::set_permissions(
+            &status,
+            std::os::unix::fs::PermissionsExt::from_mode(0o600),
+        )
+        .unwrap();
+
+        let result = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(read_transaction_status(status.to_str().unwrap()));
+        assert_eq!(
+            result.unwrap_err().kind(),
+            std::io::ErrorKind::InvalidData
         );
 
         let _ = std::fs::remove_dir_all(dir);
