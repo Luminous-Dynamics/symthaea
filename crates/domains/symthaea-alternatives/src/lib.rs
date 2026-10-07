@@ -530,8 +530,10 @@ pub struct MeasurementModelInputFrontierRef {
     pub frontier_id: String,
     /// Revision of the authoritative model-input frontier record.
     pub frontier_revision: String,
-    /// Digest of the exact authoritative model-input frontier.
+    /// Digest of the exact authoritative model-input frontier record.
     pub frontier_digest: String,
+    /// Digest of the canonical input-quantity set attested by the authoritative frontier.
+    pub input_set_digest: String,
     /// Exact measurement-model identity governed by this frontier.
     pub measurement_model_id: String,
     /// Revision of the exact measurement model governed by this frontier.
@@ -548,6 +550,7 @@ impl MeasurementModelInputFrontierRef {
         if self.frontier_id.is_empty()
             || self.frontier_revision.is_empty()
             || self.frontier_digest.is_empty()
+            || self.input_set_digest.is_empty()
             || self.measurement_model_id.is_empty()
             || self.measurement_model_revision.is_empty()
             || self.measurement_model_digest.is_empty()
@@ -653,12 +656,12 @@ impl CalibrationTraceabilityTopology {
             .collect::<Vec<_>>();
         let expected_frontier_digest =
             canonical_measurement_model_input_frontier_digest(&input_quantity_ids)?;
-        if self.input_frontier.frontier_digest != expected_frontier_digest {
+        if self.input_frontier.input_set_digest != expected_frontier_digest {
             return Err(
-                AssessmentError::MeasurementModelInputFrontierDigestMismatch {
+                AssessmentError::MeasurementModelInputFrontierInputSetDigestMismatch {
                     frontier_id: self.input_frontier.frontier_id.clone(),
-                    expected_frontier_digest,
-                    actual_frontier_digest: self.input_frontier.frontier_digest.clone(),
+                    expected_input_set_digest: expected_frontier_digest,
+                    actual_input_set_digest: self.input_frontier.input_set_digest.clone(),
                 },
             );
         }
@@ -3920,14 +3923,14 @@ pub enum AssessmentError {
         /// Actual topology binding count.
         actual_input_count: usize,
     },
-    /// The topology input set does not match the authoritative input frontier digest.
-    MeasurementModelInputFrontierDigestMismatch {
+    /// The topology input set does not match the authoritative input frontier's attested set digest.
+    MeasurementModelInputFrontierInputSetDigestMismatch {
         /// Frontier identity.
         frontier_id: String,
         /// Digest computed from the topology's input set.
-        expected_frontier_digest: String,
+        expected_input_set_digest: String,
         /// Digest supplied by the authoritative frontier reference.
-        actual_frontier_digest: String,
+        actual_input_set_digest: String,
     },
     /// The model-input frontier itself contains a duplicate input quantity.
     DuplicateMeasurementModelInputQuantity,
@@ -4462,13 +4465,13 @@ impl std::fmt::Display for AssessmentError {
                 f,
                 "measurement-model input frontier {frontier_id} declares {expected_input_count} inputs but topology binds {actual_input_count}"
             ),
-            Self::MeasurementModelInputFrontierDigestMismatch {
+            Self::MeasurementModelInputFrontierInputSetDigestMismatch {
                 frontier_id,
-                expected_frontier_digest,
-                actual_frontier_digest,
+                expected_input_set_digest,
+                actual_input_set_digest,
             } => write!(
                 f,
-                "measurement-model input frontier {frontier_id} digest {actual_frontier_digest} does not match topology input set digest {expected_frontier_digest}"
+                "measurement-model input frontier {frontier_id} attested input-set digest {actual_input_set_digest} does not match topology input set digest {expected_input_set_digest}"
             ),
             Self::DuplicateMeasurementModelInputQuantity => {
                 write!(f, "measurement-model input frontier contains duplicate input quantity")
@@ -8219,7 +8222,8 @@ mod tests {
             input_frontier: MeasurementModelInputFrontierRef {
                 frontier_id: "model-input-frontier-v1".into(),
                 frontier_revision: "r1".into(),
-                frontier_digest: input_frontier_digest,
+                frontier_digest: "model-input-frontier-record-digest-v1".into(),
+                input_set_digest: input_frontier_digest,
                 measurement_model_id: "model-v1".into(),
                 measurement_model_revision: "r1".into(),
                 measurement_model_digest: "model-digest-v1".into(),
@@ -8352,7 +8356,8 @@ mod tests {
             input_frontier: MeasurementModelInputFrontierRef {
                 frontier_id: "fixture-input-frontier-v1".into(),
                 frontier_revision: "v1".into(),
-                frontier_digest: input_frontier_digest,
+                frontier_digest: "fixture-input-frontier-record-digest-v1".into(),
+                input_set_digest: input_frontier_digest,
                 measurement_model_id: "fixture-measurement-model-v1".into(),
                 measurement_model_revision: "v1".into(),
                 measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
