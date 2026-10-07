@@ -404,7 +404,7 @@ fn canonical_boundary_syndrome(mask: u8) -> u8 {
 
 #[test]
 fn small_fixture_quotient_metric_matches_ambient_coset_geometry() {
-    let mut buckets = [Vec::<u8>::new(); 64];
+    let mut buckets: [Vec<u8>; 64] = std::array::from_fn(|_| Vec::new());
     let mut leaders = [usize::MAX; 64];
 
     for mask in 0u16..256 {
