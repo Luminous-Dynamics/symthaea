@@ -98,6 +98,7 @@ fn pre_state_identity_for_command(
 }
 
 fn capture_authoritative_service_definition_content(
+    operation: NixServiceOperationKindV1,
     unit: &str,
 ) -> Result<NixVerifiedServiceDefinitionContentV1, String> {
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -109,10 +110,17 @@ fn capture_authoritative_service_definition_content(
         let observer = NixSystemdReadOnlyObserverV1::connect_system()
             .await
             .map_err(|error| format!("could not connect read-only systemd observer: {error}"))?;
-        observer
-            .capture_service_definition_content(unit)
-            .await
-            .map_err(|error| format!("authoritative service definition capture failed: {error}"))
+
+        let result = match operation {
+            NixServiceOperationKindV1::Restart => {
+                observer
+                    .capture_service_definition_content_for_restart(unit)
+                    .await
+            }
+            _ => observer.capture_service_definition_content(unit).await,
+        };
+
+        result.map_err(|error| format!("authoritative service definition capture failed: {error}"))
     })
 }
 
@@ -143,12 +151,26 @@ fn service_effect_context_from_capture(
         return Err("service pre-state identity does not match the requested unit".to_string());
     }
 
+    let pre_invocation_id = if *operation == NixServiceOperationKindV1::Restart {
+        Some(
+            content
+                .pre_invocation_id()
+                .ok_or_else(|| {
+                    "Restart service approval requires an observer-derived pre-invocation identity"
+                        .to_string()
+                })?
+                .to_string(),
+        )
+    } else {
+        None
+    };
+
     NixServiceEffectContextV1::from_verified_definition_content(
         *operation,
         unit.clone(),
         generation,
         pre_state_digest.to_string(),
-        None,
+        pre_invocation_id,
         0,
         content,
     )
@@ -1376,7 +1398,7 @@ impl DaemonState {
                             // exact action-intent digest that the operator approves.
                             let approval_definition_content = match &cmd {
                                 NixOSCommand::Service { unit, .. } => {
-                                    match capture_authoritative_service_definition_content(unit) {
+                                    match capture_authoritative_service_definition_content(operation, unit) {
                                         Ok(content) => Some(content),
                                         Err(error) => {
                                             eprintln!(
