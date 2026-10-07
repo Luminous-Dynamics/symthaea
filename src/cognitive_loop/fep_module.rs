@@ -231,6 +231,10 @@ pub struct FepModule {
     /// Configuration for ODE-based trajectory planning.
     pub trajectory_config: TrajectoryPlanningConfig,
 
+    /// Opt-in viability modulation of the existing temporal planning-depth factor.
+    /// Disabled by default until empirical qualification is complete.
+    viability_horizon_modulation_enabled: bool,
+
     /// Latest trajectory planning telemetry.
     pub trajectory_telemetry: TrajectoryTelemetry,
 
@@ -266,6 +270,7 @@ impl FepModule {
             lr_boost: 1.0,
             surprise_bridge: None,
             trajectory_config: TrajectoryPlanningConfig::default(),
+            viability_horizon_modulation_enabled: false,
             trajectory_telemetry: TrajectoryTelemetry::default(),
             trajectory_history: VecDeque::new(),
         }
@@ -315,6 +320,38 @@ impl FepModule {
     /// Read the current viability telemetry snapshot.
     pub fn viability_telemetry(&self) -> super::viability_fabric::ViabilityTelemetry {
         self.viability_fabric.state().telemetry()
+    }
+
+    /// Enable the opt-in viability modulation of the existing planning-depth factor.
+    pub fn enable_viability_horizon_modulation(&mut self) {
+        self.viability_horizon_modulation_enabled = true;
+    }
+
+    /// Whether viability modulation is enabled for temporal planning depth.
+    pub fn viability_horizon_modulation_enabled(&self) -> bool {
+        self.viability_horizon_modulation_enabled
+    }
+
+    fn viability_planning_scale_from_pressure(pressure: f64) -> f64 {
+        super::viability_fabric::RegulationDecision::from_pressure(
+            pressure,
+            super::viability_fabric::RegulationThresholds::default(),
+        )
+        .planning_horizon_scale
+        .clamp(0.25, 1.0)
+    }
+
+    /// Current bounded viability multiplier for the existing planning-depth factor.
+    ///
+    /// This never changes behavior unless explicitly enabled.
+    pub fn viability_planning_horizon_scale(&self) -> f64 {
+        if !self.viability_horizon_modulation_enabled {
+            1.0
+        } else {
+            Self::viability_planning_scale_from_pressure(
+                self.viability_fabric.regulation_pressure(),
+            )
+        }
     }
 
     /// Run ODE-based trajectory planning if enabled and at the right interval.
@@ -619,5 +656,19 @@ impl FepModule {
     /// Get the current effective blanket permeability.
     pub fn blanket_effective_permeability(&self) -> f64 {
         self.enhanced_bridge.blanket.permeability().effective
+    }
+}
+
+#[cfg(test)]
+mod viability_planning_tests {
+    use super::FepModule;
+
+    #[test]
+    fn viability_planning_scale_contracts_as_pressure_rises() {
+        let low = FepModule::viability_planning_scale_from_pressure(0.0);
+        let high = FepModule::viability_planning_scale_from_pressure(0.9);
+        assert!((low - 1.0).abs() < f64::EPSILON);
+        assert!((0.25..=1.0).contains(&high));
+        assert!(high < low);
     }
 }
