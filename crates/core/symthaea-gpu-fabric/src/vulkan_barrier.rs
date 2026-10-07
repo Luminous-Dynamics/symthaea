@@ -103,6 +103,7 @@ pub struct VulkanBarrierExecutionReceipt {
     pub schedule_digest: String,
     pub sync_plan_digest: String,
     pub barrier_digest: String,
+    pub barrier_lowering_digest: String,
     pub node_count: u32,
     pub barrier_count: u32,
     pub resource_digests: BTreeMap<ResourceId, String>,
@@ -127,6 +128,9 @@ impl VulkanBarrierExecutionReceipt {
             return Err(VulkanBarrierReceiptError::SyncPlanDigest);
         }
         if self.barrier_digest != barrier_digest(plan) { return Err(VulkanBarrierReceiptError::BarrierDigest); }
+        if self.barrier_lowering_digest != barrier_lowering_digest(plan) {
+            return Err(VulkanBarrierReceiptError::BarrierDigest);
+        }
         if self.node_count != schedule.nodes.len() as u32 { return Err(VulkanBarrierReceiptError::NodeCount); }
         let count = plan.submissions.iter().map(|s| s.barriers.len() as u32).sum::<u32>();
         if self.barrier_count != count { return Err(VulkanBarrierReceiptError::BarrierCount); }
@@ -227,7 +231,10 @@ impl VulkanBarrierWorkloadRuntime {
         let command_pool_info = vk::CommandPoolCreateInfo::default().queue_family_index(family);
         let command_pool = unsafe { device.create_command_pool(&command_pool_info, None).map_err(VulkanBarrierError::Vk)? };
         let pool_size = vk::DescriptorPoolSize::default().ty(vk::DescriptorType::STORAGE_BUFFER).descriptor_count((MAX_WORKLOAD_NODES * 3) as u32);
-        let pool_info = vk::DescriptorPoolCreateInfo::default().max_sets(MAX_WORKLOAD_NODES as u32).pool_sizes(std::slice::from_ref(&pool_size));
+        let pool_info = vk::DescriptorPoolCreateInfo::default()
+            .flags(vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET)
+            .max_sets(MAX_WORKLOAD_NODES as u32)
+            .pool_sizes(std::slice::from_ref(&pool_size));
         let descriptor_pool = unsafe { device.create_descriptor_pool(&pool_info, None).map_err(VulkanBarrierError::Vk)? };
 
         Ok(Self {
@@ -327,6 +334,7 @@ impl VulkanBarrierWorkloadRuntime {
             ))?,
             sync_plan_digest: plan.digest_hex().map_err(|e| VulkanBarrierError::SyncPlan(e))?,
             barrier_digest: barrier_digest(plan),
+            barrier_lowering_digest: barrier_lowering_digest(plan),
             node_count: schedule.nodes.len() as u32,
             barrier_count: plan.submissions.iter().map(|s| s.barriers.len() as u32).sum(),
             resource_digests: digests,
@@ -525,6 +533,35 @@ fn resource_digest(value: &BinaryHypervector) -> String {
     h.finalize().to_hex().to_string()
 }
 
+fn barrier_lowering_digest(plan: &VulkanSyncPlan) -> String {
+    let mut h = Hasher::new();
+    h.update(b"symthaea.gpu-fabric.vulkan-barrier-lowering.v1\0");
+    h.update(b"src-stage:compute-shader\0");
+    h.update(b"dst-stage:compute-shader\0");
+    h.update(b"raw-src-access:shader-storage-write\0");
+    h.update(b"raw-dst-access:shader-storage-read\0");
+    h.update(b"waw-src-access:shader-storage-write\0");
+    h.update(b"waw-dst-access:shader-storage-write\0");
+    h.update(b"war-access:empty\0");
+    h.update(b"range-policy:rounded-storage-bytes\0");
+    h.update(b"queue-family:ignored\0");
+
+    for submission in &plan.submissions {
+        for barrier in &submission.barriers {
+            h.update(&barrier.from.to_le_bytes());
+            h.update(&barrier.to.to_le_bytes());
+            h.update(&(barrier.resource.as_str().len() as u32).to_le_bytes());
+            h.update(barrier.resource.as_str().as_bytes());
+            h.update(&[match barrier.kind {
+                DependencyKind::ReadAfterWrite => 1,
+                DependencyKind::WriteAfterRead => 2,
+                DependencyKind::WriteAfterWrite => 3,
+            }]);
+        }
+    }
+    h.finalize().to_hex().to_string()
+}
+
 fn barrier_digest(plan: &VulkanSyncPlan) -> String {
     let mut h = Hasher::new();
     h.update(b"symthaea.gpu-fabric.vulkan-barriers.v1\0");
@@ -627,6 +664,13 @@ mod tests {
         initial.insert(mid, BinaryHypervector::zeros(32));
         initial.insert(out, BinaryHypervector::zeros(32));
         (graph, schedule, plan, initial)
+    }
+
+    #[test]
+    fn barrier_lowering_digest_is_distinct_from_semantic_barrier_digest() {
+        let (_, _, plan, _) = fixture();
+        assert_ne!(barrier_digest(&plan), barrier_lowering_digest(&plan));
+        assert!(!barrier_lowering_digest(&plan).is_empty());
     }
 
     #[test]
