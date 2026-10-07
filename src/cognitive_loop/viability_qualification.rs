@@ -780,8 +780,6 @@ fn evaluate_frozen_policy_ranking<P: MicroWorldPredictor>(
     let mut top1_matches = 0u64;
     let mut pairs_evaluated = 0u64;
     let mut pairwise_matches = 0u64;
-    let policy = super::viability_micro_world::HomeostaticPolicy;
-
     while !world.done() && states < max_cycles {
         for (cycle, perturbation) in scenario.perturbations {
             if *cycle == states {
