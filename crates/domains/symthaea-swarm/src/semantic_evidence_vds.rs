@@ -123,6 +123,10 @@ pub struct Rfc9942VerifiedReceipt {
     /// the Receipt. This prevents downstream policy code from confusing an
     /// otherwise identical proof authenticated under a different trust root.
     verification_key_sha256: [u8; 32],
+    /// SHA-256 fingerprint of the exact serialized protected-header map
+    /// authenticated by COSE. This preserves byte-level signing context even
+    /// when the parsed semantic fields are otherwise identical.
+    protected_header_sha256: [u8; 32],
     /// SHA-256 fingerprint of the exact external AAD authenticated by COSE.
     /// An empty AAD therefore remains distinguishable from another context.
     external_aad_sha256: [u8; 32],
@@ -133,6 +137,7 @@ impl Rfc9942VerifiedReceipt {
     pub const fn vds_id(&self) -> u64 { self.vds_id }
     pub const fn proof(&self) -> Rfc9942VerifiedProof { self.proof }
     pub const fn verification_key_sha256(&self) -> [u8; 32] { self.verification_key_sha256 }
+    pub const fn protected_header_sha256(&self) -> [u8; 32] { self.protected_header_sha256 }
     pub const fn external_aad_sha256(&self) -> [u8; 32] { self.external_aad_sha256 }
 }
 
@@ -156,6 +161,7 @@ pub struct Rfc9942VerifiedSignatureWithReceipt {
     outer_algorithm_id: i64,
     outer_payload_sha256: [u8; 32],
     outer_verification_key_sha256: [u8; 32],
+    outer_protected_header_sha256: [u8; 32],
     outer_external_aad_sha256: [u8; 32],
     receipt_index: usize,
     receipt_placement: Rfc9942ReceiptPlacement,
@@ -166,6 +172,7 @@ impl Rfc9942VerifiedSignatureWithReceipt {
     pub const fn outer_algorithm_id(&self) -> i64 { self.outer_algorithm_id }
     pub const fn outer_payload_sha256(&self) -> [u8; 32] { self.outer_payload_sha256 }
     pub const fn outer_verification_key_sha256(&self) -> [u8; 32] { self.outer_verification_key_sha256 }
+    pub const fn outer_protected_header_sha256(&self) -> [u8; 32] { self.outer_protected_header_sha256 }
     pub const fn outer_external_aad_sha256(&self) -> [u8; 32] { self.outer_external_aad_sha256 }
     pub const fn receipt_index(&self) -> usize { self.receipt_index }
     pub const fn receipt_placement(&self) -> Rfc9942ReceiptPlacement { self.receipt_placement }
@@ -478,6 +485,7 @@ impl Rfc9942ReceiptEnvelope {
             vds_id: self.vds_id,
             proof,
             verification_key_sha256: sha256(public_key),
+            protected_header_sha256: sha256(&self.protected_header_bytes()),
             external_aad_sha256: sha256(external_aad),
         }
     }
@@ -1229,6 +1237,7 @@ impl Rfc9942SignatureWithReceipts {
             outer_algorithm_id: self.protected_algorithm_id()?,
             outer_payload_sha256: sha256(payload),
             outer_verification_key_sha256: sha256(outer_public_key),
+            outer_protected_header_sha256: sha256(&self.protected_header_bytes()),
             outer_external_aad_sha256: sha256(outer_external_aad),
             receipt_index,
             receipt_placement: placement,
