@@ -288,6 +288,9 @@ pub struct RelationalForecastLossDifferential {
 /// This is a characterization artifact, not an inferential test.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ForecastLossDependenceProfile {
+    /// Exact evaluator commitment when this profile was produced from an
+    /// evidence packet; None for free-standing descriptive calculations.
+    pub evaluation_input_blake3: Option<String>,
     pub sample_count: usize,
     pub max_lag: usize,
     pub mean: f64,
@@ -309,6 +312,9 @@ pub struct ForecastLossDependenceProfile {
 /// adjacency between the end of one origin and the beginning of another.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RollingForecastLossDependenceProfile {
+    /// Parent rolling evaluator commitment when produced from evidence.
+    /// None for free-standing descriptive calculations.
+    pub evaluation_input_blake3: Option<String>,
     pub origin_count: usize,
     pub test_samples: usize,
     pub max_lag_within_origin: usize,
@@ -414,6 +420,7 @@ impl ForecastLossDependenceProfile {
         };
 
         Ok(Self {
+            evaluation_input_blake3: None,
             sample_count: losses.len(),
             max_lag,
             mean,
@@ -497,6 +504,7 @@ impl RollingForecastLossDependenceProfile {
         )?;
 
         Ok(Self {
+            evaluation_input_blake3: None,
             origin_count,
             test_samples,
             max_lag_within_origin: max_lag_within_origin.min(test_samples - 1),
@@ -872,13 +880,18 @@ impl HeldOutRelationalPredictionEvidence {
         max_lag: usize,
     ) -> Result<ForecastLossDependenceProfile, RelationalPredictionError> {
         let differentials = self.relational_loss_differentials()?;
-        ForecastLossDependenceProfile::compute(
+        let mut profile = ForecastLossDependenceProfile::compute(
             &differentials
                 .iter()
                 .map(|item| item.loss_differential)
                 .collect::<Vec<_>>(),
             max_lag,
-        )
+        )?;
+        profile.evaluation_input_blake3 = self
+            .records
+            .first()
+            .map(|record| record.evaluation_input_blake3.clone());
+        Ok(profile)
     }
 
     pub fn verify_against_samples(
@@ -1229,13 +1242,15 @@ impl RollingOriginRelationalPredictionEvidence {
         max_lag_across_origins: usize,
     ) -> Result<RollingForecastLossDependenceProfile, RelationalPredictionError> {
         let differentials = self.relational_loss_differentials()?;
-        RollingForecastLossDependenceProfile::compute(
+        let mut profile = RollingForecastLossDependenceProfile::compute(
             &differentials,
             self.config.origin_count,
             self.config.test_samples,
             max_lag_within_origin,
             max_lag_across_origins,
-        )
+        )?;
+        profile.evaluation_input_blake3 = Some(self.evaluation_input_blake3.clone());
+        Ok(profile)
     }
 
     pub fn verify_against_samples(
@@ -3513,6 +3528,10 @@ mod tests {
         .unwrap();
 
         let profile = evidence.relational_loss_dependence(8).unwrap();
+        assert_eq!(
+            profile.evaluation_input_blake3.as_deref(),
+            evidence.records.first().map(|record| record.evaluation_input_blake3.as_str())
+        );
         assert_eq!(profile.sample_count, config().test_samples);
         assert!(profile.autocorrelations.iter().all(|value| value.is_finite()));
     }
@@ -3538,6 +3557,10 @@ mod tests {
         .unwrap();
 
         let profile = evidence.relational_loss_dependence(3, 2).unwrap();
+        assert_eq!(
+            profile.evaluation_input_blake3.as_deref(),
+            Some(evidence.evaluation_input_blake3.as_str())
+        );
         assert_eq!(profile.origin_count, config.origin_count);
         assert_eq!(profile.per_origin.len(), config.origin_count);
         assert_eq!(profile.origin_mean_differentials.len(), config.origin_count);
