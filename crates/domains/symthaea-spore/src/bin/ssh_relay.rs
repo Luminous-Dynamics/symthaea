@@ -3656,18 +3656,40 @@ async fn copy_optional_image_sidecar(
     source: &str,
     required: bool,
 ) -> Result<(), String> {
-    let source_metadata = match tokio::fs::symlink_metadata(source).await {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound && !required => return Ok(()),
+    use std::ffi::CString;
+    use std::io::{copy, Read, Write};
+    use std::os::fd::{AsRawFd, FromRawFd};
+    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let source_file = match std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(source)
+    {
+        Ok(file) => file,
+        Err(error)
+            if error.kind() == std::io::ErrorKind::NotFound && !required =>
+        {
+            return Ok(());
+        }
         Err(error) => {
             return Err(format!(
                 "image sidecar source {source} is unavailable: {error}"
             ))
         }
     };
+
+    let source_metadata = source_file.metadata().map_err(|error| {
+        format!(
+            "unable to inspect image sidecar source {source}: {error}"
+        )
+    })?;
     if !source_metadata.is_file() {
         if required {
-            return Err(format!("required image sidecar source {source} is not a regular file"));
+            return Err(format!(
+                "required image sidecar source {source} is not a regular file"
+            ));
         }
         return Ok(());
     }
@@ -3675,10 +3697,68 @@ async fn copy_optional_image_sidecar(
     let name = std::path::Path::new(source)
         .file_name()
         .ok_or_else(|| format!("image sidecar source {source} has no filename"))?;
-    let destination = std::path::Path::new(image_dir).join(name);
-    tokio::fs::copy(source, &destination)
-        .await
-        .map_err(|error| format!("unable to copy image sidecar {source}: {error}"))?;
+    let name_c = CString::new(name.as_bytes())
+        .map_err(|_| format!("image sidecar source {source} contains an invalid filename"))?;
+
+    let destination_dir = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(image_dir)
+        .map_err(|error| {
+            format!(
+                "unable to open image namespace for sidecar installation: {error}"
+            )
+        })?;
+    let destination_fd = unsafe {
+        libc::openat(
+            destination_dir.as_raw_fd(),
+            name_c.as_ptr(),
+            libc::O_WRONLY
+                | libc::O_CREAT
+                | libc::O_EXCL
+                | libc::O_NOFOLLOW
+                | libc::O_CLOEXEC,
+            0o600,
+        )
+    };
+    if destination_fd < 0 {
+        return Err(format!(
+            "unable to create image sidecar destination {}: {}",
+            std::path::Path::new(image_dir).join(name.to_string_lossy()).display(),
+            std::io::Error::last_os_error()
+        ));
+    }
+    let mut destination_file = unsafe { std::fs::File::from_raw_fd(destination_fd) };
+    let mut source_reader = source_file;
+    if let Err(error) = copy(&mut source_reader, &mut destination_file) {
+        let _ = unsafe {
+            libc::unlinkat(
+                destination_dir.as_raw_fd(),
+                name_c.as_ptr(),
+                0,
+            )
+        };
+        return Err(format!(
+            "unable to copy image sidecar {source}: {error}"
+        ));
+    }
+    destination_file
+        .sync_all()
+        .map_err(|error| {
+            let _ = unsafe {
+                libc::unlinkat(destination_dir.as_raw_fd(), name_c.as_ptr(), 0)
+            };
+            format!("unable to synchronize image sidecar {source}: {error}")
+        })?;
+    destination_dir.sync_all().map_err(|error| {
+        let _ = unsafe {
+            libc::unlinkat(destination_dir.as_raw_fd(), name_c.as_ptr(), 0)
+        };
+        format!(
+            "unable to synchronize image namespace after sidecar {source}: {error}"
+        )
+    })?;
+
     Ok(())
 }
 
