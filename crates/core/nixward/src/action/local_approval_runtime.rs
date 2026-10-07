@@ -323,15 +323,31 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn intent(service: &str) -> NixActionIntentV1 {
-        NixActionIntentV1::from_command(
+        let command = NixOSCommand::Service {
+            operation: crate::action::NixServiceOperationKindV1::Restart,
+            unit: service.to_string(),
+        };
+        let base = NixActionIntentV1::from_command(
             "machine:workstation",
-            Some("generation:42".to_string()),
-            &NixOSCommand::Service {
-                operation: crate::action::NixServiceOperationKindV1::Restart,
-                unit: service.to_string(),
-            },
+            Some(
+                "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=1111111111111111111111111111111111111111111111111111111111111111"
+                    .to_string(),
+            ),
+            &command,
         )
-        .unwrap()
+        .unwrap();
+        let context = NixServiceEffectContextV1::new(
+            crate::action::NixServiceOperationKindV1::Restart,
+            service,
+            42,
+            "1111111111111111111111111111111111111111111111111111111111111111",
+            "2222222222222222222222222222222222222222222222222222222222222222",
+            "3333333333333333333333333333333333333333333333333333333333333333",
+            Some("4444444444444444444444444444444444".to_string()),
+            0,
+        )
+        .unwrap();
+        base.with_service_effect_context(context).unwrap()
     }
 
     fn restart_command(service: &str) -> NixOSCommand {
