@@ -44,6 +44,10 @@ pub struct NixSystemdUnitDefinitionContentEvidenceV1 {
     pub manager_owner: String,
     /// D-Bus daemon incarnation returned by org.freedesktop.DBus.GetId().
     pub bus_id: String,
+    /// Optional systemd service invocation identity observed in the same capture epoch.
+    /// This is temporal provenance, not part of the byte-content commitment.
+    #[serde(default)]
+    pub pre_invocation_id: Option<String>,
     pub files: Vec<NixSystemdUnitDefinitionContentFileV1>,
     pub captured_at_monotonic_us: u64,
 }
@@ -68,6 +72,11 @@ impl NixVerifiedServiceDefinitionContentV1 {
     pub(crate) fn digest(&self) -> Result<String, NixServiceEffectContextErrorV1> {
         self.evidence.digest()
     }
+
+    /// Return the observer-derived service invocation identity from this capture epoch.
+    pub fn pre_invocation_id(&self) -> Option<&str> {
+        self.evidence.pre_invocation_id.as_deref()
+    }
 }
 
 impl NixSystemdUnitDefinitionContentEvidenceV1 {
@@ -80,6 +89,7 @@ impl NixSystemdUnitDefinitionContentEvidenceV1 {
         validate_digest(&self.source_identity_digest, "source identity digest")?;
         validate_unique_manager_owner(&self.manager_owner)?;
         validate_bus_id(&self.bus_id)?;
+        validate_invocation_id(self.pre_invocation_id.as_deref())?;
         let mut seen = std::collections::BTreeSet::new();
         for file in &self.files {
             if file.path.is_empty() || file.path.len() > MAX_STRING_BYTES || !file.path.starts_with('/') {
@@ -115,6 +125,7 @@ impl NixSystemdUnitDefinitionContentEvidenceV1 {
         put_str(&mut h, &self.source_identity_digest);
         put_str(&mut h, &self.manager_owner);
         put_str(&mut h, &self.bus_id);
+        // Invocation identity is temporal/process-epoch provenance, not content identity.
         put_u64(&mut h, self.files.len() as u64);
         for file in &self.files {
             put_str(&mut h, &file.path);
@@ -189,13 +200,18 @@ impl NixServiceEffectContextV1 {
             "authorized definition content digest",
         )?;
         validate_invocation_id(self.pre_invocation_id.as_deref())?;
+        if self.operation == NixServiceOperationKindV1::Restart
+            && self.pre_invocation_id.is_none()
+        {
+            return Err(NixServiceEffectContextErrorV1::MissingRestartInvocationId);
+        }
         if self.required_stability_us > MAX_STABILITY_WINDOW_US {
             return Err(NixServiceEffectContextErrorV1::StabilityWindowTooLarge);
         }
         Ok(())
     }
 
-    pub(crate) fn from_verified_definition_content(
+    pub fn from_verified_definition_content(
         operation: NixServiceOperationKindV1,
         unit: impl Into<String>,
         authorized_generation: u64,
@@ -209,6 +225,18 @@ impl NixServiceEffectContextV1 {
         if evidence.unit != unit {
             return Err(NixServiceEffectContextErrorV1::DefinitionContentUnitMismatch);
         }
+        let pre_invocation_id = match operation {
+            NixServiceOperationKindV1::Restart => {
+                let observed = content
+                    .pre_invocation_id()
+                    .ok_or(NixServiceEffectContextErrorV1::MissingRestartInvocationId)?;
+                if pre_invocation_id.as_deref() != Some(observed) {
+                    return Err(NixServiceEffectContextErrorV1::InvocationIdMismatch);
+                }
+                Some(observed.to_string())
+            }
+            _ => pre_invocation_id,
+        };
         let content_digest = content.digest()?;
         Self::new(
             operation,
@@ -349,6 +377,10 @@ pub enum NixServiceEffectContextErrorV1 {
     InvalidCaptureTimestamp,
     #[error("definition content unit does not match the service intent")]
     DefinitionContentUnitMismatch,
+    #[error("restart service effect requires an observer-derived pre-invocation identity")]
+    MissingRestartInvocationId,
+    #[error("service effect pre-invocation identity does not match observer-sealed content")]
+    InvocationIdMismatch,
     #[error("invalid systemd manager unique owner")]
     InvalidManagerOwner,
     #[error("invalid D-Bus daemon incarnation identifier")]
@@ -379,6 +411,7 @@ mod tests {
             source_identity_digest: "11".repeat(32),
             manager_owner: ":1.42".into(),
             bus_id: "0123456789abcdef0123456789abcdef".into(),
+            pre_invocation_id: Some("55".repeat(16)),
             files: vec![
                 NixSystemdUnitDefinitionContentFileV1 {
                     path: "/nix/store/nginx.service".into(),
@@ -479,6 +512,10 @@ mod tests {
         let mut unchanged = content_evidence();
         unchanged.captured_at_monotonic_us = 2;
         assert_eq!(baseline, unchanged.digest().unwrap());
+
+        let mut invocation_changed = content_evidence();
+        invocation_changed.pre_invocation_id = Some("66".repeat(16));
+        assert_eq!(baseline, invocation_changed.digest().unwrap());
     }
 
     #[test]
@@ -501,7 +538,7 @@ mod tests {
             "nginx.service",
             42,
             "aa".repeat(32),
-            Some("cc".repeat(16)),
+            Some("55".repeat(16)),
             1_000,
             &sealed,
         )
@@ -509,6 +546,40 @@ mod tests {
 
         assert_eq!(context.authorized_definition_digest, evidence.source_identity_digest);
         assert_eq!(context.authorized_definition_content_digest, content_digest);
+        assert_eq!(
+            context.pre_invocation_id.as_deref(),
+            Some("55".repeat(16).as_str())
+        );
+
+        let missing_invocation = NixServiceEffectContextV1::from_verified_definition_content(
+            NixServiceOperationKindV1::Restart,
+            "nginx.service",
+            42,
+            "aa".repeat(32),
+            None,
+            1_000,
+            &sealed,
+        )
+        .unwrap_err();
+        assert_eq!(
+            missing_invocation,
+            NixServiceEffectContextErrorV1::MissingRestartInvocationId
+        );
+
+        let mismatched_invocation = NixServiceEffectContextV1::from_verified_definition_content(
+            NixServiceOperationKindV1::Restart,
+            "nginx.service",
+            42,
+            "aa".repeat(32),
+            Some("66".repeat(16)),
+            1_000,
+            &sealed,
+        )
+        .unwrap_err();
+        assert_eq!(
+            mismatched_invocation,
+            NixServiceEffectContextErrorV1::InvocationIdMismatch
+        );
     }
 
     #[test]
