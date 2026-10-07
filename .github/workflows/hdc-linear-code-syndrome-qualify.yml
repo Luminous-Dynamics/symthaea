@@ -52,6 +52,7 @@ jobs:
           test -n "$EVENT_HEAD_SHA"
           test "$EVENT_HEAD_REF" = "research/hdc-linear-code-bounded-decoder-v2"
           test "$EVENT_HEAD_REPO" = "$GITHUB_REPOSITORY"
+          test "$GITHUB_REPOSITORY" = "Luminous-Dynamics/symthaea"
           test "$CURRENT_REPO_ID" = "1136141775"
           test "$EVENT_REPO_ID" = "$CURRENT_REPO_ID"
           test "$EVENT_HEAD_REPO_ID" = "$CURRENT_REPO_ID"
@@ -524,7 +525,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
           HDC Linear-Code Bounded Decoder Qualification
           =============================================
-          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v17
+          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v18
           github_run_id=${{ github.run_id }}
           github_run_attempt=${{ github.run_attempt }}
           github_workflow_sha=${{ github.workflow_sha }}
