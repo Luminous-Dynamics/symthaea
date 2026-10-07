@@ -688,6 +688,51 @@ impl NixSystemdReadOnlyObserverV1 {
         })
     }
 
+    /// Convert the exact Job object path returned by a native dispatch call
+    /// into a correlation handle without requiring the Job object to remain live.
+    ///
+    /// The terminal JobRemoved signal remains authoritative for the outcome; its
+    /// id/path/unit must match this handle and the manager/bus epoch must remain exact.
+    pub async fn capture_dispatched_job(
+        &self,
+        job_object_path: &OwnedObjectPath,
+        operation: NixServiceOperationKindV1,
+        expected_unit: &str,
+        expected_manager_owner: &str,
+        expected_bus_id: &str,
+    ) -> Result<NixSystemdJobHandleV1, NixSystemdObserverErrorV1> {
+        let expected_unit = canonical_unit(expected_unit)?;
+        operation
+            .validate_shape()
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
+        validate_job_object_path(job_object_path)?;
+        validate_unit_object_path(&self.resolve_service_unit(&expected_unit).await?)?;
+
+        let manager_owner = self.systemd_manager_owner().await?;
+        let bus_id = self.dbus_bus_id().await?;
+        if manager_owner != expected_manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if bus_id != expected_bus_id {
+            return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
+        }
+
+        let id = job_id_from_object_path(job_object_path)?;
+        let job_type = NixSystemdJobTypeV1::for_operation(operation)
+            .ok_or(NixSystemdObserverErrorV1::JobCorrelationMismatch)?;
+        let unit_object_path = self.resolve_service_unit(&expected_unit).await?;
+
+        Ok(NixSystemdJobHandleV1 {
+            id,
+            job_type,
+            unit: expected_unit,
+            object_path: job_object_path.clone(),
+            unit_object_path,
+            manager_owner,
+            bus_id,
+        })
+    }
+
     /// Legacy convenience wrapper.
     ///
     /// New governed execution must call `arm_job_removed_watcher()` before
@@ -969,6 +1014,21 @@ fn validate_unit_object_path(
         ));
     }
     Ok(())
+}
+
+fn job_id_from_object_path(
+    path: &OwnedObjectPath,
+) -> Result<u32, NixSystemdObserverErrorV1> {
+    validate_job_object_path(path)?;
+    path.as_str()
+        .strip_prefix(SYSTEMD_JOB_PATH_PREFIX)
+        .ok_or(NixSystemdObserverErrorV1::InvalidJobIdentity(
+            "job path is outside the systemd job namespace".to_string(),
+        ))?
+        .parse::<u32>()
+        .map_err(|_| NixSystemdObserverErrorV1::InvalidJobIdentity(
+            "job path does not encode a numeric ID".to_string(),
+        ))
 }
 
 fn validate_job_object_path(
@@ -1634,6 +1694,20 @@ mod tests {
             ..valid
         };
         assert!(invalid.validate().is_err());
+    }
+
+    #[test]
+    fn dispatched_job_id_parser_is_strict() {
+        let valid =
+            OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42").unwrap();
+        let zero =
+            OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/0").unwrap();
+        let bad =
+            OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/not-a-number").unwrap();
+
+        assert_eq!(job_id_from_object_path(&valid).unwrap(), 42);
+        assert!(job_id_from_object_path(&zero).is_err());
+        assert!(job_id_from_object_path(&bad).is_err());
     }
 
     #[test]
