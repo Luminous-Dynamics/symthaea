@@ -209,6 +209,9 @@ pub struct Rfc9942VerifiedSignatureWithReceipt {
     /// from which receipt_index was selected. When receipts are unprotected,
     /// this is transport provenance rather than authenticated outer-header data.
     receipt_collection_sha256: [u8; 32],
+    /// SHA-256 fingerprint of the exact serialized selected Receipt bstr
+    /// contents, preserving byte-level identity independently of its position.
+    receipt_sha256: [u8; 32],
     receipt_index: usize,
     receipt_placement: Rfc9942ReceiptPlacement,
     receipt: Rfc9942VerifiedReceipt,
@@ -224,6 +227,7 @@ impl Rfc9942VerifiedSignatureWithReceipt {
     pub const fn outer_external_aad_sha256(&self) -> [u8; 32] { self.outer_external_aad_sha256 }
     pub const fn outer_signature_sha256(&self) -> [u8; 32] { self.outer_signature_sha256 }
     pub const fn receipt_collection_sha256(&self) -> [u8; 32] { self.receipt_collection_sha256 }
+    pub const fn receipt_sha256(&self) -> [u8; 32] { self.receipt_sha256 }
     pub const fn receipt_index(&self) -> usize { self.receipt_index }
     pub const fn receipt_placement(&self) -> Rfc9942ReceiptPlacement { self.receipt_placement }
     pub const fn receipt(&self) -> Rfc9942VerifiedReceipt { self.receipt }
@@ -1335,29 +1339,46 @@ impl Rfc9942SignatureWithReceipts {
         // structural selection and preserves the distinct ReceiptsMissing /
         // ReceiptIndexOutOfBounds API taxonomy. No inner cryptographic work is
         // performed at this stage.
-        let (receipt, placement, receipt_collection_sha256) = if let Some(receipts) = self.protected_receipts.as_ref() {
-            let receipt = receipts
-                .receipts()
-                .get(receipt_index)
-                .ok_or(Rfc9942VdpError::ReceiptIndexOutOfBounds)?;
-            let collection_bytes = self
-                .protected_receipts_bytes
-                .as_deref()
-                .map_or_else(|| receipts.to_cbor(), ToOwned::to_owned);
-            (receipt, Rfc9942ReceiptPlacement::Protected, sha256(&collection_bytes))
-        } else if let Some(receipts) = self.unprotected_receipts.as_ref() {
-            let receipt = receipts
-                .receipts()
-                .get(receipt_index)
-                .ok_or(Rfc9942VdpError::ReceiptIndexOutOfBounds)?;
-            let collection_bytes = self
-                .unprotected_receipts_bytes
-                .as_deref()
-                .map_or_else(|| receipts.to_cbor(), ToOwned::to_owned);
-            (receipt, Rfc9942ReceiptPlacement::Unprotected, sha256(&collection_bytes))
-        } else {
-            return Err(Rfc9942VdpError::ReceiptsMissing);
-        };
+        let (receipt, receipt_bytes, placement, receipt_collection_sha256) =
+            if let Some(receipts) = self.protected_receipts.as_ref() {
+                let receipt = receipts
+                    .receipts()
+                    .get(receipt_index)
+                    .ok_or(Rfc9942VdpError::ReceiptIndexOutOfBounds)?;
+                let receipt_bytes = receipts
+                    .serialized_receipt_bytes(receipt_index)
+                    .ok_or(Rfc9942VdpError::ReceiptIndexOutOfBounds)?;
+                let collection_bytes = self
+                    .protected_receipts_bytes
+                    .as_deref()
+                    .map_or_else(|| receipts.to_cbor(), ToOwned::to_owned);
+                (
+                    receipt,
+                    receipt_bytes,
+                    Rfc9942ReceiptPlacement::Protected,
+                    sha256(&collection_bytes),
+                )
+            } else if let Some(receipts) = self.unprotected_receipts.as_ref() {
+                let receipt = receipts
+                    .receipts()
+                    .get(receipt_index)
+                    .ok_or(Rfc9942VdpError::ReceiptIndexOutOfBounds)?;
+                let receipt_bytes = receipts
+                    .serialized_receipt_bytes(receipt_index)
+                    .ok_or(Rfc9942VdpError::ReceiptIndexOutOfBounds)?;
+                let collection_bytes = self
+                    .unprotected_receipts_bytes
+                    .as_deref()
+                    .map_or_else(|| receipts.to_cbor(), ToOwned::to_owned);
+                (
+                    receipt,
+                    receipt_bytes,
+                    Rfc9942ReceiptPlacement::Unprotected,
+                    sha256(&collection_bytes),
+                )
+            } else {
+                return Err(Rfc9942VdpError::ReceiptsMissing);
+            };
 
         // The outer Signature_With_Receipt is the authenticated
         // composition boundary. Verify it before performing proof and inner
@@ -1396,6 +1417,7 @@ impl Rfc9942SignatureWithReceipts {
             outer_external_aad_sha256: sha256(outer_external_aad),
             outer_signature_sha256: sha256(&self.signature),
             receipt_collection_sha256,
+            receipt_sha256: sha256(receipt_bytes),
             receipt_index,
             receipt_placement: placement,
             receipt: verified_receipt,
@@ -1661,10 +1683,22 @@ impl Rfc9942SignatureWithReceipts {
 /// The to_cbor/from_cbor methods encode/decode the header value itself:
 /// an array of bstr .cbor Receipt, not an enclosing COSE protected or
 /// unprotected header map and not the integer label 394.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Rfc9942ReceiptCollection {
     receipts: Vec<Rfc9942ReceiptEnvelope>,
+    /// Exact bstr contents for each Receipt in priority order.
+    serialized_receipts: Vec<Vec<u8>>,
+    /// Exact serialized header-394 array when parsed from wire.
+    serialized_bytes: Option<Vec<u8>>,
 }
+
+impl PartialEq for Rfc9942ReceiptCollection {
+    fn eq(&self, other: &Self) -> bool {
+        self.receipts == other.receipts
+    }
+}
+
+impl Eq for Rfc9942ReceiptCollection {}
 
 impl Rfc9942ReceiptCollection {
     pub fn new(receipts: Vec<Rfc9942ReceiptEnvelope>) -> Result<Self, Rfc9942VdpError> {
@@ -1674,25 +1708,40 @@ impl Rfc9942ReceiptCollection {
         if receipts.len() > MAX_RFC9942_RECEIPTS {
             return Err(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded);
         }
-        let mut total_bytes = 0usize;
-        for receipt in &receipts {
-            let len = receipt.to_cbor().len();
-            if len > MAX_RFC9942_RECEIPT_BYTES {
+        let serialized_receipts: Vec<Vec<u8>> =
+            receipts.iter().map(Rfc9942ReceiptEnvelope::to_cbor).collect();
+        let total_bytes = serialized_receipts.iter().try_fold(0usize, |total, bytes| {
+            if bytes.len() > MAX_RFC9942_RECEIPT_BYTES {
                 return Err(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded);
             }
-            total_bytes = total_bytes
-                .checked_add(len)
-                .ok_or(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded)?;
-        }
+            total
+                .checked_add(bytes.len())
+                .ok_or(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded)
+        })?;
         if total_bytes > MAX_RFC9942_RECEIPTS_BYTES_TOTAL {
             return Err(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded);
         }
-        Ok(Self { receipts })
+        Ok(Self {
+            receipts,
+            serialized_receipts,
+            serialized_bytes: None,
+        })
     }
 
     /// Receipts in RFC 9942 priority order. The order is preserved verbatim.
     pub fn receipts(&self) -> &[Rfc9942ReceiptEnvelope] {
         &self.receipts
+    }
+
+    /// Exact serialized Receipt bstr contents at a priority index.
+    pub fn serialized_receipt_bytes(&self, index: usize) -> Option<&[u8]> {
+        self.serialized_receipts.get(index).map(Vec::as_slice)
+    }
+
+    /// Exact serialized header-394 value when this collection came from wire.
+    /// Newly constructed collections have no separate raw encoding.
+    pub fn serialized_bytes(&self) -> Option<&[u8]> {
+        self.serialized_bytes.as_deref()
     }
 
     pub fn len(&self) -> usize {
@@ -1708,17 +1757,22 @@ impl Rfc9942ReceiptCollection {
     }
 
     /// Encode the value carried by RFC 9942 header parameter 394.
+    /// Parsed collections preserve their exact source bytes; constructed
+    /// collections use deterministic receipt encodings.
     pub fn to_cbor(&self) -> Vec<u8> {
+        if let Some(bytes) = &self.serialized_bytes {
+            return bytes.clone();
+        }
         let mut out = Vec::new();
         cbor_array_len(&mut out, self.receipts.len() as u64);
-        for receipt in &self.receipts {
-            let encoded = receipt.to_cbor();
-            cbor_bytes(&mut out, &encoded);
+        for encoded in &self.serialized_receipts {
+            cbor_bytes(&mut out, encoded);
         }
         out
     }
 
     fn from_reader(reader: &mut CborReader<'_>) -> Result<Self, Rfc9942VdpError> {
+        let start = reader.offset;
         let items=reader.read_bstr_items_bounded_with_resource_limits(
             MAX_RFC9942_RECEIPTS,
             MAX_RFC9942_RECEIPT_BYTES,
@@ -1731,10 +1785,12 @@ impl Rfc9942ReceiptCollection {
         if items.is_empty() {
             return Err(Rfc9942VdpError::EmptyReceiptCollection);
         }
+        let end = reader.offset;
+        let serialized_bytes = reader.bytes[start..end].to_vec();
 
         let mut receipts = Vec::with_capacity(items.len());
-        for encoded in items {
-            let receipt = Rfc9942ReceiptEnvelope::from_cbor(&encoded)
+        for encoded in &items {
+            let receipt = Rfc9942ReceiptEnvelope::from_cbor(encoded)
                 .map_err(|error| match error {
                     Rfc9942VdpError::ResourceLimitExceeded => {
                         Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded
@@ -1743,7 +1799,11 @@ impl Rfc9942ReceiptCollection {
                 })?;
             receipts.push(receipt);
         }
-        Self::new(receipts)
+
+        let mut collection = Self::new(receipts)?;
+        collection.serialized_receipts = items;
+        collection.serialized_bytes = Some(serialized_bytes);
+        Ok(collection)
     }
 
     /// Decode the value carried by RFC 9942 header parameter 394.
