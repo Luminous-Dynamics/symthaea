@@ -4785,6 +4785,26 @@ async fn run_nmcli_add_wifi_profile(
     })
 }
 
+async fn run_nmcli_delete_wifi_profile(
+    profile_name: &str,
+) -> Result<CmdResult, String> {
+    let mut command = trusted_typed_process("nmcli")?;
+    command
+        .arg("connection")
+        .arg("delete")
+        .arg("id")
+        .arg(profile_name);
+    let output = command
+        .output()
+        .await
+        .map_err(|error| format!("unable to start typed NetworkManager profile cleanup: {error}"))?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
 async fn run_nmcli_wifi_connection_up(
     profile_name: &str,
     secret_path: &str,
@@ -9897,6 +9917,7 @@ echo '}'
                     .write(true)
                     .create_new(true)
                     .mode(0o600)
+                    .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
                     .open(&secret_path)
                 {
                     Ok(file) => file,
@@ -9941,103 +9962,95 @@ echo '}'
 
                 // Create a non-persistent profile without putting the PSK in argv.
                 let add_result = run_nmcli_add_wifi_profile(&profile_name, &ssid).await;
-                if let Err(error) = add_result {
+
+                match add_result {
+                    Ok(r) if r.exit_status == 0 => {}
+                    Ok(r) => {
+                        let profile_cleanup = run_nmcli_delete_wifi_profile(&profile_name).await;
+                        let secret_cleanup = cleanup_sensitive_file(&secret_path);
+                        let observed = if profile_cleanup
+                            .as_ref()
+                            .map(|cleanup| cleanup.exit_status == 0)
+                            .unwrap_or(false)
+                            && secret_cleanup.is_ok()
+                        {
+                            TransactionOutcome::Failed
+                        } else {
+                            TransactionOutcome::Indeterminate
+                        };
                         let _ = ws_tx
-                        .send(Message::Text(
-                            serde_json::json!({
-                                "type": "wifi_result",
-                                "code": 1,
-                                "data": format!("Wi-Fi profile creation failed: {}", error),
-                                "transaction": transaction.receipt(finalize_transaction(&transaction_ledger, &transaction, TransactionOutcome::Indeterminate, &peer_addr))
-                            })
-                            .to_string(),
-                        ))
-                        .await;
-                    continue;
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "wifi_result",
+                                    "code": protocol_exit_code(r.exit_status, observed),
+                                    "data": if observed == TransactionOutcome::Failed {
+                                        r.stderr.chars().take(400).collect::<String>()
+                                    } else {
+                                        format!(
+                                            "Wi-Fi profile creation failed and cleanup could not be fully observed: profile={:?}, secret={:?}",
+                                            profile_cleanup.as_ref().map(|v| v.exit_status),
+                                            secret_cleanup.as_ref().err()
+                                        )
+                                    },
+                                    "transaction": transaction.receipt(finalize_transaction(
+                                        &transaction_ledger,
+                                        &transaction,
+                                        observed,
+                                        &peer_addr,
+                                    ))
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                    Err(error) => {
+                        let secret_cleanup = cleanup_sensitive_file(&secret_path);
+                        let observed = if secret_cleanup.is_ok() {
+                            TransactionOutcome::Failed
+                        } else {
+                            TransactionOutcome::Indeterminate
+                        };
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type": "wifi_result",
+                                    "code": protocol_exit_code(1, observed),
+                                    "data": if observed == TransactionOutcome::Failed {
+                                        format!("Wi-Fi profile creation could not be started: {error}")
+                                    } else {
+                                        format!(
+                                            "Wi-Fi profile creation could not be started and credential cleanup failed: {}",
+                                            secret_cleanup.as_ref().err().unwrap()
+                                        )
+                                    },
+                                    "transaction": transaction.receipt(finalize_transaction(
+                                        &transaction_ledger,
+                                        &transaction,
+                                        observed,
+                                        &peer_addr,
+                                    ))
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
                 }
 
                 let result =
                     run_nmcli_wifi_connection_up(&profile_name, &secret_path).await;
                 let cleanup_result = cleanup_sensitive_file(&secret_path);
 
-                let response = if let Err(cleanup_error) = cleanup_result {
-                    eprintln!(
-                        "[{}] {} Wi-Fi credential cleanup failed: {}",
-                        peer_addr,
-                        transaction.log_line(),
-                        cleanup_error
-                    );
-                    let outcome = finalize_transaction(
-                        &transaction_ledger,
-                        &transaction,
-                        TransactionOutcome::Indeterminate,
-                        &peer_addr,
-                    );
-                    serde_json::json!({
-                        "type": "wifi_result",
-                        "code": protocol_exit_code(1, outcome),
-                        "data": format!(
-                            "Wi-Fi operation completed, but credential cleanup could not be verified: {}",
-                            cleanup_error
-                        ),
-                        "transaction": transaction.receipt(outcome)
-                    })
-                } else {
-                    match result {
-                        Ok(r) if r.exit_status == 0 => {
-                            let observed_outcome =
-                                match verify_wifi_connection(&profile_name).await {
-                                    Ok(true) => TransactionOutcome::ObservedSuccess,
-                                    Ok(false) => {
-                                        eprintln!(
-                                            "[{}] {} Wi-Fi command returned 0 but active connection was not observed",
-                                            peer_addr,
-                                            transaction.log_line()
-                                        );
-                                        TransactionOutcome::Indeterminate
-                                    }
-                                    Err(error) => {
-                                        eprintln!(
-                                            "[{}] {} Wi-Fi postcondition probe failed: {}",
-                                            peer_addr,
-                                            transaction.log_line(),
-                                            error
-                                        );
-                                        TransactionOutcome::Indeterminate
-                                    }
-                                };
-                            let outcome = finalize_transaction(
-                                &transaction_ledger,
-                                &transaction,
-                                observed_outcome,
-                                &peer_addr,
+                let response = match result {
+                    Ok(r) if r.exit_status == 0 => {
+                        if let Err(cleanup_error) = cleanup_result {
+                            eprintln!(
+                                "[{}] {} Wi-Fi credential cleanup failed: {}",
+                                peer_addr,
+                                transaction.log_line(),
+                                cleanup_error
                             );
-                            serde_json::json!({
-                                "type": "wifi_result",
-                                "code": protocol_exit_code(r.exit_status, outcome),
-                                "data": if outcome == TransactionOutcome::ObservedSuccess {
-                                    "WiFi connected".to_string()
-                                } else {
-                                    "Wi-Fi activation completed but the active connection was not durably observed.".to_string()
-                                },
-                                "transaction": transaction.receipt(outcome)
-                            })
-                        }
-                        Ok(r) => {
-                            let outcome = finalize_transaction(
-                                &transaction_ledger,
-                                &transaction,
-                                TransactionOutcome::Failed,
-                                &peer_addr,
-                            );
-                            serde_json::json!({
-                                "type": "wifi_result",
-                                "code": protocol_exit_code(r.exit_status, outcome),
-                                "data": r.stderr.chars().take(400).collect::<String>(),
-                                "transaction": transaction.receipt(outcome)
-                            })
-                        }
-                        Err(error) => {
                             let outcome = finalize_transaction(
                                 &transaction_ledger,
                                 &transaction,
@@ -10046,11 +10059,127 @@ echo '}'
                             );
                             serde_json::json!({
                                 "type": "wifi_result",
-                                "code": 1,
-                                "data": format!("Wi-Fi connection failed: {}", error),
+                                "code": protocol_exit_code(1, outcome),
+                                "data": format!(
+                                    "Wi-Fi activation succeeded, but credential cleanup could not be verified: {}",
+                                    cleanup_error
+                                ),
                                 "transaction": transaction.receipt(outcome)
                             })
+                        } else {
+                            match verify_wifi_connection(&profile_name).await {
+                                Ok(true) => {
+                                    let outcome = finalize_transaction(
+                                        &transaction_ledger,
+                                        &transaction,
+                                        TransactionOutcome::ObservedSuccess,
+                                        &peer_addr,
+                                    );
+                                    serde_json::json!({
+                                        "type": "wifi_result",
+                                        "code": protocol_exit_code(r.exit_status, outcome),
+                                        "data": "WiFi connected",
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                }
+                                Ok(false) => {
+                                    eprintln!(
+                                        "[{}] {} Wi-Fi command returned 0 but active connection was not observed",
+                                        peer_addr,
+                                        transaction.log_line()
+                                    );
+                                    let outcome = finalize_transaction(
+                                        &transaction_ledger,
+                                        &transaction,
+                                        TransactionOutcome::Indeterminate,
+                                        &peer_addr,
+                                    );
+                                    serde_json::json!({
+                                        "type": "wifi_result",
+                                        "code": protocol_exit_code(1, outcome),
+                                        "data": "Wi-Fi activation completed but the active connection was not durably observed.",
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                }
+                                Err(error) => {
+                                    eprintln!(
+                                        "[{}] {} Wi-Fi postcondition probe failed: {}",
+                                        peer_addr,
+                                        transaction.log_line(),
+                                        error
+                                    );
+                                    let outcome = finalize_transaction(
+                                        &transaction_ledger,
+                                        &transaction,
+                                        TransactionOutcome::Indeterminate,
+                                        &peer_addr,
+                                    );
+                                    serde_json::json!({
+                                        "type": "wifi_result",
+                                        "code": protocol_exit_code(1, outcome),
+                                        "data": format!("Wi-Fi postcondition probe failed: {}", error),
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                }
+                            }
                         }
+                    }
+                    Ok(r) => {
+                        let profile_cleanup = run_nmcli_delete_wifi_profile(&profile_name).await;
+                        let outcome = if profile_cleanup
+                            .as_ref()
+                            .map(|cleanup| cleanup.exit_status == 0)
+                            .unwrap_or(false)
+                        {
+                            TransactionOutcome::Failed
+                        } else {
+                            TransactionOutcome::Indeterminate
+                        };
+                        serde_json::json!({
+                            "type": "wifi_result",
+                            "code": protocol_exit_code(1, outcome),
+                            "data": if outcome == TransactionOutcome::Failed {
+                                r.stderr.chars().take(400).collect::<String>()
+                            } else {
+                                format!(
+                                    "Wi-Fi activation failed and transient profile cleanup could not be observed: {:?}",
+                                    profile_cleanup.as_ref().err().or_else(|| Some(&r.stderr))
+                                )
+                            },
+                            "transaction": transaction.receipt(finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                outcome,
+                                &peer_addr,
+                            ))
+                        })
+                    }
+                    Err(error) => {
+                        let profile_cleanup = run_nmcli_delete_wifi_profile(&profile_name).await;
+                        let outcome = if profile_cleanup
+                            .as_ref()
+                            .map(|cleanup| cleanup.exit_status == 0)
+                            .unwrap_or(false)
+                        {
+                            TransactionOutcome::Failed
+                        } else {
+                            TransactionOutcome::Indeterminate
+                        };
+                        serde_json::json!({
+                            "type": "wifi_result",
+                            "code": protocol_exit_code(1, outcome),
+                            "data": format!(
+                                "Wi-Fi activation failed; transient profile cleanup={:?}: {}",
+                                profile_cleanup.as_ref().map(|v| v.exit_status).or_else(|_| None),
+                                error
+                            ),
+                            "transaction": transaction.receipt(finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                outcome,
+                                &peer_addr,
+                            ))
+                        })
                     }
                 };
 
