@@ -47,7 +47,7 @@ const EXPECTED_SELECTION_BLAKE3: &str =
 const EXPECTED_SELECTION_COUNT: usize = 7;
 
 const EXPECTED_SELECTION_SCHEMA: &str = "broca-unimorph-selection-manifest-v1";
-const EXPECTED_QUALIFICATION_ACTION_REFS: [&str; 7] = [
+const EXPECTED_QUALIFICATION_ACTION_REFS: [&str; 8] = [
     "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
     "dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067",
     "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
@@ -55,6 +55,7 @@ const EXPECTED_QUALIFICATION_ACTION_REFS: [&str; 7] = [
     "dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067",
     "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
     "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6",
 ];
 
 #[derive(Debug, serde::Deserialize)]
@@ -314,10 +315,13 @@ fn verify_qualification_workflow_pins() -> Result<Vec<String>> {
         bail!("qualification workflow contains a non-canonical action revision");
     }
 
-    if QUALIFICATION_WORKFLOW.matches("permissions:").count() != 1
+    if QUALIFICATION_WORKFLOW.matches("permissions:").count() != 2
         || !QUALIFICATION_WORKFLOW.contains("permissions:\n  contents: read")
+        || !QUALIFICATION_WORKFLOW.contains(
+            "permissions:\n      contents: read\n      id-token: write\n      attestations: write\n      artifact-metadata: write",
+        )
     {
-        bail!("qualification workflow permissions are not the approved read-only policy");
+        bail!("qualification workflow permissions are not the approved least-privilege policy");
     }
     if QUALIFICATION_WORKFLOW.matches("persist-credentials: false").count() != 2 {
         bail!("qualification workflow checkout credentials policy is not fail-closed");
