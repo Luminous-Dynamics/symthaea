@@ -72,3 +72,11 @@ WebGPU ordering, but that mapping is a separate qualified layer.
 The schedule can be verified back against the source graph. Tampering with the
 graph digest, node ordinals, or dependency ordinals is rejected rather than
 silently normalized.
+
+## Vulkan synchronization lowering
+
+The `VulkanSyncPlan` is the first backend-specific lowering layer. It maps the semantic schedule onto deterministic logical submission queues and assigns a separate monotonic timeline to each queue.
+
+A dependency whose producer and consumer share a logical queue relies on submission order. A dependency crossing queues becomes an explicit timeline wait on the producer queue. This avoids treating a single global timeline as if signals from independent queues were implicitly ordered.
+
+The plan contains no Vulkan handles, device claims, or completion receipt. It is a lowering artifact only. Actual `VkQueue`, timeline semaphore, `VkSemaphoreSubmitInfo`, and `vkQueueSubmit2` binding remains a runtime/device layer.
