@@ -1701,6 +1701,7 @@ mod tests {
         let valid = NixSystemdJobHandleV1 {
             id: 42,
             job_type: NixSystemdJobTypeV1::Start,
+            observed_job_type: None,
             unit: "nginx.service".to_string(),
             object_path: object_path.clone(),
             unit_object_path: unit_object_path.clone(),
@@ -1736,6 +1737,7 @@ mod tests {
         let valid = NixSystemdJobHandleV1 {
             id: 42,
             job_type: NixSystemdJobTypeV1::Start,
+            observed_job_type: None,
             unit: "nginx.service".to_string(),
             object_path: object_path.clone(),
             unit_object_path: unit_object_path.clone(),
