@@ -1916,7 +1916,6 @@ impl ForecastInferenceSelectionReceipt {
         plan: &ForecastInferencePlan,
         qualification_identity_blake3: &str,
         dependence_profile_blake3: &str,
-        decision_path_id: impl Into<String>,
     ) -> Result<Self, RelationalPredictionError> {
         let mut receipt = Self {
             analysis_level: binding.analysis_level.clone(),
@@ -1926,7 +1925,9 @@ impl ForecastInferenceSelectionReceipt {
             dependence_profile_blake3: dependence_profile_blake3.to_string(),
             method_selection_rule_id: plan.method_selection_rule_id.clone(),
             method_selection_rule_spec_sha256: plan.method_selection_rule_spec_sha256.clone(),
-            decision_path_id: decision_path_id.into(),
+            decision_path_id: ForecastInferenceSelectionPath::for_plan(plan)
+                .as_str()
+                .to_string(),
             selected_procedure_id: plan.procedure_id.clone(),
             selected_procedure_spec_sha256: plan.procedure_spec_sha256.clone(),
             selected_dependence_method_id: plan.dependence_method_id.clone(),
