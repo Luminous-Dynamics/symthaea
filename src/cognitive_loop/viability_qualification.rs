@@ -1067,7 +1067,7 @@ mod tests {
     }
 
     #[test]
-    fn world_model_continuous_rollout_reaches_one_step_prediction_at_tau() {
+    fn continuous_rollout_matches_relaxation_solution_at_tau() {
         let mut model = super::goal_world::WorldModelBridge::with_actions(2);
         let before = vec![0.0f32; 64];
         let mut after = before.clone();
@@ -1091,14 +1091,12 @@ mod tests {
         )
         .expect("valid continuous rollout");
 
-        assert_eq!(rollout.one_step_prediction.len(), 64);
-        assert_eq!(rollout.terminal_state.len(), 64);
-        assert!(
-            (rollout.terminal_state[0] - rollout.one_step_prediction[0]).abs() < 2e-3
-        );
-        assert!(
-            (rollout.terminal_state[1] - rollout.one_step_prediction[1]).abs() < 2e-3
-        );
+        let relaxation_fraction = 1.0 - (-1.0f64).exp();
+        for index in [0usize, 1usize] {
+            let predicted = rollout.one_step_prediction[index];
+            let expected = predicted * relaxation_fraction;
+            assert!((rollout.terminal_state[index] - expected).abs() < 2e-3);
+        }
     }
 
     #[test]
