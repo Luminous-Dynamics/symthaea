@@ -431,6 +431,8 @@ pub struct GroundedWorldModelQualificationReport {
 
     /// Isolated response to perturbation-induced prediction error.
     pub learning_response: LearningResponseReport,
+    /// Cumulative adaptation stream with explicit prior-shock and invariant-anchor retention.
+    pub sequential_learning_response: SequentialLearningResponseReport,
 
     pub persistence_closed_loop_survived: bool,
     pub persistence_closed_loop_mean_oracle_horizon_regret: f64,
@@ -502,6 +504,64 @@ pub struct LearningResponseReport {
 impl LearningResponseReport {
     pub fn is_populated(&self) -> bool {
         self.shock_count > 0
+    }
+}
+
+
+/// Per-shock receipt for one cumulative adaptation stream.
+///
+/// Unlike the isolated learning-response experiment, this event belongs to one model
+/// instance that learns from every shock in sequence. Anchor regression is measured
+/// against the model's pre-stream anchor errors so later corrections cannot hide
+/// earlier forgetting.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SequentialLearningResponseEvent {
+    pub cycle: u64,
+    pub action: MicroAction,
+    pub shock_state_digest: u64,
+    pub shock_mae_before_update: f64,
+    pub shock_mae_after_update: f64,
+    pub same_transition_improvement: f64,
+    pub neighbor_mae_before_update: f64,
+    pub neighbor_mae_after_update: f64,
+    pub neighbor_improvement: f64,
+    pub anchor_mean_mae_from_initial: f64,
+    pub anchor_mean_regression_from_initial: f64,
+    pub anchor_max_regression_from_initial: f64,
+    pub prior_shock_mean_regression: f64,
+    pub prior_shock_max_regression: f64,
+    pub prior_shock_retention_rate: f64,
+}
+
+/// Measures retention across a single cumulative adaptation stream.
+///
+/// Every shock updates the same model instance. After each update, previously learned
+/// shock transitions and invariant anchors are re-tested. Revision quality and retention
+/// remain separate quantities.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SequentialLearningResponseReport {
+    pub shock_count: u64,
+    pub events: Vec<SequentialLearningResponseEvent>,
+    pub mean_shock_mae_before_update: f64,
+    pub mean_shock_mae_after_update: f64,
+    pub mean_same_transition_improvement: f64,
+    pub same_transition_improvement_rate: f64,
+    pub mean_neighbor_mae_before_update: f64,
+    pub mean_neighbor_mae_after_update: f64,
+    pub mean_neighbor_improvement: f64,
+    pub neighbor_improvement_rate: f64,
+    pub initial_anchor_mean_mae: f64,
+    pub final_anchor_mean_mae: f64,
+    pub final_anchor_regression_from_initial: f64,
+    pub max_anchor_regression_from_initial: f64,
+    pub anchor_regression_event_rate: f64,
+    pub prior_shock_retention_rate: f64,
+    pub max_prior_shock_regression: f64,
+}
+
+impl SequentialLearningResponseReport {
+    pub fn is_populated(&self) -> bool {
+        self.shock_count > 0 && !self.events.is_empty()
     }
 }
 
@@ -1074,6 +1134,286 @@ fn evaluate_learning_response(
         mean_anchor_regression: anchor_mean_regressions / count,
         max_anchor_regression: worst_anchor_regression,
         anchor_regression_rate: anchor_regression_count as f64 / count,
+    }
+}
+
+/// Evaluate deterministic perturbation shocks through one cumulative adaptation stream.
+///
+/// The same model clone receives every shock in order. After each update the harness
+/// rechecks the new shock, a nearby held-out neighbor, the invariant anchor set, and
+/// every previously learned shock transition. This measures cumulative adaptation and
+/// differential retention without combining them into a single pass/fail score.
+fn evaluate_sequential_learning_response(
+    base_model: &super::goal_world::WorldModelBridge,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+) -> SequentialLearningResponseReport {
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let mut shock_states = Vec::new();
+    let mut steps = 0u64;
+
+    while !world.done() && steps < max_cycles {
+        for (cycle, perturbation) in scenario.perturbations {
+            if *cycle == steps {
+                let before_shock = world.observe();
+                let shocked = perturbation.apply(before_shock);
+                let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+                shock_states.push((shocked, action));
+                world.perturb(*perturbation);
+            }
+        }
+
+        let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+        world.step(action);
+        steps = steps.saturating_add(1);
+    }
+
+    let anchor_state = benchmark_scenarios()[0].initial;
+    let anchor_probes = MicroAction::ALL
+        .into_iter()
+        .map(|action| (action, transition(anchor_state, action)))
+        .collect::<Vec<_>>();
+
+    let mut model = base_model.clone();
+    let predictor = FepWorldModelPredictor {
+        bridge: &mut model,
+    };
+
+    let initial_anchor_metrics = anchor_probes
+        .iter()
+        .map(|(anchor_action, anchor_actual)| {
+            (
+                *anchor_action,
+                predictor
+                    .predict(anchor_state, *anchor_action)
+                    .mean_absolute_delta(*anchor_actual),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let initial_anchor_count = initial_anchor_metrics.len().max(1) as f64;
+    let initial_anchor_mean_mae = initial_anchor_metrics
+        .iter()
+        .map(|(_, error)| *error)
+        .sum::<f64>()
+        / initial_anchor_count;
+
+    let mut events = Vec::with_capacity(shock_states.len());
+    let mut learned_shocks: Vec<(MicroWorldObservation, MicroAction, f64)> =
+        Vec::with_capacity(shock_states.len());
+
+    let mut shock_mae_before = 0.0;
+    let mut shock_mae_after = 0.0;
+    let mut same_transition_improvements = 0.0;
+    let mut same_transition_improvement_count = 0u64;
+    let mut neighbor_mae_before = 0.0;
+    let mut neighbor_mae_after = 0.0;
+    let mut neighbor_improvements = 0.0;
+    let mut neighbor_improvement_count = 0u64;
+    let mut anchor_regression_event_count = 0u64;
+    let mut prior_shock_retained_count = 0u64;
+    let mut prior_shock_evaluation_count = 0u64;
+    let mut max_anchor_regression_from_initial = 0.0f64;
+    let mut max_prior_shock_regression = 0.0f64;
+
+    for (shock_state, action) in &shock_states {
+        let actual = transition(*shock_state, *action);
+        let before_prediction = predictor.predict(*shock_state, *action);
+        let before_mae = before_prediction.mean_absolute_delta(actual);
+
+        let neighbor_state =
+            super::viability_micro_world::MicroPerturbation::ThreatSpike(0.01).apply(*shock_state);
+        let neighbor_actual = transition(neighbor_state, *action);
+        let neighbor_before = predictor.predict(neighbor_state, *action);
+        let neighbor_before_mae = neighbor_before.mean_absolute_delta(neighbor_actual);
+
+        let prior_before = learned_shocks
+            .iter()
+            .map(|(state, prior_action, _baseline_mae)| {
+                (
+                    *state,
+                    *prior_action,
+                    predictor
+                        .predict(*state, *prior_action)
+                        .mean_absolute_delta(transition(*state, *prior_action)),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        predictor.observe_transition(*shock_state, *action, actual);
+
+        let after_prediction = predictor.predict(*shock_state, *action);
+        let after_mae = after_prediction.mean_absolute_delta(actual);
+        let same_improvement = before_mae - after_mae;
+
+        let neighbor_after = predictor.predict(neighbor_state, *action);
+        let neighbor_after_mae = neighbor_after.mean_absolute_delta(neighbor_actual);
+        let neighbor_improvement = neighbor_before_mae - neighbor_after_mae;
+
+        let mut prior_sum_regression = 0.0;
+        let mut prior_max_regression = 0.0;
+        let mut prior_retained = 0u64;
+
+        for (state, prior_action, before_current_update_mae) in &prior_before {
+            let after_current_update_mae = predictor
+                .predict(*state, *prior_action)
+                .mean_absolute_delta(transition(*state, *prior_action));
+            let regression = after_current_update_mae - before_current_update_mae;
+            prior_sum_regression += regression;
+            prior_max_regression = prior_max_regression.max(regression);
+
+            let baseline_mae = learned_shocks
+                .iter()
+                .find(|(learned_state, learned_action, _)| {
+                    learned_state == state && learned_action == prior_action
+                })
+                .map(|(_, _, baseline)| *baseline)
+                .unwrap_or(*before_current_update_mae);
+
+            if after_current_update_mae <= baseline_mae + 1e-12 {
+                prior_retained += 1;
+            }
+        }
+
+        let prior_count = learned_shocks.len() as f64;
+        let prior_mean_regression = if prior_count == 0.0 {
+            0.0
+        } else {
+            prior_sum_regression / prior_count
+        };
+        let prior_retention_rate = if learned_shocks.is_empty() {
+            1.0
+        } else {
+            prior_shock_evaluation_count = prior_shock_evaluation_count
+                .saturating_add(learned_shocks.len() as u64);
+            prior_shock_retained_count = prior_shock_retained_count
+                .saturating_add(prior_retained);
+            prior_retained as f64 / learned_shocks.len() as f64
+        };
+
+        let anchor_after_metrics = anchor_probes
+            .iter()
+            .map(|(anchor_action, anchor_actual)| {
+                let after_mae = predictor
+                    .predict(anchor_state, *anchor_action)
+                    .mean_absolute_delta(*anchor_actual);
+                let initial_mae = initial_anchor_metrics
+                    .iter()
+                    .find(|(action, _)| action == anchor_action)
+                    .map(|(_, error)| *error)
+                    .unwrap_or(f64::NAN);
+                (*anchor_action, initial_mae, after_mae)
+            })
+            .collect::<Vec<_>>();
+
+        let anchor_count = anchor_after_metrics.len().max(1) as f64;
+        let anchor_mean_after = anchor_after_metrics
+            .iter()
+            .map(|(_, _, after)| *after)
+            .sum::<f64>()
+            / anchor_count;
+        let anchor_mean_regression = anchor_mean_after - initial_anchor_mean_mae;
+        let event_max_anchor_regression = anchor_after_metrics
+            .iter()
+            .map(|(_, initial, after)| after - initial)
+            .fold(0.0f64, f64::max);
+
+        if anchor_mean_regression > 1e-12 || event_max_anchor_regression > 1e-12 {
+            anchor_regression_event_count =
+                anchor_regression_event_count.saturating_add(1);
+        }
+        max_anchor_regression_from_initial =
+            max_anchor_regression_from_initial.max(event_max_anchor_regression);
+        max_prior_shock_regression = max_prior_shock_regression.max(prior_max_regression);
+
+        shock_mae_before += before_mae;
+        shock_mae_after += after_mae;
+        same_transition_improvements += same_improvement;
+        neighbor_mae_before += neighbor_before_mae;
+        neighbor_mae_after += neighbor_after_mae;
+        neighbor_improvements += neighbor_improvement;
+
+        if same_improvement > 1e-12 {
+            same_transition_improvement_count =
+                same_transition_improvement_count.saturating_add(1);
+        }
+        if neighbor_improvement > 1e-12 {
+            neighbor_improvement_count =
+                neighbor_improvement_count.saturating_add(1);
+        }
+
+        events.push(SequentialLearningResponseEvent {
+            cycle: shock_state.cycle,
+            action: *action,
+            shock_state_digest: shock_state.digest(),
+            shock_mae_before_update: before_mae,
+            shock_mae_after_update: after_mae,
+            same_transition_improvement: same_improvement,
+            neighbor_mae_before_update: neighbor_before_mae,
+            neighbor_mae_after_update: neighbor_after_mae,
+            neighbor_improvement,
+            anchor_mean_mae_from_initial: anchor_mean_after,
+            anchor_mean_regression_from_initial: anchor_mean_regression,
+            anchor_max_regression_from_initial: event_max_anchor_regression,
+            prior_shock_mean_regression: prior_mean_regression,
+            prior_shock_max_regression: prior_max_regression,
+            prior_shock_retention_rate: prior_retention_rate,
+        });
+
+        learned_shocks.push((*shock_state, *action, after_mae));
+    }
+
+    let count = shock_states.len() as f64;
+    if count <= 0.0 {
+        return SequentialLearningResponseReport {
+            shock_count: 0,
+            events: Vec::new(),
+            mean_shock_mae_before_update: 0.0,
+            mean_shock_mae_after_update: 0.0,
+            mean_same_transition_improvement: 0.0,
+            same_transition_improvement_rate: 0.0,
+            mean_neighbor_mae_before_update: 0.0,
+            mean_neighbor_mae_after_update: 0.0,
+            mean_neighbor_improvement: 0.0,
+            neighbor_improvement_rate: 0.0,
+            initial_anchor_mean_mae: 0.0,
+            final_anchor_mean_mae: 0.0,
+            final_anchor_regression_from_initial: 0.0,
+            max_anchor_regression_from_initial: 0.0,
+            anchor_regression_event_rate: 0.0,
+            prior_shock_retention_rate: 0.0,
+            max_prior_shock_regression: 0.0,
+        };
+    }
+
+    let final_anchor_mean_mae = events
+        .last()
+        .map(|event| event.anchor_mean_mae_from_initial)
+        .unwrap_or(initial_anchor_mean_mae);
+    let prior_shock_retention_rate = if prior_shock_evaluation_count == 0 {
+        1.0
+    } else {
+        prior_shock_retained_count as f64 / prior_shock_evaluation_count as f64
+    };
+
+    SequentialLearningResponseReport {
+        shock_count: shock_states.len() as u64,
+        events,
+        mean_shock_mae_before_update: shock_mae_before / count,
+        mean_shock_mae_after_update: shock_mae_after / count,
+        mean_same_transition_improvement: same_transition_improvements / count,
+        same_transition_improvement_rate: same_transition_improvement_count as f64 / count,
+        mean_neighbor_mae_before_update: neighbor_mae_before / count,
+        mean_neighbor_mae_after_update: neighbor_mae_after / count,
+        mean_neighbor_improvement: neighbor_improvements / count,
+        neighbor_improvement_rate: neighbor_improvement_count as f64 / count,
+        initial_anchor_mean_mae,
+        final_anchor_mean_mae,
+        final_anchor_regression_from_initial: final_anchor_mean_mae - initial_anchor_mean_mae,
+        max_anchor_regression_from_initial,
+        anchor_regression_event_rate: anchor_regression_event_count as f64 / count,
+        prior_shock_retention_rate,
+        max_prior_shock_regression,
     }
 }
 
@@ -1963,6 +2303,9 @@ impl FepModule {
         let learning_response =
             evaluate_learning_response(predictor.bridge, held_out, held_out_cycles);
 
+        let sequential_learning_response =
+            evaluate_sequential_learning_response(predictor.bridge, held_out, held_out_cycles);
+
         let closed_loop = run_homeostatic_agent_horizon_scenario(
             &mut predictor,
             held_out,
@@ -1997,6 +2340,7 @@ impl FepModule {
             environment_query_report,
             procedural_held_out_transfer,
             learning_response,
+            sequential_learning_response,
             persistence_closed_loop_survived: persistence_closed_loop.survived,
             persistence_closed_loop_mean_oracle_horizon_regret:
                 persistence_closed_loop.mean_oracle_horizon_regret,
@@ -2337,6 +2681,57 @@ mod tests {
         assert!((0.0..=1.0).contains(&report.neighbor_improvement_rate));
         assert!((0.0..=1.0).contains(&report.anchor_regression_rate));
         assert!(report.mean_anchor_max_regression.is_finite());
+    }
+
+    #[test]
+    fn sequential_learning_response_is_populated_and_finite() {
+        let model = super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let report = evaluate_sequential_learning_response(
+            &model,
+            &benchmark_scenarios()[1],
+            12,
+        );
+
+        assert_eq!(report.shock_count, 2);
+        assert_eq!(report.events.len(), 2);
+        assert!(report.events.iter().all(|event| {
+            event.shock_state_digest != 0
+                && event.shock_mae_before_update.is_finite()
+                && event.shock_mae_after_update.is_finite()
+                && event.neighbor_mae_before_update.is_finite()
+                && event.neighbor_mae_after_update.is_finite()
+                && event.anchor_mean_mae_from_initial.is_finite()
+                && event.anchor_mean_regression_from_initial.is_finite()
+                && event.anchor_max_regression_from_initial.is_finite()
+                && event.prior_shock_mean_regression.is_finite()
+                && event.prior_shock_max_regression.is_finite()
+                && event.prior_shock_retention_rate.is_finite()
+        }));
+        assert!(report.is_populated());
+        for value in [
+            report.mean_shock_mae_before_update,
+            report.mean_shock_mae_after_update,
+            report.mean_same_transition_improvement,
+            report.same_transition_improvement_rate,
+            report.mean_neighbor_mae_before_update,
+            report.mean_neighbor_mae_after_update,
+            report.mean_neighbor_improvement,
+            report.neighbor_improvement_rate,
+            report.initial_anchor_mean_mae,
+            report.final_anchor_mean_mae,
+            report.final_anchor_regression_from_initial,
+            report.max_anchor_regression_from_initial,
+            report.anchor_regression_event_rate,
+            report.prior_shock_retention_rate,
+            report.max_prior_shock_regression,
+        ] {
+            assert!(value.is_finite());
+        }
+        assert!((0.0..=1.0).contains(&report.same_transition_improvement_rate));
+        assert!((0.0..=1.0).contains(&report.neighbor_improvement_rate));
+        assert!((0.0..=1.0).contains(&report.anchor_regression_event_rate));
+        assert!((0.0..=1.0).contains(&report.prior_shock_retention_rate));
+        assert_eq!(report.events[0].prior_shock_retention_rate, 1.0);
     }
 
     #[test]
