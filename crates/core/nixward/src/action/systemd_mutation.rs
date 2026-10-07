@@ -42,6 +42,8 @@ pub enum NixSystemdMutationTransportErrorV1 {
     BusIncarnationChanged,
     #[error("systemd returned an invalid Job object path")]
     InvalidJobObjectPath,
+    #[error("systemd returned an invalid unit-file change record")]
+    InvalidUnitFileChange,
 }
 
 /// Typed lifecycle mutation transport.
