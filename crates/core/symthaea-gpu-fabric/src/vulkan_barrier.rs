@@ -1295,7 +1295,7 @@ mod tests {
         assert_eq!(graph.digest_hex().unwrap(), canonical_graph.digest_hex().unwrap());
 
         for node in &graph.nodes {
-            let (reads, writes) = canonical_workload_resources(node).unwrap();
+            let (reads, writes) = canonical_workload_resources(node);
             assert_eq!(reads.len(), 2);
             assert_eq!(writes.len(), 1);
             assert!(reads[0].resource <= reads[1].resource);
