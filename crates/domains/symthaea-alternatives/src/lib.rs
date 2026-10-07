@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 41;
+pub const SCHEMA_VERSION: u16 = 42;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-v54";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-v55";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -583,6 +583,10 @@ pub struct MeasurementUncertaintyEvaluationRef {
     pub component_set_digest: String,
     /// Number of uncertainty components evaluated by this record.
     pub component_count: usize,
+    /// BLAKE3 digest over the exact ordered calibration/traceability chain used by the evaluation.
+    pub calibration_chain_digest: String,
+    /// Number of calibration/traceability links used by the evaluation.
+    pub calibration_chain_count: usize,
     /// Exact measurement-model identity evaluated by this record.
     pub measurement_model_id: String,
     /// Revision of the exact measurement model.
@@ -647,6 +651,8 @@ impl MeasurementUncertaintyEvaluationRef {
             || self.uncertainty_budget_digest.is_empty()
             || self.component_set_digest.is_empty()
             || self.component_count == 0
+            || self.calibration_chain_digest.is_empty()
+            || self.calibration_chain_count == 0
             || self.measurement_model_id.is_empty()
             || self.measurement_model_revision.is_empty()
             || self.measurement_model_digest.is_empty()
@@ -1036,6 +1042,30 @@ impl EvidenceRecord {
                                 evidence_id: self.id.clone(),
                                 expected_procedure_digest: observation.procedure_digest.clone(),
                                 actual_procedure_digest: uncertainty.procedure_digest.clone(),
+                            },
+                        );
+                    }
+                    let expected_calibration_chain_digest =
+                        canonical_calibration_chain_hash(&observation.calibration_chain_refs)?;
+                    let expected_calibration_chain_count =
+                        observation.calibration_chain_refs.len();
+                    if uncertainty.evaluation.calibration_chain_digest
+                        != expected_calibration_chain_digest
+                        || uncertainty.evaluation.calibration_chain_count
+                            != expected_calibration_chain_count
+                    {
+                        return Err(
+                            AssessmentError::MeasurementUncertaintyEvaluationCalibrationChainMismatch {
+                                uncertainty_id: uncertainty.uncertainty_id.clone(),
+                                expected_calibration_chain_digest,
+                                actual_calibration_chain_digest: uncertainty
+                                    .evaluation
+                                    .calibration_chain_digest
+                                    .clone(),
+                                expected_calibration_chain_count,
+                                actual_calibration_chain_count: uncertainty
+                                    .evaluation
+                                    .calibration_chain_count,
                             },
                         );
                     }
@@ -2849,6 +2879,19 @@ pub enum AssessmentError {
         /// Observation record digest carried by the uncertainty analysis.
         actual_observation_record_digest: String,
     },
+    /// The uncertainty evaluation is bound to a different calibration/traceability chain.
+    MeasurementUncertaintyEvaluationCalibrationChainMismatch {
+        /// Uncertainty identity.
+        uncertainty_id: String,
+        /// Digest derived from the exact observation's ordered calibration chain.
+        expected_calibration_chain_digest: String,
+        /// Digest declared by the uncertainty evaluation record.
+        actual_calibration_chain_digest: String,
+        /// Number of links in the exact observation's ordered calibration chain.
+        expected_calibration_chain_count: usize,
+        /// Number of links declared by the uncertainty evaluation record.
+        actual_calibration_chain_count: usize,
+    },
     /// Stated measurement uncertainty carries a digest different from its component-reference set.
     MeasurementUncertaintyComponentRefsDigestMismatch {
         /// Uncertainty identity.
@@ -4323,6 +4366,17 @@ impl AlternativesEngine {
     }
 }
 
+/// Compute a domain-separated BLAKE3 digest over the exact ordered calibration/traceability chain.
+fn canonical_calibration_chain_hash(
+    calibration_chain: &[CalibrationTraceabilityRef],
+) -> Result<String, AssessmentError> {
+    let bytes = serde_json::to_vec(calibration_chain).map_err(|_| AssessmentError::NonFinite)?;
+    let mut hasher = Hasher::new();
+    hasher.update(b"symthaea:calibration-traceability-chain:v1\n");
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
 fn canonical_measurement_uncertainty_component_refs_hash(
     component_refs: &[MeasurementUncertaintyComponentRef],
 ) -> Result<String, AssessmentError> {
@@ -4544,6 +4598,16 @@ mod tests {
                         uncertainty_budget_digest: "fixture-uncertainty-budget-digest-v1".into(),
                         component_set_digest: String::new(),
                         component_count: 1,
+                        calibration_chain_digest: canonical_calibration_chain_hash(&[
+                            CalibrationTraceabilityRef {
+                                calibration_id: "fixture-calibration-chain-v1".into(),
+                                calibration_revision: "v1".into(),
+                                calibration_record_digest: "fixture-calibration-chain-record-digest-v1".into(),
+                                used_at_epoch_seconds: 1_700_000_000,
+                            },
+                        ])
+                        .unwrap(),
+                        calibration_chain_count: 1,
                         measurement_model_id: "fixture-measurement-model-v1".into(),
                         measurement_model_revision: "v1".into(),
                         measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
@@ -4661,6 +4725,8 @@ mod tests {
                 uncertainty_budget_digest: "budget-digest-v1".into(),
                 component_set_digest: String::new(),
                 component_count: 1,
+                calibration_chain_digest: "test-calibration-chain-digest".into(),
+                calibration_chain_count: 1,
                 measurement_model_id: "model-v1".into(),
                 measurement_model_revision: "r1".into(),
                 measurement_model_digest: "model-digest-v1".into(),
@@ -8169,38 +8235,49 @@ mod tests {
     #[test]
     fn calibration_traceability_order_is_receipt_significant() {
         let case = crate::corpus::five_pathway_adversarial_case();
+
         let mut ordered = case.clone();
-        let observed = ordered
+        let ordered_evidence = ordered
             .candidates
             .iter_mut()
             .flat_map(|candidate| candidate.evidence.iter_mut())
             .find(|evidence| evidence.observation.is_some())
             .unwrap();
-        observed
-            .observation
-            .as_mut()
-            .unwrap()
-            .calibration_chain_refs
-            .push(CalibrationTraceabilityRef {
+        let (ordered_chain_digest, ordered_chain_count) = {
+            let observation = ordered_evidence.observation.as_mut().unwrap();
+            observation.calibration_chain_refs.push(CalibrationTraceabilityRef {
                 calibration_id: "additional-reference".into(),
                 calibration_revision: "v1".into(),
                 calibration_record_digest: "additional-record-digest".into(),
                 used_at_epoch_seconds: 1_700_000_001,
             });
+            (
+                canonical_calibration_chain_hash(&observation.calibration_chain_refs).unwrap(),
+                observation.calibration_chain_refs.len(),
+            )
+        };
+        let ordered_uncertainty = ordered_evidence.uncertainty.as_mut().unwrap();
+        ordered_uncertainty.evaluation.calibration_chain_digest = ordered_chain_digest;
+        ordered_uncertainty.evaluation.calibration_chain_count = ordered_chain_count;
 
         let mut reversed = ordered.clone();
-        let observed = reversed
+        let reversed_evidence = reversed
             .candidates
             .iter_mut()
             .flat_map(|candidate| candidate.evidence.iter_mut())
             .find(|evidence| evidence.observation.is_some())
             .unwrap();
-        observed
-            .observation
-            .as_mut()
-            .unwrap()
-            .calibration_chain_refs
-            .reverse();
+        let (reversed_chain_digest, reversed_chain_count) = {
+            let observation = reversed_evidence.observation.as_mut().unwrap();
+            observation.calibration_chain_refs.reverse();
+            (
+                canonical_calibration_chain_hash(&observation.calibration_chain_refs).unwrap(),
+                observation.calibration_chain_refs.len(),
+            )
+        };
+        let reversed_uncertainty = reversed_evidence.uncertainty.as_mut().unwrap();
+        reversed_uncertainty.evaluation.calibration_chain_digest = reversed_chain_digest;
+        reversed_uncertainty.evaluation.calibration_chain_count = reversed_chain_count;
 
         let ordered_result = AlternativesEngine
             .assess(&ordered.requirement, &ordered.candidates, Some(ordered.incumbent_id))
@@ -8212,7 +8289,37 @@ mod tests {
                 Some(reversed.incumbent_id),
             )
             .unwrap();
-        assert_ne!(ordered_result.receipt.payload_hash, reversed_result.receipt.payload_hash);
+        assert_ne!(
+            ordered_result.receipt.payload_hash,
+            reversed_result.receipt.payload_hash
+        );
+    }
+
+    #[test]
+    fn calibration_traceability_mutation_rejects_stale_uncertainty_evaluation() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let mut mutated = case.clone();
+        let evidence = mutated
+            .candidates
+            .iter_mut()
+            .flat_map(|candidate| candidate.evidence.iter_mut())
+            .find(|evidence| evidence.observation.is_some())
+            .unwrap();
+        evidence
+            .observation
+            .as_mut()
+            .unwrap()
+            .calibration_chain_refs[0]
+            .calibration_record_digest = "tampered-calibration-record".into();
+
+        let error = AlternativesEngine
+            .assess(&mutated.requirement, &mutated.candidates, Some(mutated.incumbent_id))
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyEvaluationCalibrationChainMismatch { .. }
+        ));
     }
 
     #[test]
@@ -8272,12 +8379,18 @@ mod tests {
                     .find(|evidence| e.observation.is_some())
             })
             .unwrap();
-        observed
-            .observation
-            .as_mut()
-            .unwrap()
-            .calibration_chain_refs[0]
-            .calibration_record_digest = "tampered-calibration-record".into();
+        let (calibration_chain_digest, calibration_chain_count) = {
+            let observation = observed.observation.as_mut().unwrap();
+            observation.calibration_chain_refs[0].calibration_record_digest =
+                "tampered-calibration-record".into();
+            (
+                canonical_calibration_chain_hash(&observation.calibration_chain_refs).unwrap(),
+                observation.calibration_chain_refs.len(),
+            )
+        };
+        let uncertainty = observed.uncertainty.as_mut().unwrap();
+        uncertainty.evaluation.calibration_chain_digest = calibration_chain_digest;
+        uncertainty.evaluation.calibration_chain_count = calibration_chain_count;
         let changed = AlternativesEngine
             .assess(&mutated.requirement, &mutated.candidates, Some(mutated.incumbent_id))
             .unwrap();
