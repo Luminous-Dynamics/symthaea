@@ -205,7 +205,6 @@ pub(crate) struct TransactionReceipt {
     pub(crate) outcome: TransactionOutcome,
     pub(crate) artifact_commitment: Option<ArtifactCommitment>,
     pub(crate) configuration_commitment: Option<ArtifactCommitment>,
-    pub(crate) hardware_configuration_commitment: Option<ArtifactCommitment>,
 }
 
 impl SystemTransaction {
@@ -253,21 +252,6 @@ impl SystemTransaction {
         artifact_commitment: Option<ArtifactCommitment>,
         configuration_commitment: Option<ArtifactCommitment>,
     ) -> TransactionReceipt {
-        self.receipt_with_image_bundle(
-            outcome,
-            artifact_commitment,
-            configuration_commitment,
-            None,
-        )
-    }
-
-    pub(crate) fn receipt_with_image_bundle(
-        &self,
-        outcome: TransactionOutcome,
-        artifact_commitment: Option<ArtifactCommitment>,
-        configuration_commitment: Option<ArtifactCommitment>,
-        hardware_configuration_commitment: Option<ArtifactCommitment>,
-    ) -> TransactionReceipt {
         TransactionReceipt {
             schema_version: self.schema_version,
             request_id: self.request_id.clone(),
@@ -279,7 +263,6 @@ impl SystemTransaction {
             outcome,
             artifact_commitment,
             configuration_commitment,
-            hardware_configuration_commitment,
         }
     }
 
