@@ -2528,8 +2528,19 @@ impl PredictionNullSummary {
         samples: &[RelationalPredictionSample],
         config: HeldOutRelationalPredictionConfig,
     ) -> Result<(), RelationalPredictionError> {
+        self.verify_against_samples_at_start(samples, config, self.source_slice_start)
+    }
+
+    /// Replay a null trace against the exact origin-local sample slice used to
+    /// produce it, while preserving its absolute source-slice identity.
+    pub fn verify_against_samples_at_start(
+        &self,
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+        source_slice_start: usize,
+    ) -> Result<(), RelationalPredictionError> {
         self.validate_trace()?;
-        if config != self.config {
+        if config != self.config || source_slice_start != self.source_slice_start {
             return Err(RelationalPredictionError::InvalidSplit);
         }
         let expected = prediction_null_input_digest(
@@ -2538,7 +2549,7 @@ impl PredictionNullSummary {
             self.family,
             self.feature_set,
             self.requested_surrogate_count,
-            self.source_slice_start,
+            source_slice_start,
         );
         // Standalone replay verifies the null-local commitment only.
         // The parent qualification commitment may legitimately differ after
@@ -2547,12 +2558,13 @@ impl PredictionNullSummary {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
         }
 
-        let recomputed = Self::compute_for_feature_set(
+        let recomputed = Self::compute_for_feature_set_at_start(
             samples,
             config,
             self.family,
             self.feature_set,
             self.requested_surrogate_count,
+            source_slice_start,
         )?;
         if recomputed != *self {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
@@ -5475,6 +5487,33 @@ mod tests {
         assert!(json.contains(NULL_EVIDENCE_SCHEMA));
         assert!(json.contains("evaluation_input_blake3"));
         assert!(json.contains("qualification_input_blake3"));
+    }
+
+    #[test]
+    fn rolling_null_trace_replays_with_absolute_source_start() {
+        let samples = build_samples(0.5);
+        let config = config();
+        let source_start = 8;
+        let segment_total = config.train_samples + config.gap_samples + config.test_samples;
+        let segment = &samples[source_start..source_start + segment_total];
+
+        let trace = PredictionNullSummary::compute_for_feature_set_at_start(
+            segment,
+            config,
+            PredictionNullFamily::IncrementalRelationalShift,
+            PredictionFeatureSet::RelationalAugmented,
+            8,
+            source_start,
+        )
+        .unwrap();
+
+        trace
+            .verify_against_samples_at_start(segment, config, source_start)
+            .unwrap();
+        assert_eq!(
+            trace.verify_against_samples_at_start(segment, config, source_start + 1),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
     }
 
     #[test]
