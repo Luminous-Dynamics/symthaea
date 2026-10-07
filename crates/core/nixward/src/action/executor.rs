@@ -1433,6 +1433,33 @@ impl NixOSExecutor {
             ));
         }
 
+        let expected_manager_owner = authority
+            .service_manager_owner()
+            .ok_or_else(|| {
+                "Service execution authority has no bound systemd manager owner"
+                    .to_string()
+            })?;
+        let expected_bus_id = authority
+            .service_bus_id()
+            .ok_or_else(|| {
+                "Service execution authority has no bound D-Bus bus incarnation"
+                    .to_string()
+            })?;
+        if content.manager_owner() != expected_manager_owner {
+            return Err(format!(
+                "systemd manager owner changed since approval: approved={} current={}",
+                expected_manager_owner,
+                content.manager_owner()
+            ));
+        }
+        if content.bus_id() != expected_bus_id {
+            return Err(format!(
+                "D-Bus incarnation changed since approval: approved={} current={}",
+                expected_bus_id,
+                content.bus_id()
+            ));
+        }
+
         if operation == NixServiceOperationKindV1::Restart {
             let expected_invocation_id = authority
                 .pre_invocation_id()
