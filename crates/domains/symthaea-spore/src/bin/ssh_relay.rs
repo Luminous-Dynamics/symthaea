@@ -3576,7 +3576,7 @@ async fn restore_verified_archive(
 
 #[derive(Debug, Clone)]
 struct ConfigurationSwap {
-    target_dir: std::path::PathBuf,
+    target_dir: std::fs::File,
     temp_name: String,
     backup_name: String,
 }
@@ -3716,25 +3716,20 @@ fn replace_configuration_atomically_blocking(
         .map_err(|error| format!("unable to synchronize configuration directory after swap: {error}"))?;
 
     Ok(ConfigurationSwap {
-        target_dir: target_dir_path.to_path_buf(),
+        target_dir,
         temp_name,
         backup_name,
     })
 }
 
 fn finalize_configuration_swap_blocking(
-    swap: &ConfigurationSwap,
+    swap: ConfigurationSwap,
     commit: bool,
 ) -> Result<(), String> {
     use std::ffi::CString;
-    use std::os::unix::fs::{AsRawFd, OpenOptionsExt};
+    use std::os::unix::fs::AsRawFd;
 
-    let target_dir = std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open(&swap.target_dir)
-        .map_err(|error| format!("unable to reopen configuration directory for swap finalization: {error}"))?;
-    let dir_fd = target_dir.as_raw_fd();
+    let dir_fd = swap.target_dir.as_raw_fd();
     let temp_c = CString::new(swap.temp_name.as_str())
         .map_err(|_| "configuration swap temp name contains NUL".to_string())?;
     let backup_c = CString::new(swap.backup_name.as_str())
@@ -3762,7 +3757,7 @@ fn finalize_configuration_swap_blocking(
         unlink(&backup_c)?;
     }
 
-    target_dir
+    swap.target_dir
         .sync_all()
         .map_err(|error| format!("unable to synchronize configuration directory after swap finalization: {error}"))
 }
@@ -3789,7 +3784,7 @@ async fn finalize_configuration_swap(
     swap: ConfigurationSwap,
     commit: bool,
 ) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || finalize_configuration_swap_blocking(&swap, commit))
+    tokio::task::spawn_blocking(move || finalize_configuration_swap_blocking(swap, commit))
         .await
         .map_err(|error| format!("configuration swap finalization task failed: {error}"))?
 }
