@@ -317,6 +317,28 @@ purposes: the generic oracle exercises the construction across random codes, whi
 fixed specification oracle breaks algorithmic coupling on the canonical fixture.
 
 
+## Quotient-metric closure
+
+The fixed specification is now used to verify more than the scalar leader profile.
+All 64 syndrome classes are materialized as their four-element ambient fibers, and
+for every ordered pair of syndrome classes the minimum Hamming distance between
+their ambient fibers is compared with the leader weight of the XOR difference of
+the two syndromes.
+
+This closes the induced quotient metric directly:
+
+`d_bar(s,t) = min { wt(x+y) : Hx^T=s, Hy^T=t } = leader(s xor t)`.
+
+The test exhausts all 4,096 syndrome pairs (16 ambient word pairs per class pair)
+and then checks the triangle inequality over all 64^3 ordered triples. It also
+records the covering-radius ceiling of 4.
+
+Unlike nearest-codeword comparison, this check never enumerates codewords at all.
+It reasons only over the independently specified syndrome partition and ambient
+Hamming distance. This makes it a geometry-level invariant rather than another
+decoder-vs-oracle equality check.
+
+
 ## Beyond-radius semantics
 
 A separate fixture tests corruption beyond the unique-decoding radius without asking the decoder to recover an arbitrarily designated clean target.
