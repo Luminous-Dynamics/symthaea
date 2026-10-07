@@ -1154,6 +1154,8 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
         sha2::Sha256::digest(&state_header_bytes(&valid_outer)).into();
     let expected_receipt_header_fingerprint: [u8; 32] =
         sha2::Sha256::digest(&receipt.protected_header_bytes()).into();
+    let expected_receipt_payload_sha256: [u8; 32] =
+        sha2::Sha256::digest(receipt.payload().attached_root().unwrap()).into();
     assert_eq!(state.outer_verification_key_sha256(), expected_key_fingerprint);
     assert_eq!(
         state.outer_protected_header_sha256(),
@@ -1167,6 +1169,10 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
     assert_eq!(
         state.receipt().protected_header_sha256(),
         expected_receipt_header_fingerprint
+    );
+    assert_eq!(
+        state.receipt().payload_sha256(),
+        expected_receipt_payload_sha256
     );
     assert_eq!(
         state.receipt().external_aad_sha256(),
