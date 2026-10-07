@@ -14,7 +14,7 @@ use super::authorization::NixLocalExecutionAuthorityV1;
 /// cannot recreate this provenance from serialized records.
 #[must_use]
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) struct NixLiveExecutionWitnessV1 {
+pub struct NixLiveExecutionWitnessV1 {
     action_intent_digest: String,
     authorization_record_digest: String,
     approval_request_id: String,
@@ -57,31 +57,31 @@ impl NixLiveExecutionWitnessV1 {
         })
     }
 
-    pub(crate) fn action_intent_digest(&self) -> &str {
+    pub fn action_intent_digest(&self) -> &str {
         &self.action_intent_digest
     }
 
-    pub(crate) fn authorization_record_digest(&self) -> &str {
+    pub fn authorization_record_digest(&self) -> &str {
         &self.authorization_record_digest
     }
 
-    pub(crate) fn approval_request_id(&self) -> &str {
+    pub fn approval_request_id(&self) -> &str {
         &self.approval_request_id
     }
 
-    pub(crate) fn projection_digest(&self) -> &str {
+    pub fn projection_digest(&self) -> &str {
         &self.projection_digest
     }
 
-    pub(crate) fn pre_state_identity(&self) -> Option<&str> {
+    pub fn pre_state_identity(&self) -> Option<&str> {
         self.pre_state_identity.as_deref()
     }
 
-    pub(crate) fn service_definition_content_digest(&self) -> Option<&str> {
+    pub fn service_definition_content_digest(&self) -> Option<&str> {
         self.service_definition_content_digest.as_deref()
     }
 
-    pub(crate) fn pre_invocation_id(&self) -> Option<&str> {
+    pub fn pre_invocation_id(&self) -> Option<&str> {
         self.pre_invocation_id.as_deref()
     }
 
