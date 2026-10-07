@@ -34,6 +34,7 @@ use super::local_approval_store::{
     ConsumedLocalApprovalDecisionV1, LocalApprovalRequestStoreErrorV1,
     LocalApprovalRequestStoreV1, PendingRequestCurrentnessV1, PendingRequestInstallV1,
 };
+use super::service_effect::NixVerifiedServiceDefinitionContentV1;
 use super::temporal::UnixMillisV1;
 use std::path::Path;
 use thiserror::Error;
@@ -153,14 +154,61 @@ impl LocalApprovalRuntimeV1 {
 
     /// Mint and atomically install one exact local approval request.
     ///
-    /// The caller supplies the exact typed command, semantic intent, profile,
-    /// and time window. The runtime derives the operator-visible ceremony text
-    /// itself from that command before installation.
-    /// Incarnation identity and request nonce remain owned by the live daemon context.
+    /// The generic entry point deliberately excludes Service actions. Service approval
+    /// must carry an observer-sealed definition capture through the dedicated entry point.
     pub fn create_pending_request(
         &self,
         intent: &NixActionIntentV1,
         command: &NixOSCommand,
+        authority_profile: RequiredApprovalProfileV1,
+        created_at: UnixMillisV1,
+        expires_at: UnixMillisV1,
+    ) -> Result<InstalledLocalApprovalRequestV1, LocalApprovalRuntimeErrorV1> {
+        if matches!(command, NixOSCommand::Service { .. }) {
+            return Err(LocalApprovalRuntimeErrorV1::Authorization(
+                super::authorization::NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture,
+            ));
+        }
+        self.create_pending_request_internal(
+            intent,
+            command,
+            None,
+            authority_profile,
+            created_at,
+            expires_at,
+        )
+    }
+
+    /// Mint and install a Service approval only when the exact intent is bound to
+    /// observer-sealed definition content at the approval boundary.
+    pub fn create_pending_service_request_with_definition_capture(
+        &self,
+        intent: &NixActionIntentV1,
+        command: &NixOSCommand,
+        content: &NixVerifiedServiceDefinitionContentV1,
+        authority_profile: RequiredApprovalProfileV1,
+        created_at: UnixMillisV1,
+        expires_at: UnixMillisV1,
+    ) -> Result<InstalledLocalApprovalRequestV1, LocalApprovalRuntimeErrorV1> {
+        if !matches!(command, NixOSCommand::Service { .. }) {
+            return Err(LocalApprovalRuntimeErrorV1::IntentCommandMismatch);
+        }
+        intent.validate_service_definition_content_capture(content)?;
+        self.create_pending_request_internal(
+            intent,
+            command,
+            Some(content),
+            authority_profile,
+            created_at,
+            expires_at,
+        )
+    }
+
+    fn create_pending_request_internal(
+        &self,
+        intent: &NixActionIntentV1,
+        command: &NixOSCommand,
+        definition_content: Option<&NixVerifiedServiceDefinitionContentV1>,
         authority_profile: RequiredApprovalProfileV1,
         created_at: UnixMillisV1,
         expires_at: UnixMillisV1,
@@ -179,15 +227,21 @@ impl LocalApprovalRuntimeV1 {
             return Err(LocalApprovalRuntimeErrorV1::IntentCommandMismatch);
         }
 
-        if matches!(
-            command,
-            NixOSCommand::Service { .. }
-        ) && intent.service_effect_context().is_none()
-        {
-            return Err(LocalApprovalRuntimeErrorV1::Authorization(
-                super::authorization::NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture,
-            ));
+        match command {
+            NixOSCommand::Service { .. } => {
+                let content = definition_content.ok_or_else(|| {
+                    LocalApprovalRuntimeErrorV1::Authorization(
+                        super::authorization::NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture,
+                    )
+                })?;
+                intent.validate_service_definition_content_capture(content)?;
+            }
+            _ if definition_content.is_some() => {
+                return Err(LocalApprovalRuntimeErrorV1::IntentCommandMismatch);
+            }
+            _ => {}
         }
+
         let displayed_action = operator_visible_action_for_command(command);
 
         let request = self.daemon_incarnation.create_approval_request(
