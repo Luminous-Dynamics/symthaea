@@ -3578,7 +3578,6 @@ async fn restore_verified_archive(
 struct ConfigurationSwap {
     target_dir: std::fs::File,
     temp_name: String,
-    backup_name: String,
 }
 
 fn atomic_exchange_at(
@@ -3662,11 +3661,8 @@ fn replace_configuration_atomically_blocking(
     }
 
     let temp_name = format!(".configuration.nix.swap.{transaction_id}");
-    let backup_name = format!(".configuration.nix.backup.{transaction_id}");
     let temp_c = CString::new(temp_name.as_str())
         .map_err(|_| "configuration swap staging name contains NUL".to_string())?;
-    let backup_c = CString::new(backup_name.as_str())
-        .map_err(|_| "configuration backup name contains NUL".to_string())?;
 
     let temp_fd = unsafe {
         libc::openat(
@@ -3697,16 +3693,10 @@ fn replace_configuration_atomically_blocking(
             format!("unable to synchronize configuration swap staging file: {error}")
         })?;
 
-    if unsafe { libc::linkat(dir_fd, final_c.as_ptr(), dir_fd, backup_c.as_ptr(), 0) } != 0 {
-        let error = std::io::Error::last_os_error();
-        let _ = unsafe { libc::unlinkat(dir_fd, temp_c.as_ptr(), 0) };
-        return Err(format!(
-            "unable to retain current configuration backup link: {error}"
-        ));
-    }
-
+    // RENAME_EXCHANGE is itself the rollback handle: after the exchange,
+    // the old configuration inode remains at temp_name until the transaction
+    // is explicitly committed or reverted.
     if let Err(error) = atomic_exchange_at(dir_fd, &temp_c, &final_c) {
-        let _ = unsafe { libc::unlinkat(dir_fd, backup_c.as_ptr(), 0) };
         let _ = unsafe { libc::unlinkat(dir_fd, temp_c.as_ptr(), 0) };
         return Err(error);
     }
@@ -3718,7 +3708,6 @@ fn replace_configuration_atomically_blocking(
     Ok(ConfigurationSwap {
         target_dir,
         temp_name,
-        backup_name,
     })
 }
 
@@ -3732,8 +3721,6 @@ fn finalize_configuration_swap_blocking(
     let dir_fd = swap.target_dir.as_raw_fd();
     let temp_c = CString::new(swap.temp_name.as_str())
         .map_err(|_| "configuration swap temp name contains NUL".to_string())?;
-    let backup_c = CString::new(swap.backup_name.as_str())
-        .map_err(|_| "configuration swap backup name contains NUL".to_string())?;
     let final_c = CString::new("configuration.nix").unwrap();
 
     let unlink = |name: &std::ffi::CString| -> Result<(), String> {
@@ -3749,12 +3736,13 @@ fn finalize_configuration_swap_blocking(
     };
 
     if commit {
+        // The temp path contains the old inode. Removing it commits the swap.
         unlink(&temp_c)?;
-        unlink(&backup_c)?;
     } else {
+        // The temp path still contains the old inode. Exchange it back to restore
+        // the exact original file atomically, then remove the replacement inode.
         atomic_exchange_at(dir_fd, &temp_c, &final_c)?;
         unlink(&temp_c)?;
-        unlink(&backup_c)?;
     }
 
     swap.target_dir
@@ -9623,13 +9611,6 @@ mod tests {
             ).unwrap(),
             old
         );
-        assert_eq!(
-            std::fs::read(
-                dir.join(&swap.backup_name)
-            ).unwrap(),
-            old
-        );
-
         finalize_configuration_swap_blocking(swap, true).unwrap();
         assert_eq!(std::fs::read(&target).unwrap(), new);
 
