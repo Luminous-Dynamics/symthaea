@@ -4215,7 +4215,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
 
             "discover_disks" => {
                 eprintln!("[{}] Discovering disks...", peer_addr);
-                match run_cmd("lsblk --json -o NAME,SIZE,MODEL,TYPE,TRAN,RM -b").await {
+                match run_privileged_args("lsblk", &["--json", "-o", "NAME,SIZE,MODEL,TYPE,TRAN,RM", "-b"]).await {
                     Ok(result) if result.exit_status == 0 => {
                         let disks = parse_lsblk(&result.stdout);
                         let disks_json =
@@ -6352,13 +6352,54 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
             // ═══════════════════════════════════════════════════════
             "list_generations" => {
                 eprintln!("[{}] Listing generations...", peer_addr);
-                match run_cmd(r#"nix-env --list-generations -p /nix/var/nix/profiles/system 2>/dev/null | awk '{num=$1; date=$2" "$3" "$4; cur=""; if(/\(current\)/) cur=",\"current\":true"; if(NR>1) printf ","; printf "{\"number\":%s,\"date\":\"%s\"%s}", num, date, cur}' | awk 'BEGIN{print "["} {print} END{print "]"}'"#).await {
+                match run_privileged_args(
+                    "nix-env",
+                    &["--list-generations", "-p", "/nix/var/nix/profiles/system"],
+                )
+                .await
+                {
                     Ok(r) if r.exit_status == 0 => {
-                        let clean: String = r.stdout.chars().filter(|c| !c.is_control() || *c == '\n').collect();
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"generations","data":clean}).to_string())).await;
+                        let generations: Vec<serde_json::Value> = r
+                            .stdout
+                            .lines()
+                            .filter_map(|line| {
+                                let fields: Vec<&str> = line.split_whitespace().collect();
+                                if fields.len() < 4 {
+                                    return None;
+                                }
+                                let number = fields[0].parse::<u64>().ok()?;
+                                Some(serde_json::json!({
+                                    "number": number,
+                                    "date": format!("{} {} {}", fields[1], fields[2], fields[3]),
+                                    "current": line.contains("(current)")
+                                }))
+                            })
+                            .collect();
+                        let data =
+                            serde_json::to_string(&generations).unwrap_or_else(|_| "[]".into());
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({"type":"generations","data":data}).to_string(),
+                            ))
+                            .await;
                     }
-                    Ok(r) => { let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Failed (exit {}): {}", r.exit_status, &r.stderr[..r.stderr.len().min(200)])).to_json())).await; }
-                    Err(e) => { let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Failed: {}", e)).to_json())).await; }
+                    Ok(r) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Failed (exit {}): {}",
+                                    r.exit_status,
+                                    r.stderr.chars().take(200).collect::<String>()
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&format!("Failed: {}", e)).to_json()))
+                            .await;
+                    }
                 }
             }
 
@@ -6652,13 +6693,61 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
 
             "list_services" => {
                 eprintln!("[{}] Listing services...", peer_addr);
-                match run_cmd(r#"systemctl list-units --type=service --all --no-pager --plain 2>/dev/null | grep '\.service' | awk '{name=$1; sub(/\.service$/,"",name); active=$3; sub_=$4; $1=$2=$3=$4=""; desc=substr($0,5); printf "{\"name\":\"%s\",\"active\":\"%s\",\"sub\":\"%s\",\"desc\":\"%s\"}\n", name, active, sub_, desc}' | awk 'BEGIN{print "["} NR>1{printf ","} {print} END{print "]"}'"#).await {
+                match run_privileged_args(
+                    "systemctl",
+                    &[
+                        "list-units",
+                        "--type=service",
+                        "--all",
+                        "--no-pager",
+                        "--plain",
+                        "--no-legend",
+                    ],
+                )
+                .await
+                {
                     Ok(r) if r.exit_status == 0 => {
-                        let clean: String = r.stdout.chars().filter(|c| !c.is_control() || *c == '\n').collect();
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"services","data":clean}).to_string())).await;
+                        let services: Vec<serde_json::Value> = r
+                            .stdout
+                            .lines()
+                            .filter_map(|line| {
+                                let fields: Vec<&str> = line.split_whitespace().collect();
+                                if fields.len() < 4 || !fields[0].ends_with(".service") {
+                                    return None;
+                                }
+                                Some(serde_json::json!({
+                                    "name": fields[0].trim_end_matches(".service"),
+                                    "active": fields[2],
+                                    "sub": fields[3],
+                                    "desc": fields.get(4..).map(|rest| rest.join(" ")).unwrap_or_default()
+                                }))
+                            })
+                            .collect();
+                        let data =
+                            serde_json::to_string(&services).unwrap_or_else(|_| "[]".into());
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({"type":"services","data":data}).to_string(),
+                            ))
+                            .await;
                     }
-                    Ok(r) => { let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Failed: {}", &r.stderr[..r.stderr.len().min(200)])).to_json())).await; }
-                    Err(e) => { let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Failed: {}", e)).to_json())).await; }
+                    Ok(r) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Failed (exit {}): {}",
+                                    r.exit_status,
+                                    r.stderr.chars().take(200).collect::<String>()
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&format!("Failed: {}", e)).to_json()))
+                            .await;
+                    }
                 }
             }
 
@@ -7058,26 +7147,19 @@ echo '}'
 
             "read_config" => {
                 eprintln!("[{}] Reading config...", peer_addr);
-                match run_cmd("cat /etc/nixos/configuration.nix 2>/dev/null").await {
-                    Ok(r) if r.exit_status == 0 => {
+                match tokio::fs::read_to_string("/etc/nixos/configuration.nix").await {
+                    Ok(data) => {
                         let _ = ws_tx
                             .send(Message::Text(
-                                serde_json::json!({"type":"config","data":r.stdout}).to_string(),
+                                serde_json::json!({"type":"config","data":data}).to_string(),
                             ))
                             .await;
                     }
-                    Ok(_) => {
+                    Err(error) => {
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error("Cannot read /etc/nixos/configuration.nix")
+                                RelayMessage::error(&format!("Cannot read /etc/nixos/configuration.nix: {error}"))
                                     .to_json(),
-                            ))
-                            .await;
-                    }
-                    Err(e) => {
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::error(&format!("Failed: {}", e)).to_json(),
                             ))
                             .await;
                     }
@@ -8237,7 +8319,7 @@ echo '}'
             // ── WiFi scanning and connection ──
             "scan_wifi" => {
                 eprintln!("[{}] Scanning WiFi...", peer_addr);
-                match run_cmd("nmcli -t -f SSID,SIGNAL,SECURITY device wifi list 2>/dev/null").await
+                match run_privileged_args("nmcli", &["-t", "-f", "SSID,SIGNAL,SECURITY", "device", "wifi", "list"]).await
                 {
                     Ok(r) if r.exit_status == 0 => {
                         let _ = ws_tx
@@ -8721,20 +8803,27 @@ echo '}'
             // Used to detect stale package names in the app database.
             "nixpkgs_version" => {
                 eprintln!("[{}] Querying nixpkgs version...", peer_addr);
-                match run_cmd("nixos-version 2>/dev/null || nix eval nixpkgs#lib.version --raw 2>/dev/null || echo unknown").await {
-                    Ok(r) => {
-                        let version = r.stdout.trim().to_string();
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({
+                let version = match run_privileged_args("nixos-version", &[]).await {
+                    Ok(r) if r.exit_status == 0 => r.stdout.trim().to_string(),
+                    _ => match run_privileged_args(
+                        "nix",
+                        &["eval", "nixpkgs#lib.version", "--raw"],
+                    )
+                    .await
+                    {
+                        Ok(r) if r.exit_status == 0 => r.stdout.trim().to_string(),
+                        _ => "unknown".to_string(),
+                    },
+                };
+                let _ = ws_tx
+                    .send(Message::Text(
+                        serde_json::json!({
                             "type": "nixpkgs_version",
                             "data": version
-                        }).to_string())).await;
-                    }
-                    Err(e) => {
-                        let _ = ws_tx.send(Message::Text(
-                            RelayMessage::error(&format!("Version check failed: {}", e)).to_json()
-                        )).await;
-                    }
-                }
+                        })
+                        .to_string(),
+                    ))
+                    .await;
             }
 
             "disconnect" => {
