@@ -7655,52 +7655,54 @@ echo "COMPLETE"
 
                 match run_cmd_with_stdin(&script, image_archive_file).await {
                     Ok(r) => {
-                        let observed_outcome = if r.exit_status == 0 {
-                            let config_result = run_cmd_with_stdin(
+                        let observed_outcome = if r.exit_status != 0 {
+                            TransactionOutcome::Failed
+                        } else {
+                            match run_cmd_with_stdin(
                                 restore_configuration_from_verified_stdin(),
                                 image_configuration_file,
                             )
-                            .await;
-                            match config_result {
+                            .await
+                            {
                                 Ok(config) if config.exit_status == 0 => {
                                     match verify_restored_image_postcondition(
                                         &image_configuration_commitment,
                                     )
-                                    .await {
-                                Ok(true) => TransactionOutcome::ObservedSuccess,
-                                Ok(false) => TransactionOutcome::Failed,
-                                    Err(error) => {
+                                    .await
+                                    {
+                                        Ok(true) => TransactionOutcome::ObservedSuccess,
+                                        Ok(false) => TransactionOutcome::Failed,
+                                        Err(error) => {
+                                            eprintln!(
+                                                "[{}] {} restore postcondition probe failed: {}",
+                                                peer_addr,
+                                                transaction.log_line(),
+                                                error
+                                            );
+                                            TransactionOutcome::Indeterminate
+                                        }
+                                    }
+                                }
+                                Ok(config) => {
                                     eprintln!(
-                                        "[{}] {} restore postcondition probe failed: {}",
+                                        "[{}] {} configuration restore command exited with {}: {}",
                                         peer_addr,
                                         transaction.log_line(),
-                                        error
+                                        config.exit_status,
+                                        config.stderr.chars().take(200).collect::<String>()
                                     );
-                                    TransactionOutcome::Indeterminate
+                                    TransactionOutcome::Failed
                                 }
-                            }
-                                    },
                                 Err(error) => {
                                     eprintln!(
-                                        "[{}] {} configuration restore from verified descriptor failed: {}",
+                                        "[{}] {} configuration restore command could not be started: {}",
                                         peer_addr,
                                         transaction.log_line(),
                                         error
                                     );
                                     TransactionOutcome::Indeterminate
                                 }
-                            },
-                            Err(error) => {
-                                eprintln!(
-                                    "[{}] {} configuration restore command could not be started: {}",
-                                    peer_addr,
-                                    transaction.log_line(),
-                                    error
-                                );
-                                TransactionOutcome::Indeterminate
                             }
-                        } else {
-                            TransactionOutcome::Failed
                         };
                         let outcome = finalize_transaction(
                             &transaction_ledger,
