@@ -1716,7 +1716,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn completion_lowering_digest_binds_final_timeline_policy() {
         let (_, _, mut plan, _) = fixture();
         let baseline = completion_lowering_digest(
@@ -1775,6 +1774,7 @@ mod tests {
         ));
     }
 
+    #[test]
     fn receipt_rejects_tampered_completion_lowering_digest() {
         let (graph, schedule, plan, initial) = fixture();
         let final_state = simulate(&graph, &schedule, &initial).unwrap();
