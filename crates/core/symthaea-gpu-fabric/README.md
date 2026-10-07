@@ -80,3 +80,17 @@ The `VulkanSyncPlan` is the first backend-specific lowering layer. It maps the s
 A dependency whose producer and consumer share a logical queue relies on submission order. A dependency crossing queues becomes an explicit timeline wait on the producer queue. This avoids treating a single global timeline as if signals from independent queues were implicitly ordered.
 
 The plan contains no Vulkan handles, device claims, or completion receipt. It is a lowering artifact only. Actual `VkQueue`, timeline semaphore, `VkSemaphoreSubmitInfo`, and `vkQueueSubmit2` binding remains a runtime/device layer.
+## Real Vulkan synchronization qualification
+
+The `VulkanSyncRuntime` binds a `VulkanSyncPlan` to actual Vulkan 1.3
+timeline semaphores and `vkQueueSubmit2`, then waits on and queries the
+resulting timeline values from the host.
+
+This lane is intentionally synchronization-only. It maps all logical lanes
+onto one actual compute queue, so its result proves real timeline
+submission/wait/completion behavior but does not claim independent hardware
+queue execution.
+
+The qualification workflow installs the Vulkan validation layer and runs the
+ignored real-device test separately from ordinary unit tests. A skipped or
+queued workflow is not treated as a qualification result.
