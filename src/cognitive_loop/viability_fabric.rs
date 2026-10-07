@@ -550,15 +550,14 @@ impl ViabilityFabric {
         let key = name.into();
         let previous = self.state.resource_pressure.get(&key);
         let rate_of_change = previous
-            .and_then(|prev| {
+            .map(|prev| {
                 let delta_cycle = observation.cycle.saturating_sub(prev.observation.cycle);
                 if delta_cycle == 0 {
-                    None
+                    // Telemetry may refresh the same variable more than once within a cycle.
+                    // Preserve the already-derived trend rather than erasing it.
+                    prev.rate_of_change
                 } else {
-                    Some(
-                        (observation.value - prev.observation.value)
-                            / delta_cycle as f64,
-                    )
+                    (observation.value - prev.observation.value) / delta_cycle as f64
                 }
             })
             .unwrap_or(0.0);
@@ -814,6 +813,49 @@ mod tests {
             prediction_error: None,
         };
         assert!(variable.normalized_pressure() > 0.0);
+    }
+
+    #[test]
+    fn same_cycle_observation_preserves_derived_rate() {
+        let mut fabric = ViabilityFabric::new(4);
+        let band = band();
+        fabric.begin_cycle(1);
+        fabric.observe_variable(
+            "load",
+            ViabilitySignal::new(0.4, 1.0, 1, "test"),
+            band,
+            None,
+        );
+        fabric.begin_cycle(2);
+        fabric.observe_variable(
+            "load",
+            ViabilitySignal::new(0.6, 1.0, 2, "test"),
+            band,
+            None,
+        );
+
+        let before = fabric
+            .state()
+            .resource_pressure
+            .get("load")
+            .expect("load exists")
+            .rate_of_change;
+
+        fabric.observe_variable(
+            "load",
+            ViabilitySignal::new(0.6, 1.0, 2, "test"),
+            band,
+            None,
+        );
+
+        let after = fabric
+            .state()
+            .resource_pressure
+            .get("load")
+            .expect("load exists")
+            .rate_of_change;
+
+        assert_eq!(before, after);
     }
 
     #[test]
