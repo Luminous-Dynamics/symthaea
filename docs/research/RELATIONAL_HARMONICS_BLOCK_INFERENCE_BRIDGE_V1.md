@@ -6,6 +6,19 @@
 
 This note derives a candidate block-level inferential object for the existing RH-006 rolling geometry and records deterministic null-size simulations. It does not authorize a p-value, confidence interval, or change the existing stop-assumption-failure selector.
 
+## Calibration correction
+
+An earlier draft used relational coefficients that were too large to serve as clean equal-risk stress targets under several dependent/error-heteroskedastic DGPs. Before retaining the result as methodological evidence, the targets were rechecked with a separate DGP-only 120-replication calibration audit and replaced with:
+
+~~~text
+IID:              0.080
+AR(0.5):          0.088
+AR(0.8):          0.126
+AR(0.5)+hetero:   0.1125
+~~~
+
+The updated simulation is the canonical result. The prior draft is superseded by this correction in Git history.
+
 ## 1. Exact statistical object
 
 For origin o and target j, define the retained squared-loss differential:
@@ -46,15 +59,17 @@ beta_relational = 0
 is not identical in finite samples to
 
 ~~~text
-E[D[o]] = 0.
+E[D[o]] = 0
 ~~~
 
-The larger forecasting method estimates additional coefficients even when their population values are zero. That estimation can change finite-sample forecast risk. Clark–McCracken explicitly formulate their nested forecast framework around finite-sample equal-accuracy rather than assuming that zero additional coefficients automatically yields equal finite-sample MSFE. Doko Tchatoka–Haque likewise treat nested forecast inference as a special bootstrap problem.
+because the larger forecasting method estimates additional coefficients even when their population values are zero. That estimation can change finite-sample forecast risk.
+
+Clark–McCracken explicitly formulate nested forecast testing around finite-sample equal accuracy rather than assuming zero additional coefficients automatically produces equal finite-sample MSFE. Doko Tchatoka–Haque likewise treat nested forecast inference as a special bootstrap problem.
 
 Therefore the simulation suite separates:
 
 1. **Coefficient-null:** incremental relational coefficients are exactly zero. This diagnoses the finite-sample nesting effect; it is not the final equal-risk null.
-2. **DGP-only equal-risk calibration targets:** small fixed relational coefficients are chosen in simulation-only calibration work so the expected origin-level loss differential is approximately zero for a declared geometry. These targets are not estimated from confirmatory data and are not scientific effect estimates.
+2. **DGP-only approximate equal-risk targets:** fixed coefficients are selected in simulation-only calibration work so the expected origin-level loss differential is approximately zero for the declared geometry. These values are not estimated from confirmatory data and are not scientific effect estimates.
 
 ## 3. Candidate block statistic
 
@@ -79,21 +94,21 @@ This is a candidate diagnostic statistic, not an approved RH-006 test statistic.
 
 ## 4. Candidate origin-level moving-block bootstrap
 
-The first executable candidate imposes its null by centering the origin means:
+The candidate imposes its null by centering the origin means:
 
 ~~~text
-D0[o] = D[o] - bar_D.
+D0[o] = D[o] - bar_D
 ~~~
 
-A moving-block bootstrap then samples contiguous origin blocks of length L with replacement until O origin means have been generated. The same statistic T* is computed on every bootstrap sequence, using the same fixed Bartlett bandwidth.
+and then samples contiguous origin blocks of length L with replacement until O origin means are generated. The same statistic T* is computed on every bootstrap sequence using the same fixed Bartlett bandwidth.
 
 The one-sided empirical tail is:
 
 ~~~text
-p_candidate = (1 + count(T* >= T_obs)) / (B + 1).
+p_candidate = (1 + count(T* >= T_obs)) / (B + 1)
 ~~~
 
-The +1 correction is only a deterministic finite-sample bootstrap convention. The result remains explicitly non-formal in this artifact.
+This is explicitly non-formal.
 
 ### Design-derived block-length anchor
 
@@ -105,7 +120,7 @@ L_overlap = 1 + floor((train_samples - 1) / step_samples)
 
 origins.
 
-For the current default geometry:
+For the current geometry:
 
 ~~~text
 train_samples = 48
@@ -113,27 +128,25 @@ step_samples  = 16
 L_overlap     = 3
 ~~~
 
-so L=3 is the minimum design-derived block anchor. L=6 is retained as a prespecified sensitivity case. Neither is selected using the confirmatory loss realization.
+so L=3 is the minimum design-derived block anchor. L=6 is a prespecified sensitivity case. Neither is chosen from the confirmatory effect.
 
-This overlap formula captures one known source of cross-origin dependence. It does not prove that the complete forecast-loss process has dependence length three.
+The overlap formula captures one source of cross-origin dependence. It does not prove that the complete forecast-loss process has dependence length three.
 
 ## 5. Why this candidate is not yet the final nested bootstrap
 
-The candidate resamples the retained origin-loss means. It therefore does not recreate:
+The candidate resamples retained origin-loss means. It therefore does not recreate:
 
 - the raw outcome-generating process;
-- the finite-sample parameter-estimation distribution;
+- finite-sample parameter-estimation uncertainty;
 - training-window standardization estimation;
 - ridge fitting at every bootstrap origin;
-- the joint dependence created when overlapping rolling training windows are refit on the same resampled series.
+- the joint dependence created when overlapping rolling training windows are refit on one resampled series.
 
-That is a decisive limitation for RH-006.
-
-Doko Tchatoka–Haque's published hybrid procedure instead constructs a bootstrap DGP and refits the nested forecasting system, with dependence handled through a moving-block component and residual resampling. The present loss-level bootstrap deliberately does less, so its simulation behavior is a diagnostic of the candidate, not a citation-based validity claim.
+Doko Tchatoka–Haque's published procedure instead constructs a bootstrap DGP and refits the forecasting system, using dependence-aware residual/block generation. That distinction is central here.
 
 ## 6. Deterministic simulation design
 
-The simulator mirrors the RH-006 estimator:
+The research harness mirrors the RH-006 estimator:
 
 - fixed-width rolling training;
 - fixed gap;
@@ -149,9 +162,9 @@ The simulator mirrors the RH-006 estimator:
 - origin-level studentization;
 - moving-block bootstrap over origins.
 
-The random generator is a pinned SplitMix64 stream with Rademacher innovations. This avoids dependence on platform-specific normal RNG behavior.
+The RNG is a pinned SplitMix64 stream with Rademacher innovations.
 
-Default pilot geometry:
+Pilot geometry:
 
 ~~~text
 train_samples      = 48
@@ -167,14 +180,32 @@ bootstrap_reps     = 199
 Monte Carlo reps   = 120
 ~~~
 
-The deterministic result artifact is:
+Generated simulation artifact SHA-256:
+
+~~~text
+01ac0ec64b8d17292ba2162fb9f9d9f06b840a5494ebace3502b6d609a817043
+~~~
+
+Machine-readable record:
 
 ~~~text
 docs/research/RELATIONAL_HARMONICS_BLOCK_INFERENCE_SIMULATION_V1.json
-SHA-256: 25a85de9000a51953ff17edc96928d271d3e2f2496996bbd7016a89568a959d1
 ~~~
 
-## 7. Simulation findings
+## 7. Calibration audit
+
+The recalibrated stress targets were checked in a separate DGP-only run before the size simulation.
+
+| Scenario | beta_relational | Mean D | SE(mean D) | z |
+|---|---:|---:|---:|---:|
+| IID | 0.080 | 0.0000895 | 0.0001066 | 0.84 |
+| AR(0.5) | 0.088 | -0.0000937 | 0.0001081 | -0.87 |
+| AR(0.8) | 0.126 | -0.0003102 | 0.0003008 | -1.03 |
+| AR(0.5) + heteroskedastic | 0.1125 | -0.0000138 | 0.0001882 | -0.07 |
+
+These are approximate finite-sample equal-risk targets, not exact analytical solutions.
+
+## 8. Size-simulation findings
 
 ### Coefficient-null
 
@@ -182,76 +213,72 @@ With all incremental relational coefficients set to zero:
 
 ~~~text
 mean origin loss differential = -0.00188764
-empirical rejection = 0 / 120
+rejection = 0 / 120
 ~~~
 
-This is not evidence of a correctly calibrated 5% test. It demonstrates the finite-sample nesting point: the coefficient restriction can induce a non-zero risk difference for the two estimated forecasting methods.
+This is not evidence of a correctly calibrated 5% test. It demonstrates the finite-sample nesting effect.
 
-### Approximate equal-risk DGP targets
+### Approximate equal-risk targets
 
-The simulation-only calibrated scenarios produced:
-
-| Scenario | L | Rejections / 120 | Empirical size | Mean D |
+| Scenario | L | Rejections / 120 | Empirical size | MC SE |
 |---|---:|---:|---:|---:|
-| IID equal-risk target | 3 | 12 | 0.100 | 0.000116 |
-| IID equal-risk target | 6 | 16 | 0.133 | 0.000116 |
-| AR(0.5) equal-risk target | 3 | 10 | 0.083 | 0.000514 |
-| AR(0.5) equal-risk target | 6 | 13 | 0.108 | 0.000514 |
-| AR(0.8) equal-risk target | 3 | 13 | 0.108 | 0.000981 |
-| AR(0.8) equal-risk target | 6 | 18 | 0.150 | 0.000981 |
-| AR(0.5) heteroskedastic target | 3 | 10 | 0.083 | 0.000357 |
-| AR(0.5) heteroskedastic target | 6 | 14 | 0.117 | 0.000357 |
+| IID | 3 | 6 | 0.050 | 0.0199 |
+| IID | 6 | 14 | 0.117 | 0.0293 |
+| AR(0.5) | 3 | 3 | 0.025 | 0.0143 |
+| AR(0.5) | 6 | 6 | 0.050 | 0.0199 |
+| AR(0.8) | 3 | 8 | 0.067 | 0.0228 |
+| AR(0.8) | 6 | 11 | 0.092 | 0.0263 |
+| AR(0.5) + heteroskedastic | 3 | 6 | 0.050 | 0.0199 |
+| AR(0.5) + heteroskedastic | 6 | 11 | 0.092 | 0.0263 |
 
-The Monte Carlo size standard errors for the non-zero rejection rates are roughly 0.025–0.033 at 120 repetitions, so these are still pilot-scale measurements. Nevertheless, the result is not close enough to nominal behavior to justify promotion to formal inference, particularly as serial dependence and heteroskedasticity strengthen.
+The L=3 results are broadly near the 5% target in this pilot; the L=6 results are systematically more liberal. The AR(0.8) case is modestly above nominal at L=3, but the Monte Carlo experiment is still only 120 replications.
 
-The larger L=6 sensitivity case is worse in every equal-risk scenario in this pilot. This is another reason not to choose block length by intuition alone.
+The strongest conclusion is therefore **not** that the candidate is valid. It is that the design-derived overlap block L=3 is the only block length tested here that remains plausibly calibrated across the declared stress cases, while a larger block cannot be assumed safer.
 
-## 8. New methodological conclusion
+## 9. New methodological conclusion
 
-**Do not promote the origin-loss MBB to the formal method.**
+The corrected evidence keeps the origin-level statistic as a **candidate worth deeper testing**, but does not justify promoting it.
 
-The more promising next candidate is a **restricted-DGP nested rolling bootstrap**:
+The next candidate should be a **restricted-DGP nested rolling bootstrap**:
 
 1. preserve the exact RH-006 feature and split geometry;
-2. define an explicit null forecasting DGP for the nested comparison;
-3. resample dependent errors/innovations with a declared dependence mechanism;
-4. reconstruct the outcome series under the null;
+2. define the null DGP explicitly;
+3. generate dependence-preserving bootstrap errors/innovations;
+4. reconstruct the outcome series under that null;
 5. refit both nested methods from scratch at every rolling origin;
-6. recompute training-only standardization and fixed ridge fitting inside every bootstrap replicate;
-7. retain the full origin-level loss-differential vector;
+6. recompute training-only standardization and fixed ridge inside every replicate;
+7. retain the complete origin-level loss-differential vector;
 8. compute the same origin-level statistic;
-9. verify size across dependence, heteroskedasticity, ridge, horizon, overlap, and near-singularity scenarios.
+9. compare its empirical size across the complete declared failure-mode matrix.
 
-This would directly address the finite-sample nesting problem that the current loss-level bootstrap cannot see.
+This directly addresses the finite-sample nesting effect that the retained-loss bootstrap cannot reproduce.
 
-The null DGP itself remains an open specification problem. A restricted context regression with dependence-preserving residual generation is a plausible starting point, but its assumptions must be written and tested rather than inherited by citation.
+## 10. Approval gate
 
-## 9. Required approval matrix
-
-Before the applicability artifact can leave not-approved-for-execution, the future candidate should demonstrate, prospectively and independently of the confirmatory result:
+Before the applicability artifact can leave not-approved-for-execution, the future candidate must demonstrate prospectively:
 
 - nominal null size under IID, weak dependence, strong dependence, and heteroskedasticity;
-- stability across declared fixed ridge values;
-- correct handling of training-only preprocessing;
+- stability across declared ridge values;
+- correct training-only preprocessing;
 - correct horizon alignment;
-- correct overlap reproduction;
-- deterministic failure near singular designs;
-- sensitivity to prespecified block/dependence choices;
-- reproducibility of bootstrap artifacts from identical source + manifest + seed;
+- exact reproduction of rolling overlap;
+- deterministic behavior near singular designs;
+- prespecified dependence/block choices;
+- byte-stable replay from source + manifest + seed;
 - no result-dependent method or bandwidth switching.
 
-A small number of successful simulations is not sufficient. The acceptance target is calibration across the declared failure modes.
+A successful pilot is not sufficient for promotion.
 
-## 10. Hard stop
+## 11. Hard stop
 
-Until the raw-series/refit bridge is derived and passes the above simulation gate:
+Until the raw-series/refit bridge is derived and passes the simulation gate:
 
 - ForecastInferenceSelectionPath remains stop-assumption-failure;
 - the estimator applicability artifact remains not-approved-for-execution;
-- no p-value or confidence interval is emitted by RH-006;
+- no formal p-value or confidence interval is emitted by RH-006;
 - dependence profiles remain descriptive;
 - surrogate exceedance fractions remain empirical diagnostics;
-- the rolling MSE difference remains an estimand/diagnostic only.
+- rolling MSE differences remain estimands/diagnostics only.
 
 ## References
 
@@ -260,4 +287,4 @@ Until the raw-series/refit bridge is derived and passes the above simulation gat
 - Giacomini, R. & White, H. (2006), *Tests of Conditional Predictive Ability*, Econometrica 74(6), 1545–1578. DOI: 10.1111/j.1468-0262.2006.00718.x.
 - Zhu, Y. & Timmermann, A. (2020), *Can Two Forecasts Have the Same Conditional Expected Accuracy?* https://arxiv.org/abs/2006.03238.
 
-This document freezes the current negative result and identifies the raw-series/refit bootstrap as the next methodological target.
+This document records the corrected simulation boundary and advances the raw-series/refit bootstrap as the next methodological target.
