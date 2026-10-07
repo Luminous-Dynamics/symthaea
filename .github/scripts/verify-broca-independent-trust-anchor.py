@@ -243,14 +243,30 @@ def verify_trigger_is_current(
     )
 
 
-def verify_broca_jobs(run_id: int) -> dict[str, Any]:
-    jobs = api_request(
-        "GET",
-        f"/actions/runs/{run_id}/jobs",
-        query={"per_page": "100"},
-    ).get("jobs", [])
+def list_run_jobs(run_id: int) -> list[dict[str, Any]]:
+    jobs: list[dict[str, Any]] = []
+    for page in range(1, 11):
+        page_jobs = api_request(
+            "GET",
+            f"/actions/runs/{run_id}/jobs",
+            query={"filter": "latest", "per_page": "100", "page": str(page)},
+        ).get("jobs", [])
+        if not isinstance(page_jobs, list):
+            raise VerificationError(
+                f"unexpected workflow-job response on page {page}"
+            )
+        jobs.extend(page_jobs)
+        if len(page_jobs) < 100:
+            return jobs
+    raise VerificationError(
+        "workflow-job enumeration exceeded the independent verifier's 1000-job safety bound"
+    )
 
-    outcomes: dict[str, list[str | None]] = {}
+
+def verify_broca_jobs(run_id: int) -> dict[str, Any]:
+    jobs = list_run_jobs(run_id)
+
+    outcomes: dict[str, list[str | None]] = []
     for name in EXPECTED_BROCA_JOBS:
         matches = [job for job in jobs if job.get("name") == name]
         outcomes[name] = [job.get("conclusion") for job in matches]
