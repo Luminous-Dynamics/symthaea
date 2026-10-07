@@ -144,6 +144,25 @@ def main() -> None:
     if 'strip_prefix("/nix/var/nix/profiles/system/bin/")' not in trusted_body:
         fail("typed executable resolver lost the validated system-profile exception")
 
+    # There should be no privileged command-construction sites outside the
+    # intentionally narrow capability adapters. This keeps helper functions from
+    # bypassing the trusted executable resolver while preserving shell compatibility
+    # only inside the dedicated shell/script adapters.
+    process_calls = [line for line in lines if "privileged_process(" in line]
+    if len(process_calls) != 4:
+        fail(
+            "unexpected privileged_process constructor count: "
+            f"expected 4 capability-bound sites, found {len(process_calls)}"
+        )
+    allowed_constructor_fragments = (
+        "fn privileged_process(",
+        "privileged_process(shell)",
+        "privileged_process(executable.as_ref())",
+    )
+    for line in process_calls:
+        if not any(fragment in line for fragment in allowed_constructor_fragments):
+            fail(f"unapproved privileged_process construction: {line.strip()!r}")
+
     # Nested interpreters inside generated privileged scripts create a second
     # parsing authority underneath the already-controlled relay interpreter.
     # Keep this global because the relevant helpers live outside the mutation arms.
