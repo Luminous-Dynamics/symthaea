@@ -279,6 +279,25 @@ def verify_trust_anchor_workflow() -> str:
         raise VerificationError(
             f"trust-anchor workflow Action refs mismatch: expected {EXPECTED_TRUST_ANCHOR_ACTION_REFS!r}, got {uses!r}"
         )
+
+    # The trust root must never gain a PR-controlled or externally-dispatched
+    # privileged execution path. Only workflow_run and the constrained manual
+    # replay are admissible trigger mechanisms.
+    for forbidden_trigger in (
+        "pull_request:",
+        "pull_request_target:",
+        "push:",
+        "schedule:",
+        "repository_dispatch:",
+        "workflow_call:",
+        "workflow_create:",
+        "workflow_delete:",
+    ):
+        if forbidden_trigger in workflow:
+            raise VerificationError(
+                f"trust-anchor workflow contains forbidden trigger: {forbidden_trigger}"
+            )
+
     require_fragments(
         workflow,
         [
@@ -466,32 +485,69 @@ def approved_snapshot(
     if not isinstance(approved, list) or not approved:
         raise VerificationError("independent trust policy has no approved file snapshot")
 
-    approved_paths = [
-        item.get("path") for item in approved if isinstance(item, dict)
-    ]
+    for index, item in enumerate(approved):
+        if not isinstance(item, dict):
+            raise VerificationError(
+                f"independent trust policy file entry {index} is not an object"
+            )
+        path = item.get("path")
+        status = item.get("status")
+        blob_sha = item.get("blob_sha")
+        if (
+            not isinstance(path, str)
+            or not path
+            or not isinstance(status, str)
+            or status not in {"added", "modified"}
+            or not isinstance(blob_sha, str)
+            or not re.fullmatch(r"[0-9a-f]{40}", blob_sha)
+        ):
+            raise VerificationError(
+                f"independent trust policy file entry {index} is not canonical"
+            )
+
+    approved_paths = [item["path"] for item in approved]
     if len(set(approved_paths)) != len(approved_paths):
         raise VerificationError(
             "independent trust policy contains duplicate file paths"
         )
 
     expected_keys = {
-        (item.get("path"), item.get("status"), item.get("blob_sha"))
+        (item["path"], item["status"], item["blob_sha"])
         for item in approved
-        if isinstance(item, dict)
     }
     if len(expected_keys) != len(approved):
         raise VerificationError(
             "independent trust policy contains malformed duplicate file entries"
         )
 
-    actual_paths = [item.get("filename") for item in pr_files]
+    for index, item in enumerate(pr_files):
+        if not isinstance(item, dict):
+            raise VerificationError(
+                f"GitHub pull-request file entry {index} is not an object"
+            )
+        path = item.get("filename")
+        status = item.get("status")
+        blob_sha = item.get("sha")
+        if (
+            not isinstance(path, str)
+            or not path
+            or not isinstance(status, str)
+            or status not in {"added", "modified"}
+            or not isinstance(blob_sha, str)
+            or not re.fullmatch(r"[0-9a-f]{40}", blob_sha)
+        ):
+            raise VerificationError(
+                f"GitHub pull-request file entry {index} is not canonical"
+            )
+
+    actual_paths = [item["filename"] for item in pr_files]
     if len(set(actual_paths)) != len(actual_paths):
         raise VerificationError(
             "GitHub returned duplicate pull-request file paths"
         )
 
     actual_keys = {
-        (item.get("filename"), item.get("status"), item.get("sha"))
+        (item["filename"], item["status"], item["sha"])
         for item in pr_files
     }
     if actual_keys != expected_keys:
