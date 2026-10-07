@@ -604,6 +604,7 @@ impl RollingForecastLossDependenceProfile {
             profile.validate()?;
             if profile.sample_count != self.test_samples
                 || profile.max_lag != self.max_lag_within_origin
+                || profile.evaluation_input_blake3 != self.evaluation_input_blake3
             {
                 return Err(RelationalPredictionError::InvalidSplit);
             }
@@ -3718,6 +3719,14 @@ mod tests {
         assert_eq!(profile.across_origin_mean_profile.sample_count, config.origin_count);
         profile.validate().unwrap();
         assert!(profile.to_json().unwrap().contains("rolling-two-level"));
+
+        let mut tampered = profile.clone();
+        tampered.per_origin[1].evaluation_input_blake3 =
+            Some("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string());
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
         assert!(profile.to_json().unwrap().contains("evaluation_input_blake3"));
     }
 
