@@ -113,6 +113,8 @@ pub enum VulkanBarrierReceiptError {
     MissingResourceStorageSize(ResourceId),
     #[error("receipt Vulkan API version does not match the qualified runtime")]
     ApiVersion,
+    #[error("receipt physical-device API version does not match the qualified device")]
+    PhysicalDeviceApiVersion,
     #[error("receipt expected timeline value does not match the synchronization plan")]
     TimelineExpected,
     #[error("receipt observed timeline value {observed} is below expected {expected}")]
@@ -134,6 +136,7 @@ pub struct VulkanBarrierExecutionReceipt {
     pub completion_expected: u64,
     pub completion_observed: u64,
     pub vulkan_api_version: u32,
+    pub physical_device_api_version: u32,
 }
 
 impl VulkanBarrierExecutionReceipt {
@@ -197,6 +200,9 @@ impl VulkanBarrierExecutionReceipt {
         if self.vulkan_api_version != VULKAN_API_VERSION {
             return Err(VulkanBarrierReceiptError::ApiVersion);
         }
+        if self.physical_device_api_version < VULKAN_API_VERSION {
+            return Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersion);
+        }
         let expected_completion = plan
             .submissions
             .iter()
@@ -229,6 +235,7 @@ pub struct VulkanBarrierWorkloadRuntime {
     memory_properties: vk::PhysicalDeviceMemoryProperties,
     max_storage_buffer_range: u64,
     max_compute_workgroup_count_x: u32,
+    physical_device_api_version: u32,
 }
 
 impl VulkanBarrierWorkloadRuntime {
@@ -319,6 +326,7 @@ impl VulkanBarrierWorkloadRuntime {
             pipeline_layout, pipeline, shader, memory_properties,
             max_storage_buffer_range: u64::from(props.limits.max_storage_buffer_range),
             max_compute_workgroup_count_x: props.limits.max_compute_work_group_count[0],
+            physical_device_api_version: props.api_version,
         })
     }
 
@@ -546,6 +554,7 @@ impl VulkanBarrierWorkloadRuntime {
             completion_expected,
             completion_observed,
             vulkan_api_version: VULKAN_API_VERSION,
+            physical_device_api_version: self.physical_device_api_version,
         };
         receipt.verify_against(graph, schedule, plan, &observed).map_err(VulkanBarrierError::Receipt)?;
         Ok((observed, receipt))
@@ -1155,6 +1164,7 @@ mod tests {
             completion_expected: 1,
             completion_observed: 0,
             vulkan_api_version: VULKAN_API_VERSION,
+            physical_device_api_version: VULKAN_API_VERSION,
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -1191,11 +1201,49 @@ mod tests {
             completion_expected: 1,
             completion_observed: 1,
             vulkan_api_version: VULKAN_API_VERSION,
+            physical_device_api_version: VULKAN_API_VERSION,
         };
         receipt.vulkan_api_version = vk::API_VERSION_1_2;
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
             Err(VulkanBarrierReceiptError::ApiVersion)
+        ));
+    }
+
+    #[test]
+    fn receipt_rejects_unqualified_physical_device_api_version() {
+        let (graph, schedule, plan, initial) = fixture();
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        let digests = final_state
+            .iter()
+            .map(|(resource, value)| (resource.clone(), resource_digest(value)))
+            .collect::<BTreeMap<_, _>>();
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| (
+                resource.clone(),
+                rounded_storage_bytes(value.as_bytes().len() as u64),
+            ))
+            .collect::<BTreeMap<_, _>>();
+        let receipt = VulkanBarrierExecutionReceipt {
+            version: RECEIPT_VERSION,
+            graph_digest: graph.digest_hex().unwrap(),
+            schedule_digest: schedule.digest_hex().unwrap(),
+            sync_plan_digest: plan.digest_hex().unwrap(),
+            barrier_digest: barrier_digest(&plan),
+            barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
+            node_count: schedule.nodes.len() as u32,
+            barrier_count: 1,
+            resource_digests: digests,
+            resource_storage_sizes: storage_sizes,
+            completion_expected: 1,
+            completion_observed: 1,
+            vulkan_api_version: VULKAN_API_VERSION,
+            physical_device_api_version: vk::API_VERSION_1_2,
+        };
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersion)
         ));
     }
 
