@@ -1215,6 +1215,8 @@ pub struct RollingOriginRelationalPredictionQualification {
     pub surrogate_count: usize,
     /// Commitment over the exact source sample sequence and rolling configuration.
     pub evaluation_input_blake3: String,
+    /// Commitment over input identity, configuration, surrogate count, and provenance.
+    pub qualification_identity_blake3: String,
     /// Exact source-sample start index for each rolling origin.
     pub origin_starts: Vec<usize>,
     pub observed: RollingOriginRelationalPredictionSummary,
@@ -1229,6 +1231,7 @@ impl RollingOriginRelationalPredictionQualification {
         validate_rolling_qualification_config_shape(&self.config)?;
 
         if !is_hex_digest(&self.evaluation_input_blake3, 64)
+            || !is_hex_digest(&self.qualification_identity_blake3, 64)
             || self.surrogate_count == 0
             || self.observed.status != EvidenceStatus::Measured
             || self.observed.first_origin != self.config.first_origin
@@ -1257,6 +1260,16 @@ impl RollingOriginRelationalPredictionQualification {
             validate_forecast_horizon_from_summary(segment, self.config.forecast_horizon)?;
         }
         validate_rolling_summary_aggregates(&self.observed)?;
+
+        let expected_identity = rolling_qualification_identity_digest(
+            &self.evaluation_input_blake3,
+            &self.provenance,
+            self.config,
+            self.surrogate_count,
+        );
+        if expected_identity != self.qualification_identity_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
 
         let held_out_config = HeldOutRelationalPredictionConfig {
             train_samples: self.config.train_samples,
@@ -1334,6 +1347,14 @@ impl RollingOriginRelationalPredictionQualification {
             return Err(RelationalPredictionError::InvalidSplit);
         }
         if rolling_evaluation_input_digest(samples, config) != self.evaluation_input_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        if rolling_qualification_identity_digest(
+            &self.evaluation_input_blake3,
+            &self.provenance,
+            self.config,
+            self.surrogate_count,
+        ) != self.qualification_identity_blake3 {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
         }
 
@@ -1420,6 +1441,12 @@ impl RollingOriginRelationalPredictionQualification {
             config,
             surrogate_count,
             evaluation_input_blake3: rolling_evaluation_input_digest(samples, config),
+            qualification_identity_blake3: rolling_qualification_identity_digest(
+                &rolling_evaluation_input_digest(samples, config),
+                &provenance,
+                config,
+                surrogate_count,
+            ),
             origin_starts: (0..config.origin_count)
                 .map(|origin| {
                     config
@@ -1818,6 +1845,8 @@ pub struct HeldOutRelationalPredictionQualification {
     pub surrogate_count: usize,
     /// Commitment over the exact source sample sequence and holdout configuration.
     pub evaluation_input_blake3: String,
+    /// Commitment over input identity, configuration, surrogate count, and provenance.
+    pub qualification_identity_blake3: String,
     pub observed: HeldOutRelationalPredictionSummary,
     pub circular_shift_null: PredictionNullSummary,
     pub feature_decoupling_null: PredictionNullSummary,
@@ -1829,6 +1858,7 @@ impl HeldOutRelationalPredictionQualification {
         validate_evidence_provenance(&self.provenance)?;
         validate_held_out_config_shape(&self.config)?;
         if !is_hex_digest(&self.evaluation_input_blake3, 64)
+            || !is_hex_digest(&self.qualification_identity_blake3, 64)
             || self.surrogate_count == 0
             || self.observed.status != EvidenceStatus::Measured
             || self.observed.train_samples != self.config.train_samples
@@ -1887,6 +1917,16 @@ impl HeldOutRelationalPredictionQualification {
             self.config.gap_samples,
         )?;
 
+        let expected_identity = single_qualification_identity_digest(
+            &self.evaluation_input_blake3,
+            &self.provenance,
+            self.config,
+            self.surrogate_count,
+        );
+        if expected_identity != self.qualification_identity_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
         let expected_mse = self.observed.relational_augmented.mean_squared_error;
         let nulls = [
             (
@@ -1930,6 +1970,14 @@ impl HeldOutRelationalPredictionQualification {
             return Err(RelationalPredictionError::InvalidSplit);
         }
         if evaluation_input_digest(samples, config) != self.evaluation_input_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        if single_qualification_identity_digest(
+            &self.evaluation_input_blake3,
+            &self.provenance,
+            self.config,
+            self.surrogate_count,
+        ) != self.qualification_identity_blake3 {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
         }
         let recomputed = Self::compute(
@@ -1978,6 +2026,12 @@ impl HeldOutRelationalPredictionQualification {
             config,
             surrogate_count,
             evaluation_input_blake3: evaluation_input_digest(samples, config),
+            qualification_identity_blake3: single_qualification_identity_digest(
+                &evaluation_input_digest(samples, config),
+                &provenance,
+                config,
+                surrogate_count,
+            ),
             observed,
             circular_shift_null,
             feature_decoupling_null,
@@ -2465,6 +2519,50 @@ fn rolling_evaluation_input_digest(
     hasher.finalize().to_hex().to_string()
 }
 
+fn single_qualification_identity_digest(
+    input_digest: &str,
+    provenance: &RelationalPredictionProvenance,
+    config: HeldOutRelationalPredictionConfig,
+    surrogate_count: usize,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-qualification-identity/v1");
+    update_string(&mut hasher, input_digest);
+    update_string(&mut hasher, &provenance.protocol_id);
+    update_string(&mut hasher, &provenance.source_data_sha256);
+    update_string(&mut hasher, &provenance.software_commit_sha);
+    update_usize(&mut hasher, config.train_samples);
+    update_usize(&mut hasher, config.test_samples);
+    update_usize(&mut hasher, config.gap_samples);
+    update_f64(&mut hasher, config.ridge_lambda);
+    update_usize(&mut hasher, surrogate_count);
+    hasher.finalize().to_hex().to_string()
+}
+
+fn rolling_qualification_identity_digest(
+    input_digest: &str,
+    provenance: &RelationalPredictionProvenance,
+    config: RollingOriginRelationalPredictionConfig,
+    surrogate_count: usize,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-rolling-qualification-identity/v1");
+    update_string(&mut hasher, input_digest);
+    update_string(&mut hasher, &provenance.protocol_id);
+    update_string(&mut hasher, &provenance.source_data_sha256);
+    update_string(&mut hasher, &provenance.software_commit_sha);
+    update_usize(&mut hasher, config.first_origin);
+    update_usize(&mut hasher, config.train_samples);
+    update_usize(&mut hasher, config.test_samples);
+    update_usize(&mut hasher, config.gap_samples);
+    update_usize(&mut hasher, config.origin_count);
+    update_usize(&mut hasher, config.step_samples);
+    update_f64(&mut hasher, config.forecast_horizon);
+    update_f64(&mut hasher, config.ridge_lambda);
+    update_usize(&mut hasher, surrogate_count);
+    hasher.finalize().to_hex().to_string()
+}
+
 fn update_samples_digest(
     hasher: &mut blake3::Hasher,
     samples: &[RelationalPredictionSample],
@@ -2482,6 +2580,11 @@ fn update_samples_digest(
         update_f64(hasher, sample.common_driver);
         update_f64(hasher, sample.future_outcome);
     }
+}
+
+fn update_string(hasher: &mut blake3::Hasher, value: &str) {
+    update_usize(hasher, value.len());
+    hasher.update(value.as_bytes());
 }
 
 fn update_usize(hasher: &mut blake3::Hasher, value: usize) {
