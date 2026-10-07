@@ -1879,7 +1879,7 @@ impl ForecastInferenceSelectionReceipt {
             binding_blake3: binding.binding_blake3.clone(),
             qualification_identity_blake3: qualification_identity_blake3.to_string(),
             plan_blake3: plan.plan_blake3.clone(),
-            dependence_profile_blake3: forecast_loss_dependence_profile_digest(dependence),
+            dependence_profile_blake3: dependence_profile_blake3.to_string(),
             method_selection_rule_id: plan.method_selection_rule_id.clone(),
             method_selection_rule_spec_sha256: plan.method_selection_rule_spec_sha256.clone(),
             decision_path_id: decision_path_id.into(),
