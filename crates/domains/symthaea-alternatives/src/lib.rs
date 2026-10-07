@@ -8163,11 +8163,11 @@ mod tests {
             input_bindings: vec![
                 CalibrationTraceabilityInputBinding {
                     input_quantity_id: "fixture-input-a".into(),
-                    node_id: "calibration".into(),
+                    node_id: "calibration-a".into(),
                 },
                 CalibrationTraceabilityInputBinding {
                     input_quantity_id: "fixture-input-b".into(),
-                    node_id: "calibration".into(),
+                    node_id: "calibration-b".into(),
                 },
             ],
             reference_node_ids: vec!["reference-si".into(), "reference-time".into()],
@@ -8181,12 +8181,20 @@ mod tests {
                     used_at_epoch_seconds: 1_000,
                 },
                 CalibrationTraceabilityNodeRef {
-                    node_id: "calibration".into(),
+                    node_id: "calibration-a".into(),
                     kind: CalibrationTraceabilityNodeKind::CalibrationRecord,
                     record_id: calibration.calibration_id.clone(),
                     record_revision: calibration.calibration_revision.clone(),
                     record_digest: calibration.calibration_record_digest.clone(),
                     used_at_epoch_seconds: calibration.used_at_epoch_seconds,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "calibration-b".into(),
+                    kind: CalibrationTraceabilityNodeKind::CalibrationRecord,
+                    record_id: "calibration-b".into(),
+                    record_revision: "v1".into(),
+                    record_digest: "calibration-b-digest".into(),
+                    used_at_epoch_seconds: 1_700_000_001,
                 },
                 CalibrationTraceabilityNodeRef {
                     node_id: "reference-si".into(),
@@ -8208,14 +8216,18 @@ mod tests {
             edges: vec![
                 CalibrationTraceabilityEdge {
                     from_node_id: "result".into(),
-                    to_node_id: "calibration".into(),
+                    to_node_id: "calibration-a".into(),
                 },
                 CalibrationTraceabilityEdge {
-                    from_node_id: "calibration".into(),
+                    from_node_id: "calibration-a".into(),
                     to_node_id: "reference-si".into(),
                 },
                 CalibrationTraceabilityEdge {
-                    from_node_id: "calibration".into(),
+                    from_node_id: "result".into(),
+                    to_node_id: "calibration-b".into(),
+                },
+                CalibrationTraceabilityEdge {
+                    from_node_id: "calibration-b".into(),
                     to_node_id: "reference-time".into(),
                 },
             ],
