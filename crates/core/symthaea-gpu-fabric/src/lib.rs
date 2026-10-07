@@ -280,6 +280,10 @@ impl CpuReferenceExecutor {
                     plan_digest: plan.digest_hex(),
                     kernel_id: plan.operation.kernel_id().to_owned(),
                     kernel_digest: plan.operation.kernel_digest(),
+                    implementation_digest: None,
+                    device_identity: None,
+                    driver_identity: None,
+                    resource_limits: plan.limits,
                     input_digest,
                     output_digest: digest_bytes(output.as_bytes()),
                     determinism: plan.determinism,
@@ -300,6 +304,15 @@ pub struct ExecutionReceipt {
     pub plan_digest: String,
     pub kernel_id: String,
     pub kernel_digest: String,
+    /// Digest of the concrete backend implementation. Present for accelerated
+    /// execution only; this is intentionally separate from semantic kernel identity.
+    pub implementation_digest: Option<String>,
+    /// Concrete device identity for accelerated execution.
+    pub device_identity: Option<String>,
+    /// Concrete driver/runtime identity for accelerated execution.
+    pub driver_identity: Option<String>,
+    /// Exact resource contract copied from the plan.
+    pub resource_limits: ResourceLimits,
     pub input_digest: String,
     pub output_digest: String,
     pub determinism: DeterminismMode,
@@ -428,7 +441,7 @@ fn packed_bytes(dimensions: u32) -> u64 {
 fn stable_digest<T: Serialize>(value: &T) -> [u8; 32] {
     let bytes = serde_json::to_vec(value).expect("semantic GPU values are serializable");
     let mut hasher = Hasher::new();
-    hasher.update(b"symthaea-gpu-fabric ");
+    hasher.update(b"symthaea-gpu-fabric\0");
     hasher.update(&bytes);
     *hasher.finalize().as_bytes()
 }
@@ -547,6 +560,10 @@ mod tests {
             kernel_id: HDC_BIND_XOR_KERNEL_ID.to_owned(),
             kernel_digest: GpuOperation::HdcBindXor { dimensions: 8 }
                 .kernel_digest(),
+            implementation_digest: None,
+            device_identity: None,
+            driver_identity: None,
+            resource_limits: plan.limits,
             input_digest: "x".to_owned(),
             output_digest: "x".to_owned(),
             determinism: DeterminismMode::Strict,
