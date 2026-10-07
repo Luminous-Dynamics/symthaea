@@ -221,7 +221,8 @@ The provenance fields are intentionally caller-supplied. The evaluator must not 
 JSON schemas are versioned in the emitted document:
 
 - `relational-prediction-evidence/v4` for one held-out segment;
-- `relational-prediction-rolling-evidence/v4` for the repeated-origin bundle.
+- `relational-prediction-rolling-evidence/v4` for the repeated-origin bundle;
+- `relational-prediction-null-evidence/v2` for a null calibration trace, with separate local replay and parent-qualification commitments.
 
 For rolling-origin bundles, the packet also retains `origin_starts`, the exact source-sample start index realized for each child segment. The parent packet also commits to the complete source sequence used to derive those starts, so replay can distinguish a schedule mismatch from a different input sequence. Validation recomputes these from `first_origin` and `step_samples`, so the declared schedule and retained child packets cannot silently diverge.
 
