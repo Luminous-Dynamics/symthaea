@@ -954,6 +954,30 @@ impl TransactionLedger {
         }))
     }
 
+    pub(crate) fn successful_image_configuration(
+        &self,
+        transaction_id: &str,
+        target_machine_digest: Option<&str>,
+    ) -> Result<Option<ArtifactCommitment>, String> {
+        validate_transaction_id(transaction_id)?;
+        if let Some(digest) = target_machine_digest {
+            validate_digest(digest, "target_machine_digest")?;
+        }
+
+        let records = self.load()?;
+        Ok(records.values().find_map(|record| {
+            if record.transaction_id == transaction_id
+                && record.mutation == MutationKind::CreateImage
+                && record.target_machine_digest.as_deref() == target_machine_digest
+                && record.outcome == Some(TransactionOutcome::ObservedSuccess)
+            {
+                record.configuration_commitment.clone()
+            } else {
+                None
+            }
+        }))
+    }
+
     pub(crate) fn lookup(&self, request_id: &str) -> Result<Option<TransactionReceipt>, String> {
         let request_id = validate_request_id(request_id)?;
         let records = self.load()?;
