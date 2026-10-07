@@ -84,6 +84,76 @@ fn selection_context_changes_projection_identity() {
 
 #[cfg(feature = "semantic-receipts")]
 #[test]
+fn bound_projection_preserves_noncanonical_collection_identity() {
+    use symthaea_swarm::rfc9942_selection::evaluate_priority_first_valid;
+    use symthaea_swarm::semantic_evidence_vds::{
+        Rfc9942ProofKind, Rfc9942ReceiptCollection, Rfc9942ReceiptEnvelope,
+        Rfc9942ReceiptPayload, Rfc9942Vdp, Rfc9162InclusionProof,
+        COSE_ES256_ALGORITHM_ID,
+    };
+
+    fn cbor_bstr(bytes: &[u8]) -> Vec<u8> {
+        assert!(bytes.len() < 256);
+        let mut out = vec![0x40 | bytes.len() as u8];
+        out.extend_from_slice(bytes);
+        out
+    }
+
+    let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x11; 32]]).to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+    let canonical = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp,
+        Rfc9942ReceiptPayload::Attached([1; 32]),
+        vec![1; 64],
+    )
+    .unwrap()
+    .to_cbor();
+
+    // COSE permits an indefinite-length top-level array. Preserve that valid
+    // source encoding as identity-bearing provenance.
+    let mut noncanonical = canonical.clone();
+    assert_eq!(noncanonical.get(1), Some(&0x84));
+    noncanonical[1] = 0x9f;
+    noncanonical.push(0xff);
+
+    let mut collection_wire = vec![0x81];
+    collection_wire.extend_from_slice(&cbor_bstr(&noncanonical));
+    let collection = Rfc9942ReceiptCollection::from_cbor(&collection_wire).unwrap();
+    assert_eq!(collection.serialized_bytes(), Some(collection_wire.as_slice()));
+    assert_eq!(
+        collection.serialized_receipt_bytes(0),
+        Some(noncanonical.as_slice())
+    );
+
+    let decision = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
+    let projected =
+        ReceiptSelectionContext::from_bound_decision(&decision, &collection).unwrap();
+
+    assert_eq!(projected.collection_sha256, decision.collection_sha256);
+    assert_eq!(
+        projected.selected_receipt_sha256,
+        decision.selected_receipt_sha256.unwrap()
+    );
+
+    let mut canonical_collection_wire = vec![0x81];
+    canonical_collection_wire.extend_from_slice(&cbor_bstr(&canonical));
+    let canonical_collection =
+        Rfc9942ReceiptCollection::from_cbor(&canonical_collection_wire).unwrap();
+    let canonical_decision =
+        evaluate_priority_first_valid(&canonical_collection, |_index, _| Ok(()));
+    assert_ne!(
+        decision.collection_sha256,
+        canonical_decision.collection_sha256
+    );
+    assert_ne!(
+        decision.selected_receipt_sha256,
+        canonical_decision.selected_receipt_sha256
+    );
+}
+
+#[cfg(feature = "semantic-receipts")]
+#[test]
 fn bound_selection_projection_requires_exact_source_collection() {
     use symthaea_swarm::rfc9942_selection::evaluate_priority_first_valid;
     use symthaea_swarm::semantic_evidence_vds::{
