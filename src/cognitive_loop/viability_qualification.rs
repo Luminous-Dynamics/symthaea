@@ -340,7 +340,7 @@ impl MicroWorldPredictor for FepWorldModelPredictor<'_> {
             return state;
         };
 
-        let get = |index: usize| predicted.get(index).copied().unwrap_or(0.0) as f64;
+        let get = |index: usize| predicted.get(index).copied().unwrap_or(f64::NAN);
         MicroWorldObservation {
             cycle: state.cycle.saturating_add(1),
             energy: get(0),
@@ -349,7 +349,6 @@ impl MicroWorldPredictor for FepWorldModelPredictor<'_> {
             threat: get(3),
             progress: get(4),
         }
-        .clamp_for_qualification()
     }
 
     fn prediction_confidence(&self, action: MicroAction) -> f64 {
@@ -383,25 +382,6 @@ impl MicroWorldPredictor for FepWorldModelPredictor<'_> {
             &before_encoded,
             &after_encoded,
         );
-    }
-}
-
-/// Local clamp helper for the qualification adapter.
-///
-/// The benchmark's public observation clamp is intentionally private to its module;
-/// the qualification boundary therefore repeats only the fixed [0,1] contract.
-trait QualificationClamp {
-    fn clamp_for_qualification(self) -> Self;
-}
-
-impl QualificationClamp for MicroWorldObservation {
-    fn clamp_for_qualification(mut self) -> Self {
-        self.energy = self.energy.clamp(0.0, 1.0);
-        self.integrity = self.integrity.clamp(0.0, 1.0);
-        self.knowledge = self.knowledge.clamp(0.0, 1.0);
-        self.threat = self.threat.clamp(0.0, 1.0);
-        self.progress = self.progress.clamp(0.0, 1.0);
-        self
     }
 }
 
