@@ -890,6 +890,21 @@ fn main() -> Result<(), String> {
     let statistical_sampling_frame_byte_refs: Vec<&[u8]> =
         vec![statistical_sampling_frame_bytes.as_slice()];
 
+    let statistical_randomness_commitment =
+        symthaea_communication::NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact {
+            schema_version:
+                symthaea_communication::NEUROSEMANTIC_REMEDIATION_STATISTICAL_RANDOMNESS_COMMITMENT_SCHEMA_VERSION,
+            commitment_ref: "synthetic-statistical-randomness-commitment-v1".into(),
+            selection_procedure_ref: "simple-random-without-replacement-v1".into(),
+            randomization_seed_hash: symthaea_communication::content_hash(
+                &42u64.to_le_bytes(),
+            ),
+            study_protocol_hash: study_protocol_hash.clone(),
+            execution_revision: execution_revision.clone(),
+        };
+    let statistical_randomness_commitment_bytes =
+        serde_json::to_vec(&statistical_randomness_commitment).map_err(|e| e.to_string())?;
+
     let statistical_selection_trace =
         symthaea_communication::NeurosemanticRemediationStatisticalSelectionTraceArtifact {
             schema_version:
@@ -897,6 +912,7 @@ fn main() -> Result<(), String> {
             selection_ref: "synthetic-statistical-selection-v1".into(),
             sampling_frame_hash: statistical_sampling_frame.fingerprint()?,
             selection_procedure_ref: "simple-random-without-replacement-v1".into(),
+            randomness_commitment_hash: statistical_randomness_commitment.fingerprint()?,
             randomization_seed_u64: 42,
             sample_size: observation_sets[0].observations.len() as u32,
             selected_subject_artifact_hashes: observation_sets[0]
@@ -961,6 +977,7 @@ fn main() -> Result<(), String> {
         vec![
             statistical_execution_bytes.as_slice(),
             statistical_selection_trace_bytes.as_slice(),
+            statistical_randomness_commitment_bytes.as_slice(),
         ];
 
     let statistical_design = NeurosemanticRemediationStatisticalDesignArtifact {
@@ -1780,6 +1797,67 @@ fn main() -> Result<(), String> {
                 &[forged_design_bytes.as_slice()],
                 &statistical_sampling_frame_byte_refs,
                 &[forged_execution_bytes.as_slice()],
+            )
+            .is_err()
+    };
+
+    let remediation_uncertainty_randomness_commitment_substitution_blocked = {
+        let alternate_commitment =
+            symthaea_communication::NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact {
+                schema_version:
+                    symthaea_communication::NEUROSEMANTIC_REMEDIATION_STATISTICAL_RANDOMNESS_COMMITMENT_SCHEMA_VERSION,
+                commitment_ref: "synthetic-alternate-randomness-commitment-v1".into(),
+                selection_procedure_ref: "simple-random-without-replacement-v1".into(),
+                randomization_seed_hash: symthaea_communication::content_hash(
+                    &43u64.to_le_bytes(),
+                ),
+                study_protocol_hash: study_protocol_hash.clone(),
+                execution_revision: execution_revision.clone(),
+            };
+        let alternate_commitment_bytes =
+            serde_json::to_vec(&alternate_commitment).map_err(|e| e.to_string())?;
+        let mut forged_trace = statistical_selection_trace.clone();
+        forged_trace.randomness_commitment_hash = alternate_commitment.fingerprint()?;
+        let forged_trace_bytes =
+            serde_json::to_vec(&forged_trace).map_err(|e| e.to_string())?;
+        let mut forged_execution = statistical_execution.clone();
+        forged_execution.selection_trace_hash = forged_trace.fingerprint()?;
+        let forged_execution_bytes =
+            serde_json::to_vec(&forged_execution).map_err(|e| e.to_string())?;
+        let mut forged_design = statistical_design.clone();
+        forged_design.statistical_execution_hash = forged_execution.fingerprint()?;
+        let forged_design_bytes =
+            serde_json::to_vec(&forged_design).map_err(|e| e.to_string())?;
+        let mut forged_uncertainty = uncertainty_computation.clone();
+        forged_uncertainty.statistical_design_hash = forged_design.fingerprint()?;
+        let forged_uncertainty_bytes =
+            serde_json::to_vec(&forged_uncertainty).map_err(|e| e.to_string())?;
+        let mut forged_measurement = measurement.clone();
+        forged_measurement.measurements[0].uncertainty =
+            NeurosemanticRemediationUncertainty::Interval {
+                lower_numerator: 0,
+                upper_numerator: 6_577,
+                scale: 4,
+                confidence_level_bps: 9_500,
+                uncertainty_method_ref: "wilson-score-95-v1".into(),
+                uncertainty_computation_artifact_hash:
+                    symthaea_communication::content_hash(&forged_uncertainty_bytes),
+            };
+        let forged_measurement_bytes =
+            serde_json::to_vec(&forged_measurement).map_err(|e| e.to_string())?;
+        let mut forged_impact = remediation_impact.clone();
+        forged_impact.measurement_artifact_hash = forged_measurement.fingerprint()?;
+        forged_impact
+            .verify_measurement_computation_bundle_bytes(
+                &forged_measurement_bytes,
+                &computation_byte_refs,
+                &observation_set_byte_refs,
+                &population_manifest_byte_refs,
+                &[forged_uncertainty_bytes.as_slice()],
+                &uncertainty_assumption_byte_refs,
+                &[forged_design_bytes.as_slice()],
+                &statistical_sampling_frame_byte_refs,
+                &[forged_execution_bytes.as_slice(), forged_trace_bytes.as_slice(), alternate_commitment_bytes.as_slice()],
             )
             .is_err()
     };
@@ -2628,6 +2706,8 @@ fn main() -> Result<(), String> {
             remediation_measurement_computation_verified,
         "remediation_uncertainty_selection_trace_substitution_blocked":
             remediation_uncertainty_selection_trace_substitution_blocked,
+        "remediation_uncertainty_randomness_commitment_substitution_blocked":
+            remediation_uncertainty_randomness_commitment_substitution_blocked,
         "remediation_uncertainty_statistical_execution_substitution_blocked":
             remediation_uncertainty_statistical_execution_substitution_blocked,
         "remediation_uncertainty_inclusion_probability_substitution_blocked":
