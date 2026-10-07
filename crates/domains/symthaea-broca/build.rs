@@ -159,6 +159,43 @@ fn cargo_cfg_identity() -> Vec<u8> {
     cfg.join("\n").into_bytes()
 }
 
+fn native_build_environment_identity() -> Vec<u8> {
+    const VARIABLES: &[&str] = &[
+        "CC",
+        "CXX",
+        "AR",
+        "RANLIB",
+        "LD",
+        "RUSTC_LINKER",
+        "CFLAGS",
+        "CXXFLAGS",
+        "CPPFLAGS",
+        "LDFLAGS",
+        "PKG_CONFIG",
+        "PKG_CONFIG_PATH",
+        "PKG_CONFIG_LIBDIR",
+        "PKG_CONFIG_SYSROOT_DIR",
+        "OPENSSL_DIR",
+        "OPENSSL_LIB_DIR",
+        "OPENSSL_INCLUDE_DIR",
+        "LIBCLANG_PATH",
+        "BINDGEN_EXTRA_CLANG_ARGS",
+        "CMAKE_PREFIX_PATH",
+        "CMAKE_GENERATOR",
+        "CMAKE_TOOLCHAIN_FILE",
+        "CUDA_HOME",
+        "CUDA_PATH",
+        "VULKAN_SDK",
+    ];
+    let mut entries = Vec::with_capacity(VARIABLES.len());
+    for variable in VARIABLES {
+        let value = env::var(variable).unwrap_or_default();
+        entries.push(format!("{variable}={value}"));
+    }
+    entries.join("
+").into_bytes()
+}
+
 fn system_package_identity() -> Vec<u8> {
     let packages = ["pkg-config", "libssl-dev", "libclang-dev", "cmake"];
     let mut entries = Vec::with_capacity(packages.len());
@@ -193,6 +230,35 @@ fn main() {
     println!("cargo:rerun-if-env-changed=BROCA_NATIVE_PACKAGE_CONTEXT");
     println!("cargo:rerun-if-env-changed=BROCA_RUSTUP_VERSION");
     println!("cargo:rerun-if-env-changed=BROCA_NATIVE_TOOLCHAIN_CONTEXT");
+    for variable in [
+        "CC",
+        "CXX",
+        "AR",
+        "RANLIB",
+        "LD",
+        "RUSTC_LINKER",
+        "CFLAGS",
+        "CXXFLAGS",
+        "CPPFLAGS",
+        "LDFLAGS",
+        "PKG_CONFIG",
+        "PKG_CONFIG_PATH",
+        "PKG_CONFIG_LIBDIR",
+        "PKG_CONFIG_SYSROOT_DIR",
+        "OPENSSL_DIR",
+        "OPENSSL_LIB_DIR",
+        "OPENSSL_INCLUDE_DIR",
+        "LIBCLANG_PATH",
+        "BINDGEN_EXTRA_CLANG_ARGS",
+        "CMAKE_PREFIX_PATH",
+        "CMAKE_GENERATOR",
+        "CMAKE_TOOLCHAIN_FILE",
+        "CUDA_HOME",
+        "CUDA_PATH",
+        "VULKAN_SDK",
+    ] {
+        println!("cargo:rerun-if-env-changed={variable}");
+    }
     for variable in ["PROFILE", "DEBUG", "OPT_LEVEL", "NUM_JOBS", "RUNNER_OS", "RUNNER_ARCH", "ImageOS", "ImageVersion"] {
         println!("cargo:rerun-if-env-changed={variable}");
     }
@@ -250,6 +316,7 @@ fn main() {
     let native_toolchain_context = env::var("BROCA_NATIVE_TOOLCHAIN_CONTEXT")
         .unwrap_or_default()
         .into_bytes();
+    let native_build_environment = native_build_environment_identity();
     let profile = env::var("PROFILE").unwrap_or_default().into_bytes();
     let debug = env::var("DEBUG").unwrap_or_default().into_bytes();
     let opt_level = env::var("OPT_LEVEL").unwrap_or_default().into_bytes();
@@ -291,7 +358,7 @@ fn main() {
     // This is intentionally separate from compiler source identity: the same checked-in source
     // can have different dependency/toolchain semantics if its build context changes.
     let build_context_revision = domain_digest(
-        b"symthaea-broca-unimorph-compiler-build-context-revision-v8",
+        b"symthaea-broca-unimorph-compiler-build-context-revision-v9",
         &[
             &crate_manifest,
             &workspace_manifest,
@@ -308,6 +375,7 @@ fn main() {
             &system_packages,
             &rustup_version,
             &native_toolchain_context,
+            &native_build_environment,
             &profile,
             &debug,
             &opt_level,
