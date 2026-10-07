@@ -324,6 +324,104 @@ impl NixSystemdReadOnlyObserverV1 {
         .await
     }
 
+    /// Continue observing a completed, correlated Service job through a bounded
+    /// post-dispatch stability window.
+    ///
+    /// The returned observation is the second stability sample, so its capture time
+    /// is guaranteed to be at or after the stability window end. The completed JobRemoved
+    /// evidence is immutable execution evidence associated with that final observation;
+    /// it is never re-derived from the current Unit.Job property.
+    pub async fn observe_service_post_state_after_stability_window(
+        &self,
+        operation: NixServiceOperationKindV1,
+        unit: &str,
+        generation: u64,
+        completed_job: NixSystemdJobEvidenceV1,
+        expected_manager_owner: &str,
+        expected_bus_id: &str,
+        required_window_us: u64,
+    ) -> Result<
+        (
+            NixVerifiedPostStateObservationV1,
+            NixVerifiedPostStateStabilityEvidenceV1,
+        ),
+        NixSystemdObserverErrorV1,
+    > {
+        if required_window_us == 0 {
+            return Err(NixSystemdObserverErrorV1::InvalidPostState(
+                "required stability window must be non-zero".to_string(),
+            ));
+        }
+        completed_job
+            .validate_shape()
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
+
+        let current_owner = self.systemd_manager_owner().await?;
+        let current_bus_id = self.dbus_bus_id().await?;
+        if current_owner != expected_manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if current_bus_id != expected_bus_id {
+            return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
+        }
+
+        let first = self
+            .observe_service_post_state_internal(
+                operation,
+                unit,
+                generation,
+                Some(completed_job.clone()),
+            )
+            .await?;
+        let first_at = first.as_ref().observed_at_monotonic_us;
+
+        tokio::time::sleep(Duration::from_micros(required_window_us)).await;
+
+        let current_owner = self.systemd_manager_owner().await?;
+        let current_bus_id = self.dbus_bus_id().await?;
+        if current_owner != expected_manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if current_bus_id != expected_bus_id {
+            return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
+        }
+
+        let second = self
+            .observe_service_post_state_internal(
+                operation,
+                unit,
+                generation,
+                Some(completed_job),
+            )
+            .await?;
+        let second_at = second.as_ref().observed_at_monotonic_us;
+
+        if second_at < first_at {
+            return Err(NixSystemdObserverErrorV1::InvalidPostState(
+                "post-dispatch observation monotonic time regressed".to_string(),
+            ));
+        }
+
+        let samples = vec![
+            stability_sample_from_observation(first.as_ref())?,
+            stability_sample_from_observation(second.as_ref())?,
+        ];
+        let sequence_digest = super::post_state::stability_sequence_digest(&samples)
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
+        let stability = NixPostStateStabilityEvidenceV1 {
+            required_window_us,
+            window_start_monotonic_us: first_at,
+            window_end_monotonic_us: second_at,
+            samples,
+            sequence_digest,
+        };
+
+        let verified_stability = NixVerifiedPostStateStabilityEvidenceV1::from_observer(stability)
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
+
+        Ok((second, verified_stability))
+    }
+
     /// Read Service.Result from the exact resolved unit object.
     pub async fn read_service_result(
         &self,
@@ -807,6 +905,16 @@ impl NixSystemdReadOnlyObserverV1 {
             });
         }
 
+        let definition_content = self
+            .capture_service_definition_content(&expected_unit)
+            .await?;
+        if definition_content.as_ref().manager_owner != manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        let definition_content_digest = definition_content
+            .digest()
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
+
         let observation = build_observation_from_properties(
             operation,
             &expected_unit,
@@ -815,6 +923,7 @@ impl NixSystemdReadOnlyObserverV1 {
             &manager_owner,
             &service_result,
             &unit_properties,
+            &definition_content_digest,
             job,
         )?;
 
@@ -1354,6 +1463,7 @@ fn stability_sample_from_observation(
         definition_digest: observation
             .definition_digest()
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?,
+        definition_content_digest: observation.definition_content_digest.clone(),
         state_digest: observation
             .state_digest()
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?,
@@ -1372,6 +1482,7 @@ fn build_observation_from_properties(
     manager_owner: &str,
     service_result: &str,
     properties: &HashMap<String, OwnedValue>,
+    definition_content_digest: &str,
     job: Option<NixSystemdJobEvidenceV1>,
 ) -> Result<NixServicePostStateObservationV1, NixSystemdObserverErrorV1> {
     for property in REQUIRED_UNIT_PROPERTIES {
@@ -1453,6 +1564,7 @@ fn build_observation_from_properties(
         observed_generation: generation,
         unit_object_path: unit_object_path.as_str().to_string(),
         definition_identity,
+        definition_content_digest: definition_content_digest.to_string(),
         load_state,
         active_state,
         sub_state,

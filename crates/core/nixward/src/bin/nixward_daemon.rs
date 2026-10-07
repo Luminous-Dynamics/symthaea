@@ -1734,11 +1734,42 @@ impl DaemonState {
                                 // and promoted it to a live execution-authority object.
                                 // execute_authorized verifies the exact command identity
                                 // and consumes that authority object by value.
-                                let result = match execution_authority {
-                                    Some(authority) => executor.execute_authorized(cmd, authority).await,
-                                    None => executor.execute(cmd, SafetyLevel::ReadOnly.required_phi()).await,
+                                let is_service = matches!(
+                                    &cmd,
+                                    nixward::action::executor::NixOSCommand::Service { .. }
+                                );
+                                let (result, receipt) = match (is_service, execution_authority) {
+                                    (true, Some(authority)) => executor
+                                        .execute_authorized_service_with_receipt(cmd, authority)
+                                        .await,
+                                    (false, Some(authority)) => {
+                                        (executor.execute_authorized(cmd, authority).await, None)
+                                    }
+                                    (_, None) => (
+                                        executor
+                                            .execute(cmd, SafetyLevel::ReadOnly.required_phi())
+                                            .await,
+                                        None,
+                                    ),
                                 };
-                                eprintln!("nixward-daemon: Active healing execution finished. Result: {:?}", result);
+                                eprintln!(
+                                    "nixward-daemon: Active healing execution finished. Result: {:?}",
+                                    result
+                                );
+                                if let Some(receipt) = receipt {
+                                    match serde_json::to_string(&receipt) {
+                                        Ok(encoded) => eprintln!(
+                                            "nixward-daemon: execution receipt: {encoded}"
+                                        ),
+                                        Err(error) => eprintln!(
+                                            "nixward-daemon: execution receipt could not be serialized: {error}"
+                                        ),
+                                    }
+                                } else {
+                                    eprintln!(
+                                        "nixward-daemon: no qualifying Service receipt emitted"
+                                    );
+                                }
                             });
                         });
                     } else {

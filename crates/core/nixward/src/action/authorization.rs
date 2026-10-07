@@ -22,6 +22,7 @@ use super::service_effect::{
     NixServiceEffectContextErrorV1, NixServiceEffectContextV1,
     NixVerifiedServiceDefinitionContentV1,
 };
+use super::post_state::NixServicePostStateExpectationV1;
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -563,6 +564,10 @@ impl NixLocalExecutionAuthorityV1 {
         self.intent.pre_state_identity.as_deref()
     }
 
+    pub(crate) fn intent(&self) -> &NixActionIntentV1 {
+        &self.intent
+    }
+
     pub(crate) fn approval_request_id(&self) -> &str {
         self.approval.request_id()
     }
@@ -593,6 +598,29 @@ impl NixLocalExecutionAuthorityV1 {
         self.intent
             .service_effect_context()
             .and_then(|context| context.pre_invocation_id.clone())
+    }
+
+    /// Materialize the exact post-state expectation bound by this consumed Service authority.
+    /// No expectation field is reconstructed from current host state.
+    pub(crate) fn service_post_state_expectation(
+        &self,
+    ) -> Result<NixServicePostStateExpectationV1, NixAuthorizationErrorV1> {
+        let context = self
+            .intent
+            .service_effect_context()
+            .ok_or(NixAuthorizationErrorV1::MissingServiceEffectContext)?;
+
+        Ok(NixServicePostStateExpectationV1 {
+            operation: context.operation,
+            unit: context.unit.clone(),
+            authorized_generation: context.authorized_generation,
+            authorized_definition_digest: context.authorized_definition_digest.clone(),
+            authorized_definition_content_digest: context
+                .authorized_definition_content_digest
+                .clone(),
+            pre_invocation_id: context.pre_invocation_id.clone(),
+            required_stability_us: context.required_stability_us,
+        })
     }
 
     pub(crate) fn pre_invocation_id(&self) -> Option<&str> {
