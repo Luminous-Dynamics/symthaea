@@ -148,6 +148,9 @@ pub struct Rfc9942VerifiedReceipt {
     /// authenticated by COSE. This preserves byte-level signing context even
     /// when the parsed semantic fields are otherwise identical.
     protected_header_sha256: [u8; 32],
+    /// SHA-256 fingerprint of the exact serialized unprotected-header map.
+    /// This is provenance only: COSE does not authenticate this bucket.
+    unprotected_header_sha256: [u8; 32],
     /// SHA-256 fingerprint of the exact external AAD authenticated by COSE.
     /// An empty AAD therefore remains distinguishable from another context.
     external_aad_sha256: [u8; 32],
@@ -168,6 +171,7 @@ impl Rfc9942VerifiedReceipt {
     pub const fn payload_mode(&self) -> Rfc9942PayloadMode { self.payload_mode }
     pub const fn verification_key_sha256(&self) -> [u8; 32] { self.verification_key_sha256 }
     pub const fn protected_header_sha256(&self) -> [u8; 32] { self.protected_header_sha256 }
+    pub const fn unprotected_header_sha256(&self) -> [u8; 32] { self.unprotected_header_sha256 }
     pub const fn external_aad_sha256(&self) -> [u8; 32] { self.external_aad_sha256 }
     pub const fn signature_sha256(&self) -> [u8; 32] { self.signature_sha256 }
     pub const fn proof_sha256(&self) -> [u8; 32] { self.proof_sha256 }
@@ -195,6 +199,9 @@ pub struct Rfc9942VerifiedSignatureWithReceipt {
     outer_payload_mode: Rfc9942PayloadMode,
     outer_verification_key_sha256: [u8; 32],
     outer_protected_header_sha256: [u8; 32],
+    /// SHA-256 fingerprint of the exact serialized outer unprotected-header map.
+    /// This is provenance only: COSE does not authenticate this bucket.
+    outer_unprotected_header_sha256: [u8; 32],
     outer_external_aad_sha256: [u8; 32],
     /// SHA-256 fingerprint of the exact outer COSE signature bytes that verified.
     outer_signature_sha256: [u8; 32],
@@ -213,6 +220,7 @@ impl Rfc9942VerifiedSignatureWithReceipt {
     pub const fn outer_payload_mode(&self) -> Rfc9942PayloadMode { self.outer_payload_mode }
     pub const fn outer_verification_key_sha256(&self) -> [u8; 32] { self.outer_verification_key_sha256 }
     pub const fn outer_protected_header_sha256(&self) -> [u8; 32] { self.outer_protected_header_sha256 }
+    pub const fn outer_unprotected_header_sha256(&self) -> [u8; 32] { self.outer_unprotected_header_sha256 }
     pub const fn outer_external_aad_sha256(&self) -> [u8; 32] { self.outer_external_aad_sha256 }
     pub const fn outer_signature_sha256(&self) -> [u8; 32] { self.outer_signature_sha256 }
     pub const fn receipt_collection_sha256(&self) -> [u8; 32] { self.receipt_collection_sha256 }
@@ -540,6 +548,11 @@ impl Rfc9942ReceiptEnvelope {
             payload_mode,
             verification_key_sha256: sha256(public_key),
             protected_header_sha256: sha256(&self.protected_header_bytes()),
+            unprotected_header_sha256: sha256(
+                self.unprotected_bytes
+                    .as_deref()
+                    .unwrap_or(&[]),
+            ),
             external_aad_sha256: sha256(external_aad),
             signature_sha256: sha256(&self.signature),
             proof_sha256,
@@ -1347,6 +1360,11 @@ impl Rfc9942SignatureWithReceipts {
             },
             outer_verification_key_sha256: sha256(outer_public_key),
             outer_protected_header_sha256: sha256(&self.protected_header_bytes()),
+            outer_unprotected_header_sha256: sha256(
+                self.unprotected_bytes
+                    .as_deref()
+                    .unwrap_or(&[]),
+            ),
             outer_external_aad_sha256: sha256(outer_external_aad),
             outer_signature_sha256: sha256(&self.signature),
             receipt_collection_sha256,
