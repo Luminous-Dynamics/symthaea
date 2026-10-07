@@ -856,7 +856,6 @@ impl CognitiveLoopService {
                 // CORRECT INITIALIZATION:
                 ledger: symthaea_core::physics::thermodynamics::ThermodynamicLedger::new(1000.0),
             },
-            viability: super::viability_fabric::ViabilityFabric::new(1024),
             feedback_state: super::feedback_state::FeedbackState::new(),
             coherence_tracker: ConversationCoherenceTracker::new(0.3),
             memory: super::memory_execution::MemoryExecution {
