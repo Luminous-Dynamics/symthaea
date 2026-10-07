@@ -552,6 +552,18 @@ impl NixLocalExecutionAuthorityV1 {
             .map(|context| context.authorized_definition_content_digest.as_str())
     }
 
+    pub(crate) fn service_manager_owner(&self) -> Option<&str> {
+        self.intent
+            .service_effect_context()
+            .map(|context| context.authorized_manager_owner.as_str())
+    }
+
+    pub(crate) fn service_bus_id(&self) -> Option<&str> {
+        self.intent
+            .service_effect_context()
+            .map(|context| context.authorized_bus_id.as_str())
+    }
+
     pub(crate) fn service_effect_context_pre_invocation_id(&self) -> Option<String> {
         self.intent
             .service_effect_context()
@@ -834,6 +846,8 @@ fn validate_service_definition_capture(
         || context.operation != *operation
         || context.unit != *unit
         || context.authorized_definition_digest != evidence.source_identity_digest
+        || context.authorized_manager_owner != evidence.manager_owner
+        || context.authorized_bus_id != evidence.bus_id
     {
         return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
     }
@@ -866,6 +880,8 @@ fn validate_service_definition_capture_binding(
         if context.unit != *unit
             || context.authorized_definition_digest != evidence.source_identity_digest
             || context.authorized_definition_content_digest != content_digest
+            || context.authorized_manager_owner != evidence.manager_owner
+            || context.authorized_bus_id != evidence.bus_id
         {
             return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
         }
@@ -1491,6 +1507,8 @@ mod tests {
             &"11".repeat(32),
             &"22".repeat(32),
             &"44".repeat(32),
+            ":1.42",
+            "0123456789abcdef0123456789abcdef",
             Some("33".repeat(16)),
             1_000,
         )
@@ -1512,6 +1530,8 @@ mod tests {
                 "1111111111111111111111111111111111111111111111111111111111111111",
                 "2222222222222222222222222222222222222222222222222222222222222222",
                 "4444444444444444444444444444444444444444444444444444444444444444",
+                ":1.42",
+                "0123456789abcdef0123456789abcdef",
                 Some("3333333333333333333333333333333333".into()),
                 1_000,
             )
@@ -1584,6 +1604,24 @@ mod tests {
             NixVerifiedServiceDefinitionContentV1::from_observer(altered_evidence).unwrap();
         assert_eq!(
             validate_service_definition_capture_binding(&contextual, &altered).unwrap_err(),
+            NixAuthorizationErrorV1::DefinitionContentCaptureMismatch
+        );
+
+        let mut manager_altered = sealed.as_ref().clone();
+        manager_altered.manager_owner = ":1.43".into();
+        let manager_altered =
+            NixVerifiedServiceDefinitionContentV1::from_observer(manager_altered).unwrap();
+        assert_eq!(
+            validate_service_definition_capture_binding(&contextual, &manager_altered).unwrap_err(),
+            NixAuthorizationErrorV1::DefinitionContentCaptureMismatch
+        );
+
+        let mut bus_altered = sealed.as_ref().clone();
+        bus_altered.bus_id = "fedcba9876543210fedcba9876543210".into();
+        let bus_altered =
+            NixVerifiedServiceDefinitionContentV1::from_observer(bus_altered).unwrap();
+        assert_eq!(
+            validate_service_definition_capture_binding(&contextual, &bus_altered).unwrap_err(),
             NixAuthorizationErrorV1::DefinitionContentCaptureMismatch
         );
     }
