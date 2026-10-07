@@ -29,6 +29,9 @@ const EXPECTED_RAW_URI: &str =
     "https://raw.githubusercontent.com/unimorph/eng/66e0e9e8e2dcd196da081a25a48e5c1fe3d8b49b/eng";
 const EXPECTED_COMMIT: &str = "66e0e9e8e2dcd196da081a25a48e5c1fe3d8b49b";
 const EXPECTED_BLOB_SHA: &str = "8eae5ed242e87e50f6bd182133277f50fe93cef3";
+const EXPECTED_README_BLOB_SHA: &str = "197564dd6bb45b2bcdad08428446ad2a5db6138d";
+const EXPECTED_LICENSE: &str = "CC BY-SA 3.0";
+const EXPECTED_SOURCE: &str = "Wikipedia";
 const EXPECTED_ARTIFACT_BLAKE3: &str =
     "c4a677818237fb1060d2541272e2da1d5b6bfd2ae40df00b9187d1ae8566426f";
 const EXPECTED_ARTIFACT_BYTES: usize = 18_022_905;
@@ -116,12 +119,19 @@ fn main() -> Result<()> {
         SNAPSHOT_MANIFEST,
         "- BLAKE3-256: ",
     )?;
+    let readme_blob = parse_required_line(
+        SNAPSHOT_MANIFEST,
+        "README blob SHA at the same commit: ",
+    )?;
 
     if uri != EXPECTED_RAW_URI
         || commit != EXPECTED_COMMIT
         || blob != EXPECTED_BLOB_SHA
         || artifact_len != EXPECTED_ARTIFACT_BYTES
         || artifact_blake3 != EXPECTED_ARTIFACT_BLAKE3
+        || readme_blob != EXPECTED_README_BLOB_SHA
+        || !SNAPSHOT_MANIFEST.contains("- Source: Wikipedia")
+        || !SNAPSHOT_MANIFEST.contains("- License: CC BY-SA 3.0")
     {
         bail!("checked-in UniMorph snapshot manifest disagrees with its frozen identity constants");
     }
@@ -183,8 +193,8 @@ fn main() -> Result<()> {
         MorphophonologicalResourceEvidence::external(
             "unimorph/eng",
             uri,
-            "unimorph-4.0",
-            "CC BY-SA 3.0",
+            EXPECTED_COMMIT,
+            EXPECTED_LICENSE,
             EXPECTED_ARTIFACT_BLAKE3,
         )?,
         "unimorph-eng-4",
