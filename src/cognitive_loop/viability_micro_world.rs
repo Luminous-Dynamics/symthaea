@@ -1077,7 +1077,7 @@ pub fn run_homeostatic_agent_scenario<P: MicroWorldPredictor>(
     let denom = steps.max(1) as f64;
     HomeostaticRunReport {
         steps,
-        survived: final_state.is_viable(),
+        survived: final_state.is_viable() && !terminated_on_execution_failure,
         final_energy: final_state.energy,
         final_integrity: final_state.integrity,
         final_knowledge: final_state.knowledge,
@@ -1249,7 +1249,7 @@ pub fn run_homeostatic_agent_horizon_scenario<P: MicroWorldPredictor>(
     HomeostaticHorizonRunReport {
         steps,
         horizon: horizon.max(1),
-        survived: final_state.is_viable(),
+        survived: final_state.is_viable() && !terminated_on_execution_failure,
         final_energy: final_state.energy,
         final_integrity: final_state.integrity,
         final_progress: final_state.progress,
@@ -1667,6 +1667,7 @@ mod tests {
         assert!(report.terminated_on_execution_failure);
         assert_eq!(report.execution_failures, 1);
         assert_eq!(report.steps, 0);
+        assert!(!report.survived);
         assert!(report.actions.is_empty());
     }
 
