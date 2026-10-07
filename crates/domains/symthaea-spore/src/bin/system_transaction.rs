@@ -911,9 +911,13 @@ impl TransactionLedger {
         target_machine_digest: Option<&str>,
     ) -> Result<bool, String> {
         if mutation == MutationKind::CreateImage {
-            return Ok(self
-                .successful_image_artifact(transaction_id, target_machine_digest)?
-                .is_some());
+            return Ok(
+                self.successful_image_artifact(transaction_id, target_machine_digest)?
+                    .is_some()
+                    && self
+                        .successful_image_configuration(transaction_id, target_machine_digest)?
+                        .is_some(),
+            );
         }
 
         validate_transaction_id(transaction_id)?;
