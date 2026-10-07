@@ -229,7 +229,6 @@ impl PredictionErrorLedger {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ActionPrediction {
     pub action_id: u64,
-            pre_state_digest: 1,
     /// Digest of the exact pre-action state used to produce this prediction.
     pub pre_state_digest: u64,
     pub action_label: String,
@@ -244,7 +243,6 @@ pub struct ActionPrediction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PredictionCancellation {
     pub action_id: u64,
-            pre_state_digest: 1,
     pub prediction_cycle: u64,
     pub cancellation_cycle: u64,
     pub reason: String,
@@ -256,7 +254,6 @@ pub struct PredictionCancellation {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ActionOutcome {
     pub action_id: u64,
-            pre_state_digest: 1,
     pub action_label: String,
     pub cycle: u64,
     pub pre_state_digest: u64,
@@ -829,7 +826,6 @@ mod tests {
             pre_state_digest: 1,
             action_label: "test".to_string(),
             cycle: 7,
-            pre_state_digest: 1,
             post_state_digest: 2,
             authority_granted: true,
             safety_gate_passed: true,
@@ -880,7 +876,6 @@ mod tests {
             pre_state_digest: 1,
             action_label: "test".to_string(),
             cycle: 7,
-            pre_state_digest: 1,
             post_state_digest: 2,
             authority_granted: true,
             safety_gate_passed: true,
@@ -970,7 +965,6 @@ mod tests {
             pre_state_digest: 1,
             action_label: "tampered".to_string(),
             cycle: 9,
-            pre_state_digest: 1,
             post_state_digest: 2,
             authority_granted: true,
             safety_gate_passed: true,
@@ -987,7 +981,6 @@ mod tests {
             pre_state_digest: 1,
             action_label: "test".to_string(),
             cycle: 9,
-            pre_state_digest: 1,
             post_state_digest: 2,
             authority_granted: true,
             safety_gate_passed: true,
@@ -1072,7 +1065,6 @@ mod tests {
             pre_state_digest: 1,
             action_label: "test".to_string(),
             cycle: 3,
-            pre_state_digest: 1,
             post_state_digest: 2,
             authority_granted: false,
             safety_gate_passed: false,
@@ -1127,6 +1119,7 @@ mod tests {
         for action_id in [1, 2] {
             fabric.predict_action(ActionPrediction {
                 action_id,
+                pre_state_digest: 1,
                 action_label: "test".to_string(),
                 cycle: 1,
                 predicted_world_delta: None,
