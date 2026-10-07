@@ -49,13 +49,40 @@ pub struct ReceiptSelectionContext {
     pub selected_index: u32,
     pub selected_receipt_sha256: [u8; 32],
     /// Digest of the complete selection decision, including rejected and
-    /// not-evaluated candidates.
+    /// not-evaluated candidates. This is an application digest, not a
+    /// Holochain EntryHash; a conductor adapter must map the decision to a
+    /// native addressable entry when validation needs to retrieve it.
     pub selection_decision_sha256: [u8; 32],
     pub selection_policy: String,
     pub selection_policy_version: u16,
 }
 
 impl ReceiptSelectionContext {
+    /// Build a durable projection directly from a fully evaluated RFC 9942
+    /// selection decision, preventing the compact anchor from disagreeing with
+    /// the decision it references.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn from_decision(
+        decision: &crate::rfc9942_selection::ReceiptSelectionDecision,
+    ) -> Result<Self, HolochainProjectionError> {
+        let selected_index = decision
+            .selected_index
+            .ok_or(HolochainProjectionError::InvalidReceiptSelection)?;
+        let selected_receipt_sha256 = decision
+            .selected_receipt_sha256
+            .ok_or(HolochainProjectionError::InvalidReceiptSelection)?;
+
+        Ok(Self {
+            collection_sha256: decision.collection_sha256,
+            collection_len: decision.collection_len,
+            selected_index,
+            selected_receipt_sha256,
+            selection_decision_sha256: decision.digest(),
+            selection_policy: decision.policy_id.to_owned(),
+            selection_policy_version: decision.policy_version,
+        })
+    }
+
     fn validate(&self) -> Result<(), HolochainProjectionError> {
         if self.collection_len == 0 || self.selected_index >= self.collection_len {
             return Err(HolochainProjectionError::InvalidReceiptSelection);
