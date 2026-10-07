@@ -508,7 +508,7 @@ impl NeurosemanticRemediationStatisticalSamplingFrameArtifact {
 }
 
 const NEUROSEMANTIC_REMEDIATION_SIMPLE_RANDOM_WITHOUT_REPLACEMENT_PROCEDURE_REF: &str =
-    "simple-random-without-replacement-v1";
+    "simple-random-without-replacement-v2";
 
 /// Content-addressed commitment to the exact randomness input used by a selection trace.
 ///
@@ -6019,7 +6019,7 @@ mod tests {
                     probability_denominator: 2,
                 },
             ],
-            selection_procedure_ref: "simple-random-without-replacement-v1".into(),
+            selection_procedure_ref: "simple-random-without-replacement-v2".into(),
             dependence_model:
                 NeurosemanticRemediationStatisticalDependenceModel::IndependentObservationUnits,
             dependence_assignments: vec![
@@ -6099,7 +6099,7 @@ mod tests {
                     probability_denominator: 1,
                 },
             ],
-            selection_procedure_ref: "simple-random-without-replacement-v1".into(),
+            selection_procedure_ref: "simple-random-without-replacement-v2".into(),
             dependence_model:
                 NeurosemanticRemediationStatisticalDependenceModel::IndependentObservationUnits,
             dependence_assignments: vec![
