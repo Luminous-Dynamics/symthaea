@@ -569,7 +569,10 @@ pub struct ChangeDetectionEvent {
     pub observation_ordinal: u64,
     pub state_digest: u64,
     pub residual_mae: f64,
+    pub upper_cusum: f64,
+    pub lower_cusum: f64,
     pub cusum_score: f64,
+    pub detection_direction: &'static str,
     pub detected: bool,
 }
 
@@ -614,7 +617,10 @@ impl ChangeDetectionReport {
             && self.nominal_control_events.iter().all(|event| {
                 event.state_digest != 0
                     && event.residual_mae.is_finite()
+                    && event.upper_cusum.is_finite()
+                    && event.lower_cusum.is_finite()
                     && event.cusum_score.is_finite()
+                    && matches!(event.detection_direction, "increase" | "decrease" | "none")
             })
             && self.shifted_regime_events.iter().all(|event| {
                 event.state_digest != 0
@@ -1628,7 +1634,8 @@ fn run_change_detector(
     }
 
     let mut events = Vec::with_capacity(steps as usize);
-    let mut cusum = 0.0;
+    let mut upper_cusum = 0.0;
+    let mut lower_cusum = 0.0;
 
     for ordinal in 1..=steps {
         let state = states[((ordinal - 1) as usize) % states.len()];
@@ -1637,14 +1644,28 @@ fn run_change_detector(
         let residual_mae = predictor
             .predict(state, MicroAction::Harvest)
             .mean_absolute_delta(actual);
-        cusum = (cusum + residual_mae - baseline_mean - allowance).max(0.0);
-        let detected = cusum >= threshold;
+        upper_cusum =
+            (upper_cusum + residual_mae - baseline_mean - allowance).max(0.0);
+        lower_cusum =
+            (lower_cusum + baseline_mean - residual_mae - allowance).max(0.0);
+        let cusum_score = upper_cusum.max(lower_cusum);
+        let detected = cusum_score >= threshold;
+        let detection_direction = if upper_cusum >= threshold {
+            "increase"
+        } else if lower_cusum >= threshold {
+            "decrease"
+        } else {
+            "none"
+        };
 
         events.push(ChangeDetectionEvent {
             observation_ordinal: ordinal,
             state_digest: state.digest(),
             residual_mae,
-            cusum_score: cusum,
+            upper_cusum,
+            lower_cusum,
+            cusum_score,
+            detection_direction,
             detected,
         });
 
@@ -1659,7 +1680,8 @@ fn run_change_detector(
 /// Detect a prediction-error changepoint before adaptation.
 ///
 /// The detector uses nominal residuals as a fixed reference and a one-sided CUSUM against
-/// increases in prediction error. A no-shift nominal control is evaluated for false alarms;
+/// sustained increases or decreases in prediction error. A no-shift nominal control is
+/// evaluated for false alarms;
 /// only after that control is recorded is the shifted regime evaluated. No model update occurs
 /// during detection, so the detector cannot manufacture the evidence it is supposed to observe.
 fn evaluate_change_detection(
@@ -3245,6 +3267,12 @@ mod tests {
                 .iter()
                 .any(|event| event.detected)
         );
+        assert!(report
+            .shifted_regime_events
+            .iter()
+            .all(|event| event.detection_direction == "none"
+                || event.detection_direction == "increase"
+                || event.detection_direction == "decrease"));
         assert!(report.operationally_separates_shift());
     }
 
