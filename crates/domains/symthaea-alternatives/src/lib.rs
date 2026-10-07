@@ -1955,26 +1955,6 @@ impl CandidatePathway {
         });
         let all_dimensions_supported_evidence =
             self.all_burden_dimensions_have_supported_evidence(as_of, freshness_policy);
-        let distinct_authority_sources = self
-            .burdens
-            .values()
-            .flat_map(|estimate| self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy))
-            .filter(|e| {
-                matches!(
-                    e.kind,
-                    EvidenceKind::Observed
-                        | EvidenceKind::Reported
-                        | EvidenceKind::Derived
-                        | EvidenceKind::LifecycleAssessed
-                        | EvidenceKind::ManufacturingObserved
-                        | EvidenceKind::FieldObserved
-                        | EvidenceKind::ContinuouslyMonitored
-                ) && e.stance == EvidenceStance::Supports
-                    && e.confidence >= 0.7
-            })
-            .filter_map(|e| e.source.admitted_authority_group_id())
-            .collect::<BTreeSet<_>>()
-            .len();
         let has_all_dimension_evidence = Dimension::ALL.iter().all(|dimension| {
             self.burdens
                 .get(dimension)
