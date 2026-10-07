@@ -197,12 +197,14 @@ prediction; the deterministic oracle answers the same query through the real tra
 
 The report measures:
 
-- query count and sequence length;
-- mean terminal-state MAE;
-- mean minimum-viability-margin error across the sequence;
-- survival-decision agreement.
+- total, valid, and invalid query counts plus sequence length;
+- mean terminal-state MAE over valid answers only;
+- mean minimum-viability-margin error over valid answers only;
+- survival-decision agreement across all queries.
 
-Invalid/non-finite model answers are treated as disagreements rather than omitted samples.
+Invalid/non-finite model answers are explicit disagreements, remain in the total query count, and
+are never converted into synthetic error values. This prevents invalid forecasts from both
+inflating and deflating the numerical error metrics.
 
 This is intentionally different from scheduled-trajectory replay: it asks the model to answer
 counterfactual intervention queries from states it did not receive as its normal scheduled path.
