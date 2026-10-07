@@ -11788,6 +11788,63 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn background_process_status_writer_survives_path_replacement() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::os::unix::process::CommandExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-status-fd-race-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let log = dir.join("worker.log");
+        let status = dir.join("worker.status");
+        let pid = dir.join("worker.pid");
+        let original = dir.join("worker.status.original");
+        let attacker = dir.join("worker.status.attacker");
+
+        let mut command = tokio::process::Command::new("/bin/sleep");
+        command.arg("1");
+        let _pid = spawn_privileged_background_process(
+            command,
+            log.to_str().unwrap(),
+            status.to_str().unwrap(),
+            pid.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+
+        std::fs::rename(&status, &original).unwrap();
+        std::fs::write(&attacker, b"attacker").unwrap();
+        std::fs::File::create(&status).unwrap();
+
+        tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            loop {
+                let contents = std::fs::read_to_string(&original).unwrap();
+                if contents.trim() == "0" {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("descriptor-bound status writer should complete");
+
+        assert_eq!(
+            std::fs::read_to_string(&attacker).unwrap(),
+            "attacker"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&status).unwrap(),
+            ""
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
     async fn background_process_records_exact_pid_status_and_output() {
         use std::os::unix::fs::PermissionsExt;
 
