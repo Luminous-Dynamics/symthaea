@@ -83,10 +83,12 @@ def env_required(name: str) -> str:
 
 TOKEN = env_required("GITHUB_TOKEN")
 REPOSITORY = env_required("REPOSITORY")
+REPOSITORY_ID = int(env_required("REPOSITORY_ID"))
 TRUST_ANCHOR_SHA = env_required("TRUST_ANCHOR_SHA")
 TRIGGER_RUN_ID = int(env_required("TRIGGER_RUN_ID"))
 TRIGGER_RUN_NAME = env_required("TRIGGER_RUN_NAME")
 TRIGGER_RUN_EVENT = env_required("TRIGGER_RUN_EVENT")
+TRIGGER_RUN_REPOSITORY_ID = int(env_required("TRIGGER_RUN_REPOSITORY_ID"))
 TRIGGER_RUN_HEAD_SHA = env_required("TRIGGER_RUN_HEAD_SHA")
 TRIGGER_RUN_HEAD_BRANCH = env_required("TRIGGER_RUN_HEAD_BRANCH")
 TRIGGER_RUN_CONCLUSION = env_required("TRIGGER_RUN_CONCLUSION")
@@ -423,6 +425,7 @@ def main() -> int:
             "status_context": STATUS_CONTEXT,
         },
         "trigger": {
+            "repository_id": TRIGGER_RUN_REPOSITORY_ID,
             "run_id": TRIGGER_RUN_ID,
             "run_attempt": TRIGGER_RUN_ATTEMPT,
             "run_name": TRIGGER_RUN_NAME,
@@ -440,7 +443,9 @@ def main() -> int:
 
         trigger_run = api_request("GET", f"/actions/runs/{TRIGGER_RUN_ID}")
         if (
-            trigger_run.get("id") != TRIGGER_RUN_ID
+            trigger_run.get("repository", {}).get("id") != REPOSITORY_ID
+            or TRIGGER_RUN_REPOSITORY_ID != REPOSITORY_ID
+            or trigger_run.get("id") != TRIGGER_RUN_ID
             or trigger_run.get("name") != TRIGGER_RUN_NAME
             or trigger_run.get("event") != TRIGGER_RUN_EVENT
             or trigger_run.get("head_sha") != TRIGGER_RUN_HEAD_SHA
@@ -464,7 +469,9 @@ def main() -> int:
             if pr.get("state") == "open"
             and pr.get("head", {}).get("sha") == TRIGGER_RUN_HEAD_SHA
             and pr.get("head", {}).get("repo", {}).get("full_name") == REPOSITORY
+            and pr.get("head", {}).get("repo", {}).get("id") == REPOSITORY_ID
             and pr.get("base", {}).get("repo", {}).get("full_name") == REPOSITORY
+            and pr.get("base", {}).get("repo", {}).get("id") == REPOSITORY_ID
         ]
 
         if len(candidates) != 1:
@@ -485,6 +492,8 @@ def main() -> int:
             or pr.get("head", {}).get("sha") != TRIGGER_RUN_HEAD_SHA
             or pr.get("head", {}).get("ref") != TRIGGER_RUN_HEAD_BRANCH
             or pr.get("head", {}).get("repo", {}).get("full_name") != REPOSITORY
+            or pr.get("head", {}).get("repo", {}).get("id") != REPOSITORY_ID
+            or pr.get("base", {}).get("repo", {}).get("id") != REPOSITORY_ID
         ):
             raise StaleError("PR state/head/repository changed after association lookup")
 
