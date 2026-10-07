@@ -1107,6 +1107,78 @@ mod tests {
     }
 
     #[test]
+    fn trace_chain_is_verifiable_and_tamper_evident() {
+        let mut fabric = ViabilityFabric::new(8);
+
+        fabric.begin_cycle(1);
+        fabric
+            .predict_action(ActionPrediction {
+                action_id: 1,
+                pre_state_digest: 11,
+                action_label: "observe".to_string(),
+                cycle: 1,
+                predicted_world_delta: Some(ViabilityDelta::new(-0.1, 1.0)),
+                predicted_self_delta: None,
+                predicted_goal_delta: None,
+                authority_granted: true,
+            })
+            .unwrap();
+
+        fabric
+            .observe_action(ActionOutcome {
+                action_id: 1,
+                action_label: "observe".to_string(),
+                cycle: 2,
+                pre_state_digest: 11,
+                post_state_digest: 12,
+                authority_granted: true,
+                safety_gate_passed: true,
+                prediction: None,
+                observed_effect: Some(ViabilitySignal::new(
+                    0.45,
+                    1.0,
+                    2,
+                    "trace-test",
+                )),
+                prediction_error: PredictionErrorLedger::default(),
+                evidence_refs: vec!["sim://trace/outcome/1".to_string()],
+            })
+            .unwrap();
+
+        fabric.begin_cycle(3);
+        fabric
+            .predict_action(ActionPrediction {
+                action_id: 2,
+                pre_state_digest: 13,
+                action_label: "explore".to_string(),
+                cycle: 3,
+                predicted_world_delta: Some(ViabilityDelta::new(0.2, 0.9)),
+                predicted_self_delta: None,
+                predicted_goal_delta: None,
+                authority_granted: true,
+            })
+            .unwrap();
+
+        fabric
+            .cancel_prediction(
+                2,
+                4,
+                "synthetic actuator unavailable",
+                vec!["sim://trace/cancel/2".to_string()],
+            )
+            .unwrap();
+
+        let trace = fabric.trace();
+        assert_eq!(trace.len(), 2);
+        assert_eq!(trace[1].previous_digest, trace[0].chain_digest);
+        assert_eq!(fabric.latest_trace_digest(), trace[1].chain_digest);
+        assert!(fabric.verify_trace());
+
+        fabric.trace.make_contiguous()[1].chain_digest[0] ^= 0x01;
+        assert!(!fabric.verify_trace());
+    }
+
+    #[test]
     fn signed_delta_preserves_negative_consequences() {
         let delta = ViabilityDelta::new(-0.4, 0.9);
         assert_eq!(delta.value, -0.4);
