@@ -2680,7 +2680,7 @@ mod tests {
         assert!((0.0..=1.0).contains(&report.same_transition_improvement_rate));
         assert!((0.0..=1.0).contains(&report.neighbor_improvement_rate));
         assert!((0.0..=1.0).contains(&report.anchor_regression_rate));
-        assert!(report.mean_anchor_max_regression.is_finite());
+        assert!(report.max_anchor_regression.is_finite());
     }
 
     #[test]
