@@ -18,7 +18,8 @@ use blake3::Hasher;
 use sha2::{Digest, Sha256};
 
 use crate::semantic_evidence_vds::{
-    Rfc9942ReceiptCollection, Rfc9942ReceiptEnvelope, Rfc9942VdpError,
+    Rfc9942ReceiptCollection, Rfc9942ReceiptEnvelope, Rfc9942SignaturePayload,
+    Rfc9942SignatureWithReceipts, Rfc9942VerifiedSignatureWithReceipt, Rfc9942VdpError,
 };
 
 pub const POLICY_ID: &str = "rfc9942/priority-first-valid-v1";
@@ -175,6 +176,85 @@ impl ReceiptSelectionDecision {
 /// The callback performs cryptographic/semantic verification for exactly one
 /// candidate.  The first success is selected; lower-priority candidates are
 /// recorded as not evaluated rather than falsely labeled rejected.
+
+#[cfg(feature = "semantic-receipts")]
+impl Rfc9942SignatureWithReceipts {
+    /// Verify the outer signature and choose the first inclusion Receipt that
+    /// passes the supplied cryptographic verification context.
+    ///
+    /// The returned decision records every higher-priority rejection and marks
+    /// lower-priority candidates as not evaluated once a valid receipt wins.
+    /// The final verified capability is rechecked through the existing
+    /// composition verifier, keeping its construction boundary intact.
+    pub fn verify_es256_inclusion_priority_first_valid_receipt_state(
+        &self,
+        receipt_public_key: &[u8],
+        outer_public_key: &[u8],
+        receipt_external_aad: &[u8],
+        outer_external_aad: &[u8],
+        detached_outer_payload: Option<&[u8]>,
+    ) -> Result<
+        (Rfc9942VerifiedSignatureWithReceipt, ReceiptSelectionDecision),
+        Rfc9942VdpError,
+    > {
+        let payload = match (self.payload(), detached_outer_payload) {
+            (
+                Rfc9942SignaturePayload::Attached(bytes),
+                None,
+            ) => bytes.as_slice(),
+            (
+                crate::semantic_evidence_vds::Rfc9942SignaturePayload::Attached(_),
+                Some(_),
+            ) => return Err(Rfc9942VdpError::InvalidStructure),
+            (
+                Rfc9942SignaturePayload::Detached,
+                Some(bytes),
+            ) => bytes,
+            (
+                crate::semantic_evidence_vds::Rfc9942SignaturePayload::Detached,
+                None,
+            ) => return Err(Rfc9942VdpError::DetachedPayloadRequired),
+        };
+
+        self.verify_es256(outer_public_key, outer_external_aad, detached_outer_payload)?;
+
+        let collection = self.receipts().ok_or(Rfc9942VdpError::ReceiptsMissing)?;
+        let collection_bytes = collection
+            .serialized_bytes()
+            .map_or_else(|| collection.to_cbor(), ToOwned::to_owned);
+
+        let decision = evaluate_priority_first_valid(
+            collection,
+            &collection_bytes,
+            |_index, receipt| {
+                receipt
+                    .verify_es256_inclusion_state(
+                        payload,
+                        receipt_public_key,
+                        receipt_external_aad,
+                        None,
+                    )
+                    .map(|_| ())
+            },
+        );
+
+        let selected_index = decision
+            .selected_index
+            .ok_or(Rfc9942VdpError::NoMatchingProof)? as usize;
+
+        let verified = self.verify_es256_inclusion_receipt_state(
+            selected_index,
+            receipt_public_key,
+            outer_public_key,
+            receipt_external_aad,
+            outer_external_aad,
+            detached_outer_payload,
+        )?;
+
+        Ok((verified, decision))
+    }
+}
+
 pub fn evaluate_priority_first_valid<F>(
     collection: &Rfc9942ReceiptCollection,
     collection_bytes: &[u8],
