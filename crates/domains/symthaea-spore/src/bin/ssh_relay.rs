@@ -232,6 +232,52 @@ fn write_private_file(path: &str, contents: &[u8], mode: u32) -> Result<(), std:
     file.sync_all()
 }
 
+fn cleanup_sensitive_file(path: &str) -> Result<(), String> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    let mut file = match std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+    {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(format!("unable to open sensitive cleanup file {path}: {error}")),
+    };
+
+    let metadata = file
+        .metadata()
+        .map_err(|error| format!("unable to inspect sensitive cleanup file {path}: {error}"))?;
+    if !metadata.file_type().is_file()
+        || metadata.uid() != unsafe { libc::geteuid() }
+        || metadata.permissions().mode() & 0o077 != 0
+    {
+        return Err(format!(
+            "sensitive cleanup file {path} failed ownership, type, or permission checks"
+        ));
+    }
+
+    let mut remaining = metadata.len();
+    let zeros = [0u8; 8192];
+    while remaining > 0 {
+        let count = remaining.min(zeros.len() as u64) as usize;
+        file.write_all(&zeros[..count])
+            .map_err(|error| format!("unable to clear sensitive cleanup file {path}: {error}"))?;
+        remaining -= count as u64;
+    }
+    file.set_len(0)
+        .map_err(|error| format!("unable to truncate sensitive cleanup file {path}: {error}"))?;
+    file.sync_all()
+        .map_err(|error| format!("unable to synchronize sensitive cleanup file {path}: {error}"))?;
+
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!("unable to unlink sensitive cleanup file {path}: {error}")),
+    }
+}
+
 fn prepare_transaction_runtime(
     log_path: &str,
     status_path: &str,
@@ -9580,7 +9626,7 @@ echo '}'
                     .and_then(|_| secret_file.sync_all())
                 {
                     drop(secret_file);
-                    let _ = tokio::fs::remove_file(&secret_path).await;
+                    let _ = cleanup_sensitive_file(&secret_path);
                     let _ = ws_tx
                         .send(Message::Text(
                             RelayMessage::error(&format!(
@@ -9604,8 +9650,7 @@ echo '}'
                 // Create a non-persistent profile without putting the PSK in argv.
                 let add_result = run_nmcli_add_wifi_profile(&profile_name, &ssid).await;
                 if let Err(error) = add_result {
-                    let _ = tokio::fs::remove_file(&secret_path).await;
-                    let _ = ws_tx
+                        let _ = ws_tx
                         .send(Message::Text(
                             serde_json::json!({
                                 "type": "wifi_result",
@@ -9621,66 +9666,102 @@ echo '}'
 
                 let result =
                     run_nmcli_wifi_connection_up(&profile_name, &secret_path).await;
+                let cleanup_result = cleanup_sensitive_file(&secret_path);
 
-                let response = match result {
-                    Ok(r) if r.exit_status == 0 => {
-                        let observed_outcome = match verify_wifi_connection(&profile_name).await {
-                            Ok(true) => TransactionOutcome::ObservedSuccess,
-                            Ok(false) => {
-                                eprintln!(
-                                    "[{}] {} Wi-Fi command returned 0 but active connection was not observed",
-                                    peer_addr, transaction.log_line()
-                                );
-                                TransactionOutcome::Indeterminate
-                            }
-                            Err(error) => {
-                                eprintln!(
-                                    "[{}] {} Wi-Fi postcondition probe failed: {}",
-                                    peer_addr, transaction.log_line(), error
-                                );
-                                TransactionOutcome::Indeterminate
-                            }
-                        };
-                        let outcome = finalize_transaction(
-                            &transaction_ledger,
-                            &transaction,
-                            observed_outcome,
-                            &peer_addr,
-                        );
-                        serde_json::json!({
-                            "type": "wifi_result",
-                            "code": protocol_exit_code(r.exit_status, outcome),
-                            "data": if outcome == TransactionOutcome::ObservedSuccess {
-                                "WiFi connected".to_string()
-                            } else {
-                                "Wi-Fi activation completed but the active connection was not durably observed.".to_string()
-                            },
-                            "transaction": transaction.receipt(outcome)
-                        })
-                    }
-                    Ok(r) => {
-                        let outcome = finalize_transaction(
-                            &transaction_ledger,
-                            &transaction,
-                            TransactionOutcome::Failed,
-                            &peer_addr,
-                        );
-                        serde_json::json!({
-                            "type": "wifi_result",
-                            "code": protocol_exit_code(r.exit_status, outcome),
-                            "data": r.stderr.chars().take(400).collect::<String>(),
-                            "transaction": transaction.receipt(outcome)
-                        })
-                    }
-                    Err(error) => serde_json::json!({
+                let response = if let Err(cleanup_error) = cleanup_result {
+                    eprintln!(
+                        "[{}] {} Wi-Fi credential cleanup failed: {}",
+                        peer_addr,
+                        transaction.log_line(),
+                        cleanup_error
+                    );
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
+                    serde_json::json!({
                         "type": "wifi_result",
-                        "code": 1,
-                        "data": format!("Wi-Fi connection failed: {}", error),
-                        "transaction": transaction.receipt(finalize_transaction(&transaction_ledger, &transaction, TransactionOutcome::Indeterminate, &peer_addr))
-                    }),
+                        "code": protocol_exit_code(1, outcome),
+                        "data": format!(
+                            "Wi-Fi operation completed, but credential cleanup could not be verified: {}",
+                            cleanup_error
+                        ),
+                        "transaction": transaction.receipt(outcome)
+                    })
+                } else {
+                    match result {
+                        Ok(r) if r.exit_status == 0 => {
+                            let observed_outcome =
+                                match verify_wifi_connection(&profile_name).await {
+                                    Ok(true) => TransactionOutcome::ObservedSuccess,
+                                    Ok(false) => {
+                                        eprintln!(
+                                            "[{}] {} Wi-Fi command returned 0 but active connection was not observed",
+                                            peer_addr,
+                                            transaction.log_line()
+                                        );
+                                        TransactionOutcome::Indeterminate
+                                    }
+                                    Err(error) => {
+                                        eprintln!(
+                                            "[{}] {} Wi-Fi postcondition probe failed: {}",
+                                            peer_addr,
+                                            transaction.log_line(),
+                                            error
+                                        );
+                                        TransactionOutcome::Indeterminate
+                                    }
+                                };
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                observed_outcome,
+                                &peer_addr,
+                            );
+                            serde_json::json!({
+                                "type": "wifi_result",
+                                "code": protocol_exit_code(r.exit_status, outcome),
+                                "data": if outcome == TransactionOutcome::ObservedSuccess {
+                                    "WiFi connected".to_string()
+                                } else {
+                                    "Wi-Fi activation completed but the active connection was not durably observed.".to_string()
+                                },
+                                "transaction": transaction.receipt(outcome)
+                            })
+                        }
+                        Ok(r) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Failed,
+                                &peer_addr,
+                            );
+                            serde_json::json!({
+                                "type": "wifi_result",
+                                "code": protocol_exit_code(r.exit_status, outcome),
+                                "data": r.stderr.chars().take(400).collect::<String>(),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                        }
+                        Err(error) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Indeterminate,
+                                &peer_addr,
+                            );
+                            serde_json::json!({
+                                "type": "wifi_result",
+                                "code": 1,
+                                "data": format!("Wi-Fi connection failed: {}", error),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                        }
+                    }
                 };
 
-                let _ = tokio::fs::remove_file(&secret_path).await;
                 let _ = ws_tx.send(Message::Text(response.to_string())).await;
             }
 
