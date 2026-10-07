@@ -1586,6 +1586,79 @@ fn coordinate_permutation_equivariance_preserves_bounded_decoder_semantics() {
 
 
 #[test]
+fn generator_basis_change_preserves_parity_check_and_decoder_semantics() {
+    let original = RandomLinearCode::generate(73, 8, 0xC0DE);
+    let basis = original.basis().to_vec();
+
+    // Reverse the basis order and apply a unitriangular shear to the adjacent
+    // original generators. The transformed family is still an independent basis
+    // for exactly the same code, but presents that code through different generators.
+    let mut transformed_basis = Vec::with_capacity(basis.len());
+    for index in (0..basis.len()).rev() {
+        let mut transformed = basis[index].clone();
+        if index > 0 {
+            transformed.xor_assign(&basis[index - 1]);
+        }
+        transformed_basis.push(transformed);
+    }
+
+    let transformed =
+        RandomLinearCode::from_basis(transformed_basis).expect("equivalent basis must remain independent");
+
+    let original_codewords = canonicalize_words(original.enumerate());
+    let transformed_codewords = canonicalize_words(transformed.enumerate());
+    assert_eq!(
+        transformed_codewords, original_codewords,
+        "basis presentation changed the represented code"
+    );
+
+    let original_parity_check =
+        ParityCheckMatrix::from_code(&original).expect("original parity-check");
+    let transformed_parity_check =
+        ParityCheckMatrix::from_code(&transformed).expect("transformed parity-check");
+
+    assert_eq!(
+        transformed_parity_check.rows(),
+        original_parity_check.rows(),
+        "equivalent generator bases produced different RREF parity checks"
+    );
+    assert_eq!(transformed_parity_check.columns(), original_parity_check.columns());
+    assert_eq!(
+        transformed_parity_check.fingerprint(),
+        original_parity_check.fingerprint()
+    );
+
+    let original_decoder =
+        BoundedDistanceSyndromeDecoder::from_code(&original).expect("original decoder");
+    let transformed_decoder =
+        BoundedDistanceSyndromeDecoder::from_code(&transformed).expect("transformed decoder");
+
+    let probes = deterministic_probe_masks(0xB451_5EED, 64, 73)
+        .iter()
+        .map(|&mask| error_from_mask(mask as usize, 73))
+        .collect::<Vec<_>>();
+
+    for observation in &probes {
+        let original_list = original_decoder.decode_with_minimum_list(observation, 1, 128);
+        let transformed_list =
+            transformed_decoder.decode_with_minimum_list(observation, 1, 128);
+
+        assert_eq!(transformed_list, original_list);
+
+        let (original_outcome, original_work) =
+            original_decoder.decode_with_work(observation, 1);
+        let (transformed_outcome, transformed_work) =
+            transformed_decoder.decode_with_work(observation, 1);
+        assert_eq!(transformed_outcome, original_outcome);
+        assert_eq!(transformed_work, original_work);
+    }
+
+    println!(
+        "GENERATOR_BASIS_EQUIVARIANCE=dimension=73;rank=8;probes=64;basis_transform=reverse_plus_adjacent_shear;codeword_set_equal=true;parity_check_equal=true;decoder_semantics_equal=true;work_ledger_equal=true"
+    );
+}
+
+#[test]
 fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
     let regimes = [
         (12usize, 4usize, 64u64, 0xE100_0000u64, 24usize),
