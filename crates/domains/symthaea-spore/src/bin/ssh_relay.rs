@@ -4185,6 +4185,51 @@ fn open_restore_target_directory() -> Result<std::fs::File, String> {
     Ok(directory)
 }
 
+fn open_child_directory_at(
+    parent: &std::fs::File,
+    name: &str,
+) -> Result<std::fs::File, String> {
+    use std::ffi::CString;
+    use std::os::fd::{AsRawFd, FromRawFd};
+
+    let name = CString::new(name)
+        .map_err(|_| format!("restore directory component contains NUL: {name:?}"))?;
+    let fd = unsafe {
+        libc::openat(
+            parent.as_raw_fd(),
+            name.as_ptr(),
+            libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if fd < 0 {
+        return Err(format!(
+            "unable to open restore directory component {name:?}: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+
+    let directory = unsafe { std::fs::File::from_raw_fd(fd) };
+    let metadata = directory.metadata().map_err(|error| {
+        format!(
+            "unable to inspect restore directory component {name:?}: {error}"
+        )
+    })?;
+    if !metadata.is_dir() {
+        return Err(format!(
+            "restore directory component {name:?} is not a directory"
+        ));
+    }
+
+    Ok(directory)
+}
+
+fn open_restore_configuration_directory() -> Result<std::fs::File, String> {
+    let mnt = open_restore_target_directory()?;
+    let etc = open_child_directory_at(&mnt, "etc")?;
+    open_child_directory_at(&etc, "nixos")
+}
+
+
 async fn restore_verified_archive(
     format: RestoreArchiveFormat,
     input: std::fs::File,
@@ -4590,18 +4635,7 @@ fn restore_verified_configuration_blocking(
         return Err("restore transaction identifier is invalid".into());
     }
 
-    let target_dir_path = std::path::Path::new("/mnt/etc/nixos");
-    let target_dir = std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open(target_dir_path)
-        .map_err(|error| format!("unable to open restore configuration directory: {error}"))?;
-    let dir_metadata = target_dir
-        .metadata()
-        .map_err(|error| format!("unable to inspect restore configuration directory: {error}"))?;
-    if !dir_metadata.file_type().is_dir() {
-        return Err("restore configuration target is not a directory".into());
-    }
+    let target_dir = open_restore_configuration_directory()?;
 
     let temp_name = format!(".configuration.nix.restore.{transaction_id}");
     let final_name = "configuration.nix";
@@ -11216,6 +11250,50 @@ mod tests {
         assert!(!wifi_profile_cleanup_succeeded(&Err(
             "spawn failure".into()
         )));
+    }
+
+    #[test]
+    fn restore_configuration_directory_walk_rejects_symlink_components() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let id = random_operation_id().unwrap();
+        let root = std::env::temp_dir().join(format!("nixforhumanity-restore-walk-{id}"));
+        let mnt = root.join("mnt");
+        let etc = mnt.join("etc");
+        let nixos = etc.join("nixos");
+        std::fs::create_dir_all(&nixos).unwrap();
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::fs::set_permissions(&mnt, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::fs::set_permissions(&etc, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::fs::set_permissions(&nixos, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let root_fd = std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(&mnt)
+            .unwrap();
+        let etc_fd = open_child_directory_at(&root_fd, "etc").unwrap();
+        let nixos_fd = open_child_directory_at(&etc_fd, "nixos").unwrap();
+        assert!(nixos_fd.metadata().unwrap().is_dir());
+
+        drop(nixos_fd);
+        drop(etc_fd);
+        drop(root_fd);
+
+        let evil = mnt.join("etc-link");
+        std::os::unix::fs::symlink(&nixos, &evil).unwrap();
+        let error = open_child_directory_at(
+            &std::fs::OpenOptions::new()
+                .read(true)
+                .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+                .open(&mnt)
+                .unwrap(),
+            "etc-link",
+        )
+        .expect_err("symlinked restore component must be rejected");
+        assert!(error.contains("unable to open restore directory component"));
+
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[tokio::test]
