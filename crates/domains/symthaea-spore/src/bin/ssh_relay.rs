@@ -4147,6 +4147,44 @@ fn restore_archive_format_for_commitment(
     }
 }
 
+fn bind_process_cwd_to_directory(
+    command: &mut tokio::process::Command,
+    directory: &std::fs::File,
+) -> Result<(), String> {
+    use std::os::fd::AsRawFd;
+
+    let fd = directory.as_raw_fd();
+    // SAFETY: the pre-exec hook performs only fchdir on a valid directory fd.
+    // The descriptor remains open until after spawn/exec and carries O_CLOEXEC.
+    unsafe {
+        command.pre_exec(move || {
+            if libc::fchdir(fd) == 0 {
+                Ok(())
+            } else {
+                Err(std::io::Error::last_os_error())
+            }
+        });
+    }
+    Ok(())
+}
+
+fn open_restore_target_directory() -> Result<std::fs::File, String> {
+    let directory = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open("/mnt")
+        .map_err(|error| format!("unable to open restore target directory /mnt: {error}"))?;
+
+    let metadata = directory
+        .metadata()
+        .map_err(|error| format!("unable to inspect restore target directory /mnt: {error}"))?;
+    if !metadata.is_dir() {
+        return Err("restore target /mnt is not a directory".into());
+    }
+
+    Ok(directory)
+}
+
 async fn restore_verified_archive(
     format: RestoreArchiveFormat,
     input: std::fs::File,
