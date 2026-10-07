@@ -2897,6 +2897,115 @@ fn gc_completion_outcome(exit_code: Option<u32>) -> TransactionOutcome {
 }
 
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ServiceAction {
+    Start,
+    Stop,
+    Restart,
+    Reload,
+    Enable,
+    Disable,
+}
+
+impl ServiceAction {
+    fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "start" => Ok(Self::Start),
+            "stop" => Ok(Self::Stop),
+            "restart" => Ok(Self::Restart),
+            "reload" => Ok(Self::Reload),
+            "enable" => Ok(Self::Enable),
+            "disable" => Ok(Self::Disable),
+            _ => Err(format!(
+                "Invalid service action '{value}'. Use: start, stop, restart, reload, enable, disable"
+            )),
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Start => "start",
+            Self::Stop => "stop",
+            Self::Restart => "restart",
+            Self::Reload => "reload",
+            Self::Enable => "enable",
+            Self::Disable => "disable",
+        }
+    }
+}
+
+async fn run_service_action(
+    action: ServiceAction,
+    service: &str,
+) -> Result<CmdResult, String> {
+    let mut command = privileged_process("systemctl");
+    command.arg(action.as_str()).arg(format!("{service}.service"));
+    let output = command
+        .output()
+        .await
+        .map_err(|error| format!("unable to start typed systemctl action: {error}"))?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
+async fn verify_service_postcondition_typed(
+    action: ServiceAction,
+    service: &str,
+) -> Result<bool, String> {
+    let unit = format!("{service}.service");
+
+    let mut active_command = privileged_process("systemctl");
+    active_command
+        .arg("show")
+        .arg("--property=ActiveState")
+        .arg("--value")
+        .arg(&unit);
+    let active_state = active_command
+        .output()
+        .await
+        .map_err(|error| format!("service postcondition probe failed: {error}"))?;
+    if !active_state.status.success() {
+        return Err(format!(
+            "service postcondition probe exited with {}: {}",
+            active_state.status.code().unwrap_or(1),
+            String::from_utf8_lossy(&active_state.stderr)
+                .chars()
+                .take(200)
+                .collect::<String>()
+        ));
+    }
+
+    let mut unit_file_command = privileged_process("systemctl");
+    unit_file_command
+        .arg("show")
+        .arg("--property=UnitFileState")
+        .arg("--value")
+        .arg(&unit);
+    let unit_file_state = unit_file_command
+        .output()
+        .await
+        .map_err(|error| format!("service enablement postcondition probe failed: {error}"))?;
+    if !unit_file_state.status.success() {
+        return Err(format!(
+            "service enablement postcondition probe exited with {}: {}",
+            unit_file_state.status.code().unwrap_or(1),
+            String::from_utf8_lossy(&unit_file_state.stderr)
+                .chars()
+                .take(200)
+                .collect::<String>()
+        ));
+    }
+
+    Ok(service_postcondition_met(
+        action.as_str(),
+        String::from_utf8_lossy(&active_state.stdout).trim(),
+        String::from_utf8_lossy(&unit_file_state.stdout).trim(),
+    ))
+}
+
 fn service_postcondition_met(
     action: &str,
     active_state: &str,
@@ -2912,40 +3021,10 @@ fn service_postcondition_met(
 }
 
 async fn verify_service_postcondition(action: &str, service: &str) -> Result<bool, String> {
-    let unit = format!("{}.service", service);
-    let active_state = run_cmd(&format!(
-        "systemctl show --property=ActiveState --value '{}'",
-        unit
-    ))
-    .await
-    .map_err(|error| format!("service postcondition probe failed: {error}"))?;
-    if active_state.exit_status != 0 {
-        return Err(format!(
-            "service postcondition probe exited with {}: {}",
-            active_state.exit_status,
-            active_state.stderr.chars().take(200).collect::<String>()
-        ));
-    }
-    let unit_file_state = run_cmd(&format!(
-        "systemctl show --property=UnitFileState --value '{}'",
-        unit
-    ))
-    .await
-    .map_err(|error| format!("service enablement postcondition probe failed: {error}"))?;
-    if unit_file_state.exit_status != 0 {
-        return Err(format!(
-            "service enablement postcondition probe exited with {}: {}",
-            unit_file_state.exit_status,
-            unit_file_state.stderr.chars().take(200).collect::<String>()
-        ));
-    }
-
-    Ok(service_postcondition_met(
-        action,
-        active_state.stdout.trim(),
-        unit_file_state.stdout.trim(),
-    ))
+    let action = ServiceAction::parse(action)?;
+    verify_service_postcondition_typed(action, service).await
 }
+
 async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
     let image_dir = validate_image_path(image_dir)?;
     use std::os::unix::fs::MetadataExt;
@@ -6300,14 +6379,16 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
             }
 
             "service_action" => {
-                let action = &client_msg.command;
+                let action = match ServiceAction::parse(&client_msg.command) {
+                    Ok(action) => action,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&error).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
                 let service = &client_msg.hostname;
-                if !["start", "stop", "restart", "reload", "enable", "disable"]
-                    .contains(&action.as_str())
-                {
-                    let _ = ws_tx.send(Message::Text(RelayMessage::error(&format!("Invalid action '{}'. Use: start, stop, restart, reload, enable, disable", action)).to_json())).await;
-                    continue;
-                }
                 // Validate service name to prevent shell injection
                 let service = match sanitize_input(service, "service name", false) {
                     Ok(s) => s,
@@ -6342,7 +6423,7 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                         continue;
                     }
                 };
-                let transaction_payload = format!("{}:{}", action, service);
+                let transaction_payload = format!("{}:{}", action.as_str(), service);
                 let Some(transaction) = admit_mutation_transaction(
                     &mut ws_tx,
                     &transaction_ledger,
@@ -6353,11 +6434,16 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                 ).await else {
                     continue;
                 };
-                eprintln!("[{}] {} {} {}...", peer_addr, transaction.log_line(), action, service);
-                let cmd = format!("systemctl {} {}.service 2>&1", action, service);
-                match run_cmd(&cmd).await {
+                eprintln!(
+                    "[{}] {} {} {}...",
+                    peer_addr,
+                    transaction.log_line(),
+                    action.as_str(),
+                    service
+                );
+                match run_service_action(action, &service).await {
                     Ok(r) if r.exit_status == 0 => {
-                        let observed_outcome = match verify_service_postcondition(action, &service).await {
+                        let observed_outcome = match verify_service_postcondition_typed(action, &service).await {
                             Ok(true) => TransactionOutcome::ObservedSuccess,
                             Ok(false) => {
                                 eprintln!(
@@ -9380,6 +9466,16 @@ mod tests {
         assert!(error.contains("multiple supported archive artifacts"));
 
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn service_action_is_typed_and_preserves_literal_service_identity() {
+        assert_eq!(ServiceAction::parse("restart").unwrap(), ServiceAction::Restart);
+        assert!(ServiceAction::parse("restart; touch /tmp/pwned").is_err());
+
+        let service = "foo;$(touch /tmp/pwned)";
+        let unit = format!("{service}.service");
+        assert_eq!(unit, "foo;$(touch /tmp/pwned).service");
     }
 
     #[test]
