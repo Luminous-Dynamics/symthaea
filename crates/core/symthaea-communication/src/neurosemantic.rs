@@ -839,6 +839,36 @@ impl NeurosemanticRemediationStatisticalExecutionArtifact {
     }
 }
 
+/// Validate census execution against the complete frozen frame.
+fn validate_census_sampling_execution(
+    sampling_frame: &NeurosemanticRemediationStatisticalSamplingFrameArtifact,
+    execution: &NeurosemanticRemediationStatisticalExecutionArtifact,
+) -> Result<(), String> {
+    let frame_members: BTreeSet<&str> = sampling_frame
+        .member_artifact_hashes
+        .iter()
+        .map(String::as_str)
+        .collect();
+    let inclusion_members: BTreeSet<&str> = execution
+        .inclusion_probabilities
+        .iter()
+        .map(|item| item.subject_artifact_hash.as_str())
+        .collect();
+    if sorted_hashes(&execution.selected_subject_artifact_hashes)
+            != sorted_hashes(&sampling_frame.member_artifact_hashes)
+        || inclusion_members != frame_members
+        || execution.inclusion_probabilities.iter().any(|item| {
+            item.probability_numerator != 1 || item.probability_denominator != 1
+        })
+    {
+        return Err(
+            "neurosemantic remediation census execution does not match its complete frame"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 /// Content-addressed statistical-design contract for an uncertainty calculation.
 ///
 /// This makes method applicability explicit and independently checkable. It records what
@@ -2297,17 +2327,7 @@ impl NeurosemanticRemediationImpactArtifact {
                         }
                     }
                     NeurosemanticRemediationStatisticalSamplingDesign::CensusOfTargetPopulation => {
-                        if sorted_hashes(&execution.selected_subject_artifact_hashes)
-                            != sorted_hashes(&sampling_frame.member_artifact_hashes)
-                            || execution.inclusion_probabilities.iter().any(|item| {
-                                item.probability_numerator != item.probability_denominator
-                            })
-                        {
-                            return Err(
-                                "neurosemantic remediation census execution does not match its frame"
-                                    .into(),
-                            );
-                        }
+                        validate_census_sampling_execution(&sampling_frame, &execution)?;
                     }
                     NeurosemanticRemediationStatisticalSamplingDesign::NonProbabilitySample
                     | NeurosemanticRemediationStatisticalSamplingDesign::Unknown => {}
@@ -5973,6 +5993,65 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn remediation_census_execution_requires_complete_unit_inclusion_probabilities() {
+        let subject_a = content_hash(b"census-a");
+        let subject_b = content_hash(b"census-b");
+        let frame = NeurosemanticRemediationStatisticalSamplingFrameArtifact {
+            schema_version: NEUROSEMANTIC_REMEDIATION_STATISTICAL_SAMPLING_FRAME_SCHEMA_VERSION,
+            frame_ref: "census-frame-test".into(),
+            source_dataset_manifest_hash: content_hash(b"dataset"),
+            member_artifact_hashes: vec![subject_a.clone(), subject_b.clone()],
+        };
+        let execution = NeurosemanticRemediationStatisticalExecutionArtifact {
+            schema_version: NEUROSEMANTIC_REMEDIATION_STATISTICAL_EXECUTION_SCHEMA_VERSION,
+            execution_ref: "census-execution-test".into(),
+            design_ref: "census-design-test".into(),
+            metric_ref: "census-metric-test".into(),
+            metric_definition_hash: content_hash(b"metric"),
+            observation_set_hash: content_hash(b"observations"),
+            sampling_frame_hash: frame.fingerprint().unwrap(),
+            selection_trace_hash: content_hash(b"selection-trace"),
+            selected_subject_artifact_hashes: vec![subject_a.clone(), subject_b.clone()],
+            inclusion_probabilities: vec![
+                NeurosemanticRemediationSamplingInclusionProbability {
+                    subject_artifact_hash: subject_a.clone(),
+                    probability_numerator: 1,
+                    probability_denominator: 1,
+                },
+                NeurosemanticRemediationSamplingInclusionProbability {
+                    subject_artifact_hash: subject_b.clone(),
+                    probability_numerator: 1,
+                    probability_denominator: 1,
+                },
+            ],
+            selection_procedure_ref: "simple-random-without-replacement-v1".into(),
+            dependence_model:
+                NeurosemanticRemediationStatisticalDependenceModel::IndependentObservationUnits,
+            dependence_assignments: vec![
+                NeurosemanticRemediationStatisticalDependenceAssignment {
+                    subject_artifact_hash: subject_a.clone(),
+                    dependence_group_ref: None,
+                },
+                NeurosemanticRemediationStatisticalDependenceAssignment {
+                    subject_artifact_hash: subject_b.clone(),
+                    dependence_group_ref: None,
+                },
+            ],
+            study_protocol_hash: content_hash(b"protocol"),
+            execution_revision: "b".repeat(40),
+        };
+        assert!(validate_census_sampling_execution(&frame, &execution).is_ok());
+
+        let mut missing_probability = execution.clone();
+        missing_probability.inclusion_probabilities.pop();
+        assert!(validate_census_sampling_execution(&frame, &missing_probability).is_err());
+
+        let mut invalid_probability = execution;
+        invalid_probability.inclusion_probabilities[1].probability_numerator = 0;
+        assert!(validate_census_sampling_execution(&frame, &invalid_probability).is_err());
     }
 
     #[test]
