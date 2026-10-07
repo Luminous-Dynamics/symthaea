@@ -90,3 +90,9 @@ a memory dependency. WAR remains an execution dependency without unnecessary
 memory visibility scope. The backend runtime must eventually translate these
 requirements into concrete vkCmdPipelineBarrier2 scopes for the resources it
 actually binds.
+
+### Workload-bearing Vulkan barriers
+
+The Vulkan barrier qualification harness is intentionally bounded to HdcBindXor nodes with exactly two Read resources and one Write resource. It allocates the declared resources as concrete Vulkan storage buffers, records actual compute dispatches, lowers same-queue barrier requirements to `vkCmdPipelineBarrier2`, waits on a completion fence, reads the resources back, and compares the final resource state with an independent CPU graph simulation.
+
+The resulting `VulkanBarrierExecutionReceipt` binds the graph digest, schedule digest, sync-plan digest, barrier digest, node/barrier counts, and final resource digests. It is workload and synchronization evidence, not an acceleration attestation.
