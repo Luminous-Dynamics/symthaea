@@ -577,6 +577,29 @@ fn measure_recovery(
 }
 
 impl FepModule {
+    /// Roll the current grounded world model through the same ODE engine used by
+    /// trajectory planning.
+    ///
+    /// This is an observational planning probe: it does not select an action,
+    /// update model parameters, or alter runtime policy.
+    pub fn rollout_current_world_model_trajectory(
+        &self,
+        state: &[f64],
+        action: usize,
+        horizon_seconds: f64,
+        tau: f64,
+        max_steps: usize,
+    ) -> Option<ContinuousTransitionRollout> {
+        roll_transition_model_trajectory(
+            &self.world_model,
+            state,
+            action,
+            horizon_seconds,
+            tau,
+            max_steps,
+        )
+    }
+
     /// Experimentally qualify the live FEP WorldModelBridge against deterministic
     /// synthetic-organism dynamics.
     ///
