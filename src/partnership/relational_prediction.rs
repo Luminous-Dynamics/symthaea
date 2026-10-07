@@ -1362,6 +1362,7 @@ impl Default for RollingOriginRelationalPredictionConfig {
 }
 
 const INFERENCE_PLAN_SCHEMA: &str = "relational-prediction-inference-plan/v1";
+const INFERENCE_BINDING_SCHEMA: &str = "relational-prediction-inference-binding/v1";
 
 /// Frozen analysis contract for future inferential qualification.
 /// This specifies the inferential procedure and all supporting choices without
@@ -1485,6 +1486,220 @@ impl ForecastInferencePlan {
             "alpha": self.alpha,
             "qualification_identity_blake3": &self.qualification_identity_blake3,
             "plan_blake3": &self.plan_blake3
+        }).to_string())
+    }
+}
+
+
+/// Pre-inference binding gate for a forecast-accuracy qualification.
+///
+/// This artifact deliberately performs no statistical inference. It binds one
+/// validated qualification, its retained loss differential vector, a measured
+/// dependence profile, and one frozen inference plan. A future inferential
+/// result should consume this binding rather than accepting those components
+/// independently.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ForecastInferenceBinding {
+    pub analysis_level: String,
+    pub origin_schedule_sha256: String,
+    pub qualification_identity_blake3: String,
+    pub plan_blake3: String,
+    pub evaluation_input_blake3: String,
+    pub relational_loss_differentials_blake3: String,
+    pub dependence_profile_blake3: String,
+    pub dependence_max_lag_within_origin: usize,
+    pub dependence_max_lag_across_origins: usize,
+    pub origin_count: usize,
+    pub test_samples: usize,
+    pub forecast_horizon: f64,
+    pub binding_blake3: String,
+}
+
+impl ForecastInferenceBinding {
+    pub fn from_single(
+        plan: &ForecastInferencePlan,
+        qualification: &HeldOutRelationalPredictionQualification,
+        dependence: &ForecastLossDependenceProfile,
+    ) -> Result<Self, RelationalPredictionError> {
+        let horizon = qualification.observed.minimum_outcome_horizon;
+        let binding = Self {
+            analysis_level: "single-window".to_string(),
+            origin_schedule_sha256: plan.origin_schedule_sha256.clone(),
+            qualification_identity_blake3: qualification.qualification_identity_blake3.clone(),
+            plan_blake3: plan.plan_blake3.clone(),
+            evaluation_input_blake3: qualification.evaluation_input_blake3.clone(),
+            relational_loss_differentials_blake3: qualification
+                .relational_loss_differentials_blake3
+                .clone(),
+            dependence_profile_blake3: forecast_loss_dependence_profile_digest(dependence),
+            dependence_max_lag_within_origin: dependence.max_lag,
+            dependence_max_lag_across_origins: 0,
+            origin_count: 1,
+            test_samples: qualification.config.test_samples,
+            forecast_horizon: horizon,
+            binding_blake3: String::new(),
+        };
+        let mut binding = binding;
+        binding.binding_blake3 = inference_binding_digest(&binding);
+        binding.validate_against_single(plan, qualification, dependence)?;
+        Ok(binding)
+    }
+
+    pub fn from_rolling(
+        plan: &ForecastInferencePlan,
+        qualification: &RollingOriginRelationalPredictionQualification,
+        dependence: &RollingForecastLossDependenceProfile,
+    ) -> Result<Self, RelationalPredictionError> {
+        let binding = Self {
+            analysis_level: "rolling-origin".to_string(),
+            origin_schedule_sha256: plan.origin_schedule_sha256.clone(),
+            qualification_identity_blake3: qualification.qualification_identity_blake3.clone(),
+            plan_blake3: plan.plan_blake3.clone(),
+            evaluation_input_blake3: qualification.evaluation_input_blake3.clone(),
+            relational_loss_differentials_blake3: qualification
+                .relational_loss_differentials_blake3
+                .clone(),
+            dependence_profile_blake3: rolling_forecast_loss_dependence_profile_digest(dependence),
+            dependence_max_lag_within_origin: dependence.max_lag_within_origin,
+            dependence_max_lag_across_origins: dependence.max_lag_across_origins,
+            origin_count: qualification.config.origin_count,
+            test_samples: qualification.config.test_samples,
+            forecast_horizon: qualification.config.forecast_horizon,
+            binding_blake3: String::new(),
+        };
+        let mut binding = binding;
+        binding.binding_blake3 = inference_binding_digest(&binding);
+        binding.validate_against_rolling(plan, qualification, dependence)?;
+        Ok(binding)
+    }
+
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        if !matches!(self.analysis_level.as_str(), "single-window" | "rolling-origin")
+            || !is_hex_digest(&self.origin_schedule_sha256, 64)
+            || !is_hex_digest(&self.qualification_identity_blake3, 64)
+            || !is_hex_digest(&self.plan_blake3, 64)
+            || !is_hex_digest(&self.evaluation_input_blake3, 64)
+            || !is_hex_digest(&self.relational_loss_differentials_blake3, 64)
+            || !is_hex_digest(&self.dependence_profile_blake3, 64)
+            || self.dependence_max_lag_across_origins >= self.origin_count.max(1)
+            || self.origin_count == 0
+            || self.test_samples < 4
+            || !self.forecast_horizon.is_finite()
+            || self.forecast_horizon <= 0.0
+            || !is_hex_digest(&self.binding_blake3, 64)
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        if inference_binding_digest(self) != self.binding_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
+    }
+
+    pub fn validate_against_single(
+        &self,
+        plan: &ForecastInferencePlan,
+        qualification: &HeldOutRelationalPredictionQualification,
+        dependence: &ForecastLossDependenceProfile,
+    ) -> Result<(), RelationalPredictionError> {
+        self.validate()?;
+        qualification.validate()?;
+        dependence.validate()?;
+        plan.validate_against_qualification(&qualification.qualification_identity_blake3)?;
+
+        if self.analysis_level != "single-window"
+            || self.origin_count != 1
+            || self.test_samples != qualification.config.test_samples
+            || self.origin_schedule_sha256 != plan.origin_schedule_sha256
+            || self.qualification_identity_blake3 != qualification.qualification_identity_blake3
+            || self.plan_blake3 != plan.plan_blake3
+            || self.evaluation_input_blake3 != qualification.evaluation_input_blake3
+            || self.relational_loss_differentials_blake3
+                != qualification.relational_loss_differentials_blake3
+        {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        let horizon_tolerance = 1e-9 * self.forecast_horizon.abs().max(1.0);
+        if (plan.forecast_horizon - self.forecast_horizon).abs() > horizon_tolerance
+            || (qualification.observed.minimum_outcome_horizon - qualification.observed.maximum_outcome_horizon).abs()
+                > horizon_tolerance
+            || (qualification.observed.minimum_outcome_horizon - self.forecast_horizon).abs()
+                > horizon_tolerance
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        let expected_dependence =
+            qualification.relational_loss_dependence(self.dependence_max_lag_within_origin)?;
+        if expected_dependence != *dependence
+            || self.dependence_profile_blake3 != forecast_loss_dependence_profile_digest(dependence)
+            || self.dependence_max_lag_within_origin != dependence.max_lag
+        {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        Ok(())
+    }
+
+    pub fn validate_against_rolling(
+        &self,
+        plan: &ForecastInferencePlan,
+        qualification: &RollingOriginRelationalPredictionQualification,
+        dependence: &RollingForecastLossDependenceProfile,
+    ) -> Result<(), RelationalPredictionError> {
+        self.validate()?;
+        qualification.validate()?;
+        dependence.validate()?;
+        plan.validate_against_qualification(&qualification.qualification_identity_blake3)?;
+
+        if self.analysis_level != "rolling-origin"
+            || self.origin_count != qualification.config.origin_count
+            || self.test_samples != qualification.config.test_samples
+            || self.forecast_horizon != qualification.config.forecast_horizon
+            || self.origin_schedule_sha256 != plan.origin_schedule_sha256
+            || self.qualification_identity_blake3 != qualification.qualification_identity_blake3
+            || self.plan_blake3 != plan.plan_blake3
+            || self.evaluation_input_blake3 != qualification.evaluation_input_blake3
+            || self.relational_loss_differentials_blake3
+                != qualification.relational_loss_differentials_blake3
+        {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        let expected_dependence = qualification.relational_loss_dependence(
+            self.dependence_max_lag_within_origin,
+            self.dependence_max_lag_across_origins,
+        )?;
+        if expected_dependence != *dependence
+            || self.dependence_profile_blake3
+                != rolling_forecast_loss_dependence_profile_digest(dependence)
+            || self.dependence_max_lag_within_origin != dependence.max_lag_within_origin
+            || self.dependence_max_lag_across_origins != dependence.max_lag_across_origins
+        {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+        Ok(serde_json::json!({
+            "schema": INFERENCE_BINDING_SCHEMA,
+            "analysis_level": &self.analysis_level,
+            "origin_schedule_sha256": &self.origin_schedule_sha256,
+            "qualification_identity_blake3": &self.qualification_identity_blake3,
+            "plan_blake3": &self.plan_blake3,
+            "evaluation_input_blake3": &self.evaluation_input_blake3,
+            "relational_loss_differentials_blake3": &self.relational_loss_differentials_blake3,
+            "dependence_profile_blake3": &self.dependence_profile_blake3,
+            "dependence_max_lag_within_origin": self.dependence_max_lag_within_origin,
+            "dependence_max_lag_across_origins": self.dependence_max_lag_across_origins,
+            "origin_count": self.origin_count,
+            "test_samples": self.test_samples,
+            "forecast_horizon": self.forecast_horizon,
+            "binding_blake3": &self.binding_blake3
         }).to_string())
     }
 }
@@ -3755,6 +3970,125 @@ fn inference_plan_digest(plan: &ForecastInferencePlan) -> String {
     hasher.finalize().to_hex().to_string()
 }
 
+
+fn forecast_loss_dependence_profile_digest(
+    profile: &ForecastLossDependenceProfile,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-loss-dependence-digest/v1");
+    match &profile.evaluation_input_blake3 {
+        Some(value) => {
+            hasher.update(&[1]);
+            update_string(&mut hasher, value);
+        }
+        None => hasher.update(&[0]),
+    }
+    update_usize(&mut hasher, profile.sample_count);
+    update_usize(&mut hasher, profile.max_lag);
+    update_f64(&mut hasher, profile.mean);
+    update_f64(&mut hasher, profile.variance);
+    update_usize(&mut hasher, profile.autocovariances.len());
+    for value in &profile.autocovariances {
+        update_f64(&mut hasher, *value);
+    }
+    update_usize(&mut hasher, profile.autocorrelations.len());
+    for value in &profile.autocorrelations {
+        update_f64(&mut hasher, *value);
+    }
+    update_usize(&mut hasher, profile.pair_counts.len());
+    for value in &profile.pair_counts {
+        update_usize(&mut hasher, *value);
+    }
+    match profile.lag_one_autocorrelation {
+        Some(value) => {
+            hasher.update(&[1]);
+            update_f64(&mut hasher, value);
+        }
+        None => hasher.update(&[0]),
+    }
+    match profile.first_nonpositive_autocorrelation_lag {
+        Some(value) => {
+            hasher.update(&[1]);
+            update_usize(&mut hasher, value);
+        }
+        None => hasher.update(&[0]),
+    }
+    match profile.max_absolute_autocorrelation_lag {
+        Some(value) => {
+            hasher.update(&[1]);
+            update_usize(&mut hasher, value);
+        }
+        None => hasher.update(&[0]),
+    }
+    update_f64(&mut hasher, profile.max_absolute_autocorrelation);
+    update_f64(&mut hasher, profile.bartlett_long_run_variance);
+    match profile.effective_sample_size {
+        Some(value) => {
+            hasher.update(&[1]);
+            update_f64(&mut hasher, value);
+        }
+        None => hasher.update(&[0]),
+    }
+    update_string(&mut hasher, "Measured");
+    hasher.finalize().to_hex().to_string()
+}
+
+fn rolling_forecast_loss_dependence_profile_digest(
+    profile: &RollingForecastLossDependenceProfile,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-rolling-loss-dependence-digest/v1");
+    match &profile.evaluation_input_blake3 {
+        Some(value) => {
+            hasher.update(&[1]);
+            update_string(&mut hasher, value);
+        }
+        None => hasher.update(&[0]),
+    }
+    update_usize(&mut hasher, profile.origin_count);
+    update_usize(&mut hasher, profile.test_samples);
+    update_usize(&mut hasher, profile.max_lag_within_origin);
+    update_usize(&mut hasher, profile.max_lag_across_origins);
+    update_usize(&mut hasher, profile.per_origin.len());
+    for child in &profile.per_origin {
+        update_string(
+            &mut hasher,
+            &forecast_loss_dependence_profile_digest(child),
+        );
+    }
+    update_usize(&mut hasher, profile.origin_mean_differentials.len());
+    for value in &profile.origin_mean_differentials {
+        update_f64(&mut hasher, *value);
+    }
+    update_string(
+        &mut hasher,
+        &forecast_loss_dependence_profile_digest(&profile.across_origin_mean_profile),
+    );
+    update_string(&mut hasher, "Measured");
+    hasher.finalize().to_hex().to_string()
+}
+
+fn inference_binding_digest(binding: &ForecastInferenceBinding) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-inference-binding/v1");
+    update_string(&mut hasher, &binding.analysis_level);
+    update_string(&mut hasher, &binding.origin_schedule_sha256);
+    update_string(&mut hasher, &binding.qualification_identity_blake3);
+    update_string(&mut hasher, &binding.plan_blake3);
+    update_string(&mut hasher, &binding.evaluation_input_blake3);
+    update_string(
+        &mut hasher,
+        &binding.relational_loss_differentials_blake3,
+    );
+    update_string(&mut hasher, &binding.dependence_profile_blake3);
+    update_usize(&mut hasher, binding.dependence_max_lag_within_origin);
+    update_usize(&mut hasher, binding.dependence_max_lag_across_origins);
+    update_usize(&mut hasher, binding.origin_count);
+    update_usize(&mut hasher, binding.test_samples);
+    update_f64(&mut hasher, binding.forecast_horizon);
+    hasher.finalize().to_hex().to_string()
+}
+
 fn loss_differentials_digest(
     parent_input_digest: &str,
     differentials: &[RelationalForecastLossDifferential],
@@ -4769,6 +5103,85 @@ mod tests {
                 assert!(pair[1].feature_time > pair[0].outcome_time);
             }
         }
+    }
+
+
+    #[test]
+    fn inference_binding_binds_plan_qualification_loss_vector_and_dependence() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let qualification = RollingOriginRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            4,
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        let plan = ForecastInferencePlan::new(
+            config.forecast_horizon,
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "nested-forecast-bootstrap-v1",
+            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+            "loss-dependence-bartlett-v1",
+            "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+            "moving-block-bootstrap-v1",
+            "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            "small-sample-conservative-v1",
+            "single-primary-comparison-v1",
+            0.05,
+            qualification.qualification_identity_blake3.clone(),
+        )
+        .unwrap();
+
+        let dependence = qualification.relational_loss_dependence(3, 2).unwrap();
+        let binding =
+            ForecastInferenceBinding::from_rolling(&plan, &qualification, &dependence).unwrap();
+        binding.validate_against_rolling(&plan, &qualification, &dependence)
+            .unwrap();
+        assert_eq!(
+            binding.dependence_profile_blake3,
+            rolling_forecast_loss_dependence_profile_digest(&dependence)
+        );
+        assert!(binding.to_json().unwrap().contains(INFERENCE_BINDING_SCHEMA));
+
+        let mut tampered_dependence = dependence.clone();
+        tampered_dependence.mean += 0.001;
+        assert_eq!(
+            binding.validate_against_rolling(&plan, &qualification, &tampered_dependence),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let alternate_qualification = RollingOriginRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            4,
+            RelationalPredictionProvenance::new(
+                "RH-006-v1-alt",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let alternate_dependence = alternate_qualification.relational_loss_dependence(3, 2).unwrap();
+        assert_eq!(
+            binding.validate_against_rolling(&plan, &alternate_qualification, &alternate_dependence),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
     }
 
     #[test]
