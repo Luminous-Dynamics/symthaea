@@ -247,6 +247,43 @@ def main() -> None:
         if not any(fragment in line for fragment in allowed_constructor_fragments):
             fail(f"unapproved privileged_process construction: {line.strip()!r}")
 
+    # Transaction cleanup is itself a privileged authority boundary. It must stay
+    # descriptor-relative and never fall back to pathname-based recursive deletion.
+    cleanup_start = text.find("fn remove_transaction_artifact_dir(path: &str)")
+    cleanup_end = text.find("\n/// Generate Secure Boot setup commands", cleanup_start)
+    if cleanup_start < 0 or cleanup_end < 0:
+        fail("transaction cleanup helper disappeared")
+    cleanup_body = text[cleanup_start:cleanup_end]
+    for required in (
+        "remove_transaction_artifact_dir_blocking(",
+        "O_NOFOLLOW",
+        "openat(",
+        "unlinkat(",
+    ):
+        if required not in cleanup_body:
+            fail(f"transaction cleanup lost required descriptor primitive {required!r}")
+    if "remove_dir_all(" in cleanup_body:
+        fail("transaction cleanup regressed to pathname-based recursive deletion")
+
+    # Recursive rm is especially dangerous inside generated privileged install plans.
+    # The test module may mention it in adversarial fixtures; production source may not.
+    test_module = text.find("#[cfg(test)]\nmod tests {")
+    if test_module < 0:
+        fail("test module boundary disappeared")
+    production_text = text[:test_module]
+    if "rm -rf" in production_text:
+        fail("production relay source contains recursive rm -rf")
+
+    # Generated system_config.nix content must remain an out-of-band staged file.
+    patch_start = text.find("fn system_config_patch(")
+    patch_end = text.find("\n/// Generate the automated install script", patch_start)
+    if patch_start < 0 or patch_end < 0:
+        fail("system_config_patch helper disappeared")
+    patch_body = text[patch_start:patch_end]
+    for forbidden in ("SYSPATCH", "cat >", "NIXCONF"):
+        if forbidden in patch_body:
+            fail(f"system_config_patch regained inline shell-source generation: {forbidden!r}")
+
     # Nested interpreters inside generated privileged scripts create a second
     # parsing authority underneath the already-controlled relay interpreter.
     # Keep this global because the relevant helpers live outside the mutation arms.
