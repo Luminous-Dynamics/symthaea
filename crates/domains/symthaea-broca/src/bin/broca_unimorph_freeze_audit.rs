@@ -47,6 +47,14 @@ const EXPECTED_SELECTION_BLAKE3: &str =
 const EXPECTED_SELECTION_COUNT: usize = 7;
 
 const EXPECTED_SELECTION_SCHEMA: &str = "broca-unimorph-selection-manifest-v1";
+const EXPECTED_LANGUAGE_TAG: &str = "en";
+const EXPECTED_DIALECT_SCOPE: &str = "en-unspecified";
+const EXPECTED_RULE_SET_ID: &str = "unimorph-eng-4";
+const EXPECTED_COMPILATION_PROVENANCE: &str = "unimorph-eng-4-selection";
+const EXPECTED_COMPILER_ID: &str = "symthaea-unimorph-tsv-compiler";
+const EXPECTED_COMPILER_VERSION: &str = "broca-unimorph-tsv-compiler-v1";
+const EXPECTED_NORMALIZATION_POLICY: &str =
+    "trim-one-line-ending-sort-feature-tokens-sort-output-rules-v1";
 const EXPECTED_QUALIFICATION_ACTION_REFS: [&str; 8] = [
     "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
     "dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067",
@@ -67,6 +75,13 @@ struct SelectionManifest {
     artifact_blake3: String,
     artifact_byte_length: usize,
     aggregate_source_selection_blake3: String,
+    language_tag: String,
+    dialect_scope: String,
+    rule_set_id: String,
+    compilation_provenance: String,
+    compiler_id: String,
+    compiler_version: String,
+    normalization_policy: String,
     records: Vec<SelectionRecord>,
 }
 
@@ -158,6 +173,9 @@ fn main() -> Result<()> {
         );
     }
 
+    std::str::from_utf8(&artifact)
+        .context("frozen UniMorph artifact is not valid UTF-8")?;
+
     let actual_b3 = blake3::hash(&artifact).to_hex().to_string();
     if actual_b3 != EXPECTED_ARTIFACT_BLAKE3 {
         bail!(
@@ -214,8 +232,8 @@ fn main() -> Result<()> {
 
     let mut witness_selection = slices.clone();
     let (rule_set, witness) = MorphophonologicalRuleSet::compile_unimorph_tsv_source(
-        "en",
-        "en-unspecified",
+        selection.language_tag.clone(),
+        selection.dialect_scope.clone(),
         MorphophonologicalResourceEvidence::external(
             "unimorph/eng",
             uri,
@@ -223,8 +241,8 @@ fn main() -> Result<()> {
             EXPECTED_LICENSE,
             EXPECTED_ARTIFACT_BLAKE3,
         )?,
-        "unimorph-eng-4",
-        "unimorph-eng-4-selection",
+        selection.rule_set_id.clone(),
+        selection.compilation_provenance.clone(),
         &artifact,
         std::mem::take(&mut witness_selection),
     )?;
@@ -429,11 +447,16 @@ fn verify_checked_in_manifests(selection: &SelectionManifest) -> Result<()> {
         bail!("human-readable selection manifest is missing required frozen identities");
     }
 
-    if selection.records.len() != EXPECTED_SELECTION_COUNT {
-        bail!(
-            "selection manifest does not enumerate exactly {} frozen records",
-            EXPECTED_SELECTION_COUNT
-        );
+    if selection.records.len() != EXPECTED_SELECTION_COUNT
+        || selection.language_tag != EXPECTED_LANGUAGE_TAG
+        || selection.dialect_scope != EXPECTED_DIALECT_SCOPE
+        || selection.rule_set_id != EXPECTED_RULE_SET_ID
+        || selection.compilation_provenance != EXPECTED_COMPILATION_PROVENANCE
+        || selection.compiler_id != EXPECTED_COMPILER_ID
+        || selection.compiler_version != EXPECTED_COMPILER_VERSION
+        || selection.normalization_policy != EXPECTED_NORMALIZATION_POLICY
+    {
+        bail!("machine-readable selection manifest compiler namespace does not match the frozen contract");
     }
 
     let mut source_lines = Vec::with_capacity(selection.records.len());
@@ -587,7 +610,14 @@ fn write_structured_receipt(
         "compiler": {
             "implementation_revision": symthaea_broca::UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION,
             "parser_revision": symthaea_broca::UNIMORPH_TSV_SOURCE_PARSER_REVISION,
-            "build_context_revision": symthaea_broca::UNIMORPH_TSV_COMPILER_BUILD_CONTEXT_REVISION
+            "build_context_revision": symthaea_broca::UNIMORPH_TSV_COMPILER_BUILD_CONTEXT_REVISION,
+            "compiler_id": symthaea_broca::UNIMORPH_TSV_COMPILER_ID,
+            "compiler_version": symthaea_broca::UNIMORPH_TSV_COMPILER_VERSION,
+            "normalization_policy": symthaea_broca::UNIMORPH_TSV_NORMALIZATION_POLICY,
+            "language_tag": EXPECTED_LANGUAGE_TAG,
+            "dialect_scope": EXPECTED_DIALECT_SCOPE,
+            "rule_set_id": EXPECTED_RULE_SET_ID,
+            "compilation_provenance": EXPECTED_COMPILATION_PROVENANCE
         },
         "checked_in_evidence": {
             "snapshot_manifest_git_blob_sha": snapshot_manifest_blob,
