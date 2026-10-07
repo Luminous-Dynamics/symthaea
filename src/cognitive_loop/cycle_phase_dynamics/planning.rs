@@ -294,7 +294,8 @@ impl CognitiveLoopService {
             } else {
                 1.0
             };
-            (pe_scale * slope_scale)
+            let viability_scale = self.fep.viability_planning_horizon_scale() as f32;
+            (pe_scale * slope_scale * viability_scale)
                 .clamp(PREDICTION_HORIZON_MIN_SCALE, PREDICTION_HORIZON_MAX_SCALE)
         };
 
