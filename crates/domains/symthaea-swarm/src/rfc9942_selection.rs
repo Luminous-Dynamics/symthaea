@@ -445,7 +445,7 @@ mod tests {
     #[test]
     fn first_valid_selects_in_priority_order() {
         let collection = collection();
-            let decision = evaluate_priority_first_valid(
+        let decision = evaluate_priority_first_valid(
             &collection,
             |index, _| {
                 if index == 1 {
@@ -468,7 +468,6 @@ mod tests {
         );
     }
 
-    #[test]
     #[test]
     fn decision_validation_accepts_evaluator_output() {
         let collection = collection();
@@ -500,7 +499,8 @@ mod tests {
         );
     }
 
-        fn candidates_after_selection_are_not_reported_as_rejected() {
+    #[test]
+    fn candidates_after_selection_are_not_reported_as_rejected() {
         let collection = collection();
         let decision = evaluate_priority_first_valid(&collection, |_index, _| {
             Ok(())
@@ -534,7 +534,7 @@ mod tests {
     #[test]
     fn changing_rejection_reason_changes_decision_digest() {
         let collection = collection();
-            let signature_failure = evaluate_priority_first_valid(
+        let signature_failure = evaluate_priority_first_valid(
             &collection,
             |_index, _| Err(Rfc9942VdpError::InvalidEs256Signature),
         );
