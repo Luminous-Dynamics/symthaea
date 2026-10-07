@@ -4764,12 +4764,9 @@ async fn verify_restored_image_postcondition(
         return Err("restored configuration postcondition has invalid provenance".into());
     }
 
-    let actual = read_regular_file_bytes_at(
-        std::path::Path::new("/mnt/etc/nixos"),
-        "configuration.nix",
-    )
-    .await
-    .map_err(|error| format!("restored configuration postcondition probe failed: {error}"))?;
+    let actual = read_restore_configuration_postcondition()
+        .await
+        .map_err(|error| format!("restored configuration postcondition probe failed: {error}"))?;
     if actual.len() as u64 != expected_configuration.size {
         return Ok(false);
     }
@@ -4901,25 +4898,13 @@ fn configuration_bytes_match(actual: &[u8], expected: &[u8]) -> bool {
     blake3::hash(actual) == blake3::hash(expected)
 }
 
-fn read_regular_file_bytes_at_blocking(
-    directory_path: &std::path::Path,
+fn read_regular_file_from_open_directory_blocking(
+    directory: &std::fs::File,
     file_name: &str,
 ) -> Result<Vec<u8>, String> {
     use std::ffi::CString;
     use std::io::Read as _;
     use std::os::fd::{AsRawFd, FromRawFd};
-    use std::os::unix::fs::OpenOptionsExt;
-
-    let directory = std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open(directory_path)
-        .map_err(|error| {
-            format!(
-                "unable to open postcondition directory {}: {error}",
-                directory_path.display()
-            )
-        })?;
 
     let name = CString::new(file_name)
         .map_err(|_| format!("postcondition filename contains NUL: {file_name:?}"))?;
@@ -4932,45 +4917,56 @@ fn read_regular_file_bytes_at_blocking(
     };
     if fd < 0 {
         return Err(format!(
-            "unable to open postcondition file {} under {}: {}",
+            "unable to open postcondition file {}: {}",
             file_name,
-            directory_path.display(),
             std::io::Error::last_os_error()
         ));
     }
 
     let mut file = unsafe { std::fs::File::from_raw_fd(fd) };
     let metadata = file.metadata().map_err(|error| {
-        format!(
-            "unable to inspect postcondition file {} under {}: {error}",
-            file_name,
-            directory_path.display()
-        )
+        format!("unable to inspect postcondition file {file_name}: {error}")
     })?;
     if !metadata.is_file() {
         return Err(format!(
-            "postcondition file {} under {} is not a regular file",
-            file_name,
-            directory_path.display()
+            "postcondition file {file_name} is not a regular file"
         ));
     }
     if metadata.len() > 16 * 1024 * 1024 {
         return Err(format!(
-            "postcondition file {} is unexpectedly large ({} bytes)",
-            file_name,
+            "postcondition file {file_name} is unexpectedly large ({} bytes)",
             metadata.len()
         ));
     }
 
     let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    file.read_to_end(&mut bytes).map_err(|error| {
+    file.read_to_end(&mut bytes)
+        .map_err(|error| format!("unable to read postcondition file {file_name}: {error}"))?;
+    Ok(bytes)
+}
+
+fn read_regular_file_bytes_at_blocking(
+    directory_path: &std::path::Path,
+    file_name: &str,
+) -> Result<Vec<u8>, String> {
+    let directory = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(directory_path)
+        .map_err(|error| {
+            format!(
+                "unable to open postcondition directory {}: {error}",
+                directory_path.display()
+            )
+        })?;
+
+    read_regular_file_from_open_directory_blocking(&directory, file_name).map_err(|error| {
         format!(
-            "unable to read postcondition file {} under {}: {error}",
-            file_name,
+            "{} under {}",
+            error,
             directory_path.display()
         )
-    })?;
-    Ok(bytes)
+    })
 }
 
 async fn read_regular_file_bytes_at(
@@ -4984,6 +4980,15 @@ async fn read_regular_file_bytes_at(
     })
     .await
     .map_err(|error| format!("postcondition read task failed: {error}"))?
+}
+
+async fn read_restore_configuration_postcondition() -> Result<Vec<u8>, String> {
+    tokio::task::spawn_blocking(|| {
+        let directory = open_restore_configuration_directory()?;
+        read_regular_file_from_open_directory_blocking(&directory, "configuration.nix")
+    })
+    .await
+    .map_err(|error| format!("restore postcondition read task failed: {error}"))?
 }
 
 async fn verify_active_configuration(expected: &[u8]) -> Result<bool, String> {
