@@ -65,6 +65,24 @@ impl MicroAction {
     }
 }
 
+/// Deterministic execution failures from the synthetic actuator boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MicroExecutionFailure {
+    InsufficientEnergy,
+    IntegrityBelowExecutionFloor,
+    ThreatBlocksAction,
+}
+
+impl MicroExecutionFailure {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::InsufficientEnergy => "insufficient_energy",
+            Self::IntegrityBelowExecutionFloor => "integrity_below_execution_floor",
+            Self::ThreatBlocksAction => "threat_blocks_action",
+        }
+    }
+}
+
 /// The externally observable state of the benchmark organism/environment.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct MicroWorldObservation {
@@ -170,6 +188,41 @@ impl MicroWorld {
     pub fn step(&mut self, action: MicroAction) -> MicroWorldObservation {
         self.observation = transition(self.observation, action);
         self.observation
+    }
+
+    /// Execute an action through the deterministic synthetic actuator boundary.
+    ///
+    /// A rejected action must not produce an ActionOutcome; callers should cancel the
+    /// pre-action prediction with explicit evidence instead.
+    pub fn try_step(
+        &mut self,
+        action: MicroAction,
+    ) -> Result<MicroWorldObservation, MicroExecutionFailure> {
+        let required_energy = match action {
+            MicroAction::Observe => 0.025,
+            MicroAction::Explore => 0.13,
+            MicroAction::Harvest => 0.0,
+            MicroAction::Repair => 0.09,
+            MicroAction::Rest => 0.0,
+            MicroAction::Retreat => 0.045,
+        };
+
+        if self.observation.energy < required_energy {
+            return Err(MicroExecutionFailure::InsufficientEnergy);
+        }
+        if self.observation.integrity < 0.12
+            && matches!(
+                action,
+                MicroAction::Explore | MicroAction::Harvest | MicroAction::Repair
+            )
+        {
+            return Err(MicroExecutionFailure::IntegrityBelowExecutionFloor);
+        }
+        if self.observation.threat >= 0.95 && action == MicroAction::Explore {
+            return Err(MicroExecutionFailure::ThreatBlocksAction);
+        }
+
+        Ok(self.step(action))
     }
 
     pub fn perturb(&mut self, perturbation: MicroPerturbation) -> MicroWorldObservation {
@@ -1450,6 +1503,54 @@ mod tests {
         let next = transition(state, MicroAction::Explore);
         assert!(next.energy < state.energy);
         assert!(next.integrity <= state.integrity);
+    }
+
+    #[test]
+    fn execution_failure_does_not_create_false_outcome() {
+        let mut world = MicroWorld::new(
+            MicroWorldObservation {
+                cycle: 0,
+                energy: 0.10,
+                integrity: 0.10,
+                knowledge: 0.20,
+                threat: 0.20,
+                progress: 0.0,
+            },
+            8,
+        );
+        let before = world.observe();
+        assert_eq!(
+            world.try_step(MicroAction::Explore),
+            Err(MicroExecutionFailure::InsufficientEnergy)
+        );
+        assert_eq!(world.observe(), before);
+
+        let mut fabric = ViabilityFabric::new(4);
+        fabric.begin_cycle(before.cycle);
+        fabric
+            .predict_action(ActionPrediction {
+                action_id: 1,
+                pre_state_digest: before.digest(),
+                action_label: MicroAction::Explore.label().to_string(),
+                cycle: before.cycle,
+                predicted_world_delta: None,
+                predicted_self_delta: None,
+                predicted_goal_delta: None,
+                authority_granted: true,
+            })
+            .unwrap();
+
+        fabric
+            .cancel_prediction(
+                1,
+                before.cycle,
+                MicroExecutionFailure::InsufficientEnergy.as_str(),
+                vec!["sim://viability-micro-world/execution-failure/1".to_string()],
+            )
+            .unwrap();
+
+        assert_eq!(fabric.outcomes().len(), 0);
+        assert_eq!(fabric.cancellations().len(), 1);
     }
 
     #[test]
