@@ -47,6 +47,15 @@ const EXPECTED_SELECTION_BLAKE3: &str =
 const EXPECTED_SELECTION_COUNT: usize = 7;
 
 const EXPECTED_SELECTION_SCHEMA: &str = "broca-unimorph-selection-manifest-v1";
+const EXPECTED_QUALIFICATION_ACTION_REFS: [&str; 7] = [
+    "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+    "dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067",
+    "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
+    "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+    "dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067",
+    "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
+    "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+];
 
 #[derive(Debug, serde::Deserialize)]
 struct SelectionManifest {
@@ -73,6 +82,7 @@ struct SelectionRecord {
 
 fn main() -> Result<()> {
     let selection = parse_selection_manifest()?;
+    let action_refs = verify_qualification_workflow_pins()?;
     verify_checked_in_manifests(&selection)?;
 
     let uri = parse_required_line(
@@ -264,6 +274,45 @@ fn main() -> Result<()> {
         ci_provenance,
     );
     Ok(())
+}
+
+fn verify_qualification_workflow_pins() -> Result<Vec<String>> {
+    let refs = QUALIFICATION_WORKFLOW
+        .lines()
+        .filter_map(|line| {
+            let trimmed = line.trim_start();
+            trimmed
+                .strip_prefix("- uses:")
+                .map(str::trim)
+                .and_then(|value| value.split_whitespace().next())
+                .map(str::to_owned)
+        })
+        .collect::<Vec<_>>();
+
+    if refs.len() != EXPECTED_QUALIFICATION_ACTION_REFS.len()
+        || refs
+            .iter()
+            .map(String::as_str)
+            .ne(EXPECTED_QUALIFICATION_ACTION_REFS.into_iter())
+    {
+        bail!("qualification workflow action references do not match the frozen approved pin set");
+    }
+
+    if refs.iter().any(|value| {
+        value
+            .rsplit_once('@')
+            .map(|(_, revision)| {
+                revision.len() != 40
+                    || !revision
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            })
+            .unwrap_or(true)
+    }) {
+        bail!("qualification workflow contains a non-canonical action revision");
+    }
+
+    Ok(refs)
 }
 
 fn parse_selection_manifest() -> Result<SelectionManifest> {
@@ -491,7 +540,8 @@ fn write_structured_receipt(
             "selection_manifest_git_blob_sha": selection_manifest_blob,
             "selection_manifest_json_git_blob_sha": selection_manifest_json_blob,
             "qualification_workflow_path": ".github/workflows/broca-feature-matrix.yml",
-            "qualification_workflow_git_blob_sha": qualification_workflow_blob
+            "qualification_workflow_git_blob_sha": qualification_workflow_blob,
+            "qualification_action_refs": action_refs
         },
         "ci": {
             "github_actions": std::env::var("GITHUB_ACTIONS").unwrap_or_else(|_| "unknown".into()),
