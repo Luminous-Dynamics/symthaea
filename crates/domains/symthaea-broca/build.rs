@@ -7,6 +7,7 @@ use std::{
     env,
     fs,
     path::{Path, PathBuf},
+    process::Command,
 };
 
 fn canonical_source_bytes(bytes: &[u8]) -> Vec<u8> {
@@ -65,6 +66,27 @@ fn read_required(path: &Path) -> Vec<u8> {
     })
 }
 
+fn rustc_identity() -> Vec<u8> {
+    let rustc = env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
+    Command::new(&rustc)
+        .arg("--version")
+        .arg("--verbose")
+        .output()
+        .unwrap_or_else(|error| panic!("failed to execute rustc for compiler identity: {error}"))
+        .stdout
+}
+
+fn cargo_feature_identity() -> Vec<u8> {
+    let mut features = env::vars()
+        .filter_map(|(key, value)| {
+            key.strip_prefix("CARGO_FEATURE_")
+                .map(|feature| format!("{feature}={value}"))
+        })
+        .collect::<Vec<_>>();
+    features.sort_unstable();
+    features.join("\n").into_bytes()
+}
+
 fn main() {
     println!("cargo:rerun-if-changed=src/lexical_binding.rs");
     println!("cargo:rerun-if-changed=build.rs");
@@ -83,6 +105,10 @@ fn main() {
     let workspace_manifest = read_required(&workspace_root.join("Cargo.toml"));
     let cargo_lock = read_required(&workspace_root.join("Cargo.lock"));
     let rust_toolchain = read_required(&workspace_root.join("rust-toolchain.toml"));
+    let rustc_identity = rustc_identity();
+    let cargo_features = cargo_feature_identity();
+    let target = env::var("TARGET").unwrap_or_default().into_bytes();
+    let host = env::var("HOST").unwrap_or_default().into_bytes();
 
     // The implementation revision is an exact content identity of the compiler's source module
     // plus this build-time identity mechanism. It is deliberately not a manually maintained
@@ -117,6 +143,10 @@ fn main() {
             &workspace_manifest,
             &cargo_lock,
             &rust_toolchain,
+            &rustc_identity,
+            &cargo_features,
+            &target,
+            &host,
         ],
     );
 
