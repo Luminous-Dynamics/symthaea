@@ -208,7 +208,7 @@ This separates three increasingly strong claims:
 
 It also tests a fourth property:
 
-**adaptation without damaging previously learned dynamics**.
+**adaptation without damaging previously learned dynamics across the action space**.
 
 The nearby probe is deliberately not part of the update. Improvement there is therefore stronger evidence of learned
 local dynamics than simply replaying the exact transition used for the update. The anchor is also not part of the
@@ -380,8 +380,8 @@ anchor. The per-shock receipts preserve this distinction instead of hiding it be
 | Procedural held-out transfer passes across all seeds | stronger evidence of generalization across sampled state/schedule/perturbation configurations, still bounded to this generator |
 | Same-shock learning improves but neighboring probes do not | adaptation may be memorizing observed transitions rather than learning transferable local dynamics |
 | Neighboring-probe improvement follows a shock update | stronger evidence that prediction error changes the model in a locally useful way |
-| Anchor error worsens after shock adaptation | adaptation is causing measurable regression/forgetting of previously learned dynamics |
-| Shock and neighbor improve while anchor remains stable | strongest current local evidence for useful, non-destructive adaptation |
+| Any invariant-anchor action regresses after shock adaptation | adaptation is causing measurable regression/forgetting in at least one previously learned dynamic |
+| Shock and neighbor improve while the complete anchor action set remains stable | strongest current local evidence for useful, non-destructive adaptation |
 | Shock error does not improve after the update | the observed error is not yet producing effective model correction |
 
 No single metric is a synthetic-organism detector.
