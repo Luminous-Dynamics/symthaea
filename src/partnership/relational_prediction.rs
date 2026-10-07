@@ -4901,9 +4901,9 @@ fn make_surrogate(
 
 #[cfg(test)]
 mod tests {
-    const CANONICAL_SELECTION_RULE_ID: &str = "relational-inference-selection-rule-v1";
+    const CANONICAL_SELECTION_RULE_ID: &str = super::CANONICAL_INFERENCE_SELECTION_RULE_ID;
     const CANONICAL_SELECTION_RULE_SPEC_SHA256: &str =
-        "e15bc4daec6ddbf705c5b8e03e6e96f63c7e50306703bef98bbbbe1b4fc53ec1";
+        super::CANONICAL_INFERENCE_SELECTION_RULE_SPEC_SHA256;
     use super::*;
 
     fn deterministic_sequence(i: usize, frequency: f64, phase: f64) -> f64 {
@@ -5794,12 +5794,12 @@ mod tests {
             &plan,
             &qualification,
             &dependence,
-            "serial-dependence-preserving-bootstrap",
         )
         .unwrap();
 
         receipt.validate().unwrap();
         assert_eq!(receipt.plan_blake3, plan.plan_blake3);
+        assert_eq!(receipt.decision_path_id, "nested-fixed-horizon-bootstrap");
         assert_eq!(receipt.binding_blake3, ForecastInferenceBinding::from_rolling(
             &plan,
             &qualification,
@@ -5810,7 +5810,7 @@ mod tests {
         assert!(receipt.to_json().unwrap().contains(INFERENCE_SELECTION_SCHEMA));
 
         let mut tampered_path = receipt.clone();
-        tampered_path.decision_path_id = "different-branch".to_string();
+        tampered_path.decision_path_id = "stop-assumption-failure".to_string();
         assert_eq!(
             tampered_path.validate(),
             Err(RelationalPredictionError::InvalidEvidenceInputDigest)
@@ -5835,6 +5835,13 @@ mod tests {
         alternate_plan.procedure_id = "alternate-procedure".to_string();
         alternate_plan.plan_blake3 = inference_plan_digest(&alternate_plan);
         alternate_plan.validate().unwrap();
+        let stopped = ForecastInferenceSelectionReceipt::from_rolling(
+            &alternate_plan,
+            &qualification,
+            &dependence,
+        )
+        .unwrap();
+        assert_eq!(stopped.decision_path_id, "stop-assumption-failure");
         assert_eq!(
             receipt.validate_against_binding(
                 &ForecastInferenceBinding::from_rolling(&plan, &qualification, &dependence).unwrap(),
@@ -5879,7 +5886,6 @@ mod tests {
             &plan,
             &qualification,
             &dependence,
-            "nested-fixed-horizon-bootstrap",
         )
         .unwrap();
         receipt.validate().unwrap();
@@ -5891,7 +5897,7 @@ mod tests {
         );
 
         let mut tampered = receipt.clone();
-        tampered.decision_path_id.clear();
+        tampered.decision_path_id = "stop-assumption-failure".to_string();
         assert_eq!(
             tampered.validate(),
             Err(RelationalPredictionError::InvalidSplit)
