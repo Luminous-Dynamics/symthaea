@@ -905,6 +905,17 @@ impl NixSystemdReadOnlyObserverV1 {
             });
         }
 
+        let definition_content = self
+            .capture_service_definition_content(&expected_unit)
+            .await?;
+        if definition_content.as_ref().manager_owner != manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        let definition_content_digest = definition_content
+            .digest()
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
+        let definition_bus_id = definition_content.as_ref().bus_id.clone();
+
         let observation = build_observation_from_properties(
             operation,
             &expected_unit,
@@ -913,6 +924,8 @@ impl NixSystemdReadOnlyObserverV1 {
             &manager_owner,
             &service_result,
             &unit_properties,
+            &definition_content_digest,
+            &definition_bus_id,
             job,
         )?;
 
@@ -1452,10 +1465,12 @@ fn stability_sample_from_observation(
         definition_digest: observation
             .definition_digest()
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?,
+        definition_content_digest: observation.definition_content_digest.clone(),
         state_digest: observation
             .state_digest()
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?,
         manager_owner: manager_owner.to_string(),
+        bus_id: observation.systemd_bus_id.clone(),
         invocation_id: observation.invocation_id.clone(),
         state_change_at_monotonic_us: observation.state_change_at_monotonic_us,
         captured_at_monotonic_us: observation.observed_at_monotonic_us,
@@ -1470,6 +1485,8 @@ fn build_observation_from_properties(
     manager_owner: &str,
     service_result: &str,
     properties: &HashMap<String, OwnedValue>,
+    definition_content_digest: &str,
+    definition_bus_id: &str,
     job: Option<NixSystemdJobEvidenceV1>,
 ) -> Result<NixServicePostStateObservationV1, NixSystemdObserverErrorV1> {
     for property in REQUIRED_UNIT_PROPERTIES {
@@ -1551,6 +1568,7 @@ fn build_observation_from_properties(
         observed_generation: generation,
         unit_object_path: unit_object_path.as_str().to_string(),
         definition_identity,
+        definition_content_digest: definition_content_digest.to_string(),
         load_state,
         active_state,
         sub_state,
@@ -1558,6 +1576,7 @@ fn build_observation_from_properties(
         service_result,
         systemd_job: job,
         systemd_manager_owner: Some(manager_owner.to_string()),
+        systemd_bus_id: Some(definition_bus_id.to_string()),
         invocation_id,
         state_change_at_monotonic_us,
         observed_at_monotonic_us,
