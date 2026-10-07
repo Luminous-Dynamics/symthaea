@@ -19034,7 +19034,6 @@ dependencies = [
  "blake3",
  "naga 27.0.3",
  "serde",
- "serde_json",
  "thiserror 1.0.69",
 ]
 
