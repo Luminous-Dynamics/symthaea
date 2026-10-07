@@ -522,6 +522,62 @@ fn small_fixture_full_coset_distance_spectrum_is_syndrome_difference_invariant()
     );
 }
 
+
+#[test]
+fn small_fixture_spectrum_adversary_demonstrates_nonadditive_label_blind_spot() {
+    let mut buckets: [Vec<u8>; 64] = std::array::from_fn(|_| Vec::new());
+
+    for mask in 0u16..256 {
+        let byte = mask as u8;
+        let syndrome = canonical_boundary_syndrome(byte) as usize;
+        buckets[syndrome].push(byte);
+    }
+
+    assert!(buckets.iter().all(|bucket| bucket.len() == 4));
+
+    let mut weight_spectrum = [[0usize; 9]; 64];
+    for syndrome in 0..64 {
+        for &word in &buckets[syndrome] {
+            weight_spectrum[syndrome][word.count_ones() as usize] += 1;
+        }
+    }
+
+    let mut permutation = std::array::from_fn(|index| index);
+    for offset in 0..8usize {
+        permutation[40 + offset] = 56 + offset;
+        permutation[56 + offset] = 40 + offset;
+    }
+
+    let mut bijection = [false; 64];
+    for &mapped in &permutation {
+        assert!(!bijection[mapped]);
+        bijection[mapped] = true;
+    }
+    assert!(bijection.into_iter().all(|present| present));
+    assert_eq!(permutation[0], 0);
+
+    let mut spectrum_preserving_pairs = 0usize;
+    for left in 0..64usize {
+        for right in 0..64usize {
+            assert_eq!(
+                weight_spectrum[left ^ right],
+                weight_spectrum[permutation[left] ^ permutation[right]],
+                "spectrum-preserving adversary failed at left={left} right={right}"
+            );
+            spectrum_preserving_pairs += 1;
+        }
+    }
+
+    assert_eq!(spectrum_preserving_pairs, 4096);
+    assert_eq!(8usize ^ 32usize, 40);
+    assert_eq!(permutation[8] ^ permutation[32], 40);
+    assert_eq!(permutation[8usize ^ 32usize], 56);
+
+    println!(
+        "SYNDROME_SPECTRUM_ADVERSARY=ordered_pairs={spectrum_preserving_pairs};zero_fixed=true;permutation_bijective=true;nonadditive=true;blind_spot_demonstrated=true"
+    );
+}
+
 #[test]
 fn small_fixture_exact_fiber_difference_identity_holds_for_every_anchor() {
     let mut buckets: [Vec<u8>; 64] = std::array::from_fn(|_| Vec::new());
