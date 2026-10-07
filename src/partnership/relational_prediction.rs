@@ -6009,6 +6009,10 @@ mod tests {
             CANONICAL_INFERENCE_ESTIMATOR_APPLICABILITY_SPEC_SHA256
         );
         assert_eq!(
+            value["selected_method_bundle"]["estimator_compatibility_id"],
+            CANONICAL_INFERENCE_ESTIMATOR_ID
+        );
+        assert_eq!(
             value["selected_method_bundle"]["procedure_spec_sha256"],
             CANONICAL_INFERENCE_SELECTION_PROCEDURE_SPEC_SHA256
         );
@@ -6124,6 +6128,14 @@ mod tests {
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string();
         assert_eq!(
             tampered_rule.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut tampered_estimator = receipt.clone();
+        tampered_estimator.estimator_compatibility_id =
+            "alternate-estimator-compatibility-v1".to_string();
+        assert_eq!(
+            tampered_estimator.validate(),
             Err(RelationalPredictionError::InvalidEvidenceInputDigest)
         );
 
