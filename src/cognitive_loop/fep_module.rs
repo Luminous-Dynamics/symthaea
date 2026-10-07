@@ -204,6 +204,10 @@ pub struct FepModule {
     /// World Model Bridge for hierarchical grounded prediction.
     pub world_model: WorldModelBridge,
 
+    /// Viability Fabric joins FEP, world-model, and action/outcome evidence without adding
+    /// another field to CognitiveLoopService.
+    pub viability_fabric: super::viability_fabric::ViabilityFabric,
+
     /// FEP Active Inference Agent for full perception-action loop.
     pub agent: ActiveInferenceAgent,
 
@@ -253,6 +257,7 @@ impl FepModule {
             episodic_memory,
             goal_system,
             world_model,
+            viability_fabric: super::viability_fabric::ViabilityFabric::new(1024),
             agent,
             haptic_semantic_binder,
             enhanced_bridge,
