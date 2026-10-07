@@ -3679,6 +3679,13 @@ impl std::fmt::Display for AssessmentError {
             Self::EmptySourceAdmissionReference => {
                 write!(f, "source admission reference is incomplete")
             }
+            Self::SourceAdmissionSubjectBindingMismatch {
+                expected_binding,
+                actual_binding,
+            } => write!(
+                f,
+                "source admission subject binding {actual_binding} does not match expected binding {expected_binding}"
+            ),
             Self::SourceAdmissionAuthorityMismatch {
                 source_authority_id,
                 admission_authority_id,
