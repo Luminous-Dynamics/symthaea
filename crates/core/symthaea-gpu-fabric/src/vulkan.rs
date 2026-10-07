@@ -166,6 +166,7 @@ pub struct VulkanExecutor {
     device_identity: VulkanDeviceIdentity,
     implementation_digest: String,
     memory_properties: vk::PhysicalDeviceMemoryProperties,
+    claims_acceleration: bool,
     max_storage_buffer_range: u64,
     max_compute_workgroup_count_x: u32,
 }
@@ -448,6 +449,7 @@ impl VulkanExecutor {
             memory_properties,
             max_storage_buffer_range,
             max_compute_workgroup_count_x,
+            claims_acceleration: policy == VulkanDevicePolicy::HardwareRequired,
         })
     }
 
@@ -575,7 +577,7 @@ impl VulkanExecutor {
         let receipt = ExecutionReceipt {
             version: crate::RECEIPT_VERSION,
             backend: BackendKind::Vulkan,
-            accelerated: true,
+            accelerated: self.claims_acceleration,
             operation: plan.operation,
             plan_digest: plan.digest_hex(),
             kernel_id: plan.operation.kernel_id().to_owned(),
