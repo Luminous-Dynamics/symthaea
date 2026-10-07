@@ -246,6 +246,83 @@ impl NeurosemanticRemediationEvaluationSetManifest {
     }
 }
 
+/// One exact member/group binding in the fairness evaluation split.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationEvaluationSplitMember {
+    pub subject_artifact_hash: String,
+    pub group_ref: String,
+}
+
+impl NeurosemanticRemediationEvaluationSplitMember {
+    fn validate(&self) -> Result<(), String> {
+        if !valid_blake3_digest(&self.subject_artifact_hash)
+            || !valid_identifier(&self.group_ref)
+        {
+            return Err("neurosemantic remediation evaluation split member fields are invalid".into());
+        }
+        Ok(())
+    }
+}
+
+/// Typed identity of the exact evaluation split used for subgroup/fairness analysis.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationEvaluationSplitManifest {
+    pub schema_version: u16,
+    pub split_ref: String,
+    pub source_dataset_manifest_hash: String,
+    pub members: Vec<NeurosemanticRemediationEvaluationSplitMember>,
+}
+
+pub const NEUROSEMANTIC_REMEDIATION_EVALUATION_SPLIT_SCHEMA_VERSION: u16 = 1;
+
+impl NeurosemanticRemediationEvaluationSplitManifest {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != NEUROSEMANTIC_REMEDIATION_EVALUATION_SPLIT_SCHEMA_VERSION
+            || !valid_identifier(&self.split_ref)
+            || !valid_blake3_digest(&self.source_dataset_manifest_hash)
+            || self.members.is_empty()
+            || self.members.len() > MAX_NEUROSEMANTIC_REMEDIATION_EVALUATION_MEMBERS
+        {
+            return Err("neurosemantic remediation evaluation split manifest fields are invalid".into());
+        }
+        let mut subjects = BTreeSet::new();
+        for member in &self.members {
+            member.validate()?;
+            if !subjects.insert(member.subject_artifact_hash.as_str()) {
+                return Err("neurosemantic remediation evaluation split contains duplicate subjects".into());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic remediation evaluation split manifest JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let manifest: Self = serde_json::from_slice(bytes).map_err(|error| {
+            format!("neurosemantic remediation evaluation split manifest JSON: {error}")
+        })?;
+        manifest.validate()?;
+        Ok(manifest)
+    }
+
+    pub fn fingerprint(&self) -> Result<String, String> {
+        self.validate()?;
+        let mut canonical = self.clone();
+        canonical.members.sort_by(|left, right| {
+            left.subject_artifact_hash
+                .cmp(&right.subject_artifact_hash)
+                .then_with(|| left.group_ref.cmp(&right.group_ref))
+        });
+        Ok(content_hash(&serde_json::to_vec(&canonical).map_err(|error| {
+            format!("neurosemantic remediation evaluation split serialization: {error}")
+        })?))
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum NeurosemanticRemediationEvaluationMethodKind {
     RecoveryAttack,
@@ -1271,7 +1348,53 @@ impl NeurosemanticRemediationImpactArtifact {
                         return Err("neurosemantic remediation observation set is not exactly bound to the retain population".into());
                     }
                 }
-                NeurosemanticRemediationMeasurementKind::FairnessImpact => {}
+                NeurosemanticRemediationMeasurementKind::FairnessImpact => {
+                    let split =
+                        NeurosemanticRemediationEvaluationSplitManifest::from_json_bytes(population_bytes)?;
+                    if split.fingerprint()? != observation_set.population_manifest_hash
+                        || sorted_hashes(
+                            &split
+                                .members
+                                .iter()
+                                .map(|member| member.subject_artifact_hash.clone())
+                                .collect::<Vec<_>>(),
+                        ) != sorted_hashes(&observation_set.eligible_subject_artifact_hashes)
+                    {
+                        return Err(
+                            "neurosemantic remediation observation set is not exactly bound to the fairness split population"
+                                .into(),
+                        );
+                    }
+                    let observed_groups: BTreeMap<&str, &str> = observation_set
+                        .observations
+                        .iter()
+                        .filter_map(|observation| {
+                            observation
+                                .group_ref
+                                .as_deref()
+                                .map(|group| (observation.subject_artifact_hash.as_str(), group))
+                        })
+                        .collect();
+                    let expected_groups: BTreeMap<&str, &str> = split
+                        .members
+                        .iter()
+                        .map(|member| {
+                            (
+                                member.subject_artifact_hash.as_str(),
+                                member.group_ref.as_str(),
+                            )
+                        })
+                        .collect();
+                    if observed_groups
+                        .iter()
+                        .any(|(subject, group)| expected_groups.get(subject) != Some(group))
+                    {
+                        return Err(
+                            "neurosemantic remediation fairness observation group binding mismatch"
+                                .into(),
+                        );
+                    }
+                }
             }
 
             let (eligible_count, observed_count, failure_count, ratio_numerator, ratio_denominator) =
@@ -4729,6 +4852,46 @@ mod tests {
         assert!(out_of_population
             .validate(&definition.aggregation_ref)
             .is_err());
+    }
+
+    #[test]
+    fn remediation_evaluation_split_manifest_is_typed_and_canonical() {
+        let split = NeurosemanticRemediationEvaluationSplitManifest {
+            schema_version: NEUROSEMANTIC_REMEDIATION_EVALUATION_SPLIT_SCHEMA_VERSION,
+            split_ref: "split-typed".into(),
+            source_dataset_manifest_hash: content_hash(b"dataset"),
+            members: vec![
+                NeurosemanticRemediationEvaluationSplitMember {
+                    subject_artifact_hash: content_hash(b"subject-a"),
+                    group_ref: "group-a".into(),
+                },
+                NeurosemanticRemediationEvaluationSplitMember {
+                    subject_artifact_hash: content_hash(b"subject-b"),
+                    group_ref: "group-b".into(),
+                },
+            ],
+        };
+        let bytes = serde_json::to_vec(&split).unwrap();
+        assert_eq!(
+            NeurosemanticRemediationEvaluationSplitManifest::from_json_bytes(&bytes).unwrap(),
+            split
+        );
+        let mut reordered = split.clone();
+        reordered.members.reverse();
+        assert_eq!(split.fingerprint().unwrap(), reordered.fingerprint().unwrap());
+
+        let mut duplicate = split.clone();
+        duplicate.members[1].subject_artifact_hash = duplicate.members[0].subject_artifact_hash.clone();
+        assert!(duplicate.validate().is_err());
+
+        let mut bad_schema = split.clone();
+        bad_schema.schema_version = 0;
+        assert!(
+            NeurosemanticRemediationEvaluationSplitManifest::from_json_bytes(
+                &serde_json::to_vec(&bad_schema).unwrap()
+            )
+            .is_err()
+        );
     }
 
     #[test]
