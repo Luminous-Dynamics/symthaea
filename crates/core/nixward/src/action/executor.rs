@@ -1025,7 +1025,7 @@ impl NixOSExecutor {
             )?;
 
             #[cfg(feature = "systemd-observer")]
-            self.validate_authorized_service_definition_content(&authority, unit)
+            self.validate_authorized_service_definition_content(&authority, *operation, unit)
                 .await?;
 
             #[cfg(not(feature = "systemd-observer"))]
@@ -1060,6 +1060,7 @@ impl NixOSExecutor {
     async fn validate_authorized_service_definition_content(
         &mut self,
         authority: &NixLocalExecutionAuthorityV1,
+        operation: NixServiceOperationKindV1,
         unit: &str,
     ) -> Result<(), String> {
         if self.dry_run {
@@ -1081,12 +1082,16 @@ impl NixOSExecutor {
                 )
             })?;
 
-        let content = observer
-            .capture_service_definition_content(unit)
-            .await
-            .map_err(|error| {
-                format!("could not revalidate service definition content: {error}")
-            })?;
+        let content = match operation {
+            NixServiceOperationKindV1::Restart => observer
+                .capture_service_definition_content_for_restart(unit)
+                .await,
+            _ => observer.capture_service_definition_content(unit).await,
+        }
+        .map_err(|error| {
+            format!("could not revalidate service definition content: {error}")
+        })?;
+
         let actual_digest = content
             .digest()
             .map_err(|error| {
@@ -1098,6 +1103,27 @@ impl NixOSExecutor {
                 "service definition content is stale or changed since approval: approved={} current={}",
                 expected_digest, actual_digest
             ));
+        }
+
+        if operation == NixServiceOperationKindV1::Restart {
+            let expected_invocation_id = authority
+                .pre_invocation_id()
+                .ok_or_else(|| {
+                    "Restart execution authority has no bound pre-invocation identity"
+                        .to_string()
+                })?;
+            let actual_invocation_id = content
+                .pre_invocation_id()
+                .ok_or_else(|| {
+                    "Restart definition revalidation has no observer-derived pre-invocation identity"
+                        .to_string()
+                })?;
+            if actual_invocation_id != expected_invocation_id {
+                return Err(format!(
+                    "service invocation identity changed since approval: approved={} current={}",
+                    expected_invocation_id, actual_invocation_id
+                ));
+            }
         }
 
         Ok(())
