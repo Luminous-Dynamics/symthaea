@@ -5069,6 +5069,12 @@ mod tests {
                 .len(),
             qualification.relational_loss_differentials.len()
         );
+        assert_eq!(
+            value["nulls"][0]["trace"]["qualification_input_blake3"]
+                .as_str()
+                .unwrap(),
+            qualification.qualification_identity_blake3
+        );
         assert!(json.contains(QUALIFICATION_SCHEMA));
         assert!(json.contains("qualification_identity_blake3"));
         assert!(json.contains("relational_loss_differentials_blake3"));
@@ -5998,6 +6004,12 @@ mod tests {
                 .unwrap()
                 .len(),
             qualification.relational_loss_differentials.len()
+        );
+        assert_eq!(
+            value["nulls"][0]["traces"][0]["qualification_input_blake3"]
+                .as_str()
+                .unwrap(),
+            qualification.qualification_identity_blake3
         );
         assert!(json.contains(ROLLING_QUALIFICATION_SCHEMA));
         assert!(json.contains("qualification_identity_blake3"));
