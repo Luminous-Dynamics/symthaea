@@ -49,12 +49,21 @@ pub struct VulkanTimelineSignal {
     pub value: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct VulkanBarrierRequirement {
+    pub from: u32,
+    pub to: u32,
+    pub resource: ResourceId,
+    pub kind: DependencyKind,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VulkanSubmission {
     pub node_id: u32,
     pub ordinal: u32,
     pub queue: VulkanQueueId,
     pub waits: Vec<VulkanTimelineWait>,
+    pub barriers: Vec<VulkanBarrierRequirement>,
     pub signal: VulkanTimelineSignal,
 }
 
@@ -123,6 +132,7 @@ impl VulkanSyncPlan {
         }
 
         let mut waits_by_node = BTreeMap::<u32, Vec<VulkanTimelineWait>>::new();
+        let mut barriers_by_node = BTreeMap::<u32, Vec<VulkanBarrierRequirement>>::new();
         for dependency in &schedule.dependencies {
             let (producer_queue, value) = *signal_by_node
                 .get(&dependency.from)
@@ -133,6 +143,12 @@ impl VulkanSyncPlan {
                 .map(|assignment| assignment.queue)
                 .ok_or(VulkanSyncError::MissingAssignment(dependency.to))?;
             if producer_queue == consumer_queue {
+                barriers_by_node.entry(dependency.to).or_default().push(VulkanBarrierRequirement {
+                    from: dependency.from,
+                    to: dependency.to,
+                    resource: dependency.resource.clone(),
+                    kind: dependency.kind,
+                });
                 continue;
             }
             waits_by_node.entry(dependency.to).or_default().push(VulkanTimelineWait {
@@ -148,17 +164,24 @@ impl VulkanSyncPlan {
             let mut waits = waits_by_node.remove(&node.id).unwrap_or_default();
             waits.sort();
             waits.dedup();
+            let mut barriers = barriers_by_node.remove(&node.id).unwrap_or_default();
+            barriers.sort();
+            barriers.dedup();
             submissions.push(VulkanSubmission {
                 node_id: node.id,
                 ordinal: ordinal_by_node[&node.id],
                 queue,
                 waits,
+                barriers,
                 signal: VulkanTimelineSignal { queue, value },
             });
         }
 
         if !waits_by_node.is_empty() {
             return Err(VulkanSyncError::UnexpectedWaitTarget);
+        }
+        if !barriers_by_node.is_empty() {
+            return Err(VulkanSyncError::UnexpectedBarrierTarget);
         }
 
         let plan = Self {
