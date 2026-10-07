@@ -583,7 +583,7 @@ fn valid_randomization_seed_hex(seed_hex: &str) -> bool {
 
 fn randomness_stream_u64(seed_hex: &str, counter: u64) -> u64 {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-neurosemantic-statistical-selection-v2 ");
+    hasher.update(b"symthaea-neurosemantic-statistical-selection-v2\0");
     hasher.update(seed_hex.as_bytes());
     hasher.update(&counter.to_le_bytes());
     let digest = hasher.finalize();
