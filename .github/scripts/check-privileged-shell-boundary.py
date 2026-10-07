@@ -68,6 +68,7 @@ def main() -> None:
         "run_cmd_with_stdin(",
         "run_privileged_script(",
         "run_privileged_script_with_args(",
+        "privileged_process(",
         "privileged_shell_command(",
         "privileged_script_command(",
         'bash -c',
