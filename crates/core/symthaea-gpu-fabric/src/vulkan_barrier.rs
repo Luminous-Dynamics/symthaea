@@ -117,6 +117,8 @@ pub enum VulkanBarrierReceiptError {
     PhysicalDeviceApiVersion,
     #[error("receipt expected timeline value does not match the synchronization plan")]
     TimelineExpected,
+    #[error("receipt uses an unsupported multi-queue synchronization plan")]
+    MultipleLogicalQueues,
     #[error("receipt completion lowering digest mismatch")]
     CompletionLoweringDigest,
     #[error("receipt observed timeline value {observed} does not equal expected {expected}")]
@@ -208,6 +210,9 @@ impl VulkanBarrierExecutionReceipt {
         }
         if self.physical_device_api_version < VULKAN_API_VERSION {
             return Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersion);
+        }
+        if plan.queue_count > 1 || plan.assignments.iter().any(|assignment| assignment.queue.get() != 0) {
+            return Err(VulkanBarrierReceiptError::MultipleLogicalQueues);
         }
         let expected_completion = expected_final_timeline_value(plan);
         if self.completion_expected != expected_completion {
@@ -373,9 +378,17 @@ impl VulkanBarrierWorkloadRuntime {
                 std::slice::from_ref(&pipeline_info),
                 None,
             ) {
-                Ok(mut pipelines) => pipelines
-                    .pop()
-                    .expect("one compute pipeline was requested"),
+                Ok(mut pipelines) => match pipelines.pop() {
+                    Some(pipeline) => pipeline,
+                    None => {
+                        device.destroy_pipeline_layout(pipeline_layout, None);
+                        device.destroy_descriptor_set_layout(descriptor_layout, None);
+                        device.destroy_shader_module(shader, None);
+                        device.destroy_device(None);
+                        instance.destroy_instance(None);
+                        return Err(VulkanBarrierError::AllocationOverflow);
+                    }
+                },
                 Err((pipelines, error)) => {
                     for pipeline in pipelines {
                         device.destroy_pipeline(pipeline, None);
@@ -390,13 +403,42 @@ impl VulkanBarrierWorkloadRuntime {
             }
         };
         let command_pool_info = vk::CommandPoolCreateInfo::default().queue_family_index(family);
-        let command_pool = unsafe { device.create_command_pool(&command_pool_info, None).map_err(VulkanBarrierError::Vk)? };
-        let pool_size = vk::DescriptorPoolSize::default().ty(vk::DescriptorType::STORAGE_BUFFER).descriptor_count((MAX_WORKLOAD_NODES * 3) as u32);
+        let command_pool = match unsafe { device.create_command_pool(&command_pool_info, None) } {
+            Ok(pool) => pool,
+            Err(error) => {
+                unsafe {
+                    device.destroy_pipeline(pipeline, None);
+                    device.destroy_pipeline_layout(pipeline_layout, None);
+                    device.destroy_descriptor_set_layout(descriptor_layout, None);
+                    device.destroy_shader_module(shader, None);
+                    device.destroy_device(None);
+                    instance.destroy_instance(None);
+                }
+                return Err(VulkanBarrierError::Vk(error));
+            }
+        };
+        let pool_size = vk::DescriptorPoolSize::default()
+            .ty(vk::DescriptorType::STORAGE_BUFFER)
+            .descriptor_count((MAX_WORKLOAD_NODES * 3) as u32);
         let pool_info = vk::DescriptorPoolCreateInfo::default()
             .flags(vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET)
             .max_sets(MAX_WORKLOAD_NODES as u32)
             .pool_sizes(std::slice::from_ref(&pool_size));
-        let descriptor_pool = unsafe { device.create_descriptor_pool(&pool_info, None).map_err(VulkanBarrierError::Vk)? };
+        let descriptor_pool = match unsafe { device.create_descriptor_pool(&pool_info, None) } {
+            Ok(pool) => pool,
+            Err(error) => {
+                unsafe {
+                    device.destroy_command_pool(command_pool, None);
+                    device.destroy_pipeline(pipeline, None);
+                    device.destroy_pipeline_layout(pipeline_layout, None);
+                    device.destroy_descriptor_set_layout(descriptor_layout, None);
+                    device.destroy_shader_module(shader, None);
+                    device.destroy_device(None);
+                    instance.destroy_instance(None);
+                }
+                return Err(VulkanBarrierError::Vk(error));
+            }
+        };
 
         Ok(Self {
             instance, device, queue, command_pool, descriptor_layout, descriptor_pool,
@@ -889,7 +931,17 @@ fn allocate_set(
     range: u64,
 ) -> Result<vk::DescriptorSet, VulkanBarrierError> {
     let info = vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(std::slice::from_ref(&layout));
-    let set = unsafe { device.allocate_descriptor_sets(&info).map_err(VulkanBarrierError::Vk)?[0] };
+    let set = unsafe {
+        match device
+            .allocate_descriptor_sets(&info)
+            .map_err(VulkanBarrierError::Vk)?
+            .into_iter()
+            .next()
+        {
+            Some(set) => set,
+            None => return Err(VulkanBarrierError::AllocationOverflow),
+        }
+    };
     let infos = [
         vk::DescriptorBufferInfo::default().buffer(buffers[0].buffer).offset(0).range(range),
         vk::DescriptorBufferInfo::default().buffer(buffers[1].buffer).offset(0).range(range),
@@ -1771,6 +1823,58 @@ mod tests {
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
             Err(VulkanBarrierReceiptError::TimelineCompletion { expected: 1, observed: 2 })
+        ));
+    }
+
+    #[test]
+    fn receipt_rejects_multi_queue_plan() {
+        let (graph, schedule, _, initial) = fixture();
+        let queue_zero = crate::VulkanQueueId::new(0).unwrap();
+        let queue_one = crate::VulkanQueueId::new(1).unwrap();
+        let plan = VulkanSyncPlan::from_schedule(
+            &schedule,
+            &[
+                crate::VulkanQueueAssignment { node_id: 1, queue: queue_zero },
+                crate::VulkanQueueAssignment { node_id: 2, queue: queue_one },
+            ],
+        )
+        .unwrap();
+        assert!(plan.queue_count > 1);
+
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        let digests = final_state
+            .iter()
+            .map(|(resource, value)| (resource.clone(), resource_digest(value)))
+            .collect::<BTreeMap<_, _>>();
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| (
+                resource.clone(),
+                rounded_storage_bytes(value.as_bytes().len() as u64),
+            ))
+            .collect::<BTreeMap<_, _>>();
+        let expected = expected_final_timeline_value(&plan);
+        let receipt = VulkanBarrierExecutionReceipt {
+            version: RECEIPT_VERSION,
+            graph_digest: graph.digest_hex().unwrap(),
+            schedule_digest: schedule.digest_hex().unwrap(),
+            sync_plan_digest: plan.digest_hex().unwrap(),
+            barrier_digest: barrier_digest(&plan),
+            barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
+            completion_lowering_digest: completion_lowering_digest(&plan, expected, 0),
+            node_count: schedule.nodes.len() as u32,
+            barrier_count: plan.submissions.iter().map(|s| s.barriers.len() as u32).sum(),
+            resource_digests: digests,
+            resource_storage_sizes: storage_sizes,
+            completion_expected: expected,
+            completion_observed: expected,
+            vulkan_api_version: VULKAN_API_VERSION,
+            physical_device_api_version: VULKAN_API_VERSION,
+            queue_family_index: 0,
+        };
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::MultipleLogicalQueues)
         ));
     }
 
