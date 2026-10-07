@@ -2136,6 +2136,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn shared_dispatch_cannot_shell_fallback_for_authorized_service() {
+        let mut executor = NixOSExecutor::new();
+        let command = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx.service".to_string(),
+        };
+
+        let result = executor
+            .execute_confirmed_inner(
+                command,
+                ExecutionBasisV1::LiveAuthority {
+                    intent_digest: "aa".repeat(32),
+                    approval_request_id: "approval:test".to_string(),
+                    projection_digest: "bb".repeat(32),
+                },
+            )
+            .await;
+
+        assert!(matches!(
+            result,
+            ExecutionResult::Blocked {
+                safety_level: SafetyLevel::SystemModify,
+                reason,
+            } if reason.contains("governed manager-bound D-Bus dispatch")
+        ));
+        assert!(executor.history().is_empty());
+    }
+
+    #[tokio::test]
     async fn invalid_typed_service_is_blocked_even_when_confirmed() {
         let mut executor = NixOSExecutor::new().with_dry_run(true);
         let command = NixOSCommand::Service {
