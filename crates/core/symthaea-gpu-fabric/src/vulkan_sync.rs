@@ -403,6 +403,51 @@ mod tests {
     }
 
     #[test]
+    fn parallel_queues_use_independent_local_timeline_values() {
+        let r = resource();
+        let graph = ExecutionGraph::new(
+            vec![
+                node(1, &r, AccessKind::Write),
+                node(2, &r, AccessKind::Read),
+                node(3, &r, AccessKind::Read),
+            ],
+            vec![
+                DependencyEdge::new(1, 2, r.clone(), crate::DependencyKind::ReadAfterWrite),
+                DependencyEdge::new(1, 3, r, crate::DependencyKind::ReadAfterWrite),
+            ],
+        ).unwrap();
+        let schedule = ExecutionSchedule::from_graph(&graph).unwrap();
+        let q0 = VulkanQueueId::new(0).unwrap();
+        let q1 = VulkanQueueId::new(1).unwrap();
+        let q2 = VulkanQueueId::new(2).unwrap();
+        let plan = VulkanSyncPlan::from_schedule(&schedule, &[
+            VulkanQueueAssignment { node_id: 1, queue: q0 },
+            VulkanQueueAssignment { node_id: 2, queue: q1 },
+            VulkanQueueAssignment { node_id: 3, queue: q2 },
+        ]).unwrap();
+
+        assert_eq!(plan.submissions[0].signal.value, 1);
+        assert_eq!(plan.submissions[1].waits[0].value, 1);
+        assert_eq!(plan.submissions[1].signal.value, 1);
+        assert_eq!(plan.submissions[2].waits[0].value, 1);
+        assert_eq!(plan.submissions[2].signal.value, 1);
+    }
+
+    #[test]
+    fn incomplete_queue_assignment_is_rejected() {
+        let schedule = ExecutionSchedule::from_graph(&graph_chain()).unwrap();
+        let q0 = VulkanQueueId::new(0).unwrap();
+        let error = VulkanSyncPlan::from_schedule(
+            &schedule,
+            &[
+                VulkanQueueAssignment { node_id: 1, queue: q0 },
+                VulkanQueueAssignment { node_id: 2, queue: q0 },
+            ],
+        ).unwrap_err();
+        assert!(matches!(error, VulkanSyncError::AssignmentCountMismatch { .. }));
+    }
+
+    #[test]
     fn non_monotonic_signal_is_rejected() {
         let schedule = ExecutionSchedule::from_graph(&graph_chain()).unwrap();
         let q0 = VulkanQueueId::new(0).unwrap();
