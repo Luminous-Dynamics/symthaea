@@ -509,17 +509,17 @@ impl MorphophonologicalRuleSet {
         let mut rules = Vec::with_capacity(source_slices.len());
         let mut identities = HashSet::new();
         for slice in &source_slices {
-            if !source_slice_is_line_bounded(source_artifact, slice) {
-                return Err(MorphophonologicalUnimorphCompilerError::CompilationWitness(
-                    MorphophonologicalCompilationWitnessError::SourceSliceNotLineBounded,
-                ));
-            }
             let end = slice
                 .byte_offset
                 .checked_add(slice.byte_length)
                 .ok_or(MorphophonologicalUnimorphCompilerError::CompilationWitness(
                     MorphophonologicalCompilationWitnessError::SourceRangeOverflow,
                 ))?;
+            if !source_slice_is_line_bounded(source_artifact, slice) {
+                return Err(MorphophonologicalUnimorphCompilerError::CompilationWitness(
+                    MorphophonologicalCompilationWitnessError::SourceSliceNotLineBounded,
+                ));
+            }
             let bytes = source_artifact
                 .get(slice.byte_offset..end)
                 .ok_or(MorphophonologicalUnimorphCompilerError::CompilationWitness(
@@ -926,13 +926,13 @@ impl MorphophonologicalCompilationWitness {
         }
 
         for slice in &self.source_slices {
-            if !source_slice_is_line_bounded(source_artifact, slice) {
-                return Err(MorphophonologicalCompilationWitnessError::SourceSliceNotLineBounded);
-            }
             let end = slice
                 .byte_offset
                 .checked_add(slice.byte_length)
                 .ok_or(MorphophonologicalCompilationWitnessError::SourceRangeOverflow)?;
+            if !source_slice_is_line_bounded(source_artifact, slice) {
+                return Err(MorphophonologicalCompilationWitnessError::SourceSliceNotLineBounded);
+            }
             let bytes = source_artifact
                 .get(slice.byte_offset..end)
                 .ok_or(MorphophonologicalCompilationWitnessError::SourceSliceOutOfBounds)?;
