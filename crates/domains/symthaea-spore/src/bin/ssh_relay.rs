@@ -3248,6 +3248,20 @@ async fn open_verified_image_artifact(
     Ok(file)
 }
 
+fn restore_configuration_from_verified_stdin() -> &'static str {
+    r#"set -euo pipefail
+CONFIG_TMP=$(mktemp /mnt/etc/nixos/.configuration.nix.restore.XXXXXX)
+cleanup() {
+    rm -f -- "$CONFIG_TMP"
+}
+trap cleanup EXIT
+cat > "$CONFIG_TMP"
+chmod 600 "$CONFIG_TMP"
+mv -f -- "$CONFIG_TMP" /mnt/etc/nixos/configuration.nix
+trap - EXIT
+"# 
+}
+
 async fn verify_restored_image_postcondition(
     expected_configuration: &ArtifactCommitment,
 ) -> Result<bool, String> {
@@ -7598,32 +7612,34 @@ echo "COMPLETE"
                     continue;
                 }
 
-                if let Err(error) =
-                    open_verified_image_artifact(&image_path, &image_configuration_commitment)
+                let image_configuration_file =
+                    match open_verified_image_artifact(&image_path, &image_configuration_commitment)
                         .await
-                        .map(|_| ())
-                {
-                    let outcome = finalize_transaction(
-                        &transaction_ledger,
-                        &transaction,
-                        TransactionOutcome::Failed,
-                        &peer_addr,
-                    );
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            serde_json::json!({
-                                "type": "error",
-                                "message": format!(
-                                    "Image restore refused: committed configuration identity does not match the image namespace: {}",
-                                    error
-                                ),
-                                "transaction": transaction.receipt(outcome)
-                            })
-                            .to_string(),
-                        ))
-                        .await;
-                    continue;
-                }
+                    {
+                        Ok(file) => file,
+                        Err(error) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Failed,
+                                &peer_addr,
+                            );
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type": "error",
+                                        "message": format!(
+                                            "Image restore refused: committed configuration identity does not match the image namespace: {}",
+                                            error
+                                        ),
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                            continue;
+                        }
+                    };
 
                 eprintln!(
                     "[{}] {} Restoring system image from {}...",
@@ -7635,26 +7651,25 @@ echo "COMPLETE"
                     &image_artifact_commitment.name,
                 )
                 .expect("artifact commitment validator must accept only supported image artifacts");
-                let script = format!(
-                    r#"
-set -eo pipefail
-echo "STAGE: Restoring system image..."
-{restore_artifact_step}
-cp "{path}/configuration.nix" /mnt/etc/nixos/
-echo "STAGE: Image restored"
-echo "COMPLETE"
-"#,
-                    path = image_path,
-                    restore_artifact_step = restore_artifact_step
-                );
+                let script = restore_artifact_step.to_owned();
 
                 match run_cmd_with_stdin(&script, image_archive_file).await {
                     Ok(r) => {
                         let observed_outcome = if r.exit_status == 0 {
-                            match verify_restored_image_postcondition(&image_configuration_commitment).await {
+                            let config_result = run_cmd_with_stdin(
+                                restore_configuration_from_verified_stdin(),
+                                image_configuration_file,
+                            )
+                            .await;
+                            match config_result {
+                                Ok(config) if config.exit_status == 0 => {
+                                    match verify_restored_image_postcondition(
+                                        &image_configuration_commitment,
+                                    )
+                                    .await {
                                 Ok(true) => TransactionOutcome::ObservedSuccess,
                                 Ok(false) => TransactionOutcome::Failed,
-                                Err(error) => {
+                                    Err(error) => {
                                     eprintln!(
                                         "[{}] {} restore postcondition probe failed: {}",
                                         peer_addr,
@@ -7663,6 +7678,26 @@ echo "COMPLETE"
                                     );
                                     TransactionOutcome::Indeterminate
                                 }
+                            }
+                                    },
+                                Err(error) => {
+                                    eprintln!(
+                                        "[{}] {} configuration restore from verified descriptor failed: {}",
+                                        peer_addr,
+                                        transaction.log_line(),
+                                        error
+                                    );
+                                    TransactionOutcome::Indeterminate
+                                }
+                            },
+                            Err(error) => {
+                                eprintln!(
+                                    "[{}] {} configuration restore command could not be started: {}",
+                                    peer_addr,
+                                    transaction.log_line(),
+                                    error
+                                );
+                                TransactionOutcome::Indeterminate
                             }
                         } else {
                             TransactionOutcome::Failed
@@ -9015,6 +9050,14 @@ mod tests {
             );
         }
         assert!(restore_artifact_step_for_committed_archive("unknown").is_err());
+    }
+
+    #[test]
+    fn configuration_restore_consumes_stdin_and_replaces_target_atomically() {
+        let step = restore_configuration_from_verified_stdin();
+        assert!(step.contains("cat > \"$CONFIG_TMP\""));
+        assert!(step.contains("mv -f -- \"$CONFIG_TMP\" /mnt/etc/nixos/configuration.nix"));
+        assert!(!step.contains("/tmp/nixforhumanity-image-"));
     }
 
     #[tokio::test]
