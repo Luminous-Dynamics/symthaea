@@ -624,38 +624,6 @@ pub enum ExecutionResult {
     },
 }
 
-enum NixSystemdOperationLabel {
-    Start,
-    Stop,
-    Restart,
-    Reload,
-}
-
-impl From<NixServiceOperationKindV1> for NixSystemdOperationLabel {
-    fn from(value: NixServiceOperationKindV1) -> Self {
-        match value {
-            NixServiceOperationKindV1::Start => Self::Start,
-            NixServiceOperationKindV1::Stop => Self::Stop,
-            NixServiceOperationKindV1::Restart => Self::Restart,
-            NixServiceOperationKindV1::Reload => Self::Reload,
-            NixServiceOperationKindV1::Enable => Self::Start,
-            NixServiceOperationKindV1::Disable => Self::Stop,
-        }
-    }
-}
-
-impl std::fmt::Display for NixSystemdOperationLabel {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let value = match self {
-            Self::Start => "start",
-            Self::Stop => "stop",
-            Self::Restart => "restart",
-            Self::Reload => "reload",
-        };
-        formatter.write_str(value)
-    }
-}
-
 enum ExecutionBasisV1 {
     Phi {
         phi: f32,
@@ -1312,11 +1280,20 @@ impl NixOSExecutor {
         };
 
         let elapsed = started_at.elapsed().as_millis() as u64;
+        let operation_label = match *operation {
+            NixServiceOperationKindV1::Start => "start",
+            NixServiceOperationKindV1::Stop => "stop",
+            NixServiceOperationKindV1::Restart => "restart",
+            NixServiceOperationKindV1::Reload => "reload",
+            NixServiceOperationKindV1::Enable | NixServiceOperationKindV1::Disable => {
+                "unsupported"
+            }
+        };
         let result = if job_evidence.result == "done" {
             ExecutionResult::Success {
                 stdout: format!(
                     "systemd {} job {} completed for {}",
-                    NixSystemdOperationLabel::from(*operation),
+                    operation_label,
                     job_evidence.id,
                     unit
                 ),
@@ -1327,7 +1304,7 @@ impl NixOSExecutor {
             ExecutionResult::FailedNoRollback {
                 error: format!(
                     "systemd {} job {} for {} finished with result {}",
-                    NixSystemdOperationLabel::from(*operation),
+                    operation_label,
                     job_evidence.id,
                     unit,
                     job_evidence.result
