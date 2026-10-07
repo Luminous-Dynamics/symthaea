@@ -616,6 +616,12 @@ impl CalibrationTraceabilityTopology {
                 );
             }
         }
+        if reverse
+            .get(&self.result_node_id)
+            .is_some_and(|parents| !parents.is_empty())
+        {
+            return Err(AssessmentError::CalibrationTraceabilityResultHasIncomingEdge);
+        }
         let mut indegree = BTreeMap::<String, usize>::new();
         for node_id in nodes_by_id.keys() {
             indegree.insert(
@@ -3617,6 +3623,8 @@ pub enum AssessmentError {
     CalibrationTraceabilityResultNodeMissing,
     /// The topology's result node does not match the observation result.
     CalibrationTraceabilityResultObservationMismatch,
+    /// The measured-result node incorrectly has an incoming topology edge.
+    CalibrationTraceabilityResultHasIncomingEdge,
     /// An edge names a node not present in the topology.
     CalibrationTraceabilityEdgeEndpointMissing,
     /// Two identical topology edges were declared.
@@ -4071,6 +4079,9 @@ impl std::fmt::Display for AssessmentError {
             }
             Self::CalibrationTraceabilityResultObservationMismatch => {
                 write!(f, "calibration traceability result node does not match observation")
+            }
+            Self::CalibrationTraceabilityResultHasIncomingEdge => {
+                write!(f, "calibration traceability result node has an incoming edge")
             }
             Self::CalibrationTraceabilityEdgeEndpointMissing => {
                 write!(f, "calibration traceability edge endpoint is missing")
@@ -7776,6 +7787,112 @@ mod tests {
         };
         assert!(source.validate().is_ok());
         assert_eq!(source.admitted_authority_group_id(), None);
+    }
+
+    #[test]
+    fn calibration_traceability_topology_digest_is_order_independent() {
+        let observation = ObservationProvenanceRef {
+            observation_id: "obs-order".into(),
+            subject_id: "subject".into(),
+            activity_id: "activity".into(),
+            measurand_id: "measurand".into(),
+            procedure_id: "procedure".into(),
+            procedure_digest: "procedure-digest".into(),
+            record_digest: "record".into(),
+            measurement_system_id: Some("system".into()),
+            calibration_chain_refs: vec![CalibrationTraceabilityRef {
+                calibration_id: "calibration".into(),
+                calibration_revision: "v1".into(),
+                calibration_record_digest: "calibration-digest".into(),
+                used_at_epoch_seconds: 1_700_000_000,
+            }],
+            calibration_topology: None,
+            experimental_design_id: None,
+            experimental_target_id: None,
+        };
+
+        let mut topology = CalibrationTraceabilityTopology {
+            result_node_id: "result".into(),
+            reference_node_ids: vec!["reference-b".into(), "reference-a".into()],
+            nodes: vec![
+                CalibrationTraceabilityNodeRef {
+                    node_id: "result".into(),
+                    kind: CalibrationTraceabilityNodeKind::MeasurementResult,
+                    record_id: observation.observation_id.clone(),
+                    record_revision: "v1".into(),
+                    record_digest: observation.record_digest.clone(),
+                    used_at_epoch_seconds: 1_000,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "calibration".into(),
+                    kind: CalibrationTraceabilityNodeKind::CalibrationRecord,
+                    record_id: "calibration".into(),
+                    record_revision: "v1".into(),
+                    record_digest: "calibration-digest".into(),
+                    used_at_epoch_seconds: 1_700_000_000,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "reference-a".into(),
+                    kind: CalibrationTraceabilityNodeKind::ReferenceStandard,
+                    record_id: "ref-a".into(),
+                    record_revision: "v1".into(),
+                    record_digest: "ref-a-digest".into(),
+                    used_at_epoch_seconds: 1_600,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "reference-b".into(),
+                    kind: CalibrationTraceabilityNodeKind::ReferenceStandard,
+                    record_id: "ref-b".into(),
+                    record_revision: "v1".into(),
+                    record_digest: "ref-b-digest".into(),
+                    used_at_epoch_seconds: 1_600,
+                },
+            ],
+            edges: vec![
+                CalibrationTraceabilityEdge {
+                    from_node_id: "calibration".into(),
+                    to_node_id: "reference-b".into(),
+                },
+                CalibrationTraceabilityEdge {
+                    from_node_id: "result".into(),
+                    to_node_id: "calibration".into(),
+                },
+                CalibrationTraceabilityEdge {
+                    from_node_id: "calibration".into(),
+                    to_node_id: "reference-a".into(),
+                },
+            ],
+        };
+
+        let first = topology.canonical_digest().unwrap();
+        topology.nodes.reverse();
+        topology.edges.reverse();
+        topology.reference_node_ids.reverse();
+        let second = topology.canonical_digest().unwrap();
+        assert_eq!(first, second);
+
+        topology
+            .validate_against_observation(
+                &observation.observation_id,
+                &observation.record_digest,
+                &observation.calibration_chain_refs,
+            )
+            .unwrap();
+
+        topology.edges.push(CalibrationTraceabilityEdge {
+            from_node_id: "reference-a".into(),
+            to_node_id: "result".into(),
+        });
+        assert_eq!(
+            topology
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityResultHasIncomingEdge
+        );
     }
 
     #[test]
