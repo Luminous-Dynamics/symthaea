@@ -164,11 +164,6 @@ impl LocalApprovalRuntimeV1 {
         created_at: UnixMillisV1,
         expires_at: UnixMillisV1,
     ) -> Result<InstalledLocalApprovalRequestV1, LocalApprovalRuntimeErrorV1> {
-        if matches!(command, NixOSCommand::Service { .. }) {
-            return Err(LocalApprovalRuntimeErrorV1::Authorization(
-                super::authorization::NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture,
-            ));
-        }
         self.create_pending_request_internal(
             intent,
             command,
@@ -372,6 +367,10 @@ mod tests {
     use crate::action::{
         LocalApprovalDecisionKindV1, LocalApprovalSubmissionV2, submit_local_approval_v2,
     };
+    use crate::action::service_effect::{
+        NixServiceEffectContextV1, NixSystemdUnitDefinitionContentEvidenceV1,
+        NixSystemdUnitDefinitionContentFileV1, NixVerifiedServiceDefinitionContentV1,
+    };
     use std::sync::Arc;
     use std::thread;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -383,22 +382,21 @@ mod tests {
         };
         let base = NixActionIntentV1::from_command(
             "machine:workstation",
-            Some(
-                "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=1111111111111111111111111111111111111111111111111111111111111111"
-                    .to_string(),
-            ),
+            Some(format!(
+                "nixward-service-pre-state-v1|generation=42|unit={service}|state=1111111111111111111111111111111111111111111111111111111111111111"
+            )),
             &command,
         )
         .unwrap();
-        let context = NixServiceEffectContextV1::new(
+        let content = synthetic_definition_content(service);
+        let context = NixServiceEffectContextV1::from_verified_definition_content(
             crate::action::NixServiceOperationKindV1::Restart,
             service,
             42,
             "1111111111111111111111111111111111111111111111111111111111111111",
-            "2222222222222222222222222222222222222222222222222222222222222222",
-            "3333333333333333333333333333333333333333333333333333333333333333",
             Some("4444444444444444444444444444444444".to_string()),
             0,
+            &content,
         )
         .unwrap();
         base.with_service_effect_context(context).unwrap()
@@ -409,6 +407,48 @@ mod tests {
             operation: crate::action::NixServiceOperationKindV1::Restart,
             unit: service.to_string(),
         }
+    }
+
+    fn synthetic_definition_content(service: &str) -> NixVerifiedServiceDefinitionContentV1 {
+        let evidence = NixSystemdUnitDefinitionContentEvidenceV1 {
+            unit: service.to_string(),
+            source_identity_digest: "2222222222222222222222222222222222222222222222222222222222222222"
+                .to_string(),
+            manager_owner: ":1.42".to_string(),
+            bus_id: "0123456789abcdef0123456789abcdef".to_string(),
+            pre_invocation_id: Some("4444444444444444444444444444444444".to_string()),
+            files: vec![NixSystemdUnitDefinitionContentFileV1 {
+                path: format!("/nix/store/{service}"),
+                resolved_path: None,
+                byte_len: 1,
+                content_digest:
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+            }],
+            captured_at_monotonic_us: 1,
+        };
+        NixVerifiedServiceDefinitionContentV1::from_observer(evidence).unwrap()
+    }
+
+    fn create_pending_service_request(
+        runtime: &LocalApprovalRuntimeV1,
+        intent: &NixActionIntentV1,
+        command: &NixOSCommand,
+        authority_profile: RequiredApprovalProfileV1,
+        created_at: UnixMillisV1,
+        expires_at: UnixMillisV1,
+    ) -> Result<InstalledLocalApprovalRequestV1, LocalApprovalRuntimeErrorV1> {
+        let NixOSCommand::Service { unit, .. } = command else {
+            panic!("test helper requires a typed Service command");
+        };
+        let content = synthetic_definition_content(unit);
+        runtime.create_pending_service_request_with_definition_capture(
+            intent,
+            command,
+            &content,
+            authority_profile,
+            created_at,
+            expires_at,
+        )
     }
 
     fn submission_for(
