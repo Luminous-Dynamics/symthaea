@@ -10821,6 +10821,31 @@ mod tests {
         let _ = std::fs::remove_dir_all(dir);
     }
 
+    #[tokio::test]
+    async fn restore_child_cwd_is_bound_to_open_target_directory() {
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-restore-cwd-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+
+        let directory = std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(&dir)
+            .unwrap();
+
+        let mut command = tokio::process::Command::new("/bin/pwd");
+        bind_process_cwd_to_directory(&mut command, &directory).unwrap();
+
+        let output = command.output().await.unwrap();
+        assert!(output.status.success(), "pwd failed: {:?}", output.status);
+        let observed = String::from_utf8(output.stdout).unwrap();
+        assert_eq!(observed.trim_end(), dir.to_string_lossy());
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
     #[test]
     fn image_sidecar_copy_rejects_source_symlinks() {
         use std::os::unix::fs::PermissionsExt;
