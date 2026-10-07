@@ -1658,7 +1658,16 @@ impl CandidatePathway {
                         .any(|e| {
                             e.stance == EvidenceStance::Supports
                                 && e.confidence >= 0.7
-                                && !matches!(e.kind, EvidenceKind::Hypothesis)
+                                && matches!(
+                                    e.kind,
+                                    EvidenceKind::Observed
+                                        | EvidenceKind::Reported
+                                        | EvidenceKind::Derived
+                                        | EvidenceKind::LifecycleAssessed
+                                        | EvidenceKind::ManufacturingObserved
+                                        | EvidenceKind::FieldObserved
+                                        | EvidenceKind::ContinuouslyMonitored
+                                )
                         })
                 })
         })
@@ -7298,6 +7307,43 @@ mod tests {
             evidence.validate().unwrap_err(),
             AssessmentError::EmptyDerivationIdentity
         ));
+    }
+
+    #[test]
+    fn simulation_only_burden_evidence_cannot_raise_empirical_tier() {
+        let mut c = candidate(
+            "simulation-only-burden",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![
+                evidence(
+                    "reported-performance",
+                    "source-reported",
+                    EvidenceKind::Reported,
+                    EvidenceStance::Supports,
+                    0.9,
+                ),
+                evidence(
+                    "simulated-burden",
+                    "source-simulated",
+                    EvidenceKind::Simulated,
+                    EvidenceStance::Supports,
+                    0.95,
+                ),
+            ],
+        );
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["simulated-burden".into()];
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::ComputationallyPlausible
+        );
     }
 
     #[test]
