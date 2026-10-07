@@ -11,7 +11,7 @@ use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{ExecutionSchedule, ScheduleError, MAX_GRAPH_NODES};
+use crate::{DependencyKind, ExecutionSchedule, ResourceId, ScheduleError, MAX_GRAPH_NODES};
 
 pub const VULKAN_SYNC_PLAN_VERSION: u16 = 1;
 pub const MAX_VULKAN_LOGICAL_QUEUES: u16 = 64;
@@ -49,12 +49,21 @@ pub struct VulkanTimelineSignal {
     pub value: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct VulkanBarrierRequirement {
+    pub from: u32,
+    pub to: u32,
+    pub resource: ResourceId,
+    pub kind: DependencyKind,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VulkanSubmission {
     pub node_id: u32,
     pub ordinal: u32,
     pub queue: VulkanQueueId,
     pub waits: Vec<VulkanTimelineWait>,
+    pub barriers: Vec<VulkanBarrierRequirement>,
     pub signal: VulkanTimelineSignal,
 }
 
@@ -68,6 +77,23 @@ pub struct VulkanSyncPlan {
 }
 
 impl VulkanSyncPlan {
+    /// Verify that this lowering is the canonical Vulkan projection of the source schedule.
+    pub fn verify_against_schedule(
+        &self,
+        schedule: &ExecutionSchedule,
+    ) -> Result<(), VulkanSyncError> {
+        let expected_digest = schedule.digest_hex().map_err(VulkanSyncError::Schedule)?;
+        if self.schedule_digest != expected_digest {
+            return Err(VulkanSyncError::ScheduleDigestMismatch);
+        }
+
+        let expected = Self::from_schedule(schedule, &self.assignments)?;
+        if self != &expected {
+            return Err(VulkanSyncError::NonCanonicalLowering);
+        }
+        Ok(())
+    }
+
     /// Lower a semantic schedule into logical Vulkan queues and per-queue timelines.
     ///
     /// Queue ids are logical lanes, not Vulkan queue-family indices or handles.
@@ -123,6 +149,7 @@ impl VulkanSyncPlan {
         }
 
         let mut waits_by_node = BTreeMap::<u32, Vec<VulkanTimelineWait>>::new();
+        let mut barriers_by_node = BTreeMap::<u32, Vec<VulkanBarrierRequirement>>::new();
         for dependency in &schedule.dependencies {
             let (producer_queue, value) = *signal_by_node
                 .get(&dependency.from)
@@ -133,6 +160,12 @@ impl VulkanSyncPlan {
                 .map(|assignment| assignment.queue)
                 .ok_or(VulkanSyncError::MissingAssignment(dependency.to))?;
             if producer_queue == consumer_queue {
+                barriers_by_node.entry(dependency.to).or_default().push(VulkanBarrierRequirement {
+                    from: dependency.from,
+                    to: dependency.to,
+                    resource: dependency.resource.clone(),
+                    kind: dependency.kind,
+                });
                 continue;
             }
             waits_by_node.entry(dependency.to).or_default().push(VulkanTimelineWait {
@@ -148,17 +181,24 @@ impl VulkanSyncPlan {
             let mut waits = waits_by_node.remove(&node.id).unwrap_or_default();
             waits.sort();
             waits.dedup();
+            let mut barriers = barriers_by_node.remove(&node.id).unwrap_or_default();
+            barriers.sort();
+            barriers.dedup();
             submissions.push(VulkanSubmission {
                 node_id: node.id,
                 ordinal: ordinal_by_node[&node.id],
                 queue,
                 waits,
+                barriers,
                 signal: VulkanTimelineSignal { queue, value },
             });
         }
 
         if !waits_by_node.is_empty() {
             return Err(VulkanSyncError::UnexpectedWaitTarget);
+        }
+        if !barriers_by_node.is_empty() {
+            return Err(VulkanSyncError::UnexpectedBarrierTarget);
         }
 
         let plan = Self {
@@ -203,6 +243,18 @@ impl VulkanSyncPlan {
                 hasher.update(&wait.producer_queue.get().to_le_bytes());
                 hasher.update(&wait.value.to_le_bytes());
             }
+            hasher.update(&(submission.barriers.len() as u32).to_le_bytes());
+            for barrier in &submission.barriers {
+                hasher.update(&barrier.from.to_le_bytes());
+                hasher.update(&barrier.to.to_le_bytes());
+                hasher.update(&(barrier.resource.as_str().len() as u32).to_le_bytes());
+                hasher.update(barrier.resource.as_str().as_bytes());
+                hasher.update(&[match barrier.kind {
+                    DependencyKind::ReadAfterWrite => 1,
+                    DependencyKind::WriteAfterRead => 2,
+                    DependencyKind::WriteAfterWrite => 3,
+                }]);
+            }
             hasher.update(&submission.signal.queue.get().to_le_bytes());
             hasher.update(&submission.signal.value.to_le_bytes());
         }
@@ -233,13 +285,6 @@ impl VulkanSyncPlan {
             return Err(VulkanSyncError::DuplicateAssignment(u32::MAX));
         }
 
-        let max_queue = self.assignments.iter().map(|assignment| assignment.queue.get()).max();
-        if self.queue_count != max_queue.map_or(0, |max| max + 1) {
-            return Err(VulkanSyncError::QueueCountMismatch);
-        }
-        if self.assignments.iter().any(|assignment| assignment.queue.get() >= self.queue_count) {
-            return Err(VulkanSyncError::QueueAssignmentOutOfRange);
-        }
         let mut last_ordinal = None;
         let mut last_signal_by_queue = BTreeMap::<VulkanQueueId, u64>::new();
         let mut signal_index = BTreeMap::<(VulkanQueueId, u64), u32>::new();
@@ -251,11 +296,9 @@ impl VulkanSyncPlan {
                 return Err(VulkanSyncError::AssignmentMismatch(submission.node_id));
             }
             if let Some(previous) = last_ordinal {
-                if submission.ordinal != previous + 1 {
-                    return Err(VulkanSyncError::NonContiguousSubmissionOrdinals);
+                if submission.ordinal <= previous {
+                    return Err(VulkanSyncError::SubmissionOrderMismatch);
                 }
-            } else if submission.ordinal != 0 {
-                return Err(VulkanSyncError::NonContiguousSubmissionOrdinals);
             }
             last_ordinal = Some(submission.ordinal);
             if submission.signal.queue != submission.queue || submission.signal.value == 0 {
@@ -269,6 +312,33 @@ impl VulkanSyncPlan {
             if signal_index.insert((submission.queue, submission.signal.value), submission.node_id).is_some() {
                 return Err(VulkanSyncError::DuplicateSignal);
             }
+            let mut barriers = HashSet::with_capacity(submission.barriers.len());
+            for barrier in &submission.barriers {
+                if barrier.from == barrier.to
+                    || barrier.to != submission.node_id
+                    || barrier.resource.as_str().is_empty()
+                {
+                    return Err(VulkanSyncError::InvalidBarrier(submission.node_id));
+                }
+                if assignment_map.get(&barrier.from).copied() != Some(submission.queue) {
+                    return Err(VulkanSyncError::InvalidBarrierQueue(submission.node_id));
+                }
+                let from_ordinal = self.submissions
+                    .iter()
+                    .find(|candidate| candidate.node_id == barrier.from)
+                    .map(|candidate| candidate.ordinal)
+                    .ok_or(VulkanSyncError::InvalidBarrierProducer(barrier.from))?;
+                if from_ordinal >= submission.ordinal {
+                    return Err(VulkanSyncError::NonForwardBarrier {
+                        from: barrier.from,
+                        to: barrier.to,
+                    });
+                }
+                if !barriers.insert(barrier.clone()) {
+                    return Err(VulkanSyncError::DuplicateBarrier(submission.node_id));
+                }
+            }
+
             let mut waits = HashSet::with_capacity(submission.waits.len());
             for wait in &submission.waits {
                 if wait.producer_queue == submission.queue {
@@ -297,6 +367,10 @@ impl VulkanSyncPlan {
 pub enum VulkanSyncError {
     #[error("invalid execution schedule: {0}")]
     Schedule(ScheduleError),
+    #[error("sync plan schedule digest does not match the source schedule")]
+    ScheduleDigestMismatch,
+    #[error("sync plan is not the canonical lowering of the source schedule")]
+    NonCanonicalLowering,
     #[error("assignment count mismatch: expected {expected}, got {actual}")]
     AssignmentCountMismatch { expected: usize, actual: usize },
     #[error("missing queue assignment for node {0}")]
@@ -313,22 +387,30 @@ pub enum VulkanSyncError {
     MissingSignal(u32),
     #[error("wait table contains an unexpected target")]
     UnexpectedWaitTarget,
+    #[error("barrier table contains an unexpected target")]
+    UnexpectedBarrierTarget,
+    #[error("invalid barrier for node {0}")]
+    InvalidBarrier(u32),
+    #[error("barrier producer {0} does not exist")]
+    InvalidBarrierProducer(u32),
+    #[error("barrier producer is assigned to a different queue for node {0}")]
+    InvalidBarrierQueue(u32),
+    #[error("barrier {from}->{to} is not forward in submission order")]
+    NonForwardBarrier { from: u32, to: u32 },
+    #[error("duplicate barrier for node {0}")]
+    DuplicateBarrier(u32),
     #[error("unsupported Vulkan synchronization-plan version {0}")]
     UnsupportedVersion(u16),
     #[error("submission count {0} exceeds the graph bound")]
     SubmissionLimitExceeded(usize),
     #[error("submission/assignment cardinality mismatch")]
     InternalCardinalityMismatch,
-    #[error("queue count does not equal one greater than the highest assigned logical queue")]
-    QueueCountMismatch,
-    #[error("queue assignment is outside the declared queue count")]
-    QueueAssignmentOutOfRange,
     #[error("duplicate submission for node {0}")]
     DuplicateSubmission(u32),
     #[error("submission queue assignment mismatch for node {0}")]
     AssignmentMismatch(u32),
-    #[error("submission ordinals are not contiguous from zero")]
-    NonContiguousSubmissionOrdinals,
+    #[error("submission order is not strictly increasing by semantic ordinal")]
+    SubmissionOrderMismatch,
     #[error("invalid timeline signal for node {0}")]
     InvalidSignal(u32),
     #[error("timeline signal is not strictly increasing on queue {0:?}")]
@@ -377,6 +459,9 @@ mod tests {
         assert_eq!(plan.queue_submission_order(q0).unwrap(), vec![1, 2, 3]);
         assert_eq!(plan.submissions.iter().map(|submission| submission.signal.value).collect::<Vec<_>>(), vec![1, 2, 3]);
         assert!(plan.submissions.iter().all(|submission| submission.waits.is_empty()));
+        assert_eq!(plan.submissions[1].barriers.len(), 1);
+        assert_eq!(plan.submissions[2].barriers.len(), 1);
+        plan.verify_against_schedule(&schedule).unwrap();
     }
 
     #[test]
@@ -394,6 +479,7 @@ mod tests {
         assert_eq!(plan.submissions[1].signal.value, 1);
         assert_eq!(plan.submissions[2].waits, vec![VulkanTimelineWait { producer_node: 2, producer_queue: q1, value: 1 }]);
         assert_eq!(plan.submissions[2].signal.value, 2);
+        assert!(plan.submissions.iter().all(|submission| submission.barriers.is_empty()));
     }
 
     #[test]
@@ -461,21 +547,7 @@ mod tests {
     }
 
     #[test]
-    fn queue_count_must_cover_all_assignments() {
-        let schedule = ExecutionSchedule::from_graph(&graph_chain()).unwrap();
-        let q0 = VulkanQueueId::new(0).unwrap();
-        let q1 = VulkanQueueId::new(1).unwrap();
-        let mut plan = VulkanSyncPlan::from_schedule(&schedule, &[
-            VulkanQueueAssignment { node_id: 1, queue: q0 },
-            VulkanQueueAssignment { node_id: 2, queue: q1 },
-            VulkanQueueAssignment { node_id: 3, queue: q0 },
-        ]).unwrap();
-        plan.queue_count = 1;
-        assert!(matches!(plan.digest(), Err(VulkanSyncError::QueueCountMismatch)));
-    }
-
-    #[test]
-    fn submission_ordinals_must_be_contiguous() {
+    fn tampered_barrier_is_rejected_against_schedule() {
         let schedule = ExecutionSchedule::from_graph(&graph_chain()).unwrap();
         let q0 = VulkanQueueId::new(0).unwrap();
         let mut plan = VulkanSyncPlan::from_schedule(&schedule, &[
@@ -483,9 +555,13 @@ mod tests {
             VulkanQueueAssignment { node_id: 2, queue: q0 },
             VulkanQueueAssignment { node_id: 3, queue: q0 },
         ]).unwrap();
-        plan.submissions[1].ordinal = 7;
-        assert!(matches!(plan.digest(), Err(VulkanSyncError::NonContiguousSubmissionOrdinals)));
+        plan.submissions[1].barriers[0].resource = crate::ResourceId::new("tampered").unwrap();
+        assert!(matches!(
+            plan.verify_against_schedule(&schedule),
+            Err(VulkanSyncError::NonCanonicalLowering)
+        ));
     }
+
     #[test]
     fn non_monotonic_signal_is_rejected() {
         let schedule = ExecutionSchedule::from_graph(&graph_chain()).unwrap();
