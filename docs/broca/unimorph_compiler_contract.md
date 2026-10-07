@@ -119,7 +119,7 @@ UniMorph compiler receipts carry three generated identities:
 
 - `compiler_implementation_revision`: a content-addressed BLAKE3 identity of the complete `lexical_binding.rs` compiler module plus the build-time identity mechanism.
 - `source_parser_revision`: a content-addressed BLAKE3 identity of the explicitly delimited accepted source-format parser surface plus the build-time identity mechanism.
-- `compiler_build_context_revision`: a content-addressed BLAKE3 identity of the Broca crate manifest, workspace manifest, checked-in `Cargo.lock`, pinned `rust-toolchain.toml`, repository-local `.cargo/config.toml` and `.cargo/config` presence/content, actual `rustc --version --verbose` identity, actual `cargo --version --verbose` identity, configured rustc/workspace-wrapper values, enabled Cargo feature set, `CARGO_ENCODED_RUSTFLAGS`, target triple, and build host.
+- `compiler_build_context_revision`: a content-addressed BLAKE3 identity of the Broca crate manifest, workspace manifest, checked-in `Cargo.lock`, pinned `rust-toolchain.toml`, repository-local `.cargo/config.toml` and `.cargo/config` presence/content, actual `rustc --version --verbose` identity, actual `cargo --version --verbose` identity, configured rustc/workspace-wrapper values, enabled Cargo feature set, all `CARGO_CFG_*` values, Cargo profile/debug/optimization/job settings, `CARGO_ENCODED_RUSTFLAGS`, target triple, and build host.
 
 The build-context identity is deliberately separate from executable source identity. Rust source alone is not a complete reproducibility boundary when dependency resolution, the actual compiler or Cargo binary, compiler wrappers, feature selection, compiler flags, or compilation target changes.
 
@@ -141,3 +141,12 @@ Revision commitments are not self-certifying: validation first requires the gene
 
 
 Structural source-artifact validation intentionally does not require the recorded compiler revisions to equal the current implementation/context; this preserves historical witness inspectability. Current compiler replay is the stronger admission operation and requires the generated implementation, parser, and build-context identities to equal the current implementation/context before re-execution.
+
+
+## Qualification trigger boundary
+
+The Broca Feature Matrix is intentionally triggered by changes to the compiler implementation, its declared dependencies/toolchain, the frozen UniMorph manifests, and the build configuration inputs bound into the compiler build-context identity. In particular, `docs/broca/**`, `rust-toolchain.toml`, and both repository-local Cargo config spellings are qualification-triggering paths.
+
+The workflow also disables persisted checkout credentials for the qualification jobs and grants the workflow only `contents: read`; the freeze audit does not require repository write access.
+
+This trigger surface is part of the evidence boundary: changing a bound qualification input without re-running the exact-head audit is treated as an invalid qualification state rather than an implicit continuation of the previous receipt.
