@@ -172,6 +172,7 @@ impl ExecutionGraph {
             if edge.from == edge.to {
                 return Err(GraphError::SelfDependency(edge.from));
             }
+
             let from = nodes
                 .get(&edge.from)
                 .ok_or(GraphError::UnknownNode(edge.from))?;
@@ -195,12 +196,7 @@ impl ExecutionGraph {
                 });
             }
 
-            if !edge_kind_is_valid(
-                from,
-                to,
-                &edge.resource,
-                edge.kind,
-            ) {
+            if !edge_kind_is_valid(from, to, &edge.resource, edge.kind) {
                 return Err(GraphError::InvalidDependencyKind {
                     from: edge.from,
                     to: edge.to,
@@ -214,20 +210,60 @@ impl ExecutionGraph {
             }
         }
 
-        let adjacency = self.adjacency()?;
-        if let Some(node) = find_cycle_node(&adjacency, &nodes) {
-            return Err(GraphError::CycleDetected(node));
+        let topological_order = self.deterministic_topological_order()?;
+        let node_ids = topological_order.clone();
+        let mut index_by_id = HashMap::with_capacity(node_ids.len());
+        for (index, id) in node_ids.iter().copied().enumerate() {
+            index_by_id.insert(id, index);
+        }
+
+        let word_count = node_ids.len().div_ceil(64);
+        let mut reachability = vec![vec![0_u64; word_count]; node_ids.len()];
+        let mut adjacency = vec![Vec::<usize>::new(); node_ids.len()];
+
+        for edge in &self.dependencies {
+            let from = *index_by_id
+                .get(&edge.from)
+                .ok_or(GraphError::UnknownNode(edge.from))?;
+            let to = *index_by_id
+                .get(&edge.to)
+                .ok_or(GraphError::UnknownNode(edge.to))?;
+            adjacency[from].push(to);
+        }
+
+        for &node_id in topological_order.iter().rev() {
+            let node_index = *index_by_id
+                .get(&node_id)
+                .ok_or(GraphError::UnknownNode(node_id))?;
+
+            for &successor in &adjacency[node_index] {
+                reachability[node_index][successor / 64] |= 1_u64 << (successor % 64);
+                for word in 0..word_count {
+                    reachability[node_index][word] |= reachability[successor][word];
+                }
+            }
         }
 
         for left_index in 0..self.nodes.len() {
             for right_index in left_index + 1..self.nodes.len() {
                 let left = &self.nodes[left_index];
                 let right = &self.nodes[right_index];
+                let left_graph_index = *index_by_id
+                    .get(&left.id)
+                    .ok_or(GraphError::UnknownNode(left.id))?;
+                let right_graph_index = *index_by_id
+                    .get(&right.id)
+                    .ok_or(GraphError::UnknownNode(right.id))?;
 
                 for resource in shared_write_resources(left, right) {
-                    if !(reachable(&adjacency, left.id, right.id)
-                        || reachable(&adjacency, right.id, left.id))
-                    {
+                    let ordered = (reachability[left_graph_index][right_graph_index / 64]
+                        & (1_u64 << (right_graph_index % 64)))
+                        != 0
+                        || (reachability[right_graph_index][left_graph_index / 64]
+                            & (1_u64 << (left_graph_index % 64)))
+                            != 0;
+
+                    if !ordered {
                         return Err(GraphError::UnorderedResourceConflict {
                             left: left.id,
                             right: right.id,
@@ -243,17 +279,34 @@ impl ExecutionGraph {
 
     pub fn topological_order(&self) -> Result<Vec<u32>, GraphError> {
         self.validate()?;
+        self.deterministic_topological_order()
+    }
 
+    fn deterministic_topological_order(&self) -> Result<Vec<u32>, GraphError> {
         let mut indegree = self
             .nodes
             .iter()
             .map(|node| (node.id, 0_u32))
             .collect::<HashMap<_, _>>();
 
+        let mut adjacency = self
+            .nodes
+            .iter()
+            .map(|node| (node.id, Vec::<u32>::new()))
+            .collect::<HashMap<_, _>>();
+
         for edge in &self.dependencies {
             *indegree
                 .get_mut(&edge.to)
                 .ok_or(GraphError::UnknownNode(edge.to))? += 1;
+            adjacency
+                .get_mut(&edge.from)
+                .ok_or(GraphError::UnknownNode(edge.from))?
+                .push(edge.to);
+        }
+
+        for successors in adjacency.values_mut() {
+            successors.sort_unstable();
         }
 
         let mut ready = BTreeSet::new();
@@ -267,13 +320,16 @@ impl ExecutionGraph {
         while let Some(id) = ready.pop_first() {
             order.push(id);
 
-            for edge in self.dependencies.iter().filter(|edge| edge.from == id) {
+            for &successor in adjacency
+                .get(&id)
+                .ok_or(GraphError::UnknownNode(id))?
+            {
                 let degree = indegree
-                    .get_mut(&edge.to)
-                    .ok_or(GraphError::UnknownNode(edge.to))?;
+                    .get_mut(&successor)
+                    .ok_or(GraphError::UnknownNode(successor))?;
                 *degree -= 1;
                 if *degree == 0 {
-                    ready.insert(edge.to);
+                    ready.insert(successor);
                 }
             }
         }
@@ -358,32 +414,6 @@ impl ExecutionGraph {
             .collect())
     }
 
-    fn adjacency(&self) -> Result<HashMap<u32, Vec<u32>>, GraphError> {
-        let ids = self.nodes.iter().map(|node| node.id).collect::<HashSet<_>>();
-        let mut adjacency = ids
-            .into_iter()
-            .map(|id| (id, Vec::new()))
-            .collect::<HashMap<_, _>>();
-
-        for edge in &self.dependencies {
-            if !adjacency.contains_key(&edge.from) {
-                return Err(GraphError::UnknownNode(edge.from));
-            }
-            if !adjacency.contains_key(&edge.to) {
-                return Err(GraphError::UnknownNode(edge.to));
-            }
-            adjacency.get_mut(&edge.from).unwrap().push(edge.to);
-        }
-
-        for successors in adjacency.values_mut() {
-            successors.sort_unstable();
-            successors.dedup();
-        }
-
-        Ok(adjacency)
-    }
-}
-
 fn edge_kind_is_valid(
     from: &ExecutionNode,
     to: &ExecutionNode,
@@ -450,70 +480,6 @@ fn shared_write_resources(
     }
 
     resources
-}
-
-fn reachable(adjacency: &HashMap<u32, Vec<u32>>, from: u32, target: u32) -> bool {
-    if from == target {
-        return true;
-    }
-
-    let mut queue = VecDeque::from([from]);
-    let mut seen = HashSet::from([from]);
-
-    while let Some(current) = queue.pop_front() {
-        for &next in adjacency.get(&current).map(Vec::as_slice).unwrap_or_default() {
-            if next == target {
-                return true;
-            }
-            if seen.insert(next) {
-                queue.push_back(next);
-            }
-        }
-    }
-
-    false
-}
-
-fn find_cycle_node(
-    adjacency: &HashMap<u32, Vec<u32>>,
-    nodes: &HashMap<u32, &ExecutionNode>,
-) -> Option<u32> {
-    const UNVISITED: u8 = 0;
-    const ACTIVE: u8 = 1;
-    const DONE: u8 = 2;
-
-    let mut state = HashMap::with_capacity(nodes.len());
-    for &id in nodes.keys() {
-        state.insert(id, UNVISITED);
-    }
-
-    let mut ordered = nodes.keys().copied().collect::<Vec<_>>();
-    ordered.sort_unstable();
-
-    fn visit(
-        current: u32,
-        adjacency: &HashMap<u32, Vec<u32>>,
-        state: &mut HashMap<u32, u8>,
-    ) -> Option<u32> {
-        match state.get(&current).copied().unwrap_or(UNVISITED) {
-            ACTIVE => return Some(current),
-            DONE => return None,
-            _ => {}
-        }
-
-        state.insert(current, ACTIVE);
-        for &next in adjacency.get(&current).map(Vec::as_slice).unwrap_or_default() {
-            if let Some(cycle) = visit(next, adjacency, state) {
-                return Some(cycle);
-            }
-        }
-        state.insert(current, DONE);
-        None
-    }
-
-    ordered
-        .into_iter()
-        .find_map(|id| visit(id, adjacency, state))
 }
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
