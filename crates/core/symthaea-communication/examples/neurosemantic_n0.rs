@@ -890,6 +890,8 @@ fn main() -> Result<(), String> {
         upper_numerator: 6_577,
         scale: 4,
         confidence_level_bps: 9_500,
+        inference_scope:
+            symthaea_communication::NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation,
         method_ref: "wilson-score-95-v1".into(),
         assumptions_hash: symthaea_communication::content_hash(
             b"independent Bernoulli trials; fixed binary outcome; no clustering correction declared",
@@ -1289,6 +1291,22 @@ fn main() -> Result<(), String> {
                 &observation_set_byte_refs,
                 &population_manifest_byte_refs,
                 &[uncertainty_bytes.as_slice()],
+                &uncertainty_assumption_byte_refs,
+            )
+            .is_err()
+    };
+    let remediation_uncertainty_inference_scope_blocked = {
+        let mut forged = uncertainty_computation.clone();
+        forged.inference_scope =
+            symthaea_communication::NeurosemanticRemediationUncertaintyInferenceScope::FixedEvaluationPopulation;
+        let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &measurement_bytes,
+                &computation_byte_refs,
+                &observation_set_byte_refs,
+                &population_manifest_byte_refs,
+                &[bytes.as_slice()],
                 &uncertainty_assumption_byte_refs,
             )
             .is_err()
@@ -2053,6 +2071,7 @@ fn main() -> Result<(), String> {
         "remediation_uncertainty_substitution_blocked": remediation_uncertainty_substitution_blocked,
         "remediation_metric_direction_mismatch_blocked": remediation_metric_direction_mismatch_blocked,
         "remediation_uncertainty_point_estimate_binding_blocked": remediation_uncertainty_point_estimate_binding_blocked,
+        "remediation_uncertainty_inference_scope_blocked": remediation_uncertainty_inference_scope_blocked,
         "remediation_uncertainty_assumptions_substitution_blocked": remediation_uncertainty_assumptions_substitution_blocked,
         "remediation_observation_population_substitution_blocked": remediation_observation_population_substitution_blocked,
         "remediation_observation_membership_cherry_pick_blocked": remediation_observation_membership_cherry_pick_blocked,
