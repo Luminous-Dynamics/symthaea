@@ -4477,6 +4477,23 @@ impl NeurosemanticDerivationLineageRecord {
         Ok(record)
     }
 
+    /// Verify the concrete derived-output bytes against the exact output identity recorded
+    /// by the lineage record. This is an identity check, not a claim that the transformation
+    /// activity itself was truthful or authorized.
+    pub fn verify_output_artifact_bytes(&self, artifact_bytes: &[u8]) -> Result<(), String> {
+        self.validate()?;
+        if artifact_bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(
+                "neurosemantic derivation lineage output artifact exceeds the serialized artifact limit"
+                    .into(),
+            );
+        }
+        if content_hash(artifact_bytes) != self.output_artifact_hash {
+            return Err("neurosemantic derivation lineage output artifact hash mismatch".into());
+        }
+        Ok(())
+    }
+
     /// Verify one concrete input artifact against the exact content hash recorded
     /// for that lineage input. The reference identifies the intended entity; the hash
     /// makes the supplied bytes independently checkable.
@@ -7359,6 +7376,24 @@ mod tests {
         assert!(record
             .verify_input_artifact_bytes(
                 0,
+                &vec![b'x'; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1],
+            )
+            .is_err());
+    }
+
+    #[test]
+    fn derivation_lineage_verifies_concrete_output_artifact() {
+        let record = synthetic_derivation_lineage_record();
+        let output_bytes =
+            serde_json::to_vec(&NeurosemanticPayload::Hypervector(vec![1, -1])).unwrap();
+        assert!(record.verify_output_artifact_bytes(&output_bytes).is_ok());
+        assert!(record
+            .verify_output_artifact_bytes(
+                &serde_json::to_vec(&NeurosemanticPayload::Hypervector(vec![9, 9])).unwrap(),
+            )
+            .is_err());
+        assert!(record
+            .verify_output_artifact_bytes(
                 &vec![b'x'; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1],
             )
             .is_err());
