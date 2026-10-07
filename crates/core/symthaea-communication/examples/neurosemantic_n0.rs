@@ -2341,6 +2341,17 @@ fn main() -> Result<(), String> {
         .verify_derivation_provenance_record_bytes(&derivation_record_bytes)
         .map(|record| record.output_artifact_hash == message.packet.payload_hash)
         .unwrap_or(false);
+    let derivation_lineage_output_verified = derivation_lineage_record
+        .verify_output_artifact_bytes(
+            &serde_json::to_vec(&derivation_payload).map_err(|e| e.to_string())?,
+        )
+        .is_ok();
+    let derivation_lineage_output_mismatch_blocked = derivation_lineage_record
+        .verify_output_artifact_bytes(
+            &serde_json::to_vec(&NeurosemanticPayload::Hypervector(vec![9, 9]))
+                .map_err(|e| e.to_string())?,
+        )
+        .is_err();
     let derivation_lineage_input_alias_blocked = {
         let mut aliased = derivation_lineage_record.clone();
         aliased.input_artifact_refs =
@@ -2710,6 +2721,8 @@ fn main() -> Result<(), String> {
         "derivation_provenance_mismatch_blocked": derivation_provenance_mismatch_blocked,
         "derivation_lineage_structured": derivation_lineage_structured,
         "derivation_lineage_input_alias_blocked": derivation_lineage_input_alias_blocked,
+        "derivation_lineage_output_verified": derivation_lineage_output_verified,
+        "derivation_lineage_output_mismatch_blocked": derivation_lineage_output_mismatch_blocked,
         "malformed_derivation_lineage_blocked": malformed_derivation_lineage_blocked,
         "derivation_input_artifact_verified": derivation_input_artifact_verified,
         "derivation_input_artifact_mismatch_blocked": derivation_input_artifact_mismatch_blocked,
