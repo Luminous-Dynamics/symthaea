@@ -1,0 +1,40 @@
+name: GPU Fabric Vulkan Qualification
+
+on:
+  pull_request:
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - crates/core/symthaea-gpu-fabric/**
+      - .github/workflows/gpu-fabric-vulkan.yml
+
+jobs:
+  native-vulkan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Install Vulkan software driver
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends             libvulkan1 mesa-vulkan-drivers vulkan-tools vulkan-validationlayers
+
+      - name: Inspect Vulkan runtime
+        run: vulkaninfo --summary
+
+      - name: Verify validation layer
+        run: |
+          vulkaninfo --summary
+          vulkaninfo 2>&1 | grep -F "VK_LAYER_KHRONOS_validation"
+
+      - name: Compile and test Vulkan feature
+        run: cargo test --locked -p symthaea-gpu-fabric --features vulkan
+
+      - name: Execute native Vulkan oracle qualification
+        run: cargo test --locked -p symthaea-gpu-fabric --features vulkan -- --ignored --nocapture
