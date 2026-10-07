@@ -207,6 +207,29 @@ trained_predictor_MAE < persistence_MAE
 A model that only improves during online adaptation but does not transfer to a frozen scenario has
 not yet demonstrated robust predictive structure.
 
+### Leave-one-scenario-out transfer
+
+The four-scenario benchmark is no longer treated as a single train/test split.
+
+The qualification layer performs a complete leave-one-scenario-out matrix:
+
+- start every fold from the same exact pre-qualification world-model state;
+- adapt on exactly one scenario;
+- freeze the model;
+- score every other scenario without learning;
+- record the training and held-out scenario manifest digests for every fold.
+
+For four scenarios this yields 12 train → held-out transfer folds.
+
+The report retains:
+
+- mean improvement over persistence across all folds;
+- worst-fold improvement;
+- fraction of held-out folds that beat persistence;
+- the stable digest of the complete scenario family.
+
+This matters because a single favorable held-out scenario can be explained by scenario-specific familiarity, initialization, or perturbation alignment. The leave-one-out matrix tests whether predictive structure transfers across the benchmark family rather than merely across one chosen split.
+
 ## Interpretation matrix
 
 | Observation | Interpretation |
@@ -224,6 +247,9 @@ not yet demonstrated robust predictive structure.
 | Recovery improves with held-out transfer | strongest current evidence that learned prediction is functionally coupled to regulation |
 | Confidence rises on repeated bad predictions | confidence model has regressed; evidence quantity is overpowering accuracy |
 | Prediction/observation identity checks fail | evidence chain is invalid; results must not qualify the architecture |
+| Leave-one-out transfer varies sharply by held-out scenario | generalization is scenario-dependent; report the worst fold rather than only the mean |
+| Mean transfer improves but one or more folds regress | the learned model has useful structure with a remaining environment-specific blind spot |
+| All leave-one-out folds beat persistence | stronger evidence of cross-scenario predictive structure, still limited to the benchmark family |
 
 No single metric is a synthetic-organism detector.
 
@@ -233,18 +259,20 @@ A future green qualification should report all of:
 
 1. exact repository commit;
 2. exact scenario definitions and perturbation schedule;
-3. training/frozen boundary;
+3. frozen benchmark-manifest digest;
+4. training/frozen boundary;
 4. model and policy configuration;
 5. one-step and multi-horizon temporal prediction accuracy;
 6. policy-induced distribution-shift error;
 7. aggregate and planner-selected confidence calibration;
 8. action-ranking agreement and exploitation gap;
 9. survival and minimum viability margin;
-9. perturbation recovery;
-10. oracle horizon regret;
-11. persistence comparator;
-12. held-out transfer;
-13. trace/invariant verification where action evidence is recorded.
+10. perturbation recovery;
+11. oracle horizon regret;
+12. persistence comparator;
+13. held-out transfer;
+14. leave-one-scenario-out transfer matrix and worst-fold result;
+15. trace/invariant verification where action evidence is recorded.
 
 Queued CI is not a pass.
 
@@ -273,8 +301,8 @@ The remaining qualification task is to measure:
 **learned discrete prediction → continuous trajectory rollout → actual deterministic consequence**
 
 with separate measurements for one-step error, discrete multi-step error, continuous extrapolation
-error, policy-induced distribution-shift error, confidence calibration, planning regret, survival, and
-recovery.
+error, policy-induced distribution-shift error, confidence calibration, planning regret, survival,
+recovery, and cross-scenario transfer.
 
 Only after that comparison is stable should the shared transition abstraction be considered for
 runtime policy coupling or viability-driven modulation.
