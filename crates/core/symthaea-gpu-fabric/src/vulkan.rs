@@ -40,6 +40,16 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 "#;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VulkanDevicePolicy {
+    /// Accept any compute-capable Vulkan device, including software Vulkan.
+    AllowSoftware,
+    /// Reject Vulkan devices reported as CPU implementations. This is a
+    /// stronger hardware-oriented gate but does not by itself prove bare-metal
+    /// physical attachment when a hypervisor presents a virtual GPU.
+    HardwareRequired,
+}
+
 #[derive(Debug, Error)]
 pub enum VulkanError {
     #[error("Vulkan loader unavailable: {0}")]
@@ -48,6 +58,8 @@ pub enum VulkanError {
     Vk(vk::Result),
     #[error("no Vulkan physical device with a compute queue was found")]
     NoComputeDevice,
+    #[error("no non-CPU Vulkan compute device was found")]
+    NoHardwareComputeDevice,
     #[error("Vulkan device name is empty")]
     MissingDeviceName,
     #[error("no host-visible Vulkan memory type is available")]
@@ -159,8 +171,19 @@ pub struct VulkanExecutor {
 }
 
 impl VulkanExecutor {
-    /// Create a native Vulkan executor using the system Vulkan loader.
+    /// Create a native Vulkan executor, allowing software Vulkan devices.
     pub fn new() -> Result<Self, VulkanError> {
+        Self::new_with_policy(VulkanDevicePolicy::AllowSoftware)
+    }
+
+    /// Create a native Vulkan executor that rejects devices reported as CPU
+    /// implementations. This is the hardware-oriented entry point; actual
+    /// physical attachment remains an independently qualified property.
+    pub fn new_hardware() -> Result<Self, VulkanError> {
+        Self::new_with_policy(VulkanDevicePolicy::HardwareRequired)
+    }
+
+    pub fn new_with_policy(policy: VulkanDevicePolicy) -> Result<Self, VulkanError> {
         let spirv = compile_spirv()?;
         let implementation_digest = implementation_digest(&spirv);
 
@@ -187,13 +210,14 @@ impl VulkanExecutor {
                 .map_err(VulkanError::Vk)?
         };
 
-        Self::from_instance(instance, &spirv, implementation_digest)
+        Self::from_instance(instance, &spirv, implementation_digest, policy)
     }
 
     fn from_instance(
         instance: Instance,
         spirv: &[u32],
         implementation_digest: String,
+        policy: VulkanDevicePolicy,
     ) -> Result<Self, VulkanError> {
         let physical_devices = match unsafe { instance.enumerate_physical_devices() } {
             Ok(devices) => devices,
@@ -207,6 +231,12 @@ impl VulkanExecutor {
 
         for physical_device in physical_devices {
             let properties = unsafe { instance.get_physical_device_properties(physical_device) };
+            if policy == VulkanDevicePolicy::HardwareRequired
+                && properties.device_type == vk::PhysicalDeviceType::CPU
+            {
+                continue;
+            }
+
             let queue_families =
                 unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
 
@@ -236,7 +266,12 @@ impl VulkanExecutor {
             Some(selected) => selected,
             None => {
                 unsafe { instance.destroy_instance(None) };
-                return Err(VulkanError::NoComputeDevice);
+                return Err(match policy {
+                    VulkanDevicePolicy::AllowSoftware => VulkanError::NoComputeDevice,
+                    VulkanDevicePolicy::HardwareRequired => {
+                        VulkanError::NoHardwareComputeDevice
+                    }
+                });
             }
         };
 
@@ -1049,9 +1084,18 @@ mod tests {
         cpu_receipt.verify_output(&cpu_output).unwrap();
 
         let (vulkan_output, vulkan_receipt) =
-            executor.execute(&plan, &[left, right]).expect("Vulkan execution should succeed");
+            executor
+                .execute(&plan, &[left.clone(), right.clone()])
+                .expect("Vulkan execution should succeed");
+
+        let (second_output, second_receipt) =
+            executor
+                .execute(&plan, &[left, right])
+                .expect("Vulkan executor must be reusable");
 
         assert_eq!(vulkan_output, cpu_output);
+        assert_eq!(second_output, cpu_output);
+        assert_eq!(vulkan_receipt.output_digest, second_receipt.output_digest);
         assert_eq!(vulkan_receipt.operation, cpu_receipt.operation);
         assert_eq!(vulkan_receipt.plan_digest, cpu_receipt.plan_digest);
         assert_eq!(
