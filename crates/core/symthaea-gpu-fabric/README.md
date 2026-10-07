@@ -57,3 +57,18 @@ Backend identity and acceleration are separate facts. A software Vulkan
 qualification can legitimately produce a Vulkan execution receipt with
 `accelerated=false`. An `accelerated=true` receipt requires concrete
 implementation, device, and driver evidence.
+
+## Deterministic execution schedule
+
+`ExecutionSchedule` is the canonical semantic projection of an
+`ExecutionGraph`. It records a deterministic node ordinal and the exact
+dependency-to-ordinal mapping, then derives its own versioned digest.
+
+The schedule is deliberately not a Vulkan timeline-semaphore plan. A semantic
+ordinal must not be mistaken for device synchronization state. Backend lowering
+may map these dependencies onto Vulkan synchronization2/timeline semaphores or
+WebGPU ordering, but that mapping is a separate qualified layer.
+
+The schedule can be verified back against the source graph. Tampering with the
+graph digest, node ordinals, or dependency ordinals is rejected rather than
+silently normalized.
