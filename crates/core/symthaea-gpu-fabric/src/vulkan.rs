@@ -1072,42 +1072,70 @@ mod tests {
     #[ignore = "requires a Vulkan-capable qualification runner"]
     fn native_vulkan_matches_cpu_oracle() {
         let executor = VulkanExecutor::new().expect("Vulkan executor should initialize");
-        let plan = OperationPlan::new(GpuOperation::HdcBindXor { dimensions: 13 });
-        let left =
-            BinaryHypervector::from_bytes(13, vec![0b1010_0101, 0b0001_0000]).unwrap();
-        let right =
-            BinaryHypervector::from_bytes(13, vec![0b0101_0011, 0b0000_0011]).unwrap();
 
-        let (cpu_output, cpu_receipt) =
-            crate::CpuReferenceExecutor::execute(&plan, &[left.clone(), right.clone()]).unwrap();
-        cpu_receipt.verify_plan(&plan).unwrap();
-        cpu_receipt.verify_output(&cpu_output).unwrap();
+        for dimensions in [1_u32, 7, 8, 9, 31, 32, 33, 127, 128, 129, 16384] {
+            let bytes = packed_bytes(dimensions) as usize;
+            let left = BinaryHypervector::from_bytes(
+                dimensions,
+                (0..bytes)
+                    .map(|index| (index as u8).wrapping_mul(0x31).wrapping_add(0x0b))
+                    .collect(),
+            )
+            .unwrap();
+            let right = BinaryHypervector::from_bytes(
+                dimensions,
+                (0..bytes)
+                    .map(|index| (index as u8).wrapping_mul(0x8d).wrapping_add(0x53))
+                    .collect::<Vec<_>>()
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, value)| {
+                        if index + 1 == bytes && dimensions % 8 != 0 {
+                            let mask = 0xff_u8 >> (8 - (dimensions % 8));
+                            value & mask
+                        } else {
+                            value
+                        }
+                    })
+                    .collect(),
+            )
+            .unwrap();
 
-        let (vulkan_output, vulkan_receipt) =
-            executor
-                .execute(&plan, &[left.clone(), right.clone()])
+            let (cpu_output, cpu_receipt) =
+                crate::CpuReferenceExecutor::execute(&plan_for(dimensions), &[left.clone(), right.clone()])
+                    .unwrap();
+            cpu_receipt.verify_plan(&plan_for(dimensions)).unwrap();
+            cpu_receipt.verify_output(&cpu_output).unwrap();
+
+            let (vulkan_output, vulkan_receipt) = executor
+                .execute(&plan_for(dimensions), &[left.clone(), right.clone()])
                 .expect("Vulkan execution should succeed");
 
-        let (second_output, second_receipt) =
-            executor
-                .execute(&plan, &[left, right])
+            let (second_output, second_receipt) = executor
+                .execute(&plan_for(dimensions), &[left, right])
                 .expect("Vulkan executor must be reusable");
 
-        assert_eq!(vulkan_output, cpu_output);
-        assert_eq!(second_output, cpu_output);
-        assert_eq!(vulkan_receipt.output_digest, second_receipt.output_digest);
-        assert_eq!(vulkan_receipt.operation, cpu_receipt.operation);
-        assert_eq!(vulkan_receipt.plan_digest, cpu_receipt.plan_digest);
-        assert_eq!(
-            vulkan_receipt.semantic_kernel_digest,
-            cpu_receipt.semantic_kernel_digest
-        );
-        assert_ne!(
-            vulkan_receipt.implementation_digest,
-            cpu_receipt.implementation_digest
-        );
-        assert!(vulkan_receipt.accelerated);
-        vulkan_receipt.verify_plan(&plan).unwrap();
-        vulkan_receipt.verify_output(&vulkan_output).unwrap();
+            assert_eq!(vulkan_output, cpu_output);
+            assert_eq!(second_output, cpu_output);
+            assert_eq!(vulkan_receipt.output_digest, second_receipt.output_digest);
+            assert_eq!(vulkan_receipt.input_digest, second_receipt.input_digest);
+            assert_eq!(vulkan_receipt.operation, cpu_receipt.operation);
+            assert_eq!(vulkan_receipt.plan_digest, cpu_receipt.plan_digest);
+            assert_eq!(
+                vulkan_receipt.semantic_kernel_digest,
+                cpu_receipt.semantic_kernel_digest
+            );
+            assert_ne!(
+                vulkan_receipt.implementation_digest,
+                cpu_receipt.implementation_digest
+            );
+            assert!(vulkan_receipt.accelerated);
+            vulkan_receipt.verify_plan(&plan_for(dimensions)).unwrap();
+            vulkan_receipt.verify_output(&vulkan_output).unwrap();
+        }
+    }
+
+    fn plan_for(dimensions: u32) -> OperationPlan {
+        OperationPlan::new(GpuOperation::HdcBindXor { dimensions })
     }
 }
