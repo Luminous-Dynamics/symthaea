@@ -169,6 +169,10 @@ jobs:
           assert report["remediation_uncertainty_statistical_design_substitution_blocked"] is True
           assert report["remediation_uncertainty_design_observation_substitution_blocked"] is True
           assert report["remediation_uncertainty_dependence_substitution_blocked"] is True
+          assert report["remediation_uncertainty_statistical_execution_verified"] is True
+          assert report["remediation_uncertainty_statistical_execution_substitution_blocked"] is True
+          assert report["remediation_uncertainty_inclusion_probability_substitution_blocked"] is True
+          assert report["remediation_uncertainty_dependence_execution_blocked"] is True
           assert report["remediation_uncertainty_assumptions_substitution_blocked"] is True
           assert report["remediation_wilson_uncertainty_numerically_recomputed"] is True
           assert report["remediation_metric_direction_mismatch_blocked"] is True
