@@ -331,6 +331,7 @@ pub mod viability_micro_world;
 pub use viability_micro_world::{
     benchmark_scenarios, evaluate_predictor, evaluate_predictor_generalization,
     evaluate_predictor_suite, evaluate_predictor_suite_fresh, run_homeostatic_agent,
+    run_homeostatic_agent_horizon, CounterfactualRollout, HomeostaticHorizonRunReport,
     HomeostaticPolicy, HomeostaticRunReport, MicroAction, MicroWorldObservation,
     MicroWorldGeneralizationReport, MicroWorldPredictor, MicroWorldReport, MicroWorldScenario,
     MicroWorldSuiteReport,
