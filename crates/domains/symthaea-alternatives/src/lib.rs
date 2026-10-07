@@ -7662,6 +7662,64 @@ mod tests {
     }
 
     #[test]
+    fn manufacturing_artifact_and_key_diversity_under_one_authority_cannot_promote() {
+        let mut manufacturing_a = evidence(
+            "manufacturing-a",
+            "authority-a",
+            EvidenceKind::ManufacturingObserved,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut manufacturing_b = evidence(
+            "manufacturing-b",
+            "authority-a",
+            EvidenceKind::ManufacturingObserved,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        manufacturing_a.source.admission = Some(SourceAdmissionRef {
+            authority_id: "authority-a".into(),
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission-a".into(),
+            authority_epoch: "epoch-1".into(),
+            fault_domain_id: Some("domain-a".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+        manufacturing_b.source.issuer_key_fingerprint = Some("rotated-key".into());
+        manufacturing_b.source.admission = Some(SourceAdmissionRef {
+            authority_id: "authority-a".into(),
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission-b".into(),
+            authority_epoch: "epoch-2".into(),
+            fault_domain_id: Some("domain-b".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+
+        let c = candidate(
+            "single-authority-manufacturing",
+            PathwayKind::MaterialSubstitution,
+            2.0,
+            2.0,
+            vec![manufacturing_a, manufacturing_b],
+        );
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
+    }
+
+    #[test]
     fn lifecycle_tier_requires_two_admitted_lifecycle_authorities() {
         let lifecycle_a = evidence(
             "lca-a",
