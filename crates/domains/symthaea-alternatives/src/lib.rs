@@ -8285,6 +8285,13 @@ mod tests {
         };
 
         let first = topology.canonical_digest().unwrap();
+
+        let mut frontier_record_drift = topology.clone();
+        frontier_record_drift
+            .input_frontier
+            .frontier_digest = "different-frontier-record-digest".into();
+        assert_ne!(first, frontier_record_drift.canonical_digest().unwrap());
+
         topology.nodes.reverse();
         topology.edges.reverse();
         topology.input_bindings.reverse();
