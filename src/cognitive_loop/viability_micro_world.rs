@@ -449,6 +449,56 @@ pub struct MicroWorldScenario {
     pub perturbations: &'static [(u64, MicroPerturbation)],
 }
 
+impl MicroWorldScenario {
+    /// Stable digest of the complete scenario definition used by qualification.
+    ///
+    /// The digest covers the scenario identity, initial observable state, action
+    /// schedule, perturbation timing, perturbation type, and perturbation magnitude.
+    pub fn manifest_digest(&self) -> u64 {
+        fn mix(mut h: u64, bytes: &[u8]) -> u64 {
+            for byte in bytes {
+                h ^= *byte as u64;
+                h = h.wrapping_mul(0x100000001b3);
+            }
+            h
+        }
+
+        let mut h = 0xcbf29ce484222325u64;
+        h = mix(h, self.name.as_bytes());
+
+        for value in [
+            self.initial.cycle as f64,
+            self.initial.energy,
+            self.initial.integrity,
+            self.initial.knowledge,
+            self.initial.threat,
+            self.initial.progress,
+        ] {
+            h = mix(h, &value.to_bits().to_le_bytes());
+        }
+
+        h = mix(h, &(self.schedule.len() as u64).to_le_bytes());
+        for action in self.schedule {
+            h = mix(h, &[action.index() as u8]);
+        }
+
+        h = mix(h, &(self.perturbations.len() as u64).to_le_bytes());
+        for (cycle, perturbation) in self.perturbations {
+            h = mix(h, &cycle.to_le_bytes());
+            let (tag, amount) = match perturbation {
+                MicroPerturbation::EnergyDrain(value) => (0u8, *value),
+                MicroPerturbation::IntegrityDamage(value) => (1u8, *value),
+                MicroPerturbation::ThreatSpike(value) => (2u8, *value),
+                MicroPerturbation::ProgressLoss(value) => (3u8, *value),
+            };
+            h = mix(h, &[tag]);
+            h = mix(h, &amount.to_bits().to_le_bytes());
+        }
+
+        h
+    }
+}
+
 static NOMINAL_SCHEDULE: [MicroAction; 6] = [
     MicroAction::Observe,
     MicroAction::Explore,
@@ -538,6 +588,23 @@ pub fn benchmark_scenarios() -> Vec<MicroWorldScenario> {
             perturbations: &[],
         },
     ]
+}
+
+/// Stable digest for the complete frozen benchmark scenario family.
+pub fn benchmark_manifest_digest() -> u64 {
+    let scenarios = benchmark_scenarios();
+    let mut h = 0xcbf29ce484222325u64;
+    for (index, scenario) in scenarios.iter().enumerate() {
+        for byte in (index as u64).to_le_bytes() {
+            h ^= byte;
+            h = h.wrapping_mul(0x100000001b3);
+        }
+        for byte in scenario.manifest_digest().to_le_bytes() {
+            h ^= byte;
+            h = h.wrapping_mul(0x100000001b3);
+        }
+    }
+    h
 }
 
 /// Predictor interface for the benchmark harness.
