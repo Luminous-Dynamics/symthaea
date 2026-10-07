@@ -8326,6 +8326,30 @@ mod tests {
     }
 
     #[test]
+    fn candidate_semantic_digest_is_stable_across_evidence_provenance_changes() {
+        let c = candidate(
+            "candidate-semantic",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "e1",
+                "source-a",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let baseline = c.canonical_digest().unwrap();
+
+        let mut changed = c;
+        changed.evidence[0].source.artifact_digest = "changed-artifact-digest".into();
+        let changed_digest = changed.canonical_digest().unwrap();
+
+        assert_eq!(baseline, changed_digest);
+    }
+
+    #[test]
     fn experimental_design_rejects_candidate_semantic_drift() {
         let case = crate::corpus::five_pathway_adversarial_case();
         let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
