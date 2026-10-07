@@ -508,9 +508,6 @@ impl ViabilityFabric {
         if outcome.prediction.is_some() {
             return Err("outcome already contains a prediction");
         }
-        if outcome.evidence_refs.is_empty() {
-            return Err("missing evidence reference");
-        }
         if !outcome.prediction_error.world.is_finite()
             || !outcome.prediction_error.self_model.is_finite()
             || !outcome.prediction_error.interoceptive.is_finite()
@@ -533,6 +530,9 @@ impl ViabilityFabric {
         }
         if outcome.cycle < prediction.cycle {
             return Err("outcome predates prediction");
+        }
+        if outcome.evidence_refs.is_empty() {
+            return Err("missing evidence reference");
         }
         if !outcome.evidence_refs.iter().all(|r| !r.trim().is_empty()) {
             return Err("invalid evidence reference");
