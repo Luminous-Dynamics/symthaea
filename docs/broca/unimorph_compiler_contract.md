@@ -43,6 +43,10 @@ Adding implementation-identity fields is a schema change and therefore invalidat
 
 A source-backed compilation witness binds:
 
+Source slices are record selections, not arbitrary byte windows: each selected range must begin at the start of the artifact or immediately after an LF, and end at the artifact end or immediately before an LF. This prevents a valid-looking TSV row from being carved out of the middle of a larger source line.
+
+The `record_id` on a source slice is a caller-supplied label. The cryptographic identity of the selected bytes is the per-slice BLAKE3 digest plus the exact byte range; the label itself is not treated as an intrinsic upstream identifier.
+
 - the exact source artifact digest
 - exact selected source byte ranges
 - exact selected-record digests
