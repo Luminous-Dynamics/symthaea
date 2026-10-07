@@ -674,7 +674,7 @@ fn simulate(
     let mut state = initial.clone();
     for scheduled in &schedule.nodes {
         let node = graph.nodes.iter().find(|n| n.id == scheduled.id).ok_or(VulkanBarrierError::UnsupportedNodeShape(scheduled.id))?;
-        let (reads, writes) = canonical_workload_resources(node)?;
+        let (reads, writes) = canonical_workload_resources(node);
         if reads.len() != 2 || writes.len() != 1 {
             return Err(VulkanBarrierError::UnsupportedNodeShape(node.id));
         }
