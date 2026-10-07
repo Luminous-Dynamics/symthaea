@@ -723,7 +723,10 @@ impl ChangeDetectionReport {
             && self.shifted_regime_events.iter().all(|event| {
                 event.state_digest != 0
                     && event.residual_mae.is_finite()
+                    && event.upper_cusum.is_finite()
+                    && event.lower_cusum.is_finite()
                     && event.cusum_score.is_finite()
+                    && matches!(event.detection_direction, "increase" | "decrease" | "none")
             })
             && (!self.nominal_false_alarm
                 || self
@@ -3581,6 +3584,25 @@ mod tests {
         assert!(operating.decrease_correct_direction_rate.is_finite());
         assert!(operating.increase_correct_direction_rate.is_finite());
         assert!(!operating.gradual_drift_events.is_empty());
+    }
+
+    #[test]
+    fn malformed_shift_detection_receipts_fail_closed() {
+        let base_model =
+            super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let (trained_model, train_steps) =
+            train_world_model_clone(&base_model, &benchmark_scenarios()[0], 24);
+        assert!(train_steps > 0);
+        let mut report = evaluate_change_detection(&trained_model);
+        assert!(report.is_scoreable());
+        assert!(!report.shifted_regime_events.is_empty());
+
+        report.shifted_regime_events[0].upper_cusum = f64::NAN;
+        assert!(!report.is_scoreable());
+
+        let mut report = evaluate_change_detection(&trained_model);
+        report.shifted_regime_events[0].detection_direction = "invalid";
+        assert!(!report.is_scoreable());
     }
 
     #[test]
