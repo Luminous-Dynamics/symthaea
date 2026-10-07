@@ -292,6 +292,31 @@ This establishes the syndrome map itself as a qualified GF(2) homomorphism on
 the finite fixture, rather than inferring correctness only from successful
 decoding outcomes. It is still a finite fixture proof and makes no asymptotic
 or performance claim.
+## Fixed-fixture specification oracle
+
+The [8,2,4] fixture now has a third syndrome reference that is deliberately not
+derived from either implementation's nullspace construction. Six parity checks are
+specified directly from the fixture invariant that the first four bits are equal and
+the last four bits are equal:
+
+`x0+x1`, `x1+x2`, `x2+x3`, `x4+x5`, `x5+x6`, `x6+x7`.
+
+This fixture-specific specification oracle is intentionally non-general. Its purpose
+is to detect a common-mode error in the two algorithmic syndrome constructions: both
+the production parity-check derivation and the copied test-side nullspace elimination
+could agree with each other while sharing the same derivation mistake. The fixed
+checks instead encode the mathematical definition of this finite code directly.
+
+All 256 ambient words are compared across all three maps, and the fixed specification
+must expose all 64 syndromes with four observations per fiber while its zero-syndrome
+fiber contains exactly the four codewords. The qualification receipt records this as
+`FIXED_SYNDROME_SPEC` separately from the generic coset and syndrome ledgers.
+
+This does not replace the generic independent nullspace oracle. The two serve different
+purposes: the generic oracle exercises the construction across random codes, while the
+fixed specification oracle breaks algorithmic coupling on the canonical fixture.
+
+
 ## Beyond-radius semantics
 
 A separate fixture tests corruption beyond the unique-decoding radius without asking the decoder to recover an arbitrarily designated clean target.
