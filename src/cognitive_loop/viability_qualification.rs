@@ -48,7 +48,7 @@ pub trait ActionConditionedTransitionModel {
 
 impl ActionConditionedTransitionModel for super::goal_world::WorldModelBridge {
     fn state_dimension(&self) -> usize {
-        64
+        super::goal_world::WorldModelBridge::state_dimension(self)
     }
 
     fn action_count(&self) -> usize {
@@ -56,7 +56,7 @@ impl ActionConditionedTransitionModel for super::goal_world::WorldModelBridge {
     }
 
     fn predict_next_state(&self, state: &[f64], action: usize) -> Option<Vec<f64>> {
-        if state.len() != 64 {
+        if state.len() != self.state_dimension() {
             return None;
         }
 
@@ -857,6 +857,34 @@ mod tests {
         assert!(
             (rollout.terminal_state[1] - rollout.one_step_prediction[1]).abs() < 2e-3
         );
+    }
+
+    #[test]
+    fn deliberately_overconfident_bad_predictions_are_miscalibrated() {
+        #[derive(Debug, Default)]
+        struct OverconfidentPersistence;
+
+        impl MicroWorldPredictor for OverconfidentPersistence {
+            fn predict(
+                &self,
+                state: MicroWorldObservation,
+                action: MicroAction,
+            ) -> MicroWorldObservation {
+                PersistencePredictor::default().predict(state, action)
+            }
+
+            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
+                1.0
+            }
+        }
+
+        let scenarios = benchmark_scenarios();
+        let (_, _, _, _, calibration, _) =
+            evaluate_frozen_scenario(&OverconfidentPersistence, &scenarios[0], 8);
+
+        assert!(calibration.sample_count > 0);
+        assert!(calibration.expected_calibration_error > 0.0);
+        assert!(calibration.confidence_accuracy_mse > 0.0);
     }
 
     #[test]
