@@ -509,6 +509,11 @@ impl MorphophonologicalRuleSet {
         let mut rules = Vec::with_capacity(source_slices.len());
         let mut identities = HashSet::new();
         for slice in &source_slices {
+            if !source_slice_is_line_bounded(source_artifact, slice) {
+                return Err(MorphophonologicalUnimorphCompilerError::CompilationWitness(
+                    MorphophonologicalCompilationWitnessError::SourceSliceNotLineBounded,
+                ));
+            }
             let end = slice
                 .byte_offset
                 .checked_add(slice.byte_length)
@@ -921,6 +926,9 @@ impl MorphophonologicalCompilationWitness {
         }
 
         for slice in &self.source_slices {
+            if !source_slice_is_line_bounded(source_artifact, slice) {
+                return Err(MorphophonologicalCompilationWitnessError::SourceSliceNotLineBounded);
+            }
             let end = slice
                 .byte_offset
                 .checked_add(slice.byte_length)
@@ -949,6 +957,7 @@ pub enum MorphophonologicalCompilationWitnessError {
     EmptySourceSelection,
     MalformedSourceSlice,
     EmptySourceSlice,
+    SourceSliceNotLineBounded,
     DuplicateSourceRecordId,
     SourceRangeOverflow,
     OverlappingSourceSlices,
@@ -981,6 +990,7 @@ impl std::fmt::Display for MorphophonologicalCompilationWitnessError {
             Self::EmptySourceSelection => write!(f, "morphophonological compilation witness must select at least one source record"),
             Self::MalformedSourceSlice => write!(f, "morphophonological compilation witness contains a malformed source slice"),
             Self::EmptySourceSlice => write!(f, "morphophonological compilation witness source slice must contain at least one byte"),
+            Self::SourceSliceNotLineBounded => write!(f, "morphophonological compilation witness source slice must align to a complete source record boundary"),
             Self::DuplicateSourceRecordId => write!(f, "morphophonological compilation witness source record ids must be unique"),
             Self::SourceRangeOverflow => write!(f, "morphophonological compilation witness source range overflows"),
             Self::OverlappingSourceSlices => write!(f, "morphophonological compilation witness source slices must not overlap"),
@@ -1012,6 +1022,21 @@ fn is_canonical_blake3_digest(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn source_slice_is_line_bounded(source_artifact: &[u8], slice: &MorphophonologicalSourceSlice) -> bool {
+    let end = match slice.byte_offset.checked_add(slice.byte_length) {
+        Some(end) => end,
+        None => return false,
+    };
+    if end > source_artifact.len() || slice.byte_length == 0 {
+        return false;
+    }
+    let starts_at_line_boundary =
+        slice.byte_offset == 0 || source_artifact.get(slice.byte_offset - 1) == Some(&b'\n');
+    let ends_at_line_boundary =
+        end == source_artifact.len() || source_artifact.get(end) == Some(&b'\n');
+    starts_at_line_boundary && ends_at_line_boundary
 }
 
 /// A deliberately small deterministic operation vocabulary for executable
@@ -3354,6 +3379,41 @@ mod tests {
                 .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
                 .expect_err("UniMorph compiled rules must retain one-to-one source mapping"),
             MorphophonologicalCompilationWitnessError::SourceRecordRuleMappingMismatch
+        );
+    }
+
+    #[test]
+    fn unimorph_compilation_rejects_line_fragment_source_selection() {
+        let artifact = b"prefix walk\twalked\tV;PST suffix\n";
+        let selected = b"walk\twalked\tV;PST";
+        let offset = b"prefix ".len();
+        let slices = vec![MorphophonologicalSourceSlice {
+            record_id: "walk-past-fragment".into(),
+            byte_offset: offset,
+            byte_length: selected.len(),
+            record_blake3: blake3::hash(selected).to_hex().to_string(),
+        }];
+
+        let error = MorphophonologicalRuleSet::compile_unimorph_tsv_source(
+            "en",
+            "en-unspecified",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "fixture:unimorph-tsv",
+                "fixture-snapshot-v1",
+            )
+            .unwrap(),
+            "fixture:unimorph:v1",
+            "fixture:compiler:v1",
+            artifact,
+            slices,
+        )
+        .expect_err("a selected source record must not be carved from the middle of a line");
+
+        assert_eq!(
+            error,
+            MorphophonologicalUnimorphCompilerError::CompilationWitness(
+                MorphophonologicalCompilationWitnessError::SourceSliceNotLineBounded
+            )
         );
     }
 
