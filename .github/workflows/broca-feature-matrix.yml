@@ -31,6 +31,7 @@ env:
   RUST_BACKTRACE: 1
   RUSTC_WRAPPER: ""
   SCCACHE_DISABLE: "1"
+  BROCA_QUALIFICATION_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   broca-check:
@@ -63,6 +64,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          ref: ${{ env.BROCA_QUALIFICATION_HEAD_SHA }}
 
       - name: Verify qualification action pins
         run: |
@@ -84,6 +86,8 @@ jobs:
           test "$(grep -Ec '^  contents: read$' "$workflow")" -eq 1
           test "$(grep -Ec '^[[:space:]]*persist-credentials: false$' "$workflow")" -eq 2
           test "$(grep -Ec '^[[:space:]]*toolchain: 1\.96\.0$' "$workflow")" -eq 2
+          test "$(grep -Ec '^  BROCA_QUALIFICATION_HEAD_SHA:' "$workflow")" -eq 1
+          test "$(grep -Ec '^[[:space:]]*ref: \$\{\{ env\.BROCA_QUALIFICATION_HEAD_SHA \}\}$' "$workflow")" -eq 2
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master 2026-10-01
@@ -133,6 +137,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          ref: ${{ env.BROCA_QUALIFICATION_HEAD_SHA }}
 
       - name: Verify qualification action pins
         run: |
@@ -154,6 +159,8 @@ jobs:
           test "$(grep -Ec '^  contents: read$' "$workflow")" -eq 1
           test "$(grep -Ec '^[[:space:]]*persist-credentials: false$' "$workflow")" -eq 2
           test "$(grep -Ec '^[[:space:]]*toolchain: 1\.96\.0$' "$workflow")" -eq 2
+          test "$(grep -Ec '^  BROCA_QUALIFICATION_HEAD_SHA:' "$workflow")" -eq 1
+          test "$(grep -Ec '^[[:space:]]*ref: \$\{\{ env\.BROCA_QUALIFICATION_HEAD_SHA \}\}$' "$workflow")" -eq 2
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master 2026-10-01
