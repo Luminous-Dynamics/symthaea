@@ -173,7 +173,9 @@ jobs:
                 verifier_on_main: evidence.contextRef === 'refs/heads/main',
                 repository_identity:
                   evidence.contextRepository === expected.repository &&
-                  Number(evidence.run.repository?.id) === expected.repositoryId,
+                  Number(evidence.run.repository?.id) === expected.repositoryId &&
+                  Number(evidence.run.head_repository?.id) === expected.repositoryId &&
+                  evidence.run.head_repository?.full_name === expected.repository,
                 run_identity:
                   evidence.run.workflow_id === expected.workflowId &&
                   evidence.run.path === expected.workflowPath &&
