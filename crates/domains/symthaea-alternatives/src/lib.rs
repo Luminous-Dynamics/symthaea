@@ -8358,6 +8358,33 @@ mod tests {
     }
 
     #[test]
+    fn calibration_traceability_count_mutation_rejects_stale_uncertainty_evaluation() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let mut mutated = case.clone();
+        let evidence = mutated
+            .candidates
+            .iter_mut()
+            .flat_map(|candidate| candidate.evidence.iter_mut())
+            .find(|evidence| evidence.observation.is_some())
+            .unwrap();
+        evidence
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .calibration_chain_count += 1;
+
+        let error = AlternativesEngine
+            .assess(&mutated.requirement, &mutated.candidates, Some(mutated.incumbent_id))
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyEvaluationCalibrationChainMismatch { .. }
+        ));
+    }
+
+    #[test]
     fn observation_provenance_rejects_incomplete_calibration_link() {
         let mut observation = ObservationProvenanceRef {
             observation_id: "obs".into(),
