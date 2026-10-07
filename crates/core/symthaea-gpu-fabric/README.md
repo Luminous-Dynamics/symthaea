@@ -47,9 +47,11 @@ The graph is validated fail-closed:
 - graph identifiers are bounded;
 - topological order and graph digest are independent of insertion order.
 
-The graph digest is a semantic schedule identity. Vulkan synchronization2 and
-timeline semaphores, WebGPU encoder ordering, and Prism compositor scheduling
-should be lowerings of this graph rather than independent dependency models.
+The graph digest is a semantic dependency identity. `ExecutionSchedule` is its
+canonical deterministic ordering projection. Vulkan synchronization2 and
+per-queue timeline semaphores, WebGPU encoder ordering, and Prism compositor
+scheduling should be lowerings of this semantic layer rather than independent
+dependency models.
 
 ## Acceleration claims
 
@@ -72,3 +74,19 @@ WebGPU ordering, but that mapping is a separate qualified layer.
 The schedule can be verified back against the source graph. Tampering with the
 graph digest, node ordinals, or dependency ordinals is rejected rather than
 silently normalized.
+
+## Vulkan synchronization lowering
+
+The `VulkanSyncPlan` is the first backend-specific lowering layer. It maps the semantic schedule onto deterministic logical submission queues and assigns a separate monotonic timeline to each queue.
+
+A dependency whose producer and consumer share a logical queue relies on submission order. A dependency crossing queues becomes an explicit timeline wait on the producer queue. This avoids treating a single global timeline as if signals from independent queues were implicitly ordered.
+
+The plan contains no Vulkan handles, device claims, or completion receipt. It is a lowering artifact only. Actual `VkQueue`, timeline semaphore, `VkSemaphoreSubmitInfo`, and `vkQueueSubmit2` binding remains a runtime/device layer.
+### Same-queue Vulkan hazards
+
+For Vulkan lowering, same-queue RAW and WAW dependencies are represented as
+explicit barrier requirements because submission order alone does not establish
+a memory dependency. WAR remains an execution dependency without unnecessary
+memory visibility scope. The backend runtime must eventually translate these
+requirements into concrete vkCmdPipelineBarrier2 scopes for the resources it
+actually binds.
