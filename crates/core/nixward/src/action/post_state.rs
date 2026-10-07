@@ -936,6 +936,14 @@ impl NixPostStateReceiptV1 {
             "authorization record digest",
         )?;
         validate_digest(&self.effect_digest, "effect digest")?;
+        if let Some(request_id) = &self.approval_request_id {
+            if request_id.trim().is_empty() {
+                return Err(NixPostStateErrorV1::EmptyField("approval request id"));
+            }
+        }
+        if let Some(projection_digest) = &self.approval_projection_digest {
+            validate_digest(projection_digest, "approval projection digest")?;
+        }
         NixServiceOperationV1::new(self.target_unit.clone(), self.operation)
             .map_err(|_| NixPostStateErrorV1::InvalidServiceUnit)?;
         let expected_effect_digest = service_effect_digest(
@@ -1100,6 +1108,11 @@ impl NixPostStateReceiptV1 {
                 {
                     return Err(NixPostStateErrorV1::InvalidClaim);
                 }
+                if self.approval_request_id.is_none()
+                    || self.approval_projection_digest.is_none()
+                {
+                    return Err(NixPostStateErrorV1::MissingLiveExecutionWitness);
+                }
             }
             _ => {}
         }
@@ -1112,6 +1125,8 @@ impl NixPostStateReceiptV1 {
         h.update(POST_STATE_RECEIPT_DOMAIN_V1);
         put_str(&mut h, &self.action_intent_digest);
         put_str(&mut h, &self.authorization_record_digest);
+        put_opt_str(&mut h, self.approval_request_id.as_deref());
+        put_opt_str(&mut h, self.approval_projection_digest.as_deref());
         put_str(&mut h, &self.effect_digest);
         put_str(&mut h, &self.target_unit);
         put_u64(&mut h, self.authorized_generation);
@@ -1660,6 +1675,53 @@ pub enum NixPostStateErrorV1 {
     MissingBoundPreState,
     #[error("bound pre-state identity is malformed")]
     InvalidBoundPreState,
+    #[error("live execution provenance is required for a Proven receipt")]
+    MissingLiveExecutionWitness,
+    #[error("live execution provenance does not match the bound authorization lineage")]
+    LiveExecutionWitnessMismatch,
+}
+
+fn validate_live_execution_witness(
+    witness: &NixLiveExecutionWitnessV1,
+    intent: &NixActionIntentV1,
+    expectation: &NixServicePostStateExpectationV1,
+    action_intent_digest: &str,
+    authorization: &NixExecutionAuthorizationRecordV1,
+) -> Result<(), NixPostStateErrorV1> {
+    if witness.action_intent_digest() != action_intent_digest
+        || authorization.action_intent_digest != action_intent_digest
+        || witness.pre_state_identity() != intent.pre_state_identity.as_deref()
+    {
+        return Err(NixPostStateErrorV1::LiveExecutionWitnessMismatch);
+    }
+
+    match &intent.action {
+        NixActionDescriptorV1::Service { operation, unit } => {
+            let Some(context) = intent.service_effect_context() else {
+                return Err(NixPostStateErrorV1::MissingServiceEffectContext);
+            };
+            if context.operation != *operation
+                || context.unit != *unit
+                || expectation.operation != *operation
+                || expectation.unit != *unit
+                || witness.service_definition_content_digest()
+                    != Some(context.authorized_definition_content_digest.as_str())
+                || witness.pre_invocation_id() != context.pre_invocation_id.as_deref()
+                || expectation.pre_invocation_id.as_deref() != witness.pre_invocation_id()
+            {
+                return Err(NixPostStateErrorV1::LiveExecutionWitnessMismatch);
+            }
+        }
+        _ => {
+            if witness.service_definition_content_digest().is_some()
+                || witness.pre_invocation_id().is_some()
+            {
+                return Err(NixPostStateErrorV1::LiveExecutionWitnessMismatch);
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
