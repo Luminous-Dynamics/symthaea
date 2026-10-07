@@ -5741,6 +5741,27 @@ mod tests {
             value["ordered_rules"][5]["then"],
             "nested-fixed-horizon-bootstrap"
         );
+        assert_eq!(value["ordered_rules"][6]["then"], "stop-assumption-failure");
+        assert_eq!(
+            value["selected_method_bundle"]["procedure_id"],
+            "nested-forecast-bootstrap-v1"
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["dependence_method_id"],
+            "loss-dependence-bartlett-v1"
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["resampling_method_id"],
+            "moving-block-bootstrap-v1"
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["small_sample_policy_id"],
+            "small-sample-conservative-v1"
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["multiplicity_policy_id"],
+            "single-primary-comparison-v1"
+        );
         assert_eq!(value["decision_semantics"]["result_dependent_method_switching"], false);
         assert_eq!(value["decision_semantics"]["temporal_preregistration_proof_in_code"], false);
         assert_eq!(value["decision_semantics"]["structural_floors_are_not_adequacy_claims"], true);
