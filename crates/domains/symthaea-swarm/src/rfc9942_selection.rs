@@ -137,6 +137,8 @@ pub enum ReceiptSelectionDecisionError {
     CandidateDigestZero,
     SelectionDigestZero,
     SelectedCandidateMismatch,
+    CollectionDigestMismatch,
+    CandidateDigestMismatch,
     RejectedAfterSelection,
     UnselectedCandidateMarkedNotEvaluated,
 }
@@ -265,6 +267,53 @@ impl ReceiptSelectionDecision {
     pub fn validated_digest(&self) -> Result<[u8; 32], ReceiptSelectionDecisionError> {
         self.validate()?;
         Ok(self.digest())
+    }
+
+    /// Validate that the identity-bearing portions of this decision correspond
+    /// exactly to a concrete RFC 9942 receipt collection.
+    ///
+    /// This binds the decision to the source collection's exact serialized
+    /// bytes and each priority-positioned Receipt encoding. It does not claim
+    /// that rejected candidates were independently re-verified; those outcomes
+    /// remain policy/evaluator evidence.
+    pub fn validate_against_collection(
+        &self,
+        collection: &Rfc9942ReceiptCollection,
+    ) -> Result<(), ReceiptSelectionDecisionError> {
+        self.validate()?;
+
+        if self.collection_len as usize != collection.len() {
+            return Err(ReceiptSelectionDecisionError::CandidateCountMismatch);
+        }
+
+        let collection_bytes = collection
+            .serialized_bytes()
+            .map_or_else(|| collection.to_cbor(), ToOwned::to_owned);
+        if self.collection_sha256 != sha256(&collection_bytes) {
+            return Err(ReceiptSelectionDecisionError::CollectionDigestMismatch);
+        }
+
+        for (index, candidate) in self.candidates.iter().enumerate() {
+            let receipt_bytes = collection
+                .serialized_receipt_bytes(index)
+                .ok_or(ReceiptSelectionDecisionError::CandidateCountMismatch)?;
+            let expected = sha256(receipt_bytes);
+            if candidate.receipt_sha256 != expected {
+                return Err(ReceiptSelectionDecisionError::CandidateDigestMismatch);
+            }
+        }
+
+        if let Some(index) = self.selected_index {
+            let selected = self
+                .candidates
+                .get(index as usize)
+                .ok_or(ReceiptSelectionDecisionError::SelectedCandidateMismatch)?;
+            if self.selected_receipt_sha256 != Some(selected.receipt_sha256) {
+                return Err(ReceiptSelectionDecisionError::SelectedCandidateMismatch);
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -565,6 +614,44 @@ mod tests {
         assert_eq!(
             decision.validate(),
             Err(ReceiptSelectionDecisionError::RejectedAfterSelection)
+        );
+    }
+
+    #[test]
+    fn decision_must_bind_to_exact_collection_identities() {
+        let collection = collection();
+        let decision = evaluate_priority_first_valid(
+            &collection,
+            |index, _| if index == 1 {
+                Ok(())
+            } else {
+                Err(Rfc9942VdpError::InvalidEs256Signature)
+            },
+        );
+
+        assert_eq!(decision.validate_against_collection(&collection), Ok(()));
+
+        let reordered = Rfc9942ReceiptCollection::new(
+            collection.receipts().iter().cloned().rev().collect(),
+        )
+        .unwrap();
+        assert_eq!(
+            decision.validate_against_collection(&reordered),
+            Err(ReceiptSelectionDecisionError::CollectionDigestMismatch)
+        );
+
+        let mut tampered_candidate = decision.clone();
+        tampered_candidate.candidates[0].receipt_sha256[0] ^= 1;
+        assert_eq!(
+            tampered_candidate.validate_against_collection(&collection),
+            Err(ReceiptSelectionDecisionError::CandidateDigestMismatch)
+        );
+
+        let mut tampered_collection_digest = decision.clone();
+        tampered_collection_digest.collection_sha256[0] ^= 1;
+        assert_eq!(
+            tampered_collection_digest.validate_against_collection(&collection),
+            Err(ReceiptSelectionDecisionError::CollectionDigestMismatch)
         );
     }
 
