@@ -337,6 +337,8 @@ impl NixSystemdReadOnlyObserverV1 {
         unit: &str,
         generation: u64,
         completed_job: NixSystemdJobEvidenceV1,
+        expected_manager_owner: &str,
+        expected_bus_id: &str,
         required_window_us: u64,
     ) -> Result<
         (
@@ -354,6 +356,15 @@ impl NixSystemdReadOnlyObserverV1 {
             .validate_shape()
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
 
+        let current_owner = self.systemd_manager_owner().await?;
+        let current_bus_id = self.dbus_bus_id().await?;
+        if current_owner != expected_manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if current_bus_id != expected_bus_id {
+            return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
+        }
+
         let first = self
             .observe_service_post_state_internal(
                 operation,
@@ -365,6 +376,15 @@ impl NixSystemdReadOnlyObserverV1 {
         let first_at = first.as_ref().observed_at_monotonic_us;
 
         tokio::time::sleep(Duration::from_micros(required_window_us)).await;
+
+        let current_owner = self.systemd_manager_owner().await?;
+        let current_bus_id = self.dbus_bus_id().await?;
+        if current_owner != expected_manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if current_bus_id != expected_bus_id {
+            return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
+        }
 
         let second = self
             .observe_service_post_state_internal(
