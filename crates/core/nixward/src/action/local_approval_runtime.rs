@@ -1007,8 +1007,7 @@ mod tests {
             action.digest().unwrap()
         );
 
-        let mut altered_content = synthetic_definition_content("nginx.service");
-        altered_content = NixVerifiedServiceDefinitionContentV1::from_observer(
+        let altered_content = NixVerifiedServiceDefinitionContentV1::from_observer(
             NixSystemdUnitDefinitionContentEvidenceV1 {
                 unit: "nginx.service".to_string(),
                 source_identity_digest: "3333333333333333333333333333333333333333333333333333333333333333"
@@ -1039,6 +1038,49 @@ mod tests {
         );
         assert!(matches!(
             mismatch,
+            Err(LocalApprovalRuntimeErrorV1::Authorization(
+                super::super::authorization::NixAuthorizationErrorV1::DefinitionContentCaptureMismatch
+            ))
+        ));
+        assert_eq!(runtime.pending_count().unwrap(), 1);
+
+        // Invocation identity is separate from the content digest, but it is still
+        // required to match for Restart approval provenance.
+        let invocation_altered = NixVerifiedServiceDefinitionContentV1::from_observer(
+            NixSystemdUnitDefinitionContentEvidenceV1 {
+                unit: "nginx.service".to_string(),
+                source_identity_digest: "2222222222222222222222222222222222222222222222222222222222222222"
+                    .to_string(),
+                manager_owner: ":1.42".to_string(),
+                bus_id: "0123456789abcdef0123456789abcdef".to_string(),
+                pre_invocation_id: Some("5555555555555555555555555555555555".to_string()),
+                files: vec![NixSystemdUnitDefinitionContentFileV1 {
+                    path: "/nix/store/nginx.service".to_string(),
+                    resolved_path: None,
+                    byte_len: 1,
+                    content_digest:
+                        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                            .to_string(),
+                }],
+                captured_at_monotonic_us: 1,
+            }
+        )
+        .unwrap();
+        assert_eq!(
+            invocation_altered.digest().unwrap(),
+            content.digest().unwrap()
+        );
+
+        let invocation_mismatch = runtime.create_pending_service_request_with_definition_capture(
+            &action,
+            &restart_command("nginx.service"),
+            &invocation_altered,
+            RequiredApprovalProfileV1::SameUidProcessV1,
+            UnixMillisV1::new(now.saturating_sub(1_000)),
+            UnixMillisV1::new(now + 60_000),
+        );
+        assert!(matches!(
+            invocation_mismatch,
             Err(LocalApprovalRuntimeErrorV1::Authorization(
                 super::super::authorization::NixAuthorizationErrorV1::DefinitionContentCaptureMismatch
             ))
