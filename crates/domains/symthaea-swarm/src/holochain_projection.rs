@@ -16,6 +16,8 @@ pub const DOMAIN: &[u8] = b"symthaea-swarm/holochain-evidence-anchor-v1";
 pub const MAX_SELECTION_POLICY_BYTES: usize = 256;
 pub const MAX_CONTEXT_BYTES: usize = 8 * 1024;
 pub const HOLOCHAIN_ACTION_HASH_BYTES: usize = 39;
+/// Holochain 0.7 ActionHash primitive prefix (`uhCkk`), in raw bytes.
+pub const HOLOCHAIN_ACTION_HASH_PREFIX: [u8; 3] = [0x84, 0x29, 0x24];
 
 /// Opaque native Holochain ActionHash bytes.
 ///
@@ -29,6 +31,9 @@ impl HolochainActionHash {
     pub fn from_raw(bytes: [u8; HOLOCHAIN_ACTION_HASH_BYTES]) -> Result<Self, HolochainProjectionError> {
         if bytes == [0; HOLOCHAIN_ACTION_HASH_BYTES] {
             return Err(HolochainProjectionError::ZeroDigest);
+        }
+        if bytes[..3] != HOLOCHAIN_ACTION_HASH_PREFIX {
+            return Err(HolochainProjectionError::InvalidActionHashType);
         }
         Ok(Self(bytes))
     }
@@ -155,6 +160,7 @@ pub enum HolochainProjectionError {
     ZeroDigest,
     InvalidReceiptSelection,
     UnaddressableDependency(&'static str),
+    InvalidActionHashType,
     FieldTooLarge(&'static str),
 }
 
@@ -280,6 +286,12 @@ fn put_string(out: &mut Vec<u8>, value: &str) {
 mod tests {
     use super::*;
 
+    fn valid_action_hash(fill: u8) -> HolochainActionHash {
+        let mut bytes = [fill; HOLOCHAIN_ACTION_HASH_BYTES];
+        bytes[..3].copy_from_slice(&HOLOCHAIN_ACTION_HASH_PREFIX);
+        HolochainActionHash::from_raw(bytes).unwrap()
+    }
+
     fn anchor() -> HolochainEvidenceAnchor {
         HolochainEvidenceAnchor {
             anchor_id: Uuid::from_u128(1),
@@ -287,7 +299,7 @@ mod tests {
             kind: EvidenceAnchorKind::Attestation,
             evidence_digest: [1; 32],
             parent_evidence_digest: Some([2; 32]),
-            parent_action_hash: Some(HolochainActionHash([7; HOLOCHAIN_ACTION_HASH_BYTES])),
+            parent_action_hash: Some(valid_action_hash(7)),
             vds_root: Some([3; 32]),
             receipt_selection: Some(ReceiptSelectionContext {
                 collection_sha256: [4; 32],
@@ -298,7 +310,7 @@ mod tests {
                 selection_policy: "rfc9942/priority-first-valid-v1".into(),
                 selection_policy_version: 1,
             }),
-            selection_decision_action_hash: Some(HolochainActionHash([8; HOLOCHAIN_ACTION_HASH_BYTES])),
+            selection_decision_action_hash: Some(valid_action_hash(8)),
             context: b"qualification".to_vec(),
         }
     }
@@ -369,9 +381,13 @@ mod tests {
     fn native_action_hash_binding_is_canonical() {
         let mut first = anchor();
         let before = first.canonical_bytes().unwrap();
-        first.parent_action_hash = Some(HolochainActionHash([9; HOLOCHAIN_ACTION_HASH_BYTES]));
+        first.parent_action_hash = Some(valid_action_hash(9));
         assert_ne!(before, first.canonical_bytes().unwrap());
         assert!(HolochainActionHash::from_raw([0; HOLOCHAIN_ACTION_HASH_BYTES]).is_err());
+        assert_eq!(
+            HolochainActionHash::from_raw([9; HOLOCHAIN_ACTION_HASH_BYTES]),
+            Err(HolochainProjectionError::InvalidActionHashType)
+        );
     }
 
     #[test]
