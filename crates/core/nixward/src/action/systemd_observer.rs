@@ -687,8 +687,9 @@ impl NixSystemdReadOnlyObserverV1 {
             .validate_shape()
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
         validate_job_object_path(job_object_path)?;
-        validate_unit_object_path(&self.resolve_service_unit(&expected_unit).await?)?;
 
+        // Establish the daemon/manager epoch before resolving the unit object path.
+        // A manager rollover must fail before any new-incarnation object path is used.
         let manager_owner = self.systemd_manager_owner().await?;
         let bus_id = self.dbus_bus_id().await?;
         if manager_owner != expected_manager_owner {
