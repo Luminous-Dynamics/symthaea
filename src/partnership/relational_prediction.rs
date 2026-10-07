@@ -1805,7 +1805,8 @@ impl ForecastInferenceBinding {
     }
 }
 
-/// Machine-readable record of which prespecified inference-selection branch was taken.
+/// Machine-readable record of the inference-selection branch asserted by the
+/// prespecified decision rule.
 ///
 /// This receipt sits above the validated pre-inference binding. It records the
 /// selected branch without executing inference and without claiming to prove
@@ -1820,6 +1821,7 @@ pub struct ForecastInferenceSelectionReceipt {
     pub method_selection_rule_id: String,
     pub method_selection_rule_spec_sha256: String,
     /// Stable branch identifier from the externally frozen selection rule.
+    /// The receipt records this assertion; it does not execute the external rule.
     pub decision_path_id: String,
     pub selected_procedure_id: String,
     pub selected_procedure_spec_sha256: String,
@@ -5756,6 +5758,55 @@ mod tests {
                 &rolling_forecast_loss_dependence_profile_digest(&dependence),
             ),
             Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
+    fn inference_selection_receipt_supports_single_window() {
+        let samples = build_samples(0.5);
+        let config = config();
+        let qualification = HeldOutRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            4,
+            provenance(),
+        )
+        .unwrap();
+        let plan = ForecastInferencePlan::new(
+            0.5,
+            single_origin_schedule_sha256(config, 0.5),
+            "relational-inference-selection-rule-v1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "nested-forecast-bootstrap-v1",
+            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+            "loss-dependence-bartlett-v1",
+            "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+            "moving-block-bootstrap-v1",
+            "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            "small-sample-conservative-v1",
+            "single-primary-comparison-v1",
+            0.05,
+            qualification.qualification_identity_blake3.clone(),
+        )
+        .unwrap();
+        let dependence = qualification.relational_loss_dependence(8).unwrap();
+        let receipt = ForecastInferenceSelectionReceipt::from_single(
+            &plan,
+            &qualification,
+            &dependence,
+            "nested-fixed-horizon-bootstrap",
+        )
+        .unwrap();
+        receipt.validate().unwrap();
+        assert_eq!(receipt.analysis_level, "single-window");
+        assert_eq!(receipt.selected_procedure_id, plan.procedure_id);
+        assert_eq!(receipt.dependence_profile_blake3, forecast_loss_dependence_profile_digest(&dependence));
+
+        let mut tampered = receipt.clone();
+        tampered.decision_path_id.clear();
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
         );
     }
 
