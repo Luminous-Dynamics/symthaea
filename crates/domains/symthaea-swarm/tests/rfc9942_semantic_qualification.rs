@@ -1350,6 +1350,55 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
 }
 
 
+
+#[test]
+fn rfc9942_detached_outer_payload_mode_is_preserved() {
+    let receipt = signed_receipt(b"candidate");
+    let collection = Rfc9942ReceiptCollection::new(vec![receipt]).unwrap();
+    let key = rfc8392_public_key();
+    let rng = SystemRandom::new();
+
+    // The outer payload is detached, while the inner inclusion Receipt keeps
+    // an attached Merkle root. The combined capability must preserve both
+    // transport modes independently.
+    let unsigned = Rfc9942SignatureWithReceipts::new(
+        symthaea_swarm::semantic_evidence_vds::Rfc9942SignaturePayload::Detached,
+        vec![0u8; 64],
+        Some(collection.clone()),
+    );
+    let tbs = unsigned.signature1_tbs(&[], Some(b"candidate")).unwrap();
+    let signer = rfc8392_signing_key(&rng);
+    let signature = signer.sign(&rng, &tbs).unwrap().as_ref().to_vec();
+    let outer = Rfc9942SignatureWithReceipts::new(
+        symthaea_swarm::semantic_evidence_vds::Rfc9942SignaturePayload::Detached,
+        signature,
+        Some(collection),
+    );
+
+    let state = outer
+        .verify_es256_inclusion_receipt_state(
+            0,
+            &key,
+            &key,
+            &[],
+            &[],
+            Some(b"candidate"),
+        )
+        .unwrap();
+
+    assert_eq!(
+        state.outer_payload_mode(),
+        symthaea_swarm::semantic_evidence_vds::Rfc9942PayloadMode::Detached
+    );
+    assert_eq!(
+        state.receipt().payload_mode(),
+        symthaea_swarm::semantic_evidence_vds::Rfc9942PayloadMode::Attached
+    );
+    let expected_outer_payload_sha256: [u8; 32] =
+        sha2::Sha256::digest(b"candidate").into();
+    assert_eq!(state.outer_payload_sha256(), expected_outer_payload_sha256);
+}
+
 #[test]
 fn rfc9942_outer_selection_errors_precede_authentication() {
     let empty = Rfc9942SignatureWithReceipts::new(
