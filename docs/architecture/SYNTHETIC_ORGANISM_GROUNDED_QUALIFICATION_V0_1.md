@@ -179,6 +179,35 @@ The same run separately calibrates confidence only on planner-selected actions. 
 stricter than aggregate held-out calibration because selection can preferentially expose overconfident
 model errors.
 
+### Prediction-error adaptation response
+
+The qualification layer now includes an isolated adaptation-response experiment on the stressed scenario.
+
+For each deterministic perturbation shock:
+
+1. capture the perturbed state and scheduled action;
+2. score the shock transition before learning;
+3. score a nearby state/action probe before learning;
+4. apply exactly one observed transition update to an isolated model clone;
+5. re-score the identical shock transition;
+6. re-score the nearby probe without any further update.
+
+The report distinguishes:
+
+- mean shock MAE before and after the update;
+- same-transition improvement and improvement rate;
+- neighboring-probe MAE before and after the update;
+- neighboring-probe improvement and improvement rate.
+
+This separates three increasingly strong claims:
+
+**error detected** → **the exact error can be corrected** → **the correction transfers to a nearby state**.
+
+The nearby probe is deliberately not part of the update. Improvement there is therefore stronger evidence of learned
+local dynamics than simply replaying the exact transition used for the update.
+
+A negative or zero improvement is valid evidence too. The benchmark must not assume that adaptation succeeds.
+
 ### Procedurally generated held-out transfer
 
 The qualification layer also evaluates a deterministic procedural family that is never used for
@@ -329,6 +358,9 @@ This matters because a single favorable held-out scenario can be explained by sc
 | The query bank has zero valid answers | the world-model interface is not scoreable; do not interpret zero numerical error as success |
 | Procedural held-out transfer regresses while authored transfer passes | the model may be specialized to the authored scenario family |
 | Procedural held-out transfer passes across all seeds | stronger evidence of generalization across sampled state/schedule/perturbation configurations, still bounded to this generator |
+| Same-shock learning improves but neighboring probes do not | adaptation may be memorizing observed transitions rather than learning transferable local dynamics |
+| Neighboring-probe improvement follows a shock update | stronger evidence that prediction error changes the model in a locally useful way |
+| Shock error does not improve after the update | the observed error is not yet producing effective model correction |
 
 No single metric is a synthetic-organism detector.
 
@@ -353,7 +385,8 @@ A future green qualification should report all of:
 14. leave-one-scenario-out transfer matrix and worst-fold result;
 15. environment-level counterfactual query-bank results, including path error and changed-channel F1;
 16. procedurally generated held-out transfer results and procedural-family manifest digest;
-17. trace/invariant verification where action evidence is recorded.
+17. prediction-error adaptation response, including same-transition and neighboring-probe improvement;
+18. trace/invariant verification where action evidence is recorded.
 
 Queued CI is not a pass.
 
