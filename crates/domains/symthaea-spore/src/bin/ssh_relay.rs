@@ -24,7 +24,9 @@ use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::tungstenite::Message;
 
 mod system_transaction;
-use system_transaction::{MutationKind, MutationLease, SystemTransaction, TransactionOutcome};
+use system_transaction::{
+    ArtifactCommitment, MutationKind, MutationLease, SystemTransaction, TransactionOutcome,
+};
 
 // Security validators from the library (shared with fuzz targets)
 use symthaea_spore::security::{
@@ -2982,6 +2984,171 @@ async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
     Ok(false)
 }
 
+fn read_image_artifact_commitment_blocking(
+    image_dir: &str,
+    artifact_name: &str,
+) -> Result<Option<ArtifactCommitment>, String> {
+    let image_dir = validate_image_path(image_dir)?;
+
+    if !matches!(artifact_name, "system.btrfs.zst" | "system.tar.gz") {
+        return Err(format!(
+            "unsupported image artifact commitment name: {artifact_name}"
+        ));
+    }
+
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let directory = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(&image_dir)
+        .map_err(|error| {
+            format!(
+                "unable to open image artifact directory {}: {error}",
+                image_dir
+            )
+        })?;
+    let directory_metadata = directory.metadata().map_err(|error| {
+        format!(
+            "unable to inspect image artifact directory {}: {error}",
+            image_dir
+        )
+    })?;
+    if !directory_metadata.file_type().is_dir() {
+        return Err("image artifact namespace is not a directory".into());
+    }
+    if directory_metadata.permissions().mode() & 0o777 != 0o700
+        || directory_metadata.uid() != unsafe { libc::geteuid() }
+    {
+        return Err("image artifact namespace has unsafe ownership or permissions".into());
+    }
+
+    let path = std::path::Path::new(&image_dir).join(artifact_name);
+    let mut file = match std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(&path)
+    {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(format!(
+                "unable to open image artifact {}: {error}",
+                path.display()
+            ))
+        }
+    };
+
+    let metadata = file.metadata().map_err(|error| {
+        format!(
+            "unable to inspect image artifact {}: {error}",
+            path.display()
+        )
+    })?;
+    if !metadata.file_type().is_file() {
+        return Err(format!(
+            "image artifact {} is not a regular file",
+            path.display()
+        ));
+    }
+    if metadata.permissions().mode() & 0o077 != 0
+        || metadata.uid() != unsafe { libc::geteuid() }
+    {
+        return Err(format!(
+            "image artifact {} has unsafe ownership or permissions",
+            path.display()
+        ));
+    }
+    let expected_size = metadata.len();
+    if expected_size == 0 {
+        return Err(format!("image artifact {} is empty", path.display()));
+    }
+
+    let mut hasher = blake3::Hasher::new();
+    let mut total = 0u64;
+    let mut buffer = [0u8; 1024 * 1024];
+    loop {
+        let read = file.read(&mut buffer).map_err(|error| {
+            format!(
+                "unable to hash image artifact {}: {error}",
+                path.display()
+            )
+        })?;
+        if read == 0 {
+            break;
+        }
+        total = total
+            .checked_add(read as u64)
+            .ok_or_else(|| format!("image artifact {} size overflowed", path.display()))?;
+        hasher.update(&buffer[..read]);
+    }
+    if total != expected_size {
+        return Err(format!(
+            "image artifact {} changed while being hashed (expected {} bytes, read {})",
+            path.display(),
+            expected_size,
+            total
+        ));
+    }
+
+    Ok(Some(ArtifactCommitment {
+        name: artifact_name.to_string(),
+        size: total,
+        digest: hasher.finalize().to_hex().to_string(),
+    }))
+}
+
+async fn image_artifact_commitment(
+    image_dir: &str,
+    artifact_name: &str,
+) -> Result<Option<ArtifactCommitment>, String> {
+    let image_dir = image_dir.to_string();
+    let artifact_name = artifact_name.to_string();
+    tokio::task::spawn_blocking(move || {
+        read_image_artifact_commitment_blocking(&image_dir, &artifact_name)
+    })
+    .await
+    .map_err(|error| format!("image artifact hashing task failed: {error}"))?
+}
+
+async fn commit_image_artifact(image_dir: &str) -> Result<ArtifactCommitment, String> {
+    let mut found = Vec::new();
+    for artifact_name in ["system.btrfs.zst", "system.tar.gz"] {
+        if let Some(commitment) = image_artifact_commitment(image_dir, artifact_name).await? {
+            found.push(commitment);
+        }
+    }
+
+    match found.as_slice() {
+        [commitment] => Ok(commitment.clone()),
+        [] => Err("image completed without a supported archive artifact".into()),
+        _ => Err("image namespace contains multiple supported archive artifacts".into()),
+    }
+}
+
+async fn verify_image_artifact_commitment(
+    image_dir: &str,
+    expected: &ArtifactCommitment,
+) -> Result<(), String> {
+    if !matches!(expected.name.as_str(), "system.btrfs.zst" | "system.tar.gz") {
+        return Err("image artifact commitment names an unsupported artifact".into());
+    }
+
+    let actual = image_artifact_commitment(image_dir, &expected.name)
+        .await?
+        .ok_or_else(|| format!("committed image artifact {} is missing", expected.name))?;
+    if actual != *expected {
+        return Err(format!(
+            "image artifact commitment mismatch for {}: committed {} bytes / {}, observed {} bytes / {}",
+            expected.name,
+            expected.size,
+            expected.digest,
+            actual.size,
+            actual.digest
+        ));
+    }
+    Ok(())
+}
+
 async fn verify_restored_image_postcondition(image_dir: &str) -> Result<bool, String> {
     let image_dir = validate_image_path(image_dir)?;
     let target = tokio::fs::symlink_metadata("/mnt/etc/nixos/configuration.nix")
@@ -3013,10 +3180,10 @@ async fn verify_restored_image_postcondition(image_dir: &str) -> Result<bool, St
         .await
         .map_err(|error| format!("restored configuration read failed: {error}"))?;
 
-    match expected {
-        Some(expected) => Ok(configuration_bytes_match(&actual, &expected)),
-        None => Ok(!actual.is_empty()),
-    }
+    let expected = expected.ok_or_else(|| {
+        "restored image is missing mandatory configuration provenance sidecar".to_string()
+    })?;
+    Ok(configuration_bytes_match(&actual, &expected))
 }
 
 fn wifi_connection_observed(output: &str, profile_name: &str) -> bool {
@@ -3178,6 +3345,29 @@ fn finalize_transaction(
         Err(error) => {
             eprintln!(
                 "[{}] Transaction {} completion journal failed: {}",
+                peer_addr, transaction.transaction_id, error
+            );
+            TransactionOutcome::Indeterminate
+        }
+    }
+}
+
+fn finalize_transaction_with_artifact(
+    ledger: &TransactionLedger,
+    transaction: &SystemTransaction,
+    observed_outcome: TransactionOutcome,
+    artifact_commitment: ArtifactCommitment,
+    peer_addr: &str,
+) -> TransactionOutcome {
+    match ledger.mark_completed_with_artifact(
+        transaction,
+        observed_outcome,
+        Some(artifact_commitment),
+    ) {
+        Ok(()) => observed_outcome,
+        Err(error) => {
+            eprintln!(
+                "[{}] Transaction {} completion journal with artifact failed: {}",
                 peer_addr, transaction.transaction_id, error
             );
             TransactionOutcome::Indeterminate
@@ -7004,40 +7194,66 @@ echo "COMPLETE"
                     }
                     _ => None,
                 };
-                let (response_code, observed_outcome) = match image_exit_code {
+                let (response_code, observed_outcome, artifact_commitment) = match image_exit_code {
                     Some(0) => match verify_image_artifact(&image_dest).await {
-                        Ok(true) => (0, TransactionOutcome::ObservedSuccess),
+                        Ok(true) => match commit_image_artifact(&image_dest).await {
+                            Ok(commitment) => {
+                                (0, TransactionOutcome::ObservedSuccess, Some(commitment))
+                            }
+                            Err(error) => {
+                                eprintln!(
+                                    "[{}] {} image artifact commitment failed: {}",
+                                    peer_addr, transaction.log_line(), error
+                                );
+                                (1, TransactionOutcome::Indeterminate, None)
+                            }
+                        },
                         Ok(false) => {
                             eprintln!(
                                 "[{}] {} image command returned 0 but no non-empty image artifact was observed",
                                 peer_addr, transaction.log_line()
                             );
-                            (1, TransactionOutcome::Indeterminate)
+                            (1, TransactionOutcome::Indeterminate, None)
                         }
                         Err(error) => {
                             eprintln!(
                                 "[{}] {} image postcondition probe failed: {}",
                                 peer_addr, transaction.log_line(), error
                             );
-                            (1, TransactionOutcome::Indeterminate)
+                            (1, TransactionOutcome::Indeterminate, None)
                         }
                     },
-                    Some(code) => (code, TransactionOutcome::Failed),
-                    None => (1, TransactionOutcome::Indeterminate),
+                    Some(code) => (code, TransactionOutcome::Failed, None),
+                    None => (1, TransactionOutcome::Indeterminate, None),
                 };
-                let outcome = finalize_transaction(
-                    &transaction_ledger,
-                    &transaction,
-                    observed_outcome,
-                    &peer_addr,
-                );
+                let outcome = if let Some(commitment) = artifact_commitment.as_ref() {
+                    finalize_transaction_with_artifact(
+                        &transaction_ledger,
+                        &transaction,
+                        observed_outcome,
+                        commitment.clone(),
+                        &peer_addr,
+                    )
+                } else {
+                    finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        observed_outcome,
+                        &peer_addr,
+                    )
+                };
+                let durable_artifact_commitment =
+                    (outcome == TransactionOutcome::ObservedSuccess).then_some(artifact_commitment.clone());
 
                 let _ = ws_tx
                     .send(Message::Text(
                         serde_json::json!({
                             "type": "exit",
                             "code": protocol_exit_code(response_code, outcome),
-                            "transaction": transaction.receipt(outcome)
+                            "transaction": transaction.receipt_with_artifact(
+                                outcome,
+                                durable_artifact_commitment.flatten(),
+                            )
                         })
                         .to_string(),
                     ))
@@ -7132,13 +7348,12 @@ echo "COMPLETE"
                     }
                 };
 
-                match transaction_ledger.has_successful_transaction(
+                let image_artifact_commitment = match transaction_ledger.successful_image_artifact(
                     &image_transaction_id,
-                    MutationKind::CreateImage,
                     transaction.target_machine_digest.as_deref(),
                 ) {
-                    Ok(true) => {}
-                    Ok(false) => {
+                    Ok(Some(commitment)) => commitment,
+                    Ok(None) => {
                         let outcome = finalize_transaction(
                             &transaction_ledger,
                             &transaction,
@@ -7149,7 +7364,7 @@ echo "COMPLETE"
                             .send(Message::Text(
                                 serde_json::json!({
                                     "type": "error",
-                                    "message": "Image restore refused: image is not bound to a successfully completed create_image transaction on this target.",
+                                    "message": "Image restore refused: creator transaction has no committed image artifact identity on this target.",
                                     "transaction": transaction.receipt(outcome)
                                 })
                                 .to_string(),
@@ -7176,6 +7391,31 @@ echo "COMPLETE"
                             .await;
                         continue;
                     }
+                };
+
+                if let Err(error) =
+                    verify_image_artifact_commitment(&image_path, &image_artifact_commitment).await
+                {
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Failed,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type": "error",
+                                "message": format!(
+                                    "Image restore refused: committed artifact identity does not match the image namespace: {}",
+                                    error
+                                ),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    continue;
                 }
 
                 eprintln!(
