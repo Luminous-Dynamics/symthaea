@@ -27,6 +27,8 @@ const SELECTION_MANIFEST: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../docs/broca/unimorph_eng_4_selection_manifest.md"));
 const SELECTION_MANIFEST_JSON: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../docs/broca/unimorph_eng_4_selection_manifest.json"));
+const QUALIFICATION_WORKFLOW: &str =
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../.github/workflows/broca-feature-matrix.yml"));
 
 const EXPECTED_RAW_URI: &str =
     "https://raw.githubusercontent.com/unimorph/eng/66e0e9e8e2dcd196da081a25a48e5c1fe3d8b49b/eng";
@@ -453,6 +455,7 @@ fn write_structured_receipt(
     let snapshot_manifest_blob = git_blob_sha1(SNAPSHOT_MANIFEST.as_bytes())?;
     let selection_manifest_blob = git_blob_sha1(SELECTION_MANIFEST.as_bytes())?;
     let selection_manifest_json_blob = git_blob_sha1(SELECTION_MANIFEST_JSON.as_bytes())?;
+    let qualification_workflow_blob = git_blob_sha1(QUALIFICATION_WORKFLOW.as_bytes())?;
 
     let receipt = serde_json::json!({
         "schema_version": "broca-unimorph-freeze-audit-receipt-v1",
@@ -486,7 +489,9 @@ fn write_structured_receipt(
         "checked_in_evidence": {
             "snapshot_manifest_git_blob_sha": snapshot_manifest_blob,
             "selection_manifest_git_blob_sha": selection_manifest_blob,
-            "selection_manifest_json_git_blob_sha": selection_manifest_json_blob
+            "selection_manifest_json_git_blob_sha": selection_manifest_json_blob,
+            "qualification_workflow_path": ".github/workflows/broca-feature-matrix.yml",
+            "qualification_workflow_git_blob_sha": qualification_workflow_blob
         },
         "ci": {
             "github_actions": std::env::var("GITHUB_ACTIONS").unwrap_or_else(|_| "unknown".into()),
