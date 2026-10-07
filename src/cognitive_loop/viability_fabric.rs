@@ -139,6 +139,34 @@ pub struct ViabilityVariable {
 }
 
 impl ViabilityVariable {
+    /// Anticipatory pressure from movement toward/through a preferred-band boundary.
+    ///
+    /// This is deliberately bounded and conservative: worsening motion only adds pressure;
+    /// improving motion does not erase pressure caused by the current absolute state.
+    pub fn anticipatory_pressure(&self) -> f64 {
+        let value = self.observation.value;
+        let rate = self.rate_of_change;
+        if !value.is_finite() || !rate.is_finite() || !self.band.validate() {
+            return 1.0;
+        }
+
+        let (lo, hi) = self.band.preferred;
+        let tolerance_width = (self.band.tolerated.1 - self.band.tolerated.0).max(f64::EPSILON);
+        let distance = if rate > 0.0 && value >= lo {
+            (hi - value).max(0.0)
+        } else if rate < 0.0 && value <= hi {
+            (value - lo).max(0.0)
+        } else {
+            0.0
+        };
+
+        if distance <= 0.0 {
+            return 1.0_f64.min(rate.abs() / tolerance_width);
+        }
+
+        (rate.abs() / (distance + tolerance_width)).clamp(0.0, 1.0)
+    }
+
     pub fn normalized_pressure(&self) -> f64 {
         let value = self.observation.value;
         if !value.is_finite() || !self.band.validate() {
@@ -273,7 +301,11 @@ impl ViabilityState {
         } else {
             self.resource_pressure
                 .values()
-                .map(ViabilityVariable::normalized_pressure)
+                .map(|variable| {
+                    variable
+                        .normalized_pressure()
+                        .max(variable.anticipatory_pressure())
+                })
                 .sum::<f64>()
                 / self.resource_pressure.len() as f64
         }
@@ -504,16 +536,32 @@ impl ViabilityFabric {
         band: ViabilityBand,
         prediction: Option<ViabilitySignal>,
     ) {
+        let key = name.into();
+        let previous = self.state.resource_pressure.get(&key);
+        let rate_of_change = previous
+            .and_then(|prev| {
+                let delta_cycle = observation.cycle.saturating_sub(prev.observation.cycle);
+                if delta_cycle == 0 {
+                    None
+                } else {
+                    Some(
+                        (observation.value - prev.observation.value)
+                            / delta_cycle as f64,
+                    )
+                }
+            })
+            .unwrap_or(0.0);
+
         let prediction_error = prediction
             .as_ref()
             .map(|predicted| (predicted.value - observation.value).abs().clamp(0.0, 1.0));
 
         self.state.resource_pressure.insert(
-            name.into(),
+            key,
             ViabilityVariable {
                 observation: observation.clone(),
                 band,
-                rate_of_change: 0.0,
+                rate_of_change,
                 prediction,
                 prediction_error,
             },
@@ -709,6 +757,34 @@ mod tests {
             prediction_error: None,
         };
         assert_eq!(variable.normalized_pressure(), 0.0);
+    }
+
+    #[test]
+    fn rate_of_change_is_derived_from_previous_observation() {
+        let mut fabric = ViabilityFabric::new(4);
+        let band = band();
+        fabric.begin_cycle(1);
+        fabric.observe_variable(
+            "load",
+            ViabilitySignal::new(0.4, 1.0, 1, "test"),
+            band,
+            None,
+        );
+        fabric.begin_cycle(2);
+        fabric.observe_variable(
+            "load",
+            ViabilitySignal::new(0.6, 1.0, 2, "test"),
+            band,
+            None,
+        );
+
+        let variable = fabric
+            .state()
+            .resource_pressure
+            .get("load")
+            .expect("load exists");
+        assert!((variable.rate_of_change - 0.2).abs() < 1e-12);
+        assert!(variable.anticipatory_pressure() > 0.0);
     }
 
     #[test]
