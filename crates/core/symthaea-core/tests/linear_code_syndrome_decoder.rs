@@ -522,7 +522,6 @@ fn small_fixture_full_coset_distance_spectrum_is_syndrome_difference_invariant()
     );
 }
 
-
 #[test]
 fn small_fixture_exact_fiber_difference_identity_holds_for_every_anchor() {
     let mut buckets: [Vec<u8>; 64] = std::array::from_fn(|_| Vec::new());
@@ -562,10 +561,8 @@ fn small_fixture_exact_fiber_difference_identity_holds_for_every_anchor() {
                     "anchored difference fiber diverged from syndrome XOR target: left={left} right={right} anchor={anchor:#x} target={}",
                     left ^ right
                 );
-                assert_eq!(
-                    observed.iter().filter(|&&present| present).count(),
-                    4
-                );
+                let observed_size = observed.iter().filter(|&&present| present).count();
+                assert_eq!(observed_size, 4);
                 identities += 1;
             }
         }

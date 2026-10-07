@@ -151,26 +151,26 @@ The full syndrome-quotient Hamming-distance spectrum is intentionally promoted a
 geometry-only witness rather than a complete certificate of the quotient's additive
 coordinate law. The finite fixture admits an explicit adversarial syndrome-label
 permutation that preserves the full pairwise spectrum while failing XOR additivity:
-swap labels \\(40..47\\) with \\(56..63\\) and fix every other label. This map fixes zero
+swap labels \(40..47\) with \(56..63\) and fix every other label. This map fixes zero
 and preserves the spectrum condition, but
-\\[
-8\\oplus32=40,\\qquad p(8)\\oplus p(32)=40,\\qquad p(40)=56,
-\\]
+\[
+8\oplus32=40,\qquad p(8)\oplus p(32)=40,\qquad p(40)=56,
+\]
 so
-\\[
-p(8\\oplus32)\\ne p(8)\\oplus p(32).
-\\]
+\[
+p(8\oplus32)\ne p(8)\oplus p(32).
+\]
 
 This boundary matters because a distance spectrum observes only Hamming weights of
 ambient differences. It can therefore certify a strong colored metric geometry
 without certifying the chosen syndrome labels form an additive coordinate system.
 
 The next witness closes exactly that blind spot without claiming a new mathematical
-foundation. For every syndrome pair \\(s,t\\), every anchor \\(x\\in F_s\\), and the complete
+foundation. For every syndrome pair \(s,t\), every anchor \(x\in F_s\), and the complete
 target fiber, the qualification checks the exact finite identity
-\\[
-\\{x\\oplus y:y\\in F_t\\}=F_{s\\oplus t}.
-\\]
+\[
+\{x\oplus y:y\in F_t\}=F_{s\oplus t}.
+\]
 For this fixture that produces 4,096 ordered syndrome pairs, 16,384 anchored
 set identities, and 65,536 underlying XOR differences. It is a closure/sensitivity
 witness over the already established coset partition, so it should be interpreted as
@@ -180,9 +180,9 @@ of linearity.
 ## Walsh/dual-fiber structure
 
 A metric-orthogonal witness is obtained from the Boolean Walsh characters
-\\[
-W_s(u)=\\sum_{x\\in F_s}(-1)^{u\\cdot x}.
-\\]
+\[
+W_s(u)=\sum_{x\in F_s}(-1)^{u\cdot x}.
+\]
 For a linear subspace, the Fourier transform of its indicator is supported exactly on
 the dual subspace and has magnitude equal to the subspace cardinality; the same result
 on an affine coset adds only a character-dependent sign. See the finite-code Fourier

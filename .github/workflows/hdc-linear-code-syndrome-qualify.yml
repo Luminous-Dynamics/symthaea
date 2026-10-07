@@ -472,7 +472,6 @@ jobs:
           path: hdc-linear-code-evidence
           if-no-files-found: error
 
-
       - name: Publish artifact provenance summary
         if: always() && steps.upload_receipt.outcome == 'success'
         env:
