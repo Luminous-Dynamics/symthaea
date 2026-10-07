@@ -4833,27 +4833,27 @@ echo "  User password set."
 
                 // Write the install script directly to disk (no heredoc).
                 // SECURITY: Direct file write eliminates SCRIPTEOF heredoc injection.
-                match write_private_file(&script_path, script.as_bytes(), 0o700) {
-                    Ok(()) => {
-                    Err(e) => {
-                        for secret_path in &staged_secret_paths {
-                            let _ = tokio::fs::remove_file(secret_path).await;
-                        }
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::error(&format!("Failed to write script: {}", e))
-                                    .to_json(),
-                            ))
-                            .await;
-                        remove_transaction_artifact_dir(&transaction_dir);
-                        continue;
+                if let Err(error) = write_private_file(&script_path, script.as_bytes(), 0o700) {
+                    for secret_path in &staged_secret_paths {
+                        let _ = tokio::fs::remove_file(secret_path).await;
                     }
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!("Failed to write script: {}", error))
+                                .to_json(),
+                        ))
+                        .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
+                    continue;
                 }
 
-                // Upload verification
+                // Upload verification is now a filesystem observation, not a shell
+                // expression whose pathname has to cross another parser.
                 match std::fs::metadata(&script_path) {
-                    Ok(metadata) if metadata.is_file() && (metadata.permissions().mode() & 0o111) != 0 => {
-                        let _ = ws_tx
+                    Ok(metadata)
+                        if metadata.is_file()
+                            && (metadata.permissions().mode() & 0o111) != 0 =>
+                    {
                         let _ = ws_tx
                             .send(Message::Text(
                                 RelayMessage::output("Install script uploaded.", "stdout")
@@ -4861,15 +4861,17 @@ echo "  User password set."
                             ))
                             .await;
                     }
-                    Ok(r) => {
+                    Ok(metadata) => {
                         for secret_path in &staged_secret_paths {
                             let _ = tokio::fs::remove_file(secret_path).await;
                         }
                         let _ = ws_tx
                             .send(Message::Text(
                                 RelayMessage::error(&format!(
-                                    "Failed to upload script: {}",
-                                    r.stderr.chars().take(300).collect::<String>()
+                                    "Failed to upload script: {} (mode {:04o}, regular_file={})",
+                                    script_path,
+                                    metadata.permissions().mode() & 0o777,
+                                    metadata.is_file()
                                 ))
                                 .to_json(),
                             ))
@@ -4877,13 +4879,17 @@ echo "  User password set."
                         remove_transaction_artifact_dir(&transaction_dir);
                         continue;
                     }
-                    Err(e) => {
+                    Err(error) => {
                         for secret_path in &staged_secret_paths {
                             let _ = tokio::fs::remove_file(secret_path).await;
                         }
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!("Upload failed: {}", e)).to_json(),
+                                RelayMessage::error(&format!(
+                                    "Upload verification failed: {}",
+                                    error
+                                ))
+                                .to_json(),
                             ))
                             .await;
                         remove_transaction_artifact_dir(&transaction_dir);
