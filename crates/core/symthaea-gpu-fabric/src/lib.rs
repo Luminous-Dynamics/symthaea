@@ -8,6 +8,12 @@ use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+#[cfg(feature = "vulkan")]
+mod vulkan;
+
+#[cfg(feature = "vulkan")]
+pub use vulkan::{VULKAN_HDC_XOR_WGSL, VulkanDeviceIdentity, VulkanError, VulkanExecutor};
+
 pub const PLAN_VERSION: u16 = 1;
 pub const RECEIPT_VERSION: u16 = 1;
 pub const HDC_BIND_XOR_KERNEL_ID: &str = "symthaea.hdc.bind_xor.v1";
