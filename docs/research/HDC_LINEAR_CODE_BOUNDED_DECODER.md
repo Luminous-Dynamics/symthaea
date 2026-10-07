@@ -489,7 +489,7 @@ inside the parity-check/decoder pipeline, which is a different failure mode from
 coordinate-indexing errors.
 
 The emitted ledger is `GENERATOR_BASIS_EQUIVARIANCE`, and the workflow promotes it
-to a required gate in receipt schema v16.
+to a required gate in receipt schema v18.
 
 ## Composed metamorphic invariance
 
