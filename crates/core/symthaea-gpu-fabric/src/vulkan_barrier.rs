@@ -325,7 +325,7 @@ impl VulkanBarrierWorkloadRuntime {
             barrier_count: plan.submissions.iter().map(|s| s.barriers.len() as u32).sum(),
             resource_digests: digests,
         };
-        receipt.verify_against(graph, schedule, plan, &observed).map_err(VulkanBarrierError::OracleMismatchReceipt)?;
+        receipt.verify_against(graph, schedule, plan, &observed).map_err(VulkanBarrierError::Receipt)?;
         Ok((observed, receipt))
     }
 }
@@ -524,4 +524,157 @@ fn barrier_digest(plan: &VulkanSyncPlan) -> String {
         }
     }
     h.finalize().to_hex().to_string()
+}
+
+impl Drop for VulkanBarrierWorkloadRuntime {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = self.device.device_wait_idle();
+            self.device.destroy_descriptor_pool(self.descriptor_pool, None);
+            self.device.destroy_command_pool(self.command_pool, None);
+            self.device.destroy_pipeline(self.pipeline, None);
+            self.device.destroy_pipeline_layout(self.pipeline_layout, None);
+            self.device.destroy_descriptor_set_layout(self.descriptor_layout, None);
+            self.device.destroy_shader_module(self.shader, None);
+            self.device.destroy_device(None);
+            self.instance.destroy_instance(None);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fixture() -> (
+        ExecutionGraph,
+        ExecutionSchedule,
+        VulkanSyncPlan,
+        BTreeMap<ResourceId, BinaryHypervector>,
+    ) {
+        let lhs = ResourceId::new("lhs").unwrap();
+        let rhs = ResourceId::new("rhs").unwrap();
+        let mid = ResourceId::new("mid").unwrap();
+        let out = ResourceId::new("out").unwrap();
+
+        let n1 = ExecutionNode::new(
+            1,
+            GpuOperation::HdcBindXor { dimensions: 32 },
+            vec![
+                crate::ResourceUse::new(lhs.clone(), AccessKind::Read),
+                crate::ResourceUse::new(rhs.clone(), AccessKind::Read),
+                crate::ResourceUse::new(mid.clone(), AccessKind::Write),
+            ],
+        );
+        let n2 = ExecutionNode::new(
+            2,
+            GpuOperation::HdcBindXor { dimensions: 32 },
+            vec![
+                crate::ResourceUse::new(mid.clone(), AccessKind::Read),
+                crate::ResourceUse::new(rhs.clone(), AccessKind::Read),
+                crate::ResourceUse::new(out.clone(), AccessKind::Write),
+            ],
+        );
+
+        let graph = ExecutionGraph::new(
+            vec![n1, n2],
+            vec![crate::DependencyEdge::new(
+                1,
+                2,
+                mid,
+                DependencyKind::ReadAfterWrite,
+            )],
+        )
+        .unwrap();
+        let schedule = ExecutionSchedule::from_graph(&graph).unwrap();
+        let queue = crate::VulkanQueueId::new(0).unwrap();
+        let plan = VulkanSyncPlan::from_schedule(
+            &schedule,
+            &[
+                crate::VulkanQueueAssignment { node_id: 1, queue },
+                crate::VulkanQueueAssignment { node_id: 2, queue },
+            ],
+        )
+        .unwrap();
+
+        let mut initial = BTreeMap::new();
+        initial.insert(
+            lhs,
+            BinaryHypervector::from_bytes(32, vec![0x0f, 0xf0, 0xaa, 0x55]).unwrap(),
+        );
+        initial.insert(
+            rhs,
+            BinaryHypervector::from_bytes(32, vec![0x33, 0xcc, 0x55, 0xaa]).unwrap(),
+        );
+        initial.insert(mid, BinaryHypervector::zeros(32));
+        initial.insert(out, BinaryHypervector::zeros(32));
+        (graph, schedule, plan, initial)
+    }
+
+    #[test]
+    fn barrier_digest_is_stable_and_bound_to_plan() {
+        let (_, _, plan, _) = fixture();
+        assert_eq!(barrier_digest(&plan), barrier_digest(&plan));
+        assert_eq!(plan.submissions[1].barriers.len(), 1);
+        assert!(plan.submissions[1].barriers[0].requires_memory_dependency());
+    }
+
+    #[test]
+    fn cpu_oracle_propagates_hdc_resource_chain() {
+        let (graph, schedule, _, initial) = fixture();
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        assert_eq!(
+            final_state[&ResourceId::new("mid").unwrap()].as_bytes(),
+            &[0x3c, 0x3c, 0xff, 0xff]
+        );
+        assert_eq!(
+            final_state[&ResourceId::new("out").unwrap()].as_bytes(),
+            &[0x0f, 0xf0, 0xaa, 0x55]
+        );
+    }
+
+    #[test]
+    fn receipt_rejects_tampered_barrier_digest() {
+        let (graph, schedule, plan, initial) = fixture();
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        let digests = final_state
+            .iter()
+            .map(|(resource, value)| (resource.clone(), resource_digest(value)))
+            .collect::<BTreeMap<_, _>>();
+
+        let mut receipt = VulkanBarrierExecutionReceipt {
+            version: RECEIPT_VERSION,
+            graph_digest: graph.digest_hex().unwrap(),
+            schedule_digest: schedule.digest_hex().unwrap(),
+            sync_plan_digest: plan.digest_hex().unwrap(),
+            barrier_digest: barrier_digest(&plan),
+            node_count: schedule.nodes.len() as u32,
+            barrier_count: 1,
+            resource_digests: digests,
+        };
+        receipt.barrier_digest = String::from("tampered");
+
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::BarrierDigest)
+        ));
+    }
+
+    #[test]
+    #[ignore = "requires a Vulkan 1.3 validation runner"]
+    fn real_vulkan_barrier_workload_matches_cpu_oracle() {
+        let (graph, schedule, plan, initial) = fixture();
+        let runtime = VulkanBarrierWorkloadRuntime::new()
+            .expect("qualified Vulkan 1.3 synchronization2 device");
+        let (observed, receipt) = runtime
+            .execute_verified(&graph, &schedule, &plan, &initial)
+            .expect("Vulkan barrier workload must complete");
+        receipt
+            .verify_against(&graph, &schedule, &plan, &observed)
+            .expect("receipt must independently verify");
+        assert_eq!(
+            observed[&ResourceId::new("out").unwrap()].as_bytes(),
+            &[0x0f, 0xf0, 0xaa, 0x55]
+        );
+    }
 }
