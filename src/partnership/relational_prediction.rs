@@ -32,6 +32,7 @@
 //! assumptions; they are not generic significance tests.
 
 use super::relational_harmonics::EvidenceStatus;
+use sha2::{Digest, Sha256};
 
 const EVIDENCE_SCHEMA: &str = "relational-prediction-evidence/v4";
 const ROLLING_EVIDENCE_SCHEMA: &str = "relational-prediction-rolling-evidence/v4";
@@ -1491,6 +1492,72 @@ impl ForecastInferencePlan {
 }
 
 
+
+/// Deterministic commitment to the single-window origin schedule.
+///
+/// The schedule digest covers only the declared split geometry and forecast
+/// horizon; model/provenance identity is committed separately by the
+/// qualification and inference-plan digests.
+pub fn single_origin_schedule_sha256(
+    config: HeldOutRelationalPredictionConfig,
+    forecast_horizon: f64,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"relational-prediction-origin-schedule/single/v1");
+    update_schedule_usize(&mut hasher, 0);
+    update_schedule_usize(&mut hasher, config.train_samples);
+    update_schedule_usize(&mut hasher, config.gap_samples);
+    update_schedule_usize(&mut hasher, config.test_samples);
+    update_schedule_f64(&mut hasher, forecast_horizon);
+    hex::encode(hasher.finalize())
+}
+
+/// Deterministic commitment to every rolling-origin split.
+///
+/// Origin starts are derived from the same checked arithmetic used by the
+/// rolling evaluator, so a caller cannot silently commit a different schedule
+/// while leaving the rolling qualification configuration unchanged.
+pub fn rolling_origin_schedule_sha256(
+    config: RollingOriginRelationalPredictionConfig,
+) -> Result<String, RelationalPredictionError> {
+    validate_rolling_qualification_config_shape(&config)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"relational-prediction-origin-schedule/rolling/v1");
+    update_schedule_usize(&mut hasher, config.first_origin);
+    update_schedule_usize(&mut hasher, config.train_samples);
+    update_schedule_usize(&mut hasher, config.gap_samples);
+    update_schedule_usize(&mut hasher, config.test_samples);
+    update_schedule_usize(&mut hasher, config.origin_count);
+    update_schedule_usize(&mut hasher, config.step_samples);
+    update_schedule_f64(&mut hasher, config.forecast_horizon);
+    for origin in 0..config.origin_count {
+        let start = config
+            .step_samples
+            .checked_mul(origin)
+            .and_then(|offset| config.first_origin.checked_add(offset))
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+        update_schedule_usize(&mut hasher, start);
+        let test_start = start
+            .checked_add(config.train_samples)
+            .and_then(|value| value.checked_add(config.gap_samples))
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+        let test_end = test_start
+            .checked_add(config.test_samples)
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+        update_schedule_usize(&mut hasher, test_start);
+        update_schedule_usize(&mut hasher, test_end);
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+
+fn update_schedule_usize(hasher: &mut Sha256, value: usize) {
+    hasher.update((value as u64).to_le_bytes());
+}
+
+fn update_schedule_f64(hasher: &mut Sha256, value: f64) {
+    hasher.update(value.to_bits().to_le_bytes());
+}
+
 /// Pre-inference binding gate for a forecast-accuracy qualification.
 ///
 /// This artifact deliberately performs no statistical inference. It binds one
@@ -1619,6 +1686,11 @@ impl ForecastInferenceBinding {
         qualification.validate()?;
         dependence.validate()?;
         plan.validate_against_qualification(&qualification.qualification_identity_blake3)?;
+        let expected_schedule =
+            single_origin_schedule_sha256(qualification.config, plan.forecast_horizon);
+        if plan.origin_schedule_sha256 != expected_schedule {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
 
         if self.analysis_level != "single-window"
             || self.origin_count != 1
@@ -1665,6 +1737,10 @@ impl ForecastInferenceBinding {
         qualification.validate()?;
         dependence.validate()?;
         plan.validate_against_qualification(&qualification.qualification_identity_blake3)?;
+        let expected_schedule = rolling_origin_schedule_sha256(qualification.config)?;
+        if plan.origin_schedule_sha256 != expected_schedule {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
 
         if self.analysis_level != "rolling-origin"
             || self.origin_count != qualification.config.origin_count
@@ -5120,6 +5196,43 @@ mod tests {
 
 
     #[test]
+    fn origin_schedule_digest_is_deterministic_and_configuration_bound() {
+        let config = config();
+        let single_a = single_origin_schedule_sha256(config, 0.5);
+        let single_b = single_origin_schedule_sha256(config, 0.5);
+        assert_eq!(single_a, single_b);
+        assert_eq!(single_a.len(), 64);
+
+        let mut altered_single = config;
+        altered_single.gap_samples += 1;
+        assert_ne!(
+            single_a,
+            single_origin_schedule_sha256(altered_single, 0.5)
+        );
+
+        let rolling = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let rolling_a = rolling_origin_schedule_sha256(rolling).unwrap();
+        let rolling_b = rolling_origin_schedule_sha256(rolling).unwrap();
+        assert_eq!(rolling_a, rolling_b);
+        assert_eq!(rolling_a.len(), 64);
+
+        let mut altered_rolling = rolling;
+        altered_rolling.step_samples += 1;
+        assert_ne!(
+            rolling_a,
+            rolling_origin_schedule_sha256(altered_rolling).unwrap()
+        );
+    }
+
+    #[test]
     fn inference_binding_binds_plan_qualification_loss_vector_and_dependence() {
         let samples = build_samples(0.5);
         let config = RollingOriginRelationalPredictionConfig {
@@ -5146,7 +5259,7 @@ mod tests {
 
         let plan = ForecastInferencePlan::new(
             config.forecast_horizon,
-            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            rolling_origin_schedule_sha256(config).unwrap(),
             "nested-forecast-bootstrap-v1",
             "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
             "loss-dependence-bartlett-v1",
@@ -5170,6 +5283,20 @@ mod tests {
             rolling_forecast_loss_dependence_profile_digest(&dependence)
         );
         assert!(binding.to_json().unwrap().contains(INFERENCE_BINDING_SCHEMA));
+        let mut invalid_schedule_plan = plan.clone();
+        invalid_schedule_plan.origin_schedule_sha256 =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string();
+        invalid_schedule_plan.plan_blake3 = inference_plan_digest(&invalid_schedule_plan);
+        invalid_schedule_plan.validate().unwrap();
+        assert_eq!(
+            binding.validate_against_rolling(
+                &invalid_schedule_plan,
+                &qualification,
+                &dependence
+            ),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
         let mut tampered_binding = binding.clone();
         tampered_binding.forecast_horizon += 0.25;
         assert_eq!(
