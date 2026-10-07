@@ -1180,8 +1180,17 @@ mod tests {
             ledger.admit(create.clone()).unwrap(),
             TransactionAdmission::New(_)
         ));
+        let artifact = ArtifactCommitment {
+            name: "system.tar.gz".into(),
+            size: 123,
+            digest: "c".repeat(64),
+        };
         ledger
-            .mark_completed(&create, TransactionOutcome::ObservedSuccess)
+            .mark_completed_with_artifact(
+                &create,
+                TransactionOutcome::ObservedSuccess,
+                Some(artifact.clone()),
+            )
             .unwrap();
 
         assert!(ledger
@@ -1191,6 +1200,12 @@ mod tests {
                 Some(&target_a)
             )
             .unwrap());
+        assert_eq!(
+            ledger
+                .successful_image_artifact(&create.transaction_id, Some(&target_a))
+                .unwrap(),
+            Some(artifact)
+        );
         assert!(!ledger
             .has_successful_transaction(
                 &create.transaction_id,
@@ -1317,6 +1332,7 @@ mod tests {
             target_machine_digest: None,
             request_digest: "a".repeat(64),
             outcome: None,
+            artifact_commitment: None,
         };
         let error = ledger
             .append(&event)
