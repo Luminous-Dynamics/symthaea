@@ -881,8 +881,9 @@ fn main() -> Result<(), String> {
         symthaea_communication::NeurosemanticRemediationStatisticalSamplingFrameArtifact {
             schema_version:
                 symthaea_communication::NEUROSEMANTIC_REMEDIATION_STATISTICAL_SAMPLING_FRAME_SCHEMA_VERSION,
-            frame_ref: "synthetic-forget-sampling-frame-v1".into(),
+            frame_ref: "synthetic-forget-sampling-frame-v2".into(),
             source_dataset_manifest_hash: forget_set_manifest.source_dataset_manifest_hash.clone(),
+            target_population_manifest_hash: forget_set_manifest.fingerprint()?,
             member_artifact_hashes: forget_set_manifest.member_artifact_hashes.clone(),
         };
     let statistical_sampling_frame_bytes =
