@@ -15,7 +15,7 @@ jobs:
     env:
       VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install Vulkan runtime and validation
         run: |
@@ -28,7 +28,7 @@ jobs:
           vulkaninfo --summary | grep -q 'VK_LAYER_KHRONOS_validation'
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58 # 1.96.0
 
       - name: Prepare isolated GPU Fabric workspace
         run: |
@@ -39,6 +39,16 @@ jobs:
           cp crates/core/symthaea-gpu-fabric/Cargo.toml .ci/gpu-fabric-workspace/Cargo.toml
           sed -i -e 's/edition.workspace = true/edition = "2024"/' -e 's/license.workspace = true/license = "AGPL-3.0-or-later"/' -e 's/blake3 = { workspace = true }/blake3 = "1.5"/' -e 's/serde = { workspace = true }/serde = { version = "1.0", features = ["derive"] }/' -e 's/thiserror = { workspace = true }/thiserror = "=1.0.69"/' .ci/gpu-fabric-workspace/Cargo.toml
           printf '\n[workspace]\nresolver = "2"\n' >> .ci/gpu-fabric-workspace/Cargo.toml
+
+      - name: Verify isolated workspace boundary
+        working-directory: .ci/gpu-fabric-workspace
+        run: |
+          cargo metadata --locked --no-deps --format-version 1 > metadata.json
+          grep -q '"name":"symthaea-gpu-fabric"' metadata.json
+          if grep -q 'symthaea-observation-attestation' metadata.json; then
+            echo 'isolated workspace unexpectedly resolved root workspace member' >&2
+            exit 1
+          fi
 
       - name: Compile barrier workload harness
         working-directory: .ci/gpu-fabric-workspace
