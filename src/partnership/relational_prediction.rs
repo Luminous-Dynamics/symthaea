@@ -1208,6 +1208,8 @@ impl RollingOriginRelationalPredictionSummary {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RollingOriginRelationalPredictionQualification {
+    /// Caller-attested dataset/software provenance for the qualification run.
+    pub provenance: RelationalPredictionProvenance,
     pub config: RollingOriginRelationalPredictionConfig,
     /// Requested surrogate count used at every rolling origin.
     pub surrogate_count: usize,
@@ -1223,6 +1225,7 @@ pub struct RollingOriginRelationalPredictionQualification {
 
 impl RollingOriginRelationalPredictionQualification {
     pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        validate_evidence_provenance(&self.provenance)?;
         validate_rolling_qualification_config_shape(&self.config)?;
 
         if !is_hex_digest(&self.evaluation_input_blake3, 64)
@@ -1334,8 +1337,12 @@ impl RollingOriginRelationalPredictionQualification {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
         }
 
-        let recomputed =
-            Self::compute(samples, config, self.surrogate_count)?;
+        let recomputed = Self::compute(
+            samples,
+            config,
+            self.surrogate_count,
+            self.provenance.clone(),
+        )?;
         if recomputed != *self {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
         }
@@ -1347,6 +1354,7 @@ impl RollingOriginRelationalPredictionQualification {
         samples: &[RelationalPredictionSample],
         config: RollingOriginRelationalPredictionConfig,
         surrogate_count: usize,
+        provenance: RelationalPredictionProvenance,
     ) -> Result<Self, RelationalPredictionError> {
         if surrogate_count == 0 {
             return Err(RelationalPredictionError::InvalidSurrogateCount);
@@ -1408,6 +1416,7 @@ impl RollingOriginRelationalPredictionQualification {
         }
 
         let qualification = Self {
+            provenance,
             config,
             surrogate_count,
             evaluation_input_blake3: rolling_evaluation_input_digest(samples, config),
@@ -1802,6 +1811,8 @@ impl PredictionNullSummary {
 /// Full held-out qualification bundle: observed ablation plus multiple null families.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HeldOutRelationalPredictionQualification {
+    /// Caller-attested dataset/software provenance for the qualification run.
+    pub provenance: RelationalPredictionProvenance,
     pub config: HeldOutRelationalPredictionConfig,
     /// Requested surrogate count used for every null family.
     pub surrogate_count: usize,
@@ -1815,6 +1826,7 @@ pub struct HeldOutRelationalPredictionQualification {
 
 impl HeldOutRelationalPredictionQualification {
     pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        validate_evidence_provenance(&self.provenance)?;
         validate_held_out_config_shape(&self.config)?;
         if !is_hex_digest(&self.evaluation_input_blake3, 64)
             || self.surrogate_count == 0
@@ -1920,7 +1932,12 @@ impl HeldOutRelationalPredictionQualification {
         if evaluation_input_digest(samples, config) != self.evaluation_input_blake3 {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
         }
-        let recomputed = Self::compute(samples, config, self.surrogate_count)?;
+        let recomputed = Self::compute(
+            samples,
+            config,
+            self.surrogate_count,
+            self.provenance.clone(),
+        )?;
         if recomputed != *self {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
         }
@@ -1931,6 +1948,7 @@ impl HeldOutRelationalPredictionQualification {
         samples: &[RelationalPredictionSample],
         config: HeldOutRelationalPredictionConfig,
         surrogate_count: usize,
+        provenance: RelationalPredictionProvenance,
     ) -> Result<Self, RelationalPredictionError> {
         let observed = HeldOutRelationalPredictionSummary::compute(samples, config)?;
         let circular_shift_null = PredictionNullSummary::compute_for_feature_set(
@@ -1956,6 +1974,7 @@ impl HeldOutRelationalPredictionQualification {
         )?;
 
         let qualification = Self {
+            provenance,
             config,
             surrogate_count,
             evaluation_input_blake3: evaluation_input_digest(samples, config),
@@ -3406,7 +3425,7 @@ mod tests {
     fn qualification_rejects_tampered_summary_parameter_count() {
         let samples = build_samples(0.5);
         let qualification =
-            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
+            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12, provenance()).unwrap();
 
         let mut tampered = qualification.clone();
         tampered.observed.relational_augmented.parameter_count -= 1;
@@ -3421,7 +3440,7 @@ mod tests {
     fn qualification_rejects_tampered_summary_feature_label() {
         let samples = build_samples(0.5);
         let qualification =
-            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
+            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12, provenance()).unwrap();
 
         let mut tampered = qualification.clone();
         tampered.observed.relational_profile.feature_set =
@@ -3437,7 +3456,7 @@ mod tests {
     fn qualification_rejects_tampered_summary_parameter_count() {
         let samples = build_samples(0.5);
         let qualification =
-            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
+            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12, provenance()).unwrap();
 
         let mut tampered = qualification.clone();
         tampered.observed.relational_augmented.parameter_count -= 1;
@@ -3452,7 +3471,7 @@ mod tests {
     fn qualification_binds_compound_input_commitment() {
         let samples = build_samples(0.5);
         let qualification =
-            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
+            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12, provenance()).unwrap();
 
         let expected_digest = evaluation_input_digest(&samples, config());
         assert_eq!(qualification.evaluation_input_blake3, expected_digest);
@@ -3476,10 +3495,32 @@ mod tests {
     }
 
     #[test]
+    fn qualification_binds_provenance_identity() {
+        let samples = build_samples(0.5);
+        let qualification =
+            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12, provenance())
+                .unwrap();
+
+        qualification.validate().unwrap();
+        assert_eq!(qualification.provenance, provenance());
+
+        let mut tampered = qualification.clone();
+        tampered.provenance.software_commit_sha =
+            "fedcba9876543210fedcba9876543210fedcba98".to_string();
+
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceProvenance(
+                "software_commit_sha"
+            ))
+        );
+    }
+
+    #[test]
     fn qualification_binds_surrogate_count() {
         let samples = build_samples(0.5);
         let qualification =
-            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
+            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12, provenance()).unwrap();
 
         assert_eq!(qualification.surrogate_count, 12);
 
@@ -3495,7 +3536,7 @@ mod tests {
     fn qualification_replay_binds_whole_bundle_to_exact_input() {
         let samples = build_samples(0.5);
         let qualification =
-            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
+            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12, provenance()).unwrap();
 
         assert_eq!(
             qualification.verify_against_samples(&samples, config()),
@@ -3521,7 +3562,7 @@ mod tests {
     fn qualification_binds_nulls_to_observed_result() {
         let samples = build_samples(0.5);
         let qualification =
-            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
+            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12, provenance()).unwrap();
 
         qualification.validate().unwrap();
 
@@ -3598,9 +3639,9 @@ mod tests {
     fn deterministic_null_calibration_has_multiple_families() {
         let samples = build_samples(0.5);
         let first =
-            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
+            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12, provenance()).unwrap();
         let second =
-            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12).unwrap();
+            HeldOutRelationalPredictionQualification::compute(&samples, config(), 12, provenance()).unwrap();
 
         assert_eq!(first, second);
         assert_eq!(
@@ -3983,7 +4024,7 @@ mod tests {
         };
 
         let qualification =
-            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8)
+            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8, provenance())
                 .unwrap();
         qualification.validate().unwrap();
         assert_eq!(qualification.origin_starts, vec![0, 8, 16, 24]);
@@ -4022,7 +4063,7 @@ mod tests {
         };
 
         let qualification =
-            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8)
+            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8, provenance())
                 .unwrap();
 
         let mut tampered = qualification.clone();
@@ -4049,7 +4090,7 @@ mod tests {
         };
 
         let qualification =
-            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8)
+            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8, provenance())
                 .unwrap();
         qualification.validate().unwrap();
 
@@ -4060,6 +4101,39 @@ mod tests {
         assert_eq!(
             tampered.validate(),
             Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn rolling_qualification_binds_provenance_identity() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+
+        let qualification =
+            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8, provenance())
+                .unwrap();
+
+        qualification.validate().unwrap();
+        assert_eq!(qualification.provenance, provenance());
+
+        let mut tampered = qualification.clone();
+        tampered.provenance.source_data_sha256 =
+            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210".to_string();
+
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceProvenance(
+                "source_data_sha256"
+            ))
         );
     }
 
@@ -4078,7 +4152,7 @@ mod tests {
         };
 
         let qualification =
-            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8).unwrap();
+            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8, provenance()).unwrap();
 
         assert_eq!(qualification.surrogate_count, 8);
 
@@ -4105,7 +4179,7 @@ mod tests {
         };
 
         let qualification =
-            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8).unwrap();
+            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8, provenance()).unwrap();
 
         assert_eq!(qualification.observed.origin_count, 4);
         assert_eq!(qualification.circular_shift_nulls.len(), 4);
@@ -4238,6 +4312,7 @@ mod tests {
                 ..Default::default()
             },
             4,
+            provenance(),
         );
 
         assert_eq!(result, Err(RelationalPredictionError::InvalidSplit));
