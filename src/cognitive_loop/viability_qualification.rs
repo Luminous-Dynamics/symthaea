@@ -21,8 +21,8 @@ use super::fep_module::FepModule;
 use super::viability_micro_world::{
     benchmark_manifest_digest, benchmark_scenarios, procedural_held_out_manifest_digest,
     procedural_held_out_scenarios, run_homeostatic_agent_horizon_scenario, MicroAction, MicroWorld,
-    transition, MicroWorldObservation, MicroWorldPredictor, MicroWorldScenario, PersistencePredictor,
-    ProceduralMicroWorldScenario,
+    transition, transition_with_harvest_yield_scale, MicroWorldObservation, MicroWorldPredictor,
+    MicroWorldScenario, PersistencePredictor, ProceduralMicroWorldScenario,
 };
 
 use crate::dynamics::ode_solvers::{
@@ -433,6 +433,8 @@ pub struct GroundedWorldModelQualificationReport {
     pub learning_response: LearningResponseReport,
     /// Cumulative adaptation stream with explicit prior-shock and invariant-anchor retention.
     pub sequential_learning_response: SequentialLearningResponseReport,
+    /// Adaptation latency for a deliberate change in one revisable environment fact.
+    pub regime_shift_adaptation: RegimeShiftAdaptationReport,
 
     pub persistence_closed_loop_survived: bool,
     pub persistence_closed_loop_mean_oracle_horizon_regret: f64,
@@ -557,6 +559,74 @@ pub struct SequentialLearningResponseReport {
     pub anchor_regression_event_rate: f64,
     pub prior_shock_retention_rate: f64,
     pub max_prior_shock_regression: f64,
+}
+
+/// Per-update receipt for adaptation to an intentionally changed environmental regime.
+///
+/// Harvest yield is the only revisable benchmark fact. All non-harvest action dynamics
+/// remain governed by the nominal transition law and are therefore protected as invariants.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RegimeShiftAdaptationEvent {
+    pub update_ordinal: u64,
+    pub cycle: u64,
+    pub action: MicroAction,
+    pub state_digest: u64,
+    pub shifted_validation_mae: f64,
+    pub shifted_validation_error_fraction: f64,
+    pub invariant_anchor_mean_mae: f64,
+    pub invariant_anchor_regression: f64,
+    pub invariant_anchor_max_regression: f64,
+}
+
+/// Revision-latency and invariant-retention report for one explicit regime change.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RegimeShiftAdaptationReport {
+    pub regime_shift_harvest_yield_scale: f64,
+    pub target_error_fraction: f64,
+    pub update_count: u64,
+    pub events: Vec<RegimeShiftAdaptationEvent>,
+    pub pre_revision_shifted_validation_mae: f64,
+    pub final_shifted_validation_mae: f64,
+    pub revision_improvement: f64,
+    pub revision_latency_updates: Option<u64>,
+    pub initial_invariant_anchor_mean_mae: f64,
+    pub final_invariant_anchor_mean_mae: f64,
+    pub final_invariant_anchor_regression: f64,
+    pub max_invariant_anchor_regression: f64,
+    pub invariant_anchor_regression_event_rate: f64,
+}
+
+impl RegimeShiftAdaptationReport {
+    pub fn is_populated(&self) -> bool {
+        self.update_count > 0 && !self.events.is_empty()
+    }
+
+    pub fn is_scoreable(&self) -> bool {
+        self.regime_shift_harvest_yield_scale.is_finite()
+            && self.regime_shift_harvest_yield_scale > 0.0
+            && self.target_error_fraction.is_finite()
+            && (0.0..=1.0).contains(&self.target_error_fraction)
+            && self.update_count > 0
+            && self.events.len() as u64 == self.update_count
+            && self.events.iter().all(|event| {
+                event.state_digest != 0
+                    && event.shifted_validation_mae.is_finite()
+                    && event.shifted_validation_error_fraction.is_finite()
+                    && event.invariant_anchor_mean_mae.is_finite()
+                    && event.invariant_anchor_regression.is_finite()
+                    && event.invariant_anchor_max_regression.is_finite()
+                    && (0.0..=1.0).contains(&event.shifted_validation_error_fraction)
+            })
+            && self.pre_revision_shifted_validation_mae.is_finite()
+            && self.final_shifted_validation_mae.is_finite()
+            && self.revision_improvement.is_finite()
+            && self.initial_invariant_anchor_mean_mae.is_finite()
+            && self.final_invariant_anchor_mean_mae.is_finite()
+            && self.final_invariant_anchor_regression.is_finite()
+            && self.max_invariant_anchor_regression.is_finite()
+            && self.invariant_anchor_regression_event_rate.is_finite()
+            && (0.0..=1.0).contains(&self.invariant_anchor_regression_event_rate)
+    }
 }
 
 impl SequentialLearningResponseReport {
@@ -1426,6 +1496,220 @@ fn evaluate_sequential_learning_response(
         anchor_regression_event_rate: anchor_regression_event_count as f64 / count,
         prior_shock_retention_rate,
         max_prior_shock_regression,
+    }
+}
+
+const REGIME_SHIFT_HARVEST_YIELD_SCALE: f64 = 0.60;
+const REGIME_SHIFT_TARGET_ERROR_FRACTION: f64 = 0.25;
+const REGIME_SHIFT_MAX_UPDATES: u64 = 8;
+
+fn regime_shift_validation_states() -> Vec<MicroWorldObservation> {
+    procedural_held_out_scenarios()
+        .into_iter()
+        .take(4)
+        .map(|scenario| scenario.initial)
+        .collect()
+}
+
+fn measure_shifted_harvest_validation_mae(
+    predictor: &FepWorldModelPredictor<'_>,
+    states: &[MicroWorldObservation],
+    harvest_yield_scale: f64,
+) -> f64 {
+    if states.is_empty() {
+        return 0.0;
+    }
+
+    let total = states
+        .iter()
+        .map(|state| {
+            let actual =
+                transition_with_harvest_yield_scale(*state, MicroAction::Harvest, harvest_yield_scale);
+            predictor
+                .predict(*state, MicroAction::Harvest)
+                .mean_absolute_delta(actual)
+        })
+        .sum::<f64>();
+    total / states.len() as f64
+}
+
+fn measure_invariant_anchor_mae(predictor: &FepWorldModelPredictor<'_>) -> (f64, f64) {
+    let states = regime_shift_validation_states();
+    if states.is_empty() {
+        return (0.0, 0.0);
+    }
+
+    let mut total = 0.0;
+    let mut count = 0u64;
+    let mut max_regression = 0.0f64;
+
+    for state in states {
+        for action in MicroAction::ALL {
+            if action == MicroAction::Harvest {
+                continue;
+            }
+
+            let actual = transition(state, action);
+            let error = predictor.predict(state, action).mean_absolute_delta(actual);
+            total += error;
+            count = count.saturating_add(1);
+            max_regression = max_regression.max(error);
+        }
+    }
+
+    (total / count.max(1) as f64, max_regression)
+}
+
+/// Measure adaptation latency after changing one explicitly revisable environment fact.
+///
+/// The model is first frozen and measured against held-out shifted-regime validation states.
+/// The same model clone then receives at most REGIME_SHIFT_MAX_UPDATES harvest observations
+/// from a deterministic shifted-regime stream. After every update, validation is re-run on
+/// states that were never used for those updates, while non-harvest action dynamics are
+/// checked against the nominal transition law as invariants.
+///
+/// Latency is the number of shifted-regime observations required to reduce validation error
+/// to REGIME_SHIFT_TARGET_ERROR_FRACTION of its pre-adaptation value. None means the target
+/// was not reached within the bounded adaptation stream.
+fn evaluate_regime_shift_adaptation(
+    base_model: &super::goal_world::WorldModelBridge,
+    scenario: &MicroWorldScenario,
+) -> RegimeShiftAdaptationReport {
+    const ADAPTATION_SCHEDULE: [MicroAction; 6] = [
+        MicroAction::Harvest,
+        MicroAction::Observe,
+        MicroAction::Rest,
+        MicroAction::Harvest,
+        MicroAction::Retreat,
+        MicroAction::Repair,
+    ];
+
+    let validation_states = regime_shift_validation_states();
+    let mut model = base_model.clone();
+    let mut predictor = FepWorldModelPredictor { bridge: &mut model };
+
+    let pre_revision_shifted_validation_mae =
+        measure_shifted_harvest_validation_mae(
+            &predictor,
+            &validation_states,
+            REGIME_SHIFT_HARVEST_YIELD_SCALE,
+        );
+
+    let initial_invariant_anchor_mean_mae =
+        measure_invariant_anchor_mae(&predictor).0;
+
+    let target_error = pre_revision_shifted_validation_mae
+        * REGIME_SHIFT_TARGET_ERROR_FRACTION;
+    let mut revision_latency_updates = if pre_revision_shifted_validation_mae <= f64::EPSILON {
+        Some(0)
+    } else {
+        None
+    };
+
+    let mut world = MicroWorld::new(scenario.initial, REGIME_SHIFT_MAX_UPDATES);
+    let mut events = Vec::new();
+    let mut update_count = 0u64;
+    let mut state_digest_seed = scenario.initial;
+
+    while !world.done() && update_count < REGIME_SHIFT_MAX_UPDATES {
+        let cycle = world.observe().cycle;
+        let action = ADAPTATION_SCHEDULE[update_count as usize % ADAPTATION_SCHEDULE.len()];
+        let before = world.observe();
+
+        let after = if action == MicroAction::Harvest {
+            transition_with_harvest_yield_scale(
+                before,
+                action,
+                REGIME_SHIFT_HARVEST_YIELD_SCALE,
+            )
+        } else {
+            transition_with_harvest_yield_scale(
+                before,
+                action,
+                REGIME_SHIFT_HARVEST_YIELD_SCALE,
+            )
+        };
+
+        world.perturb(super::viability_micro_world::MicroPerturbation::ProgressLoss(0.0));
+        let _ = state_digest_seed;
+        predictor.observe_transition(before, action, after);
+        state_digest_seed = after;
+        update_count = update_count.saturating_add(1);
+        let shifted_validation_mae = measure_shifted_harvest_validation_mae(
+            &predictor,
+            &validation_states,
+            REGIME_SHIFT_HARVEST_YIELD_SCALE,
+        );
+        let shifted_validation_error_fraction = if pre_revision_shifted_validation_mae <= f64::EPSILON {
+            0.0
+        } else {
+            (shifted_validation_mae / pre_revision_shifted_validation_mae).clamp(0.0, 1.0)
+        };
+
+        let (invariant_anchor_mean_mae, _) = measure_invariant_anchor_mae(&predictor);
+        let invariant_anchor_regression =
+            invariant_anchor_mean_mae - initial_invariant_anchor_mean_mae;
+
+        if revision_latency_updates.is_none()
+            && shifted_validation_mae <= target_error
+        {
+            revision_latency_updates = Some(update_count);
+        }
+
+        events.push(RegimeShiftAdaptationEvent {
+            update_ordinal: update_count,
+            cycle,
+            action,
+            state_digest: state_digest_seed.digest(),
+            shifted_validation_mae,
+            shifted_validation_error_fraction,
+            invariant_anchor_mean_mae,
+            invariant_anchor_regression,
+            invariant_anchor_max_regression: (invariant_anchor_mean_mae
+                - initial_invariant_anchor_mean_mae)
+                .max(0.0),
+        });
+
+        let _ = world.step(action);
+    }
+
+    let final_shifted_validation_mae = events
+        .last()
+        .map(|event| event.shifted_validation_mae)
+        .unwrap_or(pre_revision_shifted_validation_mae);
+    let final_invariant_anchor_mean_mae = events
+        .last()
+        .map(|event| event.invariant_anchor_mean_mae)
+        .unwrap_or(initial_invariant_anchor_mean_mae);
+    let max_invariant_anchor_regression = events
+        .iter()
+        .map(|event| event.invariant_anchor_max_regression)
+        .fold(0.0f64, f64::max);
+    let invariant_anchor_regression_event_rate = if events.is_empty() {
+        0.0
+    } else {
+        events
+            .iter()
+            .filter(|event| event.invariant_anchor_regression > 1e-12)
+            .count() as f64
+            / events.len() as f64
+    };
+
+    RegimeShiftAdaptationReport {
+        regime_shift_harvest_yield_scale: REGIME_SHIFT_HARVEST_YIELD_SCALE,
+        target_error_fraction: REGIME_SHIFT_TARGET_ERROR_FRACTION,
+        update_count,
+        events,
+        pre_revision_shifted_validation_mae,
+        final_shifted_validation_mae,
+        revision_improvement: pre_revision_shifted_validation_mae - final_shifted_validation_mae,
+        revision_latency_updates,
+        initial_invariant_anchor_mean_mae,
+        final_invariant_anchor_mean_mae,
+        final_invariant_anchor_regression: final_invariant_anchor_mean_mae
+            - initial_invariant_anchor_mean_mae,
+        max_invariant_anchor_regression,
+        invariant_anchor_regression_event_rate,
     }
 }
 
@@ -2318,6 +2602,9 @@ impl FepModule {
         let sequential_learning_response =
             evaluate_sequential_learning_response(predictor.bridge, held_out, held_out_cycles);
 
+        let regime_shift_adaptation =
+            evaluate_regime_shift_adaptation(predictor.bridge, held_out);
+
         let closed_loop = run_homeostatic_agent_horizon_scenario(
             &mut predictor,
             held_out,
@@ -2353,6 +2640,7 @@ impl FepModule {
             procedural_held_out_transfer,
             learning_response,
             sequential_learning_response,
+            regime_shift_adaptation,
             persistence_closed_loop_survived: persistence_closed_loop.survived,
             persistence_closed_loop_mean_oracle_horizon_regret:
                 persistence_closed_loop.mean_oracle_horizon_regret,
@@ -2695,6 +2983,27 @@ mod tests {
         assert!((0.0..=1.0).contains(&report.neighbor_improvement_rate));
         assert!((0.0..=1.0).contains(&report.anchor_regression_rate));
         assert!(report.max_anchor_regression.is_finite());
+    }
+
+    #[test]
+    fn regime_shift_adaptation_is_populated_and_scoreable() {
+        let model = super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let report = evaluate_regime_shift_adaptation(
+            &model,
+            &benchmark_scenarios()[1],
+        );
+
+        assert!(report.is_populated());
+        assert!(report.is_scoreable());
+        assert_eq!(report.events.len() as u64, report.update_count);
+        assert!(report.pre_revision_shifted_validation_mae.is_finite());
+        assert!(report.final_shifted_validation_mae.is_finite());
+        assert!(report.revision_improvement.is_finite());
+        assert!(report.target_error_fraction < 1.0);
+        assert!(report
+            .events
+            .iter()
+            .all(|event| (1..=REGIME_SHIFT_MAX_UPDATES).contains(&event.update_ordinal)));
     }
 
     #[test]
