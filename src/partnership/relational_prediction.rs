@@ -1999,6 +1999,9 @@ impl ForecastInferenceSelectionReceipt {
             || self.selected_dependence_spec_sha256 != plan.dependence_spec_sha256
             || self.selected_resampling_method_id != plan.resampling_method_id
             || self.selected_resampling_spec_sha256 != plan.resampling_spec_sha256
+            || self.selected_small_sample_policy_id != plan.small_sample_policy_id
+            || self.selected_multiplicity_policy_id != plan.multiplicity_policy_id
+            || self.decision_path_id != ForecastInferenceSelectionPath::for_plan(plan).as_str()
         {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
         }
@@ -2029,6 +2032,8 @@ impl ForecastInferenceSelectionReceipt {
             "selected_dependence_spec_sha256": &self.selected_dependence_spec_sha256,
             "selected_resampling_method_id": &self.selected_resampling_method_id,
             "selected_resampling_spec_sha256": &self.selected_resampling_spec_sha256,
+            "selected_small_sample_policy_id": &self.selected_small_sample_policy_id,
+            "selected_multiplicity_policy_id": &self.selected_multiplicity_policy_id,
             "selection_blake3": &self.selection_blake3
         }).to_string())
     }
