@@ -19,6 +19,7 @@ use super::authorization::{
     NixActionDescriptorV1, NixActionIntentV1, NixAuthorizationDecisionV1,
     NixExecutionAuthorizationRecordV1,
 };
+use super::execution_witness::NixLiveExecutionWitnessV1;
 use super::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use super::service_state::{
     ServiceActiveStateV1, ServiceLoadStateV1, ServiceUnitFileStateV1,
@@ -531,6 +532,9 @@ pub enum NixPostStateClaimV1 {
 pub struct NixPostStateReceiptV1 {
     pub action_intent_digest: String,
     pub authorization_record_digest: String,
+    /// Durable approval lineage copied from transient execution provenance.
+    pub approval_request_id: Option<String>,
+    pub approval_projection_digest: Option<String>,
     pub effect_digest: String,
     pub target_unit: String,
     pub authorized_generation: u64,
@@ -581,6 +585,50 @@ impl NixPostStateReceiptV1 {
         stability: Option<&NixVerifiedPostStateStabilityEvidenceV1>,
         observer_identity: impl Into<String>,
         observer_version: impl Into<String>,
+    ) -> Result<Self, NixPostStateErrorV1> {
+        Self::build_internal(
+            intent,
+            authorization,
+            expectation,
+            observation,
+            stability,
+            observer_identity,
+            observer_version,
+            None,
+        )
+    }
+
+    pub(crate) fn build_proven_from_live_execution_witness(
+        intent: &NixActionIntentV1,
+        authorization: &NixExecutionAuthorizationRecordV1,
+        expectation: &NixServicePostStateExpectationV1,
+        observation: &NixVerifiedPostStateObservationV1,
+        stability: Option<&NixVerifiedPostStateStabilityEvidenceV1>,
+        witness: &NixLiveExecutionWitnessV1,
+        observer_identity: impl Into<String>,
+        observer_version: impl Into<String>,
+    ) -> Result<Self, NixPostStateErrorV1> {
+        Self::build_internal(
+            intent,
+            authorization,
+            expectation,
+            observation,
+            stability,
+            observer_identity,
+            observer_version,
+            Some(witness),
+        )
+    }
+
+    fn build_internal(
+        intent: &NixActionIntentV1,
+        authorization: &NixExecutionAuthorizationRecordV1,
+        expectation: &NixServicePostStateExpectationV1,
+        observation: &NixVerifiedPostStateObservationV1,
+        stability: Option<&NixVerifiedPostStateStabilityEvidenceV1>,
+        observer_identity: impl Into<String>,
+        observer_version: impl Into<String>,
+        witness: Option<&NixLiveExecutionWitnessV1>,
     ) -> Result<Self, NixPostStateErrorV1> {
         let action_intent_digest = intent
             .digest()
@@ -648,13 +696,25 @@ impl NixPostStateReceiptV1 {
         }
 
         let assessment = evaluate_postcondition(expectation, observation)?;
+        if let Some(witness) = witness {
+            validate_live_execution_witness(
+                witness,
+                intent,
+                expectation,
+                &action_intent_digest,
+                authorization,
+            )?;
+        }
         let claim = match assessment {
             NixPostconditionAssessmentV1::Satisfied => {
                 if expectation.required_stability_us == 0 {
                     NixPostStateClaimV1::Observed
                 } else {
-                    match stability.map(NixVerifiedPostStateStabilityEvidenceV1::as_ref) {
-                        Some(stability)
+                    match (
+                        stability.map(NixVerifiedPostStateStabilityEvidenceV1::as_ref),
+                        witness,
+                    ) {
+                        (Some(stability), Some(_))
                             if stability.required_window_us >= expectation.required_stability_us =>
                         {
                             NixPostStateClaimV1::Proven
@@ -689,6 +749,8 @@ impl NixPostStateReceiptV1 {
         let receipt = Self {
             action_intent_digest,
             authorization_record_digest,
+            approval_request_id: witness.map(|value| value.approval_request_id().to_string()),
+            approval_projection_digest: witness.map(|value| value.projection_digest().to_string()),
             effect_digest: expectation.effect_digest()?,
             target_unit: expectation.unit.clone(),
             authorized_generation: expectation.authorized_generation,
