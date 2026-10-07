@@ -152,9 +152,17 @@ even when the one-step predictor looks strong.
 
 The qualification harness evaluates a frozen model at 1, 2, 4, and 8 environment steps.
 
-Each horizon reports mean one-step error from the same visited states, terminal error after continuous
-rollout over the horizon, and the terminal-to-one-step error ratio. This distinguishes local predictive
-skill from dynamics that actually compose over time.
+Each horizon reports:
+
+- mean one-step error from the same visited states;
+- terminal error from repeatedly applying the frozen **discrete** predictor;
+- terminal error from the continuous ODE rollout;
+- the continuous terminal-to-one-step error ratio.
+
+The discrete terminal score is the direct multi-step world-model test. The continuous score is a
+separate test of whether the transition law admits a coherent continuous relaxation. The two are
+not treated as mathematically interchangeable. In particular, the ODE adapter's relaxation does
+not claim to reproduce a discrete transition exactly at one time constant.
 
 ### Policy-induced distribution shift
 
@@ -245,8 +253,9 @@ The remaining qualification task is to measure:
 
 **learned discrete prediction → continuous trajectory rollout → actual deterministic consequence**
 
-with separate measurements for one-step model error, continuous extrapolation error, confidence
-calibration, planning regret, survival, and recovery.
+with separate measurements for one-step error, discrete multi-step error, continuous extrapolation
+error, policy-induced distribution-shift error, confidence calibration, planning regret, survival, and
+recovery.
 
 Only after that comparison is stable should the shared transition abstraction be considered for
 runtime policy coupling or viability-driven modulation.
