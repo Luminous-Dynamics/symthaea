@@ -916,7 +916,20 @@ fn rfc9942_outer_detached_payload_binds_inner_inclusion_and_outer_signature() {
         state.receipt_placement(),
         symthaea_swarm::semantic_evidence_vds::Rfc9942ReceiptPlacement::Unprotected
     );
-    assert_eq!(state.receipt_index(), 0);
+    let protected_outer = signed_outer(&receipt, b"candidate", true);
+    let protected_state = protected_outer
+        .verify_es256_inclusion_receipt_state(0, &key, &key, &[], &[], None)
+        .unwrap();
+    assert_eq!(
+        protected_state.receipt().protected_header_sha256(),
+        expected_receipt_header_fingerprint
+    );
+    assert_ne!(
+        state.outer_protected_header_sha256(),
+        protected_state.outer_protected_header_sha256(),
+        "moving receipts into the protected bucket must change the authenticated header provenance"
+    );
+    assert_eq!(protected_state.receipt_index(), 0);
     assert_eq!(
         state.receipt().proof().inclusion_head(),
         Some(head)
@@ -1040,6 +1053,10 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
         out
     }
 
+    fn state_header_bytes(outer: &Rfc9942SignatureWithReceipts) -> Vec<u8> {
+        outer.protected_header_bytes()
+    }
+
     fn signed_outer(
         receipt: &Rfc9942ReceiptEnvelope,
         payload: &[u8],
@@ -1141,10 +1158,28 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
     assert_eq!(state.outer_algorithm_id(), COSE_ES256_ALGORITHM_ID);
     let expected_key_fingerprint: [u8; 32] = sha2::Sha256::digest(&key).into();
     let expected_empty_aad_fingerprint: [u8; 32] = sha2::Sha256::digest(&[]).into();
+    let expected_outer_header_fingerprint: [u8; 32] =
+        sha2::Sha256::digest(&state_header_bytes(&valid_outer)).into();
+    let expected_receipt_header_fingerprint: [u8; 32] =
+        sha2::Sha256::digest(&receipt.protected_header_bytes()).into();
     assert_eq!(state.outer_verification_key_sha256(), expected_key_fingerprint);
+    assert_eq!(
+        state.outer_protected_header_sha256(),
+        expected_outer_header_fingerprint
+    );
     assert_eq!(state.outer_external_aad_sha256(), expected_empty_aad_fingerprint);
-    assert_eq!(state.receipt().verification_key_sha256(), expected_key_fingerprint);
-    assert_eq!(state.receipt().external_aad_sha256(), expected_empty_aad_fingerprint);
+    assert_eq!(
+        state.receipt().verification_key_sha256(),
+        expected_key_fingerprint
+    );
+    assert_eq!(
+        state.receipt().protected_header_sha256(),
+        expected_receipt_header_fingerprint
+    );
+    assert_eq!(
+        state.receipt().external_aad_sha256(),
+        expected_empty_aad_fingerprint
+    );
     assert_eq!(state.receipt_index(), 0);
     assert_eq!(
         state.receipt_placement(),
