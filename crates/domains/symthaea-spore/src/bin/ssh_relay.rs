@@ -184,19 +184,21 @@ fn open_trusted_script(path: &str) -> Result<std::fs::File, std::io::Error> {
     Ok(file)
 }
 
-async fn run_privileged_script_with_args(
-    path: &str,
-    args: &[&str],
-) -> Result<CmdResult, std::io::Error> {
-    let script = open_trusted_script(path)?;
-    let shell = if std::path::Path::new("/bin/bash").exists() {
+fn trusted_script_shell() -> &'static str {
+    if std::path::Path::new("/bin/bash").exists() {
         "/bin/bash"
     } else if std::path::Path::new("/run/current-system/sw/bin/bash").exists() {
         "/run/current-system/sw/bin/bash"
     } else {
         "/bin/sh"
-    };
+    }
+}
 
+fn trusted_script_process(
+    script: std::fs::File,
+    args: &[&str],
+) -> tokio::process::Command {
+    let shell = trusted_script_shell();
     let mut command = privileged_process(shell);
     if shell.ends_with("/bash") {
         command.arg("-p");
@@ -204,10 +206,18 @@ async fn run_privileged_script_with_args(
     command
         .arg("-s")
         .arg("--")
-        .arg("nixforhumanity-preflight")
+        .arg("nixforhumanity-script")
         .args(args)
         .stdin(std::process::Stdio::from(script));
+    command
+}
 
+async fn run_privileged_script_with_args(
+    path: &str,
+    args: &[&str],
+) -> Result<CmdResult, std::io::Error> {
+    let script = open_trusted_script(path)?;
+    let mut command = trusted_script_process(script, args);
     let output = command.output().await?;
     Ok(CmdResult {
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
@@ -427,8 +437,9 @@ async fn spawn_privileged_background_script(
     status_path: &str,
     pid_path: &str,
 ) -> Result<u32, std::io::Error> {
+    let script = open_trusted_script(script_path)?;
     spawn_privileged_background_process(
-        privileged_script_command(script_path),
+        trusted_script_process(script, &[]),
         log_path,
         status_path,
         pid_path,
