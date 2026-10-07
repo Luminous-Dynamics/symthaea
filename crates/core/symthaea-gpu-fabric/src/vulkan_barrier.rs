@@ -282,47 +282,134 @@ impl VulkanBarrierWorkloadRuntime {
         for (resource, value) in initial { buffers[resource].write(&self.device, value.as_bytes())?; }
 
         let command_info = vk::CommandBufferAllocateInfo::default()
-            .command_pool(self.command_pool).level(vk::CommandBufferLevel::PRIMARY).command_buffer_count(1);
-        let command = unsafe { self.device.allocate_command_buffers(&command_info).map_err(VulkanBarrierError::Vk)?[0] };
-        let begin = vk::CommandBufferBeginInfo::default().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-        unsafe { self.device.begin_command_buffer(command, &begin).map_err(VulkanBarrierError::Vk)?; }
+            .command_pool(self.command_pool)
+            .level(vk::CommandBufferLevel::PRIMARY)
+            .command_buffer_count(1);
+        let command = unsafe {
+            self.device
+                .allocate_command_buffers(&command_info)
+                .map_err(VulkanBarrierError::Vk)?
+                .into_iter()
+                .next()
+                .ok_or(VulkanBarrierError::AllocationOverflow)?
+        };
+        let command_guard = CommandBufferGuard::new(
+            self.device.clone(),
+            self.command_pool,
+            command,
+        );
 
-        let mut sets = Vec::new();
+        let begin = vk::CommandBufferBeginInfo::default()
+            .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        unsafe {
+            self.device
+                .begin_command_buffer(command_guard.command(), &begin)
+                .map_err(VulkanBarrierError::Vk)?;
+        }
+
+        let mut set_guard =
+            DescriptorSetGuard::new(self.device.clone(), self.descriptor_pool);
         for scheduled in &schedule.nodes {
-            let node = graph.nodes.iter().find(|n| n.id == scheduled.id).ok_or(VulkanBarrierError::UnsupportedNodeShape(scheduled.id))?;
-            let reads = node.resources.iter().filter(|u| u.access == AccessKind::Read).collect::<Vec<_>>();
-            let writes = node.resources.iter().filter(|u| u.access == AccessKind::Write).collect::<Vec<_>>();
-            if reads.len() != 2 || writes.len() != 1 || node.resources.len() != 3 { return Err(VulkanBarrierError::UnsupportedNodeShape(node.id)); }
-            let submission = plan.submissions.iter().find(|s| s.node_id == node.id).ok_or(VulkanBarrierError::UnsupportedNodeShape(node.id))?;
-            record_barriers(&self.device, command, &submission.barriers, &buffers)?;
+            let node = graph
+                .nodes
+                .iter()
+                .find(|n| n.id == scheduled.id)
+                .ok_or(VulkanBarrierError::UnsupportedNodeShape(scheduled.id))?;
+            let reads = node
+                .resources
+                .iter()
+                .filter(|u| u.access == AccessKind::Read)
+                .collect::<Vec<_>>();
+            let writes = node
+                .resources
+                .iter()
+                .filter(|u| u.access == AccessKind::Write)
+                .collect::<Vec<_>>();
+            if reads.len() != 2 || writes.len() != 1 || node.resources.len() != 3 {
+                return Err(VulkanBarrierError::UnsupportedNodeShape(node.id));
+            }
+
+            let submission = plan
+                .submissions
+                .iter()
+                .find(|s| s.node_id == node.id)
+                .ok_or(VulkanBarrierError::UnsupportedNodeShape(node.id))?;
+
+            record_barriers(
+                &self.device,
+                command_guard.command(),
+                &submission.barriers,
+                &buffers,
+            )?;
+
             let range = buffers[&writes[0].resource].storage_size;
-            let set = allocate_set(&self.device, self.descriptor_pool, self.descriptor_layout, [&buffers[&reads[0].resource], &buffers[&reads[1].resource], &buffers[&writes[0].resource]], range)?;
-            sets.push(set);
-            let groups = ((range / 4) as u32).saturating_add(WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
-            if groups.max(1) > self.max_compute_workgroup_count_x { return Err(VulkanBarrierError::DispatchTooLarge(writes[0].resource.clone())); }
+            let set = allocate_set(
+                &self.device,
+                self.descriptor_pool,
+                self.descriptor_layout,
+                [
+                    &buffers[&reads[0].resource],
+                    &buffers[&reads[1].resource],
+                    &buffers[&writes[0].resource],
+                ],
+                range,
+            )?;
+            set_guard.push(set);
+
+            let groups = ((range / 4) as u32)
+                .saturating_add(WORKGROUP_SIZE - 1)
+                / WORKGROUP_SIZE;
+            if groups.max(1) > self.max_compute_workgroup_count_x {
+                return Err(VulkanBarrierError::DispatchTooLarge(
+                    writes[0].resource.clone(),
+                ));
+            }
             unsafe {
-                self.device.cmd_bind_pipeline(command, vk::PipelineBindPoint::COMPUTE, self.pipeline);
-                self.device.cmd_bind_descriptor_sets(command, vk::PipelineBindPoint::COMPUTE, self.pipeline_layout, 0, &[set], &[]);
-                self.device.cmd_dispatch(command, groups.max(1), 1, 1);
+                self.device.cmd_bind_pipeline(
+                    command_guard.command(),
+                    vk::PipelineBindPoint::COMPUTE,
+                    self.pipeline,
+                );
+                self.device.cmd_bind_descriptor_sets(
+                    command_guard.command(),
+                    vk::PipelineBindPoint::COMPUTE,
+                    self.pipeline_layout,
+                    0,
+                    &[set],
+                    &[],
+                );
+                self.device
+                    .cmd_dispatch(command_guard.command(), groups.max(1), 1, 1);
             }
         }
 
-        unsafe { self.device.end_command_buffer(command).map_err(VulkanBarrierError::Vk)?; }
-        let fence = unsafe { self.device.create_fence(&vk::FenceCreateInfo::default(), None).map_err(VulkanBarrierError::Vk)? };
-        let submit = vk::SubmitInfo::default().command_buffers(std::slice::from_ref(&command));
-        if let Err(error) = unsafe { self.device.queue_submit(self.queue, std::slice::from_ref(&submit), fence) } {
+        unsafe {
+            self.device
+                .end_command_buffer(command_guard.command())
+                .map_err(VulkanBarrierError::Vk)?;
+        }
+        let fence = unsafe {
+            self.device
+                .create_fence(&vk::FenceCreateInfo::default(), None)
+                .map_err(VulkanBarrierError::Vk)?
+        };
+        let submit =
+            vk::SubmitInfo::default().command_buffers(std::slice::from_ref(&command_guard.command()));
+        if let Err(error) = unsafe {
+            self.device
+                .queue_submit(self.queue, std::slice::from_ref(&submit), fence)
+        } {
             unsafe { self.device.destroy_fence(fence, None); }
             return Err(VulkanBarrierError::Vk(error));
         }
         if let Err(error) = unsafe { self.device.wait_for_fences(&[fence], true, u64::MAX) } {
-            unsafe { let _ = self.device.device_wait_idle(); self.device.destroy_fence(fence, None); }
+            unsafe {
+                let _ = self.device.device_wait_idle();
+                self.device.destroy_fence(fence, None);
+            }
             return Err(VulkanBarrierError::Fence(error));
         }
-        unsafe {
-            self.device.destroy_fence(fence, None);
-            self.device.free_command_buffers(self.command_pool, std::slice::from_ref(&command));
-            self.device.free_descriptor_sets(self.descriptor_pool, &sets).map_err(VulkanBarrierError::Vk)?;
-        }
+        unsafe { self.device.destroy_fence(fence, None); }
 
         let mut observed = BTreeMap::new();
         for (resource, value) in initial {
@@ -411,6 +498,58 @@ fn record_barriers(
     let dependency = vk::DependencyInfo::default().memory_barriers(&execution_barriers).buffer_memory_barriers(&buffer_barriers);
     unsafe { device.cmd_pipeline_barrier2(command, &dependency); }
     Ok(())
+}
+
+struct CommandBufferGuard {
+    device: Device,
+    pool: vk::CommandPool,
+    command: vk::CommandBuffer,
+}
+
+impl CommandBufferGuard {
+    fn new(device: Device, pool: vk::CommandPool, command: vk::CommandBuffer) -> Self {
+        Self { device, pool, command }
+    }
+
+    fn command(&self) -> vk::CommandBuffer {
+        self.command
+    }
+}
+
+impl Drop for CommandBufferGuard {
+    fn drop(&mut self) {
+        unsafe {
+            self.device
+                .free_command_buffers(self.pool, std::slice::from_ref(&self.command));
+        }
+    }
+}
+
+struct DescriptorSetGuard {
+    device: Device,
+    pool: vk::DescriptorPool,
+    sets: Vec<vk::DescriptorSet>,
+}
+
+impl DescriptorSetGuard {
+    fn new(device: Device, pool: vk::DescriptorPool) -> Self {
+        Self { device, pool, sets: Vec::new() }
+    }
+
+    fn push(&mut self, set: vk::DescriptorSet) {
+        self.sets.push(set);
+    }
+}
+
+impl Drop for DescriptorSetGuard {
+    fn drop(&mut self) {
+        if self.sets.is_empty() {
+            return;
+        }
+        unsafe {
+            let _ = self.device.free_descriptor_sets(self.pool, &self.sets);
+        }
+    }
 }
 
 struct WorkloadBuffer {
