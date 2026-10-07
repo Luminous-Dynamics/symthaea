@@ -99,7 +99,7 @@ fn trusted_typed_executable(
     const SYSTEM_BIN: &str = "/run/current-system/sw/bin/";
 
     let basename = match program {
-        "btrfs" | "docker" | "du" | "gzip" | "lsblk" | "nix" | "nix-collect-garbage" | "nix-env"
+        "btrfs" | "docker" | "du" | "echo" | "gzip" | "lsblk" | "nix-collect-garbage" | "nix-env"
         | "nix-instantiate" | "nixos-rebuild" | "mysqldump" | "nixos-version" | "nmcli" | "pg_dumpall" | "systemctl"
         | "tar" | "uname" | "zstd" => Some(program),
         _ => None,
@@ -123,9 +123,18 @@ fn trusted_typed_executable(
     ))
 }
 
+fn trusted_typed_process(
+    program: &str,
+) -> Result<tokio::process::Command, String> {
+    let executable = trusted_typed_executable(program)
+        .map_err(|error| format!("typed privileged executable rejected: {error}"))?;
+    Ok(privileged_process(executable.as_ref()))
+}
+
+
 async fn run_privileged_args(program: &str, args: &[&str]) -> Result<CmdResult, std::io::Error> {
-    let executable = trusted_typed_executable(program)?;
-    let mut command = privileged_process(executable.as_ref());
+    let mut command = trusted_typed_process(program)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::PermissionDenied, error))?;
     command.args(args);
     let output = command.output().await?;
     Ok(CmdResult {
@@ -410,7 +419,8 @@ async fn run_privileged_args_with_stdin(
     args: &[&str],
     input: std::fs::File,
 ) -> Result<CmdResult, std::io::Error> {
-    let mut command = privileged_process(program);
+    let mut command = trusted_typed_process(program)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::PermissionDenied, error))?;
     command.args(args);
     command.stdin(std::process::Stdio::from(input));
     let output = command.output().await?;
@@ -3252,7 +3262,7 @@ async fn run_service_action(
     action: ServiceAction,
     service: &str,
 ) -> Result<CmdResult, String> {
-    let mut command = privileged_process("systemctl");
+    let mut command = trusted_typed_process("systemctl")?;
     command.arg(action.as_str()).arg(format!("{service}.service"));
     let output = command
         .output()
@@ -3271,7 +3281,7 @@ async fn verify_service_postcondition_typed(
 ) -> Result<bool, String> {
     let unit = format!("{service}.service");
 
-    let mut active_command = privileged_process("systemctl");
+    let mut active_command = trusted_typed_process("systemctl")?;
     active_command
         .arg("show")
         .arg("--property=ActiveState")
@@ -3292,7 +3302,7 @@ async fn verify_service_postcondition_typed(
         ));
     }
 
-    let mut unit_file_command = privileged_process("systemctl");
+    let mut unit_file_command = trusted_typed_process("systemctl")?;
     unit_file_command
         .arg("show")
         .arg("--property=UnitFileState")
@@ -3352,7 +3362,7 @@ async fn create_btrfs_image_archive(image_dir: &str) -> Result<bool, String> {
     let archive_file = create_private_runtime_file(&archive, 0o600)
         .map_err(|error| format!("unable to create btrfs image archive: {error}"))?;
 
-    let mut sender = privileged_process("btrfs");
+    let mut sender = trusted_typed_process("btrfs")?;
     sender
         .arg("send")
         .arg(&snapshot)
@@ -3373,7 +3383,7 @@ async fn create_btrfs_image_archive(image_dir: &str) -> Result<bool, String> {
         .take()
         .ok_or_else(|| "btrfs send did not expose stdout".to_string())?;
 
-    let mut encoder = privileged_process("zstd");
+    let mut encoder = trusted_typed_process("zstd")?;
     encoder
         .args(["-3", "-T0"])
         .stdin(std::process::Stdio::from(sender_stdout))
@@ -3433,7 +3443,7 @@ async fn create_tar_image_archive(image_dir: &str) -> Result<(), String> {
     let archive_file = create_private_runtime_file(&archive, 0o600)
         .map_err(|error| format!("unable to create tar image archive: {error}"))?;
 
-    let mut tar = privileged_process("tar");
+    let mut tar = trusted_typed_process("tar")?;
     tar.args([
         "-czf",
         "-",
@@ -3852,7 +3862,7 @@ async fn restore_verified_archive(
 ) -> Result<CmdResult, String> {
     let (stdout, stderr, exit_status) = match format {
         RestoreArchiveFormat::TarGzip => {
-            let mut command = privileged_process("tar");
+            let mut command = trusted_typed_process("tar")?;
             command
                 .arg("--no-absolute-names")
                 .arg("-xzf")
@@ -3871,7 +3881,7 @@ async fn restore_verified_archive(
             )
         }
         RestoreArchiveFormat::BtrfsZstd => {
-            let mut decoder = privileged_process("zstd");
+            let mut decoder = trusted_typed_process("zstd")?;
             decoder
                 .arg("-d")
                 .stdin(std::process::Stdio::from(input))
@@ -3886,7 +3896,7 @@ async fn restore_verified_archive(
                 .take()
                 .ok_or_else(|| "typed zstd restore did not expose stdout".to_string())?;
 
-            let mut receiver = privileged_process("btrfs");
+            let mut receiver = trusted_typed_process("btrfs")?;
             receiver
                 .arg("receive")
                 .arg("/mnt/")
@@ -4402,7 +4412,7 @@ async fn run_nmcli_add_wifi_profile(
     profile_name: &str,
     ssid: &str,
 ) -> Result<CmdResult, String> {
-    let mut command = privileged_process("nmcli");
+    let mut command = trusted_typed_process("nmcli")?;
     command
         .arg("connection")
         .arg("add")
@@ -4605,12 +4615,10 @@ async fn run_privileged_to_file(
     args: &[&str],
     output_path: &str,
 ) -> Result<CmdResult, String> {
-    let executable = trusted_typed_executable(program)
-        .map_err(|error| format!("typed preservation executable rejected: {error}"))?;
+    let mut command = trusted_typed_process(program)?;
     let output_file = create_private_runtime_file(output_path, 0o600)
         .map_err(|error| format!("unable to create preservation archive {output_path}: {error}"))?;
 
-    let mut command = privileged_process(executable.as_ref());
     command.args(args);
     command.stdout(std::process::Stdio::from(output_file));
     command.stderr(std::process::Stdio::piped());
@@ -4632,14 +4640,11 @@ async fn run_privileged_pipeline_to_gzip(
     output_path: &str,
     identity: Option<(u32, u32)>,
 ) -> Result<CmdResult, String> {
-    let executable = trusted_typed_executable(program)
-        .map_err(|error| format!("typed preservation executable rejected: {error}"))?;
-    let gzip_executable = trusted_typed_executable("gzip")
-        .map_err(|error| format!("typed preservation gzip executable rejected: {error}"))?;
+    let mut producer = trusted_typed_process(program)?;
+    let mut gzip = trusted_typed_process("gzip")?;
     let output_file = create_private_runtime_file(output_path, 0o600)
         .map_err(|error| format!("unable to create preservation archive {output_path}: {error}"))?;
 
-    let mut producer = privileged_process(executable.as_ref());
     producer.args(args);
     if let Some((uid, gid)) = identity {
         producer.uid(uid);
@@ -4663,7 +4668,6 @@ async fn run_privileged_pipeline_to_gzip(
         }
     };
 
-    let mut gzip = privileged_process(gzip_executable.as_ref());
     gzip.arg("-c")
         .stdin(std::process::Stdio::from(producer_stdout))
         .stdout(std::process::Stdio::from(output_file))
@@ -7998,7 +8002,7 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                 let gc_log = format!("{transaction_dir}/gc.log");
                 let gc_status = format!("{transaction_dir}/gc.status");
                 let gc_pid = format!("{transaction_dir}/gc.pid");
-                let mut gc_command = privileged_process("nix-collect-garbage");
+                let mut gc_command = trusted_typed_process("nix-collect-garbage")?;
                 gc_command.args(["-d", "--delete-older-than", "30d"]);
                 if let Err(error) = spawn_privileged_background_process(
                     gc_command,
@@ -10851,7 +10855,7 @@ mod tests {
         let status = dir.join("worker.status");
         let pid = dir.join("worker.pid");
 
-        let mut command = privileged_process("echo");
+        let mut command = trusted_typed_process("echo").unwrap();
         command.arg("worker-output");
         let child_pid = spawn_privileged_background_process(
             command,
