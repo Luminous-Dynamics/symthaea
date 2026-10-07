@@ -100,6 +100,28 @@ fn main() {
     println!("cargo:rerun-if-changed=../../../Cargo.toml");
     println!("cargo:rerun-if-changed=../../../Cargo.lock");
     println!("cargo:rerun-if-changed=../../../rust-toolchain.toml");
+    println!("cargo:rerun-if-env-changed=RUSTC");
+    println!("cargo:rerun-if-env-changed=CARGO_ENCODED_RUSTFLAGS");
+    for feature in [
+        "CARGO_FEATURE_GPU",
+        "CARGO_FEATURE_PARALLEL",
+        "CARGO_FEATURE_NETWORKING",
+        "CARGO_FEATURE_WASM_SANDBOX",
+        "CARGO_FEATURE_MAMBA_CPU",
+        "CARGO_FEATURE_MAMBA",
+        "CARGO_FEATURE_GPU_LOGITS",
+        "CARGO_FEATURE_CUDA",
+        "CARGO_FEATURE_HF_TOKENIZER",
+        "CARGO_FEATURE_COLLECT",
+        "CARGO_FEATURE_SIMD",
+        "CARGO_FEATURE_TEST_HELPERS",
+        "CARGO_FEATURE_THERAPEUTIC",
+        "CARGO_FEATURE_SPEECH_DATA",
+        "CARGO_FEATURE_CODE_SHEAF_EVAL",
+        "CARGO_FEATURE_HIGHWAY_PROJECTION",
+    ] {
+        println!("cargo:rerun-if-env-changed={feature}");
+    }
 
     let manifest_dir = PathBuf::from(
         env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set by Cargo"),
@@ -113,6 +135,7 @@ fn main() {
     let rust_toolchain = read_required(&workspace_root.join("rust-toolchain.toml"));
     let rustc_identity = rustc_identity();
     let cargo_features = cargo_feature_identity();
+    let rustflags = env::var("CARGO_ENCODED_RUSTFLAGS").unwrap_or_default().into_bytes();
     let target = env::var("TARGET").unwrap_or_default().into_bytes();
     let host = env::var("HOST").unwrap_or_default().into_bytes();
 
@@ -151,6 +174,7 @@ fn main() {
             &rust_toolchain,
             &rustc_identity,
             &cargo_features,
+            &rustflags,
             &target,
             &host,
         ],
