@@ -10201,8 +10201,9 @@ echo '}'
                             "type": "wifi_result",
                             "code": protocol_exit_code(1, outcome),
                             "data": format!(
-                                "Wi-Fi activation failed; transient profile cleanup={:?}: {}",
-                                profile_cleanup.as_ref().map(|v| v.exit_status).or_else(|_| None),
+                                "Wi-Fi activation failed and cleanup could not be fully observed: profile={:?}, secret={:?}, detail={}",
+                                profile_cleanup.as_ref().map(|v| v.exit_status),
+                                cleanup_result.as_ref().err(),
                                 error
                             ),
                             "transaction": transaction.receipt(finalize_transaction(
@@ -11181,6 +11182,26 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn wifi_profile_cleanup_treats_missing_profile_as_success() {
+        let missing = Ok(CmdResult {
+            stdout: String::new(),
+            stderr: "Connection profile not found".into(),
+            exit_status: 10,
+        });
+        let failed = Ok(CmdResult {
+            stdout: String::new(),
+            stderr: "permission denied".into(),
+            exit_status: 4,
+        });
+
+        assert!(wifi_profile_cleanup_succeeded(&missing));
+        assert!(!wifi_profile_cleanup_succeeded(&failed));
+        assert!(!wifi_profile_cleanup_succeeded(&Err(
+            "spawn failure".into()
+        )));
     }
 
     #[tokio::test]
