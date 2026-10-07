@@ -34,6 +34,7 @@ use super::local_approval_store::{
     ConsumedLocalApprovalDecisionV1, LocalApprovalRequestStoreErrorV1,
     LocalApprovalRequestStoreV1, PendingRequestCurrentnessV1, PendingRequestInstallV1,
 };
+use super::service_effect::NixVerifiedServiceDefinitionContentV1;
 use super::temporal::UnixMillisV1;
 use std::path::Path;
 use thiserror::Error;
@@ -153,14 +154,56 @@ impl LocalApprovalRuntimeV1 {
 
     /// Mint and atomically install one exact local approval request.
     ///
-    /// The caller supplies the exact typed command, semantic intent, profile,
-    /// and time window. The runtime derives the operator-visible ceremony text
-    /// itself from that command before installation.
-    /// Incarnation identity and request nonce remain owned by the live daemon context.
+    /// The generic entry point deliberately excludes Service actions. Service approval
+    /// must carry an observer-sealed definition capture through the dedicated entry point.
     pub fn create_pending_request(
         &self,
         intent: &NixActionIntentV1,
         command: &NixOSCommand,
+        authority_profile: RequiredApprovalProfileV1,
+        created_at: UnixMillisV1,
+        expires_at: UnixMillisV1,
+    ) -> Result<InstalledLocalApprovalRequestV1, LocalApprovalRuntimeErrorV1> {
+        self.create_pending_request_internal(
+            intent,
+            command,
+            None,
+            authority_profile,
+            created_at,
+            expires_at,
+        )
+    }
+
+    /// Mint and install a Service approval only when the exact intent is bound to
+    /// observer-sealed definition content at the approval boundary.
+    pub fn create_pending_service_request_with_definition_capture(
+        &self,
+        intent: &NixActionIntentV1,
+        command: &NixOSCommand,
+        content: &NixVerifiedServiceDefinitionContentV1,
+        authority_profile: RequiredApprovalProfileV1,
+        created_at: UnixMillisV1,
+        expires_at: UnixMillisV1,
+    ) -> Result<InstalledLocalApprovalRequestV1, LocalApprovalRuntimeErrorV1> {
+        if !matches!(command, NixOSCommand::Service { .. }) {
+            return Err(LocalApprovalRuntimeErrorV1::IntentCommandMismatch);
+        }
+        intent.validate_service_definition_content_capture(content)?;
+        self.create_pending_request_internal(
+            intent,
+            command,
+            Some(content),
+            authority_profile,
+            created_at,
+            expires_at,
+        )
+    }
+
+    fn create_pending_request_internal(
+        &self,
+        intent: &NixActionIntentV1,
+        command: &NixOSCommand,
+        definition_content: Option<&NixVerifiedServiceDefinitionContentV1>,
         authority_profile: RequiredApprovalProfileV1,
         created_at: UnixMillisV1,
         expires_at: UnixMillisV1,
@@ -179,15 +222,21 @@ impl LocalApprovalRuntimeV1 {
             return Err(LocalApprovalRuntimeErrorV1::IntentCommandMismatch);
         }
 
-        if matches!(
-            command,
-            NixOSCommand::Service { .. }
-        ) && intent.service_effect_context().is_none()
-        {
-            return Err(LocalApprovalRuntimeErrorV1::Authorization(
-                super::authorization::NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture,
-            ));
+        match command {
+            NixOSCommand::Service { .. } => {
+                let content = definition_content.ok_or_else(|| {
+                    LocalApprovalRuntimeErrorV1::Authorization(
+                        super::authorization::NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture,
+                    )
+                })?;
+                intent.validate_service_definition_content_capture(content)?;
+            }
+            _ if definition_content.is_some() => {
+                return Err(LocalApprovalRuntimeErrorV1::IntentCommandMismatch);
+            }
+            _ => {}
         }
+
         let displayed_action = operator_visible_action_for_command(command);
 
         let request = self.daemon_incarnation.create_approval_request(
@@ -318,20 +367,39 @@ mod tests {
     use crate::action::{
         LocalApprovalDecisionKindV1, LocalApprovalSubmissionV2, submit_local_approval_v2,
     };
+    use crate::action::service_effect::{
+        NixServiceEffectContextV1, NixSystemdUnitDefinitionContentEvidenceV1,
+        NixSystemdUnitDefinitionContentFileV1, NixVerifiedServiceDefinitionContentV1,
+    };
     use std::sync::Arc;
     use std::thread;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn intent(service: &str) -> NixActionIntentV1 {
-        NixActionIntentV1::from_command(
+        let command = NixOSCommand::Service {
+            operation: crate::action::NixServiceOperationKindV1::Restart,
+            unit: service.to_string(),
+        };
+        let base = NixActionIntentV1::from_command(
             "machine:workstation",
-            Some("generation:42".to_string()),
-            &NixOSCommand::Service {
-                operation: crate::action::NixServiceOperationKindV1::Restart,
-                unit: service.to_string(),
-            },
+            Some(format!(
+                "nixward-service-pre-state-v1|generation=42|unit={service}|state=1111111111111111111111111111111111111111111111111111111111111111"
+            )),
+            &command,
         )
-        .unwrap()
+        .unwrap();
+        let content = synthetic_definition_content(service);
+        let context = NixServiceEffectContextV1::from_verified_definition_content(
+            crate::action::NixServiceOperationKindV1::Restart,
+            service,
+            42,
+            "1111111111111111111111111111111111111111111111111111111111111111",
+            Some("4444444444444444444444444444444444".to_string()),
+            0,
+            &content,
+        )
+        .unwrap();
+        base.with_service_effect_context(context).unwrap()
     }
 
     fn restart_command(service: &str) -> NixOSCommand {
@@ -339,6 +407,48 @@ mod tests {
             operation: crate::action::NixServiceOperationKindV1::Restart,
             unit: service.to_string(),
         }
+    }
+
+    fn synthetic_definition_content(service: &str) -> NixVerifiedServiceDefinitionContentV1 {
+        let evidence = NixSystemdUnitDefinitionContentEvidenceV1 {
+            unit: service.to_string(),
+            source_identity_digest: "2222222222222222222222222222222222222222222222222222222222222222"
+                .to_string(),
+            manager_owner: ":1.42".to_string(),
+            bus_id: "0123456789abcdef0123456789abcdef".to_string(),
+            pre_invocation_id: Some("4444444444444444444444444444444444".to_string()),
+            files: vec![NixSystemdUnitDefinitionContentFileV1 {
+                path: format!("/nix/store/{service}"),
+                resolved_path: None,
+                byte_len: 1,
+                content_digest:
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+            }],
+            captured_at_monotonic_us: 1,
+        };
+        NixVerifiedServiceDefinitionContentV1::from_observer(evidence).unwrap()
+    }
+
+    fn create_pending_service_request(
+        runtime: &LocalApprovalRuntimeV1,
+        intent: &NixActionIntentV1,
+        command: &NixOSCommand,
+        authority_profile: RequiredApprovalProfileV1,
+        created_at: UnixMillisV1,
+        expires_at: UnixMillisV1,
+    ) -> Result<InstalledLocalApprovalRequestV1, LocalApprovalRuntimeErrorV1> {
+        let NixOSCommand::Service { unit, .. } = command else {
+            panic!("test helper requires a typed Service command");
+        };
+        let content = synthetic_definition_content(unit);
+        runtime.create_pending_service_request_with_definition_capture(
+            intent,
+            command,
+            &content,
+            authority_profile,
+            created_at,
+            expires_at,
+        )
     }
 
     fn submission_for(
@@ -443,8 +553,8 @@ mod tests {
         let now = wall_ms();
         let command = restart_command("nginx.service");
 
-        let installed = runtime
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &runtime,
                 &intent("nginx.service"),
                 &command,
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -489,8 +599,8 @@ mod tests {
         )
         .unwrap();
 
-        let a = runtime
-            .create_pending_request(
+        let a = create_pending_service_request(
+            &runtime,
                 &intent_a,
                 &command_a,
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -498,8 +608,8 @@ mod tests {
                 UnixMillisV1::new(now + 60_000),
             )
             .unwrap();
-        let b = runtime
-            .create_pending_request(
+        let b = create_pending_service_request(
+            &runtime,
                 &intent_b,
                 &command_b,
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -557,8 +667,8 @@ mod tests {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
-        let installed = runtime
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &runtime,
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -583,8 +693,8 @@ mod tests {
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
         let action = intent("nginx.service");
-        let first = runtime
-            .create_pending_request(
+        let first = create_pending_service_request(
+            &runtime,
                 &action,
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -593,8 +703,8 @@ mod tests {
             )
             .unwrap();
         let first_projection = first.operator_projection().unwrap();
-        let second = runtime
-            .create_pending_request(
+        let second = create_pending_service_request(
+            &runtime,
                 &action,
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -625,8 +735,8 @@ mod tests {
         let runtime_path = parent.path().join("runtime");
         let first = LocalApprovalRuntimeV1::bind_in(&runtime_path).unwrap();
         let now = wall_ms();
-        let installed = first
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &first,
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -652,8 +762,8 @@ mod tests {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
-        let installed = runtime
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &runtime,
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -705,8 +815,8 @@ mod tests {
         let now = wall_ms();
         let action = intent("nginx.service");
 
-        let first = runtime
-            .create_pending_request(
+        let first = create_pending_service_request(
+            &runtime,
                 &action,
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -716,8 +826,8 @@ mod tests {
             .unwrap();
         let first_projection = first.operator_projection().unwrap();
 
-        let second = runtime
-            .create_pending_request(
+        let second = create_pending_service_request(
+            &runtime,
                 &action,
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -768,8 +878,8 @@ mod tests {
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
 
-        let installed = runtime
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &runtime,
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -797,8 +907,8 @@ mod tests {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
-        let installed = runtime
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &runtime,
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -823,8 +933,17 @@ mod tests {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
+        let bare_intent = NixActionIntentV1::from_command(
+            "machine:workstation",
+            Some(
+                "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=1111111111111111111111111111111111111111111111111111111111111111"
+                    .to_string(),
+            ),
+            &restart_command("nginx.service"),
+        )
+        .unwrap();
         let result = runtime.create_pending_request(
-            &intent("nginx.service"),
+            &bare_intent,
             &restart_command("nginx.service"),
             RequiredApprovalProfileV1::SameUidProcessV1,
             UnixMillisV1::new(now.saturating_sub(1_000)),
@@ -841,12 +960,141 @@ mod tests {
     }
 
     #[test]
+    fn fabricated_service_context_cannot_enter_generic_approval_entry_point() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let fabricated_intent = intent("nginx.service");
+
+        let result = runtime.create_pending_request(
+            &fabricated_intent,
+            &restart_command("nginx.service"),
+            RequiredApprovalProfileV1::SameUidProcessV1,
+            UnixMillisV1::new(now.saturating_sub(1_000)),
+            UnixMillisV1::new(now + 60_000),
+        );
+
+        assert!(matches!(
+            result,
+            Err(LocalApprovalRuntimeErrorV1::Authorization(
+                super::super::authorization::NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture
+            ))
+        ));
+        assert_eq!(runtime.pending_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn sealed_service_capture_is_required_and_accepted_by_dedicated_entry_point() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let action = intent("nginx.service");
+        let content = synthetic_definition_content("nginx.service");
+
+        let installed = runtime
+            .create_pending_service_request_with_definition_capture(
+                &action,
+                &restart_command("nginx.service"),
+                &content,
+                RequiredApprovalProfileV1::SameUidProcessV1,
+                UnixMillisV1::new(now.saturating_sub(1_000)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+
+        assert_eq!(
+            installed.request().action_intent_digest,
+            action.digest().unwrap()
+        );
+
+        let altered_content = NixVerifiedServiceDefinitionContentV1::from_observer(
+            NixSystemdUnitDefinitionContentEvidenceV1 {
+                unit: "nginx.service".to_string(),
+                source_identity_digest: "3333333333333333333333333333333333333333333333333333333333333333"
+                    .to_string(),
+                manager_owner: ":1.42".to_string(),
+                bus_id: "0123456789abcdef0123456789abcdef".to_string(),
+                pre_invocation_id: Some("4444444444444444444444444444444444".to_string()),
+                files: vec![NixSystemdUnitDefinitionContentFileV1 {
+                    path: "/nix/store/nginx.service".to_string(),
+                    resolved_path: None,
+                    byte_len: 1,
+                    content_digest:
+                        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                            .to_string(),
+                }],
+                captured_at_monotonic_us: 1,
+            }
+        )
+        .unwrap();
+
+        let mismatch = runtime.create_pending_service_request_with_definition_capture(
+            &action,
+            &restart_command("nginx.service"),
+            &altered_content,
+            RequiredApprovalProfileV1::SameUidProcessV1,
+            UnixMillisV1::new(now.saturating_sub(1_000)),
+            UnixMillisV1::new(now + 60_000),
+        );
+        assert!(matches!(
+            mismatch,
+            Err(LocalApprovalRuntimeErrorV1::Authorization(
+                super::super::authorization::NixAuthorizationErrorV1::DefinitionContentCaptureMismatch
+            ))
+        ));
+        assert_eq!(runtime.pending_count().unwrap(), 1);
+
+        // Invocation identity is separate from the content digest, but it is still
+        // required to match for Restart approval provenance.
+        let invocation_altered = NixVerifiedServiceDefinitionContentV1::from_observer(
+            NixSystemdUnitDefinitionContentEvidenceV1 {
+                unit: "nginx.service".to_string(),
+                source_identity_digest: "2222222222222222222222222222222222222222222222222222222222222222"
+                    .to_string(),
+                manager_owner: ":1.42".to_string(),
+                bus_id: "0123456789abcdef0123456789abcdef".to_string(),
+                pre_invocation_id: Some("5555555555555555555555555555555555".to_string()),
+                files: vec![NixSystemdUnitDefinitionContentFileV1 {
+                    path: "/nix/store/nginx.service".to_string(),
+                    resolved_path: None,
+                    byte_len: 1,
+                    content_digest:
+                        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                            .to_string(),
+                }],
+                captured_at_monotonic_us: 1,
+            }
+        )
+        .unwrap();
+        assert_eq!(
+            invocation_altered.digest().unwrap(),
+            content.digest().unwrap()
+        );
+
+        let invocation_mismatch = runtime.create_pending_service_request_with_definition_capture(
+            &action,
+            &restart_command("nginx.service"),
+            &invocation_altered,
+            RequiredApprovalProfileV1::SameUidProcessV1,
+            UnixMillisV1::new(now.saturating_sub(1_000)),
+            UnixMillisV1::new(now + 60_000),
+        );
+        assert!(matches!(
+            invocation_mismatch,
+            Err(LocalApprovalRuntimeErrorV1::Authorization(
+                super::super::authorization::NixAuthorizationErrorV1::DefinitionContentCaptureMismatch
+            ))
+        ));
+        assert_eq!(runtime.pending_count().unwrap(), 1);
+    }
+
+    #[test]
     fn installed_request_projection_cannot_be_rebound_to_external_display_text() {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
-        let installed = runtime
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &runtime,
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -873,8 +1121,8 @@ mod tests {
         let now = wall_ms();
         let action = intent("nginx.service");
 
-        let first = runtime
-            .create_pending_request(
+        let first = create_pending_service_request(
+            &runtime,
                 &action,
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -884,8 +1132,8 @@ mod tests {
             .unwrap();
         let first_id = first.request_id().to_string();
 
-        let second = runtime
-            .create_pending_request(
+        let second = create_pending_service_request(
+            &runtime,
                 &action,
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -920,8 +1168,8 @@ mod tests {
             LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap(),
         );
         let now = wall_ms();
-        let installed = runtime
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &runtime,
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -952,8 +1200,8 @@ mod tests {
         let runtime_path = parent.path().join("runtime");
         let first = LocalApprovalRuntimeV1::bind_in(&runtime_path).unwrap();
         let now = wall_ms();
-        let installed = first
-            .create_pending_request(
+        let installed = create_pending_service_request(
+            &first,
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -997,8 +1245,8 @@ mod tests {
         let now = wall_ms();
         let action = intent("nginx.service");
 
-        let first = runtime
-            .create_pending_request(
+        let first = create_pending_service_request(
+            &runtime,
                 &action,
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
@@ -1008,8 +1256,8 @@ mod tests {
             .unwrap();
         let first_submission = submission_for(&first, LocalApprovalDecisionKindV1::Approved);
 
-        let second = runtime
-            .create_pending_request(
+        let second = create_pending_service_request(
+            &runtime,
                 &action,
                 &restart_command("nginx.service"),
                 RequiredApprovalProfileV1::SameUidProcessV1,
