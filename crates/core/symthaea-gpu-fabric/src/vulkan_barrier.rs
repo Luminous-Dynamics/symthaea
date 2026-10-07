@@ -1965,6 +1965,27 @@ mod tests {
         ));
     }
 
+    fn print_receipt_evidence(label: &str, receipt: &VulkanBarrierExecutionReceipt) {
+        println!("qualification_claim=workload_execution+synchronization_only");
+        println!("qualification_fixture={label}");
+        println!("receipt_version={}", receipt.version);
+        println!("graph_digest={}", receipt.graph_digest);
+        println!("schedule_digest={}", receipt.schedule_digest);
+        println!("sync_plan_digest={}", receipt.sync_plan_digest);
+        println!("barrier_digest={}", receipt.barrier_digest);
+        println!("barrier_lowering_digest={}", receipt.barrier_lowering_digest);
+        println!("completion_lowering_digest={}", receipt.completion_lowering_digest);
+        println!("node_count={}", receipt.node_count);
+        println!("barrier_count={}", receipt.barrier_count);
+        println!("resource_storage_sizes={:?}", receipt.resource_storage_sizes);
+        println!("resource_digests={:?}", receipt.resource_digests);
+        println!("completion_expected={}", receipt.completion_expected);
+        println!("completion_observed={}", receipt.completion_observed);
+        println!("vulkan_api_version={}", receipt.vulkan_api_version);
+        println!("physical_device_api_version={}", receipt.physical_device_api_version);
+        println!("queue_family_index={}", receipt.queue_family_index);
+    }
+
     #[test]
     #[ignore = "requires a Vulkan 1.3 validation runner"]
     fn real_vulkan_barrier_workload_matches_cpu_oracle() {
@@ -1978,6 +1999,14 @@ mod tests {
             receipt
                 .verify_against(&graph, &schedule, &plan, &observed)
                 .expect("receipt must independently verify");
+            print_receipt_evidence(
+                if graph.nodes.len() == 2 && plan.submissions.len() == 2 {
+                    "fixture"
+                } else {
+                    "hazard"
+                },
+                &receipt,
+            );
         }
 
         let (_, _, _, initial) = fixture();
