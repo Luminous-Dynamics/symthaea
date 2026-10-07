@@ -3021,7 +3021,16 @@ mod tests {
         assert!(report
             .events
             .iter()
-            .all(|event| (1..=REGIME_SHIFT_MAX_UPDATES).contains(&event.update_ordinal)));
+            .all(|event| {
+                event.action == MicroAction::Harvest
+                    && (1..=REGIME_SHIFT_MAX_UPDATES).contains(&event.update_ordinal)
+                    && event.shifted_validation_error_ratio >= 0.0
+                    && event.shifted_validation_error_ratio.is_finite()
+            }));
+        assert!(report
+            .revision_latency_updates
+            .map(|latency| latency <= report.update_count)
+            .unwrap_or(true));
     }
 
     #[test]
