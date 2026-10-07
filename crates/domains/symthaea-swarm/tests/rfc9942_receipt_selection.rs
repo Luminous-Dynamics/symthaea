@@ -136,4 +136,16 @@ fn parsed_noncanonical_receipt_wire_bytes_are_preserved() {
         Some(noncanonical_receipt.as_slice())
     );
     assert_eq!(parsed.to_cbor(), wire);
+
+    let canonical_decision = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
+    let parsed_decision = evaluate_priority_first_valid(&parsed, |_index, _| Ok(()));
+    assert_ne!(
+        canonical_decision.collection_sha256,
+        parsed_decision.collection_sha256
+    );
+    assert_ne!(
+        canonical_decision.selected_receipt_sha256,
+        parsed_decision.selected_receipt_sha256
+    );
+    assert_ne!(canonical_decision.digest(), parsed_decision.digest());
 }
