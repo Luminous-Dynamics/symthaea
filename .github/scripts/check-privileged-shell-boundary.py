@@ -146,6 +146,18 @@ def main() -> None:
         if required not in runner_body:
             fail(f"descriptor-bound script runner lost required primitive {required!r}")
 
+    # Secret credentials must never regain shell-owned cleanup. Native cleanup
+    # happens before terminal transaction journaling instead.
+    forbidden_secret_cleanup = (
+        'rm -f {pw_file}',
+        'rm -f "$LUKS_KEYFILE"',
+        'format!("trap',
+        'map(|path| format!("rm -f -- {}", path))',
+    )
+    for needle in forbidden_secret_cleanup:
+        if needle in text:
+            fail(f"secret material cleanup regressed to shell construction: {needle!r}")
+
     # Typed execution is closed-world: bare program names must first pass
     # through the trusted executable resolver, and the resolver must pin them
     # to the current NixOS system closure instead of PATH search.
