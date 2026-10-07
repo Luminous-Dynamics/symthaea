@@ -7160,10 +7160,11 @@ echo '}'
                     continue;
                 }
 
-                // Stage browser-supplied configuration through the filesystem API.
-                // Never interpolate it into a shell heredoc: a user-controlled
-                // delimiter must not become a command-injection boundary.
-                if let Err(e) = tokio::fs::write(&wc_config_path, client_msg.configuration_nix.as_bytes()).await {
+                // Stage browser-supplied configuration through one private, synchronized
+                // descriptor. There is no separate chmod step that can silently fail.
+                if let Err(error) =
+                    write_private_file(&wc_config_path, client_msg.configuration_nix.as_bytes(), 0o600)
+                {
                     let _ = tokio::fs::remove_file(&wc_preimage_path).await;
                     let outcome = finalize_transaction(
                         &transaction_ledger,
@@ -7176,34 +7177,7 @@ echo '}'
                             serde_json::json!({
                                 "type":"exit",
                                 "code": protocol_exit_code(1, outcome),
-                                "data": format!("Config staging could not be established: {}", e),
-                                "transaction": transaction.receipt(outcome)
-                            })
-                            .to_string(),
-                        ))
-                        .await;
-                    remove_transaction_artifact_dir(&transaction_dir);
-                    continue;
-                }
-                if let Err(e) = tokio::fs::set_permissions(
-                    &wc_config_path,
-                    std::os::unix::fs::PermissionsExt::from_mode(0o600),
-                )
-                .await
-                {
-                    let _ = tokio::fs::remove_file(&wc_config_path).await;
-                    let outcome = finalize_transaction(
-                        &transaction_ledger,
-                        &transaction,
-                        TransactionOutcome::Indeterminate,
-                        &peer_addr,
-                    );
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            serde_json::json!({
-                                "type":"exit",
-                                "code": protocol_exit_code(1, outcome),
-                                "data": format!("Config staging permissions could not be established: {}", e),
+                                "data": format!("Config staging could not be established: {}", error),
                                 "transaction": transaction.receipt(outcome)
                             })
                             .to_string(),
@@ -7251,7 +7225,7 @@ echo "REBUILD_COMPLETE"
                     preimage = wc_preimage_path
                 );
 
-                if let Err(e) = tokio::fs::write(&wc_script_path, rebuild_script.as_bytes()).await {
+                if let Err(error) = write_private_file(&wc_script_path, rebuild_script.as_bytes(), 0o700) {
                     let _ = tokio::fs::remove_file(&wc_config_path).await;
                     let _ = tokio::fs::remove_file(&wc_preimage_path).await;
                     let outcome = finalize_transaction(
@@ -7265,36 +7239,7 @@ echo "REBUILD_COMPLETE"
                             serde_json::json!({
                                 "type":"exit",
                                 "code": protocol_exit_code(1, outcome),
-                                "data": format!("Rebuild script staging could not be established: {}", e),
-                                "transaction": transaction.receipt(outcome)
-                            })
-                            .to_string(),
-                        ))
-                        .await;
-                    remove_transaction_artifact_dir(&transaction_dir);
-                    continue;
-                }
-                if let Err(e) = tokio::fs::set_permissions(
-                    &wc_script_path,
-                    std::os::unix::fs::PermissionsExt::from_mode(0o700),
-                )
-                .await
-                {
-                    let _ = tokio::fs::remove_file(&wc_config_path).await;
-                    let _ = tokio::fs::remove_file(&wc_preimage_path).await;
-                    let _ = tokio::fs::remove_file(&wc_script_path).await;
-                    let outcome = finalize_transaction(
-                        &transaction_ledger,
-                        &transaction,
-                        TransactionOutcome::Indeterminate,
-                        &peer_addr,
-                    );
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            serde_json::json!({
-                                "type":"exit",
-                                "code": protocol_exit_code(1, outcome),
-                                "data": format!("Rebuild script permissions could not be established: {}", e),
+                                "data": format!("Rebuild script staging could not be established: {}", error),
                                 "transaction": transaction.receipt(outcome)
                             })
                             .to_string(),
@@ -7347,64 +7292,52 @@ echo "REBUILD_COMPLETE"
                         .to_json(),
                     ))
                     .await;
-                let mut last_lines = 0u64;
+                let mut last_lines = 0usize;
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                    if let Ok(result) = run_cmd(&format!(
-                        "wc -l < {} 2>/dev/null && tail -n +{} {} 2>/dev/null",
-                        wc_log_path,
-                        last_lines + 1,
-                        wc_log_path
-                    ))
-                    .await
-                    {
-                        if result.exit_status == 0 {
-                            let lines: Vec<&str> = result.stdout.lines().collect();
-                            if let Some(first) = lines.first() {
-                                if let Ok(total) = first.trim().parse::<u64>() {
-                                    for line in &lines[1..] {
-                                        if !line.trim().is_empty() {
-                                            let _ = ws_tx
-                                                .send(Message::Text(
-                                                    RelayMessage::output(line, "stdout").to_json(),
-                                                ))
-                                                .await;
-                                            if line.contains("REBUILD_COMPLETE") {
-                                                complete = true;
-                                            }
-                                        }
+                    if let Ok(bytes) = tokio::fs::read(&wc_log_path).await {
+                        let text = String::from_utf8_lossy(&bytes);
+                        let lines: Vec<&str> = text.lines().collect();
+                        if lines.len() >= last_lines {
+                            for line in &lines[last_lines..] {
+                                if !line.trim().is_empty() {
+                                    let _ = ws_tx
+                                        .send(Message::Text(
+                                            RelayMessage::output(line, "stdout").to_json(),
+                                        ))
+                                        .await;
+                                    if line.contains("REBUILD_COMPLETE") {
+                                        complete = true;
                                     }
-                                    last_lines = total;
                                 }
                             }
+                            last_lines = lines.len();
                         }
                     }
                     if complete {
                         break;
                     }
-                    if let Ok(check) = run_cmd(&format!(
-                        "test -s {} || ! kill -0 \"$(cat {} 2>/dev/null)\" 2>/dev/null",
-                        wc_status_path,
-                        wc_pid_path
-                    ))
-                    .await
+                    if read_transaction_status(&wc_status_path)
+                        .await
+                        .ok()
+                        .flatten()
+                        .is_some()
                     {
-                        if check.exit_status == 0 {
-                            break;
-                        }
+                        break;
+                    }
+                    let pid = tokio::fs::read_to_string(&wc_pid_path)
+                        .await
+                        .ok()
+                        .and_then(|text| text.trim().parse::<u32>().ok())
+                        .unwrap_or(0);
+                    if !process_id_is_alive(pid) {
+                        break;
                     }
                 }
-                let rebuild_exit_code = match run_cmd(&format!(
-                    "cat {} 2>/dev/null",
-                    wc_status_path
-                ))
-                .await
-                {
-                    Ok(result) if result.exit_status == 0 => {
-                        result.stdout.trim().parse::<u32>().ok()
-                    }
-                    _ => None,
-                };
+                let rebuild_exit_code = read_transaction_status(&wc_status_path)
+                    .await
+                    .ok()
+                    .flatten();
                 let (exit_code, observed_outcome) = match rebuild_exit_code {
                     Some(0) => match verify_active_configuration(client_msg.configuration_nix.as_bytes()).await {
                         Ok(true) => (0, TransactionOutcome::ObservedSuccess),
@@ -7687,60 +7620,47 @@ echo "COMPLETE"
                     ))
                     .await;
 
-                let mut last_lines = 0u64;
+                let mut last_lines = 0usize;
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-
-                    if let Ok(result) = run_cmd(&format!(
-                        "wc -l < {} 2>/dev/null && tail -n +{} {} 2>/dev/null",
-                        img_log,
-                        last_lines + 1,
-                        img_log
-                    ))
-                    .await
-                    {
-                        if result.exit_status == 0 {
-                            let lines: Vec<&str> = result.stdout.lines().collect();
-                            if let Some(first) = lines.first() {
-                                if let Ok(total) = first.trim().parse::<u64>() {
-                                    for line in &lines[1..] {
-                                        if !line.trim().is_empty() {
-                                            let _ = ws_tx
-                                                .send(Message::Text(
-                                                    RelayMessage::output(line, "stdout").to_json(),
-                                                ))
-                                                .await;
-                                        }
-                                    }
-                                    last_lines = total;
+                    if let Ok(bytes) = tokio::fs::read(&img_log).await {
+                        let text = String::from_utf8_lossy(&bytes);
+                        let lines: Vec<&str> = text.lines().collect();
+                        if lines.len() >= last_lines {
+                            for line in &lines[last_lines..] {
+                                if !line.trim().is_empty() {
+                                    let _ = ws_tx
+                                        .send(Message::Text(
+                                            RelayMessage::output(line, "stdout").to_json(),
+                                        ))
+                                        .await;
                                 }
                             }
+                            last_lines = lines.len();
                         }
                     }
-
-                    if let Ok(check) = run_cmd(&format!(
-                        "test -s {} || ! kill -0 \\"$(cat {} 2>/dev/null)\\" 2>/dev/null",
-                        img_status, img_pid
-                    ))
-                    .await
+                    if read_transaction_status(&img_status)
+                        .await
+                        .ok()
+                        .flatten()
+                        .is_some()
                     {
-                        if check.exit_status == 0 {
-                            break;
-                        }
+                        break;
+                    }
+                    let pid = tokio::fs::read_to_string(&img_pid)
+                        .await
+                        .ok()
+                        .and_then(|text| text.trim().parse::<u32>().ok())
+                        .unwrap_or(0);
+                    if !process_id_is_alive(pid) {
+                        break;
                     }
                 }
 
-                let image_exit_code = match run_cmd(&format!(
-                    "cat {} 2>/dev/null",
-                    img_status
-                ))
-                .await
-                {
-                    Ok(result) if result.exit_status == 0 => {
-                        result.stdout.trim().parse::<u32>().ok()
-                    }
-                    _ => None,
-                };
+                let image_exit_code = read_transaction_status(&img_status)
+                    .await
+                    .ok()
+                    .flatten();
                 let (response_code, observed_outcome, image_commitment) = match image_exit_code {
                     Some(0) => match verify_image_artifact(&image_dest).await {
                         Ok(true) => match commit_image_bundle(&image_dest).await {
