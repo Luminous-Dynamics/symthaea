@@ -118,6 +118,11 @@ pub use systemd_observer::{
 pub use systemd_mutation::{
     NixSystemdLifecycleMutationTransportV1, NixSystemdMutationTransportErrorV1,
 };
+#[cfg(all(feature = "systemd-observer", feature = "systemd-mutation"))]
+pub use systemd_lifecycle::{
+    NixSystemdLifecycleEvidenceV2, NixSystemdLifecycleTransactionErrorV2,
+    NixSystemdLifecycleTransactionV2,
+};
 pub use service_state::{
     NixServiceEnablementEvidenceV1,
     NixServiceOperationCapabilitiesV1,
