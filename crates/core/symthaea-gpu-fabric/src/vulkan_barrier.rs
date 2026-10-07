@@ -50,6 +50,8 @@ pub enum VulkanBarrierError {
     MultipleLogicalQueues,
     #[error("invalid semantic schedule: {0}")]
     Schedule(crate::ScheduleError),
+    #[error("invalid execution graph: {0}")]
+    Graph(crate::GraphError),
     #[error("non-canonical Vulkan synchronization plan: {0}")]
     SyncPlan(crate::VulkanSyncError),
     #[error("resource {0} has no initial binding")]
@@ -319,9 +321,7 @@ impl VulkanBarrierWorkloadRuntime {
         for (resource, value) in &observed { digests.insert(resource.clone(), resource_digest(value)); }
         let receipt = VulkanBarrierExecutionReceipt {
             version: RECEIPT_VERSION,
-            graph_digest: graph.digest_hex().map_err(|_| VulkanBarrierError::Schedule(
-                crate::ScheduleError::UnsupportedVersion(schedule.version),
-            ))?,
+            graph_digest: graph.digest_hex().map_err(VulkanBarrierError::Graph)?,
             schedule_digest: schedule.digest_hex().map_err(|_| VulkanBarrierError::Schedule(
                 crate::ScheduleError::UnsupportedVersion(schedule.version),
             ))?,
@@ -441,7 +441,10 @@ impl WorkloadBuffer {
             if bytes.len() < self.allocation_size as usize { ptr::write_bytes(mapped.cast::<u8>().add(bytes.len()), 0, self.allocation_size as usize - bytes.len()); }
             if !self.coherent {
                 let range = vk::MappedMemoryRange::default().memory(self.memory).offset(0).size(vk::WHOLE_SIZE);
-                device.flush_mapped_memory_ranges(std::slice::from_ref(&range)).map_err(VulkanBarrierError::Vk)?;
+                if let Err(error) = device.flush_mapped_memory_ranges(std::slice::from_ref(&range)) {
+                    device.unmap_memory(self.memory);
+                    return Err(VulkanBarrierError::Vk(error));
+                }
             }
             device.unmap_memory(self.memory);
         }
@@ -453,7 +456,10 @@ impl WorkloadBuffer {
         let mapped = unsafe { device.map_memory(self.memory, 0, self.allocation_size, vk::MemoryMapFlags::empty()).map_err(VulkanBarrierError::Vk)? };
         if !self.coherent {
             let range = vk::MappedMemoryRange::default().memory(self.memory).offset(0).size(vk::WHOLE_SIZE);
-            unsafe { device.invalidate_mapped_memory_ranges(std::slice::from_ref(&range)).map_err(VulkanBarrierError::Vk)?; }
+            if let Err(error) = unsafe { device.invalidate_mapped_memory_ranges(std::slice::from_ref(&range)) } {
+                unsafe { device.unmap_memory(self.memory); }
+                return Err(VulkanBarrierError::Vk(error));
+            }
         }
         let mut bytes = vec![0_u8; len];
         unsafe { ptr::copy_nonoverlapping(mapped.cast::<u8>(), bytes.as_mut_ptr(), len); device.unmap_memory(self.memory); }
