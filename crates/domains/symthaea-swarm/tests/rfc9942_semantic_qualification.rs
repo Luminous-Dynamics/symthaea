@@ -1191,6 +1191,21 @@ fn rfc9942_unprotected_receipt_priority_is_explicit_transport_provenance() {
         symthaea_swarm::semantic_evidence_vds::Rfc9942ReceiptPlacement::Unprotected
     );
     assert_eq!(first_state.outer_signature_sha256(), outer_signature_sha256);
+    let first_unprotected_header_sha256: [u8; 32] =
+        sha2::Sha256::digest(&first_outer.unprotected_header_bytes()).into();
+    assert_eq!(
+        first_state.outer_unprotected_header_sha256(),
+        first_unprotected_header_sha256
+    );
+    let first_receipt_unprotected_sha256: [u8; 32] =
+        sha2::Sha256::digest(
+            &first_outer.receipts().unwrap().receipts()[0].unprotected_header_bytes()
+        )
+        .into();
+    assert_eq!(
+        first_state.receipt().unprotected_header_sha256(),
+        first_receipt_unprotected_sha256
+    );
     let first_collection_sha256: [u8; 32] = sha2::Sha256::digest(&first_collection).into();
     assert_eq!(
         first_state.receipt_collection_sha256(),
@@ -1233,6 +1248,16 @@ fn rfc9942_unprotected_receipt_priority_is_explicit_transport_provenance() {
     assert_eq!(
         swapped_state.receipt_collection_sha256(),
         swapped_collection_sha256
+    );
+    let swapped_unprotected_header_sha256: [u8; 32] =
+        sha2::Sha256::digest(&swapped_outer.unprotected_header_bytes()).into();
+    assert_eq!(
+        swapped_state.outer_unprotected_header_sha256(),
+        swapped_unprotected_header_sha256
+    );
+    assert_ne!(
+        swapped_state.outer_unprotected_header_sha256(),
+        first_state.outer_unprotected_header_sha256()
     );
     assert_ne!(
         swapped_state.receipt_collection_sha256(),
@@ -1801,9 +1826,15 @@ fn detached_inclusion_state_derives_and_binds_root() {
         sig,
     ).unwrap();
 
+    let expected_unprotected_header_sha256: [u8; 32] =
+        sha2::Sha256::digest(&receipt.unprotected_header_bytes()).into();
     let state = receipt
         .verify_es256_inclusion_state(candidate, &key, &[], None)
         .unwrap();
+    assert_eq!(
+        state.unprotected_header_sha256(),
+        expected_unprotected_header_sha256
+    );
     assert_eq!(
         state.payload_mode(),
         symthaea_swarm::semantic_evidence_vds::Rfc9942PayloadMode::Detached
