@@ -406,6 +406,45 @@ mod tests {
     }
 
     #[test]
+    fn sync_receipt_binds_plan_digest() {
+        let plan = test_plan();
+        let digest = plan.digest_hex().unwrap();
+        let receipt = VulkanSyncExecutionReceipt {
+            version: VULKAN_SYNC_RECEIPT_VERSION,
+            sync_plan_digest: digest.clone(),
+            queue_count: plan.queue_count,
+            submitted_nodes: plan.submissions.len() as u32,
+            expected_final_values: vec![1, 1],
+            observed_final_values: vec![1, 1],
+            vulkan_api_version: VULKAN_SYNC_API_VERSION,
+        };
+        receipt.verify_against(&plan).unwrap();
+        let mut tampered = receipt;
+        tampered.sync_plan_digest.replace_range(..8, "deadbeef");
+        assert!(matches!(
+            tampered.verify_against(&plan),
+            Err(VulkanSyncRuntimeError::PlanDigestMismatch)
+        ));
+    }
+
+    #[test]
+    fn sync_receipt_rejects_unreached_timeline() {
+        let plan = test_plan();
+        let receipt = VulkanSyncExecutionReceipt {
+            version: VULKAN_SYNC_RECEIPT_VERSION,
+            sync_plan_digest: plan.digest_hex().unwrap(),
+            queue_count: plan.queue_count,
+            submitted_nodes: plan.submissions.len() as u32,
+            expected_final_values: vec![1, 1],
+            observed_final_values: vec![1, 0],
+            vulkan_api_version: VULKAN_SYNC_API_VERSION,
+        };
+        assert!(matches!(
+            receipt.verify_against(&plan),
+            Err(VulkanSyncRuntimeError::ReceiptCompletionMismatch { queue: 1, .. })
+        ));
+    }
+    #[test]
     #[ignore = "requires a Vulkan 1.3 qualification runner"]
     fn real_vulkan_timeline_submission_reaches_completion() {
         let mut runtime = VulkanSyncRuntime::new().expect("qualified Vulkan 1.3 device");
