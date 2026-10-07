@@ -5202,6 +5202,26 @@ mod tests {
             binding.validate_against_rolling(&plan, &alternate_qualification, &alternate_dependence),
             Err(RelationalPredictionError::InvalidEvidenceInputDigest)
         );
+
+        let alternate_plan = ForecastInferencePlan::new(
+            config.forecast_horizon,
+            plan.origin_schedule_sha256.clone(),
+            "different-nested-procedure-v1",
+            plan.procedure_spec_sha256.clone(),
+            plan.dependence_method_id.clone(),
+            plan.dependence_spec_sha256.clone(),
+            plan.resampling_method_id.clone(),
+            plan.resampling_spec_sha256.clone(),
+            plan.small_sample_policy_id.clone(),
+            plan.multiplicity_policy_id.clone(),
+            plan.alpha,
+            qualification.qualification_identity_blake3.clone(),
+        )
+        .unwrap();
+        assert_eq!(
+            binding.validate_against_rolling(&alternate_plan, &qualification, &dependence),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
     }
 
     #[test]
