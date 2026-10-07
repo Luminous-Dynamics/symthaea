@@ -296,7 +296,7 @@ pub enum NeurosemanticRemediationMetricDirection {
     DescriptiveOnly,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NeurosemanticRemediationUncertainty {
     NotEstimated,
     Interval {
@@ -667,7 +667,7 @@ impl NeurosemanticRemediationMeasurementArtifact {
             if definition.kind != measurement.kind {
                 return Err("neurosemantic remediation measurement kind disagrees with metric definition".into());
             }
-            match measurement.uncertainty {
+            match &measurement.uncertainty {
                 NeurosemanticRemediationUncertainty::NotEstimated => {}
                 NeurosemanticRemediationUncertainty::Interval {
                     lower_numerator,
@@ -3250,7 +3250,7 @@ impl AuthorizedNeurosemanticMessage {
             || provenance.policy_provenance_hash
                 != self.packet.data_policy.handling.policy_provenance_hash
             || provenance.handling_policy_fingerprint
-                != self.packet.data_policy.handling.fingerprint()?
+                != self.packet.data_policy.handling.fingerprint_for_attestation()?
             || provenance.authority_ref.is_empty()
             || provenance.key_ref.is_empty()
             || now_unix_s >= provenance.attestation_expires_at_unix_s
