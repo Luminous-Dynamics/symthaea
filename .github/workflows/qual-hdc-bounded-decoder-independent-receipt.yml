@@ -58,7 +58,7 @@ jobs:
             ].sort();
 
             const expectedSourceBlobShas = {
-              .github/workflows/hdc-linear-code-syndrome-qualify.yml:
+              '.github/workflows/hdc-linear-code-syndrome-qualify.yml':
                 'e26dd53340d9ebf0ed1461d3d50704351d38ca33',
               'crates/core/symthaea-core/src/hdc/mod.rs':
                 '17b297a167b57f22070a50115f4967b820f911c1',
