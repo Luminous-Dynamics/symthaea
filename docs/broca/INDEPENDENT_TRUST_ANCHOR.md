@@ -32,6 +32,8 @@ GitHub documents that `workflow_run` workflows execute from the default branch. 
 
 The verifier deliberately does not consume or execute artifacts from the triggering workflow. This follows GitHub's security guidance that artifacts from preceding workflows must be treated as untrusted data.
 
+The workflow also observes `requested` and `in_progress` activity types. Those early events publish a pending commit status, invalidating any earlier success before a new qualifying run can complete. GitHub documents these activity types for `workflow_run`; `requested` is not emitted for a re-run, so `in_progress` remains the early invalidation path for re-runs.
+
 ## Evidence chain
 
 The resulting control-plane chain is:
