@@ -148,6 +148,25 @@ This metric answers a different question from one-step MAE:
 A large gap between one-step MAE and continuous-rollout MAE is evidence of temporal model mismatch,
 even when the one-step predictor looks strong.
 
+### Multi-horizon profile
+
+The qualification harness evaluates a frozen model at 1, 2, 4, and 8 environment steps.
+
+Each horizon reports mean one-step error from the same visited states, terminal error after continuous
+rollout over the horizon, and the terminal-to-one-step error ratio. This distinguishes local predictive
+skill from dynamics that actually compose over time.
+
+### Policy-induced distribution shift
+
+A second frozen evaluation lets the model choose its own actions with the horizon-aware policy.
+
+The environment advances using those chosen actions, but the model is not updated during scoring.
+The resulting predictor MAE is compared with the fixed-schedule held-out MAE.
+
+A rising ratio indicates that the model becomes less reliable on states induced by its own policy.
+This directly tests a control-specific failure mode: a planner can move the environment into states that
+were rare or absent during training.
+
 ### Planning quality
 
 The horizon-aware policy already computes deterministic oracle horizon regret.
@@ -170,6 +189,8 @@ not yet demonstrated robust predictive structure.
 |---|---|
 | Training MAE falls, held-out MAE does not | adaptation may be memorizing scenario-specific dynamics |
 | One-step MAE improves, continuous-rollout MAE remains high | the learned transition does not compose coherently over the temporal horizon |
+| Multi-horizon terminal error grows rapidly with horizon | the model has short-range predictive skill without reliable long-horizon dynamics |
+| Policy-induced error ratio rises above fixed-schedule error | the model is vulnerable to its own policy-induced distribution shift |
 | Held-out MAE improves, confidence ECE worsens | prediction improves but confidence is not calibrated |
 | Held-out MAE improves, survival does not | predictive knowledge is not causally reaching useful action selection |
 | Survival improves, oracle regret does not | hard-coded homeostatic biases may dominate the benefit |
@@ -188,14 +209,15 @@ A future green qualification should report all of:
 2. exact scenario definitions and perturbation schedule;
 3. training/frozen boundary;
 4. model and policy configuration;
-5. prediction accuracy;
-6. confidence calibration;
-7. survival and minimum viability margin;
-8. perturbation recovery;
-9. oracle horizon regret;
-10. persistence comparator;
-11. held-out transfer;
-12. trace/invariant verification where action evidence is recorded.
+5. one-step and multi-horizon temporal prediction accuracy;
+6. policy-induced distribution-shift error;
+7. confidence calibration;
+8. survival and minimum viability margin;
+9. perturbation recovery;
+10. oracle horizon regret;
+11. persistence comparator;
+12. held-out transfer;
+13. trace/invariant verification where action evidence is recorded.
 
 Queued CI is not a pass.
 
