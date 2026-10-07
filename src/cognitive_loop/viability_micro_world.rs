@@ -173,6 +173,47 @@ impl MicroWorld {
     }
 }
 
+/// Train/evaluate a fresh predictor independently on each scenario.
+///
+/// Unlike evaluate_predictor_suite, this prevents learning on scenario A from
+/// changing the initial conditions for scenario B. It is the preferred benchmark
+/// for reporting generalization across environments.
+pub fn evaluate_predictor_suite_fresh<P, F>(
+    mut factory: F,
+    max_cycles: u64,
+) -> MicroWorldSuiteReport
+where
+    P: MicroWorldPredictor,
+    F: FnMut() -> P,
+{
+    let scenarios = benchmark_scenarios();
+    let mut reports = Vec::with_capacity(scenarios.len());
+
+    for scenario in &scenarios {
+        let mut predictor = factory();
+        reports.push(evaluate_predictor_scenario(
+            &mut predictor,
+            scenario,
+            max_cycles,
+        ));
+    }
+
+    let episodes = reports.len();
+    let denom = episodes.max(1) as f64;
+    MicroWorldSuiteReport {
+        episodes,
+        total_steps: reports.iter().map(|r| r.steps).sum(),
+        mean_baseline_mae: reports.iter().map(|r| r.baseline_mae).sum::<f64>() / denom,
+        mean_predictor_mae: reports.iter().map(|r| r.predictor_mae).sum::<f64>() / denom,
+        mean_improvement: reports
+            .iter()
+            .map(MicroWorldReport::improvement_over_baseline)
+            .sum::<f64>()
+            / denom,
+        survival_rate: reports.iter().map(|r| r.survival_ratio).sum::<f64>() / denom,
+    }
+}
+
 /// Ground-truth deterministic transition function.
 ///
 /// The action effects are intentionally simple enough that a learned predictor can
@@ -929,6 +970,16 @@ mod tests {
         let scenarios = benchmark_scenarios();
         assert!(scenarios.len() >= 4);
         assert!(scenarios.windows(2).any(|w| w[0].initial != w[1].initial));
+    }
+
+    #[test]
+    fn fresh_suite_does_not_share_predictor_state_between_episodes() {
+        let report = evaluate_predictor_suite_fresh(
+            WorldModelBridgePredictor::default,
+            24,
+        );
+        assert_eq!(report.episodes, 4);
+        assert!(report.mean_predictor_mae > 0.0);
     }
 
     #[test]
