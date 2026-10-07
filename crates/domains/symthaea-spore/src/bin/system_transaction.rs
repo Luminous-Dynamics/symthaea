@@ -178,7 +178,10 @@ pub(crate) struct ArtifactCommitment {
 }
 
 fn validate_artifact_commitment(artifact: &ArtifactCommitment) -> Result<(), String> {
-    if !matches!(artifact.name.as_str(), "system.btrfs.zst" | "system.tar.gz") {
+    if !matches!(
+        artifact.name.as_str(),
+        "system.btrfs.zst" | "system.tar.gz" | "configuration.nix"
+    ) {
         return Err(format!(
             "artifact commitment has an unsupported filename: {}",
             artifact.name
@@ -1298,6 +1301,35 @@ mod tests {
         assert_eq!(receipt.transaction_id, tx.transaction_id);
         assert_eq!(receipt.request_digest, tx.request_digest);
         assert_eq!(receipt.outcome, TransactionOutcome::ObservedSuccess);
+    }
+
+    #[test]
+    fn artifact_commitment_allows_archive_and_required_configuration_sidecar_only() {
+        let archive = ArtifactCommitment {
+            name: "system.tar.gz".into(),
+            size: 1,
+            digest: "a".repeat(64),
+        };
+        let btrfs = ArtifactCommitment {
+            name: "system.btrfs.zst".into(),
+            size: 1,
+            digest: "b".repeat(64),
+        };
+        let configuration = ArtifactCommitment {
+            name: "configuration.nix".into(),
+            size: 1,
+            digest: "c".repeat(64),
+        };
+        assert!(validate_artifact_commitment(&archive).is_ok());
+        assert!(validate_artifact_commitment(&btrfs).is_ok());
+        assert!(validate_artifact_commitment(&configuration).is_ok());
+
+        let hardware = ArtifactCommitment {
+            name: "hardware-configuration.nix".into(),
+            size: 1,
+            digest: "d".repeat(64),
+        };
+        assert!(validate_artifact_commitment(&hardware).is_err());
     }
 
     #[test]
