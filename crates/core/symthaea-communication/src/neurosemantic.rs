@@ -4642,7 +4642,7 @@ mod tests {
             scope_ref: "forget-set-v1".into(),
             unit_ref: "proportion".into(),
             aggregation_ref: "per-item-rate".into(),
-            direction: NeurosemanticRemediationMetricDirection::DescriptiveOnly,
+            direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
         };
         let observation_set = NeurosemanticRemediationObservationSetArtifact {
             schema_version: NEUROSEMANTIC_REMEDIATION_OBSERVATION_SET_SCHEMA_VERSION,
@@ -4772,7 +4772,7 @@ mod tests {
             scope_ref: "forget-set-v1".into(),
             unit_ref: "proportion".into(),
             aggregation_ref: "per-item-rate".into(),
-            direction: NeurosemanticRemediationMetricDirection::DescriptiveOnly,
+            direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
         };
         let observation_set_hash = content_hash(b"observation-set-uncertainty");
         let assumptions_hash = content_hash(b"synthetic-structural-assumptions");
@@ -4876,7 +4876,7 @@ mod tests {
                 scope_ref: "evaluation-set-v1".into(),
                 unit_ref: "proportion".into(),
                 aggregation_ref: "per-item-rate".into(),
-                direction: NeurosemanticRemediationMetricDirection::DescriptiveOnly,
+                direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
             })
             .collect();
         let measured = NeurosemanticRemediationMeasurementArtifact {
