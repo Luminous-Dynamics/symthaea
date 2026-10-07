@@ -386,6 +386,17 @@ pub enum NeurosemanticRemediationUncertainty {
     },
 }
 
+/// Target population model for an uncertainty calculation.
+///
+/// FixedEvaluationPopulation describes uncertainty only within the exact frozen
+/// evaluation population. Superpopulation permits inferential claims beyond that
+/// frozen population under the declared sampling assumptions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum NeurosemanticRemediationUncertaintyInferenceScope {
+    FixedEvaluationPopulation,
+    Superpopulation,
+}
+
 /// Content-addressed output record for a declared uncertainty calculation.
 ///
 /// This binds the uncertainty result to the exact metric definition, observation set,
@@ -404,6 +415,7 @@ pub struct NeurosemanticRemediationUncertaintyComputationArtifact {
     pub upper_numerator: i64,
     pub scale: u32,
     pub confidence_level_bps: u16,
+    pub inference_scope: NeurosemanticRemediationUncertaintyInferenceScope,
     pub method_ref: String,
     /// Content-addressed assumptions statement used by the uncertainty procedure.
     pub assumptions_hash: String,
@@ -665,7 +677,7 @@ pub const NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION: u16 = 3;
 pub const NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION: u16 = 1;
 pub const NEUROSEMANTIC_REMEDIATION_OBSERVATION_SET_SCHEMA_VERSION: u16 = 1;
 pub const NEUROSEMANTIC_REMEDIATION_METRIC_COMPUTATION_SCHEMA_VERSION: u16 = 1;
-pub const NEUROSEMANTIC_REMEDIATION_UNCERTAINTY_COMPUTATION_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_REMEDIATION_UNCERTAINTY_COMPUTATION_SCHEMA_VERSION: u16 = 2;
 const MAX_NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITIONS: usize = 32;
 const MAX_NEUROSEMANTIC_REMEDIATION_METRIC_TEXT_BYTES: usize = 256;
 const MAX_NEUROSEMANTIC_REMEDIATION_OBSERVATIONS: usize = 4096;
@@ -679,6 +691,7 @@ fn validate_uncertainty_method_application(
     method_ref: &str,
     unit_ref: &str,
     aggregation_ref: &str,
+    inference_scope: NeurosemanticRemediationUncertaintyInferenceScope,
 ) -> Result<(), String> {
     if method_ref != NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF {
         return Ok(());
@@ -691,6 +704,12 @@ fn validate_uncertainty_method_application(
     {
         return Err(
             "neurosemantic remediation Wilson uncertainty method is only valid for single-proportion failure-rate metrics"
+                .into(),
+        );
+    }
+    if inference_scope != NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation {
+        return Err(
+            "neurosemantic remediation Wilson uncertainty method requires an explicit superpopulation inference scope"
                 .into(),
         );
     }
@@ -1505,8 +1524,11 @@ impl NeurosemanticRemediationImpactArtifact {
                         uncertainty.method_ref.as_str(),
                         definition.unit_ref.as_str(),
                         definition.aggregation_ref.as_str(),
+                        uncertainty.inference_scope,
                     )?;
-                    if uncertainty.confidence_level_bps != 9_500
+                    if uncertainty.inference_scope
+                            != NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation
+                        || uncertainty.confidence_level_bps != 9_500
                         || uncertainty.assumptions_ref
                             != NEUROSEMANTIC_REMEDIATION_WILSON_95_ASSUMPTIONS_REF
                         || uncertainty.assumptions_hash
@@ -4581,7 +4603,7 @@ mod tests {
         assert!(impact.verify_evaluation_method_bytes(NeurosemanticRemediationEvaluationMethodKind::RecoveryAttack, &serde_json::to_vec(&revision_swap).unwrap()).is_err());
 
         let mut legacy = impact.clone();
-        legacy.schema_version = 0;
+        legacy.schema_version = 1;
         assert!(NeurosemanticRemediationImpactArtifact::from_json_bytes(&serde_json::to_vec(&legacy).unwrap()).is_err());
 
         let mut invalid_roles = impact.clone();
@@ -5025,6 +5047,7 @@ mod tests {
             upper_numerator: 1,
             scale: 4,
             confidence_level_bps: 9_500,
+            inference_scope: NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation,
             method_ref: "synthetic-structural-interval-v1".into(),
             assumptions_hash,
             assumptions_ref: "synthetic-structural-assumptions-v1".into(),
@@ -5076,18 +5099,39 @@ mod tests {
             NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF,
             "proportion",
             "worst-subgroup-gap",
+            NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation,
         )
         .is_err());
         assert!(validate_uncertainty_method_application(
             NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF,
             "count",
             "per-item-rate",
+            NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation,
         )
         .is_err());
         assert!(validate_uncertainty_method_application(
             NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF,
             "proportion",
             "per-item-rate",
+            NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation,
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn remediation_wilson_method_requires_superpopulation_scope() {
+        assert!(validate_uncertainty_method_application(
+            NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF,
+            "proportion",
+            "per-item-rate",
+            NeurosemanticRemediationUncertaintyInferenceScope::FixedEvaluationPopulation,
+        )
+        .is_err());
+        assert!(validate_uncertainty_method_application(
+            NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF,
+            "proportion",
+            "per-item-rate",
+            NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation,
         )
         .is_ok());
     }
