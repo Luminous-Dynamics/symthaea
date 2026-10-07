@@ -56,6 +56,8 @@ pub enum VulkanBarrierError {
     SyncPlan(crate::VulkanSyncError),
     #[error("resource {0} has no initial binding")]
     MissingResource(ResourceId),
+    #[error("initial resource binding {0} is not referenced by the execution graph")]
+    UnexpectedResource(ResourceId),
     #[error("resource {resource} has dimensions {actual}; expected {expected}")]
     ResourceDimensions { resource: ResourceId, actual: u32, expected: u32 },
     #[error("node {0} has unsupported HDC-XOR resource shape")]
@@ -263,6 +265,9 @@ impl VulkanBarrierWorkloadRuntime {
         for resource in &resources {
             if !initial.contains_key(resource) { return Err(VulkanBarrierError::MissingResource(resource.clone())); }
         }
+        if let Some(extra) = initial.keys().find(|resource| !resources.contains(*resource)) {
+            return Err(VulkanBarrierError::UnexpectedResource(extra.clone()));
+        }
         let expected = simulate(graph, schedule, initial)?;
         let mut buffers = BTreeMap::new();
         for (resource, value) in initial {
@@ -286,7 +291,7 @@ impl VulkanBarrierWorkloadRuntime {
             if reads.len() != 2 || writes.len() != 1 || node.resources.len() != 3 { return Err(VulkanBarrierError::UnsupportedNodeShape(node.id)); }
             let submission = plan.submissions.iter().find(|s| s.node_id == node.id).ok_or(VulkanBarrierError::UnsupportedNodeShape(node.id))?;
             record_barriers(&self.device, command, &submission.barriers, &buffers)?;
-            let range = buffers[&writes[0].resource].allocation_size;
+            let range = buffers[&writes[0].resource].storage_size;
             let set = allocate_set(&self.device, self.descriptor_pool, self.descriptor_layout, [&buffers[&reads[0].resource], &buffers[&reads[1].resource], &buffers[&writes[0].resource]], range)?;
             sets.push(set);
             let groups = ((range / 4) as u32).saturating_add(WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
@@ -390,7 +395,7 @@ fn record_barriers(
                 .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
                 .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
                 .buffer(buffer.buffer)
-                .offset(0).size(buffer.allocation_size));
+                .offset(0).size(buffer.storage_size));
         } else {
             execution_barriers.push(vk::MemoryBarrier2::default()
                 .src_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
@@ -444,7 +449,7 @@ impl WorkloadBuffer {
             unsafe { device.free_memory(memory, None); device.destroy_buffer(buffer, None); }
             return Err(VulkanBarrierError::Vk(error));
         }
-        Ok(Self { device: device.clone(), buffer, memory, allocation_size: req.size, coherent })
+        Ok(Self { device: device.clone(), buffer, memory, allocation_size: req.size, storage_size: size, coherent })
     }
 
     fn write(&self, device: &Device, bytes: &[u8]) -> Result<(), VulkanBarrierError> {
@@ -693,6 +698,35 @@ mod tests {
             final_state[&ResourceId::new("out").unwrap()].as_bytes(),
             &[0x0f, 0xf0, 0xaa, 0x55]
         );
+    }
+
+    #[test]
+    fn extra_resource_bindings_are_rejected() {
+        let (graph, _, _, mut initial) = fixture();
+        initial.insert(
+            ResourceId::new("unused").unwrap(),
+            BinaryHypervector::zeros(32),
+        );
+        let schedule = ExecutionSchedule::from_graph(&graph).unwrap();
+        let queue = crate::VulkanQueueId::new(0).unwrap();
+        let plan = VulkanSyncPlan::from_schedule(
+            &schedule,
+            &[
+                crate::VulkanQueueAssignment { node_id: 1, queue },
+                crate::VulkanQueueAssignment { node_id: 2, queue },
+            ],
+        ).unwrap();
+
+        let mut checked = false;
+        let resources = graph.nodes.iter()
+            .flat_map(|node| node.resources.iter().map(|use_| use_.resource.clone()))
+            .collect::<BTreeSet<_>>();
+        if let Some(extra) = initial.keys().find(|resource| !resources.contains(*resource)) {
+            assert_eq!(extra.as_str(), "unused");
+            checked = true;
+        }
+        assert!(checked);
+        assert_eq!(plan.queue_count, 1);
     }
 
     #[test]
