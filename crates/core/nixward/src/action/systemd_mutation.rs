@@ -165,6 +165,22 @@ impl NixSystemdLifecycleMutationTransportV1 {
             .await?;
 
         validate_job_object_path(&job_path)?;
+
+        // A manager or bus rollover during the D-Bus RPC invalidates the dispatch
+        // as qualifying evidence even if a Job path was returned.
+        let final_owner: String = bus
+            .call("GetNameOwner", &(SYSTEMD_DESTINATION,))
+            .await?;
+        if final_owner != manager_owner {
+            return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
+        }
+        let final_bus_id: String = bus.call("GetId", &()).await?;
+        validate_bus_id(&final_bus_id)?;
+        if final_bus_id != expected_bus_id {
+            return Err(NixSystemdMutationTransportErrorV1::BusIncarnationChanged);
+        }
+
+        validate_job_object_path(&job_path)?;
         Ok(job_path)
     }
 
