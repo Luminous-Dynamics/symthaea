@@ -672,6 +672,18 @@ The deterministic micro-world is intentionally simple. Its role is to establish 
 oracle and a reproducible experimental boundary before attempting to qualify real
 HDC/CfC/FEP predictions.
 
+The first live integration is also now observational: `CognitiveLoopService` owns a
+`ViabilityFabric`, initializes it with bounded capacity, refreshes canonical thermodynamic
+load and prediction/error state each cycle, and exports a `ViabilityTelemetry` view through
+the existing `CycleMetadata` stream. This deliberately introduces no homeostatic policy
+change yet. The measured state therefore cannot silently change behavior while we establish
+the telemetry baseline.
+
+The world-model bridge has also gained a lightweight action-conditioned delta model with
+evidence-weighted confidence. Confidence rises with repeated accurate transitions and is
+suppressed by persistent prediction error. A predictor can therefore be routed into a
+policy only after accumulating actual transition evidence.
+
 The first benchmark questions are therefore:
 
 1. Can a predictor beat persistence?
