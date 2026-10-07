@@ -659,30 +659,42 @@ The RFC's first qualification layer is now implemented on the RFC branch:
 - `src/cognitive_loop/viability_micro_world.rs`
   - deterministic six-action environment;
   - replay-stable transition function;
+  - deterministic perturbation schedule for recovery testing;
   - persistence predictor baseline;
   - generic predictor trait with evidence-weighted confidence;
   - prediction-error evaluator;
   - scenario suite;
   - episode-isolated online-adaptation suite;
   - frozen held-out cross-scenario transfer protocol;
+  - side-effect-free multi-step counterfactual rollouts;
   - survival-aware homeostatic policy;
-  - closed-loop policy runner.
+  - scenario-aware reactive and horizon runners.
 
 The deterministic micro-world is intentionally simple. Its role is to establish a test
 oracle and a reproducible experimental boundary before attempting to qualify real
 HDC/CfC/FEP predictions.
 
-The first live integration is also now observational: `CognitiveLoopService` owns a
-`ViabilityFabric`, initializes it with bounded capacity, refreshes canonical thermodynamic
-load and prediction/error state each cycle, and exports a `ViabilityTelemetry` view through
-the existing `CycleMetadata` stream. This deliberately introduces no homeostatic policy
-change yet. The measured state therefore cannot silently change behavior while we establish
-the telemetry baseline.
+The first live integration is observational: `FepModule` owns a bounded
+`ViabilityFabric`, refreshes canonical thermodynamic load, canonical FEP energy reserve,
+and prediction/error state each cycle, and exports a `ViabilityTelemetry` view through the
+existing `CycleMetadata` stream. The existing temporal planning-depth factor also has an
+opt-in viability modulation; it is neutral by default. The measured state therefore cannot
+silently change behavior while the control path remains disabled during qualification.
+
+The fabric derives finite-difference trends for observed viability variables. Worsening
+movement toward a preferred-band boundary can contribute anticipatory pressure before the
+absolute state becomes critical. Absolute state pressure and rate pressure remain separate
+inside the variable representation, allowing later ablations of reactive versus anticipatory
+regulation.
 
 The world-model bridge has also gained a lightweight action-conditioned delta model with
 evidence-weighted confidence. Confidence rises with repeated accurate transitions and is
 suppressed by persistent prediction error. A predictor can therefore be routed into a
 policy only after accumulating actual transition evidence.
+
+The action model reports confidence as evidence quantity multiplied by empirical accuracy.
+Persistent prediction error therefore suppresses confidence instead of allowing repetition
+to manufacture certainty.
 
 The micro-world policy layer now evaluates finite counterfactual horizons. It tracks the
 minimum confidence and minimum predicted viability margin across the imagined trajectory,
