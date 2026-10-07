@@ -402,6 +402,14 @@ def approved_snapshot(
     if not isinstance(approved, list) or not approved:
         raise VerificationError("independent trust policy has no approved file snapshot")
 
+    approved_paths = [
+        item.get("path") for item in approved if isinstance(item, dict)
+    ]
+    if len(set(approved_paths)) != len(approved_paths):
+        raise VerificationError(
+            "independent trust policy contains duplicate file paths"
+        )
+
     expected_keys = {
         (item.get("path"), item.get("status"), item.get("blob_sha"))
         for item in approved
@@ -410,6 +418,12 @@ def approved_snapshot(
     if len(expected_keys) != len(approved):
         raise VerificationError(
             "independent trust policy contains malformed duplicate file entries"
+        )
+
+    actual_paths = [item.get("filename") for item in pr_files]
+    if len(set(actual_paths)) != len(actual_paths):
+        raise VerificationError(
+            "GitHub returned duplicate pull-request file paths"
         )
 
     actual_keys = {
