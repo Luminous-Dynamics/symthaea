@@ -50,11 +50,8 @@ fn collection() -> Rfc9942ReceiptCollection {
 #[test]
 fn priority_first_valid_is_auditable() {
     let collection = collection();
-    let collection_bytes = collection.to_cbor();
-
     let decision = evaluate_priority_first_valid(
         &collection,
-        &collection_bytes,
         |index, _| {
             if index == 0 {
                 Err(symthaea_swarm::Rfc9942VdpError::InvalidEs256Signature)
@@ -80,9 +77,8 @@ fn priority_first_valid_is_auditable() {
 #[test]
 fn short_circuit_is_explicit_and_deterministic() {
     let collection = collection();
-    let bytes = collection.to_cbor();
-    let first = evaluate_priority_first_valid(&collection, &bytes, |_index, _| Ok(()));
-    let second = evaluate_priority_first_valid(&collection, &bytes, |_index, _| Ok(()));
+    let first = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
+    let second = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
 
     assert_eq!(first, second);
     assert_eq!(first.selected_index, Some(0));
@@ -101,10 +97,10 @@ fn changing_the_collection_order_changes_the_decision_identity() {
     )
     .unwrap();
 
-    let first = evaluate_priority_first_valid(&collection, &collection.to_cbor(), |_index, _| {
+    let first = evaluate_priority_first_valid(&collection, |_index, _| {
         Err(symthaea_swarm::Rfc9942VdpError::NoMatchingProof)
     });
-    let second = evaluate_priority_first_valid(&reversed, &reversed.to_cbor(), |_index, _| {
+    let second = evaluate_priority_first_valid(&reversed, |_index, _| {
         Err(symthaea_swarm::Rfc9942VdpError::NoMatchingProof)
     });
 
