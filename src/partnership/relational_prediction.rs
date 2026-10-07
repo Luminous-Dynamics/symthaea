@@ -38,6 +38,7 @@ const ROLLING_EVIDENCE_SCHEMA: &str = "relational-prediction-rolling-evidence/v4
 const NULL_EVIDENCE_SCHEMA: &str = "relational-prediction-null-evidence/v2";
 const FEATURE_SCHEMA: &str = "relational-prediction-features/v1";
 const MODEL_SCHEMA: &str = "linear-ridge-standardized-v1";
+const DEPENDENCE_PROFILE_SCHEMA: &str = "relational-prediction-loss-dependence/v1";
 
 /// A future outcome paired with features available strictly before that outcome.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -436,6 +437,72 @@ impl ForecastLossDependenceProfile {
             status: EvidenceStatus::Measured,
         })
     }
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        if self.sample_count < 4
+            || self.max_lag >= self.sample_count
+            || self.autocovariances.len() != self.max_lag + 1
+            || self.autocorrelations.len() != self.max_lag + 1
+            || !self.mean.is_finite()
+            || !self.variance.is_finite()
+            || self.variance < 0.0
+            || !self.max_absolute_autocorrelation.is_finite()
+            || !(0.0..=1.0).contains(&self.max_absolute_autocorrelation)
+            || !self.bartlett_long_run_variance.is_finite()
+            || self.status != EvidenceStatus::Measured
+        {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        if let Some(digest) = &self.evaluation_input_blake3 {
+            if !is_hex_digest(digest, 64) {
+                return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+            }
+        }
+
+        if self.autocovariances.iter().any(|value| !value.is_finite())
+            || self.autocorrelations.iter().any(|value| {
+                !value.is_finite() || !(-1.0..=1.0).contains(value)
+            })
+        {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let tolerance = 1e-12 * self.variance.abs().max(1.0);
+        if (self.autocovariances[0] - self.variance).abs() > tolerance {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        if self.effective_sample_size.is_some_and(|value| {
+            !value.is_finite() || value < 1.0 || value > self.sample_count as f64
+        }) {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+        Ok(serde_json::json!({
+            "schema": DEPENDENCE_PROFILE_SCHEMA,
+            "level": "single-window",
+            "binding": self.evaluation_input_blake3.as_deref().map_or("unbound", |_| "bound"),
+            "evaluation_input_blake3": &self.evaluation_input_blake3,
+            "sample_count": self.sample_count,
+            "max_lag": self.max_lag,
+            "mean": self.mean,
+            "variance": self.variance,
+            "autocovariances": &self.autocovariances,
+            "autocorrelations": &self.autocorrelations,
+            "lag_one_autocorrelation": self.lag_one_autocorrelation,
+            "first_nonpositive_autocorrelation_lag": self.first_nonpositive_autocorrelation_lag,
+            "max_absolute_autocorrelation_lag": self.max_absolute_autocorrelation_lag,
+            "max_absolute_autocorrelation": self.max_absolute_autocorrelation,
+            "bartlett_long_run_variance": self.bartlett_long_run_variance,
+            "effective_sample_size": self.effective_sample_size,
+            "status": "Measured"
+        }).to_string())
+    }
 }
 
 impl RollingForecastLossDependenceProfile {
@@ -514,6 +581,76 @@ impl RollingForecastLossDependenceProfile {
             across_origin_mean_profile,
             status: EvidenceStatus::Measured,
         })
+    }
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        if self.origin_count < 4
+            || self.test_samples < 4
+            || self.per_origin.len() != self.origin_count
+            || self.origin_mean_differentials.len() != self.origin_count
+            || self.max_lag_within_origin >= self.test_samples
+            || self.max_lag_across_origins >= self.origin_count
+            || self.status != EvidenceStatus::Measured
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        if let Some(digest) = &self.evaluation_input_blake3 {
+            if !is_hex_digest(digest, 64) {
+                return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+            }
+        }
+
+        for profile in &self.per_origin {
+            profile.validate()?;
+            if profile.sample_count != self.test_samples
+                || profile.max_lag != self.max_lag_within_origin
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+
+        if self.origin_mean_differentials.iter().any(|value| !value.is_finite()) {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+        self.across_origin_mean_profile.validate()?;
+        if self.across_origin_mean_profile.sample_count != self.origin_count
+            || self.across_origin_mean_profile.max_lag != self.max_lag_across_origins
+            || self.across_origin_mean_profile.evaluation_input_blake3
+                != self.evaluation_input_blake3
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+        let per_origin = self
+            .per_origin
+            .iter()
+            .map(|profile| {
+                serde_json::from_str::<serde_json::Value>(&profile.to_json()?)
+                    .map_err(|_| RelationalPredictionError::ModelFitFailed)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(serde_json::json!({
+            "schema": DEPENDENCE_PROFILE_SCHEMA,
+            "level": "rolling-two-level",
+            "binding": self.evaluation_input_blake3.as_deref().map_or("unbound", |_| "bound"),
+            "evaluation_input_blake3": &self.evaluation_input_blake3,
+            "origin_count": self.origin_count,
+            "test_samples": self.test_samples,
+            "max_lag_within_origin": self.max_lag_within_origin,
+            "max_lag_across_origins": self.max_lag_across_origins,
+            "origin_mean_differentials": &self.origin_mean_differentials,
+            "per_origin": per_origin,
+            "across_origin_mean_profile": serde_json::from_str::<serde_json::Value>(
+                &self.across_origin_mean_profile.to_json()?
+            ).map_err(|_| RelationalPredictionError::ModelFitFailed)?,
+            "status": "Measured"
+        }).to_string())
     }
 }
 
@@ -3448,6 +3585,8 @@ mod tests {
         assert!(profile.max_absolute_autocorrelation > 0.5);
         assert!(profile.bartlett_long_run_variance.is_finite());
         assert!(profile.effective_sample_size.unwrap() < losses.len() as f64);
+        profile.validate().unwrap();
+        assert!(profile.to_json().unwrap().contains(DEPENDENCE_PROFILE_SCHEMA));
     }
 
     #[test]
@@ -3565,6 +3704,9 @@ mod tests {
         assert_eq!(profile.per_origin.len(), config.origin_count);
         assert_eq!(profile.origin_mean_differentials.len(), config.origin_count);
         assert_eq!(profile.across_origin_mean_profile.sample_count, config.origin_count);
+        profile.validate().unwrap();
+        assert!(profile.to_json().unwrap().contains("rolling-two-level"));
+        assert!(profile.to_json().unwrap().contains("evaluation_input_blake3"));
     }
 
     #[test]
