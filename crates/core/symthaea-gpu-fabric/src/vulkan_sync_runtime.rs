@@ -234,8 +234,12 @@ impl VulkanSyncRuntime {
 
     fn ensure_semaphores(&mut self, queue_count: u16) -> Result<(), VulkanSyncRuntimeError> {
         while self.semaphores.len() < usize::from(queue_count) {
-            let queue = VulkanQueueId::new(self.semaphores.len() as u16)
-                .map_err(|error| VulkanSyncRuntimeError::QueueLimitExceeded(error.get()))?;
+            let queue = VulkanQueueId::new(self.semaphores.len() as u16).map_err(|error| match error {
+                crate::VulkanSyncError::QueueLimitExceeded(value) => {
+                    VulkanSyncRuntimeError::QueueLimitExceeded(value)
+                }
+                _ => unreachable!("only queue-limit failure is possible for sequential ids"),
+            })?;
             let mut type_info = vk::SemaphoreTypeCreateInfo::default()
                 .semaphore_type(vk::SemaphoreType::TIMELINE)
                 .initial_value(0);
