@@ -35,7 +35,7 @@ use super::relational_harmonics::EvidenceStatus;
 
 const EVIDENCE_SCHEMA: &str = "relational-prediction-evidence/v4";
 const ROLLING_EVIDENCE_SCHEMA: &str = "relational-prediction-rolling-evidence/v4";
-const NULL_EVIDENCE_SCHEMA: &str = "relational-prediction-null-evidence/v1";
+const NULL_EVIDENCE_SCHEMA: &str = "relational-prediction-null-evidence/v2";
 const FEATURE_SCHEMA: &str = "relational-prediction-features/v1";
 const MODEL_SCHEMA: &str = "linear-ridge-standardized-v1";
 
@@ -3367,6 +3367,8 @@ mod tests {
         assert!(json.contains(EVIDENCE_SCHEMA));
         assert!(json.contains(FEATURE_SCHEMA));
         assert!(json.contains(MODEL_SCHEMA));
+        assert!(json.contains(NULL_EVIDENCE_SCHEMA));
+        assert!(json.contains("qualification_input_blake3"));
         assert!(json.contains("RelationalAugmented"));
         assert!(json.contains("predictions"));
         assert!(json.contains("test_features"));
