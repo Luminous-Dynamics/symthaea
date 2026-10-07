@@ -93,6 +93,6 @@ actually binds.
 
 ### Workload-bearing Vulkan barriers
 
-The Vulkan barrier qualification harness is intentionally bounded to HdcBindXor nodes with exactly two Read resources and one Write resource. It allocates the declared resources as concrete Vulkan storage buffers, records actual compute dispatches, lowers same-queue barrier requirements to `vkCmdPipelineBarrier2`, waits on a completion fence, reads the resources back, and compares the final resource state with an independent CPU graph simulation.
+The Vulkan barrier qualification harness is intentionally bounded to HdcBindXor nodes with exactly two Read resources and one Write resource. It allocates the declared resources as concrete Vulkan storage buffers, records actual compute dispatches, lowers same-queue barrier requirements to `vkCmdPipelineBarrier2`, submits with `vkQueueSubmit2`, waits on a fresh timeline semaphore, reads the timeline counter independently, reads the resources back, and compares the final resource state with an independent CPU graph simulation.
 
-The resulting `VulkanBarrierExecutionReceipt` binds the graph digest, schedule digest, sync-plan digest, barrier digest, node/barrier counts, and final resource digests. It is workload and synchronization evidence, not an acceleration attestation.
+The resulting `VulkanBarrierExecutionReceipt` binds the graph digest, schedule digest, sync-plan digest, semantic barrier digest, concrete Vulkan lowering digest, node/barrier counts, resource digests/storage ranges, and final timeline completion witness. The timeline fields prove final workload completion on the qualified runtime; they do not claim per-node timeline signaling, GPU acceleration, hardware queue independence, or bare-metal attachment.
