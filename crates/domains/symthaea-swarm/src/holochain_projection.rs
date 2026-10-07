@@ -16,6 +16,8 @@ pub const DOMAIN: &[u8] = b"symthaea-swarm/holochain-evidence-anchor-v1";
 pub const MAX_SELECTION_POLICY_BYTES: usize = 256;
 pub const MAX_CONTEXT_BYTES: usize = 8 * 1024;
 pub const HOLOCHAIN_ACTION_HASH_BYTES: usize = 39;
+/// RFC 9942 header 394 receipt collections are capped at 16 receipts.
+pub const MAX_RECEIPT_SELECTION_CANDIDATES: u32 = 16;
 /// Holochain 0.7 ActionHash primitive prefix (`uhCkk`), in raw bytes.
 pub const HOLOCHAIN_ACTION_HASH_PREFIX: [u8; 3] = [0x84, 0x29, 0x24];
 
@@ -115,7 +117,10 @@ impl ReceiptSelectionContext {
     }
 
     fn validate(&self) -> Result<(), HolochainProjectionError> {
-        if self.collection_len == 0 || self.selected_index >= self.collection_len {
+        if self.collection_len == 0
+            || self.collection_len > MAX_RECEIPT_SELECTION_CANDIDATES
+            || self.selected_index >= self.collection_len
+        {
             return Err(HolochainProjectionError::InvalidReceiptSelection);
         }
         if self.selection_policy.is_empty()
@@ -339,6 +344,18 @@ mod tests {
             .unwrap()
             .collection_sha256[0] ^= 1;
         assert_ne!(before, changed.canonical_bytes().unwrap());
+    }
+
+    #[test]
+    fn selection_context_rejects_collection_length_above_rfc9942_ceiling() {
+        let mut projected = anchor();
+        projected.receipt_selection.as_mut().unwrap().collection_len =
+            MAX_RECEIPT_SELECTION_CANDIDATES + 1;
+        assert_eq!(
+            projected.validate(),
+            Err(HolochainProjectionError::InvalidReceiptSelection)
+        );
+        assert!(projected.canonical_bytes().is_err());
     }
 
     #[test]
