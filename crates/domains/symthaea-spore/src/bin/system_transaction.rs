@@ -1303,11 +1303,17 @@ mod tests {
             size: 123,
             digest: "c".repeat(64),
         };
+        let configuration = ArtifactCommitment {
+            name: "configuration.nix".into(),
+            size: 456,
+            digest: "d".repeat(64),
+        };
         ledger
-            .mark_completed_with_artifact(
+            .mark_completed_with_image_artifacts(
                 &create,
                 TransactionOutcome::ObservedSuccess,
                 Some(artifact.clone()),
+                Some(configuration.clone()),
             )
             .unwrap();
 
@@ -1511,6 +1517,7 @@ mod tests {
             request_digest: "a".repeat(64),
             outcome: None,
             artifact_commitment: None,
+            configuration_commitment: None,
         };
         let error = ledger
             .append(&event)
