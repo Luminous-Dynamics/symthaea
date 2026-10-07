@@ -1386,7 +1386,12 @@ impl RollingOriginRelationalPredictionEvidence {
             max_lag_within_origin,
             max_lag_across_origins,
         )?;
-        profile.evaluation_input_blake3 = Some(self.evaluation_input_blake3.clone());
+        let binding = self.evaluation_input_blake3.clone();
+        for child in &mut profile.per_origin {
+            child.evaluation_input_blake3 = Some(binding.clone());
+        }
+        profile.across_origin_mean_profile.evaluation_input_blake3 = Some(binding.clone());
+        profile.evaluation_input_blake3 = Some(binding);
         Ok(profile)
     }
 
@@ -3702,6 +3707,13 @@ mod tests {
         );
         assert_eq!(profile.origin_count, config.origin_count);
         assert_eq!(profile.per_origin.len(), config.origin_count);
+        assert!(
+            profile
+                .per_origin
+                .iter()
+                .all(|child| child.evaluation_input_blake3.as_deref()
+                    == Some(evidence.evaluation_input_blake3.as_str()))
+        );
         assert_eq!(profile.origin_mean_differentials.len(), config.origin_count);
         assert_eq!(profile.across_origin_mean_profile.sample_count, config.origin_count);
         profile.validate().unwrap();
