@@ -108,6 +108,9 @@ jobs:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-broca-${{ matrix.name }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml', 'Cargo.toml', 'crates/domains/symthaea-broca/Cargo.toml', '.cargo/config.toml', '.cargo/config') }}
 
+      - name: Verify locked dependency graph
+        run: cargo fetch --locked
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
