@@ -6304,7 +6304,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 // to this transaction. Other local users cannot replace status,
                 // PID, log, script, or staged configuration paths from /tmp.
                 let config_staging_dir = format!("{transaction_dir}/config");
-                if let Err(error) = tokio::fs::create_dir_all(&config_staging_dir).await {
+                if let Err(error) = std::fs::create_dir(&config_staging_dir) {
                     let _ = ws_tx
                         .send(Message::Text(
                             RelayMessage::error(&format!(
