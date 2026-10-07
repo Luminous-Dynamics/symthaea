@@ -101,7 +101,7 @@ jobs:
         with:
           toolchain: 1.96.0
 
-      - name: Cache cargo registry and target
+      - name: Cache cargo registry
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cargo/registry
@@ -109,6 +109,11 @@ jobs:
 
       - name: Verify locked dependency graph
         run: cargo fetch --locked
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake libasound2-dev
 
       - name: Capture native toolchain context
         run: |
@@ -121,16 +126,11 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_ENV"
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake libasound2-dev
-
       - name: Capture native package context
         run: |
           {
             echo "BROCA_NATIVE_PACKAGE_CONTEXT<<EOF"
-            dpkg-query -W -f='${Package}=${Version}\n' pkg-config libssl-dev libclang-dev cmake | sort
+            dpkg-query -W -f='${Package}=${Version}\n' pkg-config libssl-dev libclang-dev cmake libasound2-dev | sort
             echo "EOF"
           } >> "$GITHUB_ENV"
 
@@ -189,7 +189,7 @@ jobs:
         with:
           toolchain: 1.96.0
 
-      - name: Cache cargo registry and target
+      - name: Cache cargo registry
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cargo/registry
@@ -217,7 +217,7 @@ jobs:
         run: |
           {
             echo "BROCA_NATIVE_PACKAGE_CONTEXT<<EOF"
-            dpkg-query -W -f='${Package}=${Version}\n' pkg-config libssl-dev libclang-dev cmake | sort
+            dpkg-query -W -f='${Package}=${Version}\n' pkg-config libssl-dev libclang-dev cmake libasound2-dev | sort
             echo "EOF"
           } >> "$GITHUB_ENV"
 
