@@ -403,6 +403,61 @@ fn canonical_boundary_syndrome(mask: u8) -> u8 {
 }
 
 #[test]
+fn small_fixture_quotient_metric_matches_ambient_coset_geometry() {
+    let mut buckets = [Vec::<u8>::new(); 64];
+    let mut leaders = [usize::MAX; 64];
+
+    for mask in 0u16..256 {
+        let byte = mask as u8;
+        let syndrome = canonical_boundary_syndrome(byte) as usize;
+        buckets[syndrome].push(byte);
+        leaders[syndrome] = leaders[syndrome].min(byte.count_ones() as usize);
+    }
+
+    assert!(leaders.iter().all(|&distance| distance <= 4));
+    assert_eq!(*leaders.iter().max().unwrap(), 4);
+    assert!(buckets.iter().all(|bucket| bucket.len() == 4));
+
+    let mut pair_checks = 0usize;
+    for left in 0..64usize {
+        for right in 0..64usize {
+            let mut ambient_distance = usize::MAX;
+            for &left_word in &buckets[left] {
+                for &right_word in &buckets[right] {
+                    ambient_distance = ambient_distance.min(
+                        (left_word ^ right_word).count_ones() as usize
+                    );
+                    pair_checks += 1;
+                }
+            }
+
+            assert_eq!(
+                ambient_distance,
+                leaders[left ^ right],
+                "quotient distance disagreed with ambient coset distance: left={left} right={right}"
+            );
+        }
+    }
+
+    let mut triangle_checks = 0usize;
+    for left in 0..64usize {
+        for middle in 0..64usize {
+            for right in 0..64usize {
+                assert!(
+                    leaders[left ^ right] <= leaders[left ^ middle] + leaders[middle ^ right],
+                    "quotient metric violated triangle inequality: left={left} middle={middle} right={right}"
+                );
+                triangle_checks += 1;
+            }
+        }
+    }
+
+    println!(
+        "SYNDROME_QUOTIENT_METRIC=syndromes=64;fiber_size=4;max_distance=4;ambient_pair_checks={pair_checks};triangle_checks={triangle_checks};translation_invariant=true;ambient_metric_exact=true"
+    );
+}
+
+#[test]
 fn small_fixture_production_syndrome_matches_independent_oracle_and_is_linear() {
     let code = boundary_code();
     let parity_check = ParityCheckMatrix::from_code(&code).expect("parity-check matrix");
