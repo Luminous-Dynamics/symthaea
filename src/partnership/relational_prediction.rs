@@ -1581,14 +1581,27 @@ impl ForecastInferenceBinding {
             || !is_hex_digest(&self.evaluation_input_blake3, 64)
             || !is_hex_digest(&self.relational_loss_differentials_blake3, 64)
             || !is_hex_digest(&self.dependence_profile_blake3, 64)
-            || self.dependence_max_lag_across_origins >= self.origin_count.max(1)
             || self.origin_count == 0
             || self.test_samples < 4
+            || self.dependence_max_lag_within_origin >= self.test_samples
             || !self.forecast_horizon.is_finite()
             || self.forecast_horizon <= 0.0
             || !is_hex_digest(&self.binding_blake3, 64)
         {
             return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        match self.analysis_level.as_str() {
+            "single-window" if self.origin_count != 1 || self.dependence_max_lag_across_origins != 0 => {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+            "rolling-origin"
+                if self.origin_count < 4
+                    || self.dependence_max_lag_across_origins >= self.origin_count =>
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+            _ => {}
         }
         if inference_binding_digest(self) != self.binding_blake3 {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
