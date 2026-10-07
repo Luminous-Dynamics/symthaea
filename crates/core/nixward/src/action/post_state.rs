@@ -533,7 +533,9 @@ pub struct NixPostStateReceiptV1 {
     pub action_intent_digest: String,
     pub authorization_record_digest: String,
     /// Durable approval lineage copied from transient execution provenance.
+    #[serde(default)]
     pub approval_request_id: Option<String>,
+    #[serde(default)]
     pub approval_projection_digest: Option<String>,
     pub effect_digest: String,
     pub target_unit: String,
