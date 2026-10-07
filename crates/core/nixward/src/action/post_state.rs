@@ -258,6 +258,9 @@ pub struct NixServicePostStateObservationV1 {
     pub systemd_job: Option<NixSystemdJobEvidenceV1>,
     /// Unique D-Bus owner of org.freedesktop.systemd1 for this observation.
     pub systemd_manager_owner: Option<String>,
+    /// D-Bus daemon incarnation captured with the observer epoch.
+    #[serde(default)]
+    pub systemd_bus_id: Option<String>,
     pub invocation_id: Option<String>,
     /// systemd StateChangeTimestampMonotonic represented as monotonic microseconds.
     pub state_change_at_monotonic_us: u64,
@@ -281,6 +284,9 @@ impl NixServicePostStateObservationV1 {
         )?;
         if let Some(owner) = self.systemd_manager_owner.as_deref() {
             validate_unique_manager_owner(owner)?;
+        }
+        if let Some(bus_id) = self.systemd_bus_id.as_deref() {
+            validate_bus_id(bus_id)?;
         }
         if let Some(job) = &self.systemd_job {
             job.validate_shape()?;
@@ -325,6 +331,8 @@ pub struct NixPostStateStabilitySampleV1 {
     pub definition_content_digest: String,
     pub state_digest: String,
     pub manager_owner: String,
+    #[serde(default)]
+    pub bus_id: Option<String>,
     pub invocation_id: Option<String>,
     pub state_change_at_monotonic_us: u64,
     pub captured_at_monotonic_us: u64,
@@ -345,6 +353,9 @@ impl NixPostStateStabilitySampleV1 {
         )?;
         validate_digest(&self.state_digest, "stability state digest")?;
         validate_unique_manager_owner(&self.manager_owner)?;
+        if let Some(bus_id) = self.bus_id.as_deref() {
+            validate_bus_id(bus_id)?;
+        }
         validate_optional_invocation_id(self.invocation_id.as_deref(), "stability invocation id")?;
         if self.captured_at_monotonic_us < self.state_change_at_monotonic_us {
             return Err(NixPostStateErrorV1::ObservationBeforeStateChange);
@@ -364,6 +375,7 @@ impl NixPostStateStabilitySampleV1 {
         put_str(&mut h, &self.definition_content_digest);
         put_str(&mut h, &self.state_digest);
         put_str(&mut h, &self.manager_owner);
+        put_opt_str(&mut h, self.bus_id.as_deref());
         put_opt_str(&mut h, self.invocation_id.as_deref());
         put_u64(&mut h, self.state_change_at_monotonic_us);
         put_u64(&mut h, self.captured_at_monotonic_us);
@@ -428,8 +440,10 @@ impl NixPostStateStabilityEvidenceV1 {
                 || sample.unit_object_path != first.unit_object_path
                 || sample.observed_generation != first.observed_generation
                 || sample.definition_digest != first.definition_digest
+                || sample.definition_content_digest != first.definition_content_digest
                 || sample.state_digest != first.state_digest
                 || sample.manager_owner != first.manager_owner
+                || sample.bus_id != first.bus_id
                 || sample.invocation_id != first.invocation_id
                 || sample.state_change_at_monotonic_us != first.state_change_at_monotonic_us
             {
@@ -505,6 +519,7 @@ fn validate_stability_against_observation(
                 .systemd_manager_owner
                 .as_deref()
                 .ok_or(NixPostStateErrorV1::MissingManagerOwner)?
+        || last.bus_id != observation.systemd_bus_id
         || last.invocation_id != observation.invocation_id
         || last.state_change_at_monotonic_us != observation.state_change_at_monotonic_us
         || last.captured_at_monotonic_us > observation.observed_at_monotonic_us
@@ -570,6 +585,9 @@ pub struct NixPostStateReceiptV1 {
     pub observed_service_result: String,
     /// Unique D-Bus owner of systemd1 for the observed service-manager epoch.
     pub systemd_manager_owner: String,
+    /// D-Bus daemon incarnation for the observed service-manager epoch.
+    #[serde(default)]
+    pub systemd_bus_id: Option<String>,
     pub pre_invocation_id: Option<String>,
     pub post_invocation_id: Option<String>,
     pub postcondition: NixPostconditionAssessmentV1,
@@ -689,6 +707,13 @@ impl NixPostStateReceiptV1 {
         if expectation.authorized_definition_content_digest != observed_definition_content_digest {
             return Err(NixPostStateErrorV1::DefinitionContentMismatch);
         }
+        if observation.systemd_bus_id.as_deref()
+            != intent
+                .service_effect_context()
+                .map(|context| context.authorized_bus_id.as_str())
+        {
+            return Err(NixPostStateErrorV1::BusIncarnationMismatch);
+        }
         let manager_owner = observation
             .systemd_manager_owner
             .clone()
@@ -788,6 +813,7 @@ impl NixPostStateReceiptV1 {
             observed_unit_file_state: observation.unit_file_state,
             observed_service_result: observation.service_result.clone(),
             systemd_manager_owner: manager_owner,
+            systemd_bus_id: observation.systemd_bus_id.clone(),
             pre_invocation_id: expectation.pre_invocation_id.clone(),
             post_invocation_id: observation.invocation_id.clone(),
             postcondition: assessment,
@@ -831,6 +857,13 @@ impl NixPostStateReceiptV1 {
         }
         if authorization.action_intent_digest != intent_digest {
             return Err(NixPostStateErrorV1::AuthorizationIntentMismatch);
+        }
+        if self.systemd_bus_id.as_deref()
+            != intent
+                .service_effect_context()
+                .map(|context| context.authorized_bus_id.as_str())
+        {
+            return Err(NixPostStateErrorV1::BusIncarnationMismatch);
         }
         authorization
             .validate_against_intent(intent)
@@ -1037,6 +1070,9 @@ impl NixPostStateReceiptV1 {
         require_nonempty(&self.observed_sub_state, "observed service sub-state")?;
         require_nonempty(&self.observed_service_result, "observed service result")?;
         validate_unique_manager_owner(&self.systemd_manager_owner)?;
+        if let Some(bus_id) = self.systemd_bus_id.as_deref() {
+            validate_bus_id(bus_id)?;
+        }
         let recomputed_state_digest = semantic_state_digest(
             self.operation,
             &self.target_unit,
@@ -1081,6 +1117,9 @@ impl NixPostStateReceiptV1 {
 
         match self.claim {
             NixPostStateClaimV1::Proven => {
+                if self.systemd_bus_id.is_none() {
+                    return Err(NixPostStateErrorV1::BusIncarnationMismatch);
+                }
                 if self.postcondition != NixPostconditionAssessmentV1::Satisfied {
                     return Err(NixPostStateErrorV1::InvalidClaim);
                 }
@@ -1168,6 +1207,7 @@ impl NixPostStateReceiptV1 {
         put_u8(&mut h, unit_file_state_tag(self.observed_unit_file_state));
         put_str(&mut h, &self.observed_service_result);
         put_str(&mut h, &self.systemd_manager_owner);
+        put_opt_str(&mut h, self.systemd_bus_id.as_deref());
         put_opt_str(&mut h, self.pre_invocation_id.as_deref());
         put_opt_str(&mut h, self.post_invocation_id.as_deref());
         put_u8(&mut h, assessment_tag(self.postcondition));
@@ -1681,6 +1721,8 @@ pub enum NixPostStateErrorV1 {
     AuthorizationIntentMismatch,
     #[error("receipt is bound to a different authorization record")]
     AuthorizationRecordMismatch,
+    #[error("observed D-Bus incarnation does not match the authorized Service incarnation")]
+    BusIncarnationMismatch,
     #[error("action intent does not describe the expected service effect")]
     IntentEffectMismatch,
     #[error("service effect has no bound pre-state identity")]
@@ -2007,6 +2049,7 @@ mod tests {
                 }
             }),
             systemd_manager_owner: Some(":1.123".to_string()),
+            systemd_bus_id: Some("0123456789abcdef0123456789abcdef".to_string()),
             invocation_id: Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string()),
             state_change_at_monotonic_us: 900,
             observed_at_monotonic_us: 2_000,
@@ -2031,6 +2074,7 @@ mod tests {
                 definition_content_digest: obs.definition_content_digest.clone(),
                 state_digest: obs.state_digest().unwrap(),
                 manager_owner: obs.systemd_manager_owner.clone().unwrap(),
+                bus_id: obs.systemd_bus_id.clone(),
                 invocation_id: obs.invocation_id.clone(),
                 state_change_at_monotonic_us: obs.state_change_at_monotonic_us,
                 captured_at_monotonic_us: *captured_at_monotonic_us,
@@ -2568,6 +2612,48 @@ mod tests {
         assert_eq!(
             evidence.validate_shape().unwrap_err(),
             NixPostStateErrorV1::StabilitySequenceDigestMismatch
+        );
+    }
+
+    #[test]
+    fn stability_sequence_cannot_be_rebound_to_another_dbus_incarnation() {
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut evidence = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+        evidence.samples[1].bus_id = Some("fedcba98765432100123456789abcdef".into());
+        evidence.sequence_digest = stability_sequence_digest(&evidence.samples).unwrap();
+        assert_eq!(
+            evidence.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::StabilityIdentityOrStateChanged
+        );
+    }
+
+    #[test]
+    fn receipt_rejects_dbus_incarnation_substitution() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.systemd_bus_id = Some("fedcba98765432100123456789abcdef".into());
+
+        let intent = contextual_intent(
+            NixServiceOperationKindV1::Start,
+            &exp.unit,
+            exp.authorized_generation,
+            exp.authorized_definition_content_digest.clone(),
+            exp.pre_invocation_id.clone(),
+            exp.required_stability_us,
+        );
+        let authorization = contextual_authorization(&intent);
+        assert_eq!(
+            receipt.verify_against(&intent, &authorization).unwrap_err(),
+            NixPostStateErrorV1::BusIncarnationMismatch
         );
     }
 
