@@ -4241,8 +4241,13 @@ mod tests {
         };
 
         let qualification =
-            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8, provenance())
-                .unwrap();
+            RollingOriginRelationalPredictionQualification::compute(
+                &samples,
+                config,
+                8,
+                provenance(),
+            )
+            .unwrap();
 
         let mut tampered = qualification.clone();
         tampered.observed.mean_relational_augmented_mse += 0.01;
@@ -4268,8 +4273,13 @@ mod tests {
         };
 
         let qualification =
-            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8, provenance())
-                .unwrap();
+            RollingOriginRelationalPredictionQualification::compute(
+                &samples,
+                config,
+                8,
+                provenance(),
+            )
+            .unwrap();
         qualification.validate().unwrap();
 
         let mut tampered = qualification.clone();
@@ -4297,8 +4307,13 @@ mod tests {
         };
 
         let qualification =
-            RollingOriginRelationalPredictionQualification::compute(&samples, config, 8, provenance())
-                .unwrap();
+            RollingOriginRelationalPredictionQualification::compute(
+                &samples,
+                config,
+                8,
+                provenance(),
+            )
+            .unwrap();
 
         qualification.validate().unwrap();
         assert_eq!(qualification.provenance, provenance());
