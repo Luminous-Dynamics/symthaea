@@ -817,7 +817,7 @@ impl Rfc9942ReceiptEnvelope {
                     }
                 }
                     let root = head.root();
-                    (proof_index, head, Some(root), root)
+                    (proof_index, head, leaf_index, Some(root), root)
                 }
             };
 
