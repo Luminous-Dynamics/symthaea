@@ -1595,11 +1595,13 @@ struct VerifiedQualificationReplay;
 
 /// Pre-inference binding gate for a forecast-accuracy qualification.
 ///
-/// This artifact deliberately performs no statistical inference. It binds one
-/// replay-verified qualification, its retained loss differential vector, a measured
-/// dependence profile, and one frozen inference plan. A future inferential
-/// result should consume this binding rather than accepting those components
-/// independently.
+/// This artifact deliberately performs no statistical inference. Its constructors
+/// first replay the qualification against the exact source sample sequence and then
+/// mint a private replay witness. The binding therefore cannot be reached through
+/// qualification self-consistency alone; it binds one replay-verified qualification,
+/// its retained loss differential vector, a measured dependence profile, and one
+/// frozen inference plan. A future inferential result should consume this binding
+/// rather than accepting those components independently.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ForecastInferenceBinding {
     pub analysis_level: String,
