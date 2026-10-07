@@ -54,6 +54,19 @@ pub struct NixSystemdLifecycleMutationTransportV1 {
     connection: Connection,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NixSystemdUnitFileOperationResultV1 {
+    pub carries_install_info: Option<bool>,
+    pub changes: Vec<NixSystemdUnitFileChangeV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NixSystemdUnitFileChangeV1 {
+    pub change_type: String,
+    pub filename: String,
+    pub destination: String,
+}
+
 impl NixSystemdLifecycleMutationTransportV1 {
     pub async fn connect_system()
         -> Result<Self, NixSystemdMutationTransportErrorV1>
@@ -168,19 +181,6 @@ impl NixSystemdLifecycleMutationTransportV1 {
 
         validate_job_object_path(&job_path)?;
         Ok(job_path)
-    }
-
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct NixSystemdUnitFileOperationResultV1 {
-        pub carries_install_info: Option<bool>,
-        pub changes: Vec<NixSystemdUnitFileChangeV1>,
-    }
-
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct NixSystemdUnitFileChangeV1 {
-        pub change_type: String,
-        pub filename: String,
-        pub destination: String,
     }
 
     pub async fn enable_unit_file_for_manager_owner_and_bus_id(
