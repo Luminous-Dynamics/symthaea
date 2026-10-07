@@ -776,6 +776,46 @@ def main() -> int:
         receipt["verification"]["workflow_gates"] = workflow_gate_states
         receipt["verification"]["broca_jobs"] = verify_broca_jobs(int(broca_run["id"]))
 
+        # Reconcile the control-plane state immediately before publishing success.
+        # A new exact-head run must invalidate the earlier observation rather than
+        # leaving a successful status attached to an execution that has been superseded.
+        final_workflow_runs = latest_required_runs(pr["head"]["sha"])
+        verify_trigger_is_current(trigger_run, final_workflow_runs)
+        final_gate_states: dict[str, Any] = {}
+        for name, run in final_workflow_runs.items():
+            if run is None:
+                raise WaitingError(
+                    f"required workflow disappeared for exact head during final reconciliation: {name}"
+                )
+            final_gate_states[name] = {
+                "id": run.get("id"),
+                "status": run.get("status"),
+                "conclusion": run.get("conclusion"),
+                "head_sha": run.get("head_sha"),
+                "updated_at": run.get("updated_at"),
+            }
+            if run.get("status") != "completed":
+                raise WaitingError(
+                    f"required workflow became incomplete during final reconciliation: {name}"
+                )
+            if run.get("head_sha") != pr["head"]["sha"]:
+                raise VerificationError(
+                    f"required workflow head changed during final reconciliation for {name}"
+                )
+            if run.get("conclusion") != "success":
+                raise VerificationError(
+                    f"required workflow ceased to be successful during final reconciliation: {name} -> {run.get('conclusion')}"
+                )
+
+        receipt["verification"]["final_reconciliation"] = {
+            "workflow_gates": final_gate_states,
+            "verified": True,
+        }
+        broca_run = final_workflow_runs["Broca Feature Matrix"]
+        assert broca_run is not None
+        receipt["verification"]["workflow_gates"] = final_gate_states
+        receipt["verification"]["broca_jobs"] = verify_broca_jobs(int(broca_run["id"]))
+
         workflow_paths = REQUIRED_WORKFLOWS
 
         for supporting_name in ("Workflow Syntax", "PR Governance"):
