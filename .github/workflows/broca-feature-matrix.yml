@@ -12,8 +12,15 @@ on:
       - "crates/core/symthaea-fep/**"
       - "src/voice/**"
       - ".github/workflows/broca-feature-matrix.yml"
-    # Changes to the qualification workflow itself must re-run the exact-head matrix.
+      - "docs/broca/**"
+      - "rust-toolchain.toml"
+      - ".cargo/config.toml"
+      - ".cargo/config"
+    # Changes to qualification inputs, build context, or workflow logic must re-run the exact-head matrix.
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -54,6 +61,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -87,6 +96,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
