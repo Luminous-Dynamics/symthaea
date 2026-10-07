@@ -607,6 +607,160 @@ pub fn benchmark_manifest_digest() -> u64 {
     h
 }
 
+/// Procedurally generated deterministic scenario used only for frozen generalization.
+///
+/// These scenarios vary initial conditions, action schedules, and perturbations while keeping
+/// the transition law fixed. They are generated from explicit seeds and are never used by the
+/// grounded qualification's adaptation phase.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProceduralMicroWorldScenario {
+    pub seed: u64,
+    pub initial: MicroWorldObservation,
+    pub schedule: Vec<MicroAction>,
+    pub perturbations: Vec<(u64, MicroPerturbation)>,
+}
+
+impl ProceduralMicroWorldScenario {
+    /// Stable digest of every generated scenario field.
+    pub fn manifest_digest(&self) -> u64 {
+        fn mix(mut h: u64, bytes: &[u8]) -> u64 {
+            for byte in bytes {
+                h ^= *byte as u64;
+                h = h.wrapping_mul(0x100000001b3);
+            }
+            h
+        }
+
+        let mut h = 0xcbf29ce484222325u64;
+        h = mix(h, &self.seed.to_le_bytes());
+        for value in [
+            self.initial.cycle as f64,
+            self.initial.energy,
+            self.initial.integrity,
+            self.initial.knowledge,
+            self.initial.threat,
+            self.initial.progress,
+        ] {
+            h = mix(h, &value.to_bits().to_le_bytes());
+        }
+
+        h = mix(h, &(self.schedule.len() as u64).to_le_bytes());
+        for action in &self.schedule {
+            h = mix(h, &[action.index() as u8]);
+        }
+
+        h = mix(h, &(self.perturbations.len() as u64).to_le_bytes());
+        for (cycle, perturbation) in &self.perturbations {
+            h = mix(h, &cycle.to_le_bytes());
+            let (tag, amount) = match perturbation {
+                MicroPerturbation::EnergyDrain(value) => (0u8, *value),
+                MicroPerturbation::IntegrityDamage(value) => (1u8, *value),
+                MicroPerturbation::ThreatSpike(value) => (2u8, *value),
+                MicroPerturbation::ProgressLoss(value) => (3u8, *value),
+            };
+            h = mix(h, &[tag]);
+            h = mix(h, &amount.to_bits().to_le_bytes());
+        }
+
+        h
+    }
+}
+
+fn procedural_next_u64(state: &mut u64) -> u64 {
+    // SplitMix64-style deterministic stream. No external RNG or runtime entropy.
+    *state = state.wrapping_add(0x9e3779b97f4a7c15);
+    let mut z = *state;
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
+    z ^ (z >> 31)
+}
+
+fn procedural_unit(state: &mut u64) -> f64 {
+    let bits = procedural_next_u64(state) >> 11;
+    bits as f64 / ((1u64 << 53) as f64)
+}
+
+/// Generate a deterministic held-out scenario family from explicit seeds.
+///
+/// The generator is part of the benchmark protocol, but generated scenarios are never fed
+/// into the world-model adaptation phase.
+pub fn procedural_held_out_scenarios() -> Vec<ProceduralMicroWorldScenario> {
+    const SEEDS: [u64; 8] = [
+        0x1a2b_3c4d_0000_0001,
+        0x1a2b_3c4d_0000_0002,
+        0x1a2b_3c4d_0000_0003,
+        0x1a2b_3c4d_0000_0004,
+        0x1a2b_3c4d_0000_0005,
+        0x1a2b_3c4d_0000_0006,
+        0x1a2b_3c4d_0000_0007,
+        0x1a2b_3c4d_0000_0008,
+    ];
+
+    SEEDS
+        .into_iter()
+        .map(|seed| {
+            let mut stream = seed;
+            let initial = MicroWorldObservation {
+                cycle: 0,
+                energy: 0.28 + 0.50 * procedural_unit(&mut stream),
+                integrity: 0.22 + 0.64 * procedural_unit(&mut stream),
+                knowledge: 0.08 + 0.78 * procedural_unit(&mut stream),
+                threat: 0.08 + 0.78 * procedural_unit(&mut stream),
+                progress: 0.02 + 0.58 * procedural_unit(&mut stream),
+            }
+            .clamp();
+
+            let schedule = (0..6)
+                .map(|_| {
+                    let index =
+                        (procedural_next_u64(&mut stream) % MicroAction::ALL.len() as u64) as usize;
+                    MicroAction::ALL[index]
+                })
+                .collect::<Vec<_>>();
+
+            let perturbation_a_cycle = 2 + (procedural_next_u64(&mut stream) % 3);
+            let perturbation_b_cycle = 6 + (procedural_next_u64(&mut stream) % 3);
+            let perturbation_a_amount = 0.08 + 0.18 * procedural_unit(&mut stream);
+            let perturbation_b_amount = 0.06 + 0.16 * procedural_unit(&mut stream);
+            let perturbation_a = match procedural_next_u64(&mut stream) % 4 {
+                0 => MicroPerturbation::EnergyDrain(perturbation_a_amount),
+                1 => MicroPerturbation::IntegrityDamage(perturbation_a_amount),
+                2 => MicroPerturbation::ThreatSpike(perturbation_a_amount),
+                _ => MicroPerturbation::ProgressLoss(perturbation_a_amount),
+            };
+            let perturbation_b = match procedural_next_u64(&mut stream) % 4 {
+                0 => MicroPerturbation::EnergyDrain(perturbation_b_amount),
+                1 => MicroPerturbation::IntegrityDamage(perturbation_b_amount),
+                2 => MicroPerturbation::ThreatSpike(perturbation_b_amount),
+                _ => MicroPerturbation::ProgressLoss(perturbation_b_amount),
+            };
+
+            ProceduralMicroWorldScenario {
+                seed,
+                initial,
+                schedule,
+                perturbations: vec![
+                    (perturbation_a_cycle, perturbation_a),
+                    (perturbation_b_cycle, perturbation_b),
+                ],
+            }
+        })
+        .collect()
+}
+
+/// Stable digest for the complete procedural held-out family.
+pub fn procedural_held_out_manifest_digest() -> u64 {
+    let scenarios = procedural_held_out_scenarios();
+    let mut h = 0xcbf29ce484222325u64;
+    for scenario in scenarios {
+        for byte in scenario.manifest_digest().to_le_bytes() {
+            h ^= byte;
+            h = h.wrapping_mul(0x100000001b3);
+        }
+    }
+    h
+}
+
 /// Predictor interface for the benchmark harness.
 ///
 /// A production predictor can later be backed by WorldModelBridge, a learned latent
