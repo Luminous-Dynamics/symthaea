@@ -47,12 +47,22 @@ fn delimited_surface<'a>(
     let start = source
         .windows(begin.len())
         .position(|window| window == begin)
-        .ok_or_else(|| format!("missing compiler revision marker: {}", String::from_utf8_lossy(begin)))?;
+        .ok_or_else(|| {
+            format!(
+                "missing compiler revision marker: {}",
+                String::from_utf8_lossy(begin)
+            )
+        })?;
     let content_start = start + begin.len();
     let relative_end = source[content_start..]
         .windows(end.len())
         .position(|window| window == end)
-        .ok_or_else(|| format!("missing compiler revision marker: {}", String::from_utf8_lossy(end)))?;
+        .ok_or_else(|| {
+            format!(
+                "missing compiler revision marker: {}",
+                String::from_utf8_lossy(end)
+            )
+        })?;
     let content_end = content_start + relative_end;
     if content_start >= content_end {
         return Err("compiler revision marker surface is empty".to_string());
@@ -62,7 +72,10 @@ fn delimited_surface<'a>(
 
 fn read_required(path: &Path) -> Vec<u8> {
     fs::read(path).unwrap_or_else(|error| {
-        panic!("failed to read compiler identity input {}: {error}", path.display())
+        panic!(
+            "failed to read compiler identity input {}: {error}",
+            path.display()
+        )
     })
 }
 
@@ -75,10 +88,15 @@ fn read_optional(path: &Path) -> Vec<u8> {
             surface
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            format!("{}\\0absent", path.to_string_lossy()).into_bytes()
+            let mut surface = path.to_string_lossy().as_bytes().to_vec();
+            surface.extend_from_slice(b"\0absent");
+            surface
         }
         Err(error) => {
-            panic!("failed to read optional compiler identity input {}: {error}", path.display())
+            panic!(
+                "failed to read optional compiler identity input {}: {error}",
+                path.display()
+            )
         }
     }
 }
@@ -89,7 +107,9 @@ fn rustc_identity() -> Vec<u8> {
         .arg("--version")
         .arg("--verbose")
         .output()
-        .unwrap_or_else(|error| panic!("failed to execute rustc for compiler identity: {error}"));
+        .unwrap_or_else(|error| {
+            panic!("failed to execute rustc for compiler identity: {error}")
+        });
     if !output.status.success() {
         panic!(
             "rustc identity command failed with status {}",
@@ -105,7 +125,9 @@ fn cargo_identity() -> Vec<u8> {
         .arg("--version")
         .arg("--verbose")
         .output()
-        .unwrap_or_else(|error| panic!("failed to execute cargo for compiler identity: {error}"));
+        .unwrap_or_else(|error| {
+            panic!("failed to execute cargo for compiler identity: {error}")
+        });
     if !output.status.success() {
         panic!(
             "cargo identity command failed with status {}",
@@ -179,7 +201,9 @@ fn main() {
     let rustc_workspace_wrapper =
         env::var("RUSTC_WORKSPACE_WRAPPER").unwrap_or_default().into_bytes();
     let cargo_features = cargo_feature_identity();
-    let rustflags = env::var("CARGO_ENCODED_RUSTFLAGS").unwrap_or_default().into_bytes();
+    let rustflags = env::var("CARGO_ENCODED_RUSTFLAGS")
+        .unwrap_or_default()
+        .into_bytes();
     let target = env::var("TARGET").unwrap_or_default().into_bytes();
     let host = env::var("HOST").unwrap_or_default().into_bytes();
 
