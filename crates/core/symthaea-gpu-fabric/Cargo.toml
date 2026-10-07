@@ -13,7 +13,6 @@ vulkan = ["dep:ash", "dep:naga"]
 [dependencies]
 blake3 = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
 thiserror = { workspace = true }
 ash = { workspace = true, optional = true }
 naga = { workspace = true, optional = true }
