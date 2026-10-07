@@ -233,6 +233,13 @@ impl VulkanSyncPlan {
             return Err(VulkanSyncError::DuplicateAssignment(u32::MAX));
         }
 
+        let max_queue = self.assignments.iter().map(|assignment| assignment.queue.get()).max();
+        if self.queue_count != max_queue.map_or(0, |max| max + 1) {
+            return Err(VulkanSyncError::QueueCountMismatch);
+        }
+        if self.assignments.iter().any(|assignment| assignment.queue.get() >= self.queue_count) {
+            return Err(VulkanSyncError::QueueAssignmentOutOfRange);
+        }
         let mut last_ordinal = None;
         let mut last_signal_by_queue = BTreeMap::<VulkanQueueId, u64>::new();
         let mut signal_index = BTreeMap::<(VulkanQueueId, u64), u32>::new();
@@ -244,9 +251,11 @@ impl VulkanSyncPlan {
                 return Err(VulkanSyncError::AssignmentMismatch(submission.node_id));
             }
             if let Some(previous) = last_ordinal {
-                if submission.ordinal <= previous {
-                    return Err(VulkanSyncError::SubmissionOrderMismatch);
+                if submission.ordinal != previous + 1 {
+                    return Err(VulkanSyncError::NonContiguousSubmissionOrdinals);
                 }
+            } else if submission.ordinal != 0 {
+                return Err(VulkanSyncError::NonContiguousSubmissionOrdinals);
             }
             last_ordinal = Some(submission.ordinal);
             if submission.signal.queue != submission.queue || submission.signal.value == 0 {
@@ -310,12 +319,16 @@ pub enum VulkanSyncError {
     SubmissionLimitExceeded(usize),
     #[error("submission/assignment cardinality mismatch")]
     InternalCardinalityMismatch,
+    #[error("queue count does not equal one greater than the highest assigned logical queue")]
+    QueueCountMismatch,
+    #[error("queue assignment is outside the declared queue count")]
+    QueueAssignmentOutOfRange,
     #[error("duplicate submission for node {0}")]
     DuplicateSubmission(u32),
     #[error("submission queue assignment mismatch for node {0}")]
     AssignmentMismatch(u32),
-    #[error("submission order is not strictly increasing by semantic ordinal")]
-    SubmissionOrderMismatch,
+    #[error("submission ordinals are not contiguous from zero")]
+    NonContiguousSubmissionOrdinals,
     #[error("invalid timeline signal for node {0}")]
     InvalidSignal(u32),
     #[error("timeline signal is not strictly increasing on queue {0:?}")]
@@ -447,6 +460,32 @@ mod tests {
         assert!(matches!(error, VulkanSyncError::AssignmentCountMismatch { .. }));
     }
 
+    #[test]
+    fn queue_count_must_cover_all_assignments() {
+        let schedule = ExecutionSchedule::from_graph(&graph_chain()).unwrap();
+        let q0 = VulkanQueueId::new(0).unwrap();
+        let q1 = VulkanQueueId::new(1).unwrap();
+        let mut plan = VulkanSyncPlan::from_schedule(&schedule, &[
+            VulkanQueueAssignment { node_id: 1, queue: q0 },
+            VulkanQueueAssignment { node_id: 2, queue: q1 },
+            VulkanQueueAssignment { node_id: 3, queue: q0 },
+        ]).unwrap();
+        plan.queue_count = 1;
+        assert!(matches!(plan.digest(), Err(VulkanSyncError::QueueCountMismatch)));
+    }
+
+    #[test]
+    fn submission_ordinals_must_be_contiguous() {
+        let schedule = ExecutionSchedule::from_graph(&graph_chain()).unwrap();
+        let q0 = VulkanQueueId::new(0).unwrap();
+        let mut plan = VulkanSyncPlan::from_schedule(&schedule, &[
+            VulkanQueueAssignment { node_id: 1, queue: q0 },
+            VulkanQueueAssignment { node_id: 2, queue: q0 },
+            VulkanQueueAssignment { node_id: 3, queue: q0 },
+        ]).unwrap();
+        plan.submissions[1].ordinal = 7;
+        assert!(matches!(plan.digest(), Err(VulkanSyncError::NonContiguousSubmissionOrdinals)));
+    }
     #[test]
     fn non_monotonic_signal_is_rejected() {
         let schedule = ExecutionSchedule::from_graph(&graph_chain()).unwrap();
