@@ -8413,6 +8413,39 @@ mod tests {
     }
 
     #[test]
+    fn calibration_traceability_timestamp_mutation_changes_assessment_receipt() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let original = AlternativesEngine
+            .assess(&case.requirement, &case.candidates, Some(case.incumbent_id))
+            .unwrap();
+
+        let mut mutated = case.clone();
+        let evidence = mutated
+            .candidates
+            .iter_mut()
+            .flat_map(|candidate| candidate.evidence.iter_mut())
+            .find(|evidence| evidence.observation.is_some())
+            .unwrap();
+        let (calibration_chain_digest, calibration_chain_count) = {
+            let observation = evidence.observation.as_mut().unwrap();
+            observation.calibration_chain_refs[0].used_at_epoch_seconds += 1;
+            (
+                canonical_calibration_chain_hash(&observation.calibration_chain_refs).unwrap(),
+                observation.calibration_chain_refs.len(),
+            )
+        };
+        let uncertainty = evidence.uncertainty.as_mut().unwrap();
+        uncertainty.evaluation.calibration_chain_digest = calibration_chain_digest;
+        uncertainty.evaluation.calibration_chain_count = calibration_chain_count;
+
+        let changed = AlternativesEngine
+            .assess(&mutated.requirement, &mutated.candidates, Some(mutated.incumbent_id))
+            .unwrap();
+
+        assert_ne!(original.receipt.payload_hash, changed.receipt.payload_hash);
+    }
+
+    #[test]
     fn observation_can_bind_to_experimental_design_identity() {
         let mut observation = ObservationProvenanceRef {
             observation_id: "obs".into(),
@@ -8427,6 +8460,7 @@ mod tests {
                 calibration_id: "calibration".into(),
                 calibration_revision: "v1".into(),
                 calibration_record_digest: "calibration-digest".into(),
+                used_at_epoch_seconds: 1_700_000_000,
             }],
             experimental_design_id: Some("design:water-v1".into()),
             experimental_target_id: Some("target:water-v1".into()),
