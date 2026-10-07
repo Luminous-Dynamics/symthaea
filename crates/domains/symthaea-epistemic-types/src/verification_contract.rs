@@ -75,7 +75,7 @@ pub fn url_values_equivalent(left: &str, right: &str) -> Result<bool, url::Parse
 }
 
 fn is_lower_hex_digest(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 fn decode_sha256_multibase(value: &str) -> Result<[u8; 32], VerificationFailure> {
