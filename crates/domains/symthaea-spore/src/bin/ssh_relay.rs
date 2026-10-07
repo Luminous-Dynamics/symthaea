@@ -3283,13 +3283,14 @@ async fn create_btrfs_image_archive(image_dir: &str) -> Result<bool, String> {
         sender_child.wait_with_output(),
         encoder_child.wait_with_output()
     );
+
+    let snapshot_cleanup =
+        run_privileged_args("btrfs", &["subvolume", "delete", &snapshot]).await?;
+
     let sender_output =
         sender_output.map_err(|error| format!("btrfs send wait failed: {error}"))?;
     let encoder_output =
         encoder_output.map_err(|error| format!("zstd image encoding wait failed: {error}"))?;
-
-    let snapshot_cleanup =
-        run_privileged_args("btrfs", &["subvolume", "delete", &snapshot]).await?;
 
     if !snapshot_cleanup.status.success()
         || !sender_output.status.success()
@@ -3404,37 +3405,56 @@ async fn write_installed_packages_sidecar(image_dir: &str) -> Result<(), String>
 }
 
 fn freeze_image_namespace_blocking(image_dir: &str) -> Result<(), String> {
-    use std::os::unix::fs::PermissionsExt;
+    use std::ffi::CString;
+    use std::os::unix::fs::{AsRawFd, FromRawFd, PermissionsExt};
 
     let directory = std::fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(image_dir)
         .map_err(|error| format!("unable to open image namespace for freezing: {error}"))?;
+    let dir_fd = directory.as_raw_fd();
 
     for entry in std::fs::read_dir(image_dir)
         .map_err(|error| format!("unable to enumerate image namespace: {error}"))?
     {
         let entry =
             entry.map_err(|error| format!("unable to inspect image namespace entry: {error}"))?;
-        let metadata = std::fs::symlink_metadata(entry.path())
+        let name = entry.file_name();
+        let name_c = CString::new(name.as_encoded_bytes())
+            .map_err(|_| "image namespace contains a filename with NUL".to_string())?;
+
+        let fd = unsafe {
+            libc::openat(
+                dir_fd,
+                name_c.as_ptr(),
+                libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+            )
+        };
+        if fd < 0 {
+            return Err(format!(
+                "unable to open image namespace artifact {}: {}",
+                entry.path().display(),
+                std::io::Error::last_os_error()
+            ));
+        }
+        let file = unsafe { std::fs::File::from_raw_fd(fd) };
+        let metadata = file
+            .metadata()
             .map_err(|error| format!("unable to inspect image namespace artifact: {error}"))?;
-        if !metadata.file_type().is_file() {
+        if !metadata.is_file() {
             return Err(format!(
                 "image namespace contains non-regular artifact {}",
                 entry.path().display()
             ));
         }
-        std::fs::set_permissions(
-            entry.path(),
-            std::fs::Permissions::from_mode(0o400),
-        )
-        .map_err(|error| {
-            format!(
-                "unable to freeze image artifact {}: {error}",
-                entry.path().display()
-            )
-        })?;
+        file.set_permissions(std::fs::Permissions::from_mode(0o400))
+            .map_err(|error| {
+                format!(
+                    "unable to freeze image artifact {}: {error}",
+                    entry.path().display()
+                )
+            })?;
     }
 
     directory
@@ -8121,6 +8141,7 @@ echo '}'
                     continue;
                 }
 
+                let mut sidecar_error = None;
                 for (source, required) in [
                     ("/etc/nixos/configuration.nix", true),
                     ("/etc/nixos/hardware-configuration.nix", false),
@@ -8130,32 +8151,36 @@ echo '}'
                     if let Err(error) =
                         copy_optional_image_sidecar(&image_dest, source, required).await
                     {
-                        eprintln!(
-                            "[{}] {} image sidecar staging failed: {}",
-                            peer_addr,
-                            transaction.log_line(),
-                            error
-                        );
-                        let _ = std::fs::remove_dir_all(&image_dest);
-                        let outcome = finalize_transaction(
-                            &transaction_ledger,
-                            &transaction,
-                            TransactionOutcome::Indeterminate,
-                            &peer_addr,
-                        );
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                serde_json::json!({
-                                    "type":"exit",
-                                    "code":protocol_exit_code(1, outcome),
-                                    "data":format!("Image sidecar staging failed: {error}"),
-                                    "transaction":transaction.receipt(outcome)
-                                })
-                                .to_string(),
-                            ))
-                            .await;
-                        continue;
+                        sidecar_error = Some(error);
+                        break;
                     }
+                }
+                if let Some(error) = sidecar_error {
+                    eprintln!(
+                        "[{}] {} image sidecar staging failed: {}",
+                        peer_addr,
+                        transaction.log_line(),
+                        error
+                    );
+                    let _ = std::fs::remove_dir_all(&image_dest);
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type":"exit",
+                                "code":protocol_exit_code(1, outcome),
+                                "data":format!("Image sidecar staging failed: {error}"),
+                                "transaction":transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    continue;
                 }
 
                 // Inventory is informational in the existing image schema.
