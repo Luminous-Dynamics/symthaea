@@ -179,6 +179,25 @@ witness over the already established coset partition, so it should be interprete
 a direct guard against the spectrum blind spot rather than as an independent proof
 of linearity.
 
+## Coordinate-permutation equivariance
+
+A binary Hamming-space coordinate permutation is an isometry, and two linear codes related
+by such a permutation are equivalent codes. citeturn631975search0turn631975search1
+The bounded decoder should therefore be equivariant under a coordinate relabeling: distances,
+minimum error weights, unique/ambiguous/no-match classes, and the concrete error/codeword
+lists should transform with the same permutation.
+
+The qualification now checks this metamorphic property on every one of the 256 ambient
+observations of the [8,2,4] fixture, and on 32 deterministic probes of a packed 73-bit
+[73,8] random code using a permutation that exercises coordinates across the 64-bit word
+boundary. The list surface is compared as an unordered set after applying the permutation,
+preventing an implementation-specific traversal order from becoming part of the claim.
+
+This is an algorithmic invariance witness rather than another restatement of the quotient
+spectrum. It specifically probes coordinate indexing, packed-word boundaries, parity-check
+construction, and the decoder's interpretation of Hamming geometry under representation
+isomorphism.
+
 ## Walsh/dual-fiber structure
 
 A metric-orthogonal witness is obtained from the Boolean Walsh characters

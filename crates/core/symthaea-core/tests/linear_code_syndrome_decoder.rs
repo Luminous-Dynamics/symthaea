@@ -1383,6 +1383,161 @@ fn deterministic_probe_masks(mut state: u64, count: usize, dimension: usize) -> 
     output
 }
 
+fn permute_codeword(word: &BinaryCodeword, permutation: &[usize]) -> BinaryCodeword {
+    assert_eq!(word.dimension(), permutation.len());
+    let mut output = BinaryCodeword::zero(word.dimension());
+    let mut seen_targets = vec![false; permutation.len()];
+    for (source, &target) in permutation.iter().enumerate() {
+        assert!(target < permutation.len());
+        assert!(!seen_targets[target]);
+        seen_targets[target] = true;
+        if word.bit(source) {
+            output.set_bit(target, true);
+        }
+    }
+    assert!(seen_targets.into_iter().all(|seen| seen));
+    output
+}
+
+fn permute_code(code: &RandomLinearCode, permutation: &[usize]) -> RandomLinearCode {
+    assert_eq!(code.dimension(), permutation.len());
+    let basis = code
+        .basis()
+        .iter()
+        .map(|word| permute_codeword(word, permutation))
+        .collect::<Vec<_>>();
+    RandomLinearCode::from_basis(basis).expect("permuted basis remains independent")
+}
+
+fn canonicalize_words(mut words: Vec<BinaryCodeword>) -> Vec<BinaryCodeword> {
+    words.sort_by_key(|word| word.words().to_vec());
+    words
+}
+
+#[test]
+fn coordinate_permutation_equivariance_preserves_bounded_decoder_semantics() {
+    fn check(
+        code: &RandomLinearCode,
+        permutation: &[usize],
+        observations: &[BinaryCodeword],
+        bound: usize,
+    ) {
+        let permuted_code = permute_code(code, permutation);
+        let original_decoder =
+            BoundedDistanceSyndromeDecoder::from_code(code).expect("original decoder");
+        let permuted_decoder =
+            BoundedDistanceSyndromeDecoder::from_code(&permuted_code).expect("permuted decoder");
+
+        for observation in observations {
+            let permuted_observation = permute_codeword(observation, permutation);
+            let original = original_decoder.decode_with_minimum_list(observation, bound, 64);
+            let permuted =
+                permuted_decoder.decode_with_minimum_list(&permuted_observation, bound, 64);
+
+            match (&original.outcome, &permuted.outcome) {
+                (
+                    BoundedDistanceDecode::Unique {
+                        codeword: original_codeword,
+                        error: original_error,
+                        distance: original_distance,
+                    },
+                    BoundedDistanceDecode::Unique {
+                        codeword: permuted_codeword,
+                        error: permuted_error,
+                        distance: permuted_distance,
+                    },
+                ) => {
+                    assert_eq!(*permuted_distance, *original_distance);
+                    assert_eq!(
+                        *permuted_codeword,
+                        permute_codeword(original_codeword, permutation)
+                    );
+                    assert_eq!(
+                        *permuted_error,
+                        permute_codeword(original_error, permutation)
+                    );
+                }
+                (
+                    BoundedDistanceDecode::Ambiguous {
+                        distance: original_distance,
+                        matching_error_patterns: original_matches,
+                    },
+                    BoundedDistanceDecode::Ambiguous {
+                        distance: permuted_distance,
+                        matching_error_patterns: permuted_matches,
+                    },
+                ) => {
+                    assert_eq!(*permuted_distance, *original_distance);
+                    assert_eq!(*permuted_matches, *original_matches);
+                }
+                (
+                    BoundedDistanceDecode::NoMatchWithinBound {
+                        max_error_weight: original_bound,
+                    },
+                    BoundedDistanceDecode::NoMatchWithinBound {
+                        max_error_weight: permuted_bound,
+                    },
+                ) => assert_eq!(*permuted_bound, *original_bound),
+                (
+                    BoundedDistanceDecode::InvalidObservationDimension { .. },
+                    BoundedDistanceDecode::InvalidObservationDimension { .. },
+                )
+                | (
+                    BoundedDistanceDecode::InvalidBound { .. },
+                    BoundedDistanceDecode::InvalidBound { .. },
+                ) => {}
+                (left, right) => panic!(
+                    "coordinate permutation changed scalar decoder class: original={left:?} permuted={right:?}"
+                ),
+            }
+
+            let expected_errors = canonicalize_words(
+                original
+                    .minimum_errors
+                    .iter()
+                    .map(|error| permute_codeword(error, permutation))
+                    .collect::<Vec<_>>(),
+            );
+            let observed_errors = canonicalize_words(permuted.minimum_errors.clone());
+            assert_eq!(observed_errors, expected_errors);
+
+            let expected_codewords = canonicalize_words(
+                original
+                    .nearest_codewords
+                    .iter()
+                    .map(|codeword| permute_codeword(codeword, permutation))
+                    .collect::<Vec<_>>(),
+            );
+            let observed_codewords = canonicalize_words(permuted.nearest_codewords.clone());
+            assert_eq!(observed_codewords, expected_codewords);
+            assert_eq!(permuted.list_complete, original.list_complete);
+        }
+    }
+
+    let boundary = boundary_code();
+    let boundary_observations = (0u16..256)
+        .map(|mask| error_from_mask(mask as usize, boundary.dimension()))
+        .collect::<Vec<_>>();
+    let boundary_permutation = [3, 0, 7, 1, 6, 2, 5, 4];
+    check(&boundary, &boundary_permutation, &boundary_observations, 2);
+
+    let random = RandomLinearCode::generate(73, 8, 0xC0DE);
+    let random_permutation = (0..73usize)
+        .map(|index| (index * 17 + 11) % 73)
+        .collect::<Vec<_>>();
+    let probes = deterministic_probe_masks(0xA11C_E001, 32, 73)
+        .iter()
+        .map(|&mask| error_from_mask(mask as usize, 73))
+        .collect::<Vec<_>>();
+    check(&random, &random_permutation, &probes, 1);
+
+    println!(
+        "COORDINATE_PERMUTATION_EQUIVARIANCE=boundary_observations={};boundary_dimension=8;boundary_bound=2;random_dimension=73;random_rank=8;random_probes=32;random_bound=1;list_surface_checked=true;distance_preserved=true;error_equivariance=true;codeword_equivariance=true;no_match_equivariance=true",
+        boundary_observations.len()
+    );
+}
+
+
 #[test]
 fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
     let regimes = [

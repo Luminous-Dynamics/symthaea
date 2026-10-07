@@ -38,6 +38,9 @@ jobs:
           EVENT_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           EVENT_HEAD_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref_name }}
           EVENT_HEAD_REPO: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
+          EVENT_HEAD_REPO_ID: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.id || github.repository_id }}
+          EVENT_REPO_ID: ${{ github.event.repository.id }}
+          CURRENT_REPO_ID: ${{ github.repository_id }}
           EVENT_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
           SYNTHETIC_MERGE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || '' }}
           GH_TOKEN: ${{ github.token }}
@@ -48,6 +51,12 @@ jobs:
           test -n "$EVENT_HEAD_SHA"
           test "$EVENT_HEAD_REF" = "research/hdc-linear-code-bounded-decoder-v2"
           test "$EVENT_HEAD_REPO" = "$GITHUB_REPOSITORY"
+          test "$CURRENT_REPO_ID" = "1136141775"
+          test "$EVENT_REPO_ID" = "$CURRENT_REPO_ID"
+          test "$EVENT_HEAD_REPO_ID" = "$CURRENT_REPO_ID"
+          LIVE_RUN_JSON="$(gh api --method GET -H "Accept: application/vnd.github+json" "/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}")"
+          LIVE_RUN_REPO_ID="$(printf '%s' "$LIVE_RUN_JSON" | jq -r '.repository.id')"
+          test "$LIVE_RUN_REPO_ID" = "$CURRENT_REPO_ID"
           test "$ACTUAL_SHA" = "$EVENT_HEAD_SHA"
           git cat-file -e "${PARENT_SHA}^{commit}"
           COMPARE_JSON="$(gh api --method GET \
@@ -346,6 +355,19 @@ jobs:
           test -n "$LEDGER"
           printf "factor_syndrome_separation=%s\\n" "$LEDGER" >> "$GITHUB_OUTPUT"
 
+      - name: Capture coordinate permutation equivariance
+        id: coordinate_permutation
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            coordinate_permutation_equivariance_preserves_bounded_decoder_semantics -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^COORDINATE_PERMUTATION_EQUIVARIANCE=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^COORDINATE_PERMUTATION_EQUIVARIANCE=//p')"
+          test -n "$LEDGER"
+          printf "coordinate_permutation_equivariance=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
       - name: Capture syndrome decoder ledger
         id: decoder_ledger
         run: |
@@ -412,7 +434,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
           HDC Linear-Code Bounded Decoder Qualification
           =============================================
-          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v10
+          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v11
           github_run_id=${{ github.run_id }}
           github_run_attempt=${{ github.run_attempt }}
           github_workflow_sha=${{ github.workflow_sha }}
@@ -424,6 +446,10 @@ jobs:
           parent_head=${{ steps.head.outputs.parent_sha }}
           parent_head_required=164d6b94d12bb72a902bdc2164d25cd540d3ba7f
           source_repo=${{ steps.head.outputs.source_repo }}
+          source_repo_id=${{ steps.head.outputs.source_repo_id }}
+          event_repo_id=${{ steps.head.outputs.event_repo_id }}
+          current_repo_id=${{ steps.head.outputs.current_repo_id }}
+          live_run_repo_id=${{ steps.head.outputs.live_run_repo_id }}
           event_base_sha=${{ steps.head.outputs.event_base_sha }}
           ancestry_status=${{ steps.head.outputs.ancestry_status }}
           stack_distance=${{ steps.head.outputs.stack_distance }}
@@ -451,6 +477,8 @@ jobs:
           syndrome_quotient_spectrum=${{ steps.quotient_spectrum.outputs.syndrome_quotient_spectrum }}
           syndrome_spectrum_adversary_status=${{ steps.spectrum_adversary.outcome }}
           syndrome_spectrum_adversary=${{ steps.spectrum_adversary.outputs.syndrome_spectrum_adversary }}
+          coordinate_permutation_equivariance_status=${{ steps.coordinate_permutation.outcome }}
+          coordinate_permutation_equivariance=${{ steps.coordinate_permutation.outputs.coordinate_permutation_equivariance }}
           syndrome_fiber_difference_status=${{ steps.fiber_difference.outcome }}
           syndrome_fiber_difference=${{ steps.fiber_difference.outputs.syndrome_fiber_difference }}
           walsh_dual_fiber_status=${{ steps.walsh_dual_fiber.outcome }}
@@ -470,7 +498,7 @@ jobs:
           runner_arch=${{ steps.runner.outputs.runner_arch }}
           runner_image=${{ steps.runner.outputs.runner_image }}
           runner_image_version=${{ steps.runner.outputs.runner_image_version }}
-          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.fixed_syndrome_spec.outcome == 'success' && steps.quotient_metric.outcome == 'success' && steps.quotient_spectrum.outcome == 'success' && steps.spectrum_adversary.outcome == 'success' && steps.fiber_difference.outcome == 'success' && steps.walsh_dual_fiber.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.fixed_syndrome_spec.outcome == 'success' && steps.quotient_metric.outcome == 'success' && steps.quotient_spectrum.outcome == 'success' && steps.spectrum_adversary.outcome == 'success' && steps.coordinate_permutation.outcome == 'success' && steps.fiber_difference.outcome == 'success' && steps.walsh_dual_fiber.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
           random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
           random_syndrome_sweep=${{ steps.random_sweep.outputs.random_syndrome_sweep }}
