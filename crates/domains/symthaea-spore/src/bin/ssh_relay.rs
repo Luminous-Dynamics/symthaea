@@ -128,6 +128,21 @@ async fn run_privileged_script(path: &str) -> Result<CmdResult, std::io::Error> 
     })
 }
 
+async fn run_privileged_script_with_args(
+    path: &str,
+    args: &[&str],
+) -> Result<CmdResult, std::io::Error> {
+    let mut command = privileged_script_command(path);
+    command.args(args);
+    let output = command.output().await?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
+
 
 fn create_private_runtime_file(path: &str, mode: u32) -> Result<std::fs::File, std::io::Error> {
     std::fs::OpenOptions::new()
@@ -5797,67 +5812,67 @@ echo "  User password set."
             "pre_install_check" => {
                 eprintln!("[{}] Running pre-install checks...", peer_addr);
                 let disk = client_msg.disk.clone();
-                let check_script = format!(
-                    r#"
-echo '{{"checks": ['
+                let check_script = r#"DISK="$1"
+
+echo '{"checks": ['
 
 # 1. EFI vs BIOS
 if [ -d /sys/firmware/efi ]; then
-  echo '{{"name":"boot_mode","status":"pass","detail":"EFI/UEFI detected — systemd-boot will be used"}},'
+  echo '{"name":"boot_mode","status":"pass","detail":"EFI/UEFI detected — systemd-boot will be used"},'
 else
-  echo '{{"name":"boot_mode","status":"warn","detail":"Legacy BIOS detected — GRUB will be used (limited features)"}},'
+  echo '{"name":"boot_mode","status":"warn","detail":"Legacy BIOS detected — GRUB will be used (limited features)"},'
 fi
 
 # 2. RAM check
-RAM_MB=$(free -m | awk '/Mem:/{{print $2}}')
+RAM_MB=$(free -m | awk '/Mem:/{print $2}')
 if [ "$RAM_MB" -ge 4096 ]; then
-  echo "{{"name":"ram","status":"pass","detail":"${{RAM_MB}}MB RAM — sufficient for any desktop"}},"
+  echo "{"name":"ram","status":"pass","detail":"${RAM_MB}MB RAM — sufficient for any desktop"},"
 elif [ "$RAM_MB" -ge 2048 ]; then
-  echo "{{"name":"ram","status":"warn","detail":"${{RAM_MB}}MB RAM — use XFCE or Sway for best performance"}},"
+  echo "{"name":"ram","status":"warn","detail":"${RAM_MB}MB RAM — use XFCE or Sway for best performance"},"
 else
-  echo "{{"name":"ram","status":"fail","detail":"${{RAM_MB}}MB RAM — insufficient for graphical desktop. CLI-only recommended"}},"
+  echo "{"name":"ram","status":"fail","detail":"${RAM_MB}MB RAM — insufficient for graphical desktop. CLI-only recommended"},"
 fi
 
 # 3. Disk health (SMART)
-if command -v smartctl >/dev/null 2>&1 && [ -n "{disk}" ]; then
-  SMART=$(smartctl -H "{disk}" 2>/dev/null | grep -i "overall" | head -1)
+if command -v smartctl >/dev/null 2>&1 && [ -n "$DISK" ]; then
+  SMART=$(smartctl -H "$DISK" 2>/dev/null | grep -i "overall" | head -1)
   if echo "$SMART" | grep -qi "PASSED\|OK"; then
-    echo '{{"name":"disk_health","status":"pass","detail":"SMART: disk healthy"}},'
+    echo '{"name":"disk_health","status":"pass","detail":"SMART: disk healthy"},'
   elif [ -z "$SMART" ]; then
-    echo '{{"name":"disk_health","status":"warn","detail":"SMART not supported on this disk"}},'
+    echo '{"name":"disk_health","status":"warn","detail":"SMART not supported on this disk"},'
   else
-    echo "{{"name":"disk_health","status":"fail","detail":"SMART WARNING: $SMART"}},"
+    echo "{"name":"disk_health","status":"fail","detail":"SMART WARNING: $SMART"},"
   fi
 else
-  echo '{{"name":"disk_health","status":"warn","detail":"smartctl not available"}},'
+  echo '{"name":"disk_health","status":"warn","detail":"smartctl not available"},'
 fi
 
 # 4. BitLocker detection
 BL_FOUND=false
-for PART in $(blkid -o device "{disk}"* 2>/dev/null); do
+for PART in $(blkid -o device "$DISK"* 2>/dev/null); do
   if blkid "$PART" 2>/dev/null | grep -qi bitlocker; then
     BL_FOUND=true
-    echo "{{"name":"bitlocker","status":"warn","detail":"BitLocker detected on $PART — have your recovery key ready"}},"
+    echo "{"name":"bitlocker","status":"warn","detail":"BitLocker detected on $PART — have your recovery key ready"},"
   fi
 done
 if [ "$BL_FOUND" = false ]; then
-  echo '{{"name":"bitlocker","status":"pass","detail":"No BitLocker encryption detected"}},'
+  echo '{"name":"bitlocker","status":"pass","detail":"No BitLocker encryption detected"},'
 fi
 
 # 5. Free space (for alongside mode)
-FREE_SECTORS=$(sgdisk -p "{disk}" 2>/dev/null | awk '/Total free space/{{print $5}}' || echo "0")
+FREE_SECTORS=$(sgdisk -p "$DISK" 2>/dev/null | awk '/Total free space/{print $5}' || echo "0")
 FREE_GB=$((FREE_SECTORS * 512 / 1073741824))
 if [ "$FREE_GB" -ge 40 ]; then
-  echo "{{"name":"free_space","status":"pass","detail":"${{FREE_GB}}GB free — sufficient for NixOS"}},"
+  echo "{"name":"free_space","status":"pass","detail":"${FREE_GB}GB free — sufficient for NixOS"},"
 elif [ "$FREE_GB" -ge 20 ]; then
-  echo "{{"name":"free_space","status":"warn","detail":"${{FREE_GB}}GB free — tight. Consider freeing more space"}},"
+  echo "{"name":"free_space","status":"warn","detail":"${FREE_GB}GB free — tight. Consider freeing more space"},"
 else
-  echo "{{"name":"free_space","status":"fail","detail":"${{FREE_GB}}GB free — insufficient for dual-boot. Shrink existing partitions first"}},"
+  echo "{"name":"free_space","status":"fail","detail":"${FREE_GB}GB free — insufficient for dual-boot. Shrink existing partitions first"},"
 fi
 
 # 6. Existing OS detection
 OS_LIST=""
-for PART in $(lsblk -rno NAME,FSTYPE "{disk}" 2>/dev/null | awk '$2~/ntfs|ext4|btrfs|xfs/{{print "/dev/"$1}}'); do
+for PART in $(lsblk -rno NAME,FSTYPE "$DISK" 2>/dev/null | awk '$2~/ntfs|ext4|btrfs|xfs/{print "/dev/"$1}'); do
   MOUNT_DIR=$(mktemp -d)
   if mount -o ro "$PART" "$MOUNT_DIR" 2>/dev/null; then
     if [ -d "$MOUNT_DIR/Windows/System32" ]; then
@@ -5871,23 +5886,52 @@ for PART in $(lsblk -rno NAME,FSTYPE "{disk}" 2>/dev/null | awk '$2~/ntfs|ext4|b
   rmdir "$MOUNT_DIR" 2>/dev/null
 done
 if [ -n "$OS_LIST" ]; then
-  echo "{{"name":"existing_os","status":"info","detail":"Detected:$OS_LIST"}},"
+  echo "{"name":"existing_os","status":"info","detail":"Detected:$OS_LIST"},"
 else
-  echo '{{"name":"existing_os","status":"pass","detail":"No existing OS detected on this disk"}},'
+  echo '{"name":"existing_os","status":"pass","detail":"No existing OS detected on this disk"},'
 fi
 
 # 7. Network connectivity
 if ping -c1 -W3 cache.nixos.org >/dev/null 2>&1; then
-  echo '{{"name":"network","status":"pass","detail":"Network OK — can reach NixOS cache"}}'
+  echo '{"name":"network","status":"pass","detail":"Network OK — can reach NixOS cache"}'
 else
-  echo '{{"name":"network","status":"fail","detail":"Cannot reach cache.nixos.org — install will fail without internet"}}'
+  echo '{"name":"network","status":"fail","detail":"Cannot reach cache.nixos.org — install will fail without internet"}'
 fi
 
-echo ']}}'
-"#,
-                    disk = disk
-                );
-                match run_cmd(&check_script).await {
+echo ']}'
+"#;
+                let preflight_id = random_operation_id().unwrap_or_else(|_| {
+                    // This is only a temporary namespace identity; refusing to reuse a
+                    // fixed pathname is safer than proceeding if the CSPRNG is unavailable.
+                    std::process::abort();
+                });
+                let preflight_path =
+                    format!("/tmp/nixforhumanity-preflight-{preflight_id}.sh");
+
+                if let Err(error) = write_private_file(
+                    &preflight_path,
+                    check_script.as_bytes(),
+                    0o700,
+                ) {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Unable to stage pre-install check safely: {error}"
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                let check_result = run_privileged_script_with_args(
+                    &preflight_path,
+                    &[&disk],
+                )
+                .await;
+                let _ = tokio::fs::remove_file(&preflight_path).await;
+
+                match check_result {
                     Ok(result) if result.exit_status == 0 => {
                         let _ = ws_tx
                             .send(Message::Text(format!(
