@@ -26,7 +26,7 @@ pub mod corpus;
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 43;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-v61";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-v62";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -1946,15 +1946,6 @@ impl CandidatePathway {
             self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
                 .any(|e| e.kind == EvidenceKind::Simulated)
         });
-        let any_supported_measurement = self.burdens.values().any(|estimate| {
-            self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy).any(|e| {
-                matches!(
-                    e.kind,
-                    EvidenceKind::Observed | EvidenceKind::Reported | EvidenceKind::Derived
-                ) && e.stance == EvidenceStance::Supports
-                    && e.confidence >= 0.7
-            })
-        });
         let all_dimensions_supported_evidence =
             self.all_burden_dimensions_have_supported_evidence(as_of, freshness_policy);
         let has_all_dimension_evidence = Dimension::ALL.iter().all(|dimension| {
@@ -2131,14 +2122,12 @@ impl CandidatePathway {
             && field_distinct_authority_sources >= 2
         {
             QualificationState::FieldQualified
-        } else if any_supported_measurement
-            && manufacturing_distinct_authority_sources >= 2
+        } else if manufacturing_distinct_authority_sources >= 2
             && has_all_dimension_evidence
             && all_dimensions_manufacturing_observed
         {
             QualificationState::ManufacturingQualified
-        } else if any_supported_measurement
-            && lifecycle_distinct_authority_sources >= 2
+        } else if lifecycle_distinct_authority_sources >= 2
             && has_all_dimension_evidence
             && all_dimensions_lifecycle_assessed
         {
