@@ -712,14 +712,15 @@ fn evaluate_cross_scenario_transfer(
     );
 
     for (train_index, training) in scenarios.iter().enumerate() {
-        let (mut trained_model, train_steps) =
-            train_world_model_clone(base_model, training, train_cycles);
-
         for (held_out_index, held_out) in scenarios.iter().enumerate() {
             if held_out_index == train_index {
                 continue;
             }
 
+            // Each train → held-out pair gets a fresh clone so future changes to the
+            // evaluation phase cannot create cross-fold state leakage.
+            let (mut trained_model, train_steps) =
+                train_world_model_clone(base_model, training, train_cycles);
             let predictor = FepWorldModelPredictor {
                 bridge: &mut trained_model,
             };
