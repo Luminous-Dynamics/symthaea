@@ -541,7 +541,13 @@ impl NixLocalExecutionAuthorityV1 {
             .service_effect_context()
             .map(|context| context.authorized_definition_content_digest.as_str())
     }
-}
+
+    /// Return the observer-bound pre-invocation identity for a Restart authority.
+    pub(crate) fn pre_invocation_id(&self) -> Option<&str> {
+        self.intent
+            .service_effect_context()
+            .and_then(|context| context.pre_invocation_id.as_deref())
+    }
 
 
 pub(crate) struct LiveNixAuthorizationV1 {
@@ -820,6 +826,11 @@ fn validate_service_definition_capture(
     if context.authorized_definition_content_digest != content_digest {
         return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
     }
+    if *operation == NixServiceOperationKindV1::Restart
+        && context.pre_invocation_id.as_deref() != evidence.pre_invocation_id.as_deref()
+    {
+        return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
+    }
     Ok(())
 }
 
@@ -846,6 +857,13 @@ fn validate_service_definition_capture_binding(
             || context.authorized_definition_content_digest != content_digest
         {
             return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
+        }
+        if let NixActionDescriptorV1::Service { operation: NixServiceOperationKindV1::Restart, .. } =
+            intent.action
+        {
+            if context.pre_invocation_id.as_deref() != evidence.pre_invocation_id.as_deref() {
+                return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
+            }
         }
     }
 
@@ -1505,6 +1523,7 @@ mod tests {
             source_identity_digest: "11".repeat(32),
             manager_owner: ":1.42".into(),
             bus_id: "0123456789abcdef0123456789abcdef".into(),
+            pre_invocation_id: Some("bb".repeat(16)),
             files: vec![NixSystemdUnitDefinitionContentFileV1 {
                 path: "/nix/store/nginx.service".into(),
                 resolved_path: None,
@@ -1552,6 +1571,15 @@ mod tests {
             NixVerifiedServiceDefinitionContentV1::from_observer(altered_evidence).unwrap();
         assert_eq!(
             validate_service_definition_capture_binding(&contextual, &altered).unwrap_err(),
+            NixAuthorizationErrorV1::DefinitionContentCaptureMismatch
+        );
+
+        let mut invocation_altered = evidence.clone();
+        invocation_altered.pre_invocation_id = Some("cc".repeat(16));
+        let invocation_altered =
+            NixVerifiedServiceDefinitionContentV1::from_observer(invocation_altered).unwrap();
+        assert_eq!(
+            validate_service_definition_capture_binding(&contextual, &invocation_altered).unwrap_err(),
             NixAuthorizationErrorV1::DefinitionContentCaptureMismatch
         );
     }
