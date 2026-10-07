@@ -1367,16 +1367,16 @@ const INFERENCE_BINDING_SCHEMA: &str = "relational-prediction-inference-binding/
 const INFERENCE_SELECTION_SCHEMA: &str = "relational-prediction-inference-selection/v1";
 const CANONICAL_INFERENCE_SELECTION_RULE_ID: &str = "relational-inference-selection-rule-v1";
 const CANONICAL_INFERENCE_SELECTION_RULE_SPEC_SHA256: &str =
-    "aaed4c4086601986c75a739e90d1d9cad539eb18383d61f97301b32b7340ce6b";
+    "3cbc7106d5f5b934958abfaf797c7a188aece444014027b4bbc3950b9db842b8";
 const CANONICAL_INFERENCE_SELECTION_PROCEDURE_ID: &str = "nested-forecast-bootstrap-v1";
 const CANONICAL_INFERENCE_SELECTION_DEPENDENCE_ID: &str = "loss-dependence-bartlett-v1";
 const CANONICAL_INFERENCE_SELECTION_RESAMPLING_ID: &str = "moving-block-bootstrap-v1";
 const CANONICAL_INFERENCE_SELECTION_PROCEDURE_SPEC_SHA256: &str =
-    "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4";
+    "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b";
 const CANONICAL_INFERENCE_SELECTION_DEPENDENCE_SPEC_SHA256: &str =
-    "8b5195edb3c93a1c4a56d48c96732dfbd14c6e1299b5ac2cf53cef55ce37caf1";
+    "0a6d4a8c4a9c96d1845af12a290e65b4c575c91678a85c79b1570b1c189553b9";
 const CANONICAL_INFERENCE_SELECTION_RESAMPLING_SPEC_SHA256: &str =
-    "ba1886b0727d5ac1fd6b107486d20c68cc5775416cdfb8eeb1887df7e2be450b";
+    "b66046e1016389d126ef79abad15ab293d26a1fef9579d9578442cd1bd81d80d";
 const CANONICAL_INFERENCE_SELECTION_SMALL_SAMPLE_POLICY_ID: &str =
     "small-sample-conservative-v1";
 const CANONICAL_INFERENCE_SELECTION_MULTIPLICITY_POLICY_ID: &str =
@@ -5552,11 +5552,11 @@ mod tests {
             CANONICAL_SELECTION_RULE_ID,
             CANONICAL_SELECTION_RULE_SPEC_SHA256,
             "nested-forecast-bootstrap-v1",
-            "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4",
+            "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b",
             "loss-dependence-bartlett-v1",
-            "8b5195edb3c93a1c4a56d48c96732dfbd14c6e1299b5ac2cf53cef55ce37caf1",
+            "0a6d4a8c4a9c96d1845af12a290e65b4c575c91678a85c79b1570b1c189553b9",
             "moving-block-bootstrap-v1",
-            "ba1886b0727d5ac1fd6b107486d20c68cc5775416cdfb8eeb1887df7e2be450b",
+            "b66046e1016389d126ef79abad15ab293d26a1fef9579d9578442cd1bd81d80d",
             "small-sample-conservative-v1",
             "single-primary-comparison-v1",
             0.05,
@@ -5612,11 +5612,11 @@ mod tests {
             CANONICAL_SELECTION_RULE_ID,
             CANONICAL_SELECTION_RULE_SPEC_SHA256,
             "nested-forecast-bootstrap-v1",
-            "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4",
+            "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b",
             "loss-dependence-bartlett-v1",
-            "8b5195edb3c93a1c4a56d48c96732dfbd14c6e1299b5ac2cf53cef55ce37caf1",
+            "0a6d4a8c4a9c96d1845af12a290e65b4c575c91678a85c79b1570b1c189553b9",
             "moving-block-bootstrap-v1",
-            "ba1886b0727d5ac1fd6b107486d20c68cc5775416cdfb8eeb1887df7e2be450b",
+            "b66046e1016389d126ef79abad15ab293d26a1fef9579d9578442cd1bd81d80d",
             "small-sample-conservative-v1",
             "single-primary-comparison-v1",
             0.05,
@@ -5707,7 +5707,7 @@ mod tests {
     #[test]
     fn inference_plan_rejects_cross_qualification_binding() {
         let identity_a = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-        let identity_b = "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4";
+        let identity_b = "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b";
         let plan = ForecastInferencePlan::new(
             0.5,
             identity_a,
@@ -5990,11 +5990,11 @@ mod tests {
             CANONICAL_SELECTION_RULE_ID,
             CANONICAL_SELECTION_RULE_SPEC_SHA256,
             "nested-forecast-bootstrap-v1",
-            "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4",
+            "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b",
             "loss-dependence-bartlett-v1",
-            "8b5195edb3c93a1c4a56d48c96732dfbd14c6e1299b5ac2cf53cef55ce37caf1",
+            "0a6d4a8c4a9c96d1845af12a290e65b4c575c91678a85c79b1570b1c189553b9",
             "moving-block-bootstrap-v1",
-            "ba1886b0727d5ac1fd6b107486d20c68cc5775416cdfb8eeb1887df7e2be450b",
+            "b66046e1016389d126ef79abad15ab293d26a1fef9579d9578442cd1bd81d80d",
             "small-sample-conservative-v1",
             "single-primary-comparison-v1",
             0.05,
@@ -6099,11 +6099,11 @@ mod tests {
             CANONICAL_SELECTION_RULE_ID,
             CANONICAL_SELECTION_RULE_SPEC_SHA256,
             "nested-forecast-bootstrap-v1",
-            "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4",
+            "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b",
             "loss-dependence-bartlett-v1",
-            "8b5195edb3c93a1c4a56d48c96732dfbd14c6e1299b5ac2cf53cef55ce37caf1",
+            "0a6d4a8c4a9c96d1845af12a290e65b4c575c91678a85c79b1570b1c189553b9",
             "moving-block-bootstrap-v1",
-            "ba1886b0727d5ac1fd6b107486d20c68cc5775416cdfb8eeb1887df7e2be450b",
+            "b66046e1016389d126ef79abad15ab293d26a1fef9579d9578442cd1bd81d80d",
             "small-sample-conservative-v1",
             "single-primary-comparison-v1",
             0.05,
@@ -6512,7 +6512,7 @@ mod tests {
 
         let mut tampered_null = qualification.clone();
         tampered_null.circular_shift_null.qualification_input_blake3 =
-            "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4".to_string();
+            "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b".to_string();
         assert_eq!(
             tampered_null.validate(),
             Err(RelationalPredictionError::InvalidSplit)
@@ -6534,7 +6534,7 @@ mod tests {
 
         let mut alternate_provenance = provenance();
         alternate_provenance.source_data_sha256 =
-            "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4".to_string();
+            "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b".to_string();
         let qualification_b = HeldOutRelationalPredictionQualification::compute(
             &samples,
             config,
@@ -7418,7 +7418,7 @@ mod tests {
 
         let mut tampered = qualification.clone();
         tampered.incremental_relational_nulls[2].qualification_input_blake3 =
-            "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4".to_string();
+            "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b".to_string();
 
         assert_eq!(
             tampered.validate(),
@@ -7470,7 +7470,7 @@ mod tests {
 
         let mut tampered = qualification.clone();
         tampered.provenance.source_data_sha256 =
-            "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4".to_string();
+            "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b".to_string();
 
         assert_eq!(
             tampered.validate(),
