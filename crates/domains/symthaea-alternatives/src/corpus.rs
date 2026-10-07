@@ -816,3 +816,4 @@ mod tests {
         assert!(!direct.evidence_conflict);
         assert_eq!(direct.qualification, QualificationState::LifecycleQualified);
     }
+}
