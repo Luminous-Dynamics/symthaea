@@ -21,6 +21,7 @@ pub(crate) struct NixLiveExecutionWitnessV1 {
     pre_state_identity: Option<String>,
     service_definition_content_digest: Option<String>,
     pre_invocation_id: Option<String>,
+    authorization_record_digest: String,
 }
 
 impl NixLiveExecutionWitnessV1 {
@@ -33,6 +34,12 @@ impl NixLiveExecutionWitnessV1 {
             .map_err(|error| format!("cannot derive execution provenance intent: {error}"))?;
         let approval_request_id = authority.approval_request_id().to_string();
         let projection_digest = authority.projection_digest().to_string();
+        let authorization_record_digest = authority
+            .canonical_authorization_record()
+            .and_then(|record| record.digest())
+            .map_err(|error| {
+                format!("cannot derive canonical authorization provenance: {error}")
+            })?;
         if approval_request_id.is_empty() || projection_digest.is_empty() {
             return Err("live execution authority has incomplete approval lineage".to_string());
         }
@@ -47,6 +54,7 @@ impl NixLiveExecutionWitnessV1 {
                 .map(str::to_owned),
             pre_invocation_id: authority
                 .service_effect_context_pre_invocation_id(),
+            authorization_record_digest,
         })
     }
 
@@ -74,6 +82,10 @@ impl NixLiveExecutionWitnessV1 {
         self.pre_invocation_id.as_deref()
     }
 
+    pub(crate) fn authorization_record_digest(&self) -> &str {
+        &self.authorization_record_digest
+    }
+
     #[cfg(test)]
     pub(crate) fn for_test(
         action_intent_digest: impl Into<String>,
@@ -82,6 +94,7 @@ impl NixLiveExecutionWitnessV1 {
         pre_state_identity: Option<String>,
         service_definition_content_digest: Option<String>,
         pre_invocation_id: Option<String>,
+        authorization_record_digest: impl Into<String>,
     ) -> Self {
         Self {
             action_intent_digest: action_intent_digest.into(),
@@ -90,6 +103,7 @@ impl NixLiveExecutionWitnessV1 {
             pre_state_identity,
             service_definition_content_digest,
             pre_invocation_id,
+            authorization_record_digest: authorization_record_digest.into(),
         }
     }
 }
