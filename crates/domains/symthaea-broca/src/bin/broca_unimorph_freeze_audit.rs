@@ -3,9 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Reproducibility audit for the frozen UniMorph English 4.0 compiler input.
 //!
-//! This consumes the checked-in human-readable snapshot/selection manifests, retrieves the
-//! immutable raw artifact, verifies byte identity and exact selected records, then invokes the
-//! production UniMorph compiler and current replay contract. It is evidence for provenance only;
+//! This consumes the checked-in snapshot manifests, retrieves the immutable raw artifact, verifies
+//! byte identity and exact selected records from the machine-readable selection manifest, then
+//! invokes the production UniMorph compiler and current replay contract. It is evidence for provenance only;
 //! it does not claim linguistic correctness or corpus completeness.
 
 use std::{
@@ -24,6 +24,8 @@ const SNAPSHOT_MANIFEST: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../docs/broca/unimorph_eng_4_snapshot_manifest.md"));
 const SELECTION_MANIFEST: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../docs/broca/unimorph_eng_4_selection_manifest.md"));
+const SELECTION_MANIFEST_JSON: &str =
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../docs/broca/unimorph_eng_4_selection_manifest.json"));
 
 const EXPECTED_RAW_URI: &str =
     "https://raw.githubusercontent.com/unimorph/eng/66e0e9e8e2dcd196da081a25a48e5c1fe3d8b49b/eng";
@@ -41,63 +43,34 @@ const EXPECTED_SELECTION_BLAKE3: &str =
     "74585e2733a2d036cc396ebb5be77796d10b0de78814ad798731b2b96efbd726";
 const EXPECTED_SELECTION_COUNT: usize = 7;
 
-const EXPECTED_SLICES: [(&str, usize, usize, &str); 7] = [
-    (
-        "eng4:line:1",
-        0,
-        26,
-        "d9374b6a84663b09917a521a865d73749386c059281bbd9ba3cbc92435f049f3",
-    ),
-    (
-        "eng4:line:2",
-        26,
-        32,
-        "907603894b6fe571ab7698f4e54e93dc2f0b707e210df91c9ae870b2c6449e67",
-    ),
-    (
-        "eng4:line:3",
-        58,
-        35,
-        "333a1e0f859e7be770e54645652a9c0da696a4ff3ae8ae50f8c113f93cbc2273",
-    ),
-    (
-        "eng4:line:4",
-        93,
-        27,
-        "3038dfd4dc2907b1d43cbd38f907673bec2ffc037903a65218e2642b0d5d0193",
-    ),
-    (
-        "eng4:line:5",
-        120,
-        34,
-        "fe340586f544413839e9a00c7993f09f51f26cf92b609468fff47a311f8d2f3f",
-    ),
-    (
-        "eng4:line:6",
-        154,
-        20,
-        "9db132698ce145c60901a0f287a93b531c9986efccefe4ed8ff94c0a4d272a03",
-    ),
-    (
-        "eng4:line:7",
-        174,
-        24,
-        "68a55886f3a052a603a873234c9a60a2cfcfbfff7b70eb6c25c04ce5c73fcf28",
-    ),
-];
+const EXPECTED_SELECTION_SCHEMA: &str = "broca-unimorph-selection-manifest-v1";
 
-const EXPECTED_ROWS: [&str; 7] = [
-    "microtome\tmicrotomes\tN;PL\n",
-    "microtome\tmicrotomes\tV;PRS;3;SG\n",
-    "microtome\tmicrotoming\tV;V.PTCP;PRS\n",
-    "microtome\tmicrotomed\tV;PST\n",
-    "microtome\tmicrotomed\tV;V.PTCP;PST\n",
-    "eat\teats\tV;PRS;3;SG\n",
-    "eat\teating\tV;V.PTCP;PRS\n",
-];
+#[derive(Debug, serde::Deserialize)]
+struct SelectionManifest {
+    schema_version: String,
+    upstream_repository: String,
+    immutable_commit: String,
+    git_blob_sha: String,
+    artifact_blake3: String,
+    artifact_byte_length: usize,
+    aggregate_source_selection_blake3: String,
+    records: Vec<SelectionRecord>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct SelectionRecord {
+    record_id: String,
+    source_line: usize,
+    byte_offset: usize,
+    byte_length: usize,
+    record_blake3: String,
+    row: String,
+}
+
 
 fn main() -> Result<()> {
-    verify_checked_in_manifests()?;
+    let selection = parse_selection_manifest()?;
+    verify_checked_in_manifests(&selection)?;
 
     let uri = parse_required_line(
         SNAPSHOT_MANIFEST,
@@ -134,6 +107,13 @@ fn main() -> Result<()> {
         || readme_blob != EXPECTED_README_BLOB_SHA
         || !SNAPSHOT_MANIFEST.contains(&format!("- Source: {EXPECTED_SOURCE}"))
         || !SNAPSHOT_MANIFEST.contains(&format!("- License: {EXPECTED_LICENSE}"))
+        || selection.upstream_repository != "unimorph/eng"
+        || selection.immutable_commit != EXPECTED_COMMIT
+        || selection.git_blob_sha != EXPECTED_BLOB_SHA
+        || selection.artifact_blake3 != EXPECTED_ARTIFACT_BLAKE3
+        || selection.artifact_byte_length != EXPECTED_ARTIFACT_BYTES
+        || selection.aggregate_source_selection_blake3 != EXPECTED_SELECTION_BLAKE3
+        || selection.records.len() != EXPECTED_SELECTION_COUNT
     {
         bail!("checked-in UniMorph snapshot manifest disagrees with its frozen identity constants");
     }
@@ -181,25 +161,25 @@ fn main() -> Result<()> {
         );
     }
 
-    let slices = expected_slices()?;
-    if slices.len() != EXPECTED_SELECTION_COUNT {
-        bail!("expected {} frozen source slices, got {}", EXPECTED_SELECTION_COUNT, slices.len());
-    }
-
+    let slices = selection.records.iter().map(to_source_slice).collect::<Result<Vec<_>>>()?;
     let mut selected_bytes = Vec::with_capacity(artifact.len().min(256));
-    for ((record_id, offset, length, digest), expected_row) in EXPECTED_SLICES
-        .iter()
-        .zip(EXPECTED_ROWS.iter())
-    {
+    for record in &selection.records {
+        let end = record
+            .byte_offset
+            .checked_add(record.byte_length)
+            .with_context(|| format!("frozen slice {} range overflow", record.record_id))?;
         let slice = artifact
-            .get(*offset..offset.saturating_add(*length))
-            .with_context(|| format!("frozen slice {record_id} is out of bounds"))?;
-        if slice != expected_row.as_bytes() {
-            bail!("frozen slice {record_id} does not equal its checked-in manifest row");
+            .get(record.byte_offset..end)
+            .with_context(|| format!("frozen slice {} is out of bounds", record.record_id))?;
+        if slice != record.row.as_bytes() {
+            bail!("frozen slice {} does not equal its machine-readable manifest row", record.record_id);
         }
         let actual = blake3::hash(slice).to_hex().to_string();
-        if actual != *digest {
-            bail!("frozen slice {record_id} BLAKE3 mismatch");
+        if actual != record.record_blake3 {
+            bail!("frozen slice {} BLAKE3 mismatch", record.record_id);
+        }
+        if record.source_line == 0 {
+            bail!("frozen slice {} has invalid source line 0", record.record_id);
         }
         selected_bytes.extend_from_slice(slice);
     }
@@ -262,10 +242,48 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn verify_checked_in_manifests() -> Result<()> {
+fn parse_selection_manifest() -> Result<SelectionManifest> {
+    let manifest: SelectionManifest =
+        serde_json::from_str(SELECTION_MANIFEST_JSON).context("invalid machine-readable UniMorph selection manifest")?;
+    if manifest.schema_version != EXPECTED_SELECTION_SCHEMA {
+        bail!(
+            "unsupported UniMorph selection manifest schema: expected {}, got {}",
+            EXPECTED_SELECTION_SCHEMA,
+            manifest.schema_version
+        );
+    }
+    Ok(manifest)
+}
+
+fn to_source_slice(record: &SelectionRecord) -> Result<MorphophonologicalSourceSlice> {
+    if record.record_id.trim().is_empty()
+        || record.record_blake3.len() != 64
+        || !record
+            .record_blake3
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        bail!("selection manifest record {} has malformed identity", record.record_id);
+    }
+    if record.byte_length == 0 {
+        bail!("selection manifest record {} has zero length", record.record_id);
+    }
+    if record.source_line == 0 {
+        bail!("selection manifest record {} has invalid source line 0", record.record_id);
+    }
+    Ok(MorphophonologicalSourceSlice {
+        record_id: record.record_id.clone(),
+        byte_offset: record.byte_offset,
+        byte_length: record.byte_length,
+        record_blake3: record.record_blake3.clone(),
+    })
+}
+
+fn verify_checked_in_manifests(selection: &SelectionManifest) -> Result<()> {
     for (name, text) in [
         ("snapshot manifest", SNAPSHOT_MANIFEST),
         ("selection manifest", SELECTION_MANIFEST),
+        ("selection manifest JSON", SELECTION_MANIFEST_JSON),
     ] {
         if text.trim().is_empty() {
             bail!("{name} is empty");
@@ -279,41 +297,58 @@ fn verify_checked_in_manifests() -> Result<()> {
         bail!("snapshot manifest does not contain the expected immutable README blob");
     }
 
-    for required in [
-        EXPECTED_COMMIT,
-        EXPECTED_BLOB_SHA,
-        EXPECTED_ARTIFACT_BLAKE3,
-        EXPECTED_SELECTION_BLAKE3,
-    ] {
-        if !SNAPSHOT_MANIFEST.contains(required) && !SELECTION_MANIFEST.contains(required) {
-            bail!("checked-in manifests are missing expected identity {required}");
-        }
-    }
-
-    if SELECTION_MANIFEST.matches("eng4:line:").count() != EXPECTED_SELECTION_COUNT {
-        bail!("selection manifest does not enumerate exactly seven frozen records");
-    }
-
-    for ((record_id, offset, length, digest), expected_row) in
-        EXPECTED_SLICES.iter().zip(EXPECTED_ROWS.iter())
+    if !SELECTION_MANIFEST.contains(EXPECTED_SELECTION_BLAKE3)
+        || !SELECTION_MANIFEST.contains(EXPECTED_BLOB_SHA)
+        || !SELECTION_MANIFEST.contains(EXPECTED_ARTIFACT_BLAKE3)
     {
-        let table_row =
-            format!("| {record_id} | {line} | {offset} | {length} | {digest} |",
-                line = EXPECTED_SLICES
-                    .iter()
-                    .position(|entry| entry.0 == *record_id)
-                    .map(|index| index + 1)
-                    .unwrap_or_default());
+        bail!("human-readable selection manifest is missing required frozen identities");
+    }
+
+    if selection.records.len() != EXPECTED_SELECTION_COUNT {
+        bail!(
+            "selection manifest does not enumerate exactly {} frozen records",
+            EXPECTED_SELECTION_COUNT
+        );
+    }
+
+    let mut source_lines = Vec::with_capacity(selection.records.len());
+    let slices = selection.records.iter().map(to_source_slice).collect::<Result<Vec<_>>>()?;
+    for (expected_line, record) in selection.records.iter().enumerate() {
+        if record.source_line != expected_line + 1 {
+            bail!(
+                "selection manifest source line sequence is not contiguous at {}",
+                record.record_id
+            );
+        }
+        source_lines.push(record.source_line);
+        let table_row = format!(
+            "| {} | {} | {} | {} | {} |",
+            record.record_id,
+            record.source_line,
+            record.byte_offset,
+            record.byte_length,
+            record.record_blake3
+        );
         if !SELECTION_MANIFEST.contains(&table_row) {
-            bail!("selection manifest is missing exact table entry for {record_id}");
+            bail!("human-readable selection manifest is missing exact table entry for {}", record.record_id);
         }
-        if !SELECTION_MANIFEST.contains(expected_row.trim_end_matches('\n')) {
-            bail!("selection manifest is missing exact selected record text for {record_id}");
+        if !SELECTION_MANIFEST.contains(record.row.trim_end_matches('\n')) {
+            bail!("human-readable selection manifest is missing exact selected record text for {}", record.record_id);
         }
+    }
+
+    let recomputed = recompute_selection_digest(&slices);
+    if recomputed != selection.aggregate_source_selection_blake3 {
+        bail!(
+            "machine-readable selection aggregate mismatch: expected {}, got {}",
+            selection.aggregate_source_selection_blake3,
+            recomputed
+        );
     }
 
     Ok(())
 }
+
 
 fn parse_required_line<'a>(text: &'a str, prefix: &str) -> Result<&'a str> {
     text.lines()
@@ -358,23 +393,6 @@ fn git_blob_sha1(bytes: &[u8]) -> Result<String> {
     let digest = String::from_utf8(output.stdout)
         .context("git hash-object emitted non-UTF-8 output")?;
     Ok(digest.trim().to_owned())
-}
-
-fn expected_slices() -> Result<Vec<MorphophonologicalSourceSlice>> {
-    EXPECTED_SLICES
-        .iter()
-        .map(|(record_id, byte_offset, byte_length, record_blake3)| {
-            if *byte_length == 0 {
-                bail!("frozen record {record_id} has zero length");
-            }
-            Ok(MorphophonologicalSourceSlice {
-                record_id: (*record_id).to_owned(),
-                byte_offset: *byte_offset,
-                byte_length: *byte_length,
-                record_blake3: (*record_blake3).to_owned(),
-            })
-        })
-        .collect()
 }
 
 fn recompute_selection_digest(slices: &[MorphophonologicalSourceSlice]) -> String {
