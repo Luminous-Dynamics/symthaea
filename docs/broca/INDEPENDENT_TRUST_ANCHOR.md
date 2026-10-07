@@ -65,3 +65,9 @@ The verifier does not trust the `workflow_run` event payload by itself. It fetch
 ## Final publication revalidation
 
 Immediately before a successful status is published, the verifier re-reads the authoritative PR record and complete changed-file list. It re-applies the independent snapshot lock and rejects any head, base, repository, draft/state, or file/blob change observed after the earlier qualification checks. This closes the time-of-check/time-of-use gap between evidence admission and trust-status publication.
+
+## Trust-policy schema boundary
+
+The independent policy is treated as a typed admission record, not arbitrary JSON. Every approved entry must have a non-empty path, an added/modified status, and a canonical 40-hex Git blob SHA; duplicate paths and malformed live PR file records are rejected. The trust workflow also rejects additional trigger classes such as pull_request_target, push, schedule, repository_dispatch, and workflow_call, preserving the intended default-branch workflow_run trust boundary.
+
+The checked-in policy is a bootstrap artifact for the initial compiler qualification. After the trust anchor is established on the default branch, changing the policy itself requires an independently authorized base-branch change; a target PR cannot redefine its own admission policy and then satisfy that same policy.
