@@ -1117,6 +1117,13 @@ impl NixPostStateReceiptV1 {
                     if Some(job_type) != NixSystemdJobTypeV1::for_operation(self.operation) {
                         return Err(NixPostStateErrorV1::InvalidClaim);
                     }
+                    if let Some(observed_job_type) = self.systemd_job_type_observed
+                        && observed_job_type != job_type
+                    {
+                        return Err(NixPostStateErrorV1::JobTypeMismatch);
+                    }
+                } else if self.systemd_job_type_observed.is_some() {
+                    return Err(NixPostStateErrorV1::JobTypeMismatch);
                 }
                 if let (Some(job_unit), Some(job_object_path), Some(job_id)) = (
                     self.systemd_job_unit.as_deref(),
