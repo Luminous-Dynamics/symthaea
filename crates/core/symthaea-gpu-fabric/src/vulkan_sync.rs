@@ -295,6 +295,33 @@ impl VulkanSyncPlan {
             if signal_index.insert((submission.queue, submission.signal.value), submission.node_id).is_some() {
                 return Err(VulkanSyncError::DuplicateSignal);
             }
+            let mut barriers = HashSet::with_capacity(submission.barriers.len());
+            for barrier in &submission.barriers {
+                if barrier.from == barrier.to
+                    || barrier.to != submission.node_id
+                    || barrier.resource.as_str().is_empty()
+                {
+                    return Err(VulkanSyncError::InvalidBarrier(submission.node_id));
+                }
+                if assignment_map.get(&barrier.from).copied() != Some(submission.queue) {
+                    return Err(VulkanSyncError::InvalidBarrierQueue(submission.node_id));
+                }
+                let from_ordinal = self.submissions
+                    .iter()
+                    .find(|candidate| candidate.node_id == barrier.from)
+                    .map(|candidate| candidate.ordinal)
+                    .ok_or(VulkanSyncError::InvalidBarrierProducer(barrier.from))?;
+                if from_ordinal >= submission.ordinal {
+                    return Err(VulkanSyncError::NonForwardBarrier {
+                        from: barrier.from,
+                        to: barrier.to,
+                    });
+                }
+                if !barriers.insert(barrier.clone()) {
+                    return Err(VulkanSyncError::DuplicateBarrier(submission.node_id));
+                }
+            }
+
             let mut waits = HashSet::with_capacity(submission.waits.len());
             for wait in &submission.waits {
                 if wait.producer_queue == submission.queue {
@@ -339,6 +366,18 @@ pub enum VulkanSyncError {
     MissingSignal(u32),
     #[error("wait table contains an unexpected target")]
     UnexpectedWaitTarget,
+    #[error("barrier table contains an unexpected target")]
+    UnexpectedBarrierTarget,
+    #[error("invalid barrier for node {0}")]
+    InvalidBarrier(u32),
+    #[error("barrier producer {0} does not exist")]
+    InvalidBarrierProducer(u32),
+    #[error("barrier producer is assigned to a different queue for node {0}")]
+    InvalidBarrierQueue(u32),
+    #[error("barrier {from}->{to} is not forward in submission order")]
+    NonForwardBarrier { from: u32, to: u32 },
+    #[error("duplicate barrier for node {0}")]
+    DuplicateBarrier(u32),
     #[error("unsupported Vulkan synchronization-plan version {0}")]
     UnsupportedVersion(u16),
     #[error("submission count {0} exceeds the graph bound")]
