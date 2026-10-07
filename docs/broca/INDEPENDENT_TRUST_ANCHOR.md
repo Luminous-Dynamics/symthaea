@@ -45,3 +45,8 @@ The trust anchor complements, rather than replaces, the Broca Feature Matrix's l
 A passing independent trust-anchor receipt establishes that the declared repository-control-plane contract and required qualification runs were independently inspected.
 
 It does not establish linguistic validity, source correctness, semantic adequacy, pronunciation correctness, naturalness, or speaker appropriateness.
+
+
+## Independent snapshot lock
+
+The verifier consumes `docs/broca/independent_trust_policy_v1.json`, which is maintained outside the Broca PR. The policy records the approved PR number, base ref/base SHA, exact approved head SHA, and the Git blob SHA of every changed file. Any new Broca commit therefore invalidates the independent status until a separate base-branch policy update explicitly re-approves the new snapshot.
