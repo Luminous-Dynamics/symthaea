@@ -14,6 +14,7 @@ use symthaea_swarm::semantic_evidence_vds::{
 };
 use ring::{rand::SystemRandom, signature::{EcdsaKeyPair, KeyPair}};
 use sha2::Digest;
+use ed25519_dalek::{Signer, SigningKey};
 
 const RFC8392_PUBLIC_X: [u8; 32] = [
     0x14, 0x33, 0x29, 0xcc, 0xe7, 0x86, 0x8e, 0x41,
@@ -727,6 +728,60 @@ fn rfc9942_semantic_state_cannot_confuse_valid_signature_with_wrong_entry() {
     );
 }
 
+
+
+#[test]
+fn rfc9942_ed25519_detached_inclusion_derives_root_before_signature() {
+    let candidate = b"ed25519-detached";
+    let leaves = vec![candidate.to_vec(), b"other-entry".to_vec()];
+    let vds = Rfc9162Sha256Vds;
+    let head = vds.tree_head(&leaves);
+    let proof = vds.inclusion_proof(&leaves, 0).unwrap().to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+
+    let signing_key = SigningKey::from_bytes(&[0x42; 32]);
+    let unsigned = Rfc9942ReceiptEnvelope::new(
+        -8,
+        vdp.clone(),
+        Rfc9942ReceiptPayload::Detached,
+        vec![0u8; 64],
+    )
+    .unwrap();
+    let tbs = unsigned.signature1_tbs(&[], Some(&head.root())).unwrap();
+    let signature = signing_key.sign(&tbs).to_bytes().to_vec();
+
+    let receipt = Rfc9942ReceiptEnvelope::new(
+        -8,
+        vdp,
+        Rfc9942ReceiptPayload::Detached,
+        signature,
+    )
+    .unwrap();
+
+    // No detached root is supplied. The verifier must derive it from the
+    // inclusion proof and candidate first, then authenticate exactly that root.
+    assert_eq!(
+        receipt.verify_ed25519_inclusion(
+            candidate,
+            &signing_key.verifying_key().to_bytes(),
+            &[],
+            None,
+        ),
+        Ok(head)
+    );
+
+    // A supplied detached payload must still match the proof-derived root;
+    // otherwise the proof boundary rejects it before signature verification.
+    assert_eq!(
+        receipt.verify_ed25519_inclusion(
+            candidate,
+            &signing_key.verifying_key().to_bytes(),
+            &[],
+            Some(&[0xA5; 32]),
+        ),
+        Err(Rfc9942VdpError::NoMatchingProof)
+    );
+}
 
 #[test]
 fn rfc9942_consistency_state_binds_signature_to_detached_root() {
