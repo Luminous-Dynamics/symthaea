@@ -593,6 +593,11 @@ pub struct ChangeDetectionReport {
 }
 
 impl ChangeDetectionReport {
+    /// True only when the detector identifies the shifted regime and stays quiet on control.
+    pub fn operationally_separates_shift(&self) -> bool {
+        self.shifted_regime_detected && !self.nominal_false_alarm
+    }
+
     pub fn is_populated(&self) -> bool {
         self.baseline_sample_count > 0
             && !self.nominal_control_events.is_empty()
@@ -3240,6 +3245,7 @@ mod tests {
                 .iter()
                 .any(|event| event.detected)
         );
+        assert!(report.operationally_separates_shift());
     }
 
     #[test]
