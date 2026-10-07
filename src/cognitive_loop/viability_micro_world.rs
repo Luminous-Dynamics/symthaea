@@ -684,9 +684,8 @@ impl MicroWorldObservation {
     }
 }
 
-/// Confidence multiplier retained per counterfactual depth. This makes confidence
-/// horizon-aware without treating the planner's utility discount as a probability model.
-const HORIZON_CONFIDENCE_DECAY: f64 = 0.85;
+/// Default confidence multiplier retained per counterfactual depth.
+pub const DEFAULT_HORIZON_CONFIDENCE_DECAY: f64 = 0.85;
 
 /// Minimal homeostatic policy used to qualify whether a predictor can support
 /// survival-aware action selection.
@@ -746,8 +745,27 @@ impl HomeostaticPolicy {
         horizon: usize,
         discount: f64,
     ) -> (MicroAction, MicroWorldObservation, CounterfactualRollout) {
+        self.choose_horizon_with_confidence_decay(
+            predictor,
+            current,
+            horizon,
+            discount,
+            DEFAULT_HORIZON_CONFIDENCE_DECAY,
+        )
+    }
+
+    /// Horizon-aware counterfactual policy with explicit confidence decay.
+    pub fn choose_horizon_with_confidence_decay<P: MicroWorldPredictor>(
+        &self,
+        predictor: &P,
+        current: MicroWorldObservation,
+        horizon: usize,
+        discount: f64,
+        confidence_decay: f64,
+    ) -> (MicroAction, MicroWorldObservation, CounterfactualRollout) {
         let horizon = horizon.max(1);
         let discount = discount.clamp(0.0, 1.0);
+        let confidence_decay = confidence_decay.clamp(0.0, 1.0);
 
         let mut best_action = MicroAction::Observe;
         let mut best_state = current;
@@ -765,11 +783,11 @@ impl HomeostaticPolicy {
                 let action = if depth == 0 {
                     first_action
                 } else {
-                    self.greedy_future_action(predictor, state, depth)
+                    self.greedy_future_action(predictor, state, depth, confidence_decay)
                 };
                 let raw = predictor.predict(&state, action);
                 let confidence = predictor.prediction_confidence(action).clamp(0.0, 1.0)
-                    * HORIZON_CONFIDENCE_DECAY.powi(depth as i32);
+                    * confidence_decay.powi(depth as i32);
                 let blended = blend_prediction(state, raw, confidence);
 
                 min_confidence = min_confidence.min(confidence);
@@ -822,13 +840,13 @@ impl HomeostaticPolicy {
                     current,
                     predictor.predict(&current, a),
                     predictor.prediction_confidence(a).clamp(0.0, 1.0)
-                        * HORIZON_CONFIDENCE_DECAY.powi(depth as i32),
+                        * confidence_decay.powi(depth as i32),
                 );
                 let b_state = blend_prediction(
                     current,
                     predictor.predict(&current, b),
                     predictor.prediction_confidence(b).clamp(0.0, 1.0)
-                        * HORIZON_CONFIDENCE_DECAY.powi(depth as i32),
+                        * confidence_decay.powi(depth as i32),
                 );
                 Self::score(a_state, current, a)
                     .partial_cmp(&Self::score(b_state, current, b))
