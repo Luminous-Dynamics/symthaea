@@ -6050,7 +6050,8 @@ mod tests {
         assert!(validate_census_sampling_execution(&frame, &missing_probability).is_err());
 
         let mut invalid_probability = execution;
-        invalid_probability.inclusion_probabilities[1].probability_numerator = 0;
+        invalid_probability.inclusion_probabilities[1].probability_numerator = 1;
+        invalid_probability.inclusion_probabilities[1].probability_denominator = 2;
         assert!(validate_census_sampling_execution(&frame, &invalid_probability).is_err());
     }
 
