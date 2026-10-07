@@ -9592,6 +9592,128 @@ mod tests {
     }
 
     #[test]
+    fn configuration_swap_is_atomic_and_commit_removes_old_inode_aliases() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-config-swap-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let target = dir.join("configuration.nix");
+        let old = b"{ config = old; }\n";
+        let new = b"{ config = new; }\n";
+        std::fs::write(&target, old).unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        let swap = replace_configuration_atomically_blocking(
+            &dir,
+            &transaction_id,
+            old,
+            new,
+        )
+        .unwrap();
+
+        assert_eq!(std::fs::read(&target).unwrap(), new);
+        assert_eq!(
+            std::fs::read(
+                dir.join(&swap.temp_name)
+            ).unwrap(),
+            old
+        );
+        assert_eq!(
+            std::fs::read(
+                dir.join(&swap.backup_name)
+            ).unwrap(),
+            old
+        );
+
+        finalize_configuration_swap_blocking(swap, true).unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), new);
+
+        let entries: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0], std::ffi::OsString::from("configuration.nix"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn configuration_swap_rolls_back_to_exact_original_inode_content() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-config-rollback-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let target = dir.join("configuration.nix");
+        let old = b"{ config = old; }\n";
+        let new = b"{ config = new; }\n";
+        std::fs::write(&target, old).unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        let swap = replace_configuration_atomically_blocking(
+            &dir,
+            &transaction_id,
+            old,
+            new,
+        )
+        .unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), new);
+
+        finalize_configuration_swap_blocking(swap, false).unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), old);
+
+        let entries: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0], std::ffi::OsString::from("configuration.nix"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn configuration_swap_rejects_stale_pre_state_without_mutating_target() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-config-stale-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let target = dir.join("configuration.nix");
+        std::fs::write(&target, b"{ config = actual; }\n").unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        let error = replace_configuration_atomically_blocking(
+            &dir,
+            &transaction_id,
+            b"{ config = stale; }\n",
+            b"{ config = replacement; }\n",
+        )
+        .expect_err("stale pre-state must refuse replacement");
+        assert!(error.contains("stale overwrite"));
+        assert_eq!(
+            std::fs::read(&target).unwrap(),
+            b"{ config = actual; }\n"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn configuration_postcondition_digest_is_exact() {
         let expected = b"{ config = true; }\n";
         assert!(configuration_bytes_match(expected, expected));
