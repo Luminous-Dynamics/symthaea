@@ -89,6 +89,20 @@ async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
     })
 }
 
+/// Execute one privileged program with typed argv, without introducing a
+/// shell parsing boundary. Consequential mutation paths should prefer this
+/// helper whenever their operation can be represented by one executable.
+async fn run_privileged_args(program: &str, args: &[&str]) -> Result<CmdResult, std::io::Error> {
+    let mut command = privileged_process(program);
+    command.args(args);
+    let output = command.output().await?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
 /// Execute a privileged shell command with an already-open artifact as stdin.
 ///
 /// The caller should open and verify the artifact first, then pass that exact
@@ -6275,7 +6289,7 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                     transaction.log_line(),
                     previous_generation
                 );
-                match run_cmd("nixos-rebuild switch --rollback 2>&1").await {
+                match run_privileged_args("nixos-rebuild", &["switch", "--rollback"]).await {
                     Ok(r) => {
                         let observed_outcome = if r.exit_status == 0 {
                             match current_system_generation().await {
@@ -6378,11 +6392,25 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                     continue;
                 };
                 eprintln!("[{}] {} Switching to generation {}...", peer_addr, transaction.log_line(), r#gen);
-                let cmd = format!(
-                    "nix-env --switch-generation {} -p /nix/var/nix/profiles/system && /nix/var/nix/profiles/system/bin/switch-to-configuration switch 2>&1",
-                    r#gen
-                );
-                match run_cmd(&cmd).await {
+                let generation_result = run_privileged_args(
+                    "nix-env",
+                    &["--switch-generation", r#gen, "-p", "/nix/var/nix/profiles/system"],
+                )
+                .await;
+
+                let switch_result = match generation_result {
+                    Ok(r) if r.exit_status == 0 => {
+                        run_privileged_args(
+                            "/nix/var/nix/profiles/system/bin/switch-to-configuration",
+                            &["switch"],
+                        )
+                        .await
+                    }
+                    Ok(r) => Ok(r),
+                    Err(error) => Err(error),
+                };
+
+                match switch_result {
                     Ok(r) => {
                         let observed_outcome = if r.exit_status == 0 {
                             match current_system_generation().await {
