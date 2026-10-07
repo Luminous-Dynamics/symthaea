@@ -10825,6 +10825,29 @@ mod tests {
     }
 
     #[test]
+    fn sensitive_cleanup_zeroes_and_removes_secret_material() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!("nixforhumanity-secret-cleanup-{id}"));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let secret = dir.join("secret");
+        std::fs::write(&secret, b"very-secret-credential").unwrap();
+        std::fs::set_permissions(&secret, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        cleanup_sensitive_file(secret.to_str().unwrap()).unwrap();
+        assert!(!secret.exists());
+
+        let symlink = dir.join("symlink");
+        std::os::unix::fs::symlink("/etc/passwd", &symlink).unwrap();
+        assert!(cleanup_sensitive_file(symlink.to_str().unwrap()).is_err());
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn trusted_script_open_rejects_symlinks_and_unsafe_modes() {
         use std::os::unix::fs::PermissionsExt;
 
