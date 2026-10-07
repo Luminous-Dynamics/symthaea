@@ -960,6 +960,93 @@ mod tests {
     }
 
     #[test]
+    fn fabricated_service_context_cannot_enter_generic_approval_entry_point() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let fabricated_intent = intent("nginx.service");
+
+        let result = runtime.create_pending_request(
+            &fabricated_intent,
+            &restart_command("nginx.service"),
+            RequiredApprovalProfileV1::SameUidProcessV1,
+            UnixMillisV1::new(now.saturating_sub(1_000)),
+            UnixMillisV1::new(now + 60_000),
+        );
+
+        assert!(matches!(
+            result,
+            Err(LocalApprovalRuntimeErrorV1::Authorization(
+                super::super::authorization::NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture
+            ))
+        ));
+        assert_eq!(runtime.pending_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn sealed_service_capture_is_required_and_accepted_by_dedicated_entry_point() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let action = intent("nginx.service");
+        let content = synthetic_definition_content("nginx.service");
+
+        let installed = runtime
+            .create_pending_service_request_with_definition_capture(
+                &action,
+                &restart_command("nginx.service"),
+                &content,
+                RequiredApprovalProfileV1::SameUidProcessV1,
+                UnixMillisV1::new(now.saturating_sub(1_000)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+
+        assert_eq!(
+            installed.request().action_intent_digest,
+            action.digest().unwrap()
+        );
+
+        let mut altered_content = synthetic_definition_content("nginx.service");
+        altered_content = NixVerifiedServiceDefinitionContentV1::from_observer(
+            NixSystemdUnitDefinitionContentEvidenceV1 {
+                unit: "nginx.service".to_string(),
+                source_identity_digest: "3333333333333333333333333333333333333333333333333333333333333333"
+                    .to_string(),
+                manager_owner: ":1.42".to_string(),
+                bus_id: "0123456789abcdef0123456789abcdef".to_string(),
+                pre_invocation_id: Some("4444444444444444444444444444444444".to_string()),
+                files: vec![NixSystemdUnitDefinitionContentFileV1 {
+                    path: "/nix/store/nginx.service".to_string(),
+                    resolved_path: None,
+                    byte_len: 1,
+                    content_digest:
+                        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                            .to_string(),
+                }],
+                captured_at_monotonic_us: 1,
+            }
+        )
+        .unwrap();
+
+        let mismatch = runtime.create_pending_service_request_with_definition_capture(
+            &action,
+            &restart_command("nginx.service"),
+            &altered_content,
+            RequiredApprovalProfileV1::SameUidProcessV1,
+            UnixMillisV1::new(now.saturating_sub(1_000)),
+            UnixMillisV1::new(now + 60_000),
+        );
+        assert!(matches!(
+            mismatch,
+            Err(LocalApprovalRuntimeErrorV1::Authorization(
+                super::super::authorization::NixAuthorizationErrorV1::DefinitionContentCaptureMismatch
+            ))
+        ));
+        assert_eq!(runtime.pending_count().unwrap(), 1);
+    }
+
+    #[test]
     fn installed_request_projection_cannot_be_rebound_to_external_display_text() {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
