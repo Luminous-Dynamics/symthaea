@@ -3299,7 +3299,9 @@ fn restore_verified_configuration_blocking(
     input: std::fs::File,
     transaction_id: &str,
 ) -> Result<(), String> {
-    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    use std::ffi::CString;
+    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::io::{AsRawFd, FromRawFd};
 
     if transaction_id.len() != 32
         || !transaction_id.bytes().all(|byte| byte.is_ascii_hexdigit())
@@ -3321,17 +3323,40 @@ fn restore_verified_configuration_blocking(
     }
 
     let temp_name = format!(".configuration.nix.restore.{transaction_id}");
-    let temp_path = target_dir_path.join(&temp_name);
-    let mut output = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .mode(0o600)
-        .open(&temp_path)
+    let final_name = "configuration.nix";
+    let temp_c = CString::new(temp_name.as_str())
+        .map_err(|_| "restore configuration staging name contains a NUL byte".to_string())?;
+    let final_c = CString::new(final_name)
+        .map_err(|_| "restore configuration target name contains a NUL byte".to_string())?;
+    let dir_fd = target_dir.as_raw_fd();
+
+    let temp_fd = unsafe {
+        libc::openat(
+            dir_fd,
+            temp_c.as_ptr(),
+            libc::O_WRONLY
+                | libc::O_CREAT
+                | libc::O_EXCL
+                | libc::O_NOFOLLOW
+                | libc::O_CLOEXEC,
+            0o600,
+        )
+    };
+    if temp_fd < 0 {
+        return Err(format!(
+            "unable to create atomic restore configuration staging file {}: {}",
+            temp_name,
+            std::io::Error::last_os_error()
+        ));
+    }
+    let mut output = unsafe { std::fs::File::from_raw_fd(temp_fd) };
+    output
+        .set_permissions(std::fs::Permissions::from_mode(0o600))
         .map_err(|error| {
+            let _ = unsafe { libc::unlinkat(dir_fd, temp_c.as_ptr(), 0) };
             format!(
-                "unable to create atomic restore configuration staging file {}: {error}",
-                temp_path.display()
+                "unable to protect atomic restore configuration staging file {}: {error}",
+                temp_name
             )
         })?;
 
@@ -3340,22 +3365,22 @@ fn restore_verified_configuration_blocking(
         .map_err(|error| {
             format!(
                 "unable to copy verified configuration into staging file {}: {error}",
-                temp_path.display()
+                temp_name
             )
         });
     if let Err(error) = copy_result {
         drop(output);
-        let _ = std::fs::remove_file(&temp_path);
+        let _ = unsafe { libc::unlinkat(dir_fd, temp_c.as_ptr(), 0) };
         return Err(error);
     }
 
-    let final_path = target_dir_path.join("configuration.nix");
-    if let Err(error) = std::fs::rename(&temp_path, &final_path) {
+    if unsafe { libc::renameat(dir_fd, temp_c.as_ptr(), dir_fd, final_c.as_ptr()) } != 0 {
+        let error = std::io::Error::last_os_error();
         drop(output);
-        let _ = std::fs::remove_file(&temp_path);
+        let _ = unsafe { libc::unlinkat(dir_fd, temp_c.as_ptr(), 0) };
         return Err(format!(
             "unable to atomically install restored configuration {}: {error}",
-            final_path.display()
+            final_name
         ));
     }
 
