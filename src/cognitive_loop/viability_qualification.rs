@@ -1604,8 +1604,8 @@ fn change_detector_parameters(
         .collect::<Vec<_>>();
     let sample_count = residuals.len().max(1);
     let baseline_mean = residuals.iter().sum::<f64>() / sample_count as f64;
-    let allowance = (baseline_mean * 0.25).max(CHANGE_DETECTION_MIN_ALLOWANCE);
-    let threshold = (baseline_mean * 3.0).max(CHANGE_DETECTION_MIN_THRESHOLD);
+    let allowance = (baseline_mean * 0.10).max(CHANGE_DETECTION_MIN_ALLOWANCE);
+    let threshold = (baseline_mean * 1.5).max(CHANGE_DETECTION_MIN_THRESHOLD);
     (baseline_mean, allowance, threshold, states)
 }
 
@@ -1614,14 +1614,15 @@ fn run_change_detector(
     states: &[MicroWorldObservation],
     steps: u64,
     harvest_yield_scale: f64,
+    baseline_mean: f64,
+    allowance: f64,
+    threshold: f64,
 ) -> Vec<ChangeDetectionEvent> {
     if states.is_empty() || steps == 0 {
         return Vec::new();
     }
 
     let mut events = Vec::with_capacity(steps as usize);
-    let (_, allowance, threshold, _) = change_detector_parameters(predictor);
-    let baseline_mean = change_detector_parameters(predictor).0;
     let mut cusum = 0.0;
 
     for ordinal in 1..=steps {
@@ -1673,6 +1674,9 @@ fn evaluate_change_detection(
             &control_states,
             CHANGE_DETECTION_CONTROL_STEPS,
             1.0,
+            baseline_mean,
+            allowance,
+            threshold,
         );
     let nominal_false_alarm = nominal_control_events.iter().any(|event| event.detected);
 
@@ -1682,6 +1686,9 @@ fn evaluate_change_detection(
             &control_states,
             CHANGE_DETECTION_SHIFT_STEPS,
             REGIME_SHIFT_HARVEST_YIELD_SCALE,
+            baseline_mean,
+            allowance,
+            threshold,
         );
     let detection_observation = shifted_regime_events
         .iter()
@@ -3208,8 +3215,12 @@ mod tests {
 
     #[test]
     fn change_detection_is_populated_and_separated_from_adaptation() {
-        let model = super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
-        let report = evaluate_change_detection(&model);
+        let base_model =
+            super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let (trained_model, train_steps) =
+            train_world_model_clone(&base_model, &benchmark_scenarios()[0], 24);
+        assert!(train_steps > 0);
+        let report = evaluate_change_detection(&trained_model);
 
         assert!(report.is_populated());
         assert!(report.is_scoreable());
