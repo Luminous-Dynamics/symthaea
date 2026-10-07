@@ -5053,6 +5053,22 @@ mod tests {
         .unwrap();
 
         let json = qualification.to_json().unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            value["qualification_identity_blake3"].as_str().unwrap(),
+            qualification.qualification_identity_blake3
+        );
+        assert_eq!(
+            value["relational_loss_differentials_blake3"].as_str().unwrap(),
+            qualification.relational_loss_differentials_blake3
+        );
+        assert_eq!(
+            value["relational_loss_differentials"]
+                .as_array()
+                .unwrap()
+                .len(),
+            qualification.relational_loss_differentials.len()
+        );
         assert!(json.contains(QUALIFICATION_SCHEMA));
         assert!(json.contains("qualification_identity_blake3"));
         assert!(json.contains("relational_loss_differentials_blake3"));
@@ -5967,6 +5983,22 @@ mod tests {
         .unwrap();
 
         let json = qualification.to_json().unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            value["qualification_identity_blake3"].as_str().unwrap(),
+            qualification.qualification_identity_blake3
+        );
+        assert_eq!(
+            value["relational_loss_differentials_blake3"].as_str().unwrap(),
+            qualification.relational_loss_differentials_blake3
+        );
+        assert_eq!(
+            value["relational_loss_differentials"]
+                .as_array()
+                .unwrap()
+                .len(),
+            qualification.relational_loss_differentials.len()
+        );
         assert!(json.contains(ROLLING_QUALIFICATION_SCHEMA));
         assert!(json.contains("qualification_identity_blake3"));
         assert!(json.contains("relational_loss_differentials_blake3"));
