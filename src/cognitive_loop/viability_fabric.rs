@@ -416,6 +416,9 @@ pub struct ViabilityTelemetry {
     pub viability_goal_prediction_error: f64,
     pub viability_model_uncertainty: f64,
     pub viability_execution_prediction_error: f64,
+    /// Exact multiplier applied to the existing temporal planning-depth factor.
+    /// 1.0 means no viability control influence.
+    pub viability_planning_horizon_scale: f64,
 }
 
 impl CognitiveResourceMode {
@@ -454,6 +457,7 @@ impl ViabilityState {
             viability_goal_prediction_error: self.prediction_errors.goal,
             viability_model_uncertainty: self.prediction_errors.model_confidence,
             viability_execution_prediction_error: self.prediction_errors.execution,
+            viability_planning_horizon_scale: 1.0,
         }
     }
 }
