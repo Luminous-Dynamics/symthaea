@@ -4456,7 +4456,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 // Authoritative target architecture check. Browser-generated flakes
                 // currently default to x86_64-linux; never silently realize one on a
                 // different machine architecture.
-                let target_arch = match run_cmd("uname -m").await {
+                let target_arch = match run_privileged_args("uname", &["-m"]).await {
                     Ok(result) if result.exit_status == 0 => result.stdout.trim().to_string(),
                     Ok(result) => {
                         let _ = ws_tx
