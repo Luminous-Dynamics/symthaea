@@ -1,8 +1,15 @@
 use symthaea_swarm::holochain_projection::{
     EvidenceAnchorKind, HolochainActionHash, HolochainEvidenceAnchor,
     HolochainProjectionError, ReceiptSelectionContext, HOLOCHAIN_ACTION_HASH_BYTES,
+    HOLOCHAIN_ACTION_HASH_PREFIX,
 };
 use uuid::Uuid;
+
+fn valid_action_hash(fill: u8) -> HolochainActionHash {
+    let mut bytes = [fill; HOLOCHAIN_ACTION_HASH_BYTES];
+    bytes[..3].copy_from_slice(&HOLOCHAIN_ACTION_HASH_PREFIX);
+    HolochainActionHash::from_raw(bytes).unwrap()
+}
 
 fn anchor() -> HolochainEvidenceAnchor {
     HolochainEvidenceAnchor {
@@ -11,7 +18,7 @@ fn anchor() -> HolochainEvidenceAnchor {
         kind: EvidenceAnchorKind::Attestation,
         evidence_digest: [1; 32],
         parent_evidence_digest: Some([2; 32]),
-        parent_action_hash: Some(HolochainActionHash::from_raw([7; HOLOCHAIN_ACTION_HASH_BYTES]).unwrap()),
+        parent_action_hash: Some(valid_action_hash(7)),
         vds_root: Some([3; 32]),
         receipt_selection: Some(ReceiptSelectionContext {
             collection_sha256: [4; 32],
@@ -23,7 +30,7 @@ fn anchor() -> HolochainEvidenceAnchor {
             selection_policy_version: 1,
         }),
         selection_decision_action_hash: Some(
-            HolochainActionHash::from_raw([8; HOLOCHAIN_ACTION_HASH_BYTES]).unwrap(),
+            valid_action_hash(8),
         ),
         context: b"qualification".to_vec(),
     }
@@ -41,6 +48,10 @@ fn native_action_hashes_are_opaque_but_exactly_address_sized() {
     let hash = HolochainActionHash::from_raw([9; HOLOCHAIN_ACTION_HASH_BYTES]).unwrap();
     assert_eq!(hash.as_bytes().len(), HOLOCHAIN_ACTION_HASH_BYTES);
     assert!(HolochainActionHash::from_raw([0; HOLOCHAIN_ACTION_HASH_BYTES]).is_err());
+    assert_eq!(
+        HolochainActionHash::from_raw([9; HOLOCHAIN_ACTION_HASH_BYTES]),
+        Err(HolochainProjectionError::InvalidActionHashType)
+    );
 }
 
 #[test]
