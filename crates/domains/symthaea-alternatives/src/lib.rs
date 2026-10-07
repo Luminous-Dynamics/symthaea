@@ -7814,7 +7814,7 @@ mod tests {
             hypothesis_statement: "A direct measurement can discriminate the unresolved water-burden intervals of the selected frontier candidates.".into(),
             unresolved_uncertainty_refs: vec!["uncertainty:direct-substitute:Water".into()],
             candidate_ids: vec!["direct-substitute".into(), "process-substitute".into()],
-            candidate_digests: fixture_candidate_digests(&case.candidates, ["direct-substitute", "process-substitute"]),
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["direct-substitute", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "water-discrimination".into(),
             measurand_id: "fixture-measurand:Water".into(),
@@ -7876,7 +7876,7 @@ mod tests {
             hypothesis_statement: "Test.".into(),
             unresolved_uncertainty_refs: vec!["u".into()],
             candidate_ids: vec!["does-not-exist".into(), "does-not-exist-2".into()],
-            candidate_digests: fixture_candidate_digests(&case.candidates, ["does-not-exist", "does-not-exist-2"]),
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["does-not-exist", "does-not-exist-2"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "invalid-target".into(),
             measurand_id: "fixture-measurand:Water".into(),
@@ -7957,7 +7957,7 @@ mod tests {
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u2".into(), "u1".into()],
             candidate_ids: vec!["process-substitute".into(), "product-redesign".into()],
-            candidate_digests: fixture_candidate_digests(&case.candidates, ["process-substitute", "product-redesign"]),
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["process-substitute", "product-redesign"]),
             expected_discrimination: vec![target_b.clone(), target_a.clone()],
             protocol: ExperimentalProtocolRef {
                 protocol_id: "protocol".into(),
@@ -8020,7 +8020,7 @@ mod tests {
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
             candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
-            candidate_digests: fixture_candidate_digests(&case.candidates, ["product-redesign", "process-substitute"]),
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["product-redesign", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
                 measurand_id: "fixture-measurand:Water".into(),
@@ -8077,7 +8077,7 @@ mod tests {
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
             candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
-            candidate_digests: fixture_candidate_digests(&case.candidates, ["product-redesign", "process-substitute"]),
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["product-redesign", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
                 measurand_id: "fixture-measurand:Water".into(),
@@ -8128,7 +8128,7 @@ mod tests {
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
             candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
-            candidate_digests: fixture_candidate_digests(&case.candidates, ["product-redesign", "process-substitute"]),
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["product-redesign", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
                 measurand_id: "fixture-measurand:Water".into(),
@@ -8180,7 +8180,7 @@ mod tests {
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
             candidate_ids: vec!["direct-substitute".into(), "process-substitute".into()],
-            candidate_digests: fixture_candidate_digests(&case.candidates, ["direct-substitute", "process-substitute"]),
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["direct-substitute", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
             measurand_id: "fixture-measurand:Water".into(),
@@ -8274,7 +8274,7 @@ mod tests {
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
             candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
-            candidate_digests: fixture_candidate_digests(&case.candidates, ["product-redesign", "process-substitute"]),
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["product-redesign", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
             measurand_id: "fixture-measurand:Water".into(),
@@ -8424,7 +8424,7 @@ mod tests {
             hypothesis_statement: "A measurement distinguishes the selected alternatives.".into(),
             unresolved_uncertainty_refs: vec!["uncertainty:water".into()],
             candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
-            candidate_digests: fixture_candidate_digests(&case.candidates, ["product-redesign", "process-substitute"]),
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["product-redesign", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
                 measurand_id: observed_measurand.clone(),
@@ -8494,7 +8494,7 @@ mod tests {
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
             candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
-            candidate_digests: fixture_candidate_digests(&case.candidates, ["product-redesign", "process-substitute"]),
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["product-redesign", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
                 measurand_id: "fixture-measurand:Water".into(),
@@ -8573,7 +8573,7 @@ mod tests {
             hypothesis_statement: "Test water.".into(),
             unresolved_uncertainty_refs: vec!["u1".into()],
             candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
-            candidate_digests: fixture_candidate_digests(&case.candidates, ["product-redesign", "process-substitute"]),
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["product-redesign", "process-substitute"]),
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "t1".into(),
                 measurand_id: "fixture-measurand:Water".into(),
