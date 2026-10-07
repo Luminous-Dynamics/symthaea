@@ -1148,29 +1148,166 @@ fn create_transaction_artifact_dir(transaction_id: &str) -> Result<String, Strin
 }
 
 fn remove_transaction_artifact_dir(path: &str) {
-    let valid = path
-        .strip_prefix("/tmp/nixforhumanity-transaction-")
-        .is_some_and(|suffix| {
-            suffix.len() == 32 && suffix.bytes().all(|byte| byte.is_ascii_hexdigit())
-        });
-    if !valid {
+    let Some(suffix) = path.strip_prefix("/tmp/nixforhumanity-transaction-") else {
+        eprintln!(
+            "refusing to recursively remove invalid transaction artifact path {}",
+            path
+        );
+        return;
+    };
+    if suffix.len() != 32 || !suffix.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         eprintln!(
             "refusing to recursively remove invalid transaction artifact path {}",
             path
         );
         return;
     }
-    if let Err(error) = std::fs::remove_dir_all(path) {
-        // Missing is benign during best-effort cleanup; any other error is
-        // surfaced because it may leave sensitive or authoritative staging data.
+
+    if let Err(error) = remove_transaction_artifact_dir_blocking(suffix) {
         if error.kind() != std::io::ErrorKind::NotFound {
             eprintln!(
-                "unable to remove transaction artifact directory {}: {}",
+                "unable to safely remove transaction artifact directory {}: {}",
                 path, error
             );
         }
     }
 }
+
+fn remove_transaction_artifact_dir_blocking(
+    transaction_suffix: &str,
+) -> Result<(), std::io::Error> {
+    use std::ffi::CStr;
+    use std::os::fd::{AsRawFd, FromRawFd};
+    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let tmp_dir = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open("/tmp")?;
+
+    let name = std::ffi::CString::new(format!(
+        "nixforhumanity-transaction-{transaction_suffix}"
+    ))
+    .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid transaction name"))?;
+
+    let root_fd = unsafe {
+        libc::openat(
+            tmp_dir.as_raw_fd(),
+            name.as_ptr(),
+            libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if root_fd < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    let root = unsafe { std::fs::File::from_raw_fd(root_fd) };
+    let metadata = root.metadata()?;
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    if !metadata.is_dir()
+        || metadata.uid() != unsafe { libc::geteuid() }
+        || metadata.permissions().mode() & 0o777 != 0o700
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "transaction artifact directory failed ownership/type/mode checks",
+        ));
+    }
+
+    remove_directory_contents_fd(root.as_raw_fd())?;
+    drop(root);
+
+    let result = unsafe {
+        libc::unlinkat(
+            tmp_dir.as_raw_fd(),
+            name.as_ptr(),
+            libc::AT_REMOVEDIR,
+        )
+    };
+    if result != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(())
+}
+
+fn remove_directory_contents_fd(dir_fd: libc::c_int) -> Result<(), std::io::Error> {
+    use std::ffi::CStr;
+    use std::os::fd::{AsRawFd, FromRawFd};
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let scan_fd = unsafe { libc::dup(dir_fd) };
+    if scan_fd < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    let directory = unsafe { libc::fdopendir(scan_fd) };
+    if directory.is_null() {
+        let error = std::io::Error::last_os_error();
+        unsafe { libc::close(scan_fd) };
+        return Err(error);
+    }
+
+    loop {
+        unsafe {
+            *libc::__errno_location() = 0;
+        }
+        let entry = unsafe { libc::readdir(directory) };
+        if entry.is_null() {
+            let errno = unsafe { *libc::__errno_location() };
+            unsafe { libc::closedir(directory) };
+            if errno != 0 {
+                return Err(std::io::Error::from_raw_os_error(errno));
+            }
+            return Ok(());
+        }
+
+        let name = unsafe { CStr::from_ptr((*entry).d_name.as_ptr()) };
+        let name_bytes = name.to_bytes();
+        if name_bytes == b"." || name_bytes == b".." {
+            continue;
+        }
+        let child_name = std::ffi::CString::new(name_bytes)
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "directory entry contains NUL"))?;
+
+        let child_fd = unsafe {
+            libc::openat(
+                dir_fd,
+                child_name.as_ptr(),
+                libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+            )
+        };
+
+        if child_fd >= 0 {
+            let child = unsafe { std::fs::File::from_raw_fd(child_fd) };
+            remove_directory_contents_fd(child.as_raw_fd())?;
+            drop(child);
+            let removed = unsafe {
+                libc::unlinkat(dir_fd, child_name.as_ptr(), libc::AT_REMOVEDIR)
+            };
+            if removed != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            continue;
+        }
+
+        let open_error = std::io::Error::last_os_error();
+        if !matches!(
+            open_error.raw_os_error(),
+            Some(libc::ENOTDIR) | Some(libc::ELOOP) | Some(libc::ENOENT)
+        ) {
+            return Err(open_error);
+        }
+
+        // Files and symlinks are never opened; unlinkat removes exactly the
+        // named directory entry relative to the already-open parent fd.
+        let removed = unsafe { libc::unlinkat(dir_fd, child_name.as_ptr(), 0) };
+        if removed != 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+    }
+}
+
 
 /// Generate Secure Boot setup commands (appended to install script when enabled).
 /// Git-initialize the NixOS config (always appended to install scripts).
@@ -6875,16 +7012,6 @@ echo "  User password set."
                     Some(code) => (code, TransactionOutcome::Failed),
                     None => (1, TransactionOutcome::Indeterminate),
                 };
-                let secret_cleanup = cleanup_sensitive_files(&staged_secret_paths);
-                if let Err(error) = &secret_cleanup {
-                    eprintln!(
-                        "[{}] {} staged install secret cleanup failed: {}",
-                        peer_addr,
-                        transaction.log_line(),
-                        error
-                    );
-                }
-
                 let secret_cleanup = cleanup_sensitive_files(&staged_secret_paths);
                 if let Err(error) = &secret_cleanup {
                     eprintln!(
