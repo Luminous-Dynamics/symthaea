@@ -5835,6 +5835,20 @@ mod tests {
             Err(RelationalPredictionError::InvalidEvidenceInputDigest)
         );
 
+        let mut invalid_path = receipt.clone();
+        invalid_path.decision_path_id = "unregistered-branch".to_string();
+        assert_eq!(
+            invalid_path.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
+        let mut empty_policy = receipt.clone();
+        empty_policy.selected_small_sample_policy_id.clear();
+        assert_eq!(
+            empty_policy.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
         let mut tampered_method = receipt.clone();
         tampered_method.selected_procedure_id = "different-procedure".to_string();
         assert_eq!(
