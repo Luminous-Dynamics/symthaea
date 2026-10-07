@@ -362,6 +362,33 @@ The report retains:
 
 This matters because a single favorable held-out scenario can be explained by scenario-specific familiarity, initialization, or perturbation alignment. The leave-one-out matrix tests whether predictive structure transfers across the benchmark family rather than merely across one chosen split.
 
+### Prediction-error change detection
+
+The qualification now adds a pre-adaptation change-detection stage. This stage is deliberately
+separate from model revision: it observes prediction error but does not update the world model.
+
+The detector uses a one-sided CUSUM against a fixed nominal residual reference collected from a
+nominal-trained model. It is evaluated in two deterministic streams:
+
+1. a nominal no-shift control, used to measure false alarms;
+2. the changed harvest-yield regime, used to measure whether the detector identifies the shift.
+
+The shifted stream uses the same held-out state pool as the control and changes only the explicitly
+revisable harvest-yield fact. No adaptation occurs during either detector stream.
+
+The report retains per-observation residuals, cumulative CUSUM score, detection state, false-alarm
+state, detection observation, and detection delay. The detector parameters are frozen by protocol
+once the nominal residual reference has been established.
+
+This follows current changepoint-aware world-model work using prediction-error CUSUM to distinguish
+abrupt dynamics shifts from ordinary learning drift, and broader change-point literature that treats
+detection delay and false alarms as first-class evaluation quantities. See Yang (2026),
+[arXiv:2609.18950](https://arxiv.org/abs/2609.18950), and Li, Wang, & Yu (2026),
+[Annual Review of Statistics and Its Application](https://doi.org/10.1146/annurev-statistics-041124-044143).
+
+A detector result does not by itself prove that an environment changed: it establishes only that
+the specified residual detector fired or did not fire under this bounded benchmark protocol.
+
 ### Regime-shift revision latency
 
 The qualification now separates legitimate revision from forgetting by explicitly changing one
@@ -449,6 +476,8 @@ anchor. The per-shock receipts preserve this distinction instead of hiding it be
 | Shifted-regime validation error falls to the target with stable invariant anchors | stronger evidence that an explicitly revisable environment fact can be updated without measurable damage to protected dynamics |
 | Shifted-regime validation error never reaches the target | adaptation is boundedly unresolved; report the observed revision latency as missing rather than treating non-revision as zero-cost |
 | Invariant anchors regress during regime revision | the plasticity mechanism is leaking into benchmark-declared invariants |
+| Nominal control fires while the shifted regime does not | the change detector has poor specificity/sensitivity for the configured residual signal and must not gate adaptation |
+| Shifted regime fires without a nominal false alarm | stronger evidence that persistent prediction error can distinguish this explicit regime change from the no-change control |
 
 No single metric is a synthetic-organism detector.
 
@@ -477,9 +506,11 @@ A future green qualification should report all of:
 neighboring-probe transfer, and isolated anchor regression;
 18. cumulative adaptation response, including per-shock receipts, prior-shock retention, and
 pre-stream invariant-anchor retention;
-19. regime-shift revision response, including pre/post shifted validation error, revision latency,
+19. prediction-error change detection, including nominal-control false alarms, shifted-regime detection,
+per-observation residual/CUSUM receipts, and detection delay;
+20. regime-shift revision response, including pre/post shifted validation error, revision latency,
 per-update receipts, and invariant-anchor regression;
-20. trace/invariant verification where action evidence is recorded.
+21. trace/invariant verification where action evidence is recorded.
 
 Queued CI is not a pass.
 
