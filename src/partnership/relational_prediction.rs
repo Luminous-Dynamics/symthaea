@@ -1365,6 +1365,16 @@ impl Default for RollingOriginRelationalPredictionConfig {
 const INFERENCE_PLAN_SCHEMA: &str = "relational-prediction-inference-plan/v2";
 const INFERENCE_BINDING_SCHEMA: &str = "relational-prediction-inference-binding/v1";
 const INFERENCE_SELECTION_SCHEMA: &str = "relational-prediction-inference-selection/v1";
+const CANONICAL_INFERENCE_SELECTION_RULE_ID: &str = "relational-inference-selection-rule-v1";
+const CANONICAL_INFERENCE_SELECTION_RULE_SPEC_SHA256: &str =
+    "ec9545571ce96955041af773bed7eb76f7e3afacc33912754ac3b143c9c84542";
+const CANONICAL_INFERENCE_SELECTION_PROCEDURE_ID: &str = "nested-forecast-bootstrap-v1";
+const CANONICAL_INFERENCE_SELECTION_DEPENDENCE_ID: &str = "loss-dependence-bartlett-v1";
+const CANONICAL_INFERENCE_SELECTION_RESAMPLING_ID: &str = "moving-block-bootstrap-v1";
+const CANONICAL_INFERENCE_SELECTION_SMALL_SAMPLE_POLICY_ID: &str =
+    "small-sample-conservative-v1";
+const CANONICAL_INFERENCE_SELECTION_MULTIPLICITY_POLICY_ID: &str =
+    "single-primary-comparison-v1";
 
 /// Frozen analysis contract for future inferential qualification.
 /// This specifies the inferential procedure and all supporting choices without
