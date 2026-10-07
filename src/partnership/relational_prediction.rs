@@ -5170,6 +5170,13 @@ mod tests {
             rolling_forecast_loss_dependence_profile_digest(&dependence)
         );
         assert!(binding.to_json().unwrap().contains(INFERENCE_BINDING_SCHEMA));
+        let mut tampered_binding = binding.clone();
+        tampered_binding.forecast_horizon += 0.25;
+        assert_eq!(
+            tampered_binding.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
 
         let mut tampered_dependence = dependence.clone();
         tampered_dependence.mean += 0.001;
