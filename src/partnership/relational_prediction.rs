@@ -1930,6 +1930,8 @@ impl ForecastInferenceSelectionReceipt {
             selected_dependence_spec_sha256: plan.dependence_spec_sha256.clone(),
             selected_resampling_method_id: plan.resampling_method_id.clone(),
             selected_resampling_spec_sha256: plan.resampling_spec_sha256.clone(),
+            selected_small_sample_policy_id: plan.small_sample_policy_id.clone(),
+            selected_multiplicity_policy_id: plan.multiplicity_policy_id.clone(),
             selection_blake3: String::new(),
         };
         receipt.selection_blake3 = inference_selection_digest(&receipt);
