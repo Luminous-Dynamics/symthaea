@@ -33,6 +33,9 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Compile base-owned verifier
+        run: python3 -m py_compile .github/scripts/verify-broca-independent-trust-anchor.py
+
       - name: Verify PR without executing PR code
         env:
           GITHUB_TOKEN: ${ github.token }}
