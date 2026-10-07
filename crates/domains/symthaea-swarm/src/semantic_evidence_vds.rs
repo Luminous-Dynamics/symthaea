@@ -198,6 +198,10 @@ pub struct Rfc9942VerifiedSignatureWithReceipt {
     outer_external_aad_sha256: [u8; 32],
     /// SHA-256 fingerprint of the exact outer COSE signature bytes that verified.
     outer_signature_sha256: [u8; 32],
+    /// SHA-256 fingerprint of the exact RFC 9942 header-394 receipt collection
+    /// from which receipt_index was selected. When receipts are unprotected,
+    /// this is transport provenance rather than authenticated outer-header data.
+    receipt_collection_sha256: [u8; 32],
     receipt_index: usize,
     receipt_placement: Rfc9942ReceiptPlacement,
     receipt: Rfc9942VerifiedReceipt,
@@ -211,6 +215,7 @@ impl Rfc9942VerifiedSignatureWithReceipt {
     pub const fn outer_protected_header_sha256(&self) -> [u8; 32] { self.outer_protected_header_sha256 }
     pub const fn outer_external_aad_sha256(&self) -> [u8; 32] { self.outer_external_aad_sha256 }
     pub const fn outer_signature_sha256(&self) -> [u8; 32] { self.outer_signature_sha256 }
+    pub const fn receipt_collection_sha256(&self) -> [u8; 32] { self.receipt_collection_sha256 }
     pub const fn receipt_index(&self) -> usize { self.receipt_index }
     pub const fn receipt_placement(&self) -> Rfc9942ReceiptPlacement { self.receipt_placement }
     pub const fn receipt(&self) -> Rfc9942VerifiedReceipt { self.receipt }
@@ -1071,8 +1076,10 @@ pub struct Rfc9942SignatureWithReceipts {
     unprotected_bytes: Option<Vec<u8>>,
     protected_extensions: Vec<Vec<u8>>,
     protected_receipts: Option<Rfc9942ReceiptCollection>,
+    protected_receipts_bytes: Option<Vec<u8>>,
     unprotected_extensions: Vec<Vec<u8>>,
     unprotected_receipts: Option<Rfc9942ReceiptCollection>,
+    unprotected_receipts_bytes: Option<Vec<u8>>,
     payload: Rfc9942SignaturePayload,
     signature: Vec<u8>,
 }
@@ -1089,8 +1096,10 @@ impl Rfc9942SignatureWithReceipts {
             unprotected_bytes: None,
             protected_extensions: Vec::new(),
             protected_receipts: None,
+            protected_receipts_bytes: None,
             unprotected_extensions: Vec::new(),
             unprotected_receipts: receipts,
+            unprotected_receipts_bytes: None,
             payload,
             signature,
         }
@@ -1281,18 +1290,26 @@ impl Rfc9942SignatureWithReceipts {
         // structural selection and preserves the distinct ReceiptsMissing /
         // ReceiptIndexOutOfBounds API taxonomy. No inner cryptographic work is
         // performed at this stage.
-        let (receipt, placement) = if let Some(receipts) = self.protected_receipts.as_ref() {
+        let (receipt, placement, receipt_collection_sha256) = if let Some(receipts) = self.protected_receipts.as_ref() {
             let receipt = receipts
                 .receipts()
                 .get(receipt_index)
                 .ok_or(Rfc9942VdpError::ReceiptIndexOutOfBounds)?;
-            (receipt, Rfc9942ReceiptPlacement::Protected)
+            let collection_bytes = self
+                .protected_receipts_bytes
+                .as_deref()
+                .map_or_else(|| receipts.to_cbor(), ToOwned::to_owned);
+            (receipt, Rfc9942ReceiptPlacement::Protected, sha256(&collection_bytes))
         } else if let Some(receipts) = self.unprotected_receipts.as_ref() {
             let receipt = receipts
                 .receipts()
                 .get(receipt_index)
                 .ok_or(Rfc9942VdpError::ReceiptIndexOutOfBounds)?;
-            (receipt, Rfc9942ReceiptPlacement::Unprotected)
+            let collection_bytes = self
+                .unprotected_receipts_bytes
+                .as_deref()
+                .map_or_else(|| receipts.to_cbor(), ToOwned::to_owned);
+            (receipt, Rfc9942ReceiptPlacement::Unprotected, sha256(&collection_bytes))
         } else {
             return Err(Rfc9942VdpError::ReceiptsMissing);
         };
@@ -1332,6 +1349,7 @@ impl Rfc9942SignatureWithReceipts {
             outer_protected_header_sha256: sha256(&self.protected_header_bytes()),
             outer_external_aad_sha256: sha256(outer_external_aad),
             outer_signature_sha256: sha256(&self.signature),
+            receipt_collection_sha256,
             receipt_index,
             receipt_placement: placement,
             receipt: verified_receipt,
@@ -1425,6 +1443,7 @@ impl Rfc9942SignatureWithReceipts {
 
         let mut protected_extensions = Vec::new();
         let mut protected_receipts = None;
+        let mut protected_receipts_bytes = None;
         let mut protected_crit = None;
         let mut protected_labels = std::collections::HashSet::new();
         for (raw_key,raw_value) in protected_entries {
@@ -1448,6 +1467,7 @@ impl Rfc9942SignatureWithReceipts {
                     return Err(Rfc9942VdpError::InvalidStructure);
                 }
                 protected_receipts=Some(Rfc9942ReceiptCollection::from_reader(&mut value_reader)?);
+                protected_receipts_bytes=Some(raw_value.clone());
             } else if label==Some(COSE_CRIT_HEADER_LABEL) {
                 if protected_crit.is_some() {
                     return Err(Rfc9942VdpError::InvalidStructure);
@@ -1501,6 +1521,7 @@ impl Rfc9942SignatureWithReceipts {
             })?;
         let mut unprotected_extensions=Vec::new();
         let mut unprotected_receipts=None;
+        let mut unprotected_receipts_bytes=None;
         let mut unprotected_labels=std::collections::HashSet::new();
         for (raw_key,raw_value) in unprotected_entries {
             let mut key_reader=CborReader::new(&raw_key);
@@ -1526,6 +1547,7 @@ impl Rfc9942SignatureWithReceipts {
                     return Err(Rfc9942VdpError::InvalidStructure);
                 }
                 unprotected_receipts=Some(Rfc9942ReceiptCollection::from_reader(&mut value_reader)?);
+                unprotected_receipts_bytes=Some(raw_value.clone());
             } else {
                 unprotected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
                 value_reader.skip_value_with_resource_limits(0, MAX_RFC9942_RECEIPT_BYTES, 64, usize::MAX)
@@ -1571,8 +1593,10 @@ impl Rfc9942SignatureWithReceipts {
             unprotected_bytes: Some(unprotected_bytes),
             protected_extensions,
             protected_receipts,
+            protected_receipts_bytes,
             unprotected_extensions,
             unprotected_receipts,
+            unprotected_receipts_bytes,
             payload,
             signature,
         })
