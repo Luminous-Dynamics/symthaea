@@ -1357,6 +1357,22 @@ fn main() -> Result<(), String> {
             )
             .is_err()
     };
+    let remediation_uncertainty_proportion_domain_blocked = {
+        let mut forged = measurement.clone();
+        forged.measurements[0].uncertainty =
+            NeurosemanticRemediationUncertainty::Interval {
+                lower_numerator: -1,
+                upper_numerator: 6_577,
+                scale: 4,
+                confidence_level_bps: 9_500,
+                uncertainty_method_ref: "wilson-score-95-v1".into(),
+                uncertainty_computation_artifact_hash:
+                    uncertainty_computation.fingerprint()?,
+            };
+        let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        remediation_impact.verify_measurement_artifact_bytes(&bytes).is_err()
+    };
+
     let remediation_uncertainty_inference_scope_blocked = {
         let mut forged = uncertainty_computation.clone();
         forged.inference_scope =
@@ -2269,6 +2285,7 @@ fn main() -> Result<(), String> {
         "remediation_metric_direction_mismatch_blocked": remediation_metric_direction_mismatch_blocked,
         "remediation_uncertainty_point_estimate_binding_blocked": remediation_uncertainty_point_estimate_binding_blocked,
         "remediation_uncertainty_inference_scope_blocked": remediation_uncertainty_inference_scope_blocked,
+        "remediation_uncertainty_proportion_domain_blocked": remediation_uncertainty_proportion_domain_blocked,
         "remediation_uncertainty_assumptions_substitution_blocked": remediation_uncertainty_assumptions_substitution_blocked,
         "remediation_observation_population_substitution_blocked": remediation_observation_population_substitution_blocked,
         "remediation_observation_membership_cherry_pick_blocked": remediation_observation_membership_cherry_pick_blocked,
