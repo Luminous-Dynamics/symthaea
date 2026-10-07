@@ -13,7 +13,8 @@ use crate::action::authorization::NixLocalExecutionAuthorityV1;
 use crate::action::execution_witness::NixLiveExecutionWitnessV1;
 #[cfg(feature = "systemd-observer")]
 use crate::action::{
-    NixSystemdLifecycleMutationTransportV1, NixSystemdReadOnlyObserverV1,
+    NixSystemdLifecycleMutationTransportV1, NixSystemdLifecycleTransactionV2,
+    NixSystemdReadOnlyObserverV1,
 };
 use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use crate::action::service_manager::ServiceManager;
@@ -1155,12 +1156,23 @@ impl NixOSExecutor {
             }
         };
 
-        let watcher = match observer.arm_job_removed_watcher().await {
-            Ok(watcher) => watcher,
+        let transaction = NixSystemdLifecycleTransactionV2::new(observer, transport);
+        let prepared = match transaction
+            .prepare_for_epoch(
+                *operation,
+                unit,
+                expected_manager_owner,
+                expected_bus_id,
+            )
+            .await
+        {
+            Ok(prepared) => prepared,
             Err(error) => {
                 return (
                     ExecutionResult::Blocked {
-                        reason: format!("could not arm JobRemoved watcher before Service dispatch: {error}"),
+                        reason: format!(
+                            "could not prepare governed Service lifecycle transaction: {error}"
+                        ),
                         safety_level: command.safety_level(),
                     },
                     None,
@@ -1168,44 +1180,8 @@ impl NixOSExecutor {
             }
         };
 
-        if watcher.manager_owner() != expected_manager_owner {
-            return (
-                ExecutionResult::Blocked {
-                    reason: "armed JobRemoved watcher manager owner does not match Service authority"
-                        .to_string(),
-                    safety_level: command.safety_level(),
-                },
-                None,
-            );
-        }
-        if watcher.bus_id() != expected_bus_id {
-            return (
-                ExecutionResult::Blocked {
-                    reason: "armed JobRemoved watcher bus incarnation does not match Service authority"
-                        .to_string(),
-                    safety_level: command.safety_level(),
-                },
-                None,
-            );
-        }
-
-        let transport = match NixSystemdLifecycleMutationTransportV1::connect_system().await {
-            Ok(transport) => transport,
-            Err(error) => {
-                return (
-                    ExecutionResult::Blocked {
-                        reason: format!("could not connect typed systemd mutation transport: {error}"),
-                        safety_level: command.safety_level(),
-                    },
-                    None,
-                );
-            }
-        };
-
-        let started_at = std::time::Instant::now();
-
-        // This is the last provenance mint before dispatch. The typed transport performs
-        // one more owner+bus check immediately before the actual D-Bus mutation call.
+        // Preparation owns the watcher and exact manager/bus epoch. Only now do we
+        // mint transient execution provenance, immediately before mutation dispatch.
         let witness = match NixLiveExecutionWitnessV1::from_live_authority(authority) {
             Ok(witness) => witness,
             Err(reason) => {
@@ -1219,58 +1195,17 @@ impl NixOSExecutor {
             }
         };
 
-        let job_path = match transport
-            .dispatch_lifecycle_for_manager_owner_and_bus_id(
-                &operation,
-                expected_manager_owner,
-                expected_bus_id,
-            )
+        let started_at = std::time::Instant::now();
+        let lifecycle = match prepared
+            .dispatch_and_observe(Duration::from_secs(60))
             .await
         {
-            Ok(job_path) => job_path,
-            Err(error) => {
-                return (
-                    ExecutionResult::Blocked {
-                        reason: format!("typed Service dispatch refused: {error}"),
-                        safety_level: command.safety_level(),
-                    },
-                    None,
-                );
-            }
-        };
-
-        let job = match observer
-            .capture_dispatched_job(
-                &job_path,
-                *operation,
-                unit,
-                expected_manager_owner,
-                expected_bus_id,
-            )
-            .await
-        {
-            Ok(job) => job,
-            Err(error) => {
-                return (
-                    ExecutionResult::FailedNoRollback {
-                        error: format!(
-                            "Service dispatch returned a Job but correlation evidence could not be sealed: {error}"
-                        ),
-                        rollback_error: None,
-                    },
-                    Some(witness),
-                );
-            }
-        };
-
-        let timeout = Duration::from_secs(60);
-        let job_evidence = match watcher.await_job_removed(&job, timeout).await {
             Ok(evidence) => evidence,
             Err(error) => {
                 return (
                     ExecutionResult::FailedNoRollback {
                         error: format!(
-                            "Service dispatch JobRemoved evidence was not observed: {error}"
+                            "governed Service lifecycle transaction failed: {error}"
                         ),
                         rollback_error: None,
                     },
@@ -1279,6 +1214,7 @@ impl NixOSExecutor {
             }
         };
 
+        let job_evidence = lifecycle.job;
         let elapsed = started_at.elapsed().as_millis() as u64;
         let operation_label = match *operation {
             NixServiceOperationKindV1::Start => "start",
