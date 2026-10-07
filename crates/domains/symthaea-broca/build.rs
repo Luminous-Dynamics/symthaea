@@ -148,6 +148,17 @@ fn cargo_feature_identity() -> Vec<u8> {
     features.join("\n").into_bytes()
 }
 
+fn cargo_cfg_identity() -> Vec<u8> {
+    let mut cfg = env::vars()
+        .filter_map(|(key, value)| {
+            key.strip_prefix("CARGO_CFG_")
+                .map(|feature| format!("{feature}={value}"))
+        })
+        .collect::<Vec<_>>();
+    cfg.sort_unstable();
+    cfg.join("\n").into_bytes()
+}
+
 fn main() {
     println!("cargo:rerun-if-changed=src/lexical_binding.rs");
     println!("cargo:rerun-if-changed=build.rs");
@@ -162,6 +173,14 @@ fn main() {
     println!("cargo:rerun-if-env-changed=RUSTC_WRAPPER");
     println!("cargo:rerun-if-env-changed=RUSTC_WORKSPACE_WRAPPER");
     println!("cargo:rerun-if-env-changed=CARGO_ENCODED_RUSTFLAGS");
+    for variable in ["PROFILE", "DEBUG", "OPT_LEVEL", "NUM_JOBS"] {
+        println!("cargo:rerun-if-env-changed={variable}");
+    }
+    for (key, _) in env::vars() {
+        if key.starts_with("CARGO_CFG_") {
+            println!("cargo:rerun-if-env-changed={key}");
+        }
+    }
     for feature in [
         "CARGO_FEATURE_GPU",
         "CARGO_FEATURE_PARALLEL",
@@ -201,6 +220,11 @@ fn main() {
     let rustc_workspace_wrapper =
         env::var("RUSTC_WORKSPACE_WRAPPER").unwrap_or_default().into_bytes();
     let cargo_features = cargo_feature_identity();
+    let cargo_cfg = cargo_cfg_identity();
+    let profile = env::var("PROFILE").unwrap_or_default().into_bytes();
+    let debug = env::var("DEBUG").unwrap_or_default().into_bytes();
+    let opt_level = env::var("OPT_LEVEL").unwrap_or_default().into_bytes();
+    let num_jobs = env::var("NUM_JOBS").unwrap_or_default().into_bytes();
     let rustflags = env::var("CARGO_ENCODED_RUSTFLAGS")
         .unwrap_or_default()
         .into_bytes();
@@ -234,7 +258,7 @@ fn main() {
     // This is intentionally separate from compiler source identity: the same checked-in source
     // can have different dependency/toolchain semantics if its build context changes.
     let build_context_revision = domain_digest(
-        b"symthaea-broca-unimorph-compiler-build-context-revision-v4",
+        b"symthaea-broca-unimorph-compiler-build-context-revision-v5",
         &[
             &crate_manifest,
             &workspace_manifest,
@@ -247,6 +271,11 @@ fn main() {
             &rustc_wrapper,
             &rustc_workspace_wrapper,
             &cargo_features,
+            &cargo_cfg,
+            &profile,
+            &debug,
+            &opt_level,
+            &num_jobs,
             &rustflags,
             &target,
             &host,
