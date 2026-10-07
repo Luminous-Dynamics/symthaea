@@ -2874,9 +2874,7 @@ mod tests {
         tampered.observed_outcomes.truncate(3);
         tampered.feature_times.truncate(3);
         tampered.outcome_times.truncate(3);
-        if let Some(features) = tampered.test_features.get_mut(..3) {
-            tampered.test_features = features.to_vec();
-        }
+        tampered.test_features.truncate(3);
         assert_eq!(
             tampered.validate_trace(),
             Err(RelationalPredictionError::InvalidSplit)
