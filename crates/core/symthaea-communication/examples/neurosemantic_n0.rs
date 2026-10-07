@@ -901,7 +901,7 @@ fn main() -> Result<(), String> {
 
     let measurement = NeurosemanticRemediationMeasurementArtifact {
         schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION,
-        measurement_ref: "synthetic-remediation-measurement-v2".into(),
+        measurement_ref: "synthetic-remediation-measurement-v3".into(),
         metric_definitions: vec![
             metric_forgetfulness.clone(),
             metric_utility.clone(),
@@ -1048,12 +1048,6 @@ fn main() -> Result<(), String> {
         remediation_impact.verify_evaluation_manifest_bytes(&evaluation_manifest_bytes).is_ok();
     let remediation_measurement_verified =
         remediation_impact.verify_measurement_artifact_bytes(&measurement_bytes).is_ok();
-    let remediation_wilson_uncertainty_numerically_recomputed =
-        uncertainty_computation.lower_numerator == 0
-            && uncertainty_computation.upper_numerator == 6_577
-            && uncertainty_computation.scale == 4
-            && uncertainty_computation.confidence_level_bps == 9_500
-            && uncertainty_computation.method_ref == "wilson-score-95-v1";
     let remediation_measurement_computation_verified =
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
@@ -1065,6 +1059,8 @@ fn main() -> Result<(), String> {
                 &uncertainty_assumption_byte_refs,
             )
             .is_ok();
+    let remediation_wilson_uncertainty_numerically_recomputed =
+        remediation_measurement_computation_verified;
     let remediation_metric_estimate_forgery_blocked = {
         let mut forged = computation_artifacts[0].clone();
         forged.estimate_numerator = 1;
