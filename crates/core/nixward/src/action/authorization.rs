@@ -552,6 +552,18 @@ impl NixLocalExecutionAuthorityV1 {
             .map(|context| context.authorized_definition_content_digest.as_str())
     }
 
+    pub(crate) fn service_manager_owner(&self) -> Option<&str> {
+        self.intent
+            .service_effect_context()
+            .map(|context| context.authorized_manager_owner.as_str())
+    }
+
+    pub(crate) fn service_bus_id(&self) -> Option<&str> {
+        self.intent
+            .service_effect_context()
+            .map(|context| context.authorized_bus_id.as_str())
+    }
+
     pub(crate) fn service_effect_context_pre_invocation_id(&self) -> Option<String> {
         self.intent
             .service_effect_context()
