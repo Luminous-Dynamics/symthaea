@@ -29,7 +29,11 @@ pub enum BackendKind {
 }
 
 impl BackendKind {
-    pub const fn accelerated(self) -> bool {
+    /// Whether this backend is capable of executing accelerated work.
+    ///
+    /// This is deliberately distinct from an execution receipt's `accelerated`
+    /// claim. A backend may run through a software implementation.
+    pub const fn supports_acceleration(self) -> bool {
         matches!(self, Self::WebGpu | Self::Vulkan)
     }
 }
@@ -358,24 +362,29 @@ impl ExecutionReceipt {
         {
             return Err(ReceiptError::KernelMismatch);
         }
-        if self.accelerated != self.backend.accelerated() {
+        if self.backend == BackendKind::CpuReference && self.accelerated {
             return Err(ReceiptError::AccelerationClaimMismatch);
         }
         if self.resource_limits != plan.limits {
             return Err(ReceiptError::ResourceLimitsMismatch);
         }
+        if self.backend == BackendKind::CpuReference
+            && (self.implementation_digest.is_some()
+                || self.device_identity.is_some()
+                || self.driver_identity.is_some())
+        {
+            return Err(ReceiptError::UnexpectedAccelerationEvidence);
+        }
         if self.accelerated {
+            if !self.backend.supports_acceleration() {
+                return Err(ReceiptError::AccelerationClaimMismatch);
+            }
             if self.implementation_digest.as_deref().is_none_or(str::is_empty)
                 || self.device_identity.as_deref().is_none_or(str::is_empty)
                 || self.driver_identity.as_deref().is_none_or(str::is_empty)
             {
                 return Err(ReceiptError::AccelerationEvidenceMissing);
             }
-        } else if self.implementation_digest.is_some()
-            || self.device_identity.is_some()
-            || self.driver_identity.is_some()
-        {
-            return Err(ReceiptError::UnexpectedAccelerationEvidence);
         }
         Ok(())
     }
