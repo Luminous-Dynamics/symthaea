@@ -723,6 +723,13 @@ impl MorphophonologicalCompilationWitness {
                     return Err(MorphophonologicalCompilationWitnessError::MalformedCompilerIdentity);
                 }
             }
+        } else if self.compiler_implementation_revision.is_some()
+            || self.source_parser_revision.is_some()
+            || self.compiler_build_context_revision.is_some()
+        {
+            return Err(
+                MorphophonologicalCompilationWitnessError::CompilerIdentityNotAllowed,
+            );
         }
         if !is_canonical_blake3_digest(&self.source_artifact_blake3)
             || !is_canonical_blake3_digest(&self.source_selection_blake3)
@@ -972,6 +979,7 @@ pub enum MorphophonologicalCompilationWitnessError {
     UnsupportedCompiler,
     MissingCompilerIdentity,
     MalformedCompilerIdentity,
+    CompilerIdentityNotAllowed,
     CompilerImplementationRevisionMismatch,
     SourceParserRevisionMismatch,
     CompilerBuildContextRevisionMismatch,
@@ -1005,6 +1013,7 @@ impl std::fmt::Display for MorphophonologicalCompilationWitnessError {
             Self::UnsupportedCompiler => write!(f, "morphophonological compilation witness compiler implementation is not supported for replay"),
             Self::MissingCompilerIdentity => write!(f, "morphophonological compilation witness is missing the implementation identity required for its declared UniMorph compiler"),
             Self::MalformedCompilerIdentity => write!(f, "morphophonological compilation witness contains a malformed UniMorph compiler identity"),
+            Self::CompilerIdentityNotAllowed => write!(f, "morphophonological compilation witness carries compiler identity fields without a declared family-specific identity contract"),
             Self::CompilerImplementationRevisionMismatch => write!(f, "morphophonological compilation witness compiler implementation revision does not match the current compiler"),
             Self::SourceParserRevisionMismatch => write!(f, "morphophonological compilation witness source parser revision does not match the current parser"),
             Self::CompilerBuildContextRevisionMismatch => write!(f, "morphophonological compilation witness compiler build-context revision does not match the current build context"),
@@ -3414,6 +3423,35 @@ mod tests {
             MorphophonologicalUnimorphCompilerError::CompilationWitness(
                 MorphophonologicalCompilationWitnessError::SourceSliceNotLineBounded
             )
+        );
+    }
+
+    #[test]
+    fn generic_compilation_witness_rejects_uncontracted_identity_fields() {
+        let rule_set = morphophonological_fixture_rule_set();
+        let artifact = b"row0\n";
+        let witness = MorphophonologicalCompilationWitness::new(
+            "fixture-compiler",
+            "fixture-compiler-v1",
+            "fixture-normalization-v1",
+            artifact,
+            vec![MorphophonologicalSourceSlice {
+                record_id: "row0".into(),
+                byte_offset: 0,
+                byte_length: artifact.len(),
+                record_blake3: blake3::hash(artifact).to_hex().to_string(),
+            }],
+            &rule_set,
+        )
+        .expect("generic compiler witness");
+
+        let mut tampered = witness;
+        tampered.compiler_implementation_revision = Some("0".repeat(64));
+        assert_eq!(
+            tampered
+                .validate_shape()
+                .expect_err("generic compiler must not smuggle an uncontracted identity"),
+            MorphophonologicalCompilationWitnessError::CompilerIdentityNotAllowed
         );
     }
 
