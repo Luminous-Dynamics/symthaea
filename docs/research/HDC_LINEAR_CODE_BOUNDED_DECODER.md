@@ -205,6 +205,8 @@ representation changes from silently changing the searched state space or error-
 
 ## Execution identity and receipt integrity
 
+The qualification workflow is intentionally PR-event-only: `opened`, `synchronize`, `reopened`, and `ready_for_review`. Push and manual invocations are not qualification events. This removes alternate trigger modalities from the qualification boundary.
+
 The qualification workflow does not treat the event payload alone as sufficient provenance. It
 binds the current repository, triggering repository, and head repository by numeric repository ID,
 then re-fetches the live Actions run and requires its repository ID, exact head SHA, head ref,
