@@ -473,7 +473,6 @@ pub struct PolicyInducedShiftReport {
     pub improvement_over_baseline: f64,
     pub survival: bool,
     pub min_actual_viability_margin: f64,
-    pub oracle_horizon_regret: f64,
     pub execution_failures: usize,
     pub terminated_on_execution_failure: bool,
     /// Ratio against the frozen fixed-schedule held-out predictor MAE.
@@ -669,7 +668,6 @@ fn evaluate_policy_induced_shift<P: MicroWorldPredictor>(
     let mut baseline_error = 0.0;
     let mut steps = 0u64;
     let mut min_actual_viability_margin = f64::INFINITY;
-    let mut oracle_regret_sum = 0.0;
     let mut execution_failures = 0usize;
     let mut terminated_on_execution_failure = false;
 
@@ -683,14 +681,6 @@ fn evaluate_policy_induced_shift<P: MicroWorldPredictor>(
         let before = world.observe();
         let (action, _, _) =
             policy.choose_horizon(predictor, before, policy_horizon, policy_discount);
-
-        oracle_regret_sum +=
-            qualification_oracle_horizon_regret(
-                before,
-                action,
-                policy_horizon.min(5),
-                policy_discount,
-            );
 
         let predicted = predictor.predict(before, action);
         let baseline = persistence.predict(before, action);
@@ -737,7 +727,6 @@ fn evaluate_policy_induced_shift<P: MicroWorldPredictor>(
         } else {
             world.observe().energy.min(world.observe().integrity) - 0.08
         },
-        oracle_horizon_regret: oracle_regret_sum / denom,
         execution_failures,
         terminated_on_execution_failure,
         shift_error_ratio: shift_ratio,
@@ -820,50 +809,6 @@ fn evaluate_frozen_continuous_rollout<M: ActionConditionedTransitionModel + ?Siz
 
 /// Replay the already selected closed-loop actions through the deterministic oracle
 /// to measure recovery against the exact pre-perturbation viability margin.
-fn qualification_oracle_horizon_regret(
-    state: MicroWorldObservation,
-    chosen_action: MicroAction,
-    horizon: usize,
-    discount: f64,
-) -> f64 {
-    let horizon = horizon.max(1).min(5);
-
-    fn action_utility(
-        state: MicroWorldObservation,
-        action: MicroAction,
-    ) -> (f64, MicroWorldObservation) {
-        let next = transition(state, action);
-        let margin = next.energy.min(next.integrity) - 0.08;
-        let immediate = super::viability_micro_world::HomeostaticPolicy::score(next, state, action)
-            - (0.12 - margin).max(0.0) * 4.0;
-        (immediate, next)
-    }
-
-    fn best(
-        state: MicroWorldObservation,
-        depth: usize,
-        discount: f64,
-    ) -> f64 {
-        if depth == 0 {
-            return 0.0;
-        }
-
-        MicroAction::ALL
-            .into_iter()
-            .map(|action| {
-                let (immediate, next) = action_utility(state, action);
-                immediate + discount * best(next, depth - 1, discount)
-            })
-            .fold(f64::NEG_INFINITY, f64::max)
-    }
-
-    let best_value = best(state, horizon, discount);
-    let (chosen_immediate, chosen_next) = action_utility(state, chosen_action);
-    let chosen_value =
-        chosen_immediate + discount * best(chosen_next, horizon - 1, discount);
-    (best_value - chosen_value).max(0.0)
-}
-
 fn measure_recovery(
     scenario: &MicroWorldScenario,
     actions: &[MicroAction],
@@ -1155,6 +1100,56 @@ mod tests {
         assert!(rollout.min_confidence < 1.0);
         let expected = 0.85_f64.powi(3);
         assert!((rollout.min_confidence - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn multi_horizon_profile_has_all_requested_horizons() {
+        let mut model = super::goal_world::WorldModelBridge::with_actions(6);
+        let before = vec![0.0f32; 64];
+        let mut after = before.clone();
+        after[0] = 0.20;
+        after[1] = -0.05;
+
+        for action in 0..6 {
+            for _ in 0..24 {
+                model
+                    .observe_action_transition(action, &before, &after)
+                    .expect("valid action/state dimensions");
+            }
+        }
+
+        let points = evaluate_multi_horizon(
+            &model,
+            &benchmark_scenarios()[0],
+            8,
+        );
+
+        assert_eq!(points.len(), QUALIFICATION_HORIZONS.len());
+        assert_eq!(
+            points.iter().map(|point| point.horizon_steps).collect::<Vec<_>>(),
+            QUALIFICATION_HORIZONS.to_vec()
+        );
+        assert!(points.iter().all(|point| point.samples > 0));
+    }
+
+    #[test]
+    fn frozen_policy_induced_shift_has_no_learning_side_effects() {
+        let predictor = OraclePredictor;
+        let scenario = benchmark_scenarios()[0];
+        let report = evaluate_policy_induced_shift(
+            &predictor,
+            &scenario,
+            8,
+            4,
+            0.8,
+            0.05,
+        );
+
+        assert!(report.steps > 0);
+        assert_eq!(report.execution_failures, 0);
+        assert!(!report.terminated_on_execution_failure);
+        assert!(report.predictor_mae < 1e-12);
+        assert!(report.survival);
     }
 
     #[test]
