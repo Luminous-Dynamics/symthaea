@@ -375,6 +375,7 @@ impl NixPostStateStabilitySampleV1 {
         put_str(&mut h, &self.definition_content_digest);
         put_str(&mut h, &self.state_digest);
         put_str(&mut h, &self.manager_owner);
+        put_opt_str(&mut h, self.bus_id.as_deref());
         put_opt_str(&mut h, self.invocation_id.as_deref());
         put_u64(&mut h, self.state_change_at_monotonic_us);
         put_u64(&mut h, self.captured_at_monotonic_us);
@@ -439,8 +440,10 @@ impl NixPostStateStabilityEvidenceV1 {
                 || sample.unit_object_path != first.unit_object_path
                 || sample.observed_generation != first.observed_generation
                 || sample.definition_digest != first.definition_digest
+                || sample.definition_content_digest != first.definition_content_digest
                 || sample.state_digest != first.state_digest
                 || sample.manager_owner != first.manager_owner
+                || sample.bus_id != first.bus_id
                 || sample.invocation_id != first.invocation_id
                 || sample.state_change_at_monotonic_us != first.state_change_at_monotonic_us
             {
@@ -703,6 +706,13 @@ impl NixPostStateReceiptV1 {
         let observed_definition_content_digest = observation.definition_content_digest.clone();
         if expectation.authorized_definition_content_digest != observed_definition_content_digest {
             return Err(NixPostStateErrorV1::DefinitionContentMismatch);
+        }
+        if observation.systemd_bus_id.as_deref()
+            != intent
+                .service_effect_context()
+                .map(|context| context.authorized_bus_id.as_str())
+        {
+            return Err(NixPostStateErrorV1::BusIncarnationMismatch);
         }
         let manager_owner = observation
             .systemd_manager_owner
