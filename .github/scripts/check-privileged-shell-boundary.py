@@ -110,6 +110,16 @@ def main() -> None:
             )
 
         if name in MUTATIONS:
+            for required in (
+                "mutation_lock.try_lock()",
+                "MutationLease::acquire()",
+                "admit_mutation_transaction(",
+            ):
+                if required not in body:
+                    fail(
+                        f'mutation arm {name!r} lost required mutation authority '
+                        f'boundary {required!r}'
+                    )
             for needle in forbidden:
                 if needle in body:
                     fail(f'mutation arm {name!r} contains forbidden shell boundary {needle!r}')
