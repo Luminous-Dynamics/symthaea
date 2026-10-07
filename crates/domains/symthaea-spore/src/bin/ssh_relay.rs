@@ -11289,6 +11289,83 @@ mod tests {
         }
     }
 
+    #[test]
+    fn fd_relative_cleanup_never_follows_child_symlink() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::os::fd::AsRawFd;
+        use std::os::unix::fs::OpenOptionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-cleanup-child-{transaction_id}"
+        ));
+        let outside = std::env::temp_dir().join(format!(
+            "nixforhumanity-cleanup-outside-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::fs::create_dir(&outside).unwrap();
+        std::fs::set_permissions(&outside, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::fs::write(outside.join("sentinel"), b"must survive").unwrap();
+
+        std::fs::create_dir(dir.join("nested")).unwrap();
+        std::fs::write(dir.join("nested/payload"), b"payload").unwrap();
+        std::os::unix::fs::symlink(&outside, dir.join("escape")).unwrap();
+
+        let opened = std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(&dir)
+            .unwrap();
+        remove_directory_contents_fd(opened.as_raw_fd()).unwrap();
+
+        assert!(!dir.join("nested").exists());
+        assert!(!dir.join("escape").exists());
+        assert_eq!(
+            std::fs::read(outside.join("sentinel")).unwrap(),
+            b"must survive"
+        );
+
+        drop(opened);
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&outside);
+    }
+
+    #[test]
+    fn transaction_cleanup_refuses_root_symlink_alias() {
+        let transaction_id = random_operation_id().unwrap();
+        let suffix = transaction_id.as_str();
+        let root = std::path::PathBuf::from(format!(
+            "/tmp/nixforhumanity-transaction-{suffix}"
+        ));
+        let target = std::env::temp_dir().join(format!(
+            "nixforhumanity-cleanup-root-target-{transaction_id}"
+        ));
+
+        let _ = std::fs::remove_file(&root);
+        let _ = std::fs::remove_dir_all(&target);
+        std::fs::create_dir(&target).unwrap();
+        std::fs::write(target.join("sentinel"), b"must survive").unwrap();
+        std::os::unix::fs::symlink(&target, &root).unwrap();
+
+        let error = remove_transaction_artifact_dir_blocking(suffix)
+            .expect_err("cleanup must refuse a symlink root");
+        assert!(
+            matches!(
+                error.raw_os_error(),
+                Some(libc::ELOOP) | Some(libc::ENOTDIR)
+            ),
+            "unexpected root-symlink error: {error}"
+        );
+        assert_eq!(
+            std::fs::read(target.join("sentinel")).unwrap(),
+            b"must survive"
+        );
+
+        let _ = std::fs::remove_file(&root);
+        let _ = std::fs::remove_dir_all(&target);
+    }
+
     #[tokio::test]
     async fn privileged_command_environment_is_hermetic_and_deterministic() {
         let result = run_cmd(
