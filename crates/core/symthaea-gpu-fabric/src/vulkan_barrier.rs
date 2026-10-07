@@ -48,8 +48,8 @@ pub enum VulkanBarrierError {
     WorkloadNodeLimit(usize),
     #[error("multiple logical queues are not supported by the single-queue workload runtime")]
     MultipleLogicalQueues,
-    #[error("invalid semantic schedule")]
-    InvalidSchedule,
+    #[error("invalid semantic schedule: {0}")]
+    Schedule(crate::ScheduleError),
     #[error("non-canonical Vulkan synchronization plan: {0}")]
     SyncPlan(crate::VulkanSyncError),
     #[error("resource {0} has no initial binding")]
@@ -70,6 +70,8 @@ pub enum VulkanBarrierError {
     OracleMismatch(ResourceId),
     #[error("Vulkan completion fence failed: {0:?}")]
     Fence(vk::Result),
+    #[error("barrier receipt verification failed: {0}")]
+    Receipt(VulkanBarrierReceiptError),
 }
 
 #[derive(Debug, Error)]
@@ -241,7 +243,7 @@ impl VulkanBarrierWorkloadRuntime {
         plan: &VulkanSyncPlan,
         initial: &BTreeMap<ResourceId, BinaryHypervector>,
     ) -> Result<(BTreeMap<ResourceId, BinaryHypervector>, VulkanBarrierExecutionReceipt), VulkanBarrierError> {
-        if schedule.verify_against(graph).is_err() { return Err(VulkanBarrierError::InvalidSchedule); }
+        schedule.verify_against(graph).map_err(VulkanBarrierError::Schedule)?;
         plan.verify_against_schedule(schedule).map_err(VulkanBarrierError::SyncPlan)?;
         if schedule.nodes.len() > MAX_WORKLOAD_NODES { return Err(VulkanBarrierError::WorkloadNodeLimit(schedule.nodes.len())); }
         if plan.queue_count > 1 || plan.assignments.iter().any(|a| a.queue.get() != 0) { return Err(VulkanBarrierError::MultipleLogicalQueues); }
@@ -317,8 +319,12 @@ impl VulkanBarrierWorkloadRuntime {
         for (resource, value) in &observed { digests.insert(resource.clone(), resource_digest(value)); }
         let receipt = VulkanBarrierExecutionReceipt {
             version: RECEIPT_VERSION,
-            graph_digest: graph.digest_hex().map_err(|_| VulkanBarrierError::InvalidSchedule)?,
-            schedule_digest: schedule.digest_hex().map_err(|_| VulkanBarrierError::InvalidSchedule)?,
+            graph_digest: graph.digest_hex().map_err(|_| VulkanBarrierError::Schedule(
+                crate::ScheduleError::UnsupportedVersion(schedule.version),
+            ))?,
+            schedule_digest: schedule.digest_hex().map_err(|_| VulkanBarrierError::Schedule(
+                crate::ScheduleError::UnsupportedVersion(schedule.version),
+            ))?,
             sync_plan_digest: plan.digest_hex().map_err(|e| VulkanBarrierError::SyncPlan(e))?,
             barrier_digest: barrier_digest(plan),
             node_count: schedule.nodes.len() as u32,
