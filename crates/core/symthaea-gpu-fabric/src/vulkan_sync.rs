@@ -226,6 +226,18 @@ impl VulkanSyncPlan {
                 hasher.update(&wait.producer_queue.get().to_le_bytes());
                 hasher.update(&wait.value.to_le_bytes());
             }
+            hasher.update(&(submission.barriers.len() as u32).to_le_bytes());
+            for barrier in &submission.barriers {
+                hasher.update(&barrier.from.to_le_bytes());
+                hasher.update(&barrier.to.to_le_bytes());
+                hasher.update(&(barrier.resource.as_str().len() as u32).to_le_bytes());
+                hasher.update(barrier.resource.as_str().as_bytes());
+                hasher.update(&[match barrier.kind {
+                    DependencyKind::ReadAfterWrite => 1,
+                    DependencyKind::WriteAfterRead => 2,
+                    DependencyKind::WriteAfterWrite => 3,
+                }]);
+            }
             hasher.update(&submission.signal.queue.get().to_le_bytes());
             hasher.update(&submission.signal.value.to_le_bytes());
         }
