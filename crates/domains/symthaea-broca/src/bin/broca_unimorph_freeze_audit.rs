@@ -9,6 +9,7 @@
 //! it does not claim linguistic correctness or corpus completeness.
 
 use std::{
+    fs,
     io::Read,
     process::Command,
     time::Duration,
@@ -240,6 +241,12 @@ fn main() -> Result<()> {
         );
     }
 
+    write_structured_receipt(
+        &actual_b3,
+        &actual_blob,
+        &slices,
+        selected_bytes.len(),
+    )?;
     let ci_provenance = collect_ci_provenance();
     println!(
         "BROCA_UNIMORPH_FREEZE_AUDIT PASS artifact_bytes={} artifact_blake3={} git_blob={} selection_blake3={} records={} rows_bytes={} compiler_revision={} parser_revision={} build_context_revision={} ci_provenance={}",
@@ -430,6 +437,77 @@ fn collect_ci_provenance() -> String {
         .map(|(key, value)| format!("{key}={}", value.replace(' ', "_")))
         .collect::<Vec<_>>()
         .join(",")
+}
+
+fn write_structured_receipt(
+    actual_b3: &str,
+    actual_blob: &str,
+    slices: &[MorphophonologicalSourceSlice],
+    selected_bytes: usize,
+) -> Result<()> {
+    let receipt_path = match std::env::var("BROCA_FREEZE_AUDIT_OUTPUT") {
+        Ok(path) if !path.trim().is_empty() => path,
+        _ => return Ok(()),
+    };
+
+    let snapshot_manifest_blob = git_blob_sha1(SNAPSHOT_MANIFEST.as_bytes())?;
+    let selection_manifest_blob = git_blob_sha1(SELECTION_MANIFEST.as_bytes())?;
+    let selection_manifest_json_blob = git_blob_sha1(SELECTION_MANIFEST_JSON.as_bytes())?;
+
+    let receipt = serde_json::json!({
+        "schema_version": "broca-unimorph-freeze-audit-receipt-v1",
+        "status": "PASS",
+        "upstream": {
+            "repository": "unimorph/eng",
+            "commit": EXPECTED_COMMIT,
+            "raw_uri": EXPECTED_RAW_URI,
+            "git_blob_sha": actual_blob,
+            "artifact_byte_length": EXPECTED_ARTIFACT_BYTES,
+            "artifact_blake3": actual_b3,
+            "readme_uri": EXPECTED_README_URI,
+            "readme_git_blob_sha": EXPECTED_README_BLOB_SHA,
+            "source_attribution": EXPECTED_SOURCE,
+            "license": EXPECTED_LICENSE
+        },
+        "selection": {
+            "manifest_schema": EXPECTED_SELECTION_SCHEMA,
+            "manifest_git_blob_sha": selection_manifest_blob,
+            "manifest_json_git_blob_sha": selection_manifest_json_blob,
+            "record_count": slices.len(),
+            "selected_bytes": selected_bytes,
+            "aggregate_blake3": EXPECTED_SELECTION_BLAKE3,
+            "records": slices
+        },
+        "compiler": {
+            "implementation_revision": symthaea_broca::UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION,
+            "parser_revision": symthaea_broca::UNIMORPH_TSV_SOURCE_PARSER_REVISION,
+            "build_context_revision": symthaea_broca::UNIMORPH_TSV_COMPILER_BUILD_CONTEXT_REVISION
+        },
+        "checked_in_evidence": {
+            "snapshot_manifest_git_blob_sha": snapshot_manifest_blob,
+            "selection_manifest_git_blob_sha": selection_manifest_blob,
+            "selection_manifest_json_git_blob_sha": selection_manifest_json_blob
+        },
+        "ci": {
+            "github_actions": std::env::var("GITHUB_ACTIONS").unwrap_or_else(|_| "unknown".into()),
+            "run_id": std::env::var("GITHUB_RUN_ID").unwrap_or_else(|_| "unknown".into()),
+            "run_attempt": std::env::var("GITHUB_RUN_ATTEMPT").unwrap_or_else(|_| "unknown".into()),
+            "workflow": std::env::var("GITHUB_WORKFLOW").unwrap_or_else(|_| "unknown".into()),
+            "workflow_ref": std::env::var("GITHUB_WORKFLOW_REF").unwrap_or_else(|_| "unknown".into()),
+            "workflow_sha": std::env::var("GITHUB_WORKFLOW_SHA").unwrap_or_else(|_| "unknown".into()),
+            "commit_sha": std::env::var("GITHUB_SHA").unwrap_or_else(|_| "unknown".into()),
+            "ref": std::env::var("GITHUB_REF").unwrap_or_else(|_| "unknown".into()),
+            "runner_os": std::env::var("RUNNER_OS").unwrap_or_else(|_| "unknown".into()),
+            "runner_arch": std::env::var("RUNNER_ARCH").unwrap_or_else(|_| "unknown".into()),
+            "image_os": std::env::var("ImageOS").unwrap_or_else(|_| "unknown".into()),
+            "image_version": std::env::var("ImageVersion").unwrap_or_else(|_| "unknown".into())
+        }
+    });
+
+    let json = serde_json::to_vec_pretty(&receipt).context("failed to serialize freeze audit receipt")?;
+    fs::write(&receipt_path, json)
+        .with_context(|| format!("failed to write structured freeze audit receipt {receipt_path}"))?;
+    Ok(())
 }
 
 fn recompute_selection_digest(slices: &[MorphophonologicalSourceSlice]) -> String {
