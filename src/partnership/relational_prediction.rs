@@ -1364,6 +1364,7 @@ impl Default for RollingOriginRelationalPredictionConfig {
 
 const INFERENCE_PLAN_SCHEMA: &str = "relational-prediction-inference-plan/v2";
 const INFERENCE_BINDING_SCHEMA: &str = "relational-prediction-inference-binding/v1";
+const INFERENCE_SELECTION_SCHEMA: &str = "relational-prediction-inference-selection/v1";
 
 /// Frozen analysis contract for future inferential qualification.
 /// This specifies the inferential procedure and all supporting choices without
@@ -1801,6 +1802,178 @@ impl ForecastInferenceBinding {
             "test_samples": self.test_samples,
             "forecast_horizon": self.forecast_horizon,
             "binding_blake3": &self.binding_blake3
+        }).to_string())
+    }
+}
+
+/// Machine-readable record of which prespecified inference-selection branch was taken.
+///
+/// This receipt sits above the validated pre-inference binding. It records the
+/// selected branch without executing inference and without claiming to prove
+/// that the plan was temporally preregistered before outcome inspection.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ForecastInferenceSelectionReceipt {
+    pub analysis_level: String,
+    pub binding_blake3: String,
+    pub qualification_identity_blake3: String,
+    pub plan_blake3: String,
+    pub dependence_profile_blake3: String,
+    pub method_selection_rule_id: String,
+    pub method_selection_rule_spec_sha256: String,
+    /// Stable branch identifier from the externally frozen selection rule.
+    pub decision_path_id: String,
+    pub selected_procedure_id: String,
+    pub selected_procedure_spec_sha256: String,
+    pub selected_dependence_method_id: String,
+    pub selected_dependence_spec_sha256: String,
+    pub selected_resampling_method_id: String,
+    pub selected_resampling_spec_sha256: String,
+    pub selection_blake3: String,
+}
+
+impl ForecastInferenceSelectionReceipt {
+    pub fn from_single(
+        plan: &ForecastInferencePlan,
+        qualification: &HeldOutRelationalPredictionQualification,
+        dependence: &ForecastLossDependenceProfile,
+        decision_path_id: impl Into<String>,
+    ) -> Result<Self, RelationalPredictionError> {
+        let binding = ForecastInferenceBinding::from_single(plan, qualification, dependence)?;
+        Self::from_binding(
+            &binding,
+            plan,
+            qualification.qualification_identity_blake3.as_str(),
+            dependence,
+            decision_path_id,
+        )
+    }
+
+    pub fn from_rolling(
+        plan: &ForecastInferencePlan,
+        qualification: &RollingOriginRelationalPredictionQualification,
+        dependence: &RollingForecastLossDependenceProfile,
+        decision_path_id: impl Into<String>,
+    ) -> Result<Self, RelationalPredictionError> {
+        let binding = ForecastInferenceBinding::from_rolling(plan, qualification, dependence)?;
+        Self::from_binding(
+            &binding,
+            plan,
+            qualification.qualification_identity_blake3.as_str(),
+            dependence,
+            decision_path_id,
+        )
+    }
+
+    fn from_binding(
+        binding: &ForecastInferenceBinding,
+        plan: &ForecastInferencePlan,
+        qualification_identity_blake3: &str,
+        dependence: &ForecastLossDependenceProfile,
+        decision_path_id: impl Into<String>,
+    ) -> Result<Self, RelationalPredictionError> {
+        let mut receipt = Self {
+            analysis_level: binding.analysis_level.clone(),
+            binding_blake3: binding.binding_blake3.clone(),
+            qualification_identity_blake3: qualification_identity_blake3.to_string(),
+            plan_blake3: plan.plan_blake3.clone(),
+            dependence_profile_blake3: forecast_loss_dependence_profile_digest(dependence),
+            method_selection_rule_id: plan.method_selection_rule_id.clone(),
+            method_selection_rule_spec_sha256: plan.method_selection_rule_spec_sha256.clone(),
+            decision_path_id: decision_path_id.into(),
+            selected_procedure_id: plan.procedure_id.clone(),
+            selected_procedure_spec_sha256: plan.procedure_spec_sha256.clone(),
+            selected_dependence_method_id: plan.dependence_method_id.clone(),
+            selected_dependence_spec_sha256: plan.dependence_spec_sha256.clone(),
+            selected_resampling_method_id: plan.resampling_method_id.clone(),
+            selected_resampling_spec_sha256: plan.resampling_spec_sha256.clone(),
+            selection_blake3: String::new(),
+        };
+        receipt.selection_blake3 = inference_selection_digest(&receipt);
+        receipt.validate_against_binding(binding, plan, qualification_identity_blake3, dependence)?;
+        Ok(receipt)
+    }
+
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        if !matches!(self.analysis_level.as_str(), "single-window" | "rolling-origin")
+            || !is_hex_digest(&self.binding_blake3, 64)
+            || !is_hex_digest(&self.qualification_identity_blake3, 64)
+            || !is_hex_digest(&self.plan_blake3, 64)
+            || !is_hex_digest(&self.dependence_profile_blake3, 64)
+            || self.method_selection_rule_id.trim().is_empty()
+            || !is_hex_digest(&self.method_selection_rule_spec_sha256, 64)
+            || self.decision_path_id.trim().is_empty()
+            || self.selected_procedure_id.trim().is_empty()
+            || !is_hex_digest(&self.selected_procedure_spec_sha256, 64)
+            || self.selected_dependence_method_id.trim().is_empty()
+            || !is_hex_digest(&self.selected_dependence_spec_sha256, 64)
+            || self.selected_resampling_method_id.trim().is_empty()
+            || !is_hex_digest(&self.selected_resampling_spec_sha256, 64)
+            || !is_hex_digest(&self.selection_blake3, 64)
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        if inference_selection_digest(self) != self.selection_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
+    }
+
+    pub fn validate_against_binding(
+        &self,
+        binding: &ForecastInferenceBinding,
+        plan: &ForecastInferencePlan,
+        qualification_identity_blake3: &str,
+        dependence: &ForecastLossDependenceProfile,
+    ) -> Result<(), RelationalPredictionError> {
+        self.validate()?;
+        binding.validate()?;
+        plan.validate_against_qualification(qualification_identity_blake3)?;
+        dependence.validate()?;
+
+        if self.analysis_level != binding.analysis_level
+            || self.binding_blake3 != binding.binding_blake3
+            || self.qualification_identity_blake3 != qualification_identity_blake3
+            || self.plan_blake3 != plan.plan_blake3
+            || self.dependence_profile_blake3 != forecast_loss_dependence_profile_digest(dependence)
+            || self.method_selection_rule_id != plan.method_selection_rule_id
+            || self.method_selection_rule_spec_sha256 != plan.method_selection_rule_spec_sha256
+            || self.selected_procedure_id != plan.procedure_id
+            || self.selected_procedure_spec_sha256 != plan.procedure_spec_sha256
+            || self.selected_dependence_method_id != plan.dependence_method_id
+            || self.selected_dependence_spec_sha256 != plan.dependence_spec_sha256
+            || self.selected_resampling_method_id != plan.resampling_method_id
+            || self.selected_resampling_spec_sha256 != plan.resampling_spec_sha256
+        {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        if self.dependence_profile_blake3 != binding.dependence_profile_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+        Ok(serde_json::json!({
+            "schema": INFERENCE_SELECTION_SCHEMA,
+            "analysis_level": &self.analysis_level,
+            "binding_blake3": &self.binding_blake3,
+            "qualification_identity_blake3": &self.qualification_identity_blake3,
+            "plan_blake3": &self.plan_blake3,
+            "dependence_profile_blake3": &self.dependence_profile_blake3,
+            "method_selection_rule_id": &self.method_selection_rule_id,
+            "method_selection_rule_spec_sha256": &self.method_selection_rule_spec_sha256,
+            "decision_path_id": &self.decision_path_id,
+            "selected_procedure_id": &self.selected_procedure_id,
+            "selected_procedure_spec_sha256": &self.selected_procedure_spec_sha256,
+            "selected_dependence_method_id": &self.selected_dependence_method_id,
+            "selected_dependence_spec_sha256": &self.selected_dependence_spec_sha256,
+            "selected_resampling_method_id": &self.selected_resampling_method_id,
+            "selected_resampling_spec_sha256": &self.selected_resampling_spec_sha256,
+            "selection_blake3": &self.selection_blake3
         }).to_string())
     }
 }
@@ -4171,6 +4344,26 @@ fn rolling_forecast_loss_dependence_profile_digest(
     hasher.finalize().to_hex().to_string()
 }
 
+fn inference_selection_digest(receipt: &ForecastInferenceSelectionReceipt) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-inference-selection/v1");
+    update_string(&mut hasher, &receipt.analysis_level);
+    update_string(&mut hasher, &receipt.binding_blake3);
+    update_string(&mut hasher, &receipt.qualification_identity_blake3);
+    update_string(&mut hasher, &receipt.plan_blake3);
+    update_string(&mut hasher, &receipt.dependence_profile_blake3);
+    update_string(&mut hasher, &receipt.method_selection_rule_id);
+    update_string(&mut hasher, &receipt.method_selection_rule_spec_sha256);
+    update_string(&mut hasher, &receipt.decision_path_id);
+    update_string(&mut hasher, &receipt.selected_procedure_id);
+    update_string(&mut hasher, &receipt.selected_procedure_spec_sha256);
+    update_string(&mut hasher, &receipt.selected_dependence_method_id);
+    update_string(&mut hasher, &receipt.selected_dependence_spec_sha256);
+    update_string(&mut hasher, &receipt.selected_resampling_method_id);
+    update_string(&mut hasher, &receipt.selected_resampling_spec_sha256);
+    hasher.finalize().to_hex().to_string()
+}
+
 fn inference_binding_digest(binding: &ForecastInferenceBinding) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"relational-prediction-inference-binding/v1");
@@ -5463,6 +5656,99 @@ mod tests {
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string();
         assert_eq!(
             rule_spec_tampered.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
+    fn inference_selection_receipt_binds_rule_branch_and_selected_method() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let qualification = RollingOriginRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            4,
+            provenance(),
+        )
+        .unwrap();
+        let plan = ForecastInferencePlan::new(
+            config.forecast_horizon,
+            rolling_origin_schedule_sha256(config).unwrap(),
+            "relational-inference-selection-rule-v1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "nested-forecast-bootstrap-v1",
+            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+            "loss-dependence-bartlett-v1",
+            "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+            "moving-block-bootstrap-v1",
+            "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            "small-sample-conservative-v1",
+            "single-primary-comparison-v1",
+            0.05,
+            qualification.qualification_identity_blake3.clone(),
+        )
+        .unwrap();
+        let dependence = qualification.relational_loss_dependence(3, 2).unwrap();
+        let receipt = ForecastInferenceSelectionReceipt::from_rolling(
+            &plan,
+            &qualification,
+            &dependence,
+            "serial-dependence-preserving-bootstrap",
+        )
+        .unwrap();
+
+        receipt.validate().unwrap();
+        assert_eq!(receipt.plan_blake3, plan.plan_blake3);
+        assert_eq!(receipt.binding_blake3, ForecastInferenceBinding::from_rolling(
+            &plan,
+            &qualification,
+            &dependence,
+        ).unwrap().binding_blake3);
+        assert_eq!(receipt.selected_procedure_id, plan.procedure_id);
+        assert_eq!(receipt.method_selection_rule_id, plan.method_selection_rule_id);
+        assert!(receipt.to_json().unwrap().contains(INFERENCE_SELECTION_SCHEMA));
+
+        let mut tampered_path = receipt.clone();
+        tampered_path.decision_path_id = "different-branch".to_string();
+        assert_eq!(
+            tampered_path.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut tampered_method = receipt.clone();
+        tampered_method.selected_procedure_id = "different-procedure".to_string();
+        assert_eq!(
+            tampered_method.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut tampered_rule = receipt.clone();
+        tampered_rule.method_selection_rule_spec_sha256 =
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string();
+        assert_eq!(
+            tampered_rule.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut alternate_plan = plan.clone();
+        alternate_plan.procedure_id = "alternate-procedure".to_string();
+        alternate_plan.plan_blake3 = inference_plan_digest(&alternate_plan);
+        alternate_plan.validate().unwrap();
+        assert_eq!(
+            receipt.validate_against_binding(
+                &ForecastInferenceBinding::from_rolling(&plan, &qualification, &dependence).unwrap(),
+                &alternate_plan,
+                &qualification.qualification_identity_blake3,
+                &dependence,
+            ),
             Err(RelationalPredictionError::InvalidEvidenceInputDigest)
         );
     }
