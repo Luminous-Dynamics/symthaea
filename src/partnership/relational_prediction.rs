@@ -4452,6 +4452,7 @@ fn inference_selection_digest(receipt: &ForecastInferenceSelectionReceipt) -> St
 }
 
 fn inference_binding_digest(binding: &ForecastInferenceBinding) -> String {
+    let _ = binding.replay_verified;
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"relational-prediction-inference-binding/v1");
     hasher.update(b"qualification-replay-verified/v1");
@@ -5747,6 +5748,62 @@ mod tests {
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string();
         assert_eq!(
             rule_spec_tampered.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
+    fn inference_binding_must_replay_exact_qualification_input() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let qualification = RollingOriginRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            4,
+            provenance(),
+        )
+        .unwrap();
+        let dependence = qualification.relational_loss_dependence(3, 2).unwrap();
+        let plan = ForecastInferencePlan::new(
+            config.forecast_horizon,
+            rolling_origin_schedule_sha256(config).unwrap(),
+            CANONICAL_INFERENCE_SELECTION_RULE_ID,
+            CANONICAL_INFERENCE_SELECTION_RULE_SPEC_SHA256,
+            CANONICAL_INFERENCE_SELECTION_PROCEDURE_ID,
+            CANONICAL_INFERENCE_SELECTION_PROCEDURE_SPEC_SHA256,
+            CANONICAL_INFERENCE_SELECTION_DEPENDENCE_ID,
+            CANONICAL_INFERENCE_SELECTION_DEPENDENCE_SPEC_SHA256,
+            CANONICAL_INFERENCE_SELECTION_RESAMPLING_ID,
+            CANONICAL_INFERENCE_SELECTION_RESAMPLING_SPEC_SHA256,
+            CANONICAL_INFERENCE_SELECTION_SMALL_SAMPLE_POLICY_ID,
+            CANONICAL_INFERENCE_SELECTION_MULTIPLICITY_POLICY_ID,
+            0.05,
+            qualification.qualification_identity_blake3.clone(),
+        )
+        .unwrap();
+
+        let binding =
+            ForecastInferenceBinding::from_rolling(&samples, &plan, &qualification, &dependence)
+                .unwrap();
+        assert!(binding.validate().is_ok());
+
+        let mut altered_samples = samples.clone();
+        altered_samples[40].future_outcome += 0.01;
+        assert_eq!(
+            ForecastInferenceBinding::from_rolling(
+                &altered_samples,
+                &plan,
+                &qualification,
+                &dependence
+            ),
             Err(RelationalPredictionError::InvalidEvidenceInputDigest)
         );
     }
