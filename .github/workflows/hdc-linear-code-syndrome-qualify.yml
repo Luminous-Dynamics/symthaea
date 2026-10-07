@@ -217,6 +217,18 @@ jobs:
           LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^FIXED_SYNDROME_SPEC=//p')"
           test -n "$LEDGER"
           printf "fixed_syndrome_spec=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+      - name: Capture syndrome quotient metric ledger
+        id: quotient_metric
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            small_fixture_quotient_metric_matches_ambient_coset_geometry -- --nocapture 2>&1)
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SYNDROME_QUOTIENT_METRIC=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^SYNDROME_QUOTIENT_METRIC=//p')"
+          test -n "$LEDGER"
+          printf "syndrome_quotient_metric=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
       - name: Capture syndrome/coset invariant ledger
         id: coset_invariants
         run: |
@@ -376,6 +388,8 @@ jobs:
           syndrome_oracle_linearity=${{ steps.syndrome_oracle.outputs.syndrome_oracle_linearity }}
           syndrome_coset_ledger_status=${{ steps.coset_invariants.outcome }}
           fixed_syndrome_spec_status=${{ steps.fixed_syndrome_spec.outcome }}
+          quotient_metric_status=${{ steps.quotient_metric.outcome }}
+          syndrome_quotient_metric=${{ steps.quotient_metric.outputs.syndrome_quotient_metric }}
           fixed_syndrome_spec=${{ steps.fixed_syndrome_spec.outputs.fixed_syndrome_spec }}
           syndrome_coset_ledger=${{ steps.coset_invariants.outputs.syndrome_coset_ledger }}
           minimum_syndrome_multiplicity_status=${{ steps.multiplicity_invariant.outcome }}
@@ -391,7 +405,7 @@ jobs:
           runner_arch=${{ steps.runner.outputs.runner_arch }}
           runner_image=${{ steps.runner.outputs.runner_image }}
           runner_image_version=${{ steps.runner.outputs.runner_image_version }}
-          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.fixed_syndrome_spec.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.fixed_syndrome_spec.outcome == 'success' && steps.quotient_metric.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
           random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
           random_syndrome_sweep=${{ steps.random_sweep.outputs.random_syndrome_sweep }}
