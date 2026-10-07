@@ -660,8 +660,11 @@ The RFC's first qualification layer is now implemented on the RFC branch:
   - deterministic six-action environment;
   - replay-stable transition function;
   - persistence predictor baseline;
-  - generic predictor trait;
+  - generic predictor trait with evidence-weighted confidence;
   - prediction-error evaluator;
+  - scenario suite;
+  - episode-isolated online-adaptation suite;
+  - frozen held-out cross-scenario transfer protocol;
   - survival-aware homeostatic policy;
   - closed-loop policy runner.
 
@@ -675,6 +678,7 @@ The first benchmark questions are therefore:
 2. Can a policy maintain viability while pursuing progress?
 3. Does prediction error remain attributable to a pre-action forecast?
 4. Do identical runs produce identical evidence?
+5. Does learning transfer to a different deterministic scenario when the test phase is frozen?
 
 No current result from this harness should be interpreted as evidence of consciousness
 or biological life.
@@ -702,7 +706,9 @@ existing WorldModel/FEP prediction
 ~~~
 
 Once this is working, we can measure whether the existing world-model path actually
-improves with experience rather than merely updating state.
+improves with experience, whether that improvement transfers to changed initial
+conditions, and whether confidence tracks evidence instead of being treated as an
+unearned scalar.
 
 ## 13. Metrics
 
