@@ -1,7 +1,7 @@
 //! Evidence-first alternatives assessment.
 //!
 //! This crate deliberately avoids a single "green score". Burden dimensions
-//! remain seuarate, hard constraints fail closed, Pareto dominance is
+//! remain separate, hard constraints fail closed, Pareto dominance is
 //! conservative over uncertainty intervals, and qualification cannot exceed
 //! what the linked evidence demonstrates.
 //!
@@ -2587,7 +2587,7 @@ impl ExperimentalDesignProvenance {
 /// Conservative next-measurement target.
 ///
 /// This is explicitly a heuristic rather than a formal expected-value-of-
-—information calculation.
+/// information calculation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MeasurementDiscriminationTarget {
     /// Left-hand frontier candidate identity.
