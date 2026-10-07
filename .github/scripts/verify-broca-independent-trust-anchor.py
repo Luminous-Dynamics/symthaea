@@ -1,0 +1,579 @@
+#!/usr/bin/env python3
+"""Independent, base-owned Broca qualification verifier.
+
+This script is executed only from the default branch by workflow_run. PR source
+is fetched as API data and is never checked out, imported, built, or executed.
+"""
+
+from __future__ import annotations
+
+import base64
+import json
+import os
+import re
+import subprocess
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+API_VERSION = "2026-03-10"
+STATUS_CONTEXT = "Broca / Independent Trust Anchor"
+RECEIPT_PATH = Path("BROCA_INDEPENDENT_TRUST_ANCHOR_RECEIPT_V1.json")
+
+ALLOWED_PATH_PREFIXES = (
+    ".github/workflows/broca-feature-matrix.yml",
+    "crates/domains/symthaea-broca/",
+    "docs/broca/",
+    "src/voice/live_voice.rs",
+)
+
+EXPECTED_ACTION_REFS = [
+    "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+    "dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067",
+    "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
+    "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+    "dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067",
+    "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
+    "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6",
+    "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+]
+
+EXPECTED_BROCA_JOBS = [
+    "symthaea-broca (no-default-features)",
+    "symthaea-broca (default)",
+    "symthaea-broca (mamba-cpu)",
+    "symthaea-broca (test-helpers)",
+    "symthaea-broca (canonical-eval)",
+    "symthaea-broca (canonical-quality-gate)",
+    "symthaea-broca (root-live-voice-ssm-language)",
+    "UniMorph frozen snapshot audit",
+]
+
+REQUIRED_WORKFLOWS = [
+    "Broca Feature Matrix",
+    "Workflow Syntax",
+    "PR Governance",
+]
+
+
+class VerificationError(Exception):
+    pass
+
+
+class WaitingError(VerificationError):
+    pass
+
+
+class StaleError(VerificationError):
+    pass
+
+
+def env_required(name: str) -> str:
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise VerificationError(f"missing required environment variable: {name}")
+    return value
+
+
+TOKEN = env_required("GITHUB_TOKEN")
+REPOSITORY = env_required("REPOSITORY")
+TRUST_ANCHOR_SHA = env_required("TRUST_ANCHOR_SHA")
+TRIGGER_RUN_ID = int(env_required("TRIGGER_RUN_ID"))
+TRIGGER_RUN_NAME = env_required("TRIGGER_RUN_NAME")
+TRIGGER_RUN_EVENT = env_required("TRIGGER_RUN_EVENT")
+TRIGGER_RUN_HEAD_SHA = env_required("TRIGGER_RUN_HEAD_SHA")
+TRIGGER_RUN_HEAD_BRANCH = env_required("TRIGGER_RUN_HEAD_BRANCH")
+TRIGGER_RUN_CONCLUSION = env_required("TRIGGER_RUN_CONCLUSION")
+TRIGGER_RUN_ATTEMPT = int(env_required("TRIGGER_RUN_ATTEMPT"))
+
+
+def api_request(
+    method: str,
+    path: str,
+    *,
+    query: dict[str, str] | None = None,
+    body: dict[str, Any] | None = None,
+) -> Any:
+    url = f"https://api.github.com/repos/{REPOSITORY}{path}"
+    if query:
+        url += "?" + urllib.parse.urlencode(query)
+    payload = None if body is None else json.dumps(body).encode("utf-8")
+    request = urllib.request.Request(
+        url,
+        data=payload,
+        method=method,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {TOKEN}",
+            "X-GitHub-Api-Version": API_VERSION,
+            "User-Agent": "symthaea-broca-independent-trust-anchor/1",
+            **({"Content-Type": "application/json"} if body is not None else {}),
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            raw = response.read()
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")
+        raise VerificationError(
+            f"GitHub API {method} {path} failed: HTTP {error.code}: {detail}"
+        ) from error
+    if not raw:
+        return None
+    return json.loads(raw)
+
+
+def get_file(path: str, ref: str) -> tuple[bytes, str]:
+    encoded = urllib.parse.quote(path, safe="")
+    data = api_request("GET", f"/contents/{encoded}", query={"ref": ref})
+    if isinstance(data, list):
+        raise VerificationError(f"expected file but API returned directory: {path}")
+    if data.get("encoding") != "base64":
+        raise VerificationError(
+            f"unexpected content encoding for {path}: {data.get('encoding')}"
+        )
+    return base64.b64decode(data["content"], validate=True), str(data["sha"])
+
+
+def require_fragments(text: str, fragments: list[str], label: str) -> None:
+    missing = [fragment for fragment in fragments if fragment not in text]
+    if missing:
+        raise VerificationError(
+            f"{label} missing required fragments: {', '.join(repr(x) for x in missing)}"
+        )
+
+
+def list_head_runs(head_sha: str) -> list[dict[str, Any]]:
+    return api_request(
+        "GET",
+        "/actions/runs",
+        query={
+            "head_sha": head_sha,
+            "event": "pull_request",
+            "per_page": "100",
+        },
+    ).get("workflow_runs", [])
+
+
+def latest_required_runs(head_sha: str) -> dict[str, dict[str, Any] | None]:
+    runs = list_head_runs(head_sha)
+    result: dict[str, dict[str, Any] | None] = {}
+    for name in REQUIRED_WORKFLOWS:
+        candidates = [
+            run
+            for run in runs
+            if run.get("name") == name and run.get("head_sha") == head_sha
+        ]
+        candidates.sort(
+            key=lambda run: (run.get("updated_at", ""), run.get("id", 0))
+        )
+        result[name] = candidates[-1] if candidates else None
+    return result
+
+
+def verify_broca_jobs(run_id: int) -> dict[str, Any]:
+    jobs = api_request(
+        "GET",
+        f"/actions/runs/{run_id}/jobs",
+        query={"per_page": "100"},
+    ).get("jobs", [])
+
+    outcomes: dict[str, list[str | None]] = {}
+    for name in EXPECTED_BROCA_JOBS:
+        matches = [job for job in jobs if job.get("name") == name]
+        outcomes[name] = [job.get("conclusion") for job in matches]
+        if len(matches) != 1:
+            raise VerificationError(
+                f"Broca job contract mismatch for {name!r}: expected one job, got {len(matches)}"
+            )
+        if matches[0].get("conclusion") != "success":
+            raise VerificationError(
+                f"Broca job {name!r} is not successful: {matches[0].get('conclusion')!r}"
+            )
+
+    if len(jobs) != len(EXPECTED_BROCA_JOBS):
+        raise VerificationError(
+            f"Broca job-count mismatch: expected {len(EXPECTED_BROCA_JOBS)}, got {len(jobs)}"
+        )
+
+    return {
+        "expected": EXPECTED_BROCA_JOBS,
+        "observed_count": len(jobs),
+        "outcomes": outcomes,
+    }
+
+
+def post_status(sha: str, state: str, description: str, target_url: str) -> None:
+    api_request(
+        "POST",
+        f"/statuses/{sha}",
+        body={
+            "state": state,
+            "context": STATUS_CONTEXT,
+            "description": description[:140],
+            "target_url": target_url,
+        },
+    )
+
+
+def trusted_checkout_identity() -> str:
+    try:
+        output = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            text=True,
+            stderr=subprocess.STDOUT,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise VerificationError(
+            f"unable to resolve trusted verifier checkout HEAD: {error}"
+        ) from error
+
+    if output != TRUST_ANCHOR_SHA:
+        raise VerificationError(
+            f"trusted verifier checkout mismatch: workflow SHA {TRUST_ANCHOR_SHA}, checkout HEAD {output}"
+        )
+
+    return output
+
+
+def main() -> int:
+    verifier_head = trusted_checkout_identity()
+    target_url = f"https://github.com/{REPOSITORY}/actions/runs/{TRIGGER_RUN_ID}"
+
+    receipt: dict[str, Any] = {
+        "schema_version": "broca-independent-trust-anchor-receipt-v1",
+        "qualification_result": "NOT_PASS",
+        "trust_anchor": {
+            "commit_sha": verifier_head,
+            "workflow_name": "Broca Independent Trust Anchor",
+            "status_context": STATUS_CONTEXT,
+        },
+        "trigger": {
+            "run_id": TRIGGER_RUN_ID,
+            "run_attempt": TRIGGER_RUN_ATTEMPT,
+            "run_name": TRIGGER_RUN_NAME,
+            "event": TRIGGER_RUN_EVENT,
+            "head_branch": TRIGGER_RUN_HEAD_BRANCH,
+            "head_sha": TRIGGER_RUN_HEAD_SHA,
+            "conclusion": TRIGGER_RUN_CONCLUSION,
+        },
+        "verification": {},
+    }
+
+    try:
+        if TRIGGER_RUN_EVENT != "pull_request":
+            raise StaleError(f"triggering event is not pull_request: {TRIGGER_RUN_EVENT!r}")
+
+        associated = api_request(
+            "GET",
+            f"/commits/{TRIGGER_RUN_HEAD_SHA}/pulls",
+            query={"per_page": "100"},
+        )
+        candidates = [
+            pr
+            for pr in associated
+            if pr.get("state") == "open"
+            and pr.get("head", {}).get("sha") == TRIGGER_RUN_HEAD_SHA
+            and pr.get("head", {}).get("repo", {}).get("full_name") == REPOSITORY
+            and pr.get("base", {}).get("repo", {}).get("full_name") == REPOSITORY
+        ]
+
+        if len(candidates) != 1:
+            raise StaleError(
+                f"expected exactly one open same-repository PR for head {TRIGGER_RUN_HEAD_SHA}, got {len(candidates)}"
+            )
+
+        pr_number = int(candidates[0]["number"])
+        pr = api_request("GET", f"/pulls/{pr_number}")
+        if (
+            pr.get("state") != "open"
+            or pr.get("head", {}).get("sha") != TRIGGER_RUN_HEAD_SHA
+            or pr.get("head", {}).get("repo", {}).get("full_name") != REPOSITORY
+        ):
+            raise StaleError("PR state/head/repository changed after association lookup")
+
+        receipt["pull_request"] = {
+            "number": pr_number,
+            "base_branch": pr.get("base", {}).get("ref"),
+            "base_sha": pr.get("base", {}).get("sha"),
+            "head_branch": pr.get("head", {}).get("ref"),
+            "head_sha": pr.get("head", {}).get("sha"),
+            "head_repo_full_name": pr.get("head", {}).get("repo", {}).get("full_name"),
+            "merge_commit_sha": pr.get("merge_commit_sha"),
+        }
+
+        changed = api_request(
+            "GET",
+            f"/compare/{pr['base']['sha']}...{pr['head']['sha']}",
+        )
+        changed_files = sorted(
+            (item.get("filename"), item.get("status"))
+            for item in changed.get("files", [])
+        )
+
+        disallowed = [
+            name
+            for name, _status in changed_files
+            if name
+            and not any(
+                name == prefix or name.startswith(prefix)
+                for prefix in ALLOWED_PATH_PREFIXES
+            )
+        ]
+        if disallowed:
+            raise VerificationError(
+                f"PR changed files outside the Broca trust-anchor allowlist: {disallowed}"
+            )
+
+        unsupported_statuses = [
+            (name, status)
+            for name, status in changed_files
+            if status not in {"added", "modified"}
+        ]
+        if unsupported_statuses:
+            raise VerificationError(
+                f"PR contains deleted/renamed files outside the allowed model: {unsupported_statuses}"
+            )
+
+        receipt["verification"]["source_scope"] = {
+            "allowed_prefixes": list(ALLOWED_PATH_PREFIXES),
+            "changed_files": [
+                {"filename": name, "status": status}
+                for name, status in changed_files
+            ],
+            "verified": True,
+        }
+
+        workflow_bytes, workflow_blob = get_file(
+            ".github/workflows/broca-feature-matrix.yml", pr["head"]["sha"]
+        )
+        workflow = workflow_bytes.decode("utf-8")
+
+        uses = [
+            match.group(1)
+            for line in workflow.splitlines()
+            if (match := re.match(r"^\s*(?:-\s*)?uses:\s+(\S+)", line))
+        ]
+        if uses != EXPECTED_ACTION_REFS:
+            raise VerificationError(
+                f"Broca workflow Action refs mismatch: expected {EXPECTED_ACTION_REFS!r}, got {uses!r}"
+            )
+
+        if "pull_request_target" in workflow or "workflow_run" in workflow:
+            raise VerificationError(
+                "Broca Feature Matrix contains an elevated/cascading trust trigger"
+            )
+        if re.search(r"\bsecrets\.", workflow):
+            raise VerificationError(
+                "Broca Feature Matrix directly references repository secrets"
+            )
+
+        require_fragments(
+            workflow,
+            [
+                "permissions:\n  contents: read",
+                "permissions:\n      contents: read\n      id-token: write\n      attestations: write\n      artifact-metadata: write",
+                "BROCA_QUALIFICATION_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}",
+                "ref: ${{ env.BROCA_QUALIFICATION_HEAD_SHA }}",
+                "toolchain: 1.96.0",
+                "persist-credentials: false",
+                "Capture native package context",
+                "BROCA_NATIVE_PACKAGE_CONTEXT",
+                "BROCA_FREEZE_AUDIT_OUTPUT: target/broca-unimorph-freeze/receipt.json",
+                "Attest structured freeze receipt",
+                "Preserve attestation bundle",
+                "receipt.attestation.bundle.json",
+            ],
+            "Broca workflow",
+        )
+        workflow_fragments = [
+            "${{ env.BROCA_QUALIFICATION_HEAD_SHA }}"
+        ]
+        if workflow.count(workflow_fragments[0]) != 2:
+            raise VerificationError(
+                "Broca workflow does not use the exact PR head in both jobs"
+            )
+        if workflow.count("toolchain: 1.96.0") != 2:
+            raise VerificationError(
+                "Broca workflow Rust toolchain selection mismatch"
+            )
+        if workflow.count("persist-credentials: false") != 2:
+            raise VerificationError(
+                "Broca workflow checkout credential policy mismatch"
+            )
+        if workflow.count("Capture native package context") != 2:
+            raise VerificationError(
+                "Broca workflow native package capture count mismatch"
+            )
+
+        audit_bytes, audit_blob = get_file(
+            "crates/domains/symthaea-broca/src/bin/broca_unimorph_freeze_audit.rs",
+            pr["head"]["sha"],
+        )
+        audit = audit_bytes.decode("utf-8")
+        require_fragments(
+            audit,
+            [
+                "verify_qualification_checkout",
+                "git rev-parse HEAD",
+                "write_structured_receipt",
+                "qualification_workflow_git_blob_sha",
+                "qualification_action_refs",
+                "EXPECTED_QUALIFICATION_ACTION_REFS: [&str; 8]",
+                "frozen UniMorph artifact is not valid UTF-8",
+                "EXPECTED_LANGUAGE_TAG",
+                "EXPECTED_DIALECT_SCOPE",
+                "EXPECTED_RULE_SET_ID",
+                "EXPECTED_COMPILER_ID",
+                "EXPECTED_COMPILER_VERSION",
+                "EXPECTED_NORMALIZATION_POLICY",
+            ],
+            "freeze auditor",
+        )
+
+        build_bytes, build_blob = get_file(
+            "crates/domains/symthaea-broca/build.rs", pr["head"]["sha"]
+        )
+        build = build_bytes.decode("utf-8")
+        require_fragments(
+            build,
+            [
+                "symthaea-broca-unimorph-compiler-build-context-revision-v6",
+                "BROCA_NATIVE_PACKAGE_CONTEXT",
+                "rerun-if-env-changed=BROCA_NATIVE_PACKAGE_CONTEXT",
+                "RUNNER_OS",
+                "RUNNER_ARCH",
+                "ImageOS",
+                "ImageVersion",
+            ],
+            "Broca build context",
+        )
+
+        manifest_bytes, manifest_blob = get_file(
+            "docs/broca/unimorph_eng_4_selection_manifest.json", pr["head"]["sha"]
+        )
+        manifest = json.loads(manifest_bytes.decode("utf-8"))
+        expected_namespace = {
+            "language_tag": "en",
+            "dialect_scope": "en-unspecified",
+            "rule_set_id": "unimorph-eng-4",
+            "compilation_provenance": "unimorph-eng-4-selection",
+            "compiler_id": "symthaea-unimorph-tsv-compiler",
+            "compiler_version": "broca-unimorph-tsv-compiler-v1",
+            "normalization_policy": "trim-one-line-ending-sort-feature-tokens-sort-output-rules-v1",
+        }
+        for key, expected in expected_namespace.items():
+            if manifest.get(key) != expected:
+                raise VerificationError(
+                    f"selection manifest namespace mismatch for {key}: expected {expected!r}, got {manifest.get(key)!r}"
+                )
+
+        receipt["verification"]["critical_source_files"] = {
+            ".github/workflows/broca-feature-matrix.yml": {
+                "blob_sha": workflow_blob,
+                "byte_length": len(workflow_bytes),
+            },
+            "crates/domains/symthaea-broca/src/bin/broca_unimorph_freeze_audit.rs": {
+                "blob_sha": audit_blob,
+                "byte_length": len(audit_bytes),
+            },
+            "crates/domains/symthaea-broca/build.rs": {
+                "blob_sha": build_blob,
+                "byte_length": len(build_bytes),
+            },
+            "docs/broca/unimorph_eng_4_selection_manifest.json": {
+                "blob_sha": manifest_blob,
+                "byte_length": len(manifest_bytes),
+                "namespace": expected_namespace,
+            },
+        }
+
+        workflow_runs = latest_required_runs(pr["head"]["sha"])
+        workflow_gate_states: dict[str, Any] = {}
+        for name, run in workflow_runs.items():
+            if run is None:
+                raise WaitingError(
+                    f"required workflow has not run for exact head: {name}"
+                )
+            workflow_gate_states[name] = {
+                "id": run.get("id"),
+                "status": run.get("status"),
+                "conclusion": run.get("conclusion"),
+                "head_sha": run.get("head_sha"),
+                "updated_at": run.get("updated_at"),
+            }
+            if run.get("status") != "completed":
+                raise WaitingError(
+                    f"required workflow is not completed for exact head: {name}"
+                )
+            if run.get("conclusion") != "success":
+                raise VerificationError(
+                    f"required workflow is not successful for exact head: {name} -> {run.get('conclusion')}"
+                )
+
+        broca_run = workflow_runs["Broca Feature Matrix"]
+        assert broca_run is not None
+        receipt["verification"]["workflow_gates"] = workflow_gate_states
+        receipt["verification"]["broca_jobs"] = verify_broca_jobs(int(broca_run["id"]))
+
+        if TRIGGER_RUN_NAME not in REQUIRED_WORKFLOWS:
+            raise VerificationError(
+                f"unexpected triggering workflow: {TRIGGER_RUN_NAME!r}"
+            )
+
+        receipt["qualification_result"] = "PASS"
+        post_status(
+            pr["head"]["sha"],
+            "success",
+            "Independent Broca trust anchor passed",
+            target_url,
+        )
+
+    except StaleError as error:
+        receipt["qualification_result"] = "STALE"
+        receipt["verification"]["error"] = str(error)
+        print(f"STALE: {error}", file=sys.stderr)
+    except WaitingError as error:
+        receipt["qualification_result"] = "WAITING"
+        receipt["verification"]["error"] = str(error)
+        post_status(
+            TRIGGER_RUN_HEAD_SHA,
+            "pending",
+            "Independent Broca trust anchor waiting on required gates",
+            target_url,
+        )
+        print(f"WAITING: {error}", file=sys.stderr)
+    except Exception as error:
+        receipt["qualification_result"] = "NOT_PASS"
+        receipt["verification"]["error"] = str(error)
+        post_status(
+            TRIGGER_RUN_HEAD_SHA,
+            "failure",
+            "Independent Broca trust anchor rejected",
+            target_url,
+        )
+        print(f"NOT_PASS: {error}", file=sys.stderr)
+    finally:
+        RECEIPT_PATH.write_text(
+            json.dumps(
+                {
+                    **receipt,
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
