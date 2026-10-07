@@ -4445,7 +4445,7 @@ async fn run_nmcli_wifi_connection_up(
     profile_name: &str,
     secret_path: &str,
 ) -> Result<CmdResult, String> {
-    let mut command = privileged_process("nmcli");
+    let mut command = trusted_typed_process("nmcli")?;
     command
         .arg("connection")
         .arg("up")
@@ -4464,7 +4464,7 @@ async fn run_nmcli_wifi_connection_up(
 }
 
 async fn verify_wifi_connection(profile_name: &str) -> Result<bool, String> {
-    let mut command = privileged_process("nmcli");
+    let mut command = trusted_typed_process("nmcli")?;
     command
         .arg("-t")
         .arg("-f")
