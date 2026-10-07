@@ -12,7 +12,7 @@
 //! prediction, regulation, and recovery. They are not a consciousness or life detector.
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 
 /// Lifecycle phases that can change resource allocation and consolidation behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -250,6 +250,65 @@ pub struct PredictionCancellation {
     pub evidence_refs: Vec<String>,
 }
 
+/// Compact tamper-evident receipt for one accepted viability event.
+///
+/// The event digest binds the accepted event payload. The chain digest then binds the
+/// event to the prior receipt. This is local tamper evidence, not an external signature.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ViabilityTraceReceipt {
+    pub sequence: u64,
+    pub event_kind: String,
+    pub action_id: u64,
+    pub cycle: u64,
+    pub event_digest: [u8; 32],
+    pub previous_digest: [u8; 32],
+    pub chain_digest: [u8; 32],
+}
+
+const VIABILITY_TRACE_DOMAIN: &[u8] = b"symthaea-viability-trace:v1";
+
+fn trace_string(hasher: &mut blake3::Hasher, value: &str) {
+    hasher.update(&(value.len() as u64).to_le_bytes());
+    hasher.update(value.as_bytes());
+}
+
+fn trace_delta(hasher: &mut blake3::Hasher, delta: &Option<ViabilityDelta>) {
+    match delta {
+        Some(delta) => {
+            hasher.update(&[1]);
+            hasher.update(&delta.value.to_bits().to_le_bytes());
+            hasher.update(&delta.confidence.to_bits().to_le_bytes());
+        }
+        None => hasher.update(&[0]),
+    }
+}
+
+fn trace_error(hasher: &mut blake3::Hasher, error: &PredictionErrorLedger) {
+    for value in [
+        error.world,
+        error.self_model,
+        error.interoceptive,
+        error.goal,
+        error.model_confidence,
+        error.execution,
+    ] {
+        hasher.update(&value.to_bits().to_le_bytes());
+    }
+}
+
+fn trace_effect(hasher: &mut blake3::Hasher, effect: &Option<ViabilitySignal>) {
+    match effect {
+        Some(effect) => {
+            hasher.update(&[1]);
+            hasher.update(&effect.value.to_bits().to_le_bytes());
+            hasher.update(&effect.confidence.to_bits().to_le_bytes());
+            hasher.update(&effect.cycle.to_le_bytes());
+            trace_string(hasher, &effect.producer);
+        }
+        None => hasher.update(&[0]),
+    }
+}
+
 /// Post-action observation. A prediction is never synthesized after the fact.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ActionOutcome {
@@ -434,6 +493,10 @@ pub struct ViabilityFabric {
     max_outcomes: usize,
     max_pending_predictions: usize,
     highest_action_id: u64,
+    trace: VecDeque<ViabilityTraceReceipt>,
+    max_trace: usize,
+    trace_head: [u8; 32],
+    trace_sequence: u64,
 }
 
 /// Cycle-level telemetry view of the viability fabric.
@@ -452,6 +515,8 @@ pub struct ViabilityTelemetry {
     pub viability_execution_prediction_error: f64,
     /// Remaining fraction of the canonical FEP thermodynamic ledger capacity.
     pub viability_energy_reserve: f64,
+    /// BLAKE3 head of the locally chained viability evidence trace.
+    pub viability_trace_digest: [u8; 32],
     /// Exact multiplier applied to the existing temporal planning-depth factor.
     /// 1.0 means no viability control influence.
     pub viability_planning_horizon_scale: f64,
@@ -498,6 +563,7 @@ impl ViabilityState {
                 .get("thermodynamic_energy_reserve")
                 .map(|v| v.observation.value)
                 .unwrap_or(0.0),
+            viability_trace_digest: [0u8; 32],
             viability_planning_horizon_scale: 1.0,
         }
     }
@@ -519,6 +585,10 @@ impl ViabilityFabric {
             max_outcomes,
             max_pending_predictions: max_outcomes.max(1).min(4096),
             highest_action_id: 0,
+            trace: VecDeque::with_capacity(max_outcomes.min(1024)),
+            max_trace: max_outcomes,
+            trace_head: *blake3::hash(VIABILITY_TRACE_DOMAIN).as_bytes(),
+            trace_sequence: 0,
         }
     }
 
@@ -528,6 +598,162 @@ impl ViabilityFabric {
 
     pub fn state_mut(&mut self) -> &mut ViabilityState {
         &mut self.state
+    }
+
+    /// Snapshot the retained local evidence chain.
+    pub fn trace(&self) -> Vec<ViabilityTraceReceipt> {
+        self.trace.iter().cloned().collect()
+    }
+
+    pub fn latest_trace_digest(&self) -> [u8; 32] {
+        self.trace_head
+    }
+
+    /// Verify sequence, predecessor links, and chain digests for the retained trace.
+    ///
+    /// When the ring has evicted older receipts, verification intentionally starts
+    /// from the first retained predecessor instead of falsely requiring the genesis hash.
+    pub fn verify_trace(&self) -> bool {
+        let genesis = *blake3::hash(VIABILITY_TRACE_DOMAIN).as_bytes();
+        if self.trace.is_empty() {
+            return self.trace_head == genesis;
+        }
+
+        let mut previous_digest = None;
+        let mut previous_sequence = None;
+
+        for receipt in &self.trace {
+            if let Some(previous_sequence) = previous_sequence {
+                if receipt.sequence != previous_sequence.saturating_add(1) {
+                    return false;
+                }
+                if receipt.previous_digest != previous_digest.expect("previous receipt exists") {
+                    return false;
+                }
+            }
+
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(VIABILITY_TRACE_DOMAIN);
+            hasher.update(&receipt.sequence.to_le_bytes());
+            trace_string(&mut hasher, &receipt.event_kind);
+            hasher.update(&receipt.action_id.to_le_bytes());
+            hasher.update(&receipt.cycle.to_le_bytes());
+            hasher.update(&receipt.event_digest);
+            if *hasher.finalize().as_bytes() != receipt.chain_digest {
+                return false;
+            }
+
+            previous_sequence = Some(receipt.sequence);
+            previous_digest = Some(receipt.chain_digest);
+        }
+
+        previous_digest == Some(self.trace_head)
+    }
+
+    fn append_trace_receipt(
+        &mut self,
+        event_kind: &str,
+        action_id: u64,
+        cycle: u64,
+        event_digest: [u8; 32],
+    ) {
+        if self.max_trace == 0 {
+            return;
+        }
+
+        let sequence = self.trace_sequence;
+        let previous_digest = self.trace_head;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(VIABILITY_TRACE_DOMAIN);
+        hasher.update(&sequence.to_le_bytes());
+        trace_string(&mut hasher, event_kind);
+        hasher.update(&action_id.to_le_bytes());
+        hasher.update(&cycle.to_le_bytes());
+        hasher.update(&event_digest);
+        let chain_digest = *hasher.finalize().as_bytes();
+
+        if self.trace.len() >= self.max_trace {
+            self.trace.pop_front();
+        }
+        self.trace.push_back(ViabilityTraceReceipt {
+            sequence,
+            event_kind: event_kind.to_string(),
+            action_id,
+            cycle,
+            event_digest,
+            previous_digest,
+            chain_digest,
+        });
+        self.trace_head = chain_digest;
+        self.trace_sequence = self.trace_sequence.saturating_add(1);
+    }
+
+    fn append_trace_outcome(&mut self, outcome: &ActionOutcome) {
+        if self.max_trace == 0 {
+            return;
+        }
+
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(VIABILITY_TRACE_DOMAIN);
+        trace_string(&mut hasher, "outcome");
+        hasher.update(&outcome.action_id.to_le_bytes());
+        hasher.update(&outcome.cycle.to_le_bytes());
+        trace_string(&mut hasher, &outcome.action_label);
+        hasher.update(&outcome.pre_state_digest.to_le_bytes());
+        hasher.update(&outcome.post_state_digest.to_le_bytes());
+        hasher.update(&[outcome.authority_granted as u8, outcome.safety_gate_passed as u8]);
+        trace_error(&mut hasher, &outcome.prediction_error);
+        trace_effect(&mut hasher, &outcome.observed_effect);
+
+        match &outcome.prediction {
+            Some(prediction) => {
+                hasher.update(&[1]);
+                hasher.update(&prediction.action_id.to_le_bytes());
+                hasher.update(&prediction.pre_state_digest.to_le_bytes());
+                hasher.update(&prediction.cycle.to_le_bytes());
+                trace_string(&mut hasher, &prediction.action_label);
+                trace_delta(&mut hasher, &prediction.predicted_world_delta);
+                trace_delta(&mut hasher, &prediction.predicted_self_delta);
+                trace_delta(&mut hasher, &prediction.predicted_goal_delta);
+                hasher.update(&[prediction.authority_granted as u8]);
+            }
+            None => hasher.update(&[0]),
+        }
+
+        for evidence in &outcome.evidence_refs {
+            trace_string(&mut hasher, evidence);
+        }
+
+        self.append_trace_receipt(
+            "outcome",
+            outcome.action_id,
+            outcome.cycle,
+            *hasher.finalize().as_bytes(),
+        );
+    }
+
+    fn append_trace_cancellation(&mut self, cancellation: &PredictionCancellation) {
+        if self.max_trace == 0 {
+            return;
+        }
+
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(VIABILITY_TRACE_DOMAIN);
+        trace_string(&mut hasher, "cancellation");
+        hasher.update(&cancellation.action_id.to_le_bytes());
+        hasher.update(&cancellation.prediction_cycle.to_le_bytes());
+        hasher.update(&cancellation.cancellation_cycle.to_le_bytes());
+        trace_string(&mut hasher, &cancellation.reason);
+        for evidence in &cancellation.evidence_refs {
+            trace_string(&mut hasher, evidence);
+        }
+
+        self.append_trace_receipt(
+            "cancellation",
+            cancellation.action_id,
+            cancellation.cancellation_cycle,
+            *hasher.finalize().as_bytes(),
+        );
     }
 
     pub fn begin_cycle(&mut self, cycle: u64) {
@@ -690,7 +916,8 @@ impl ViabilityFabric {
         if self.max_outcomes > 0 && self.outcomes.len() >= self.max_outcomes {
             self.outcomes.remove(0);
         }
-        self.outcomes.push(outcome);
+        self.outcomes.push(outcome.clone());
+        self.append_trace_outcome(&outcome);
         Ok(())
     }
 
@@ -732,13 +959,15 @@ impl ViabilityFabric {
         if self.max_outcomes > 0 && self.cancellations.len() >= self.max_outcomes {
             self.cancellations.remove(0);
         }
-        self.cancellations.push(PredictionCancellation {
+        let cancellation = PredictionCancellation {
             action_id,
             prediction_cycle,
             cancellation_cycle,
             reason: reason.into(),
             evidence_refs,
-        });
+        };
+        self.cancellations.push(cancellation.clone());
+        self.append_trace_cancellation(&cancellation);
         Ok(())
     }
 }
