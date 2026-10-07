@@ -11267,6 +11267,50 @@ mod tests {
     }
 
     #[test]
+    fn configuration_swap_refuses_unexpected_inode_interposition() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-config-interposition-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let target = dir.join("configuration.nix");
+        let old = b"{ config = old; }
+";
+        let new = b"{ config = new; }
+";
+        std::fs::write(&target, old).unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        let swap = replace_configuration_atomically_blocking(&dir, &transaction_id, old, new)
+            .unwrap();
+
+        std::fs::remove_file(&target).unwrap();
+        std::fs::write(&target, b"{ config = interposed; }
+").unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        let error = finalize_configuration_swap_blocking(swap, true)
+            .expect_err("commit must refuse an unexpected target inode");
+        assert!(error.contains("inode changed before transaction finalization"));
+        assert_eq!(
+            std::fs::read(&target).unwrap(),
+            b"{ config = interposed; }
+"
+        );
+        assert!(
+            dir.join(format!(".configuration.nix.swap.{transaction_id}"))
+                .exists(),
+            "old inode must remain available for manual recovery"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn configuration_swap_rejects_stale_pre_state_without_mutating_target() {
         use std::os::unix::fs::PermissionsExt;
 
