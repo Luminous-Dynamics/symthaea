@@ -638,6 +638,12 @@ impl TransactionLedger {
                             line_number + 1
                         ));
                     }
+                    if event.artifact_commitment.is_some() {
+                        return Err(format!(
+                            "transaction ledger start event at line {} carries an artifact commitment",
+                            line_number + 1
+                        ));
+                    }
                     let record = JournalRecord {
                         transaction_id: event.transaction_id,
                         mutation: event.mutation,
@@ -669,6 +675,14 @@ impl TransactionLedger {
                             line_number + 1
                         )
                     })?;
+                    if event.artifact_commitment.is_some()
+                        && outcome != TransactionOutcome::ObservedSuccess
+                    {
+                        return Err(format!(
+                            "transaction ledger completion at line {} carries an artifact commitment without observed success",
+                            line_number + 1
+                        ));
+                    }
                     let Some(record) = records.get_mut(&event.request_id) else {
                         return Err(format!(
                             "transaction ledger completion at line {} has no prior start",
@@ -940,6 +954,9 @@ impl TransactionLedger {
     ) -> Result<(), String> {
         if artifact_commitment.is_some() && transaction.mutation != MutationKind::CreateImage {
             return Err("only create_image transactions may commit an artifact".into());
+        }
+        if artifact_commitment.is_some() && outcome != TransactionOutcome::ObservedSuccess {
+            return Err("image artifact commitment requires observed_success".into());
         }
         if let Some(artifact) = artifact_commitment.as_ref() {
             validate_artifact_commitment(artifact)?;
