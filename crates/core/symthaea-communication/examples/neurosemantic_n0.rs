@@ -1700,6 +1700,69 @@ fn main() -> Result<(), String> {
             .is_err()
     };
 
+    let remediation_uncertainty_sampling_frame_target_identity_substitution_blocked = {
+        let mut forged_frame = statistical_sampling_frame.clone();
+        forged_frame.target_population_manifest_hash =
+            symthaea_communication::content_hash(b"alternate-target-population");
+        let forged_frame_bytes =
+            serde_json::to_vec(&forged_frame).map_err(|e| e.to_string())?;
+
+        let mut forged_trace = statistical_selection_trace.clone();
+        forged_trace.sampling_frame_hash = forged_frame.fingerprint()?;
+        let forged_trace_bytes =
+            serde_json::to_vec(&forged_trace).map_err(|e| e.to_string())?;
+
+        let mut forged_execution = statistical_execution.clone();
+        forged_execution.sampling_frame_hash = forged_frame.fingerprint()?;
+        forged_execution.selection_trace_hash = forged_trace.fingerprint()?;
+        let forged_execution_bytes =
+            serde_json::to_vec(&forged_execution).map_err(|e| e.to_string())?;
+
+        let mut forged_design = statistical_design.clone();
+        forged_design.statistical_execution_hash = forged_execution.fingerprint()?;
+        let forged_design_bytes =
+            serde_json::to_vec(&forged_design).map_err(|e| e.to_string())?;
+
+        let mut forged_uncertainty = uncertainty_computation.clone();
+        forged_uncertainty.statistical_design_hash = forged_design.fingerprint()?;
+        let forged_uncertainty_bytes =
+            serde_json::to_vec(&forged_uncertainty).map_err(|e| e.to_string())?;
+
+        let mut forged_measurement = measurement.clone();
+        forged_measurement.measurements[0].uncertainty =
+            NeurosemanticRemediationUncertainty::Interval {
+                lower_numerator: 0,
+                upper_numerator: 6_577,
+                scale: 4,
+                confidence_level_bps: 9_500,
+                uncertainty_method_ref: "wilson-score-95-v1".into(),
+                uncertainty_computation_artifact_hash:
+                    symthaea_communication::content_hash(&forged_uncertainty_bytes),
+            };
+        let forged_measurement_bytes =
+            serde_json::to_vec(&forged_measurement).map_err(|e| e.to_string())?;
+        let mut forged_impact = remediation_impact.clone();
+        forged_impact.measurement_artifact_hash = forged_measurement.fingerprint()?;
+
+        forged_impact
+            .verify_measurement_computation_bundle_bytes(
+                &forged_measurement_bytes,
+                &computation_byte_refs,
+                &observation_set_byte_refs,
+                &population_manifest_byte_refs,
+                &[forged_uncertainty_bytes.as_slice()],
+                &uncertainty_assumption_byte_refs,
+                &[forged_design_bytes.as_slice()],
+                &[forged_frame_bytes.as_slice()],
+                &[
+                    forged_execution_bytes.as_slice(),
+                    forged_trace_bytes.as_slice(),
+                    statistical_randomness_commitment_bytes.as_slice(),
+                ],
+            )
+            .is_err()
+    };
+
     let remediation_uncertainty_inclusion_probability_substitution_blocked = {
         let mut forged_execution = statistical_execution.clone();
         forged_execution.inclusion_probabilities[0].probability_numerator = 0;
@@ -2726,6 +2789,8 @@ fn main() -> Result<(), String> {
             remediation_uncertainty_randomization_seed_format_blocked,
         "remediation_uncertainty_statistical_execution_substitution_blocked":
             remediation_uncertainty_statistical_execution_substitution_blocked,
+        "remediation_uncertainty_sampling_frame_target_identity_substitution_blocked":
+            remediation_uncertainty_sampling_frame_target_identity_substitution_blocked,
         "remediation_uncertainty_inclusion_probability_substitution_blocked":
             remediation_uncertainty_inclusion_probability_substitution_blocked,
         "remediation_uncertainty_noncanonical_probability_blocked":
