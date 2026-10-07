@@ -16,6 +16,21 @@ fn boundary_code() -> RandomLinearCode {
     ])
     .expect("boundary fixture")
 }
+/// Published fixture specification for the canonical [8,2,4] code.
+///
+/// These six parity checks are intentionally hand-specified from the fixture's
+/// defining invariant: bits 0..=3 are equal and bits 4..=7 are equal. This is
+/// not derived from the production parity-check constructor and therefore acts
+/// as a mathematical specification oracle for the finite fixture.
+const CANONICAL_BOUNDARY_CHECKS: [u8; 6] = [
+    0b0000_0011, // x0 + x1
+    0b0000_0110, // x1 + x2
+    0b0000_1100, // x2 + x3
+    0b0011_0000, // x4 + x5
+    0b0110_0000, // x5 + x6
+    0b1100_0000, // x6 + x7
+];
+
 
 fn hamming_distance(left: &BinaryCodeword, right: &BinaryCodeword) -> usize {
     left.words()
@@ -320,6 +335,71 @@ fn small_fixture_coset_leader_profile_matches_decoder_without_codeword_oracle() 
         profile.len(),
         1usize << code.dimension(),
     );
+}
+
+#[test]
+fn small_fixture_fixed_parity_check_spec_agrees_with_all_syndrome_oracles() {
+    let code = boundary_code();
+    let parity_check = ParityCheckMatrix::from_code(&code).expect("parity-check matrix");
+    let independent_checks = independent_parity_check_rows(&code);
+
+    assert_eq!(CANONICAL_BOUNDARY_CHECKS.len(), 6);
+    assert_eq!(parity_check.syndrome_dimension(), CANONICAL_BOUNDARY_CHECKS.len());
+    assert_eq!(independent_checks.len(), CANONICAL_BOUNDARY_CHECKS.len());
+
+    let mut buckets = [0usize; 64];
+    let mut zero_syndrome_members = 0usize;
+
+    for mask in 0u16..256 {
+        let fixed = canonical_boundary_syndrome(mask as u8);
+        let production = parity_check
+            .syndrome(&error_from_mask(mask as usize, code.dimension()))
+            .expect("same dimension")
+            .words()[0] as u8;
+        let independent = independent_syndrome(mask as u64, &independent_checks) as u8;
+
+        assert_eq!(
+            production, fixed,
+            "production syndrome diverged from fixed fixture specification: mask={mask:#x}"
+        );
+        assert_eq!(
+            independent, fixed,
+            "independent nullspace oracle diverged from fixed fixture specification: mask={mask:#x}"
+        );
+
+        buckets[fixed as usize] += 1;
+        if fixed == 0 {
+            zero_syndrome_members += 1;
+            assert!(
+                code.contains(&error_from_mask(mask as usize, code.dimension())),
+                "fixed zero-syndrome specification admitted a non-codeword: mask={mask:#x}"
+            );
+        }
+    }
+
+    assert_eq!(
+        buckets.iter().filter(|&&count| count != 0).count(),
+        64,
+        "fixed fixture specification did not expose the full syndrome space"
+    );
+    assert!(buckets.iter().all(|&count| count == 4));
+    assert_eq!(zero_syndrome_members, code.enumerate().len());
+    assert_eq!(zero_syndrome_members, 4);
+
+    println!(
+        "FIXED_SYNDROME_SPEC=dimension={};checks={};syndromes=64;fiber_size=4;kernel_size=4;production_matches=true;independent_matches=true;spec_oracle=true",
+        code.dimension(),
+        CANONICAL_BOUNDARY_CHECKS.len()
+    );
+}
+
+fn canonical_boundary_syndrome(mask: u8) -> u8 {
+    CANONICAL_BOUNDARY_CHECKS
+        .iter()
+        .enumerate()
+        .fold(0u8, |syndrome, (index, &check)| {
+            syndrome | ((((mask & check).count_ones() & 1) as u8) << index)
+        })
 }
 
 #[test]
