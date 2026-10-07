@@ -3406,7 +3406,8 @@ async fn write_installed_packages_sidecar(image_dir: &str) -> Result<(), String>
 
 fn freeze_image_namespace_blocking(image_dir: &str) -> Result<(), String> {
     use std::ffi::CString;
-    use std::os::unix::fs::{AsRawFd, FromRawFd, PermissionsExt};
+    use std::os::fd::{AsRawFd, FromRawFd};
+    use std::os::unix::fs::PermissionsExt;
 
     let directory = std::fs::OpenOptions::new()
         .read(true)
