@@ -344,6 +344,7 @@ pub use viability_micro_world::{
     MicroWorldScenario,
     MicroWorldSuiteReport,
     PersistencePredictor, WorldModelBridgePredictor,
+    DEFAULT_HORIZON_CONFIDENCE_DECAY,
 };
 
 // ── Imports (only what the struct definitions below require) ─────────────────
