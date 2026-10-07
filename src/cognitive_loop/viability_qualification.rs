@@ -972,7 +972,7 @@ fn evaluate_learning_response(
         }
 
         events.push(LearningResponseEvent {
-            cycle: shock_state.cycle.saturating_sub(1),
+            cycle: shock_state.cycle,
             action: *action,
             shock_state_digest: shock_state.digest(),
             shock_mae_before_update: before_mae,
