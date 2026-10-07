@@ -6108,6 +6108,7 @@ mod tests {
             schema_version: NEUROSEMANTIC_REMEDIATION_STATISTICAL_SAMPLING_FRAME_SCHEMA_VERSION,
             frame_ref: "census-frame-test".into(),
             source_dataset_manifest_hash: content_hash(b"dataset"),
+            target_population_manifest_hash: content_hash(b"target-population"),
             member_artifact_hashes: vec![subject_a.clone(), subject_b.clone()],
         };
         let execution = NeurosemanticRemediationStatisticalExecutionArtifact {
@@ -6148,16 +6149,52 @@ mod tests {
             study_protocol_hash: content_hash(b"protocol"),
             execution_revision: "b".repeat(40),
         };
-        assert!(validate_census_sampling_execution(&frame, &execution).is_ok());
+        let target_population_members =
+            BTreeSet::from([subject_a.clone(), subject_b.clone()]);
+        assert!(
+            validate_census_sampling_execution(
+                &frame,
+                &execution,
+                &target_population_members,
+            )
+            .is_ok()
+        );
 
         let mut missing_probability = execution.clone();
         missing_probability.inclusion_probabilities.pop();
         assert!(validate_census_sampling_execution(&frame, &missing_probability).is_err());
 
-        let mut invalid_probability = execution;
+        let mut invalid_probability = execution.clone();
         invalid_probability.inclusion_probabilities[1].probability_numerator = 1;
         invalid_probability.inclusion_probabilities[1].probability_denominator = 2;
-        assert!(validate_census_sampling_execution(&frame, &invalid_probability).is_err());
+        assert!(
+            validate_census_sampling_execution(
+                &frame,
+                &invalid_probability,
+                &target_population_members,
+            )
+            .is_err()
+        );
+
+        let mut alternate_target_population = target_population_members.clone();
+        alternate_target_population.insert(content_hash(b"not-in-target"));
+        assert!(
+            validate_census_sampling_execution(
+                &frame,
+                &execution,
+                &alternate_target_population,
+            )
+            .is_err()
+        );
+
+        let mut stale_frame = frame.clone();
+        stale_frame.schema_version = 1;
+        assert!(
+            NeurosemanticRemediationStatisticalSamplingFrameArtifact::from_json_bytes(
+                &serde_json::to_vec(&stale_frame).unwrap()
+            )
+            .is_err()
+        );
     }
 
     #[test]
