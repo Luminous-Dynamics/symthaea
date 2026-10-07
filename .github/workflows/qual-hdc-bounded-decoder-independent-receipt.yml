@@ -356,7 +356,7 @@ jobs:
             const attackCases = [
               ['verifier_ref', (e) => { e.contextRef = 'refs/heads/research/evil'; }],
               ['repository_id', (e) => { e.run.repository.id += 1; }],
-              ['run_workflow_id', (e) => { e.run.workflow_id += 1; }],
+              ['run_workflow_path', (e) => { e.run.path = 'untrusted/workflow.yml'; }],
               ['run_event', (e) => { e.run.event = 'push'; }],
               ['run_conclusion', (e) => { e.run.conclusion = 'failure'; }],
               ['run_head_sha', (e) => { e.run.head_sha = '0'.repeat(40); }],
