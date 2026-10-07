@@ -271,6 +271,52 @@ impl FepModule {
         }
     }
 
+    /// Refresh observational viability signals from canonical cognitive-loop state.
+    ///
+    /// This method is intentionally observational: it records current thermodynamic load,
+    /// prediction error, and evidence-adjusted prediction uncertainty without changing policy.
+    pub fn refresh_viability(
+        &mut self,
+        cycle: u64,
+        thermodynamic_load: f64,
+        average_prediction_error: f64,
+        prediction_confidence: f64,
+    ) {
+        self.viability_fabric.begin_cycle(cycle);
+        self.viability_fabric.observe_variable(
+            "thermodynamic_load",
+            super::viability_fabric::ViabilitySignal::new(
+                thermodynamic_load,
+                1.0,
+                cycle,
+                "cognitive_loop::thermodynamic_load",
+            ),
+            super::viability_fabric::ViabilityBand {
+                preferred: (0.0, 0.70),
+                tolerated: (0.0, 0.90),
+                critical: (0.0, 1.0),
+            },
+            None,
+        );
+
+        let errors = &mut self.viability_fabric.state_mut().prediction_errors;
+        errors.world = average_prediction_error.clamp(0.0, 1.0);
+
+        // A neutral prior is not itself a recovery condition. Only confidence below the
+        // existing trust floor contributes regulation pressure.
+        let trust_floor = 0.4_f64;
+        errors.model_confidence = if prediction_confidence < trust_floor {
+            ((trust_floor - prediction_confidence) / trust_floor).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+    }
+
+    /// Read the current viability telemetry snapshot.
+    pub fn viability_telemetry(&self) -> super::viability_fabric::ViabilityTelemetry {
+        self.viability_fabric.state().telemetry()
+    }
+
     /// Run ODE-based trajectory planning if enabled and at the right interval.
     ///
     /// Simulates forward trajectories for each available action using
