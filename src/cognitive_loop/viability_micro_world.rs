@@ -400,6 +400,38 @@ pub fn transition(state: MicroWorldObservation, action: MicroAction) -> MicroWor
     next.clamp()
 }
 
+
+/// Deterministic transition law used to model one explicitly revisable environmental fact.
+///
+/// The benchmark treats harvest yield as environment-specific knowledge that may change
+/// between regimes. All other action consequences remain identical to transition(), so
+/// the qualification layer can test revision latency without redefining the entire world.
+pub fn transition_with_harvest_yield_scale(
+    state: MicroWorldObservation,
+    action: MicroAction,
+    harvest_yield_scale: f64,
+) -> MicroWorldObservation {
+    let scale = if harvest_yield_scale.is_finite() {
+        harvest_yield_scale.clamp(0.0, 2.0)
+    } else {
+        1.0
+    };
+
+    if (scale - 1.0).abs() <= f64::EPSILON || action != MicroAction::Harvest {
+        return transition(state, action);
+    }
+
+    let mut next = state;
+    next.cycle = state.cycle.saturating_add(1);
+
+    let efficiency = 0.55 + 0.45 * (1.0 - state.threat);
+    next.energy += (0.17 * scale) * efficiency;
+    next.threat += 0.02 * state.threat;
+    next.integrity -= 0.015 + 0.025 * state.threat;
+    next.progress += 0.03 * efficiency * (1.0 - state.progress);
+    next.clamp()
+}
+
 /// Generalization report: predictor is adapted on one scenario and evaluated on a
 /// different scenario without further updates during the test phase.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
