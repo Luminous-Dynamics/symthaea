@@ -27,6 +27,7 @@ use symthaea_communication::{
     NeurosemanticRemediationObservationRecord,
     NeurosemanticRemediationObservationSetArtifact,
     NeurosemanticRemediationMetricComputationArtifact,
+    NeurosemanticRemediationUncertaintyComputationArtifact,
 };
 
 fn main() -> Result<(), String> {
