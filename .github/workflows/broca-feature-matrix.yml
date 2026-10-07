@@ -122,6 +122,8 @@ jobs:
           sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake
 
       - name: Audit frozen UniMorph snapshot
+        env:
+          BROCA_FREEZE_AUDIT_OUTPUT: target/broca-unimorph-freeze/receipt.json
         run: |
           set -o pipefail
           mkdir -p target/broca-unimorph-freeze
