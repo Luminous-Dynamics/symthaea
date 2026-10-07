@@ -460,6 +460,49 @@ fn rfc9942_crit_rejects_unknown_critical_header() {
     );
 }
 
+
+#[test]
+fn rfc9942_crit_cannot_reference_unprotected_receipt_parameters() {
+    // COSE crit labels identify parameters whose processing is mandatory and
+    // therefore must be present in the protected bucket. Header 396 (vdp) is
+    // unprotected by the RFC 9942 Receipt profile, so it must never be
+    // admitted into the critical set.
+    let receipt_protected = [
+        0xa3, // { alg: -7, vds: 1, crit: [396] }
+        0x01, 0x26,
+        0x19, 0x01, 0x8b, 0x01,
+        0x02, 0x81, 0x19, 0x01, 0x8c,
+    ];
+    let mut receipt = vec![0xd2, 0x84, 0x4f];
+    receipt.extend_from_slice(&receipt_protected);
+    receipt.extend_from_slice(&[0xa0, 0x40, 0x40]);
+
+    assert_eq!(
+        Rfc9942ReceiptEnvelope::from_cbor(&receipt),
+        Err(Rfc9942VdpError::CriticalHeaderNotProtected)
+    );
+
+    // Header 394 (receipts) is allowed in either outer protected or
+    // unprotected buckets, but once it is named by crit it must actually be
+    // in the protected bucket for this particular message.
+    let outer_protected = [
+        0xa2, // { alg: -7, crit: [394] }
+        0x01, 0x26,
+        0x02, 0x81, 0x19, 0x01, 0x8a,
+    ];
+    let mut outer = vec![0xd2, 0x84, 0x4f];
+    outer.extend_from_slice(&outer_protected);
+    outer.extend_from_slice(&[
+        0xa1, 0x19, 0x01, 0x8a, 0x80, // receipts in unprotected bucket
+        0xf6, 0x40,
+    ]);
+
+    assert_eq!(
+        Rfc9942SignatureWithReceipts::from_cbor(&outer),
+        Err(Rfc9942VdpError::CriticalHeaderNotProtected)
+    );
+}
+
 #[test]
 fn rfc9942_crit_rejects_unprotected_critical_header() {
     // Unprotected = {2: [999], 999: null}; crit may not be unprotected.
