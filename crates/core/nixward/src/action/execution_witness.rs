@@ -37,11 +37,6 @@ impl NixLiveExecutionWitnessV1 {
             .map_err(|error| {
                 format!("cannot derive execution authorization record provenance: {error}")
             })?;
-        let authorization_record_digest = authority
-            .authorization_record_digest()
-            .map_err(|error| {
-                format!("cannot derive execution authorization record provenance: {error}")
-            })?;
         let approval_request_id = authority.approval_request_id().to_string();
         let projection_digest = authority.projection_digest().to_string();
         if approval_request_id.is_empty() || projection_digest.is_empty() {
@@ -64,10 +59,6 @@ impl NixLiveExecutionWitnessV1 {
 
     pub fn action_intent_digest(&self) -> &str {
         &self.action_intent_digest
-    }
-
-    pub fn authorization_record_digest(&self) -> &str {
-        &self.authorization_record_digest
     }
 
     pub fn authorization_record_digest(&self) -> &str {
