@@ -112,15 +112,16 @@ TOKEN = env_required("GITHUB_TOKEN")
 REPOSITORY = env_required("REPOSITORY")
 REPOSITORY_ID = int(env_required("REPOSITORY_ID"))
 TRUST_ANCHOR_SHA = env_required("TRUST_ANCHOR_SHA")
-TRIGGER_RUN_ID = int(env_required("TRIGGER_RUN_ID"))
-TRIGGER_RUN_NAME = env_required("TRIGGER_RUN_NAME")
-TRIGGER_RUN_EVENT = env_required("TRIGGER_RUN_EVENT")
-TRIGGER_ACTIVITY_TYPE = env_required("TRIGGER_ACTIVITY_TYPE")
-TRIGGER_RUN_REPOSITORY_ID = int(env_required("TRIGGER_RUN_REPOSITORY_ID"))
-TRIGGER_RUN_HEAD_SHA = env_required("TRIGGER_RUN_HEAD_SHA")
-TRIGGER_RUN_HEAD_BRANCH = env_required("TRIGGER_RUN_HEAD_BRANCH")
+TRUST_ANCHOR_MODE = env_required("TRUST_ANCHOR_MODE")
+TRIGGER_RUN_ID = int(os.environ.get("TRIGGER_RUN_ID", "0") or "0")
+TRIGGER_RUN_NAME = os.environ.get("TRIGGER_RUN_NAME", "").strip()
+TRIGGER_RUN_EVENT = os.environ.get("TRIGGER_RUN_EVENT", "").strip()
+TRIGGER_ACTIVITY_TYPE = os.environ.get("TRIGGER_ACTIVITY_TYPE", "").strip()
+TRIGGER_RUN_REPOSITORY_ID = int(os.environ.get("TRIGGER_RUN_REPOSITORY_ID", "0") or "0")
+TRIGGER_RUN_HEAD_SHA = os.environ.get("TRIGGER_RUN_HEAD_SHA", "").strip()
+TRIGGER_RUN_HEAD_BRANCH = os.environ.get("TRIGGER_RUN_HEAD_BRANCH", "").strip()
 TRIGGER_RUN_CONCLUSION = os.environ.get("TRIGGER_RUN_CONCLUSION", "").strip()
-TRIGGER_RUN_ATTEMPT = int(env_required("TRIGGER_RUN_ATTEMPT"))
+TRIGGER_RUN_ATTEMPT = int(os.environ.get("TRIGGER_RUN_ATTEMPT", "0") or "0")
 
 
 def api_request(
@@ -526,32 +527,63 @@ def main() -> int:
     }
 
     try:
+        global TRIGGER_RUN_ID, TRIGGER_RUN_NAME, TRIGGER_RUN_EVENT
+        global TRIGGER_RUN_REPOSITORY_ID, TRIGGER_RUN_HEAD_SHA, TRIGGER_RUN_HEAD_BRANCH
+        global TRIGGER_RUN_CONCLUSION, TRIGGER_RUN_ATTEMPT
+
+        if TRUST_ANCHOR_MODE == "workflow_dispatch":
+            manual_run_id = int(env_required("MANUAL_WORKFLOW_RUN_ID"))
+            manual_run = api_request("GET", f"/actions/runs/{manual_run_id}")
+            TRIGGER_RUN_ID = manual_run_id
+            TRIGGER_RUN_NAME = str(manual_run.get("name", ""))
+            TRIGGER_RUN_EVENT = str(manual_run.get("event", ""))
+            TRIGGER_RUN_REPOSITORY_ID = int(manual_run.get("repository", {}).get("id") or 0)
+            TRIGGER_RUN_HEAD_SHA = str(manual_run.get("head_sha", ""))
+            TRIGGER_RUN_HEAD_BRANCH = str(manual_run.get("head_branch", ""))
+            TRIGGER_RUN_CONCLUSION = str(manual_run.get("conclusion") or "")
+            TRIGGER_RUN_ATTEMPT = int(manual_run.get("run_attempt") or 0)
+            TRIGGER_ACTIVITY_TYPE = "completed"
+            if (
+                TRIGGER_RUN_REPOSITORY_ID != REPOSITORY_ID
+                or TRIGGER_RUN_EVENT != "pull_request"
+                or TRIGGER_RUN_NAME not in REQUIRED_WORKFLOWS
+                or not TRIGGER_RUN_HEAD_SHA
+                or not TRIGGER_RUN_HEAD_BRANCH
+                or not TRIGGER_RUN_ATTEMPT
+            ):
+                raise StaleError(
+                    "manual workflow-run target is not a valid same-repository pull-request run"
+                )
+        else:
+            if TRIGGER_RUN_EVENT != "pull_request":
+                raise StaleError(f"triggering event is not pull_request: {TRIGGER_RUN_EVENT!r}")
+            if TRIGGER_ACTIVITY_TYPE not in {"requested", "in_progress", "completed"}:
+                raise StaleError(
+                    f"unexpected workflow_run activity type: {TRIGGER_ACTIVITY_TYPE!r}"
+                )
+
+            trigger_run = api_request("GET", f"/actions/runs/{TRIGGER_RUN_ID}")
+            if (
+                trigger_run.get("repository", {}).get("id") != REPOSITORY_ID
+                or TRIGGER_RUN_REPOSITORY_ID != REPOSITORY_ID
+                or trigger_run.get("id") != TRIGGER_RUN_ID
+                or trigger_run.get("name") != TRIGGER_RUN_NAME
+                or trigger_run.get("event") != TRIGGER_RUN_EVENT
+                or trigger_run.get("head_sha") != TRIGGER_RUN_HEAD_SHA
+                or trigger_run.get("head_branch") != TRIGGER_RUN_HEAD_BRANCH
+                or trigger_run.get("run_attempt") != TRIGGER_RUN_ATTEMPT
+                or (
+                    TRIGGER_ACTIVITY_TYPE == "completed"
+                    and trigger_run.get("conclusion") != TRIGGER_RUN_CONCLUSION
+                )
+                or not trigger_run.get("workflow_id")
+            ):
+                raise StaleError(
+                    "workflow_run event payload does not match authoritative GitHub run state"
+                )
+
         if TRIGGER_RUN_EVENT != "pull_request":
             raise StaleError(f"triggering event is not pull_request: {TRIGGER_RUN_EVENT!r}")
-        if TRIGGER_ACTIVITY_TYPE not in {"requested", "in_progress", "completed"}:
-            raise StaleError(
-                f"unexpected workflow_run activity type: {TRIGGER_ACTIVITY_TYPE!r}"
-            )
-
-        trigger_run = api_request("GET", f"/actions/runs/{TRIGGER_RUN_ID}")
-        if (
-            trigger_run.get("repository", {}).get("id") != REPOSITORY_ID
-            or TRIGGER_RUN_REPOSITORY_ID != REPOSITORY_ID
-            or trigger_run.get("id") != TRIGGER_RUN_ID
-            or trigger_run.get("name") != TRIGGER_RUN_NAME
-            or trigger_run.get("event") != TRIGGER_RUN_EVENT
-            or trigger_run.get("head_sha") != TRIGGER_RUN_HEAD_SHA
-            or trigger_run.get("head_branch") != TRIGGER_RUN_HEAD_BRANCH
-            or trigger_run.get("run_attempt") != TRIGGER_RUN_ATTEMPT
-            or (
-                TRIGGER_ACTIVITY_TYPE == "completed"
-                and trigger_run.get("conclusion") != TRIGGER_RUN_CONCLUSION
-            )
-            or not trigger_run.get("workflow_id")
-        ):
-            raise StaleError(
-                "workflow_run event payload does not match authoritative GitHub run state"
-            )
 
         if TRIGGER_ACTIVITY_TYPE in {"requested", "in_progress"}:
             receipt["qualification_result"] = "WAITING"
