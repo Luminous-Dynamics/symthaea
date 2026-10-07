@@ -163,18 +163,35 @@ async fn spawn_privileged_background_script(
         .stderr(std::process::Stdio::from(log_stderr))
         .spawn()
         .await?;
-    let pid = child.id().ok_or_else(|| {
-        std::io::Error::new(std::io::ErrorKind::Other, "spawned child has no observable PID")
-    })?;
 
-    let mut pid_file = std::fs::OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open(pid_path)?;
-    pid_file.write_all(format!("{pid}\n").as_bytes())?;
-    pid_file.sync_all()?;
-    drop(pid_file);
+    let Some(pid) = child.id() else {
+        let _ = child.kill().await;
+        let _ = child.wait().await;
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "spawned child has no observable PID",
+        ));
+    };
+
+    let pid_write_result = (|| -> Result<(), std::io::Error> {
+        let mut pid_file = std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(pid_path)?;
+        pid_file.write_all(format!("{pid}\n").as_bytes())?;
+        pid_file.sync_all()?;
+        Ok(())
+    })();
+
+    if let Err(error) = pid_write_result {
+        // The mutation has already been launched, but its durable process identity
+        // could not be recorded. Contain the child immediately; the caller will
+        // finalize the transaction as indeterminate and remove the namespace.
+        let _ = child.kill().await;
+        let _ = child.wait().await;
+        return Err(error);
+    }
 
     let status_path = status_path.to_string();
     tokio::spawn(async move {
