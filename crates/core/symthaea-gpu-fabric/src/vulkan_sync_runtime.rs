@@ -12,11 +12,14 @@
 use std::ffi::CString;
 
 use ash::{vk, Device, Entry, Instance};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{VulkanQueueId, VulkanSyncPlan};
 
 const VULKAN_SYNC_API_VERSION: u32 = vk::API_VERSION_1_3;
+const VULKAN_SYNC_RECEIPT_VERSION: u16 = 1;
+const VULKAN_SYNC_TIMEOUT_NS: u64 = 5_000_000_000;
 
 #[derive(Debug, Error)]
 pub enum VulkanSyncRuntimeError {
@@ -36,8 +39,67 @@ pub enum VulkanSyncRuntimeError {
     CompletionNotReached { queue: VulkanQueueId, value: u64, observed: u64 },
     #[error("runtime produced an unexpected submission count")]
     SubmissionCountMismatch,
+    #[error("unsupported synchronization receipt version {0}")]
+    UnsupportedReceiptVersion(u16),
+    #[error("synchronization plan digest does not match the receipt")]
+    PlanDigestMismatch,
+    #[error("receipt queue count does not match the synchronization plan")]
+    ReceiptQueueCountMismatch,
+    #[error("receipt submission count does not match the synchronization plan")]
+    ReceiptSubmissionCountMismatch,
+    #[error("receipt timeline value count does not match the synchronization plan")]
+    ReceiptValueCountMismatch,
+    #[error("receipt completion mismatch on queue {queue}: expected {expected}, observed {observed}")]
+    ReceiptCompletionMismatch { queue: u16, expected: u64, observed: u64 },
 }
 
+/// Verifiable evidence that every submitted timeline reached its expected value.
+///
+/// This receipt proves synchronization completion only. It does not assert GPU
+/// acceleration, hardware queue independence, or bare-metal device attachment.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VulkanSyncExecutionReceipt {
+    pub version: u16,
+    pub sync_plan_digest: String,
+    pub queue_count: u16,
+    pub submitted_nodes: u32,
+    pub expected_final_values: Vec<u64>,
+    pub observed_final_values: Vec<u64>,
+    pub vulkan_api_version: u32,
+}
+
+impl VulkanSyncExecutionReceipt {
+    pub fn verify_against(&self, plan: &VulkanSyncPlan) -> Result<(), VulkanSyncRuntimeError> {
+        if self.version != VULKAN_SYNC_RECEIPT_VERSION {
+            return Err(VulkanSyncRuntimeError::UnsupportedReceiptVersion(self.version));
+        }
+        let digest = plan.digest_hex().map_err(VulkanSyncRuntimeError::Plan)?;
+        if self.sync_plan_digest != digest {
+            return Err(VulkanSyncRuntimeError::PlanDigestMismatch);
+        }
+        if self.queue_count != plan.queue_count {
+            return Err(VulkanSyncRuntimeError::ReceiptQueueCountMismatch);
+        }
+        if self.submitted_nodes != plan.submissions.len() as u32 {
+            return Err(VulkanSyncRuntimeError::ReceiptSubmissionCountMismatch);
+        }
+        if self.expected_final_values.len() != usize::from(plan.queue_count)
+            || self.observed_final_values.len() != usize::from(plan.queue_count)
+        {
+            return Err(VulkanSyncRuntimeError::ReceiptValueCountMismatch);
+        }
+        for queue_index in 0..usize::from(plan.queue_count) {
+            if self.observed_final_values[queue_index] < self.expected_final_values[queue_index] {
+                return Err(VulkanSyncRuntimeError::ReceiptCompletionMismatch {
+                    queue: queue_index as u16,
+                    expected: self.expected_final_values[queue_index],
+                    observed: self.observed_final_values[queue_index],
+                });
+            }
+        }
+        Ok(())
+    }
+}
 /// Concrete Vulkan runtime for synchronization-only qualification.
 ///
 /// Every logical queue in the lowering plan is mapped onto this single actual
@@ -144,6 +206,13 @@ impl VulkanSyncRuntime {
     }
 
     pub fn execute(&mut self, plan: &VulkanSyncPlan) -> Result<Vec<u64>, VulkanSyncRuntimeError> {
+        Ok(self.execute_with_receipt(plan)?.0)
+    }
+
+    pub fn execute_with_receipt(
+        &mut self,
+        plan: &VulkanSyncPlan,
+    ) -> Result<(Vec<u64>, VulkanSyncExecutionReceipt), VulkanSyncRuntimeError> {
         plan.digest_hex().map_err(VulkanSyncRuntimeError::Plan)?;
         self.reset_semaphores()?;
         if plan.submissions.len() != plan.assignments.len() {
@@ -213,11 +282,12 @@ impl VulkanSyncRuntime {
                 .values(&final_wait_values);
             unsafe {
                 self.device
-                    .wait_semaphores(&wait_info, u64::MAX)
+                    .wait_semaphores(&wait_info, VULKAN_SYNC_TIMEOUT_NS)
                     .map_err(VulkanSyncRuntimeError::Vk)?;
             }
         }
 
+        let mut observed_values = vec![0_u64; self.semaphores.len()];
         for (index, (queue, semaphore)) in self.semaphores.iter().enumerate() {
             let expected = final_values.get(index).copied().unwrap_or(0);
             if expected == 0 {
@@ -228,6 +298,7 @@ impl VulkanSyncRuntime {
                     .get_semaphore_counter_value(*semaphore)
                     .map_err(VulkanSyncRuntimeError::Vk)?
             };
+            observed_values[index] = observed;
             if observed < expected {
                 return Err(VulkanSyncRuntimeError::CompletionNotReached {
                     queue: *queue,
@@ -237,7 +308,18 @@ impl VulkanSyncRuntime {
             }
         }
 
-        Ok(final_values)
+        let receipt = VulkanSyncExecutionReceipt {
+            version: VULKAN_SYNC_RECEIPT_VERSION,
+            sync_plan_digest: plan.digest_hex().map_err(VulkanSyncRuntimeError::Plan)?,
+            queue_count: plan.queue_count,
+            submitted_nodes: plan.submissions.len() as u32,
+            expected_final_values: final_values.clone(),
+            observed_final_values: observed_values,
+            vulkan_api_version: VULKAN_SYNC_API_VERSION,
+        };
+        receipt.verify_against(plan)?;
+
+        Ok((final_values, receipt))
     }
 
     fn reset_semaphores(&mut self) -> Result<(), VulkanSyncRuntimeError> {
