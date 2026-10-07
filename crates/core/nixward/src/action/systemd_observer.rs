@@ -10,7 +10,7 @@
 //! and never mints execution authority.
 
 use super::post_state::{
-    NixPostStateStabilitySampleV1, NixPostStateStabilityEvidenceV1,
+    NixPostStateStabilityEvidenceV1, NixPostStateStabilitySampleV1,
     NixServicePostStateObservationV1, NixSystemdJobEvidenceV1, NixSystemdJobTypeV1,
     NixSystemdUnitDefinitionIdentityV1, NixVerifiedPostStateObservationV1,
     NixVerifiedPostStateStabilityEvidenceV1,
@@ -299,13 +299,8 @@ impl NixSystemdReadOnlyObserverV1 {
             return Err(NixSystemdObserverErrorV1::JobCorrelationMismatch);
         }
         let completed_job = watcher.await_job_removed(job, timeout).await?;
-        self.observe_service_post_state_internal(
-            operation,
-            unit,
-            generation,
-            Some(completed_job),
-        )
-        .await
+        self.observe_service_post_state_internal(operation, unit, generation, Some(completed_job))
+            .await
     }
 
     /// Legacy convenience method.
@@ -324,12 +319,7 @@ impl NixSystemdReadOnlyObserverV1 {
     ) -> Result<NixVerifiedPostStateObservationV1, NixSystemdObserverErrorV1> {
         let watcher = self.arm_job_removed_watcher().await?;
         self.observe_service_post_state_for_prearmed_job(
-            operation,
-            unit,
-            generation,
-            watcher,
-            job,
-            timeout,
+            operation, unit, generation, watcher, job, timeout,
         )
         .await
     }
@@ -368,7 +358,8 @@ impl NixSystemdReadOnlyObserverV1 {
         &self,
         unit: &str,
     ) -> Result<NixVerifiedServiceDefinitionContentV1, NixSystemdObserverErrorV1> {
-        self.capture_service_definition_content_internal(unit, false).await
+        self.capture_service_definition_content_internal(unit, false)
+            .await
     }
 
     /// Capture service definition content and require a non-zero InvocationID
@@ -379,7 +370,8 @@ impl NixSystemdReadOnlyObserverV1 {
         &self,
         unit: &str,
     ) -> Result<NixVerifiedServiceDefinitionContentV1, NixSystemdObserverErrorV1> {
-        self.capture_service_definition_content_internal(unit, true).await
+        self.capture_service_definition_content_internal(unit, true)
+            .await
     }
 
     async fn capture_service_definition_content_internal(
@@ -423,17 +415,18 @@ impl NixSystemdReadOnlyObserverV1 {
         let post_owner = self.systemd_manager_owner().await?;
         let post_bus_id = self.dbus_bus_id().await?;
         let post_object_path = self.resolve_service_unit(&expected_unit).await?;
-        let (post_identity, post_need_daemon_reload, post_invocation_id) = if require_restart_invocation {
-            let (identity, need_daemon_reload, invocation_id) = self
-                .read_definition_identity_and_invocation_id(&post_object_path, &expected_unit)
-                .await?;
-            (identity, need_daemon_reload, invocation_id)
-        } else {
-            let (identity, need_daemon_reload) = self
-                .read_definition_identity(&post_object_path, &expected_unit)
-                .await?;
-            (identity, need_daemon_reload, None)
-        };
+        let (post_identity, post_need_daemon_reload, post_invocation_id) =
+            if require_restart_invocation {
+                let (identity, need_daemon_reload, invocation_id) = self
+                    .read_definition_identity_and_invocation_id(&post_object_path, &expected_unit)
+                    .await?;
+                (identity, need_daemon_reload, invocation_id)
+            } else {
+                let (identity, need_daemon_reload) = self
+                    .read_definition_identity(&post_object_path, &expected_unit)
+                    .await?;
+                (identity, need_daemon_reload, None)
+            };
         if post_need_daemon_reload {
             return Err(NixSystemdObserverErrorV1::DefinitionNeedsDaemonReload);
         }
@@ -507,10 +500,8 @@ impl NixSystemdReadOnlyObserverV1 {
         &self,
         object_path: &OwnedObjectPath,
         expected_unit: &str,
-    ) -> Result<
-        (NixSystemdUnitDefinitionIdentityV1, bool, Option<String>),
-        NixSystemdObserverErrorV1,
-    > {
+    ) -> Result<(NixSystemdUnitDefinitionIdentityV1, bool, Option<String>), NixSystemdObserverErrorV1>
+    {
         validate_unit_object_path(object_path)?;
         let properties = self
             .get_all_properties(object_path, SYSTEMD_UNIT_INTERFACE)
@@ -762,11 +753,8 @@ impl NixSystemdReadOnlyObserverV1 {
         let properties = self
             .get_all_properties(&path, SYSTEMD_UNIT_INTERFACE)
             .await?;
-        let observed_id = canonical_unit(&required_string(
-            &properties,
-            SYSTEMD_UNIT_INTERFACE,
-            "Id",
-        )?)?;
+        let observed_id =
+            canonical_unit(&required_string(&properties, SYSTEMD_UNIT_INTERFACE, "Id")?)?;
         if observed_id != expected_unit {
             return Err(NixSystemdObserverErrorV1::UnitIdentityMismatch {
                 requested: expected_unit,
@@ -842,9 +830,7 @@ impl NixSystemdReadOnlyObserverV1 {
             DBUS_INTERFACE,
         )
         .await?;
-        let owner: String = bus
-            .call("GetNameOwner", &(SYSTEMD_DESTINATION,))
-            .await?;
+        let owner: String = bus.call("GetNameOwner", &(SYSTEMD_DESTINATION,)).await?;
         validate_unique_owner(&owner)?;
         Ok(owner)
     }
@@ -935,7 +921,11 @@ impl NixSystemdJobHandleV1 {
         validate_unit_object_path(&self.unit_object_path)?;
         validate_unique_owner(&self.manager_owner)?;
         validate_bus_id_shape(&self.bus_id)?;
-        if !self.object_path.as_str().ends_with(&format!("/{}", self.id)) {
+        if !self
+            .object_path
+            .as_str()
+            .ends_with(&format!("/{}", self.id))
+        {
             return Err(NixSystemdObserverErrorV1::InvalidJobIdentity(
                 "job object path/Id mismatch".to_string(),
             ));
@@ -970,9 +960,11 @@ fn validate_manager_signal_sender(
     let actual = message
         .header()
         .sender()
-        .ok_or_else(|| NixSystemdObserverErrorV1::InvalidJobIdentity(
-            "JobRemoved signal has no sender".to_string(),
-        ))?
+        .ok_or_else(|| {
+            NixSystemdObserverErrorV1::InvalidJobIdentity(
+                "JobRemoved signal has no sender".to_string(),
+            )
+        })?
         .to_string();
     if actual != expected_owner {
         return Err(NixSystemdObserverErrorV1::JobCorrelationMismatch);
@@ -986,9 +978,7 @@ fn canonical_unit(unit: &str) -> Result<String, NixSystemdObserverErrorV1> {
         .map_err(|error| NixSystemdObserverErrorV1::InvalidServiceUnit(error.to_string()))
 }
 
-fn validate_unit_object_path(
-    path: &OwnedObjectPath,
-) -> Result<(), NixSystemdObserverErrorV1> {
+fn validate_unit_object_path(path: &OwnedObjectPath) -> Result<(), NixSystemdObserverErrorV1> {
     let value = path.as_str();
     if value.is_empty() || value.len() > 4096 || !value.starts_with(SYSTEMD_UNIT_PATH_PREFIX) {
         return Err(NixSystemdObserverErrorV1::InvalidJobIdentity(
@@ -998,9 +988,7 @@ fn validate_unit_object_path(
     Ok(())
 }
 
-fn job_id_from_object_path(
-    path: &OwnedObjectPath,
-) -> Result<u32, NixSystemdObserverErrorV1> {
+fn job_id_from_object_path(path: &OwnedObjectPath) -> Result<u32, NixSystemdObserverErrorV1> {
     validate_job_object_path(path)?;
     path.as_str()
         .strip_prefix(SYSTEMD_JOB_PATH_PREFIX)
@@ -1008,14 +996,14 @@ fn job_id_from_object_path(
             "job path is outside the systemd job namespace".to_string(),
         ))?
         .parse::<u32>()
-        .map_err(|_| NixSystemdObserverErrorV1::InvalidJobIdentity(
-            "job path does not encode a numeric ID".to_string(),
-        ))
+        .map_err(|_| {
+            NixSystemdObserverErrorV1::InvalidJobIdentity(
+                "job path does not encode a numeric ID".to_string(),
+            )
+        })
 }
 
-fn validate_job_object_path(
-    path: &OwnedObjectPath,
-) -> Result<(), NixSystemdObserverErrorV1> {
+fn validate_job_object_path(path: &OwnedObjectPath) -> Result<(), NixSystemdObserverErrorV1> {
     let value = path.as_str();
     if value.is_empty() || value.len() > 4096 || !value.starts_with(SYSTEMD_JOB_PATH_PREFIX) {
         return Err(NixSystemdObserverErrorV1::InvalidJobIdentity(
@@ -1032,7 +1020,10 @@ fn required_value<'a>(
 ) -> Result<&'a OwnedValue, NixSystemdObserverErrorV1> {
     properties
         .get(property)
-        .ok_or(NixSystemdObserverErrorV1::MissingProperty { interface, property })
+        .ok_or(NixSystemdObserverErrorV1::MissingProperty {
+            interface,
+            property,
+        })
 }
 
 fn required_string(
@@ -1141,9 +1132,7 @@ fn required_invocation_id(
     )?)
 }
 
-fn invocation_id_to_string(
-    bytes: Vec<u8>,
-) -> Result<Option<String>, NixSystemdObserverErrorV1> {
+fn invocation_id_to_string(bytes: Vec<u8>) -> Result<Option<String>, NixSystemdObserverErrorV1> {
     if bytes.len() != INVOCATION_ID_BYTES {
         return Err(NixSystemdObserverErrorV1::InvalidInvocationId);
     }
@@ -1179,7 +1168,9 @@ struct DefinitionFileObjectIdentity {
 }
 
 #[cfg(unix)]
-fn definition_file_identity(file: &std::fs::File) -> Result<DefinitionFileObjectIdentity, NixSystemdObserverErrorV1> {
+fn definition_file_identity(
+    file: &std::fs::File,
+) -> Result<DefinitionFileObjectIdentity, NixSystemdObserverErrorV1> {
     use std::os::unix::fs::MetadataExt;
     let metadata = file
         .metadata()
@@ -1230,9 +1221,9 @@ fn resolve_definition_content_open_path(
     path: &str,
 ) -> Result<(PathBuf, Option<String>), NixSystemdObserverErrorV1> {
     let source = Path::new(path);
-    let resolved = source.canonicalize().map_err(|error| {
-        NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string())
-    })?;
+    let resolved = source
+        .canonicalize()
+        .map_err(|error| NixSystemdObserverErrorV1::DefinitionContentIo(error.to_string()))?;
 
     if resolved != source {
         let store_root = Path::new("/nix/store/");
@@ -1277,7 +1268,11 @@ fn read_definition_content_file(
     let (second_len, second_digest) = hash_open_definition_file(&mut file)?;
     let after = definition_file_identity(&file)?;
 
-    if before != middle || middle != after || first_len != second_len || first_digest != second_digest {
+    if before != middle
+        || middle != after
+        || first_len != second_len
+        || first_digest != second_digest
+    {
         return Err(NixSystemdObserverErrorV1::DefinitionContentMutationDetected);
     }
 
@@ -1324,11 +1319,7 @@ fn build_definition_identity_from_properties(
     properties: &HashMap<String, OwnedValue>,
     expected_unit: &str,
 ) -> Result<NixSystemdUnitDefinitionIdentityV1, NixSystemdObserverErrorV1> {
-    let observed_id = canonical_unit(&required_string(
-        properties,
-        SYSTEMD_UNIT_INTERFACE,
-        "Id",
-    )?)?;
+    let observed_id = canonical_unit(&required_string(properties, SYSTEMD_UNIT_INTERFACE, "Id")?)?;
     let names = required_strings(properties, SYSTEMD_UNIT_INTERFACE, "Names")?;
     let canonical_names = names
         .iter()
@@ -1350,23 +1341,22 @@ fn build_definition_identity_from_properties(
 fn stability_sample_from_observation(
     observation: &NixServicePostStateObservationV1,
 ) -> Result<NixPostStateStabilitySampleV1, NixSystemdObserverErrorV1> {
-    let manager_owner = observation
-        .systemd_manager_owner
-        .as_deref()
-        .ok_or(NixSystemdObserverErrorV1::InvalidPostState(
+    let manager_owner = observation.systemd_manager_owner.as_deref().ok_or(
+        NixSystemdObserverErrorV1::InvalidPostState(
             "stability observation has no systemd manager owner".to_string(),
-        ))?;
+        ),
+    )?;
     Ok(NixPostStateStabilitySampleV1 {
         operation: observation.operation,
         unit: observation.unit.clone(),
         unit_object_path: observation.unit_object_path.clone(),
         observed_generation: observation.observed_generation,
-        definition_digest: observation.definition_digest().map_err(|error| {
-            NixSystemdObserverErrorV1::InvalidPostState(error.to_string())
-        })?,
-        state_digest: observation.state_digest().map_err(|error| {
-            NixSystemdObserverErrorV1::InvalidPostState(error.to_string())
-        })?,
+        definition_digest: observation
+            .definition_digest()
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?,
+        state_digest: observation
+            .state_digest()
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?,
         manager_owner: manager_owner.to_string(),
         invocation_id: observation.invocation_id.clone(),
         state_change_at_monotonic_us: observation.state_change_at_monotonic_us,
@@ -1393,11 +1383,7 @@ fn build_observation_from_properties(
         }
     }
 
-    let observed_id = canonical_unit(&required_string(
-        properties,
-        SYSTEMD_UNIT_INTERFACE,
-        "Id",
-    )?)?;
+    let observed_id = canonical_unit(&required_string(properties, SYSTEMD_UNIT_INTERFACE, "Id")?)?;
     let names = required_strings(properties, SYSTEMD_UNIT_INTERFACE, "Names")?;
     let canonical_names = names
         .iter()
@@ -1416,18 +1402,14 @@ fn build_observation_from_properties(
         SYSTEMD_UNIT_INTERFACE,
         "LoadState",
     )?)
-    .map_err(|_| {
-        NixSystemdObserverErrorV1::UnknownStateVocabulary("LoadState".to_string())
-    })?;
+    .map_err(|_| NixSystemdObserverErrorV1::UnknownStateVocabulary("LoadState".to_string()))?;
 
     let active_state = ServiceActiveStateV1::parse(&required_string(
         properties,
         SYSTEMD_UNIT_INTERFACE,
         "ActiveState",
     )?)
-    .map_err(|_| {
-        NixSystemdObserverErrorV1::UnknownStateVocabulary("ActiveState".to_string())
-    })?;
+    .map_err(|_| NixSystemdObserverErrorV1::UnknownStateVocabulary("ActiveState".to_string()))?;
 
     let sub_state = required_string(properties, SYSTEMD_UNIT_INTERFACE, "SubState")?;
     if sub_state.is_empty() {
@@ -1442,13 +1424,10 @@ fn build_observation_from_properties(
         SYSTEMD_UNIT_INTERFACE,
         "UnitFileState",
     )?)
-    .map_err(|_| {
-        NixSystemdObserverErrorV1::UnknownStateVocabulary("UnitFileState".to_string())
-    })?;
+    .map_err(|_| NixSystemdObserverErrorV1::UnknownStateVocabulary("UnitFileState".to_string()))?;
 
     let fragment_path = required_string(properties, SYSTEMD_UNIT_INTERFACE, "FragmentPath")?;
-    let drop_in_paths =
-        required_strings(properties, SYSTEMD_UNIT_INTERFACE, "DropInPaths")?;
+    let drop_in_paths = required_strings(properties, SYSTEMD_UNIT_INTERFACE, "DropInPaths")?;
     let state_change_at_monotonic_us = required_u64(
         properties,
         SYSTEMD_UNIT_INTERFACE,
@@ -1457,9 +1436,8 @@ fn build_observation_from_properties(
     let invocation_id = required_invocation_id(properties)?;
     let observed_at_monotonic_us = monotonic_now_us()?;
 
-    let definition_identity =
-        NixSystemdUnitDefinitionIdentityV1::new(fragment_path, drop_in_paths)
-            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
+    let definition_identity = NixSystemdUnitDefinitionIdentityV1::new(fragment_path, drop_in_paths)
+        .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
 
     if let Some(ref job) = job {
         let expected_job_type = NixSystemdJobTypeV1::for_operation(operation)
@@ -1524,7 +1502,7 @@ fn decode_job_removed(
 fn monotonic_now_us() -> Result<u64, NixSystemdObserverErrorV1> {
     #[cfg(target_os = "linux")]
     {
-        use nix::time::{clock_gettime, ClockId};
+        use nix::time::{ClockId, clock_gettime};
         let time = clock_gettime(ClockId::CLOCK_MONOTONIC).map_err(|_| {
             NixSystemdObserverErrorV1::InvalidPropertyValue {
                 interface: SYSTEMD_UNIT_INTERFACE,
@@ -1616,10 +1594,8 @@ mod tests {
 
     #[test]
     fn job_path_must_encode_id() {
-        let valid =
-            OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42").unwrap();
-        let bad =
-            OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/43").unwrap();
+        let valid = OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42").unwrap();
+        let bad = OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/43").unwrap();
         validate_job_object_path(&valid).unwrap();
         assert!(valid.as_str().ends_with("/42"));
         assert!(!bad.as_str().ends_with("/42"));
@@ -1627,10 +1603,8 @@ mod tests {
 
     #[test]
     fn unit_path_boundary_is_strict() {
-        let valid = OwnedObjectPath::try_from(
-            "/org/freedesktop/systemd1/unit/nginx_2eservice",
-        )
-        .unwrap();
+        let valid =
+            OwnedObjectPath::try_from("/org/freedesktop/systemd1/unit/nginx_2eservice").unwrap();
         let bad = OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42").unwrap();
         validate_unit_object_path(&valid).unwrap();
         assert!(validate_unit_object_path(&bad).is_err());
@@ -1655,8 +1629,7 @@ mod tests {
 
     #[test]
     fn job_handle_bus_incarnation_is_part_of_its_identity() {
-        let object_path =
-            OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42").unwrap();
+        let object_path = OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42").unwrap();
         let unit_object_path =
             OwnedObjectPath::try_from("/org/freedesktop/systemd1/unit/nginx_2eservice").unwrap();
 
@@ -1680,12 +1653,9 @@ mod tests {
 
     #[test]
     fn dispatched_job_id_parser_is_strict() {
-        let valid =
-            OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42").unwrap();
-        let zero =
-            OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/0").unwrap();
-        let bad =
-            OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/not-a-number").unwrap();
+        let valid = OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42").unwrap();
+        let zero = OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/0").unwrap();
+        let bad = OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/not-a-number").unwrap();
 
         assert_eq!(job_id_from_object_path(&valid).unwrap(), 42);
         assert!(job_id_from_object_path(&zero).is_err());
@@ -1694,8 +1664,7 @@ mod tests {
 
     #[test]
     fn job_handle_manager_owner_is_part_of_its_identity() {
-        let object_path =
-            OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42").unwrap();
+        let object_path = OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42").unwrap();
         let unit_object_path =
             OwnedObjectPath::try_from("/org/freedesktop/systemd1/unit/nginx_2eservice").unwrap();
 
@@ -1725,7 +1694,12 @@ mod tests {
             "JobRemoved",
         )
         .unwrap()
-        .build(&(42u32, "/org/freedesktop/systemd1/job/42", "nginx.service", "done"))
+        .build(&(
+            42u32,
+            "/org/freedesktop/systemd1/job/42",
+            "nginx.service",
+            "done",
+        ))
         .unwrap();
         // The sender field is absent on a locally constructed message. The
         // verifier must fail closed rather than treating absence as trusted.
