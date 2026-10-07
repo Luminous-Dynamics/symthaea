@@ -237,26 +237,14 @@ def load_policy() -> dict[str, Any]:
     return policy
 
 
-def approved_snapshot(policy: dict[str, Any], pr: dict[str, Any], changed_files: list[tuple[str | None, str | None]]) -> dict[str, Any]:
+def approved_snapshot(
+    policy: dict[str, Any],
+    pr: dict[str, Any],
+    pr_files: list[dict[str, Any]],
+) -> dict[str, Any]:
     approved = policy.get("approved_files")
     if not isinstance(approved, list) or not approved:
         raise VerificationError("independent trust policy has no approved file snapshot")
-
-    actual = [
-        {"path": name, "status": status, "blob_sha": next(
-            (
-                str(item.get("sha"))
-                for item in api_request(
-                    "GET",
-                    f"/pulls/{int(pr['number'])}/files",
-                    query={"per_page": "100", "page": "1"},
-                )
-                if False
-            ),
-            "",
-        )}
-        for name, status in []
-    ]
 
     expected_keys = {
         (item.get("path"), item.get("status"), item.get("blob_sha"))
@@ -264,18 +252,13 @@ def approved_snapshot(policy: dict[str, Any], pr: dict[str, Any], changed_files:
         if isinstance(item, dict)
     }
     if len(expected_keys) != len(approved):
-        raise VerificationError("independent trust policy contains malformed duplicate file entries")
+        raise VerificationError(
+            "independent trust policy contains malformed duplicate file entries"
+        )
 
     actual_keys = {
-        (name, status, next(
-            (
-                file_item.get("sha")
-                for file_item in policy["_runtime_pr_files"]
-                if file_item.get("filename") == name and file_item.get("status") == status
-            ),
-            None,
-        ))
-        for name, status in changed_files
+        (item.get("filename"), item.get("status"), item.get("sha"))
+        for item in pr_files
     }
     if actual_keys != expected_keys:
         raise VerificationError(
@@ -283,13 +266,21 @@ def approved_snapshot(policy: dict[str, Any], pr: dict[str, Any], changed_files:
         )
 
     if pr.get("number") != policy.get("pull_request"):
-        raise VerificationError("PR number does not match independently approved snapshot")
+        raise VerificationError(
+            "PR number does not match independently approved snapshot"
+        )
     if pr.get("base", {}).get("ref") != policy.get("base_branch"):
-        raise VerificationError("PR base branch does not match independently approved snapshot")
+        raise VerificationError(
+            "PR base branch does not match independently approved snapshot"
+        )
     if pr.get("base", {}).get("sha") != policy.get("base_sha"):
-        raise VerificationError("PR base SHA does not match independently approved snapshot")
+        raise VerificationError(
+            "PR base SHA does not match independently approved snapshot"
+        )
     if pr.get("head", {}).get("sha") != policy.get("approved_head_sha"):
-        raise VerificationError("PR head SHA does not match independently approved snapshot")
+        raise VerificationError(
+            "PR head SHA does not match independently approved snapshot"
+        )
 
     return {
         "schema_version": policy.get("schema_version"),
@@ -299,8 +290,6 @@ def approved_snapshot(policy: dict[str, Any], pr: dict[str, Any], changed_files:
         "approved_head_sha": policy.get("approved_head_sha"),
         "approved_files": approved,
     }
-
-
 def post_status(sha: str, state: str, description: str, target_url: str) -> None:
     api_request(
         "POST",
@@ -407,8 +396,7 @@ def main() -> int:
             for item in pr_files
         )
 
-        policy["_runtime_pr_files"] = pr_files
-        snapshot = approved_snapshot(policy, pr, changed_files)
+        snapshot = approved_snapshot(policy, pr, pr_files)
 
         relevant_files = [
             name
