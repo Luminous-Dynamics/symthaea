@@ -283,6 +283,7 @@ fn verify_qualification_workflow_pins() -> Result<Vec<String>> {
             let trimmed = line.trim_start();
             trimmed
                 .strip_prefix("- uses:")
+                .or_else(|| trimmed.strip_prefix("uses:"))
                 .map(str::trim)
                 .and_then(|value| value.split_whitespace().next())
                 .map(str::to_owned)
