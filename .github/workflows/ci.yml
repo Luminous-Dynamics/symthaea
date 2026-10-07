@@ -347,6 +347,20 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          # PR events default to GitHub's synthetic merge ref. This job is an
+          # exact-head qualification gate, so check out the contributor head
+          # SHA explicitly and never qualify the merged result as branch-head
+          # evidence.
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$EXPECTED_SHA"
+          echo "Exact checkout verified: $actual_sha"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
