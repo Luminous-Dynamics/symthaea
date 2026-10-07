@@ -55,6 +55,33 @@ EXPECTED_BROCA_JOBS = [
     "UniMorph frozen snapshot audit",
 ]
 
+EXPECTED_MATRIX_STEPS = [
+    "Verify runner-provided Rust bootstrap",
+    "Verify qualification action pins",
+    "Install Rust toolchain",
+    "Cache cargo registry and target",
+    "Verify locked dependency graph",
+    "Capture native toolchain context",
+    "Install system dependencies",
+    "Capture native package context",
+    "Run feature check",
+]
+
+EXPECTED_FREEZE_STEPS = [
+    "Verify runner-provided Rust bootstrap",
+    "Verify qualification action pins",
+    "Install Rust toolchain",
+    "Cache cargo registry and target",
+    "Verify locked dependency graph",
+    "Capture native toolchain context",
+    "Install system dependencies",
+    "Capture native package context",
+    "Audit frozen UniMorph snapshot",
+    "Attest structured freeze receipt",
+    "Preserve attestation bundle",
+    "Upload frozen UniMorph audit evidence",
+]
+
 REQUIRED_WORKFLOWS = {
     "Broca Feature Matrix": ".github/workflows/broca-feature-matrix.yml",
     "Workflow Syntax": ".github/workflows/workflow-syntax.yml",
@@ -268,18 +295,57 @@ def list_run_jobs(run_id: int) -> list[dict[str, Any]]:
 def verify_broca_jobs(run_id: int) -> dict[str, Any]:
     jobs = list_run_jobs(run_id)
 
-    outcomes: dict[str, list[str | None]] = []
+    outcomes: dict[str, Any] = {}
     for name in EXPECTED_BROCA_JOBS:
         matches = [job for job in jobs if job.get("name") == name]
-        outcomes[name] = [job.get("conclusion") for job in matches]
         if len(matches) != 1:
             raise VerificationError(
                 f"Broca job contract mismatch for {name!r}: expected one job, got {len(matches)}"
             )
-        if matches[0].get("conclusion") != "success":
+
+        job = matches[0]
+        if job.get("status") != "completed" or job.get("conclusion") != "success":
             raise VerificationError(
-                f"Broca job {name!r} is not successful: {matches[0].get('conclusion')!r}"
+                f"Broca job {name!r} is not successfully completed: "
+                f"status={job.get('status')!r}, conclusion={job.get('conclusion')!r}"
             )
+
+        expected_steps = (
+            EXPECTED_FREEZE_STEPS if name == "UniMorph frozen snapshot audit"
+            else EXPECTED_MATRIX_STEPS
+        )
+        step_matches: dict[str, list[dict[str, Any]]] = {}
+        for step_name in expected_steps:
+            step_matches[step_name] = [
+                step for step in (job.get("steps") or [])
+                if step.get("name") == step_name
+            ]
+            if len(step_matches[step_name]) != 1:
+                raise VerificationError(
+                    f"Broca job {name!r} step contract mismatch for {step_name!r}: "
+                    f"expected one step, got {len(step_matches[step_name])}"
+                )
+            step = step_matches[step_name][0]
+            if step.get("status") != "completed" or step.get("conclusion") != "success":
+                raise VerificationError(
+                    f"Broca job {name!r} critical step {step_name!r} did not complete successfully: "
+                    f"status={step.get('status')!r}, conclusion={step.get('conclusion')!r}"
+                )
+
+        outcomes[name] = {
+            "job_id": job.get("id"),
+            "status": job.get("status"),
+            "conclusion": job.get("conclusion"),
+            "steps": {
+                step_name: {
+                    "status": step_matches[step_name][0].get("status"),
+                    "conclusion": step_matches[step_name][0].get("conclusion"),
+                    "number": step_matches[step_name][0].get("number"),
+                    "completed_at": step_matches[step_name][0].get("completed_at"),
+                }
+                for step_name in expected_steps
+            },
+        }
 
     if len(jobs) != len(EXPECTED_BROCA_JOBS):
         raise VerificationError(
