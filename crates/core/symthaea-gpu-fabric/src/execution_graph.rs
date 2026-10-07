@@ -237,9 +237,13 @@ impl ExecutionGraph {
                 .ok_or(GraphError::UnknownNode(node_id))?;
 
             for &successor in &adjacency[node_index] {
-                reachability[node_index][successor / 64] |= 1_u64 << (successor % 64);
+                let (before, after) = reachability.split_at_mut(successor);
+                let current = &mut before[node_index];
+                let successor_row = &after[0];
+
+                current[successor / 64] |= 1_u64 << (successor % 64);
                 for word in 0..word_count {
-                    reachability[node_index][word] |= reachability[successor][word];
+                    current[word] |= successor_row[word];
                 }
             }
         }
@@ -618,17 +622,34 @@ mod tests {
 
     #[test]
     fn cycles_are_rejected() {
-        let a = resource("a");
-        let b = resource("b");
+        let shared = resource("shared");
         let graph = ExecutionGraph {
             version: EXECUTION_GRAPH_VERSION,
             nodes: vec![
-                ExecutionNode::new(1, op(8), vec![ResourceUse::new(a.clone(), AccessKind::Write)]),
-                ExecutionNode::new(2, op(8), vec![ResourceUse::new(b.clone(), AccessKind::Write)]),
+                ExecutionNode::new(
+                    1,
+                    op(8),
+                    vec![ResourceUse::new(shared.clone(), AccessKind::Write)],
+                ),
+                ExecutionNode::new(
+                    2,
+                    op(8),
+                    vec![ResourceUse::new(shared.clone(), AccessKind::Write)],
+                ),
             ],
             dependencies: vec![
-                DependencyEdge::new(1, 2, b, DependencyKind::WriteAfterWrite),
-                DependencyEdge::new(2, 1, a, DependencyKind::WriteAfterWrite),
+                DependencyEdge::new(
+                    1,
+                    2,
+                    shared.clone(),
+                    DependencyKind::WriteAfterWrite,
+                ),
+                DependencyEdge::new(
+                    2,
+                    1,
+                    shared,
+                    DependencyKind::WriteAfterWrite,
+                ),
             ],
         };
 
@@ -639,30 +660,28 @@ mod tests {
     }
 
     #[test]
-    fn every_conflicting_resource_must_be_ordered() {
+    fn one_node_order_can_protect_multiple_shared_resources() {
         let first = resource("first");
         let second = resource("second");
-        let nodes = vec![
-            ExecutionNode::new(
-                1,
-                op(8),
-                vec![
-                    ResourceUse::new(first.clone(), AccessKind::Write),
-                    ResourceUse::new(second.clone(), AccessKind::Write),
-                ],
-            ),
-            ExecutionNode::new(
-                2,
-                op(8),
-                vec![
-                    ResourceUse::new(first.clone(), AccessKind::Read),
-                    ResourceUse::new(second.clone(), AccessKind::Read),
-                ],
-            ),
-        ];
-
-        let error = ExecutionGraph::new(
-            nodes.clone(),
+        let graph = ExecutionGraph::new(
+            vec![
+                ExecutionNode::new(
+                    1,
+                    op(8),
+                    vec![
+                        ResourceUse::new(first.clone(), AccessKind::Write),
+                        ResourceUse::new(second.clone(), AccessKind::Write),
+                    ],
+                ),
+                ExecutionNode::new(
+                    2,
+                    op(8),
+                    vec![
+                        ResourceUse::new(first.clone(), AccessKind::Read),
+                        ResourceUse::new(second.clone(), AccessKind::Read),
+                    ],
+                ),
+            ],
             vec![DependencyEdge::new(
                 1,
                 2,
@@ -670,22 +689,9 @@ mod tests {
                 DependencyKind::ReadAfterWrite,
             )],
         )
-        .unwrap_err();
-
-        assert!(matches!(
-            error,
-            GraphError::UnorderedResourceConflict { resource, .. }
-            if resource == second
-        ));
-
-        ExecutionGraph::new(
-            nodes,
-            vec![
-                DependencyEdge::new(1, 2, resource("first"), DependencyKind::ReadAfterWrite),
-                DependencyEdge::new(1, 2, second, DependencyKind::ReadAfterWrite),
-            ],
-        )
         .unwrap();
+
+        assert_eq!(graph.topological_order().unwrap(), vec![1, 2]);
     }
 
     #[test]
