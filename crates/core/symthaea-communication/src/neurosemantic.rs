@@ -423,15 +423,26 @@ pub struct NeurosemanticRemediationSamplingInclusionProbability {
     pub probability_denominator: u64,
 }
 
+fn gcd_u64(mut left: u64, mut right: u64) -> u64 {
+    while right != 0 {
+        let remainder = left % right;
+        left = right;
+        right = remainder;
+    }
+    left
+}
+
 impl NeurosemanticRemediationSamplingInclusionProbability {
     fn validate(&self) -> Result<(), String> {
         if !valid_blake3_digest(&self.subject_artifact_hash)
             || self.probability_denominator == 0
             || self.probability_numerator == 0
             || self.probability_numerator > self.probability_denominator
+            || gcd_u64(self.probability_numerator, self.probability_denominator) != 1
         {
             return Err(
-                "neurosemantic remediation sampling inclusion probability is invalid".into(),
+                "neurosemantic remediation sampling inclusion probability is invalid or non-canonical"
+                    .into(),
             );
         }
         Ok(())
@@ -5568,6 +5579,15 @@ mod tests {
         );
         assert_eq!(design.fingerprint().unwrap(), content_hash(&bytes));
 
+        let mut stale_v1 = design.clone();
+        stale_v1.schema_version = 1;
+        assert!(
+            NeurosemanticRemediationStatisticalDesignArtifact::from_json_bytes(
+                &serde_json::to_vec(&stale_v1).unwrap()
+            )
+            .is_err()
+        );
+
         let mut legacy = design.clone();
         legacy.schema_version = 0;
         assert!(
@@ -5620,6 +5640,16 @@ mod tests {
         assert!(
             NeurosemanticRemediationStatisticalExecutionArtifact::from_json_bytes(
                 &serde_json::to_vec(&invalid_probability).unwrap()
+            )
+            .is_err()
+        );
+
+        let mut noncanonical_probability = execution.clone();
+        noncanonical_probability.inclusion_probabilities[0].probability_numerator = 2;
+        noncanonical_probability.inclusion_probabilities[0].probability_denominator = 2;
+        assert!(
+            NeurosemanticRemediationStatisticalExecutionArtifact::from_json_bytes(
+                &serde_json::to_vec(&noncanonical_probability).unwrap()
             )
             .is_err()
         );
