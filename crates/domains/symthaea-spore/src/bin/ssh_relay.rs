@@ -8593,7 +8593,8 @@ echo '}'
                     continue;
                 }
                 eprintln!("[{}] Searching packages: {}", peer_addr, query);
-                // Sanitize query: allow only alphanumeric, dash, underscore, dot, space
+                // Keep the historical query policy while removing the shell parser
+                // from the package-search authority boundary.
                 let safe_query: String = query
                     .chars()
                     .filter(|c| {
@@ -8609,14 +8610,10 @@ echo '}'
                         .await;
                     continue;
                 }
-                let cmd = format!(
-                    "nix search nixpkgs '{}' --json 2>/dev/null | head -c 50000",
-                    safe_query.replace('\'', "'\\''")
-                );
-                match run_cmd(&cmd).await {
+
+                let mut search_args = vec!["search", "nixpkgs", safe_query.as_str(), "--json"];
+                match run_privileged_args("nix", &search_args).await {
                     Ok(r) if r.exit_status == 0 && !r.stdout.trim().is_empty() => {
-                        // Parse nix search JSON: {"legacyPackages.x86_64-linux.pkgname": {"pname":"...", "description":"..."}, ...}
-                        // Extract just package names and descriptions
                         let mut results = Vec::new();
                         if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&r.stdout) {
                             if let Some(obj) = parsed.as_object() {
@@ -8627,10 +8624,8 @@ echo '}'
                                         .get("description")
                                         .and_then(|v| v.as_str())
                                         .unwrap_or("");
-                                    // Extract short attr name from legacyPackages.x86_64-linux.pkgname
-                                    let short_attr = attr.rsplit('.').next().unwrap_or(attr);
                                     results.push(serde_json::json!({
-                                        "attr": short_attr,
+                                        "attr": attr.rsplit('.').next().unwrap_or(attr),
                                         "pname": pname,
                                         "description": desc
                                     }));
@@ -8648,12 +8643,9 @@ echo '}'
                             .await;
                     }
                     Ok(r) => {
-                        // Fallback: nix-env query
-                        let fallback = format!(
-                            "nix-env -qaP '.*{}.*' 2>/dev/null | head -30",
-                            safe_query.replace('\'', "'\\''")
-                        );
-                        match run_cmd(&fallback).await {
+                        let pattern = format!(".*{}.*", safe_query);
+                        let fallback_args = ["-qaP", &pattern];
+                        match run_privileged_args("nix-env", &fallback_args).await {
                             Ok(r2) if r2.exit_status == 0 && !r2.stdout.trim().is_empty() => {
                                 let mut results = Vec::new();
                                 for line in r2.stdout.lines().take(30) {
@@ -8700,10 +8692,6 @@ echo '}'
                 }
             }
 
-            // ── Package Validation ──
-            // Pre-install check: verify package names exist in the target's nixpkgs.
-            // Sends comma-separated package names in `command` field.
-            // Returns { type: "package_validation", valid: [...], invalid: [...], suggestions: [...] }
             "validate_packages" => {
                 let packages_str = &client_msg.command;
                 if packages_str.is_empty() {
@@ -8736,24 +8724,16 @@ echo '}'
                     }
 
                     // Check if package exists in nixpkgs via nix eval
-                    let check_cmd = format!(
-                        "nix eval 'nixpkgs#{}' --json 2>/dev/null && echo 'EXISTS' || echo 'MISSING'",
-                        pkg_clean
-                    );
-                    match run_cmd(&check_cmd).await {
-                        Ok(r) => {
-                            if r.stdout.contains("EXISTS")
-                                || (r.exit_status == 0 && !r.stdout.contains("MISSING"))
-                            {
-                                valid.push(pkg_clean.clone());
-                            } else {
-                                invalid.push(pkg_clean.clone());
-                                // Try to find similar packages
-                                let suggest_cmd = format!(
-                                    "nix search nixpkgs '{}' --json 2>/dev/null | head -c 2000",
-                                    pkg_clean
-                                );
-                                if let Ok(sr) = run_cmd(&suggest_cmd).await {
+                    let attr = format!("nixpkgs#{}", pkg_clean);
+                    match run_privileged_args("nix", &["eval", &attr, "--json"]).await {
+                        Ok(r) if r.exit_status == 0 => {
+                            valid.push(pkg_clean.clone());
+                        }
+                        Ok(_) => {
+                            invalid.push(pkg_clean.clone());
+                            // Try to find similar packages.
+                            if let Ok(sr) =
+                                run_privileged_args("nix", &["search", "nixpkgs", &pkg_clean, "--json"]).await {
                                     if !sr.stdout.is_empty() && sr.stdout.trim() != "{}" {
                                         // Extract first few attribute names from JSON
                                         if let Ok(val) =
