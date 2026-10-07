@@ -5940,7 +5940,7 @@ mod tests {
             selection_procedure_ref:
                 NEUROSEMANTIC_REMEDIATION_SIMPLE_RANDOM_WITHOUT_REPLACEMENT_PROCEDURE_REF.into(),
             randomization_seed_hash: content_hash(
-                format!("{:064x}", 42).as_bytes(),
+                b"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
             ),
             study_protocol_hash: content_hash(b"protocol"),
             execution_revision: "a".repeat(40),
@@ -5982,9 +5982,12 @@ mod tests {
             content_hash(b"subject-3"),
             content_hash(b"subject-4"),
         ];
-        let first_seed = format!("{:064x}", 42);
-        let second_seed = format!("{:064x}", 42);
-        let alternate_seed = format!("{:064x}", 43);
+        let first_seed =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        let second_seed =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        let alternate_seed =
+            "1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
         let first = replay_simple_random_without_replacement(&frame, 2, &first_seed).unwrap();
         let second = replay_simple_random_without_replacement(&frame, 2, &second_seed).unwrap();
         let alternate =
@@ -5998,7 +6001,8 @@ mod tests {
 
     #[test]
     fn remediation_statistical_selection_trace_seed_is_bounded_and_versioned() {
-        let seed = format!("{:064x}", 42);
+        let seed =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string();
         assert!(valid_randomization_seed_hex(&seed));
         assert!(!valid_randomization_seed_hex(&"a".repeat(63)));
         assert!(!valid_randomization_seed_hex(&"A".repeat(64)));
