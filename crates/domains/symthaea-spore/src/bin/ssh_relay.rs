@@ -1176,20 +1176,24 @@ fn remove_transaction_artifact_dir(path: &str) {
 fn remove_transaction_artifact_dir_blocking(
     transaction_suffix: &str,
 ) -> Result<(), std::io::Error> {
-    use std::ffi::CStr;
+    use std::ffi::CString;
     use std::os::fd::{AsRawFd, FromRawFd};
-    use std::os::unix::ffi::OsStrExt;
-    use std::os::unix::fs::OpenOptionsExt;
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 
     let tmp_dir = std::fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open("/tmp")?;
 
-    let name = std::ffi::CString::new(format!(
+    let name = CString::new(format!(
         "nixforhumanity-transaction-{transaction_suffix}"
     ))
-    .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid transaction name"))?;
+    .map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "invalid transaction name",
+        )
+    })?;
 
     let root_fd = unsafe {
         libc::openat(
@@ -1204,7 +1208,6 @@ fn remove_transaction_artifact_dir_blocking(
 
     let root = unsafe { std::fs::File::from_raw_fd(root_fd) };
     let metadata = root.metadata()?;
-    use std::os::unix::fs::{MetadataExt, PermissionsExt};
     if !metadata.is_dir()
         || metadata.uid() != unsafe { libc::geteuid() }
         || metadata.permissions().mode() & 0o777 != 0o700
@@ -1214,10 +1217,33 @@ fn remove_transaction_artifact_dir_blocking(
             "transaction artifact directory failed ownership/type/mode checks",
         ));
     }
+    let root_dev = metadata.dev();
+    let root_ino = metadata.ino();
 
     remove_directory_contents_fd(root.as_raw_fd())?;
-    drop(root);
 
+    // Refuse to remove a different object if the world-writable /tmp name was
+    // replaced while cleanup was traversing the already-open directory.
+    let mut named_stat = unsafe { std::mem::zeroed::<libc::stat>() };
+    let stat_result = unsafe {
+        libc::fstatat(
+            tmp_dir.as_raw_fd(),
+            name.as_ptr(),
+            &mut named_stat,
+            libc::AT_SYMLINK_NOFOLLOW,
+        )
+    };
+    if stat_result != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    if named_stat.st_dev != root_dev as libc::dev_t || named_stat.st_ino != root_ino as libc::ino_t {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::WouldBlock,
+            "transaction artifact root changed during cleanup; refusing to remove replacement",
+        ));
+    }
+
+    drop(root);
     let result = unsafe {
         libc::unlinkat(
             tmp_dir.as_raw_fd(),
@@ -1231,10 +1257,21 @@ fn remove_transaction_artifact_dir_blocking(
     Ok(())
 }
 
+struct DirGuard(*mut libc::DIR);
+
+impl Drop for DirGuard {
+    fn drop(&mut self) {
+        if !self.0.is_null() {
+            unsafe {
+                libc::closedir(self.0);
+            }
+        }
+    }
+}
+
 fn remove_directory_contents_fd(dir_fd: libc::c_int) -> Result<(), std::io::Error> {
     use std::ffi::CStr;
     use std::os::fd::{AsRawFd, FromRawFd};
-    use std::os::unix::fs::OpenOptionsExt;
 
     let scan_fd = unsafe { libc::dup(dir_fd) };
     if scan_fd < 0 {
@@ -1247,6 +1284,7 @@ fn remove_directory_contents_fd(dir_fd: libc::c_int) -> Result<(), std::io::Erro
         unsafe { libc::close(scan_fd) };
         return Err(error);
     }
+    let _directory_guard = DirGuard(directory);
 
     loop {
         unsafe {
@@ -1255,7 +1293,6 @@ fn remove_directory_contents_fd(dir_fd: libc::c_int) -> Result<(), std::io::Erro
         let entry = unsafe { libc::readdir(directory) };
         if entry.is_null() {
             let errno = unsafe { *libc::__errno_location() };
-            unsafe { libc::closedir(directory) };
             if errno != 0 {
                 return Err(std::io::Error::from_raw_os_error(errno));
             }
@@ -1268,7 +1305,12 @@ fn remove_directory_contents_fd(dir_fd: libc::c_int) -> Result<(), std::io::Erro
             continue;
         }
         let child_name = std::ffi::CString::new(name_bytes)
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "directory entry contains NUL"))?;
+            .map_err(|_| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "directory entry contains NUL",
+                )
+            })?;
 
         let child_fd = unsafe {
             libc::openat(
@@ -1299,14 +1341,13 @@ fn remove_directory_contents_fd(dir_fd: libc::c_int) -> Result<(), std::io::Erro
             return Err(open_error);
         }
 
-        // Files and symlinks are never opened; unlinkat removes exactly the
-        // named directory entry relative to the already-open parent fd.
         let removed = unsafe { libc::unlinkat(dir_fd, child_name.as_ptr(), 0) };
         if removed != 0 {
             return Err(std::io::Error::last_os_error());
         }
     }
 }
+
 
 
 /// Generate Secure Boot setup commands (appended to install script when enabled).
