@@ -891,7 +891,12 @@ impl NeurosemanticRemediationMeasurementArtifact {
                     uncertainty_method_ref,
                     uncertainty_computation_artifact_hash,
                 } => {
+                    let proportion_scale_factor = 10_i64
+                        .checked_pow(scale)
+                        .ok_or_else(|| "neurosemantic remediation uncertainty scale is out of range".to_string())?;
                     if lower_numerator > upper_numerator
+                        || lower_numerator < 0
+                        || upper_numerator > proportion_scale_factor
                         || scale > 12
                         || scale != measurement.estimate_scale
                         || measurement.estimate_numerator < lower_numerator
