@@ -12,6 +12,7 @@ pub mod approver_evidence;
 pub mod authorization;
 pub mod config_writer;
 pub mod daemon_incarnation;
+pub(crate) mod execution_witness;
 pub mod executor;
 pub mod flake_ops;
 pub mod gc_manager;
