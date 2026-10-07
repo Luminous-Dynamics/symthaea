@@ -261,7 +261,7 @@ jobs:
                   event: 'pull_request',
                   conclusion: 'success',
                   head_branch: expected.branch,
-                  head_sha: expected.subject,
+                  head_sha: expected.mergeCommit,
                   pull_requests: [
                     {
                       number: expected.pr,
