@@ -643,11 +643,28 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
-        let head=match detached_payload {
-            Some(payload)=>self.verify_inclusion_with_detached_payload(candidate_entry,payload)?,
-            None=>self.verify_inclusion(candidate_entry)?,
+        let (head, signature_payload) = match (&self.payload, detached_payload) {
+            (Rfc9942ReceiptPayload::Attached(_), Some(_)) => {
+                return Err(Rfc9942VdpError::InvalidStructure);
+            }
+            (Rfc9942ReceiptPayload::Attached(_), None) => {
+                (self.verify_inclusion(candidate_entry)?, None)
+            }
+            (Rfc9942ReceiptPayload::Detached, supplied) => {
+                // Match the ES256 semantic path: the inclusion proof derives
+                // the root first. A supplied detached payload is accepted only
+                // when it equals that proof-derived root.
+                self.vdp.validate_vds_id(self.vds_id)?;
+                let head = self.vdp.derive_inclusion_root(candidate_entry)?;
+                if let Some(payload) = supplied {
+                    if payload != head.root() {
+                        return Err(Rfc9942VdpError::NoMatchingProof);
+                    }
+                }
+                (head, Some(head.root()))
+            }
         };
-        self.verify_ed25519(public_key,external_aad,detached_payload)?;
+        self.verify_ed25519(public_key, external_aad, signature_payload.as_ref().map(|root| root.as_slice()))?;
         Ok(head)
     }
 
