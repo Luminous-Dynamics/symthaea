@@ -5475,11 +5475,10 @@ async fn run_privileged_pipeline_to_gzip(
     })
 }
 
-async fn validate_preservation_archive(path: &str) -> Result<u64, String> {
-    use std::io::{Seek, SeekFrom};
+fn open_preservation_archive(path: &str) -> Result<(std::fs::File, u64), String> {
     use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 
-    let mut file = std::fs::OpenOptions::new()
+    let file = std::fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(path)
@@ -5497,7 +5496,15 @@ async fn validate_preservation_archive(path: &str) -> Result<u64, String> {
             "preservation archive {path} failed ownership, permission, or size checks"
         ));
     }
-    let expected_size = metadata.len();
+    Ok((file, metadata.len()))
+}
+
+async fn verify_preservation_archive_opened(
+    path: &str,
+    mut file: std::fs::File,
+    expected_size: u64,
+) -> Result<u64, String> {
+    use std::io::{Seek, SeekFrom};
 
     let gzip = run_privileged_args_with_stdin("gzip", &["-t", "--"], &file)
         .await
@@ -5516,6 +5523,11 @@ async fn validate_preservation_archive(path: &str) -> Result<u64, String> {
     }
 
     Ok(expected_size)
+}
+
+async fn validate_preservation_archive(path: &str) -> Result<u64, String> {
+    let (file, expected_size) = open_preservation_archive(path)?;
+    verify_preservation_archive_opened(path, file, expected_size).await
 }
 
 async fn preservation_tar_archive(
@@ -12100,6 +12112,50 @@ mod tests {
         let actual = read_process_start_time_ticks(pid).unwrap();
         assert!(process_id_is_alive(pid, actual));
         assert!(!process_id_is_alive(pid, actual.wrapping_add(1)));
+    }
+
+    #[tokio::test]
+    async fn preservation_verifier_consumes_preopened_archive_after_path_replacement() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-preservation-verify-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        std::fs::write(dir.join("payload"), b"preservation payload").unwrap();
+        let archive = dir.join("archive.tar.gz");
+        let archive_path = archive.to_str().unwrap();
+
+        let source = dir.to_str().unwrap().to_string();
+        let archive_arg = archive_path.to_string();
+        let tar = run_privileged_args(
+            "tar",
+            &["-czf", &archive_arg, "-C", &source, "payload"],
+        )
+        .await
+        .unwrap();
+        assert_eq!(tar.exit_status, 0, "tar fixture creation failed: {}", tar.stderr);
+
+        let (file, size) = open_preservation_archive(archive_path).unwrap();
+
+        std::fs::write(&archive, b"replacement-bytes").unwrap();
+        std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        let verified_size = verify_preservation_archive_opened(
+            archive_path,
+            file,
+            size,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(verified_size, size);
+        assert_eq!(std::fs::read(&archive).unwrap(), b"replacement-bytes");
+
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
