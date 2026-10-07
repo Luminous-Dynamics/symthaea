@@ -5770,6 +5770,7 @@ mod tests {
             outcome_model_ref: "binary-failure-indicator-v1".into(),
             study_protocol_hash: content_hash(b"protocol"),
             assumptions_hash: content_hash(b"assumptions"),
+            statistical_execution_hash: content_hash(b"execution"),
             execution_revision: "8".repeat(40),
         };
         assert!(validate_uncertainty_method_application(
@@ -5836,6 +5837,7 @@ mod tests {
             outcome_model_ref: "binary-failure-indicator-v1".into(),
             study_protocol_hash: content_hash(b"protocol"),
             assumptions_hash: content_hash(b"assumptions"),
+            statistical_execution_hash: content_hash(b"execution"),
             execution_revision: "9".repeat(40),
         };
         assert!(validate_uncertainty_method_application(
