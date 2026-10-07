@@ -27,6 +27,8 @@ The `README.md` at the same immutable commit identifies:
 
 README blob SHA at the same commit: `197564dd6bb45b2bcdad08428446ad2a5db6138d`.
 
+The exact compiler-input selection for this frozen artifact is recorded separately in `unimorph_eng_4_selection_manifest.md`.
+
 ## Qualification boundary
 
 The Git blob SHA, exact byte length, and BLAKE3 digest jointly identify the exact captured artifact bytes. This manifest does not claim corpus completeness, linguistic correctness, or canonical UniMorph feature ordering.
