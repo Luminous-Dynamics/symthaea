@@ -705,7 +705,8 @@ fn evaluate_cross_scenario_transfer(
     let worst_improvement_over_baseline = folds
         .iter()
         .map(|fold| fold.improvement_over_baseline)
-        .fold(f64::INFINITY, f64::min);
+        .reduce(f64::min)
+        .unwrap_or(0.0);
     let held_out_beats_persistence_rate = if folds.is_empty() {
         0.0
     } else {
