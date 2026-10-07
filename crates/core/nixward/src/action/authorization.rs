@@ -858,12 +858,15 @@ fn validate_service_definition_capture_binding(
         {
             return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
         }
-        if let NixActionDescriptorV1::Service { operation: NixServiceOperationKindV1::Restart, .. } =
-            intent.action
-        {
-            if context.pre_invocation_id.as_deref() != evidence.pre_invocation_id.as_deref() {
-                return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
+        if matches!(
+            &intent.action,
+            NixActionDescriptorV1::Service {
+                operation: NixServiceOperationKindV1::Restart,
+                ..
             }
+        ) && context.pre_invocation_id.as_deref() != evidence.pre_invocation_id.as_deref()
+        {
+            return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
         }
     }
 
