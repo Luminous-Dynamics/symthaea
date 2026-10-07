@@ -24,7 +24,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 43;
+pub const SCHEMA_VERSION: u16 = 44;
 /// Assessment algorithm version.
 pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-v62";
 
@@ -278,6 +278,13 @@ pub struct SourceAdmissionRef {
     pub admission_id: String,
     /// Authority epoch/generation under which the admission was issued.
     pub authority_epoch: String,
+    /// Optional digest binding this admission to the exact source subject.
+    ///
+    /// The bound subject is the source authority, artifact identity, artifact
+    /// digest, and issuer key fingerprint. Key rotation therefore requires a
+    /// new subject binding but does not create a new authority group.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_binding_digest: Option<String>,
     /// Optional canonical fault-domain identity supplied by the authority policy.
     pub fault_domain_id: Option<String>,
     /// Optional Unix timestamp from which the admission is valid.
@@ -317,6 +324,26 @@ impl SourceAdmissionRef {
 }
 
 impl EvidenceSourceIdentity {
+    /// Compute the canonical digest an admission must bind to this exact source subject.
+    ///
+    /// The admission reference itself is intentionally excluded to avoid recursive
+    /// self-reference. This binds authority, artifact identity, artifact digest,
+    /// and issuer-key fingerprint, while leaving authority-group identity anchored
+    /// only to the authority itself.
+    pub fn canonical_subject_binding_digest(&self) -> Result<String, AssessmentError> {
+        let bytes = serde_json::to_vec(&(
+            &self.authority_id,
+            &self.artifact_id,
+            &self.artifact_digest,
+            &self.issuer_key_fingerprint,
+        ))
+        .map_err(|_| AssessmentError::NonFinite)?;
+        let mut hasher = Hasher::new();
+        hasher.update(b"symthaea:source-admission-subject:v1\n");
+        hasher.update(&bytes);
+        Ok(hasher.finalize().to_hex().to_string())
+    }
+
     /// Validate the canonical source identity fields.
     pub fn validate(&self) -> Result<(), AssessmentError> {
         if self.authority_id.is_empty()
@@ -340,6 +367,15 @@ impl EvidenceSourceIdentity {
                     admission_authority_id: admission.authority_id.clone(),
                 });
             }
+            if let Some(actual_binding) = &admission.subject_binding_digest {
+                let expected_binding = self.canonical_subject_binding_digest()?;
+                if actual_binding != &expected_binding {
+                    return Err(AssessmentError::SourceAdmissionSubjectBindingMismatch {
+                        expected_binding,
+                        actual_binding: actual_binding.clone(),
+                    });
+                }
+            }
         }
         Ok(())
     }
@@ -355,12 +391,18 @@ impl EvidenceSourceIdentity {
         hasher.finalize().to_hex().to_string()
     }
 
-    /// Return authority diversity identity only when an external admission reference exists.
+    /// Return authority diversity identity only when the admission is bound to
+    /// this exact source subject.
     ///
-    /// Symthaea does not verify the admission cryptographically; the authoritative
-    /// admission/attestation boundary remains external.
+    /// An unbound admission reference remains provenance metadata but cannot
+    /// contribute to higher-tier authority diversity. Symthaea does not verify
+    /// the admission cryptographically; the authoritative admission/attestation
+    /// boundary remains external.
     pub fn admitted_authority_group_id(&self) -> Option<String> {
-        self.admission.as_ref().map(|_| self.authority_group_id())
+        let admission = self.admission.as_ref()?;
+        let actual_binding = admission.subject_binding_digest.as_ref()?;
+        let expected_binding = self.canonical_subject_binding_digest().ok()?;
+        (actual_binding == &expected_binding).then(|| self.authority_group_id())
     }
 }
 
@@ -7214,6 +7256,80 @@ mod tests {
     }
 
     #[test]
+    fn admission_subject_binding_tracks_exact_source_identity() {
+        let mut source = EvidenceSourceIdentity {
+            authority_id: "authority".into(),
+            artifact_id: "artifact".into(),
+            artifact_digest: "digest".into(),
+            issuer_key_fingerprint: Some("key-v1".into()),
+            admission: None,
+        };
+        let binding = source.canonical_subject_binding_digest().unwrap();
+        source.admission = Some(SourceAdmissionRef {
+            authority_id: "authority".into(),
+            policy_id: "policy".into(),
+            policy_revision: "r1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission".into(),
+            authority_epoch: "epoch-1".into(),
+            subject_binding_digest: Some(binding),
+            fault_domain_id: Some("domain-a".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+        assert!(source.validate().is_ok());
+        assert_eq!(
+            source.admitted_authority_group_id(),
+            Some(source.authority_group_id())
+        );
+
+        let mut artifact_changed = source.clone();
+        artifact_changed.artifact_id = "different-artifact".into();
+        assert!(matches!(
+            artifact_changed.validate().unwrap_err(),
+            AssessmentError::SourceAdmissionSubjectBindingMismatch { .. }
+        ));
+
+        let mut digest_changed = source.clone();
+        digest_changed.artifact_digest = "different-digest".into();
+        assert!(matches!(
+            digest_changed.validate().unwrap_err(),
+            AssessmentError::SourceAdmissionSubjectBindingMismatch { .. }
+        ));
+
+        let mut key_changed = source;
+        key_changed.issuer_key_fingerprint = Some("key-v2".into());
+        assert!(matches!(
+            key_changed.validate().unwrap_err(),
+            AssessmentError::SourceAdmissionSubjectBindingMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn unbound_admission_reference_cannot_count_as_admitted_authority() {
+        let source = EvidenceSourceIdentity {
+            authority_id: "authority".into(),
+            artifact_id: "artifact".into(),
+            artifact_digest: "digest".into(),
+            issuer_key_fingerprint: None,
+            admission: Some(SourceAdmissionRef {
+                authority_id: "authority".into(),
+                policy_id: "policy".into(),
+                policy_revision: "r1".into(),
+                policy_digest: "policy-digest".into(),
+                admission_id: "admission".into(),
+                authority_epoch: "epoch-1".into(),
+                subject_binding_digest: None,
+                fault_domain_id: Some("domain-a".into()),
+                valid_from_epoch_seconds: None,
+                valid_until_epoch_seconds: None,
+            }),
+        };
+        assert!(source.validate().is_ok());
+        assert_eq!(source.admitted_authority_group_id(), None);
+    }
+
+    #[test]
     fn source_admission_reference_validates_without_claiming_authenticity() {
         let mut source = EvidenceSourceIdentity {
             authority_id: "authority".into(),
@@ -7837,6 +7953,76 @@ mod tests {
         assert_eq!(
             result.candidates[0].qualification,
             QualificationState::ManufacturingQualified
+        );
+    }
+
+    #[test]
+    fn lifecycle_tier_accepts_two_distinct_subject_bound_authorities() {
+        let functional = evidence(
+            "functional",
+            "functional-source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut lifecycle_a = evidence(
+            "lifecycle-a",
+            "authority-a",
+            EvidenceKind::LifecycleAssessed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut lifecycle_b = evidence(
+            "lifecycle-b",
+            "authority-b",
+            EvidenceKind::LifecycleAssessed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+
+        for lifecycle in [&mut lifecycle_a, &mut lifecycle_b] {
+            lifecycle.source.admission = Some(SourceAdmissionRef {
+                authority_id: lifecycle.source.authority_id.clone(),
+                policy_id: "policy".into(),
+                policy_revision: "v1".into(),
+                policy_digest: "policy-digest".into(),
+                admission_id: format!("admission-{}", lifecycle.id),
+                authority_epoch: "epoch-1".into(),
+                subject_binding_digest: None,
+                fault_domain_id: Some(format!("domain-{}", lifecycle.id)),
+                valid_from_epoch_seconds: None,
+                valid_until_epoch_seconds: None,
+            });
+            let binding = lifecycle
+                .source
+                .canonical_subject_binding_digest()
+                .unwrap();
+            lifecycle
+                .source
+                .admission
+                .as_mut()
+                .unwrap()
+                .subject_binding_digest = Some(binding);
+        }
+
+        let mut c = candidate(
+            "two-subject-bound-lifecycle-authorities",
+            PathwayKind::MaterialSubstitution,
+            2.0,
+            2.0,
+            vec![functional, lifecycle_a, lifecycle_b],
+        );
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["lifecycle-a".into(), "lifecycle-b".into()];
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::LifecycleQualified
         );
     }
 
