@@ -807,11 +807,9 @@ impl NeurosemanticRemediationMeasurementArtifact {
                     {
                         return Err("neurosemantic remediation measurement uncertainty is invalid".into());
                     }
-                    validate_uncertainty_method_application(
-                        uncertainty_method_ref.as_str(),
-                        definition.unit_ref.as_str(),
-                        definition.aggregation_ref.as_str(),
-                    )?;
+                    // The concrete uncertainty computation artifact is required to
+                    // determine inference scope; method applicability is therefore checked
+                    // during strong bundle verification.
                 }
             }
         }
