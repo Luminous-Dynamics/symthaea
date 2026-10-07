@@ -4724,7 +4724,7 @@ mod tests {
                 uncertainty_budget_revision: "r1".into(),
                 uncertainty_budget_digest: "budget-digest-v1".into(),
                 component_set_digest: String::new(),
-                component_count: 1,
+                component_count: component_refs.len(),
                 calibration_chain_digest: "test-calibration-chain-digest".into(),
                 calibration_chain_count: 1,
                 measurement_model_id: "model-v1".into(),
