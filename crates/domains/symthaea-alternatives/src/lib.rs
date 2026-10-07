@@ -26,7 +26,7 @@ pub mod corpus;
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 45;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-v63";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-v64";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -775,8 +775,23 @@ impl ObservationProvenanceRef {
         if self.experimental_target_id.is_some() && self.experimental_design_id.is_none() {
             return Err(AssessmentError::InvalidObservationProvenance);
         }
+        let mut seen_calibration_links = BTreeSet::new();
         for calibration in &self.calibration_chain_refs {
             calibration.validate()?;
+            let identity = (
+                calibration.calibration_id.as_str(),
+                calibration.calibration_revision.as_str(),
+                calibration.calibration_record_digest.as_str(),
+                calibration.used_at_epoch_seconds,
+            );
+            if !seen_calibration_links.insert(identity) {
+                return Err(AssessmentError::DuplicateCalibrationTraceabilityLink {
+                    calibration_id: calibration.calibration_id.clone(),
+                    calibration_revision: calibration.calibration_revision.clone(),
+                    calibration_record_digest: calibration.calibration_record_digest.clone(),
+                    used_at_epoch_seconds: calibration.used_at_epoch_seconds,
+                });
+            }
         }
         if let Some(topology) = &self.calibration_topology {
             topology.validate_against_observation(
@@ -3644,6 +3659,17 @@ pub enum AssessmentError {
     CalibrationTraceabilityDeadEnd,
     /// A declared linear calibration-chain link is absent from the topology.
     CalibrationTraceabilityChainLinkMissing { calibration_id: String },
+    /// The ordered linear calibration traversal contains a duplicate exact link.
+    DuplicateCalibrationTraceabilityLink {
+        /// Calibration record identity.
+        calibration_id: String,
+        /// Calibration record revision.
+        calibration_revision: String,
+        /// Calibration record digest.
+        calibration_record_digest: String,
+        /// Link-use timestamp.
+        used_at_epoch_seconds: i64,
+    },
     /// An explicitly named reference node is missing.
     CalibrationTraceabilityReferenceMissing,
     /// The uncertainty evaluation's topology digest does not match the observation topology.
@@ -4110,7 +4136,16 @@ impl std::fmt::Display for AssessmentError {
                     f,
                     "calibration chain link {calibration_id} is missing from traceability topology"
                 )
-            }
+            },
+            Self::DuplicateCalibrationTraceabilityLink {
+                calibration_id,
+                calibration_revision,
+                calibration_record_digest,
+                used_at_epoch_seconds,
+            } => write!(
+                f,
+                "duplicate calibration traceability link {calibration_id}@{calibration_revision}/{calibration_record_digest} used at {used_at_epoch_seconds}"
+            )
             Self::CalibrationTraceabilityReferenceMissing => {
                 write!(f, "calibration traceability reference node is missing")
             }
@@ -7787,6 +7822,44 @@ mod tests {
         };
         assert!(source.validate().is_ok());
         assert_eq!(source.admitted_authority_group_id(), None);
+    }
+
+    #[test]
+    fn duplicate_calibration_traceability_link_fails_closed() {
+        let mut observation = ObservationProvenanceRef {
+            observation_id: "duplicate-link-observation".into(),
+            subject_id: "subject".into(),
+            activity_id: "activity".into(),
+            measurand_id: "measurand".into(),
+            procedure_id: "procedure".into(),
+            procedure_digest: "procedure-digest".into(),
+            record_digest: "record".into(),
+            measurement_system_id: Some("system".into()),
+            calibration_chain_refs: vec![
+                CalibrationTraceabilityRef {
+                    calibration_id: "calibration".into(),
+                    calibration_revision: "v1".into(),
+                    calibration_record_digest: "calibration-digest".into(),
+                    used_at_epoch_seconds: 1_700_000_000,
+                },
+                CalibrationTraceabilityRef {
+                    calibration_id: "calibration".into(),
+                    calibration_revision: "v1".into(),
+                    calibration_record_digest: "calibration-digest".into(),
+                    used_at_epoch_seconds: 1_700_000_000,
+                },
+            ],
+            calibration_topology: None,
+            experimental_design_id: None,
+            experimental_target_id: None,
+        };
+        assert!(matches!(
+            observation.validate().unwrap_err(),
+            AssessmentError::DuplicateCalibrationTraceabilityLink { .. }
+        ));
+
+        observation.calibration_chain_refs[1].used_at_epoch_seconds = 1_700_000_001;
+        observation.validate().unwrap();
     }
 
     #[test]
