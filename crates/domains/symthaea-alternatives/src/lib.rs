@@ -1980,13 +1980,18 @@ impl CandidatePathway {
                 })
                 .unwrap_or(false)
         });
-        let has_lifecycle_assessment = self.burdens.values().any(|estimate| {
-            self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy).any(|e| {
-                e.source.admission.is_some()
-                    && e.kind == EvidenceKind::LifecycleAssessed
-                    && e.stance == EvidenceStance::Supports
-                    && e.confidence >= 0.7
-            })
+        let all_dimensions_lifecycle_assessed = Dimension::ALL.iter().all(|dimension| {
+            self.burdens
+                .get(dimension)
+                .is_some_and(|estimate| {
+                    self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+                        .any(|e| {
+                            e.source.admission.is_some()
+                                && e.kind == EvidenceKind::LifecycleAssessed
+                                && e.stance == EvidenceStance::Supports
+                                && e.confidence >= 0.7
+                        })
+                })
         });
         let field_distinct_authority_sources = self
             .burdens
@@ -2106,7 +2111,7 @@ impl CandidatePathway {
         } else if any_supported_measurement
             && distinct_authority_sources >= 2
             && has_all_dimension_evidence
-            && has_lifecycle_assessment
+            && all_dimensions_lifecycle_assessed
         {
             QualificationState::LifecycleQualified
         } else if all_dimensions_supported_evidence {
@@ -7407,6 +7412,56 @@ mod tests {
             .unwrap_err();
 
         assert!(matches!(error, AssessmentError::EvidenceUnitMismatch { .. }));
+    }
+
+    #[test]
+    fn partial_lifecycle_evidence_cannot_raise_lifecycle_tier() {
+        let lifecycle = evidence(
+            "lca",
+            "lca-authority",
+            EvidenceKind::LifecycleAssessed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let observed_a = evidence(
+            "obs-a",
+            "authority-a",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let observed_b = evidence(
+            "obs-b",
+            "authority-b",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut c = candidate(
+            "partial-lca",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![lifecycle, observed_a, observed_b],
+        );
+        for (dimension, estimate) in &mut c.burdens {
+            estimate.evidence_ids = if *dimension == Dimension::Carbon {
+                vec!["lca".into()]
+            } else if *dimension == Dimension::Hazard {
+                vec!["obs-a".into()]
+            } else {
+                vec!["obs-b".into()]
+            };
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
     }
 
     #[test]
