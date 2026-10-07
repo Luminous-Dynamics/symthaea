@@ -197,14 +197,21 @@ The report distinguishes:
 - mean shock MAE before and after the update;
 - same-transition improvement and improvement rate;
 - neighboring-probe MAE before and after the update;
-- neighboring-probe improvement and improvement rate.
+- neighboring-probe improvement and improvement rate;
+- previously learned anchor MAE before and after the update;
+- anchor regression and regression rate.
 
 This separates three increasingly strong claims:
 
 **error detected** → **the exact error can be corrected** → **the correction transfers to a nearby state**.
 
+It also tests a fourth property:
+
+**adaptation without damaging previously learned dynamics**.
+
 The nearby probe is deliberately not part of the update. Improvement there is therefore stronger evidence of learned
-local dynamics than simply replaying the exact transition used for the update.
+local dynamics than simply replaying the exact transition used for the update. The anchor is also not part of the
+update; worsening on it is evidence of adaptation-induced forgetting.
 
 A negative or zero improvement is valid evidence too. The benchmark must not assume that adaptation succeeds.
 
@@ -360,6 +367,8 @@ This matters because a single favorable held-out scenario can be explained by sc
 | Procedural held-out transfer passes across all seeds | stronger evidence of generalization across sampled state/schedule/perturbation configurations, still bounded to this generator |
 | Same-shock learning improves but neighboring probes do not | adaptation may be memorizing observed transitions rather than learning transferable local dynamics |
 | Neighboring-probe improvement follows a shock update | stronger evidence that prediction error changes the model in a locally useful way |
+| Anchor error worsens after shock adaptation | adaptation is causing measurable regression/forgetting of previously learned dynamics |
+| Shock and neighbor improve while anchor remains stable | strongest current local evidence for useful, non-destructive adaptation |
 | Shock error does not improve after the update | the observed error is not yet producing effective model correction |
 
 No single metric is a synthetic-organism detector.
@@ -385,7 +394,8 @@ A future green qualification should report all of:
 14. leave-one-scenario-out transfer matrix and worst-fold result;
 15. environment-level counterfactual query-bank results, including path error and changed-channel F1;
 16. procedurally generated held-out transfer results and procedural-family manifest digest;
-17. prediction-error adaptation response, including same-transition and neighboring-probe improvement;
+17. prediction-error adaptation response, including same-transition correction, neighboring-probe transfer,
+and anchor regression;
 18. trace/invariant verification where action evidence is recorded.
 
 Queued CI is not a pass.
