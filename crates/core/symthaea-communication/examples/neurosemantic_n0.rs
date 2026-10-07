@@ -30,6 +30,7 @@ use symthaea_communication::{
     NeurosemanticRemediationEvaluationSplitManifest,
     NeurosemanticRemediationEvaluationSplitMember,
     NeurosemanticRemediationUncertaintyComputationArtifact,
+    NeurosemanticRemediationStatisticalDesignArtifact,
 };
 
 fn main() -> Result<(), String> {
