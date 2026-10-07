@@ -31,6 +31,7 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 2
+          persist-credentials: false
 
       - name: Record exact research head and parent
         id: head
@@ -47,7 +48,7 @@ jobs:
         run: |
           ACTUAL_SHA="$(git rev-parse HEAD)"
           PARENT_SHA="164d6b94d12bb72a902bdc2164d25cd540d3ba7f"
-          git fetch --no-tags --depth=1 origin "$PARENT_SHA"
+          git -c http.extraHeader="Authorization: Bearer $GH_TOKEN" fetch --no-tags --depth=1 "https://github.com/${GITHUB_REPOSITORY}.git" "$PARENT_SHA"
           test -n "$EVENT_HEAD_SHA"
           test "$EVENT_HEAD_REF" = "research/hdc-linear-code-bounded-decoder-v2"
           test "$EVENT_HEAD_REPO" = "$GITHUB_REPOSITORY"
@@ -523,7 +524,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
           HDC Linear-Code Bounded Decoder Qualification
           =============================================
-          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v15
+          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v16
           github_run_id=${{ github.run_id }}
           github_run_attempt=${{ github.run_attempt }}
           github_workflow_sha=${{ github.workflow_sha }}
@@ -537,6 +538,7 @@ jobs:
           source_repo=${{ steps.head.outputs.source_repo }}
           source_repo_id=${{ steps.head.outputs.source_repo_id }}
           canonical_repo=Luminous-Dynamics/symthaea
+          checkout_persist_credentials=false
           live_run_pr_head_repo_name=${{ steps.head.outputs.live_run_pr_head_repo_name }}
           live_run_pr_base_repo_name=${{ steps.head.outputs.live_run_pr_base_repo_name }}
           event_repo_id=${{ steps.head.outputs.event_repo_id }}
