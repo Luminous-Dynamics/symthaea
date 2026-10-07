@@ -1,0 +1,106 @@
+{
+  "schema": "relational-prediction-block-inference-simulation/v1",
+  "status": "research-diagnostic-only",
+  "candidate_statistic": {
+    "estimand": "E[origin_mean(loss_context - loss_relational)]",
+    "statistic": "sqrt(O) * mean(D_o) / sqrt(Bartlett_LRV(D_o))",
+    "null_bootstrap": "center origin means, then moving-block bootstrap over origin index",
+    "tail": "one-sided upper tail",
+    "not_a_formal_p_value": true
+  },
+  "null_distinction": {
+    "coefficient_null": "beta_relational = 0",
+    "coefficient_null_is_not_equal_risk_in_finite_sample": true,
+    "equal_risk_stress_targets_are_dgp_only": true,
+    "equal_risk_stress_targets": {
+      "iid": 0.085,
+      "ar05": 0.10,
+      "ar08": 0.14,
+      "ar05_heteroskedastic": 0.12
+    }
+  },
+  "geometry": {
+    "alpha": 0.05,
+    "bartlett_lag": 3,
+    "bootstrap_reps": 199,
+    "monte_carlo_reps": 120,
+    "gap_samples": 4,
+    "horizon": 1,
+    "origin_count": 24,
+    "ridge_lambda": 1e-8,
+    "step_samples": 16,
+    "test_samples": 16,
+    "train_samples": 48
+  },
+  "overlap": {
+    "formula": "1 + floor((train_samples - 1) / step_samples)",
+    "training_overlap_span_origins": 3,
+    "sensitivity_block_lengths": [3, 6]
+  },
+  "rng": "SplitMix64 + Rademacher innovations; pinned algorithm in research harness",
+  "scenarios": [
+    {
+      "scenario": "iid-coefficient-null",
+      "rho": 0.0,
+      "heteroskedastic": false,
+      "beta_relational": [0.0, 0.0, 0.0],
+      "mean_origin_mean_differential": -0.001887641838957537,
+      "block_lengths": [
+        {"block_length": 3, "reject_count": 0, "empirical_size": 0.0, "empirical_se_of_size": 0.0},
+        {"block_length": 6, "reject_count": 0, "empirical_size": 0.0, "empirical_se_of_size": 0.0}
+      ]
+    },
+    {
+      "scenario": "iid-equal-risk-calibrated",
+      "rho": 0.0,
+      "heteroskedastic": false,
+      "beta_relational": [0.085, 0.085, 0.085],
+      "mean_origin_mean_differential": 0.00011558199328134932,
+      "block_lengths": [
+        {"block_length": 3, "reject_count": 12, "empirical_size": 0.1, "empirical_se_of_size": 0.027386127875258306},
+        {"block_length": 6, "reject_count": 16, "empirical_size": 0.13333333333333333, "empirical_se_of_size": 0.03103164454170876}
+      ]
+    },
+    {
+      "scenario": "ar05-equal-risk-calibrated",
+      "rho": 0.5,
+      "heteroskedastic": false,
+      "beta_relational": [0.1, 0.1, 0.1],
+      "mean_origin_mean_differential": 0.0005144554352822694,
+      "block_lengths": [
+        {"block_length": 3, "reject_count": 10, "empirical_size": 0.08333333333333333, "empirical_se_of_size": 0.025230419617479096},
+        {"block_length": 6, "reject_count": 13, "empirical_size": 0.10833333333333334, "empirical_se_of_size": 0.028372113982779848}
+      ]
+    },
+    {
+      "scenario": "ar08-equal-risk-calibrated",
+      "rho": 0.8,
+      "heteroskedastic": false,
+      "beta_relational": [0.14, 0.14, 0.14],
+      "mean_origin_mean_differential": 0.0009814365899000561,
+      "block_lengths": [
+        {"block_length": 3, "reject_count": 13, "empirical_size": 0.10833333333333334, "empirical_se_of_size": 0.028372113982779848},
+        {"block_length": 6, "reject_count": 18, "empirical_size": 0.15, "empirical_se_of_size": 0.03259601202601325}
+      ]
+    },
+    {
+      "scenario": "ar05-heteroskedastic-equal-risk-calibrated",
+      "rho": 0.5,
+      "heteroskedastic": true,
+      "beta_relational": [0.12, 0.12, 0.12],
+      "mean_origin_mean_differential": 0.00035747404700377065,
+      "block_lengths": [
+        {"block_length": 3, "reject_count": 10, "empirical_size": 0.08333333333333333, "empirical_se_of_size": 0.025230419617479096},
+        {"block_length": 6, "reject_count": 14, "empirical_size": 0.11666666666666667, "empirical_se_of_size": 0.029305226433117632}
+      ]
+    }
+  ],
+  "interpretation": {
+    "approval": false,
+    "finding": "The origin-loss moving-block bootstrap is not adequately calibrated in the pilot equal-risk stress scenarios.",
+    "coefficient_null_finding": "The coefficient-null produces a negative finite-sample mean loss differential, demonstrating that zero incremental coefficients are not the same as equal forecast risk for the estimated nested methods.",
+    "next_methodological_candidate": "restricted-DGP nested rolling bootstrap with dependence-preserving error resampling and full refitting at every rolling origin",
+    "do_not_promote": true
+  },
+  "artifact_sha256": "25a85de9000a51953ff17edc96928d271d3e2f2496996bbd7016a89568a959d1"
+}
