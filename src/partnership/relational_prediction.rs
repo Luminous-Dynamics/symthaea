@@ -4486,7 +4486,6 @@ fn inference_selection_digest(receipt: &ForecastInferenceSelectionReceipt) -> St
 }
 
 fn inference_binding_digest(binding: &ForecastInferenceBinding) -> String {
-    let _ = binding.replay_verified;
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"relational-prediction-inference-binding/v1");
     hasher.update(b"qualification-replay-verified/v1");
@@ -5898,6 +5897,35 @@ mod tests {
         assert_eq!(
             ForecastInferenceSelectionPath::for_plan(&resampling_tampered),
             ForecastInferenceSelectionPath::StopAssumptionFailure
+        );
+    }
+
+    #[test]
+    fn canonical_estimator_applicability_is_exactly_pinned() {
+        let spec = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/docs/research/RELATIONAL_HARMONICS_INFERENCE_ESTIMATOR_APPLICABILITY_V1.json"
+        ));
+        let mut hasher = Sha256::new();
+        hasher.update(spec);
+        assert_eq!(
+            hex::encode(hasher.finalize()),
+            CANONICAL_INFERENCE_ESTIMATOR_APPLICABILITY_SPEC_SHA256
+        );
+
+        let value: serde_json::Value = serde_json::from_slice(spec).unwrap();
+        assert_eq!(
+            value["schema"],
+            "relational-prediction-inference-estimator-applicability/v1"
+        );
+        assert_eq!(value["status"], "not-approved-for-execution");
+        assert_eq!(
+            value["current_evaluator"]["estimator_id"],
+            CANONICAL_INFERENCE_ESTIMATOR_ID
+        );
+        assert_eq!(
+            value["execution_gate"]["current_selection"],
+            "stop-assumption-failure"
         );
     }
 
