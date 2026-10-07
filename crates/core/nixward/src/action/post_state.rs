@@ -847,6 +847,13 @@ impl NixPostStateReceiptV1 {
         if authorization.action_intent_digest != intent_digest {
             return Err(NixPostStateErrorV1::AuthorizationIntentMismatch);
         }
+        if self.systemd_bus_id.as_deref()
+            != intent
+                .service_effect_context()
+                .map(|context| context.authorized_bus_id.as_str())
+        {
+            return Err(NixPostStateErrorV1::BusIncarnationMismatch);
+        }
         authorization
             .validate_against_intent(intent)
             .map_err(|error| match error {
@@ -1699,6 +1706,8 @@ pub enum NixPostStateErrorV1 {
     AuthorizationIntentMismatch,
     #[error("receipt is bound to a different authorization record")]
     AuthorizationRecordMismatch,
+    #[error("observed D-Bus incarnation does not match the authorized Service incarnation")]
+    BusIncarnationMismatch,
     #[error("action intent does not describe the expected service effect")]
     IntentEffectMismatch,
     #[error("service effect has no bound pre-state identity")]
