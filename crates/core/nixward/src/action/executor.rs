@@ -925,7 +925,7 @@ impl NixOSExecutor {
     }
 
     /// Execute through the consumed live authority and return transient execution provenance.
-    pub(crate) async fn execute_authorized_with_witness(
+    pub async fn execute_authorized_with_witness(
         &mut self,
         command: NixOSCommand,
         authority: NixLocalExecutionAuthorityV1,
