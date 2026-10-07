@@ -3227,18 +3227,14 @@ async fn verify_service_postcondition(action: &str, service: &str) -> Result<boo
     verify_service_postcondition_typed(action, service).await
 }
 
-async fn create_btrfs_image_archive(image_dir: &str) -> Result<(), String> {
+async fn create_btrfs_image_archive(image_dir: &str) -> Result<bool, String> {
     let snapshot = format!("{image_dir}/root-snapshot");
     let archive = format!("{image_dir}/system.btrfs.zst");
 
     let snapshot_result =
         run_privileged_args("btrfs", &["subvolume", "snapshot", "-r", "/", &snapshot]).await?;
     if snapshot_result.exit_status != 0 {
-        return Err(format!(
-            "btrfs root snapshot unavailable (exit {}): {}",
-            snapshot_result.exit_status,
-            snapshot_result.stderr.chars().take(500).collect::<String>()
-        ));
+        return Ok(false);
     }
 
     let archive_file = create_private_runtime_file(&archive, 0o600)
@@ -3316,7 +3312,7 @@ async fn create_btrfs_image_archive(image_dir: &str) -> Result<(), String> {
         return Err("btrfs image archive is empty".into());
     }
 
-    Ok(())
+    Ok(true)
 }
 
 async fn create_tar_image_archive(image_dir: &str) -> Result<(), String> {
@@ -7990,8 +7986,7 @@ echo '}'
                         let _ = ws_tx
                             .send(Message::Text(
                                 RelayMessage::error(&format!(
-                                    "Another process currently owns the system mutation fence: {}",
-                                    error
+                                    "Another process currently owns the system mutation fence: {error}"
                                 ))
                                 .to_json(),
                             ))
@@ -7999,14 +7994,14 @@ echo '}'
                         continue;
                     }
                 };
+
                 let target_machine_digest = match machine_binding_digest_hex() {
                     Ok(digest) => digest,
                     Err(error) => {
                         let _ = ws_tx
                             .send(Message::Text(
                                 RelayMessage::error(&format!(
-                                    "Unable to establish target machine identity: {}",
-                                    error
+                                    "Unable to establish target machine identity: {error}"
                                 ))
                                 .to_json(),
                             ))
@@ -8014,6 +8009,7 @@ echo '}'
                         continue;
                     }
                 };
+
                 let Some(transaction) = admit_mutation_transaction(
                     &mut ws_tx,
                     &transaction_ledger,
@@ -8021,10 +8017,13 @@ echo '}'
                     &client_msg.request_id,
                     Some(&target_machine_digest),
                     b"create-system-image",
-                ).await else {
+                )
+                .await else {
                     continue;
                 };
-                let image_dest = format!("/tmp/nixforhumanity-image-{}", transaction.transaction_id);
+
+                let image_dest =
+                    format!("/tmp/nixforhumanity-image-{}", transaction.transaction_id);
                 eprintln!(
                     "[{}] {} Creating system image at {}...",
                     peer_addr,
@@ -8032,73 +8031,7 @@ echo '}'
                     image_dest
                 );
 
-                let script_template = r#"
-set -euo pipefail
-umask 077
-echo "STAGE: Creating system image..."
-DEST="__IMAGE_DEST__"
-mkdir -m 700 "$DEST"
-
-# Snapshot current btrfs root
-if btrfs subvolume snapshot -r / "$DEST/root-snapshot" 2>/dev/null; then
-    echo "Created btrfs read-only snapshot"
-    btrfs send "$DEST/root-snapshot" | zstd -3 -T0 > "$DEST/system.btrfs.zst"
-    SIZE=$(du -sh "$DEST/system.btrfs.zst" | awk '{print $1}')
-    echo "Image size: $SIZE"
-    btrfs subvolume delete "$DEST/root-snapshot" 2>/dev/null
-else
-    echo "btrfs snapshot not available, using tar..."
-    tar -czf "$DEST/system.tar.gz" --one-file-system --exclude=/tmp --exclude=/proc --exclude=/sys --exclude=/dev --exclude=/run / 2>/dev/null
-    SIZE=$(du -sh "$DEST/system.tar.gz" | awk '{print $1}')
-    echo "Image size: $SIZE"
-fi
-
-cp /etc/nixos/configuration.nix "$DEST/"
-cp /etc/nixos/hardware-configuration.nix "$DEST/" 2>/dev/null || true
-cp /etc/nixos/flake.nix "$DEST/" 2>/dev/null || true
-cp /etc/nixos/flake.lock "$DEST/" 2>/dev/null || true
-nix-env -qa --installed 2>/dev/null > "$DEST/installed-packages.txt" || true
-
-# Freeze the committed image namespace. The relay UID cannot mutate committed
-# files between provenance verification and restore.
-find "$DEST" -maxdepth 1 -type f -exec chmod 400 -- {} +
-chmod 500 "$DEST"
-
-echo "STAGE: Image complete"
-echo "Image saved to: $DEST"
-ls -la "$DEST/"
-echo "COMPLETE"
-"#;
-                let script = script_template.replace("__IMAGE_DEST__", &image_dest);
-                let transaction_dir = match create_transaction_artifact_dir(&transaction.transaction_id) {
-                    Ok(path) => path,
-                    Err(error) => {
-                        let outcome = finalize_transaction(
-                            &transaction_ledger,
-                            &transaction,
-                            TransactionOutcome::Indeterminate,
-                            &peer_addr,
-                        );
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                serde_json::json!({
-                                    "type":"exit",
-                                    "code": protocol_exit_code(1, outcome),
-                                    "data": format!("Image artifact namespace unavailable: {}", error),
-                                    "transaction": transaction.receipt(outcome)
-                                })
-                                .to_string(),
-                            ))
-                            .await;
-                        continue;
-                    }
-                };
-                let img_script = format!("{transaction_dir}/image.sh");
-                let img_log = format!("{transaction_dir}/image.log");
-                let img_status = format!("{transaction_dir}/image.status");
-                let img_pid = format!("{transaction_dir}/image.pid");
-
-                if let Err(error) = write_private_file(&img_script, script.as_bytes(), 0o700) {
+                if let Err(error) = create_private_directory(&image_dest) {
                     let outcome = finalize_transaction(
                         &transaction_ledger,
                         &transaction,
@@ -8109,43 +8042,13 @@ echo "COMPLETE"
                         .send(Message::Text(
                             serde_json::json!({
                                 "type":"exit",
-                                "code": protocol_exit_code(1, outcome),
-                                "data": format!("Image script staging could not be established: {}", error),
-                                "transaction": transaction.receipt(outcome)
+                                "code":protocol_exit_code(1, outcome),
+                                "data":format!("Unable to create image namespace: {error}"),
+                                "transaction":transaction.receipt(outcome)
                             })
                             .to_string(),
                         ))
                         .await;
-                    remove_transaction_artifact_dir(&transaction_dir);
-                    continue;
-                }
-
-                if let Err(error) = spawn_privileged_background_script(
-                    &img_script,
-                    &img_log,
-                    &img_status,
-                    &img_pid,
-                )
-                .await
-                {
-                    let outcome = finalize_transaction(
-                        &transaction_ledger,
-                        &transaction,
-                        TransactionOutcome::Indeterminate,
-                        &peer_addr,
-                    );
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            serde_json::json!({
-                                "type":"exit",
-                                "code": protocol_exit_code(1, outcome),
-                                "data": format!("Image creation launch could not be observed: {}", error),
-                                "transaction": transaction.receipt(outcome)
-                            })
-                            .to_string(),
-                        ))
-                        .await;
-                    remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
 
@@ -8162,130 +8065,227 @@ echo "COMPLETE"
                     ))
                     .await;
 
-                let mut last_lines = 0usize;
-                loop {
-                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                    if let Ok(bytes) = tokio::fs::read(&img_log).await {
-                        let text = String::from_utf8_lossy(&bytes);
-                        let lines: Vec<&str> = text.lines().collect();
-                        if lines.len() >= last_lines {
-                            for line in &lines[last_lines..] {
-                                if !line.trim().is_empty() {
-                                    let _ = ws_tx
-                                        .send(Message::Text(
-                                            RelayMessage::output(line, "stdout").to_json(),
-                                        ))
-                                        .await;
-                                }
-                            }
-                            last_lines = lines.len();
-                        }
+                let archive_result = match create_btrfs_image_archive(&image_dest).await {
+                    Ok(true) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::output(
+                                    "Created and archived btrfs snapshot.",
+                                    "stdout",
+                                )
+                                .to_json(),
+                            ))
+                            .await;
+                        Ok(())
                     }
-                    if read_transaction_status(&img_status)
-                        .await
-                        .ok()
-                        .flatten()
-                        .is_some()
+                    Ok(false) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::output(
+                                    "btrfs snapshot unavailable; using tar fallback.",
+                                    "stdout",
+                                )
+                                .to_json(),
+                            ))
+                            .await;
+                        create_tar_image_archive(&image_dest).await
+                    }
+                    Err(error) => Err(error),
+                };
+
+                if let Err(error) = archive_result {
+                    eprintln!(
+                        "[{}] {} image creation failed: {}",
+                        peer_addr,
+                        transaction.log_line(),
+                        error
+                    );
+                    let _ = std::fs::remove_dir_all(&image_dest);
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Failed,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type":"exit",
+                                "code":protocol_exit_code(1, outcome),
+                                "data":format!("Image creation failed: {error}"),
+                                "transaction":transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                for (source, required) in [
+                    ("/etc/nixos/configuration.nix", true),
+                    ("/etc/nixos/hardware-configuration.nix", false),
+                    ("/etc/nixos/flake.nix", false),
+                    ("/etc/nixos/flake.lock", false),
+                ] {
+                    if let Err(error) =
+                        copy_optional_image_sidecar(&image_dest, source, required).await
                     {
-                        break;
-                    }
-                    let pid = tokio::fs::read_to_string(&img_pid)
-                        .await
-                        .ok()
-                        .and_then(|text| text.trim().parse::<u32>().ok())
-                        .unwrap_or(0);
-                    if !process_id_is_alive(pid) {
-                        break;
+                        eprintln!(
+                            "[{}] {} image sidecar staging failed: {}",
+                            peer_addr,
+                            transaction.log_line(),
+                            error
+                        );
+                        let _ = std::fs::remove_dir_all(&image_dest);
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code":protocol_exit_code(1, outcome),
+                                    "data":format!("Image sidecar staging failed: {error}"),
+                                    "transaction":transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
                     }
                 }
 
-                let image_exit_code = read_transaction_status(&img_status)
-                    .await
-                    .ok()
-                    .flatten();
-                let (response_code, observed_outcome, image_commitment) = match image_exit_code {
-                    Some(0) => match verify_image_artifact(&image_dest).await {
-                        Ok(true) => match commit_image_bundle(&image_dest).await {
-                            Ok((archive, configuration)) => {
-                                (
-                                    0,
-                                    TransactionOutcome::ObservedSuccess,
-                                    Some((archive, configuration)),
-                                )
-                            }
-                            Err(error) => {
-                                eprintln!(
-                                    "[{}] {} image bundle commitment failed: {}",
-                                    peer_addr, transaction.log_line(), error
-                                );
-                                (1, TransactionOutcome::Indeterminate, None)
-                            }
-                        },
-                        Ok(false) => {
-                            eprintln!(
-                                "[{}] {} image command returned 0 but no non-empty image artifact was observed",
-                                peer_addr, transaction.log_line()
+                // Inventory is informational in the existing image schema.
+                if let Err(error) = write_installed_packages_sidecar(&image_dest).await {
+                    eprintln!(
+                        "[{}] {} installed package inventory unavailable: {}",
+                        peer_addr,
+                        transaction.log_line(),
+                        error
+                    );
+                }
+
+                if let Err(error) = freeze_image_namespace(image_dest.clone()).await {
+                    eprintln!(
+                        "[{}] {} image namespace freeze failed: {}",
+                        peer_addr,
+                        transaction.log_line(),
+                        error
+                    );
+                    let _ = std::fs::remove_dir_all(&image_dest);
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Indeterminate,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type":"exit",
+                                "code":protocol_exit_code(1, outcome),
+                                "data":format!("Image freeze failed: {error}"),
+                                "transaction":transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                match verify_image_artifact(&image_dest).await {
+                    Ok(true) => match commit_image_bundle(&image_dest).await {
+                        Ok((archive, configuration)) => {
+                            let outcome = finalize_transaction_with_artifacts(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::ObservedSuccess,
+                                archive.clone(),
+                                configuration.clone(),
+                                &peer_addr,
                             );
-                            (1, TransactionOutcome::Indeterminate, None)
+                            let durable = if outcome == TransactionOutcome::ObservedSuccess {
+                                Some((archive, configuration))
+                            } else {
+                                None
+                            };
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type":"exit",
+                                        "code":protocol_exit_code(0, outcome),
+                                        "transaction":transaction.receipt_with_image_artifacts(
+                                            outcome,
+                                            durable.as_ref().map(|(archive, _)| archive.clone()),
+                                            durable.as_ref().map(|(_, configuration)| configuration.clone()),
+                                        )
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
                         }
                         Err(error) => {
-                            eprintln!(
-                                "[{}] {} image postcondition probe failed: {}",
-                                peer_addr, transaction.log_line(), error
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Indeterminate,
+                                &peer_addr,
                             );
-                            (1, TransactionOutcome::Indeterminate, None)
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type":"exit",
+                                        "code":protocol_exit_code(1, outcome),
+                                        "data":format!("Image commitment failed: {error}"),
+                                        "transaction":transaction.receipt(outcome)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
                         }
                     },
-                    Some(code) => (code, TransactionOutcome::Failed, None),
-                    None => (1, TransactionOutcome::Indeterminate, None),
-                };
-                let outcome = if let Some((archive, configuration)) = image_commitment.as_ref() {
-                    finalize_transaction_with_artifacts(
-                        &transaction_ledger,
-                        &transaction,
-                        observed_outcome,
-                        archive.clone(),
-                        configuration.clone(),
-                        &peer_addr,
-                    )
-                } else {
-                    finalize_transaction(
-                        &transaction_ledger,
-                        &transaction,
-                        observed_outcome,
-                        &peer_addr,
-                    )
-                };
-                let durable_image_commitment =
-                    if outcome == TransactionOutcome::ObservedSuccess {
-                        image_commitment.clone()
-                    } else {
-                        None
-                    };
-
-                let _ = ws_tx
-                    .send(Message::Text(
-                        serde_json::json!({
-                            "type": "exit",
-                            "code": protocol_exit_code(response_code, outcome),
-                            "transaction": transaction.receipt_with_image_artifacts(
-                                outcome,
-                                durable_image_commitment
-                                    .as_ref()
-                                    .map(|(archive, _)| archive.clone()),
-                                durable_image_commitment
-                                    .as_ref()
-                                    .map(|(_, configuration)| configuration.clone()),
-                            )
-                        })
-                        .to_string(),
-                    ))
-                    .await;
-                let _ = tokio::fs::remove_file(&img_script).await;
-                let _ = tokio::fs::remove_file(&img_log).await;
-                let _ = tokio::fs::remove_file(&img_status).await;
-                let _ = tokio::fs::remove_file(&img_pid).await;
-                remove_transaction_artifact_dir(&transaction_dir);
+                    Ok(false) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code":protocol_exit_code(1, outcome),
+                                    "data":"Image postcondition did not qualify the produced artifact.",
+                                    "transaction":transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                    }
+                    Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code":protocol_exit_code(1, outcome),
+                                    "data":format!("Image postcondition failed: {error}"),
+                                    "transaction":transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                    }
+                }
             }
 
             "restore_image" => {
