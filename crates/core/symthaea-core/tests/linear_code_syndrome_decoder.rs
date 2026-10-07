@@ -16,6 +16,7 @@ fn boundary_code() -> RandomLinearCode {
     ])
     .expect("boundary fixture")
 }
+
 /// Published fixture specification for the canonical [8,2,4] code.
 ///
 /// These six parity checks are intentionally hand-specified from the fixture's
@@ -30,7 +31,6 @@ const CANONICAL_BOUNDARY_CHECKS: [u8; 6] = [
     0b0110_0000, // x5 + x6
     0b1100_0000, // x6 + x7
 ];
-
 
 fn hamming_distance(left: &BinaryCodeword, right: &BinaryCodeword) -> usize {
     left.words()
