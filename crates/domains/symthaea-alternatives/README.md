@@ -86,6 +86,8 @@ The assessment receipt also binds a canonical BLAKE3 digest of the complete evid
 
 Source admission is authority-bound: an EvidenceSourceIdentity whose admission reference names a different authority is rejected. This keeps authority admission from becoming a detached capability token that could be attached to an unrelated source identity.
 
+An admission reference can now contribute to higher-tier authority diversity only when it is subject-bound. `SourceAdmissionRef.subject_binding_digest` commits the admission to the exact source authority, artifact identity, artifact digest, and issuer-key fingerprint using a domain-separated canonical digest. A missing subject binding remains ordinary provenance metadata but cannot count as an admitted authority; a mismatched binding fails closed. This prevents a valid admission from being replayed onto a different artifact or source revision, while issuer-key rotation still remains within the same authority group.
+
 
 ## Experimental-design provenance
 
