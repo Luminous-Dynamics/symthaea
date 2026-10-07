@@ -90,7 +90,12 @@ impl NixVerifiedPostStateObservationV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixSystemdJobEvidenceV1 {
     pub id: u32,
+    /// JobType implied by the exact typed dispatch operation.
     pub job_type: NixSystemdJobTypeV1,
+    /// Independently observed from the live Job object when it remained queryable.
+    /// None means the Job completed/disappeared before JobType could be observed.
+    #[serde(default)]
+    pub observed_job_type: Option<NixSystemdJobTypeV1>,
     /// Canonical unit name carried by systemd's JobRemoved signal.
     pub unit: String,
     /// Unique D-Bus owner of org.freedesktop.systemd1 for this job epoch.
@@ -134,6 +139,10 @@ impl NixSystemdJobEvidenceV1 {
 
     pub fn succeeded(&self) -> bool {
         self.result == "done"
+    }
+
+    pub fn observed_job_type(&self) -> Option<NixSystemdJobTypeV1> {
+        self.observed_job_type
     }
 }
 
@@ -558,6 +567,9 @@ pub struct NixPostStateReceiptV1 {
     pub operation: NixServiceOperationKindV1,
     pub systemd_job_id: Option<u32>,
     pub systemd_job_type: Option<NixSystemdJobTypeV1>,
+    /// Independently observed JobType from the live systemd Job object, when available.
+    #[serde(default)]
+    pub systemd_job_type_observed: Option<NixSystemdJobTypeV1>,
     pub systemd_job_unit: Option<String>,
     pub systemd_job_object_path: Option<String>,
     pub systemd_job_result: Option<String>,
@@ -739,6 +751,10 @@ impl NixPostStateReceiptV1 {
         let (
             systemd_job_id,
             systemd_job_type,
+            systemd_job_type_observed: observation
+                .systemd_job
+                .as_ref()
+                .and_then(|job| job.observed_job_type()),
             systemd_job_unit,
             systemd_job_object_path,
             systemd_job_result,
