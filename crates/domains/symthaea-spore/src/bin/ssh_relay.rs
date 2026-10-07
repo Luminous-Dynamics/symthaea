@@ -7424,20 +7424,22 @@ echo "COMPLETE"
                     transaction.log_line(),
                     image_path
                 );
+                let restore_artifact_step = match image_artifact_commitment.name.as_str() {
+                    "system.btrfs.zst" => {
+                        "echo \"Restoring committed btrfs snapshot...\"; zstd -d \"{path}/system.btrfs.zst\" | btrfs receive /mnt/ 2>&1"
+                    }
+                    "system.tar.gz" => {
+                        "echo \"Restoring committed tar archive...\"; tar -xzf \"{path}/system.tar.gz\" -C /mnt/ 2>&1"
+                    }
+                    _ => {
+                        unreachable!("artifact commitment validator must accept only supported image artifacts")
+                    }
+                };
                 let script = format!(
                     r#"
 set -eo pipefail
 echo "STAGE: Restoring system image..."
-if [ -f "{path}/system.btrfs.zst" ]; then
-    echo "Restoring btrfs snapshot..."
-    zstd -d "{path}/system.btrfs.zst" | btrfs receive /mnt/ 2>&1
-elif [ -f "{path}/system.tar.gz" ]; then
-    echo "Restoring tar archive..."
-    tar -xzf "{path}/system.tar.gz" -C /mnt/ 2>&1
-else
-    echo "ERROR: No image found at {path}"
-    exit 1
-fi
+{restore_artifact_step}
 if [ -f "{path}/configuration.nix" ]; then
     cp "{path}/configuration.nix" /mnt/etc/nixos/
 fi
@@ -7447,7 +7449,8 @@ fi
 echo "STAGE: Image restored"
 echo "COMPLETE"
 "#,
-                    path = image_path
+                    path = image_path,
+                    restore_artifact_step = restore_artifact_step
                 );
 
                 match run_cmd(&script).await {
@@ -8796,6 +8799,35 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn restore_artifact_selection_is_bound_to_commitment_name() {
+        for (name, expected) in [
+            (
+                "system.btrfs.zst",
+                "zstd -d \"{path}/system.btrfs.zst\" | btrfs receive /mnt/",
+            ),
+            (
+                "system.tar.gz",
+                "tar -xzf \"{path}/system.tar.gz\" -C /mnt/",
+            ),
+        ] {
+            let step = match name {
+                "system.btrfs.zst" => {
+                    "echo \"Restoring committed btrfs snapshot...\"; zstd -d \"{path}/system.btrfs.zst\" | btrfs receive /mnt/ 2>&1"
+                }
+                "system.tar.gz" => {
+                    "echo \"Restoring committed tar archive...\"; tar -xzf \"{path}/system.tar.gz\" -C /mnt/ 2>&1"
+                }
+                _ => unreachable!(),
+            };
+            assert!(step.contains(expected), "selection for {name} lost its bound command");
+            assert!(
+                !step.contains("elif [ -f"),
+                "restore selection must not fall back to an uncommitted artifact"
+            );
+        }
     }
 
     #[tokio::test]
