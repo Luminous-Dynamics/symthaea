@@ -54,8 +54,8 @@ const EXPECTED_QUALIFICATION_ACTION_REFS: [&str; 8] = [
     "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
     "dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067",
     "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
-    "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
     "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6",
+    "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
 ];
 
 #[derive(Debug, serde::Deserialize)]
