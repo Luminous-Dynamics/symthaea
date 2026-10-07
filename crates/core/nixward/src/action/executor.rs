@@ -13,6 +13,8 @@ use crate::action::authorization::NixLocalExecutionAuthorityV1;
 use crate::action::execution_witness::NixLiveExecutionWitnessV1;
 #[cfg(feature = "systemd-observer")]
 use crate::action::NixSystemdReadOnlyObserverV1;
+#[cfg(feature = "systemd-mutation")]
+use crate::action::systemd_mutation::NixSystemdLifecycleMutationTransportV1;
 use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use crate::action::service_manager::ServiceManager;
 use crate::action::service_state::NixServiceObservedStateV1;
@@ -20,6 +22,7 @@ use crate::traits::{ActionType, ConsciousnessThresholds, PhiAwareScoring};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::process::Stdio;
+use std::time::Duration;
 use tokio::process::Command;
 use tracing::{info, warn};
 
@@ -946,6 +949,28 @@ impl NixOSExecutor {
                 None,
             );
         }
+
+        if matches!(&command, NixOSCommand::Service { .. }) && !self.dry_run {
+            #[cfg(all(feature = "systemd-mutation", feature = "systemd-observer"))]
+            {
+                return self
+                    .execute_authorized_service_native(command, authority)
+                    .await;
+            }
+
+            #[cfg(not(all(feature = "systemd-mutation", feature = "systemd-observer")))]
+            {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: "typed Service execution requires the systemd-mutation capability"
+                            .to_string(),
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        }
+
         if let Err(reason) = self
             .validate_authorized_pre_state_identity(&authority, &command)
             .await
@@ -1035,6 +1060,379 @@ impl NixOSExecutor {
             &result,
         );
         (result, witness)
+    }
+
+    #[cfg(all(feature = "systemd-mutation", feature = "systemd-observer"))]
+    async fn execute_authorized_service_native(
+        &mut self,
+        command: NixOSCommand,
+        authority: NixLocalExecutionAuthorityV1,
+    ) -> (ExecutionResult, Option<NixLiveExecutionWitnessV1>) {
+        let safety = command.safety_level();
+        let (operation, unit) = match &command {
+            NixOSCommand::Service { operation, unit } => (*operation, unit.clone()),
+            _ => unreachable!("native Service executor called for non-Service command"),
+        };
+
+        if matches!(
+            operation,
+            NixServiceOperationKindV1::Enable | NixServiceOperationKindV1::Disable
+        ) {
+            return (
+                ExecutionResult::Blocked {
+                    reason: format!(
+                        "typed {:?} execution has no governed native D-Bus protocol; refusing systemctl fallback",
+                        operation
+                    ),
+                    safety_level: safety,
+                },
+                None,
+            );
+        }
+
+        if let Err(reason) = self
+            .validate_authorized_pre_state_identity(&authority, &command)
+            .await
+        {
+            return (
+                ExecutionResult::Blocked {
+                    reason,
+                    safety_level: safety,
+                },
+                None,
+            );
+        }
+
+        let pre_state_identity = authority.pre_state_identity().map(str::to_owned);
+        let (authorized_generation, expected_unit, _) = match pre_state_identity
+            .as_deref()
+            .ok_or_else(|| "execution authority has no bound service pre-state identity".to_string())
+            .and_then(parse_service_pre_state_identity)
+        {
+            Ok(value) => value,
+            Err(reason) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason,
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        };
+        if expected_unit != unit {
+            return (
+                ExecutionResult::Blocked {
+                    reason: format!(
+                        "service pre-state identity unit mismatch: approved={} command={}",
+                        expected_unit, unit
+                    ),
+                    safety_level: safety,
+                },
+                None,
+            );
+        }
+
+        let start = std::time::Instant::now();
+        let observer = match NixSystemdReadOnlyObserverV1::connect_system().await {
+            Ok(observer) => observer,
+            Err(error) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!(
+                            "could not connect read-only systemd observer for native Service dispatch: {error}"
+                        ),
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        };
+
+        // Arm JobRemoved before the final capture and before dispatch. This makes the
+        // terminal job observation part of the same governed execution epoch.
+        let watcher = match observer.arm_job_removed_watcher().await {
+            Ok(watcher) => watcher,
+            Err(error) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!(
+                            "could not arm pre-dispatch JobRemoved watcher: {error}"
+                        ),
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        };
+
+        let content = match operation {
+            NixServiceOperationKindV1::Restart => observer
+                .capture_service_definition_content_for_restart(&unit)
+                .await,
+            _ => observer.capture_service_definition_content(&unit).await,
+        };
+        let content = match content {
+            Ok(content) => content,
+            Err(error) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!(
+                            "final Service definition capture failed before native dispatch: {error}"
+                        ),
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        };
+
+        let expected_content_digest = match authority.service_definition_content_digest() {
+            Some(value) => value,
+            None => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: "Service execution authority has no bound definition-content commitment"
+                            .to_string(),
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        };
+        let actual_content_digest = match content.digest() {
+            Ok(value) => value,
+            Err(error) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!(
+                            "could not digest final Service definition capture: {error}"
+                        ),
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        };
+        if actual_content_digest != expected_content_digest {
+            return (
+                ExecutionResult::Blocked {
+                    reason: format!(
+                        "Service definition content changed since approval: approved={} current={}",
+                        expected_content_digest, actual_content_digest
+                    ),
+                    safety_level: safety,
+                },
+                None,
+            );
+        }
+
+        if operation == NixServiceOperationKindV1::Restart {
+            let expected_invocation_id = match authority.pre_invocation_id() {
+                Some(value) => value,
+                None => {
+                    return (
+                        ExecutionResult::Blocked {
+                            reason: "Restart execution authority has no bound pre-invocation identity"
+                                .to_string(),
+                            safety_level: safety,
+                        },
+                        None,
+                    );
+                }
+            };
+            let actual_invocation_id = match content.pre_invocation_id() {
+                Some(value) => value,
+                None => {
+                    return (
+                        ExecutionResult::Blocked {
+                            reason: "final Restart definition capture has no usable InvocationID"
+                                .to_string(),
+                            safety_level: safety,
+                        },
+                        None,
+                    );
+                }
+            };
+            if actual_invocation_id != expected_invocation_id {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!(
+                            "Restart InvocationID changed since approval: approved={} current={}",
+                            expected_invocation_id, actual_invocation_id
+                        ),
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        }
+
+        if watcher.manager_owner() != content.as_ref().manager_owner.as_str()
+            || watcher.bus_id() != content.as_ref().bus_id.as_str()
+        {
+            return (
+                ExecutionResult::Blocked {
+                    reason: "systemd manager/bus epoch changed between sealed capture and pre-dispatch watcher".to_string(),
+                    safety_level: safety,
+                },
+                None,
+            );
+        }
+
+        let witness = match NixLiveExecutionWitnessV1::from_live_authority(&authority) {
+            Ok(witness) => witness,
+            Err(reason) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason,
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        };
+
+        let operation_value = match NixServiceOperationV1::new(unit.clone(), operation) {
+            Ok(value) => value,
+            Err(error) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!("invalid typed Service operation: {error}"),
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        };
+
+        let transport = match NixSystemdLifecycleMutationTransportV1::connect_system().await {
+            Ok(transport) => transport,
+            Err(error) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!(
+                            "could not connect typed systemd mutation transport: {error}"
+                        ),
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        };
+
+        let job_path = match transport
+            .dispatch_lifecycle_for_manager_owner(
+                &operation_value,
+                content.as_ref().manager_owner.as_str(),
+            )
+            .await
+        {
+            Ok(job_path) => job_path,
+            Err(error) => {
+                self.record_authorized_execution(
+                    command,
+                    witness.action_intent_digest().to_string(),
+                    witness.approval_request_id().to_string(),
+                    witness.projection_digest().to_string(),
+                    pre_state_identity,
+                    &ExecutionResult::FailedNoRollback {
+                        error: format!("native systemd lifecycle dispatch failed: {error}"),
+                        rollback_error: None,
+                    },
+                );
+                return (
+                    ExecutionResult::FailedNoRollback {
+                        error: format!("native systemd lifecycle dispatch failed: {error}"),
+                        rollback_error: None,
+                    },
+                    Some(witness),
+                );
+            }
+        };
+
+        let job = match observer.capture_job(&job_path, &unit).await {
+            Ok(job) => job,
+            Err(error) => {
+                let result = ExecutionResult::FailedNoRollback {
+                    error: format!("could not capture native systemd Job identity: {error}"),
+                    rollback_error: None,
+                };
+                self.record_authorized_execution(
+                    command,
+                    witness.action_intent_digest().to_string(),
+                    witness.approval_request_id().to_string(),
+                    witness.projection_digest().to_string(),
+                    pre_state_identity,
+                    &result,
+                );
+                return (result, Some(witness));
+            }
+        };
+
+        let observation = match observer
+            .observe_service_post_state_for_prearmed_job(
+                operation,
+                &unit,
+                authorized_generation,
+                watcher,
+                &job,
+                Duration::from_secs(60),
+            )
+            .await
+        {
+            Ok(observation) => observation,
+            Err(error) => {
+                let result = ExecutionResult::FailedNoRollback {
+                    error: format!(
+                        "native systemd JobRemoved/post-state observation failed: {error}"
+                    ),
+                    rollback_error: None,
+                };
+                self.record_authorized_execution(
+                    command,
+                    witness.action_intent_digest().to_string(),
+                    witness.approval_request_id().to_string(),
+                    witness.projection_digest().to_string(),
+                    pre_state_identity,
+                    &result,
+                );
+                return (result, Some(witness));
+            }
+        };
+
+        let result = match observation.as_ref().systemd_job.as_ref() {
+            Some(job) if job.result == "done" => ExecutionResult::Success {
+                stdout: format!(
+                    "typed systemd {:?} Job {} completed with result done",
+                    operation, job.id
+                ),
+                stderr: String::new(),
+                execution_time_ms: start.elapsed().as_millis() as u64,
+            },
+            Some(job) => ExecutionResult::FailedNoRollback {
+                error: format!(
+                    "typed systemd {:?} Job {} completed with result {}",
+                    operation, job.id, job.result
+                ),
+                rollback_error: None,
+            },
+            None => ExecutionResult::FailedNoRollback {
+                error: "typed systemd Job completed without a correlated JobRemoved record"
+                    .to_string(),
+                rollback_error: None,
+            },
+        };
+
+        self.record_authorized_execution(
+            command,
+            witness.action_intent_digest().to_string(),
+            witness.approval_request_id().to_string(),
+            witness.projection_digest().to_string(),
+            pre_state_identity,
+            &result,
+        );
+        (result, Some(witness))
     }
 
     /// Revalidate the state identity bound into live authority immediately before dispatch.
