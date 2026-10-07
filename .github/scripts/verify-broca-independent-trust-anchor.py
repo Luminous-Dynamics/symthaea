@@ -498,9 +498,13 @@ def trusted_checkout_identity() -> str:
 
 
 def main() -> int:
+    global TRIGGER_RUN_ID, TRIGGER_RUN_NAME, TRIGGER_RUN_EVENT, TRIGGER_ACTIVITY_TYPE
+    global TRIGGER_RUN_REPOSITORY_ID, TRIGGER_RUN_HEAD_SHA, TRIGGER_RUN_HEAD_BRANCH
+    global TRIGGER_RUN_CONCLUSION, TRIGGER_RUN_ATTEMPT
+
     verifier_head = trusted_checkout_identity()
     policy_blob = trusted_file_blob(POLICY_PATH.as_posix())
-    target_url = f"https://github.com/{REPOSITORY}/actions/runs/{TRIGGER_RUN_ID}"
+    target_url = ""
 
     receipt: dict[str, Any] = {
         "schema_version": "broca-independent-trust-anchor-receipt-v1",
@@ -527,10 +531,6 @@ def main() -> int:
     }
 
     try:
-        global TRIGGER_RUN_ID, TRIGGER_RUN_NAME, TRIGGER_RUN_EVENT
-        global TRIGGER_RUN_REPOSITORY_ID, TRIGGER_RUN_HEAD_SHA, TRIGGER_RUN_HEAD_BRANCH
-        global TRIGGER_RUN_CONCLUSION, TRIGGER_RUN_ATTEMPT
-
         if TRUST_ANCHOR_MODE == "workflow_dispatch":
             manual_run_id = int(env_required("MANUAL_WORKFLOW_RUN_ID"))
             manual_run = api_request("GET", f"/actions/runs/{manual_run_id}")
@@ -554,8 +554,20 @@ def main() -> int:
                 raise StaleError(
                     "manual workflow-run target is not a valid same-repository pull-request run"
                 )
-        else:
-            if TRIGGER_RUN_EVENT != "pull_request":
+                target_url = f"https://github.com/{REPOSITORY}/actions/runs/{TRIGGER_RUN_ID}"
+        receipt["trigger"] = {
+            "repository_id": TRIGGER_RUN_REPOSITORY_ID,
+            "activity_type": TRIGGER_ACTIVITY_TYPE,
+            "run_id": TRIGGER_RUN_ID,
+            "run_attempt": TRIGGER_RUN_ATTEMPT,
+            "run_name": TRIGGER_RUN_NAME,
+            "event": TRIGGER_RUN_EVENT,
+            "head_branch": TRIGGER_RUN_HEAD_BRANCH,
+            "head_sha": TRIGGER_RUN_HEAD_SHA,
+            "conclusion": TRIGGER_RUN_CONCLUSION,
+        }
+
+        if TRIGGER_RUN_EVENT != "pull_request":
                 raise StaleError(f"triggering event is not pull_request: {TRIGGER_RUN_EVENT!r}")
             if TRIGGER_ACTIVITY_TYPE not in {"requested", "in_progress", "completed"}:
                 raise StaleError(
