@@ -1117,6 +1117,9 @@ impl NixPostStateReceiptV1 {
 
         match self.claim {
             NixPostStateClaimV1::Proven => {
+                if self.systemd_bus_id.is_none() {
+                    return Err(NixPostStateErrorV1::BusIncarnationMismatch);
+                }
                 if self.postcondition != NixPostconditionAssessmentV1::Satisfied {
                     return Err(NixPostStateErrorV1::InvalidClaim);
                 }
