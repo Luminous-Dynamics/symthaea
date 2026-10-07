@@ -2192,6 +2192,43 @@ mod tests {
     }
 
     #[test]
+    fn mismatched_live_execution_witness_fails_closed() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let intent = contextual_intent(
+            NixServiceOperationKindV1::Start,
+            &exp.unit,
+            exp.authorized_generation,
+            exp.authorized_definition_content_digest.clone(),
+            exp.pre_invocation_id.clone(),
+            exp.required_stability_us,
+        );
+        let authorization = contextual_authorization(&intent);
+        let witness = NixLiveExecutionWitnessV1::for_test(
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "approval:test",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            intent.pre_state_identity.clone(),
+            intent
+                .service_effect_context
+                .as_ref()
+                .map(|context| context.authorized_definition_content_digest.clone()),
+            exp.pre_invocation_id.clone(),
+        );
+
+        assert_eq!(
+            validate_live_execution_witness(
+                &witness,
+                &intent,
+                &exp,
+                &intent.digest().unwrap(),
+                &authorization,
+            )
+            .unwrap_err(),
+            NixPostStateErrorV1::LiveExecutionWitnessMismatch
+        );
+    }
+
+    #[test]
     fn live_execution_witness_enables_proven_claim() {
         let mut exp = expectation(NixServiceOperationKindV1::Start);
         exp.required_stability_us = 1_000;
