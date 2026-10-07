@@ -2,6 +2,7 @@ use symthaea_swarm::holochain_projection::{
     EvidenceAnchorKind, HolochainActionHash, HolochainEvidenceAnchor,
     HolochainProjectionError, ReceiptSelectionContext, HOLOCHAIN_ACTION_HASH_BYTES,
     HOLOCHAIN_ACTION_HASH_PREFIX,
+    MAX_RECEIPT_SELECTION_CANDIDATES,
 };
 use uuid::Uuid;
 
@@ -78,4 +79,71 @@ fn selection_context_changes_projection_identity() {
     first.receipt_selection.as_mut().unwrap().selected_index = 0;
     let second_bytes = first.canonical_bytes().unwrap();
     assert_ne!(first_bytes, second_bytes);
+}
+
+
+#[cfg(feature = "semantic-receipts")]
+#[test]
+fn bound_selection_projection_requires_exact_source_collection() {
+    use symthaea_swarm::rfc9942_selection::evaluate_priority_first_valid;
+    use symthaea_swarm::{
+        Rfc9942ProofKind, Rfc9942ReceiptCollection, Rfc9942ReceiptEnvelope,
+        Rfc9942ReceiptPayload, Rfc9942Vdp, Rfc9162InclusionProof,
+        COSE_ES256_ALGORITHM_ID,
+    };
+
+    let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x11; 32]]).to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+    let receipts = Rfc9942ReceiptCollection::new(vec![
+        Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            vdp.clone(),
+            Rfc9942ReceiptPayload::Attached([1; 32]),
+            vec![1; 64],
+        )
+        .unwrap(),
+        Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            vdp,
+            Rfc9942ReceiptPayload::Attached([2; 32]),
+            vec![2; 64],
+        )
+        .unwrap(),
+    ])
+    .unwrap();
+
+    let decision = evaluate_priority_first_valid(&receipts, |index, _| {
+        if index == 1 {
+            Ok(())
+        } else {
+            Err(symthaea_swarm::Rfc9942VdpError::NoMatchingProof)
+        }
+    });
+
+    let context =
+        ReceiptSelectionContext::from_bound_decision(&decision, &receipts).unwrap();
+    assert_eq!(context.collection_len, 2);
+    assert_eq!(context.selected_index, 1);
+    assert_eq!(
+        context.selection_decision_sha256,
+        decision.validated_digest().unwrap()
+    );
+
+    let reversed = Rfc9942ReceiptCollection::new(
+        receipts.receipts().iter().cloned().rev().collect(),
+    )
+    .unwrap();
+    assert_eq!(
+        ReceiptSelectionContext::from_bound_decision(&decision, &reversed),
+        Err(HolochainProjectionError::InvalidReceiptSelection)
+    );
+
+    let mut forged = decision.clone();
+    forged.candidates[0].receipt_sha256[0] ^= 1;
+    assert_eq!(
+        ReceiptSelectionContext::from_bound_decision(&forged, &receipts),
+        Err(HolochainProjectionError::InvalidReceiptSelection)
+    );
+
+    assert!(MAX_RECEIPT_SELECTION_CANDIDATES >= receipts.len() as u32);
 }
