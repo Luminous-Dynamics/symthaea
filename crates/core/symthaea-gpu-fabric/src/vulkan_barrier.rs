@@ -111,6 +111,7 @@ pub struct VulkanBarrierExecutionReceipt {
     pub node_count: u32,
     pub barrier_count: u32,
     pub resource_digests: BTreeMap<ResourceId, String>,
+    pub resource_storage_sizes: BTreeMap<ResourceId, u64>,
 }
 
 impl VulkanBarrierExecutionReceipt {
@@ -132,7 +133,26 @@ impl VulkanBarrierExecutionReceipt {
             return Err(VulkanBarrierReceiptError::SyncPlanDigest);
         }
         if self.barrier_digest != barrier_digest(plan) { return Err(VulkanBarrierReceiptError::BarrierDigest); }
-        if self.barrier_lowering_digest != barrier_lowering_digest(plan) {
+        let expected_storage_sizes = final_resources
+            .iter()
+            .map(|(resource, value)| {
+                (
+                    resource.clone(),
+                    rounded_storage_bytes(value.as_bytes().len() as u64),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        if self.resource_storage_sizes != expected_storage_sizes {
+            return Err(VulkanBarrierReceiptError::ResourceDigest(
+                self.resource_storage_sizes
+                    .keys()
+                    .next()
+                    .cloned()
+                    .or_else(|| expected_storage_sizes.keys().next().cloned())
+                    .unwrap_or_else(|| ResourceId::new("<missing>").expect("static resource id")),
+            ));
+        }
+        if self.barrier_lowering_digest != barrier_lowering_digest(plan, &expected_storage_sizes) {
             return Err(VulkanBarrierReceiptError::BarrierDigest);
         }
         if self.node_count != schedule.nodes.len() as u32 { return Err(VulkanBarrierReceiptError::NodeCount); }
@@ -413,17 +433,22 @@ impl VulkanBarrierWorkloadRuntime {
             if observed.get(resource) != Some(expected_value) { return Err(VulkanBarrierError::OracleMismatch(resource.clone())); }
         }
         let mut digests = BTreeMap::new();
-        for (resource, value) in &observed { digests.insert(resource.clone(), resource_digest(value)); }
+        let mut storage_sizes = BTreeMap::new();
+        for (resource, value) in &observed {
+            digests.insert(resource.clone(), resource_digest(value));
+            storage_sizes.insert(resource.clone(), buffers[resource].storage_size);
+        }
         let receipt = VulkanBarrierExecutionReceipt {
             version: RECEIPT_VERSION,
             graph_digest: graph.digest_hex().map_err(VulkanBarrierError::Graph)?,
             schedule_digest: schedule.digest_hex().map_err(VulkanBarrierError::Schedule)?,
             sync_plan_digest: plan.digest_hex().map_err(|e| VulkanBarrierError::SyncPlan(e))?,
             barrier_digest: barrier_digest(plan),
-            barrier_lowering_digest: barrier_lowering_digest(plan),
+            barrier_lowering_digest: barrier_lowering_digest(plan, &storage_sizes),
             node_count: schedule.nodes.len() as u32,
             barrier_count: plan.submissions.iter().map(|s| s.barriers.len() as u32).sum(),
             resource_digests: digests,
+            resource_storage_sizes: storage_sizes,
         };
         receipt.verify_against(graph, schedule, plan, &observed).map_err(VulkanBarrierError::Receipt)?;
         Ok((observed, receipt))
@@ -722,13 +747,17 @@ fn barrier_access_masks(kind: DependencyKind) -> (vk::AccessFlags2, vk::AccessFl
     }
 }
 
-fn barrier_lowering_digest(plan: &VulkanSyncPlan) -> String {
+fn barrier_lowering_digest(
+    plan: &VulkanSyncPlan,
+    resource_storage_sizes: &BTreeMap<ResourceId, u64>,
+) -> String {
     let mut h = Hasher::new();
     h.update(b"symthaea.gpu-fabric.vulkan-barrier-lowering.v2\0");
     h.update(b"src-stage:compute-shader\0");
     h.update(b"dst-stage:compute-shader\0");
     h.update(b"range-policy:rounded-storage-bytes\0");
     h.update(b"queue-family:ignored\0");
+    h.update(b"offset-policy:zero\0");
 
     for kind in [
         DependencyKind::ReadAfterWrite,
@@ -756,6 +785,11 @@ fn barrier_lowering_digest(plan: &VulkanSyncPlan) -> String {
                 DependencyKind::WriteAfterRead => 2,
                 DependencyKind::WriteAfterWrite => 3,
             }]);
+            let size = resource_storage_sizes
+                .get(&barrier.resource)
+                .copied()
+                .unwrap_or_default();
+            h.update(&size.to_le_bytes());
         }
     }
     h.finalize().to_hex().to_string()
@@ -951,22 +985,72 @@ mod tests {
             .map(|(resource, value)| (resource.clone(), resource_digest(value)))
             .collect::<BTreeMap<_, _>>();
 
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| {
+                (
+                    resource.clone(),
+                    rounded_storage_bytes(value.as_bytes().len() as u64),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
         let mut receipt = VulkanBarrierExecutionReceipt {
             version: RECEIPT_VERSION,
             graph_digest: graph.digest_hex().unwrap(),
             schedule_digest: schedule.digest_hex().unwrap(),
             sync_plan_digest: plan.digest_hex().unwrap(),
             barrier_digest: barrier_digest(&plan),
-            barrier_lowering_digest: barrier_lowering_digest(&plan),
+            barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
+            resource_storage_sizes: storage_sizes,
         };
         receipt.barrier_lowering_digest = String::from("tampered");
 
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
             Err(VulkanBarrierReceiptError::BarrierDigest)
+        ));
+    }
+
+    #[test]
+    fn receipt_rejects_tampered_resource_storage_size() {
+        let (graph, schedule, plan, initial) = fixture();
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        let digests = final_state
+            .iter()
+            .map(|(resource, value)| (resource.clone(), resource_digest(value)))
+            .collect::<BTreeMap<_, _>>();
+        let mut storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| {
+                (
+                    resource.clone(),
+                    rounded_storage_bytes(value.as_bytes().len() as u64),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+
+        let mut receipt = VulkanBarrierExecutionReceipt {
+            version: RECEIPT_VERSION,
+            graph_digest: graph.digest_hex().unwrap(),
+            schedule_digest: schedule.digest_hex().unwrap(),
+            sync_plan_digest: plan.digest_hex().unwrap(),
+            barrier_digest: barrier_digest(&plan),
+            barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes),
+            node_count: schedule.nodes.len() as u32,
+            barrier_count: 1,
+            resource_digests: digests,
+            resource_storage_sizes: storage_sizes.clone(),
+        };
+
+        storage_sizes.insert(ResourceId::new("mid").unwrap(), 8);
+        receipt.resource_storage_sizes = storage_sizes;
+
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::ResourceDigest(_))
         ));
     }
 
