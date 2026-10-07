@@ -745,7 +745,7 @@ impl HdcSemanticCodebook {
             ));
         }
 
-        let mut edge_candidates = Vec::with_capacity(edge_candidate_count); = Vec::<HdcRetrievalCandidate>::new();
+        let mut edge_candidates = Vec::with_capacity(edge_candidate_count);
         for source in &selected_nodes {
             for relation in self.relations.keys() {
                 for target in &selected_nodes {
