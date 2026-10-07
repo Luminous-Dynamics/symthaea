@@ -2025,6 +2025,7 @@ mod tests {
                 NixSystemdJobEvidenceV1 {
                     id: 7,
                     job_type,
+                    observed_job_type: Some(job_type),
                     unit: "nginx.service".to_string(),
                     object_path: "/org/freedesktop/systemd1/job/7".to_string(),
                     result: "done".to_string(),
