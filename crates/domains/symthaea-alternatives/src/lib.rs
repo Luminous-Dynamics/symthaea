@@ -1626,6 +1626,41 @@ impl CandidatePathway {
         })
     }
 
+    fn all_burden_dimensions_have_usable_evidence(
+        &self,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        Dimension::ALL.iter().all(|dimension| {
+            self.burdens
+                .get(dimension)
+                .is_some_and(|estimate| {
+                    self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+                        .next()
+                        .is_some()
+                })
+        })
+    }
+
+    fn all_burden_dimensions_have_supported_evidence(
+        &self,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        Dimension::ALL.iter().all(|dimension| {
+            self.burdens
+                .get(dimension)
+                .is_some_and(|estimate| {
+                    self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+                        .any(|e| {
+                            e.stance == EvidenceStance::Supports
+                                && e.confidence >= 0.7
+                                && !matches!(e.kind, EvidenceKind::Hypothesis)
+                        })
+                })
+        })
+    }
+
     fn dimension_has_conflict_at(
         &self,
         estimate: &BurdenEstimate,
@@ -1866,15 +1901,7 @@ impl CandidatePathway {
             || !self.operating_envelope_is_supported(requirement, as_of, freshness_policy)
             || !self.burden_scales_match_requirement(requirement)
             || self.burdens.is_empty()
-            || self.burdens.values().all(|estimate| {
-                let linked = self
-                    .linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
-                    .collect::<Vec<_>>();
-                linked.is_empty()
-                    || linked
-                        .iter()
-                        .all(|e| e.kind == EvidenceKind::Hypothesis)
-            })
+            || !self.all_burden_dimensions_have_usable_evidence(as_of, freshness_policy)
         {
             return QualificationState::Hypothesis;
         }
@@ -1898,6 +1925,8 @@ impl CandidatePathway {
                     && e.confidence >= 0.7
             })
         });
+        let all_dimensions_supported_evidence =
+            self.all_burden_dimensions_have_supported_evidence(as_of, freshness_policy);
         let distinct_authority_sources = self
             .burdens
             .values()
@@ -2068,7 +2097,7 @@ impl CandidatePathway {
             && has_lifecycle_assessment
         {
             QualificationState::LifecycleQualified
-        } else if any_supported_measurement {
+        } else if all_dimensions_supported_evidence {
             QualificationState::EvidenceSupported
         } else if any_simulation {
             QualificationState::ComputationallyPlausible
@@ -4081,8 +4110,8 @@ impl AlternativesEngine {
                         });
                     }
                     (Some(estimate), Some(_))
-                        if !estimate.evidence_ids.is_empty()
-                            && candidate
+                        if estimate.evidence_ids.is_empty()
+                            || candidate
                                 .linked_evidence_at(
                                     &estimate.evidence_ids,
                                     assessed_at_epoch_seconds,
@@ -6499,6 +6528,44 @@ mod tests {
                 .qualification,
             QualificationState::LifecycleQualified
         );
+    }
+
+    #[test]
+    fn unlinked_burden_dimension_blocks_frontier_and_caps_qualification() {
+        let mut c = candidate(
+            "partial-burden-evidence",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "b1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.burdens
+            .get_mut(&Dimension::Water)
+            .expect("fixture has water burden")
+            .evidence_ids
+            .clear();
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+        let assessment = &result.candidates[0];
+
+        assert_eq!(
+            assessment.qualification,
+            QualificationState::Hypothesis
+        );
+        assert!(assessment.frontier_blocked);
+        assert!(result.frontier_blockers["partial-burden-evidence"]
+            .contains(&FrontierBlocker::EvidenceUnavailable(Dimension::Water)));
+        assert!(!result
+            .pareto_frontier
+            .contains(&"partial-burden-evidence".into()));
     }
 
     #[test]
