@@ -891,6 +891,13 @@ fn evaluate_learning_response(
         let before_prediction = predictor.predict(*shock_state, *action);
         let before_mae = before_prediction.mean_absolute_delta(actual);
 
+        // Nearby probe is scored BEFORE the update as a held-out neighbor.
+        let neighbor_state = super::viability_micro_world::MicroPerturbation::ThreatSpike(0.01)
+            .apply(*shock_state);
+        let neighbor_actual = transition(neighbor_state, *action);
+        let neighbor_before = predictor.predict(neighbor_state, *action);
+        let neighbor_before_mae = neighbor_before.mean_absolute_delta(neighbor_actual);
+
         // This is the only adaptation update in this isolated shock fold.
         predictor.observe_transition(*shock_state, *action, actual);
 
@@ -906,15 +913,8 @@ fn evaluate_learning_response(
                 same_transition_improvement_count.saturating_add(1);
         }
 
-        // Nearby probe: perturb one observable channel deterministically after the shock.
-        // The update above did not see this neighboring state.
-        let neighbor_state = super::viability_micro_world::MicroPerturbation::ThreatSpike(0.01)
-            .apply(*shock_state);
-        let neighbor_actual = transition(neighbor_state, *action);
-        let neighbor_before = predictor.predict(neighbor_state, *action);
-        let neighbor_before_mae = neighbor_before.mean_absolute_delta(neighbor_actual);
-
-        // Re-test after the SAME single update; no second learning step is allowed.
+        // Re-test the SAME neighboring state after exactly one update; no second learning step
+        // is allowed, so any improvement is attributable to the single observed shock.
         let neighbor_after = predictor.predict(neighbor_state, *action);
         let neighbor_after_mae = neighbor_after.mean_absolute_delta(neighbor_actual);
         let neighbor_improvement = neighbor_before_mae - neighbor_after_mae;
