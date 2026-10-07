@@ -487,6 +487,17 @@ mod tests {
     }
 
     #[test]
+    fn validated_digest_refuses_malformed_decision() {
+        let collection = collection();
+        let mut decision = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
+        decision.selected_receipt_sha256 = Some([0xAA; 32]);
+        assert_eq!(
+            decision.validated_digest(),
+            Err(ReceiptSelectionDecisionError::SelectedCandidateMismatch)
+        );
+    }
+
+    #[test]
     fn decision_validation_rejects_mismatched_selected_digest() {
         let collection = collection();
         let mut decision = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
