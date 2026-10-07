@@ -219,6 +219,11 @@ jobs:
       - name: Test ssh-relay with server feature
         run: cargo test -p symthaea-spore --bin ssh-relay --features server -- --nocapture
 
+      # Architectural ratchet: consequential mutation handlers must not regain
+      # the shell-string executor or another "-c" parsing boundary.
+      - name: No shell-backed executor in mutation handlers
+        run: python3 .github/scripts/check-privileged-shell-boundary.py
+
   muse:
     name: Muse (tests, studio, wasm UI)
     runs-on: ubuntu-latest
