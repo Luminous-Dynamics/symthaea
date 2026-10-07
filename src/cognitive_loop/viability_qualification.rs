@@ -519,10 +519,13 @@ impl HorizonQualificationPoint {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EnvironmentQueryQualificationReport {
     pub queries: u64,
+    pub valid_queries: u64,
+    pub invalid_queries: u64,
     pub sequence_length: usize,
     pub probe_states: u64,
     pub mean_terminal_mae: f64,
     pub mean_min_viability_margin_error: f64,
+    /// Agreement over all queries; invalid answers count as disagreements.
     pub survival_agreement: f64,
 }
 
@@ -788,6 +791,8 @@ fn evaluate_environment_query_bank<M: ActionConditionedTransitionModel + ?Sized>
     let mut margin_error = 0.0;
     let mut survival_agreement = 0u64;
     let mut query_count = 0u64;
+    let mut valid_query_count = 0u64;
+    let mut invalid_query_count = 0u64;
 
     for start in &probes {
         for first in QUERY_ACTIONS {
@@ -844,6 +849,7 @@ fn evaluate_environment_query_bank<M: ActionConditionedTransitionModel + ?Sized>
                         terminal_error +=
                             predicted_terminal.mean_absolute_delta(oracle_state);
                         margin_error += (predicted_min_margin - oracle_min_margin).abs();
+                        valid_query_count = valid_query_count.saturating_add(1);
 
                         let predicted_survival =
                             predicted_min_margin > 0.0 && predicted_terminal.is_viable();
@@ -853,8 +859,9 @@ fn evaluate_environment_query_bank<M: ActionConditionedTransitionModel + ?Sized>
                             survival_agreement = survival_agreement.saturating_add(1);
                         }
                     } else {
-                        // Invalid model answers are disagreements, not missing data.
-                        margin_error += oracle_min_margin.abs();
+                        // Invalid model answers are explicit disagreements, never omitted
+                        // from the query count or converted into synthetic error values.
+                        invalid_query_count = invalid_query_count.saturating_add(1);
                     }
 
                     query_count = query_count.saturating_add(1);
@@ -863,14 +870,17 @@ fn evaluate_environment_query_bank<M: ActionConditionedTransitionModel + ?Sized>
         }
     }
 
-    let denominator = query_count.max(1) as f64;
+    let valid_denominator = valid_query_count.max(1) as f64;
+    let query_denominator = query_count.max(1) as f64;
     EnvironmentQueryQualificationReport {
         queries: query_count,
+        valid_queries: valid_query_count,
+        invalid_queries: invalid_query_count,
         sequence_length: QUERY_SEQUENCE_LENGTH,
         probe_states: probes.len() as u64,
-        mean_terminal_mae: terminal_error / denominator,
-        mean_min_viability_margin_error: margin_error / denominator,
-        survival_agreement: survival_agreement as f64 / denominator,
+        mean_terminal_mae: terminal_error / valid_denominator,
+        mean_min_viability_margin_error: margin_error / valid_denominator,
+        survival_agreement: survival_agreement as f64 / query_denominator,
     }
 }
 
@@ -1715,6 +1725,37 @@ mod tests {
     }
 
     #[test]
+    fn invalid_environment_query_answers_are_counted_as_disagreements() {
+        #[derive(Debug, Default)]
+        struct InvalidPredictor;
+
+        impl ActionConditionedTransitionModel for InvalidPredictor {
+            fn state_dimension(&self) -> usize {
+                64
+            }
+
+            fn action_count(&self) -> usize {
+                MicroAction::ALL.len()
+            }
+
+            fn predict_next_state(&self, _state: &[f64], _action: usize) -> Option<Vec<f64>> {
+                None
+            }
+        }
+
+        let report = evaluate_environment_query_bank(
+            &InvalidPredictor,
+            &benchmark_scenarios()[0],
+        );
+
+        assert_eq!(report.valid_queries, 0);
+        assert_eq!(report.invalid_queries, report.queries);
+        assert_eq!(report.survival_agreement, 0.0);
+        assert_eq!(report.mean_terminal_mae, 0.0);
+        assert_eq!(report.mean_min_viability_margin_error, 0.0);
+    }
+
+    #[test]
     fn environment_query_bank_is_populated_and_executed() {
         let model = super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
         let report = evaluate_environment_query_bank(
@@ -1724,6 +1765,7 @@ mod tests {
 
         assert!(report.is_populated());
         assert_eq!(report.probe_states, 4);
+        assert_eq!(report.invalid_queries + report.valid_queries, report.queries);
         assert_eq!(
             report.queries,
             4 * MicroAction::ALL.len().pow(QUERY_SEQUENCE_LENGTH as u32) as u64
