@@ -455,10 +455,11 @@ pub struct NeurosemanticRemediationStatisticalSamplingFrameArtifact {
     pub schema_version: u16,
     pub frame_ref: String,
     pub source_dataset_manifest_hash: String,
+    pub target_population_manifest_hash: String,
     pub member_artifact_hashes: Vec<String>,
 }
 
-pub const NEUROSEMANTIC_REMEDIATION_STATISTICAL_SAMPLING_FRAME_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_REMEDIATION_STATISTICAL_SAMPLING_FRAME_SCHEMA_VERSION: u16 = 2;
 
 impl NeurosemanticRemediationStatisticalSamplingFrameArtifact {
     pub fn validate(&self) -> Result<(), String> {
@@ -466,6 +467,7 @@ impl NeurosemanticRemediationStatisticalSamplingFrameArtifact {
             != NEUROSEMANTIC_REMEDIATION_STATISTICAL_SAMPLING_FRAME_SCHEMA_VERSION
             || !valid_identifier(&self.frame_ref)
             || !valid_blake3_digest(&self.source_dataset_manifest_hash)
+            || !valid_blake3_digest(&self.target_population_manifest_hash)
             || self.member_artifact_hashes.is_empty()
             || self.member_artifact_hashes.len() > MAX_NEUROSEMANTIC_REMEDIATION_OBSERVATIONS
             || self.member_artifact_hashes.iter().any(|hash| !valid_blake3_digest(hash))
@@ -862,18 +864,22 @@ impl NeurosemanticRemediationStatisticalExecutionArtifact {
 fn validate_census_sampling_execution(
     sampling_frame: &NeurosemanticRemediationStatisticalSamplingFrameArtifact,
     execution: &NeurosemanticRemediationStatisticalExecutionArtifact,
+    target_population_members: &BTreeSet<String>,
 ) -> Result<(), String> {
     let frame_members: BTreeSet<&str> = sampling_frame
         .member_artifact_hashes
         .iter()
         .map(String::as_str)
         .collect();
+    let target_members: BTreeSet<&str> =
+        target_population_members.iter().map(String::as_str).collect();
     let inclusion_members: BTreeSet<&str> = execution
         .inclusion_probabilities
         .iter()
         .map(|item| item.subject_artifact_hash.as_str())
         .collect();
-    if sorted_hashes(&execution.selected_subject_artifact_hashes)
+    if frame_members != target_members
+        || sorted_hashes(&execution.selected_subject_artifact_hashes)
             != sorted_hashes(&sampling_frame.member_artifact_hashes)
         || inclusion_members != frame_members
         || execution.inclusion_probabilities.iter().any(|item| {
@@ -2241,24 +2247,42 @@ impl NeurosemanticRemediationImpactArtifact {
                     );
                 }
 
-                let expected_source_dataset_manifest_hash = match computation.kind {
+                let (
+                    expected_population_manifest_hash,
+                    expected_source_dataset_manifest_hash,
+                    expected_target_population_members,
+                ) = match computation.kind {
                     NeurosemanticRemediationMeasurementKind::Forgetfulness
                     | NeurosemanticRemediationMeasurementKind::RecoveryRisk
                     | NeurosemanticRemediationMeasurementKind::RepresentationResidual
                     | NeurosemanticRemediationMeasurementKind::UtilityImpact => {
                         let population =
                             NeurosemanticRemediationEvaluationSetManifest::from_json_bytes(population_bytes)?;
-                        population.source_dataset_manifest_hash
+                        (
+                            population.fingerprint()?,
+                            population.source_dataset_manifest_hash,
+                            population.member_artifact_hashes.into_iter().collect::<BTreeSet<_>>(),
+                        )
                     }
                     NeurosemanticRemediationMeasurementKind::FairnessImpact => {
                         let split =
                             NeurosemanticRemediationEvaluationSplitManifest::from_json_bytes(population_bytes)?;
-                        split.source_dataset_manifest_hash
+                        (
+                            split.fingerprint()?,
+                            split.source_dataset_manifest_hash,
+                            split
+                                .members
+                                .into_iter()
+                                .map(|member| member.subject_artifact_hash)
+                                .collect::<BTreeSet<_>>(),
+                        )
                     }
                 };
-                if sampling_frame.source_dataset_manifest_hash != expected_source_dataset_manifest_hash {
+                if sampling_frame.source_dataset_manifest_hash != expected_source_dataset_manifest_hash
+                    || sampling_frame.target_population_manifest_hash != expected_population_manifest_hash
+                {
                     return Err(
-                        "neurosemantic remediation statistical sampling frame source dataset mismatch"
+                        "neurosemantic remediation statistical sampling frame population identity mismatch"
                             .into(),
                     );
                 }
@@ -2323,7 +2347,11 @@ impl NeurosemanticRemediationImpactArtifact {
                             .iter()
                             .map(String::as_str)
                             .collect();
-                        let inclusion_members: BTreeSet<&str> = execution
+                        let target_members: BTreeSet<&str> = expected_target_population_members
+                            .iter()
+                            .map(String::as_str)
+                            .collect();
+                                                let inclusion_members: BTreeSet<&str> = execution
                             .inclusion_probabilities
                             .iter()
                             .map(|item| item.subject_artifact_hash.as_str())
@@ -2333,7 +2361,8 @@ impl NeurosemanticRemediationImpactArtifact {
                         let common_factor = gcd_u64(frame_size, sample_size);
                         let expected_numerator = sample_size / common_factor;
                         let expected_denominator = frame_size / common_factor;
-                        if inclusion_members != frame_members
+                        if frame_members != target_members
+                            || inclusion_members != frame_members
                             || execution.inclusion_probabilities.iter().any(|item| {
                                 item.probability_numerator != expected_numerator
                                     || item.probability_denominator != expected_denominator
@@ -2346,7 +2375,11 @@ impl NeurosemanticRemediationImpactArtifact {
                         }
                     }
                     NeurosemanticRemediationStatisticalSamplingDesign::CensusOfTargetPopulation => {
-                        validate_census_sampling_execution(&sampling_frame, &execution)?;
+                        validate_census_sampling_execution(
+                            &sampling_frame,
+                            &execution,
+                            &expected_target_population_members,
+                        )?;
                     }
                     NeurosemanticRemediationStatisticalSamplingDesign::NonProbabilitySample
                     | NeurosemanticRemediationStatisticalSamplingDesign::Unknown => {}
