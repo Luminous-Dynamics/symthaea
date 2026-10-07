@@ -6,6 +6,25 @@ use symthaea_swarm::{
     Rfc9942Vdp, Rfc9162InclusionProof, COSE_ES256_ALGORITHM_ID,
 };
 
+fn cbor_bstr(bytes: &[u8]) -> Vec<u8> {
+    let len = bytes.len();
+    let mut out = Vec::new();
+    match len {
+        0..=23 => out.push(0x40 | len as u8),
+        24..=255 => {
+            out.push(0x58);
+            out.push(len as u8);
+        }
+        256..=65_535 => {
+            out.push(0x59);
+            out.extend_from_slice(&(len as u16).to_be_bytes());
+        }
+        _ => panic!("test fixture is unexpectedly large"),
+    }
+    out.extend_from_slice(bytes);
+    out
+}
+
 fn collection() -> Rfc9942ReceiptCollection {
     let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x11; 32]]).to_cbor();
     let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
@@ -106,8 +125,9 @@ fn parsed_noncanonical_receipt_wire_bytes_are_preserved() {
     noncanonical_receipt[1] = 0x9f;
     noncanonical_receipt.push(0xff);
 
-    let mut wire = vec![0x81, 0x58, noncanonical_receipt.len() as u8];
-    wire.extend_from_slice(&noncanonical_receipt);
+    let mut wire = vec![0x81];
+    wire.extend_from_slice(&cbor_bstr(&noncanonical_receipt));
+
 
     let parsed = Rfc9942ReceiptCollection::from_cbor(&wire).unwrap();
     assert_eq!(parsed.serialized_bytes(), Some(wire.as_slice()));
