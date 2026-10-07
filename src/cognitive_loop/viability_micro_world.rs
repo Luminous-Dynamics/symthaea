@@ -1622,6 +1622,55 @@ mod tests {
     }
 
     #[test]
+    fn policy_runner_terminates_and_reports_rejected_action() {
+        #[derive(Debug, Default)]
+        struct OverconfidentOptimist;
+
+        impl MicroWorldPredictor for OverconfidentOptimist {
+            fn predict(
+                &self,
+                state: MicroWorldObservation,
+                _action: MicroAction,
+            ) -> MicroWorldObservation {
+                MicroWorldObservation {
+                    cycle: state.cycle.saturating_add(1),
+                    energy: 1.0,
+                    integrity: 1.0,
+                    knowledge: 1.0,
+                    threat: 0.0,
+                    progress: 1.0,
+                }
+            }
+
+            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
+                1.0
+            }
+        }
+
+        let scenario = MicroWorldScenario {
+            name: "execution-boundary",
+            initial: MicroWorldObservation {
+                cycle: 0,
+                energy: 0.10,
+                integrity: 0.50,
+                knowledge: 0.20,
+                threat: 0.20,
+                progress: 0.0,
+            },
+            schedule: &NOMINAL_SCHEDULE,
+            perturbations: &[],
+        };
+
+        let mut predictor = OverconfidentOptimist;
+        let report = run_homeostatic_agent_scenario(&mut predictor, &scenario, 4);
+
+        assert!(report.terminated_on_execution_failure);
+        assert_eq!(report.execution_failures, 1);
+        assert_eq!(report.steps, 0);
+        assert!(report.actions.is_empty());
+    }
+
+    #[test]
     fn execution_failure_does_not_create_false_outcome() {
         let mut world = MicroWorld::new(
             MicroWorldObservation {
