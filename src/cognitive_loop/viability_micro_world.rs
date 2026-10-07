@@ -845,8 +845,12 @@ pub struct HomeostaticHorizonRunReport {
     pub final_energy: f64,
     pub final_integrity: f64,
     pub final_progress: f64,
-    pub mean_min_confidence: f64,
+    /// Mean minimum predicted viability margin across counterfactual horizons.
     pub mean_min_viability_margin: f64,
+    /// Minimum actually observed viability margin after executed actions.
+    pub min_actual_viability_margin: f64,
+    pub mean_min_confidence: f64,
+    pub perturbations_applied: usize,
     pub cumulative_prediction_error: f64,
     pub actions: Vec<MicroAction>,
 }
@@ -861,28 +865,43 @@ pub struct HomeostaticRunReport {
     pub final_knowledge: f64,
     pub final_threat: f64,
     pub final_progress: f64,
+    pub min_actual_viability_margin: f64,
+    pub perturbations_applied: usize,
     pub cumulative_prediction_error: f64,
     pub actions: Vec<MicroAction>,
 }
 
+fn nominal_scenario() -> MicroWorldScenario {
+    MicroWorldScenario {
+        name: "nominal",
+        initial: MicroWorld::default().observe(),
+        schedule: &NOMINAL_SCHEDULE,
+        perturbations: &[],
+    }
+}
+
 /// Execute perception -> prediction -> selection -> action -> observation for a
-/// deterministic environment.
-///
-/// Every selected action is recorded in ViabilityFabric only after a prediction for
-/// that action was already inserted, preserving the no-post-hoc-prediction invariant.
-/// Execute the same closed loop using the horizon-aware counterfactual policy.
-pub fn run_homeostatic_agent_horizon<P: MicroWorldPredictor>(
+/// deterministic environment. The nominal API is preserved for compatibility.
+pub fn run_homeostatic_agent<P: MicroWorldPredictor>(
     predictor: &mut P,
     max_cycles: u64,
-    horizon: usize,
-    discount: f64,
-) -> HomeostaticHorizonRunReport {
-    let mut world = MicroWorld::default();
+) -> HomeostaticRunReport {
+    let scenario = nominal_scenario();
+    run_homeostatic_agent_scenario(predictor, &scenario, max_cycles)
+}
+
+/// Execute the reactive one-step policy against a specified deterministic scenario.
+pub fn run_homeostatic_agent_scenario<P: MicroWorldPredictor>(
+    predictor: &mut P,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+) -> HomeostaticRunReport {
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
     let policy = HomeostaticPolicy;
     let mut fabric = ViabilityFabric::new(max_cycles as usize + 1);
     let mut cumulative_error = 0.0;
-    let mut confidence_sum = 0.0;
-    let mut margin_sum = 0.0;
+    let mut min_actual_viability_margin = f64::INFINITY;
+    let mut perturbations_applied = 0usize;
     let mut actions = Vec::with_capacity(max_cycles as usize);
     let mut steps = 0u64;
 
@@ -893,12 +912,148 @@ pub fn run_homeostatic_agent_horizon<P: MicroWorldPredictor>(
                 perturbations_applied += 1;
             }
         }
+
+        let before = world.observe();
+        let (action, _policy_prediction) = policy.choose(predictor, before);
+        let action_id = steps + 1;
+        let predicted_raw = predictor.predict(before, action);
+        let prediction_confidence = predictor.prediction_confidence(action);
+
+        fabric.begin_cycle(before.cycle);
+        fabric
+            .predict_action(ActionPrediction {
+                action_id,
+                action_label: action.label().to_string(),
+                cycle: before.cycle,
+                predicted_world_delta: Some(signed_delta_with_confidence(
+                    before,
+                    predicted_raw,
+                    prediction_confidence,
+                )),
+                predicted_self_delta: Some(signed_internal_delta(
+                    before,
+                    predicted_raw,
+                    prediction_confidence,
+                )),
+                predicted_goal_delta: Some(signed_goal_delta(
+                    before,
+                    predicted_raw,
+                    prediction_confidence,
+                )),
+                authority_granted: true,
+            })
+            .expect("policy action id must be unique");
+
+        let after = world.step(action);
+        min_actual_viability_margin = min_actual_viability_margin.min(
+            after.energy.min(after.integrity) - 0.08,
+        );
+
+        let error = predicted_raw.mean_absolute_delta(after);
+        predictor.observe_transition(before, action, after);
+
+        cumulative_error += error;
+        steps += 1;
+        actions.push(action);
+
+        fabric
+            .observe_action(ActionOutcome {
+                action_id,
+                action_label: action.label().to_string(),
+                cycle: after.cycle,
+                pre_state_digest: before.digest(),
+                post_state_digest: after.digest(),
+                authority_granted: true,
+                safety_gate_passed: true,
+                prediction: None,
+                observed_effect: Some(
+                    super::viability_fabric::ViabilitySignal::new(
+                        (signed_delta(before, after).value + 1.0) * 0.5,
+                        1.0,
+                        after.cycle,
+                        "viability-micro-world",
+                    ),
+                ),
+                prediction_error: PredictionErrorLedger {
+                    world: error.clamp(0.0, 1.0),
+                    ..Default::default()
+                },
+                evidence_refs: vec![format!(
+                    "sim://viability-micro-world/policy-step/{}",
+                    after.digest()
+                )],
+            })
+            .expect("closed-loop action must have a pre-action prediction");
+    }
+
+    let final_state = world.observe();
+    HomeostaticRunReport {
+        steps,
+        survived: final_state.is_viable(),
+        final_energy: final_state.energy,
+        final_integrity: final_state.integrity,
+        final_knowledge: final_state.knowledge,
+        final_threat: final_state.threat,
+        final_progress: final_state.progress,
+        min_actual_viability_margin: if min_actual_viability_margin.is_finite() {
+            min_actual_viability_margin
+        } else {
+            final_state.energy.min(final_state.integrity) - 0.08
+        },
+        perturbations_applied,
+        cumulative_prediction_error: cumulative_error,
+        actions,
+    }
+}
+
+/// Execute the horizon-aware counterfactual policy against the nominal scenario.
+pub fn run_homeostatic_agent_horizon<P: MicroWorldPredictor>(
+    predictor: &mut P,
+    max_cycles: u64,
+    horizon: usize,
+    discount: f64,
+) -> HomeostaticHorizonRunReport {
+    let scenario = nominal_scenario();
+    run_homeostatic_agent_horizon_scenario(
+        predictor,
+        &scenario,
+        max_cycles,
+        horizon,
+        discount,
+    )
+}
+
+/// Execute the horizon-aware counterfactual policy against a specified scenario.
+pub fn run_homeostatic_agent_horizon_scenario<P: MicroWorldPredictor>(
+    predictor: &mut P,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+    horizon: usize,
+    discount: f64,
+) -> HomeostaticHorizonRunReport {
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let policy = HomeostaticPolicy;
+    let mut fabric = ViabilityFabric::new(max_cycles as usize + 1);
+    let mut cumulative_error = 0.0;
+    let mut confidence_sum = 0.0;
+    let mut margin_sum = 0.0;
+    let mut min_actual_viability_margin = f64::INFINITY;
+    let mut perturbations_applied = 0usize;
+    let mut actions = Vec::with_capacity(max_cycles as usize);
+    let mut steps = 0u64;
+
+    while !world.done() && steps < max_cycles {
+        for (cycle, perturbation) in scenario.perturbations {
+            if *cycle == steps {
+                world.perturb(*perturbation);
+                perturbations_applied += 1;
+            }
+        }
+
         let before = world.observe();
         let (action, _predicted_terminal, rollout) =
             policy.choose_horizon(predictor, before, horizon, discount);
         let action_id = steps + 1;
-        // The ledger records the forecast for the immediate action; the deeper rollout
-        // remains separate counterfactual evidence.
         let predicted_first = predictor.predict(before, action);
         let first_confidence = predictor.prediction_confidence(action);
 
@@ -928,8 +1083,10 @@ pub fn run_homeostatic_agent_horizon<P: MicroWorldPredictor>(
             .expect("policy action id must be unique");
 
         let after = world.step(action);
-        // Score raw model error. Confidence belongs to policy gating, not to the
-        // measurement of whether the underlying model predicted the consequence.
+        min_actual_viability_margin = min_actual_viability_margin.min(
+            after.energy.min(after.integrity) - 0.08,
+        );
+
         let error = predicted_first.mean_absolute_delta(after);
         predictor.observe_transition(before, action, after);
 
@@ -980,100 +1137,12 @@ pub fn run_homeostatic_agent_horizon<P: MicroWorldPredictor>(
         final_progress: final_state.progress,
         mean_min_confidence: confidence_sum / denom,
         mean_min_viability_margin: margin_sum / denom,
-        cumulative_prediction_error: cumulative_error,
-        actions,
-    }
-}
-
-pub fn run_homeostatic_agent<P: MicroWorldPredictor>(
-    predictor: &mut P,
-    max_cycles: u64,
-) -> HomeostaticRunReport {
-    let mut world = MicroWorld::default();
-    let policy = HomeostaticPolicy;
-    let mut fabric = ViabilityFabric::new(max_cycles as usize + 1);
-    let mut cumulative_error = 0.0;
-    let mut actions = Vec::with_capacity(max_cycles as usize);
-    let mut steps = 0u64;
-
-    while !world.done() && steps < max_cycles {
-        let before = world.observe();
-        let (action, _predicted) = policy.choose(predictor, before);
-        let action_id = steps + 1;
-        let predicted_raw = predictor.predict(before, action);
-        let prediction_confidence = predictor.prediction_confidence(action);
-
-        fabric.begin_cycle(before.cycle);
-        fabric
-            .predict_action(ActionPrediction {
-                action_id,
-                action_label: action.label().to_string(),
-                cycle: before.cycle,
-                predicted_world_delta: Some(signed_delta_with_confidence(
-                    before,
-                    predicted,
-                    predictor.prediction_confidence(action),
-                )),
-                predicted_self_delta: Some(signed_internal_delta(
-                    before,
-                    predicted,
-                    predictor.prediction_confidence(action),
-                )),
-                predicted_goal_delta: Some(signed_goal_delta(
-                    before,
-                    predicted,
-                    predictor.prediction_confidence(action),
-                )),
-                authority_granted: true,
-            })
-            .expect("policy action id must be unique");
-
-        let after = world.step(action);
-        let error = predicted_raw.mean_absolute_delta(after);
-        predictor.observe_transition(before, action, after);
-        cumulative_error += error;
-        steps += 1;
-        actions.push(action);
-
-        fabric
-            .observe_action(ActionOutcome {
-                action_id,
-                action_label: action.label().to_string(),
-                cycle: after.cycle,
-                pre_state_digest: before.digest(),
-                post_state_digest: after.digest(),
-                authority_granted: true,
-                safety_gate_passed: true,
-                prediction: None,
-                observed_effect: Some(
-                    super::viability_fabric::ViabilitySignal::new(
-                        (signed_delta(before, after).value + 1.0) * 0.5,
-                        1.0,
-                        after.cycle,
-                        "viability-micro-world",
-                    ),
-                ),
-                prediction_error: PredictionErrorLedger {
-                    world: error.clamp(0.0, 1.0),
-                    ..Default::default()
-                },
-                evidence_refs: vec![format!(
-                    "sim://viability-micro-world/policy-step/{}",
-                    after.digest()
-                )],
-            })
-            .expect("closed-loop action must have a pre-action prediction");
-    }
-
-    let final_state = world.observe();
-    HomeostaticRunReport {
-        steps,
-        survived: final_state.is_viable(),
-        final_energy: final_state.energy,
-        final_integrity: final_state.integrity,
-        final_knowledge: final_state.knowledge,
-        final_threat: final_state.threat,
-        final_progress: final_state.progress,
+        min_actual_viability_margin: if min_actual_viability_margin.is_finite() {
+            min_actual_viability_margin
+        } else {
+            final_state.energy.min(final_state.integrity) - 0.08
+        },
+        perturbations_applied,
         cumulative_prediction_error: cumulative_error,
         actions,
     }
