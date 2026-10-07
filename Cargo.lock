@@ -19030,6 +19030,7 @@ version = "0.1.0"
 name = "symthaea-gpu-fabric"
 version = "0.1.0"
 dependencies = [
+ "ash",
  "blake3",
  "serde",
  "thiserror 1.0.69",
