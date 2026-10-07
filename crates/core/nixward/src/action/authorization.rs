@@ -541,6 +541,12 @@ impl NixLocalExecutionAuthorityV1 {
             .service_effect_context()
             .map(|context| context.authorized_definition_content_digest.as_str())
     }
+
+    pub(crate) fn service_effect_context_pre_invocation_id(&self) -> Option<String> {
+        self.intent
+            .service_effect_context()
+            .and_then(|context| context.pre_invocation_id.clone())
+    }
 }
 
 

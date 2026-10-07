@@ -19,6 +19,7 @@ use super::authorization::{
     NixActionDescriptorV1, NixActionIntentV1, NixAuthorizationDecisionV1,
     NixExecutionAuthorizationRecordV1,
 };
+use super::execution_witness::NixLiveExecutionWitnessV1;
 use super::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use super::service_state::{
     ServiceActiveStateV1, ServiceLoadStateV1, ServiceUnitFileStateV1,
@@ -531,6 +532,11 @@ pub enum NixPostStateClaimV1 {
 pub struct NixPostStateReceiptV1 {
     pub action_intent_digest: String,
     pub authorization_record_digest: String,
+    /// Durable approval lineage copied from transient execution provenance.
+    #[serde(default)]
+    pub approval_request_id: Option<String>,
+    #[serde(default)]
+    pub approval_projection_digest: Option<String>,
     pub effect_digest: String,
     pub target_unit: String,
     pub authorized_generation: u64,
@@ -581,6 +587,50 @@ impl NixPostStateReceiptV1 {
         stability: Option<&NixVerifiedPostStateStabilityEvidenceV1>,
         observer_identity: impl Into<String>,
         observer_version: impl Into<String>,
+    ) -> Result<Self, NixPostStateErrorV1> {
+        Self::build_internal(
+            intent,
+            authorization,
+            expectation,
+            observation,
+            stability,
+            observer_identity,
+            observer_version,
+            None,
+        )
+    }
+
+    pub(crate) fn build_proven_from_live_execution_witness(
+        intent: &NixActionIntentV1,
+        authorization: &NixExecutionAuthorizationRecordV1,
+        expectation: &NixServicePostStateExpectationV1,
+        observation: &NixVerifiedPostStateObservationV1,
+        stability: Option<&NixVerifiedPostStateStabilityEvidenceV1>,
+        witness: NixLiveExecutionWitnessV1,
+        observer_identity: impl Into<String>,
+        observer_version: impl Into<String>,
+    ) -> Result<Self, NixPostStateErrorV1> {
+        Self::build_internal(
+            intent,
+            authorization,
+            expectation,
+            observation,
+            stability,
+            observer_identity,
+            observer_version,
+            Some(witness),
+        )
+    }
+
+    fn build_internal(
+        intent: &NixActionIntentV1,
+        authorization: &NixExecutionAuthorizationRecordV1,
+        expectation: &NixServicePostStateExpectationV1,
+        observation: &NixVerifiedPostStateObservationV1,
+        stability: Option<&NixVerifiedPostStateStabilityEvidenceV1>,
+        observer_identity: impl Into<String>,
+        observer_version: impl Into<String>,
+        witness: Option<NixLiveExecutionWitnessV1>,
     ) -> Result<Self, NixPostStateErrorV1> {
         let action_intent_digest = intent
             .digest()
@@ -648,13 +698,25 @@ impl NixPostStateReceiptV1 {
         }
 
         let assessment = evaluate_postcondition(expectation, observation)?;
+        if let Some(witness) = witness.as_ref() {
+            validate_live_execution_witness(
+                witness,
+                intent,
+                expectation,
+                &action_intent_digest,
+                authorization,
+            )?;
+        }
         let claim = match assessment {
             NixPostconditionAssessmentV1::Satisfied => {
                 if expectation.required_stability_us == 0 {
                     NixPostStateClaimV1::Observed
                 } else {
-                    match stability.map(NixVerifiedPostStateStabilityEvidenceV1::as_ref) {
-                        Some(stability)
+                    match (
+                        stability.map(NixVerifiedPostStateStabilityEvidenceV1::as_ref),
+                        witness.as_ref(),
+                    ) {
+                        (Some(stability), Some(_))
                             if stability.required_window_us >= expectation.required_stability_us =>
                         {
                             NixPostStateClaimV1::Proven
@@ -689,6 +751,8 @@ impl NixPostStateReceiptV1 {
         let receipt = Self {
             action_intent_digest,
             authorization_record_digest,
+            approval_request_id: witness.as_ref().map(|value| value.approval_request_id().to_string()),
+            approval_projection_digest: witness.as_ref().map(|value| value.projection_digest().to_string()),
             effect_digest: expectation.effect_digest()?,
             target_unit: expectation.unit.clone(),
             authorized_generation: expectation.authorized_generation,
@@ -874,6 +938,14 @@ impl NixPostStateReceiptV1 {
             "authorization record digest",
         )?;
         validate_digest(&self.effect_digest, "effect digest")?;
+        if let Some(request_id) = &self.approval_request_id {
+            if request_id.trim().is_empty() {
+                return Err(NixPostStateErrorV1::EmptyField("approval request id"));
+            }
+        }
+        if let Some(projection_digest) = &self.approval_projection_digest {
+            validate_digest(projection_digest, "approval projection digest")?;
+        }
         NixServiceOperationV1::new(self.target_unit.clone(), self.operation)
             .map_err(|_| NixPostStateErrorV1::InvalidServiceUnit)?;
         let expected_effect_digest = service_effect_digest(
@@ -1038,6 +1110,11 @@ impl NixPostStateReceiptV1 {
                 {
                     return Err(NixPostStateErrorV1::InvalidClaim);
                 }
+                if self.approval_request_id.is_none()
+                    || self.approval_projection_digest.is_none()
+                {
+                    return Err(NixPostStateErrorV1::MissingLiveExecutionWitness);
+                }
             }
             _ => {}
         }
@@ -1050,6 +1127,8 @@ impl NixPostStateReceiptV1 {
         h.update(POST_STATE_RECEIPT_DOMAIN_V1);
         put_str(&mut h, &self.action_intent_digest);
         put_str(&mut h, &self.authorization_record_digest);
+        put_opt_str(&mut h, self.approval_request_id.as_deref());
+        put_opt_str(&mut h, self.approval_projection_digest.as_deref());
         put_str(&mut h, &self.effect_digest);
         put_str(&mut h, &self.target_unit);
         put_u64(&mut h, self.authorized_generation);
@@ -1598,6 +1677,53 @@ pub enum NixPostStateErrorV1 {
     MissingBoundPreState,
     #[error("bound pre-state identity is malformed")]
     InvalidBoundPreState,
+    #[error("live execution provenance is required for a Proven receipt")]
+    MissingLiveExecutionWitness,
+    #[error("live execution provenance does not match the bound authorization lineage")]
+    LiveExecutionWitnessMismatch,
+}
+
+fn validate_live_execution_witness(
+    witness: &NixLiveExecutionWitnessV1,
+    intent: &NixActionIntentV1,
+    expectation: &NixServicePostStateExpectationV1,
+    action_intent_digest: &str,
+    authorization: &NixExecutionAuthorizationRecordV1,
+) -> Result<(), NixPostStateErrorV1> {
+    if witness.action_intent_digest() != action_intent_digest
+        || authorization.action_intent_digest != action_intent_digest
+        || witness.pre_state_identity() != intent.pre_state_identity.as_deref()
+    {
+        return Err(NixPostStateErrorV1::LiveExecutionWitnessMismatch);
+    }
+
+    match &intent.action {
+        NixActionDescriptorV1::Service { operation, unit } => {
+            let Some(context) = intent.service_effect_context() else {
+                return Err(NixPostStateErrorV1::MissingServiceEffectContext);
+            };
+            if context.operation != *operation
+                || context.unit != *unit
+                || expectation.operation != *operation
+                || expectation.unit != *unit
+                || witness.service_definition_content_digest()
+                    != Some(context.authorized_definition_content_digest.as_str())
+                || witness.pre_invocation_id() != context.pre_invocation_id.as_deref()
+                || expectation.pre_invocation_id.as_deref() != witness.pre_invocation_id()
+            {
+                return Err(NixPostStateErrorV1::LiveExecutionWitnessMismatch);
+            }
+        }
+        _ => {
+            if witness.service_definition_content_digest().is_some()
+                || witness.pre_invocation_id().is_some()
+            {
+                return Err(NixPostStateErrorV1::LiveExecutionWitnessMismatch);
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1749,6 +1875,89 @@ mod tests {
             exp,
             &verified,
             verified_stability.as_ref(),
+            "systemd-observer-v1",
+            "1",
+        )
+    }
+
+    fn build_proven_receipt(
+        exp: &NixServicePostStateExpectationV1,
+        obs: &NixServicePostStateObservationV1,
+        stability: Option<NixPostStateStabilityEvidenceV1>,
+    ) -> Result<NixPostStateReceiptV1, NixPostStateErrorV1> {
+        let verified = NixVerifiedPostStateObservationV1::from_observer(obs.clone())?;
+        let verified_stability = stability.map(|evidence| {
+            NixVerifiedPostStateStabilityEvidenceV1 { evidence }
+        });
+
+        use super::super::authorization::{
+            NixActionIntentV1, NixAuthorizationProfileV1, NixActionScopeV1,
+        };
+        let intent = NixActionIntentV1 {
+            subject_identity: "host:test".to_string(),
+            pre_state_identity: Some(format!(
+                "nixward-service-pre-state-v1|generation={}|unit={}|state={}",
+                exp.authorized_generation,
+                exp.unit,
+                "1111111111111111111111111111111111111111111111111111111111111111"
+            )),
+            action: NixActionDescriptorV1::Service {
+                operation: exp.operation,
+                unit: exp.unit.clone(),
+            },
+            service_effect_context: Some(
+                super::authorization::NixServiceEffectContextV1::new(
+                    exp.operation,
+                    exp.unit.clone(),
+                    exp.authorized_generation,
+                    "1111111111111111111111111111111111111111111111111111111111111111",
+                    exp.authorized_definition_digest.clone(),
+                    exp.authorized_definition_content_digest.clone(),
+                    exp.pre_invocation_id.clone(),
+                    exp.required_stability_us,
+                )
+                .unwrap(),
+            ),
+            maximum_scope: NixActionScopeV1::SystemModify,
+            preconditions: Vec::new(),
+            required_postconditions: Vec::new(),
+            rollback_or_recovery_ref: None,
+        };
+        let authorization = NixExecutionAuthorizationRecordV1 {
+            action_intent_digest: intent.digest().unwrap(),
+            service_effect_context_digest: Some(
+                intent
+                    .service_effect_context
+                    .as_ref()
+                    .unwrap()
+                    .digest()
+                    .unwrap(),
+            ),
+            profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
+            authority_ref: "approval:test".to_string(),
+            issued_at_unix_ms: 1,
+            expires_at_unix_ms: None,
+            decision: NixAuthorizationDecisionV1::Approved,
+        };
+        let witness = NixLiveExecutionWitnessV1::for_test(
+            intent.digest().unwrap(),
+            "approval:test",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            intent.pre_state_identity.clone(),
+            intent
+                .service_effect_context
+                .as_ref()
+                .map(|context| context.authorized_definition_content_digest.clone()),
+            exp.pre_invocation_id.clone(),
+        );
+
+        NixPostStateReceiptV1::build_proven_from_live_execution_witness(
+            &intent,
+            &authorization,
+            exp,
+            &verified,
+            verified_stability.as_ref(),
+            witness,
             "systemd-observer-v1",
             "1",
         )
@@ -1979,7 +2188,78 @@ mod tests {
         )
         .unwrap();
 
+        assert_eq!(receipt.claim, NixPostStateClaimV1::Unproven);
+    }
+
+    #[test]
+    fn mismatched_live_execution_witness_fails_closed() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let intent = contextual_intent(
+            NixServiceOperationKindV1::Start,
+            &exp.unit,
+            exp.authorized_generation,
+            exp.authorized_definition_content_digest.clone(),
+            exp.pre_invocation_id.clone(),
+            exp.required_stability_us,
+        );
+        let authorization = contextual_authorization(&intent);
+        let witness = NixLiveExecutionWitnessV1::for_test(
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "approval:test",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            intent.pre_state_identity.clone(),
+            intent
+                .service_effect_context
+                .as_ref()
+                .map(|context| context.authorized_definition_content_digest.clone()),
+            exp.pre_invocation_id.clone(),
+        );
+
+        assert_eq!(
+            validate_live_execution_witness(
+                &witness,
+                &intent,
+                &exp,
+                &intent.digest().unwrap(),
+                &authorization,
+            )
+            .unwrap_err(),
+            NixPostStateErrorV1::LiveExecutionWitnessMismatch
+        );
+    }
+
+    #[test]
+    fn live_execution_witness_enables_proven_claim() {
+        let mut exp = expectation(NixServiceOperationKindV1::Start);
+        exp.required_stability_us = 1_000;
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+
+        let receipt = build_proven_receipt(
+            &exp,
+            &obs,
+            Some(stability(
+                &obs,
+                1_000,
+                1_000,
+                2_000,
+                &[1_000, 2_000],
+            )),
+        )
+        .unwrap();
+
         assert_eq!(receipt.claim, NixPostStateClaimV1::Proven);
+        assert_eq!(
+            receipt.approval_request_id.as_deref(),
+            Some("approval:test")
+        );
+        assert_eq!(
+            receipt.approval_projection_digest.as_deref(),
+            Some("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd")
+        );
     }
 
     #[test]
@@ -2459,7 +2739,7 @@ mod tests {
             ServiceActiveStateV1::Active,
             ServiceUnitFileStateV1::Enabled,
         );
-        let mut receipt = build_receipt(
+        let mut receipt = build_proven_receipt(
             &exp,
             &obs,
             Some(stability(
