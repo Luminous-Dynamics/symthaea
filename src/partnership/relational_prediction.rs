@@ -1367,7 +1367,7 @@ const INFERENCE_BINDING_SCHEMA: &str = "relational-prediction-inference-binding/
 const INFERENCE_SELECTION_SCHEMA: &str = "relational-prediction-inference-selection/v1";
 const CANONICAL_INFERENCE_SELECTION_RULE_ID: &str = "relational-inference-selection-rule-v1";
 const CANONICAL_INFERENCE_SELECTION_RULE_SPEC_SHA256: &str =
-    "3cbc7106d5f5b934958abfaf797c7a188aece444014027b4bbc3950b9db842b8";
+    "61ecc22c11c7967fc7a6e9784ff4fa15ff191bcac49b1d24249d567615bbe3e5";
 const CANONICAL_INFERENCE_SELECTION_PROCEDURE_ID: &str = "nested-forecast-bootstrap-v1";
 const CANONICAL_INFERENCE_SELECTION_DEPENDENCE_ID: &str = "loss-dependence-bartlett-v1";
 const CANONICAL_INFERENCE_SELECTION_RESAMPLING_ID: &str = "moving-block-bootstrap-v1";
