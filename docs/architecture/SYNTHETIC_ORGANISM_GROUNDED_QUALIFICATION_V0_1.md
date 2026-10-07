@@ -194,6 +194,7 @@ For each deterministic perturbation shock:
 
 The report distinguishes:
 
+- one auditable receipt per perturbation, including cycle, action, and exact shock-state digest;
 - mean shock MAE before and after the update;
 - same-transition improvement and improvement rate;
 - neighboring-probe MAE before and after the update;
@@ -394,8 +395,8 @@ A future green qualification should report all of:
 14. leave-one-scenario-out transfer matrix and worst-fold result;
 15. environment-level counterfactual query-bank results, including path error and changed-channel F1;
 16. procedurally generated held-out transfer results and procedural-family manifest digest;
-17. prediction-error adaptation response, including same-transition correction, neighboring-probe transfer,
-and anchor regression;
+17. prediction-error adaptation response, including per-shock receipts, same-transition correction,
+neighboring-probe transfer, and anchor regression;
 18. trace/invariant verification where action evidence is recorded.
 
 Queued CI is not a pass.
