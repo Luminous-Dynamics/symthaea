@@ -543,6 +543,10 @@ def main() -> int:
             TRIGGER_RUN_CONCLUSION = str(manual_run.get("conclusion") or "")
             TRIGGER_RUN_ATTEMPT = int(manual_run.get("run_attempt") or 0)
             TRIGGER_ACTIVITY_TYPE = "completed"
+            if manual_run.get("status") != "completed":
+                raise WaitingError(
+                    f"manual workflow-run target is not completed: {manual_run.get('status')!r}"
+                )
             if (
                 TRIGGER_RUN_REPOSITORY_ID != REPOSITORY_ID
                 or TRIGGER_RUN_EVENT != "pull_request"
@@ -784,6 +788,10 @@ def main() -> int:
                 "Attest structured freeze receipt",
                 "Preserve attestation bundle",
                 "receipt.attestation.bundle.json",
+                "workflow_dispatch:",
+                "workflow_run_id:",
+                "TRUST_ANCHOR_MODE: $"+"{{ github.event_name }}",
+                "MANUAL_WORKFLOW_RUN_ID: $"+"{{ inputs.workflow_run_id }}",
             ],
             "Broca workflow",
         )
@@ -824,6 +832,8 @@ def main() -> int:
             audit,
             [
                 "verify_qualification_checkout",
+                "TRUST_ANCHOR_MODE",
+                "MANUAL_WORKFLOW_RUN_ID",
                 "git rev-parse HEAD",
                 "write_structured_receipt",
                 "qualification_workflow_git_blob_sha",
