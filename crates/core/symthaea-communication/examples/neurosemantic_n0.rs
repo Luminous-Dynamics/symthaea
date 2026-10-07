@@ -1304,6 +1304,12 @@ fn main() -> Result<(), String> {
             )
             .is_err()
     };
+    let remediation_measurement_schema_v2_rejected = {
+        let mut legacy = measurement.clone();
+        legacy.schema_version = 2;
+        let bytes = serde_json::to_vec(&legacy).map_err(|e| e.to_string())?;
+        NeurosemanticRemediationMeasurementArtifact::from_json_bytes(&bytes).is_err()
+    };
     let remediation_uncertainty_method_substitution_blocked = {
         let mut forged = uncertainty_computation.clone();
         forged.method_ref = "other-uncertainty-method-v1".into();
@@ -2003,6 +2009,7 @@ fn main() -> Result<(), String> {
         "remediation_computation_substitution_blocked": remediation_computation_substitution_blocked,
         "remediation_canonical_population_identity_substitution_blocked": remediation_canonical_population_identity_substitution_blocked,
         "remediation_uncertainty_method_substitution_blocked": remediation_uncertainty_method_substitution_blocked,
+        "remediation_measurement_schema_v2_rejected": remediation_measurement_schema_v2_rejected,
         "remediation_uncertainty_substitution_blocked": remediation_uncertainty_substitution_blocked,
         "remediation_metric_direction_mismatch_blocked": remediation_metric_direction_mismatch_blocked,
         "remediation_uncertainty_point_estimate_binding_blocked": remediation_uncertainty_point_estimate_binding_blocked,
