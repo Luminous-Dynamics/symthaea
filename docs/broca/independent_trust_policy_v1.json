@@ -4,7 +4,7 @@
   "pull_request": 6951,
   "base_branch": "feat/broca-morph-compilation-provenance-v1",
   "base_sha": "707698fbd7ef52ca6f5c9740bf9b61ee220da2b0",
-  "approved_head_sha": "2ef5562080a151212613b3c5886b367792bab9b3",
+  "approved_head_sha": "b8b4684a2162175ecb5499a1e2f32e8f54d6782d",
   "approved_files": [
     {
       "path": ".github/workflows/broca-feature-matrix.yml",
@@ -29,7 +29,7 @@
     {
       "path": "crates/domains/symthaea-broca/src/lexical_binding.rs",
       "status": "modified",
-      "blob_sha": "8a557b1336fa5108bcd8dfb3f67a19e1eea1630e"
+      "blob_sha": "de684c3b58fab0eaceddda4ed8a93d67aef2363b"
     },
     {
       "path": "crates/domains/symthaea-broca/src/lib.rs",
