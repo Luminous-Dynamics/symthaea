@@ -1039,6 +1039,93 @@ mod tests {
         (graph, schedule, plan, initial)
     }
 
+    fn hazard_fixture() -> (
+        ExecutionGraph,
+        ExecutionSchedule,
+        VulkanSyncPlan,
+        BTreeMap<ResourceId, BinaryHypervector>,
+    ) {
+        let lhs = ResourceId::new("lhs").unwrap();
+        let rhs = ResourceId::new("rhs").unwrap();
+        let mid = ResourceId::new("mid").unwrap();
+
+        let n1 = ExecutionNode::new(
+            1,
+            GpuOperation::HdcBindXor { dimensions: 32 },
+            vec![
+                crate::ResourceUse::new(lhs.clone(), AccessKind::Read),
+                crate::ResourceUse::new(rhs.clone(), AccessKind::Read),
+                crate::ResourceUse::new(mid.clone(), AccessKind::Write),
+            ],
+        );
+        let n2 = ExecutionNode::new(
+            2,
+            GpuOperation::HdcBindXor { dimensions: 32 },
+            vec![
+                crate::ResourceUse::new(mid.clone(), AccessKind::Read),
+                crate::ResourceUse::new(lhs.clone(), AccessKind::Read),
+                crate::ResourceUse::new(rhs.clone(), AccessKind::Write),
+            ],
+        );
+        let n3 = ExecutionNode::new(
+            3,
+            GpuOperation::HdcBindXor { dimensions: 32 },
+            vec![
+                crate::ResourceUse::new(lhs.clone(), AccessKind::Read),
+                crate::ResourceUse::new(mid.clone(), AccessKind::Read),
+                crate::ResourceUse::new(rhs.clone(), AccessKind::Write),
+            ],
+        );
+
+        let graph = ExecutionGraph::new(
+            vec![n1, n2, n3],
+            vec![
+                crate::DependencyEdge::new(
+                    1,
+                    2,
+                    mid,
+                    DependencyKind::ReadAfterWrite,
+                ),
+                crate::DependencyEdge::new(
+                    1,
+                    2,
+                    rhs.clone(),
+                    DependencyKind::WriteAfterRead,
+                ),
+                crate::DependencyEdge::new(
+                    2,
+                    3,
+                    rhs.clone(),
+                    DependencyKind::WriteAfterWrite,
+                ),
+            ],
+        )
+        .unwrap();
+        let schedule = ExecutionSchedule::from_graph(&graph).unwrap();
+        let queue = crate::VulkanQueueId::new(0).unwrap();
+        let plan = VulkanSyncPlan::from_schedule(
+            &schedule,
+            &[
+                crate::VulkanQueueAssignment { node_id: 1, queue },
+                crate::VulkanQueueAssignment { node_id: 2, queue },
+                crate::VulkanQueueAssignment { node_id: 3, queue },
+            ],
+        )
+        .unwrap();
+
+        let mut initial = BTreeMap::new();
+        initial.insert(
+            lhs,
+            BinaryHypervector::from_bytes(32, vec![0x0f, 0xf0, 0xaa, 0x55]).unwrap(),
+        );
+        initial.insert(
+            rhs,
+            BinaryHypervector::from_bytes(32, vec![0x33, 0xcc, 0x55, 0xaa]).unwrap(),
+        );
+        initial.insert(mid, BinaryHypervector::zeros(32));
+        (graph, schedule, plan, initial)
+    }
+
     #[test]
     fn barrier_access_policy_matches_vulkan_hazards() {
         assert_eq!(
@@ -1090,6 +1177,47 @@ mod tests {
         assert_eq!(
             barrier_lowering_digest(&plan, &empty).unwrap_err(),
             ResourceId::new("mid").unwrap()
+        );
+    }
+
+    #[test]
+    fn workload_plan_exercises_raw_war_and_waw() {
+        let (graph, schedule, plan, initial) = hazard_fixture();
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        assert_eq!(
+            plan.submissions[1].barriers,
+            vec![
+                VulkanBarrierRequirement {
+                    from: 1,
+                    to: 2,
+                    resource: ResourceId::new("mid").unwrap(),
+                    kind: DependencyKind::ReadAfterWrite,
+                },
+                VulkanBarrierRequirement {
+                    from: 1,
+                    to: 2,
+                    resource: ResourceId::new("rhs").unwrap(),
+                    kind: DependencyKind::WriteAfterRead,
+                },
+            ]
+        );
+        assert_eq!(
+            plan.submissions[2].barriers,
+            vec![
+                VulkanBarrierRequirement {
+                    from: 2,
+                    to: 3,
+                    resource: ResourceId::new("rhs").unwrap(),
+                    kind: DependencyKind::WriteAfterWrite,
+                },
+            ]
+        );
+        assert!(plan.submissions[1].barriers[0].requires_memory_dependency());
+        assert!(!plan.submissions[1].barriers[1].requires_memory_dependency());
+        assert!(plan.submissions[2].barriers[0].requires_memory_dependency());
+        assert_eq!(
+            final_state[&ResourceId::new("rhs").unwrap()].as_bytes(),
+            &[0x33, 0xcc, 0x55, 0xaa]
         );
     }
 
@@ -1381,18 +1509,23 @@ mod tests {
     #[test]
     #[ignore = "requires a Vulkan 1.3 validation runner"]
     fn real_vulkan_barrier_workload_matches_cpu_oracle() {
-        let (graph, schedule, plan, initial) = fixture();
         let runtime = VulkanBarrierWorkloadRuntime::new()
-            .expect("qualified Vulkan 1.3 synchronization2 device");
-        let (observed, receipt) = runtime
-            .execute_verified(&graph, &schedule, &plan, &initial)
-            .expect("Vulkan barrier workload must complete");
-        receipt
-            .verify_against(&graph, &schedule, &plan, &observed)
-            .expect("receipt must independently verify");
+            .expect("qualified Vulkan 1.3 synchronization2 timeline device");
+
+        for (graph, schedule, plan, initial) in [fixture(), hazard_fixture()] {
+            let (observed, receipt) = runtime
+                .execute_verified(&graph, &schedule, &plan, &initial)
+                .expect("Vulkan barrier workload must complete");
+            receipt
+                .verify_against(&graph, &schedule, &plan, &observed)
+                .expect("receipt must independently verify");
+        }
+
+        let (_, _, _, initial) = fixture();
+        let (_, _, _, _) = hazard_fixture();
         assert_eq!(
-            observed[&ResourceId::new("out").unwrap()].as_bytes(),
-            &[0x0f, 0xf0, 0xaa, 0x55]
+            initial[&ResourceId::new("rhs").unwrap()].as_bytes(),
+            &[0x33, 0xcc, 0x55, 0xaa]
         );
     }
 }
