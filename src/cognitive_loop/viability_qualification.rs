@@ -410,6 +410,9 @@ pub struct GroundedWorldModelQualificationReport {
     /// Frozen-model policy evaluation on states induced by the model's own actions.
     pub policy_induced_shift: PolicyInducedShiftReport,
 
+    /// Agreement between predicted action ordering and oracle action ordering.
+    pub held_out_policy_ranking: PolicyRankingQualificationReport,
+
     pub persistence_closed_loop_survived: bool,
     pub persistence_closed_loop_mean_oracle_horizon_regret: f64,
     pub persistence_recovery_rate: f64,
@@ -447,6 +450,21 @@ pub struct HorizonQualificationPoint {
 impl HorizonQualificationPoint {
     pub fn has_temporal_degradation(&self) -> bool {
         self.mean_terminal_mae > self.mean_one_step_mae
+    }
+}
+
+/// Decision-centric ranking qualification on frozen held-out states.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PolicyRankingQualificationReport {
+    pub states: u64,
+    pub top1_agreement: f64,
+    pub pairwise_agreement: f64,
+    pub pairs_evaluated: u64,
+}
+
+impl PolicyRankingQualificationReport {
+    pub fn decision_structure_present(&self) -> bool {
+        self.top1_agreement > 0.5 || self.pairwise_agreement > 0.5
     }
 }
 
@@ -752,6 +770,106 @@ fn evaluate_policy_induced_shift<P: MicroWorldPredictor>(
     }
 }
 
+fn evaluate_frozen_policy_ranking<P: MicroWorldPredictor>(
+    predictor: &P,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+) -> PolicyRankingQualificationReport {
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let mut states = 0u64;
+    let mut top1_matches = 0u64;
+    let mut pairs_evaluated = 0u64;
+    let mut pairwise_matches = 0u64;
+    let policy = super::viability_micro_world::HomeostaticPolicy;
+
+    while !world.done() && states < max_cycles {
+        for (cycle, perturbation) in scenario.perturbations {
+            if *cycle == states {
+                world.perturb(*perturbation);
+            }
+        }
+
+        let current = world.observe();
+        let mut predicted_scores = Vec::with_capacity(MicroAction::ALL.len());
+        let mut oracle_scores = Vec::with_capacity(MicroAction::ALL.len());
+
+        for action in MicroAction::ALL {
+            let predicted = predictor.predict(current, action);
+            let confidence = predictor.prediction_confidence(action).clamp(0.0, 1.0);
+            predicted_scores.push(
+                super::viability_micro_world::HomeostaticPolicy::benchmark_predicted_action_score(
+                    predicted,
+                    current,
+                    action,
+                    confidence,
+                )
+            );
+            let oracle_next = transition(current, action);
+            oracle_scores.push(
+                super::viability_micro_world::HomeostaticPolicy::benchmark_action_score(
+                    oracle_next,
+                    current,
+                    action,
+                )
+            );
+        }
+
+        let predicted_best = predicted_scores
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(index, _)| index)
+            .unwrap_or(0);
+
+        let oracle_best = oracle_scores
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(index, _)| index)
+            .unwrap_or(0);
+
+        if predicted_best == oracle_best {
+            top1_matches = top1_matches.saturating_add(1);
+        }
+
+        for i in 0..predicted_scores.len() {
+            for j in (i + 1)..predicted_scores.len() {
+                let predicted_delta = predicted_scores[i] - predicted_scores[j];
+                let oracle_delta = oracle_scores[i] - oracle_scores[j];
+
+                if predicted_delta.abs() <= f64::EPSILON
+                    || oracle_delta.abs() <= f64::EPSILON
+                {
+                    continue;
+                }
+
+                pairs_evaluated = pairs_evaluated.saturating_add(1);
+                if predicted_delta.signum() == oracle_delta.signum() {
+                    pairwise_matches = pairwise_matches.saturating_add(1);
+                }
+            }
+        }
+
+        world.step(scenario.schedule[states as usize % scenario.schedule.len()]);
+        states = states.saturating_add(1);
+    }
+
+    PolicyRankingQualificationReport {
+        states,
+        top1_agreement: if states == 0 {
+            0.0
+        } else {
+            top1_matches as f64 / states as f64
+        },
+        pairwise_agreement: if pairs_evaluated == 0 {
+            0.0
+        } else {
+            pairwise_matches as f64 / pairs_evaluated as f64
+        },
+        pairs_evaluated,
+    }
+}
+
 fn encode_micro_world_state(state: MicroWorldObservation) -> Vec<f64> {
     let mut encoded = vec![0.0f64; 64];
     encoded[0] = state.energy;
@@ -996,6 +1114,9 @@ impl FepModule {
             held_out_predictor_mae,
         );
 
+        let held_out_policy_ranking =
+            evaluate_frozen_policy_ranking(&predictor, held_out, held_out_cycles);
+
         let closed_loop = run_homeostatic_agent_horizon_scenario(
             &mut predictor,
             held_out,
@@ -1022,6 +1143,7 @@ impl FepModule {
             held_out_multi_horizon,
             held_out_survived_fixed_schedule: held_out_survived,
             policy_induced_shift,
+            held_out_policy_ranking,
             persistence_closed_loop_survived: persistence_closed_loop.survived,
             persistence_closed_loop_mean_oracle_horizon_regret:
                 persistence_closed_loop.mean_oracle_horizon_regret,
@@ -1121,6 +1243,22 @@ mod tests {
         let (_, _, custom_rollout) =
             policy.choose_horizon_with_confidence_decay(&predictor, current, 4, 0.8, 0.5);
         assert!((custom_rollout.min_confidence - 0.5_f64.powi(3)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn oracle_policy_has_perfect_action_ranking() {
+        let predictor = OraclePredictor;
+        let report = evaluate_frozen_policy_ranking(
+            &predictor,
+            &benchmark_scenarios()[0],
+            8,
+        );
+
+        assert!(report.states > 0);
+        assert!(report.pairs_evaluated > 0);
+        assert!((report.top1_agreement - 1.0).abs() < 1e-12);
+        assert!((report.pairwise_agreement - 1.0).abs() < 1e-12);
+        assert!(report.decision_structure_present());
     }
 
     #[test]
