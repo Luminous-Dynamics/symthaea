@@ -881,7 +881,17 @@ impl MorphophonologicalCompilationWitness {
             .iter()
             .filter_map(|rule| rule.source_record_id.as_deref())
             .collect::<Vec<_>>();
-        if !output_ids.is_empty() {
+        if self.compiler_id == UNIMORPH_TSV_COMPILER_ID {
+            let output_id_set = output_ids.iter().copied().collect::<HashSet<_>>();
+            if output_ids.len() != self.source_slices.len()
+                || output_id_set.len() != output_ids.len()
+                || output_id_set != selected_ids
+            {
+                return Err(
+                    MorphophonologicalCompilationWitnessError::SourceRecordRuleMappingMismatch,
+                );
+            }
+        } else if !output_ids.is_empty() {
             let output_id_set = output_ids.iter().copied().collect::<HashSet<_>>();
             if output_ids.len() != self.source_slices.len()
                 || output_id_set.len() != output_ids.len()
@@ -3306,6 +3316,44 @@ mod tests {
         assert_eq!(
             witness.validate_shape().expect_err("declared UniMorph compiler must carry identity"),
             MorphophonologicalCompilationWitnessError::MissingCompilerIdentity
+        );
+    }
+
+    #[test]
+    fn unimorph_compilation_witness_requires_source_to_rule_mapping() {
+        let artifact = b"walk\twalked\tV;PST\n";
+        let slices = vec![MorphophonologicalSourceSlice {
+            record_id: "walk-past".into(),
+            byte_offset: 0,
+            byte_length: artifact.len(),
+            record_blake3: blake3::hash(artifact).to_hex().to_string(),
+        }];
+        let (mut rule_set, witness) = MorphophonologicalRuleSet::compile_unimorph_tsv_source(
+            "en",
+            "en-unspecified",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "fixture:unimorph-tsv",
+                "fixture-snapshot-v1",
+            )
+            .unwrap(),
+            "fixture:unimorph:v1",
+            "fixture:compiler:v1",
+            artifact,
+            slices,
+        )
+        .expect("compiler fixture");
+
+        rule_set.rules[0].source_record_id = None;
+
+        let mut tampered = witness;
+        tampered.output_rule_set_blake3 = rule_set.resource_blake3();
+        tampered.transformation_blake3 = tampered.compute_transformation_blake3();
+
+        assert_eq!(
+            tampered
+                .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
+                .expect_err("UniMorph compiled rules must retain one-to-one source mapping"),
+            MorphophonologicalCompilationWitnessError::SourceRecordRuleMappingMismatch
         );
     }
 
