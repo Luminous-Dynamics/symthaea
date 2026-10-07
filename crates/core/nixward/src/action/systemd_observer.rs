@@ -204,6 +204,7 @@ impl NixSystemdJobRemovedWatcherV1 {
                     return Ok(NixSystemdJobEvidenceV1 {
                         id: removed.id,
                         job_type: expected.job_type,
+                        observed_job_type: expected.observed_job_type,
                         unit: removed.unit,
                         object_path: removed.object_path.as_str().to_string(),
                         result: removed.result,
@@ -652,6 +653,7 @@ impl NixSystemdReadOnlyObserverV1 {
         Ok(NixSystemdJobHandleV1 {
             id,
             job_type,
+            observed_job_type: Some(job_type),
             unit: canonical_job_unit,
             object_path: job_object_path.clone(),
             unit_object_path: job_unit_path,
@@ -693,11 +695,15 @@ impl NixSystemdReadOnlyObserverV1 {
         let id = job_id_from_object_path(job_object_path)?;
         let job_type = NixSystemdJobTypeV1::for_operation(operation)
             .ok_or(NixSystemdObserverErrorV1::JobCorrelationMismatch)?;
+        let observed_job_type = self
+            .try_observe_dispatched_job_type(job_object_path, expected_manager_owner, expected_bus_id)
+            .await?;
         let unit_object_path = self.resolve_service_unit(&expected_unit).await?;
 
         Ok(NixSystemdJobHandleV1 {
             id,
             job_type,
+            observed_job_type,
             unit: expected_unit,
             object_path: job_object_path.clone(),
             unit_object_path,
@@ -822,6 +828,53 @@ impl NixSystemdReadOnlyObserverV1 {
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))
     }
 
+    async fn try_observe_dispatched_job_type(
+        &self,
+        job_object_path: &OwnedObjectPath,
+        expected_manager_owner: &str,
+        expected_bus_id: &str,
+    ) -> Result<Option<NixSystemdJobTypeV1>, NixSystemdObserverErrorV1> {
+        let current_owner = self.systemd_manager_owner().await?;
+        let current_bus_id = self.dbus_bus_id().await?;
+        if current_owner != expected_manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if current_bus_id != expected_bus_id {
+            return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
+        }
+
+        let properties = match self
+            .get_all_properties(job_object_path, SYSTEMD_JOB_INTERFACE)
+            .await
+        {
+            Ok(properties) => properties,
+            Err(NixSystemdObserverErrorV1::Dbus(_)) => return Ok(None),
+            Err(error) => return Err(error),
+        };
+
+        let observed = parse_job_type(required_string(
+            &properties,
+            SYSTEMD_JOB_INTERFACE,
+            "JobType",
+        )?)?;
+
+        if let (Ok(id), Some(job_path_id)) =
+            (required_u32(&properties, SYSTEMD_JOB_INTERFACE, "Id"), job_id_from_object_path(job_object_path).ok())
+        {
+            if id != job_path_id || id == 0 {
+                return Err(NixSystemdObserverErrorV1::JobCorrelationMismatch);
+            }
+        }
+
+        let post_owner = self.systemd_manager_owner().await?;
+        let post_bus_id = self.dbus_bus_id().await?;
+        if post_owner != expected_manager_owner || post_bus_id != expected_bus_id {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+
+        Ok(Some(observed))
+    }
+
     async fn systemd_manager_owner(&self) -> Result<String, NixSystemdObserverErrorV1> {
         let bus = Proxy::new(
             &self.connection,
@@ -855,6 +908,7 @@ impl NixSystemdReadOnlyObserverV1 {
 pub struct NixSystemdJobHandleV1 {
     id: u32,
     job_type: NixSystemdJobTypeV1,
+    observed_job_type: Option<NixSystemdJobTypeV1>,
     unit: String,
     object_path: OwnedObjectPath,
     unit_object_path: OwnedObjectPath,
@@ -867,6 +921,7 @@ impl std::fmt::Debug for NixSystemdJobHandleV1 {
         f.debug_struct("NixSystemdJobHandleV1")
             .field("id", &self.id)
             .field("job_type", &self.job_type)
+            .field("observed_job_type", &self.observed_job_type)
             .field("unit", &self.unit)
             .field("object_path", &self.object_path)
             .field("unit_object_path", &self.unit_object_path)
@@ -883,6 +938,10 @@ impl NixSystemdJobHandleV1 {
 
     pub fn job_type(&self) -> NixSystemdJobTypeV1 {
         self.job_type
+    }
+
+    pub fn observed_job_type(&self) -> Option<NixSystemdJobTypeV1> {
+        self.observed_job_type
     }
 
     pub fn unit(&self) -> &str {
