@@ -87,12 +87,9 @@ pub struct ReceiptSelectionContext {
 }
 
 impl ReceiptSelectionContext {
-    /// Build a durable projection directly from a fully evaluated RFC 9942
-    /// selection decision, preventing the compact anchor from disagreeing with
-    /// the decision it references.
-    #[cfg(feature = "semantic-receipts")]
     /// Internal structural conversion used only after a decision has passed
     /// the collection-bound validation performed by from_bound_decision.
+    #[cfg(feature = "semantic-receipts")]
     fn from_decision(
         decision: &crate::rfc9942_selection::ReceiptSelectionDecision,
     ) -> Result<Self, HolochainProjectionError> {
