@@ -10,6 +10,12 @@ on:
       - requested
       - in_progress
       - completed
+  workflow_dispatch:
+    inputs:
+      workflow_run_id:
+        description: "Completed pull-request workflow run ID to replay"
+        required: true
+        type: string
 
 permissions:
   actions: read
@@ -18,13 +24,13 @@ permissions:
   statuses: write
 
 concurrency:
-  group: broca-independent-trust-anchor-${{ github.event.workflow_run.head_sha }}
+  group: broca-independent-trust-anchor-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.workflow_run_id }}
   cancel-in-progress: true
 
 jobs:
   trust-anchor:
     name: Broca independent trust anchor
-    if: github.event.workflow_run.event == 'pull_request'
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -44,6 +50,8 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_ID: ${{ github.repository_id }}
           TRUST_ANCHOR_SHA: ${{ github.sha }}
+          TRUST_ANCHOR_MODE: ${{ github.event_name }}
+          MANUAL_WORKFLOW_RUN_ID: ${{ inputs.workflow_run_id }}
           TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
           TRIGGER_RUN_NAME: ${{ github.event.workflow_run.name }}
           TRIGGER_RUN_EVENT: ${{ github.event.workflow_run.event }}
