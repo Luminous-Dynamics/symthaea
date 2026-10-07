@@ -2,6 +2,7 @@ name: GPU Fabric Vulkan Barrier Qualification
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'crates/core/symthaea-gpu-fabric/**'
       - '.github/workflows/gpu-fabric-vulkan-barriers.yml'
@@ -10,6 +11,7 @@ on:
 jobs:
   vulkan-barriers:
     name: Vulkan resource barrier workload qualification
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
