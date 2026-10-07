@@ -846,6 +846,8 @@ fn validate_service_definition_capture(
         || context.operation != *operation
         || context.unit != *unit
         || context.authorized_definition_digest != evidence.source_identity_digest
+        || context.authorized_manager_owner != evidence.manager_owner
+        || context.authorized_bus_id != evidence.bus_id
     {
         return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
     }
@@ -878,6 +880,8 @@ fn validate_service_definition_capture_binding(
         if context.unit != *unit
             || context.authorized_definition_digest != evidence.source_identity_digest
             || context.authorized_definition_content_digest != content_digest
+            || context.authorized_manager_owner != evidence.manager_owner
+            || context.authorized_bus_id != evidence.bus_id
         {
             return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
         }
