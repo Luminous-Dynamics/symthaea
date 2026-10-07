@@ -229,6 +229,9 @@ impl PredictionErrorLedger {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ActionPrediction {
     pub action_id: u64,
+            pre_state_digest: 1,
+    /// Digest of the exact pre-action state used to produce this prediction.
+    pub pre_state_digest: u64,
     pub action_label: String,
     pub cycle: u64,
     pub predicted_world_delta: Option<ViabilityDelta>,
@@ -241,6 +244,7 @@ pub struct ActionPrediction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PredictionCancellation {
     pub action_id: u64,
+            pre_state_digest: 1,
     pub prediction_cycle: u64,
     pub cancellation_cycle: u64,
     pub reason: String,
@@ -252,6 +256,7 @@ pub struct PredictionCancellation {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ActionOutcome {
     pub action_id: u64,
+            pre_state_digest: 1,
     pub action_label: String,
     pub cycle: u64,
     pub pre_state_digest: u64,
@@ -432,6 +437,7 @@ pub struct ViabilityFabric {
     max_outcomes: usize,
     max_pending_predictions: usize,
     highest_action_id: u64,
+            pre_state_digest: 1,
 }
 
 /// Cycle-level telemetry view of the viability fabric.
@@ -517,6 +523,7 @@ impl ViabilityFabric {
             max_outcomes,
             max_pending_predictions: max_outcomes.max(1).min(4096),
             highest_action_id: 0,
+            pre_state_digest: 1,
         }
     }
 
@@ -589,6 +596,8 @@ impl ViabilityFabric {
         if prediction.cycle != self.state.cycle {
             return Err("prediction cycle does not match current cycle");
         }
+        // Zero is a valid digest value; identity is established by exact equality
+        // with the later observed outcome, not by treating the hash as a nonce.
         if prediction.action_label.trim().is_empty() {
             return Err("empty action label");
         }
@@ -642,6 +651,9 @@ impl ViabilityFabric {
         }
         if prediction.authority_granted != outcome.authority_granted {
             return Err("authority mismatch");
+        }
+        if prediction.pre_state_digest != outcome.pre_state_digest {
+            return Err("pre-action state digest mismatch");
         }
         if outcome.cycle < prediction.cycle {
             return Err("outcome predates prediction");
@@ -703,6 +715,7 @@ impl ViabilityFabric {
     pub fn cancel_prediction(
         &mut self,
         action_id: u64,
+            pre_state_digest: 1,
         cancellation_cycle: u64,
         reason: impl Into<String>,
         evidence_refs: Vec<String>,
@@ -813,6 +826,7 @@ mod tests {
 
         let outcome = ActionOutcome {
             action_id: 42,
+            pre_state_digest: 1,
             action_label: "test".to_string(),
             cycle: 7,
             pre_state_digest: 1,
@@ -852,6 +866,7 @@ mod tests {
 
         let injected_prediction = ActionPrediction {
             action_id: 42,
+            pre_state_digest: 1,
             action_label: "test".to_string(),
             cycle: 7,
             predicted_world_delta: None,
@@ -862,6 +877,7 @@ mod tests {
 
         let outcome = ActionOutcome {
             action_id: 42,
+            pre_state_digest: 1,
             action_label: "test".to_string(),
             cycle: 7,
             pre_state_digest: 1,
@@ -882,12 +898,64 @@ mod tests {
     }
 
     #[test]
+    fn mismatched_pre_state_digest_does_not_consume_prediction() {
+        let mut fabric = ViabilityFabric::new(4);
+        fabric.begin_cycle(9);
+        fabric.predict_action(ActionPrediction {
+            action_id: 11,
+            pre_state_digest: 100,
+            action_label: "test".to_string(),
+            cycle: 9,
+            predicted_world_delta: None,
+            predicted_self_delta: None,
+            predicted_goal_delta: None,
+            authority_granted: true,
+        }).unwrap();
+
+        let outcome = ActionOutcome {
+            action_id: 11,
+            action_label: "test".to_string(),
+            cycle: 9,
+            pre_state_digest: 101,
+            post_state_digest: 102,
+            authority_granted: true,
+            safety_gate_passed: true,
+            prediction: None,
+            observed_effect: None,
+            prediction_error: PredictionErrorLedger::default(),
+            evidence_refs: vec!["sim://digest-mismatch".to_string()],
+        };
+
+        assert_eq!(
+            fabric.observe_action(outcome),
+            Err("pre-action state digest mismatch")
+        );
+        assert_eq!(fabric.outcomes().len(), 0);
+
+        let matching = ActionOutcome {
+            action_id: 11,
+            action_label: "test".to_string(),
+            cycle: 9,
+            pre_state_digest: 100,
+            post_state_digest: 102,
+            authority_granted: true,
+            safety_gate_passed: true,
+            prediction: None,
+            observed_effect: None,
+            prediction_error: PredictionErrorLedger::default(),
+            evidence_refs: vec!["sim://digest-match".to_string()],
+        };
+        assert!(fabric.observe_action(matching).is_ok());
+    }
+
+    #[test]
     fn rejected_tampered_outcome_does_not_consume_prediction() {
         let mut fabric = ViabilityFabric::new(4);
         fabric.begin_cycle(9);
 
         let prediction = ActionPrediction {
             action_id: 10,
+            pre_state_digest: 1,
             action_label: "test".to_string(),
             cycle: 9,
             predicted_world_delta: Some(ViabilityDelta::new(-0.2, 1.0)),
@@ -899,6 +967,7 @@ mod tests {
 
         let tampered = ActionOutcome {
             action_id: 10,
+            pre_state_digest: 1,
             action_label: "tampered".to_string(),
             cycle: 9,
             pre_state_digest: 1,
@@ -915,6 +984,7 @@ mod tests {
 
         let good = ActionOutcome {
             action_id: 10,
+            pre_state_digest: 1,
             action_label: "test".to_string(),
             cycle: 9,
             pre_state_digest: 1,
@@ -965,6 +1035,7 @@ mod tests {
         fabric.begin_cycle(1);
         let prediction = ActionPrediction {
             action_id: 1,
+            pre_state_digest: 1,
             action_label: "default".to_string(),
             cycle: 1,
             predicted_world_delta: None,
@@ -981,6 +1052,7 @@ mod tests {
         fabric.begin_cycle(2);
         fabric.predict_action(ActionPrediction {
             action_id: 1,
+            pre_state_digest: 1,
             action_label: "test".to_string(),
             cycle: 2,
             predicted_world_delta: None,
@@ -997,6 +1069,7 @@ mod tests {
 
         let outcome = ActionOutcome {
             action_id: 1,
+            pre_state_digest: 1,
             action_label: "test".to_string(),
             cycle: 3,
             pre_state_digest: 1,
@@ -1018,6 +1091,7 @@ mod tests {
 
         let prediction = ActionPrediction {
             action_id: 2,
+            pre_state_digest: 1,
             action_label: "test".to_string(),
             cycle: 1,
             predicted_world_delta: None,
@@ -1034,6 +1108,7 @@ mod tests {
 
         let prediction_1 = ActionPrediction {
             action_id: 1,
+            pre_state_digest: 1,
             action_label: "test".to_string(),
             cycle: 1,
             predicted_world_delta: None,
@@ -1064,6 +1139,7 @@ mod tests {
         assert_eq!(
             fabric.predict_action(ActionPrediction {
                 action_id: 3,
+            pre_state_digest: 1,
                 action_label: "test".to_string(),
                 cycle: 1,
                 predicted_world_delta: None,
@@ -1082,6 +1158,7 @@ mod tests {
 
         let p = ActionPrediction {
             action_id: 9,
+            pre_state_digest: 1,
             action_label: "test".to_string(),
             cycle: 3,
             predicted_world_delta: None,
