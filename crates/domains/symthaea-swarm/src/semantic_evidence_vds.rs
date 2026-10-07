@@ -151,6 +151,9 @@ pub struct Rfc9942VerifiedReceipt {
     /// SHA-256 fingerprint of the exact external AAD authenticated by COSE.
     /// An empty AAD therefore remains distinguishable from another context.
     external_aad_sha256: [u8; 32],
+    /// SHA-256 fingerprint of the exact COSE signature bytes that verified this Receipt.
+    /// This preserves wire-level signature identity beyond the TBS inputs alone.
+    signature_sha256: [u8; 32],
 }
 
 impl Rfc9942VerifiedReceipt {
@@ -162,6 +165,7 @@ impl Rfc9942VerifiedReceipt {
     pub const fn verification_key_sha256(&self) -> [u8; 32] { self.verification_key_sha256 }
     pub const fn protected_header_sha256(&self) -> [u8; 32] { self.protected_header_sha256 }
     pub const fn external_aad_sha256(&self) -> [u8; 32] { self.external_aad_sha256 }
+    pub const fn signature_sha256(&self) -> [u8; 32] { self.signature_sha256 }
 }
 
 /// Where RFC 9942 header parameter 394 was carried on the outer
@@ -187,6 +191,8 @@ pub struct Rfc9942VerifiedSignatureWithReceipt {
     outer_verification_key_sha256: [u8; 32],
     outer_protected_header_sha256: [u8; 32],
     outer_external_aad_sha256: [u8; 32],
+    /// SHA-256 fingerprint of the exact outer COSE signature bytes that verified.
+    outer_signature_sha256: [u8; 32],
     receipt_index: usize,
     receipt_placement: Rfc9942ReceiptPlacement,
     receipt: Rfc9942VerifiedReceipt,
@@ -199,6 +205,7 @@ impl Rfc9942VerifiedSignatureWithReceipt {
     pub const fn outer_verification_key_sha256(&self) -> [u8; 32] { self.outer_verification_key_sha256 }
     pub const fn outer_protected_header_sha256(&self) -> [u8; 32] { self.outer_protected_header_sha256 }
     pub const fn outer_external_aad_sha256(&self) -> [u8; 32] { self.outer_external_aad_sha256 }
+    pub const fn outer_signature_sha256(&self) -> [u8; 32] { self.outer_signature_sha256 }
     pub const fn receipt_index(&self) -> usize { self.receipt_index }
     pub const fn receipt_placement(&self) -> Rfc9942ReceiptPlacement { self.receipt_placement }
     pub const fn receipt(&self) -> Rfc9942VerifiedReceipt { self.receipt }
@@ -523,6 +530,7 @@ impl Rfc9942ReceiptEnvelope {
             verification_key_sha256: sha256(public_key),
             protected_header_sha256: sha256(&self.protected_header_bytes()),
             external_aad_sha256: sha256(external_aad),
+            signature_sha256: sha256(&self.signature),
         }
     }
 
@@ -1314,6 +1322,7 @@ impl Rfc9942SignatureWithReceipts {
             outer_verification_key_sha256: sha256(outer_public_key),
             outer_protected_header_sha256: sha256(&self.protected_header_bytes()),
             outer_external_aad_sha256: sha256(outer_external_aad),
+            outer_signature_sha256: sha256(&self.signature),
             receipt_index,
             receipt_placement: placement,
             receipt: verified_receipt,
