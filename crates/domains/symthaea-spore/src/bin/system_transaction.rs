@@ -1442,6 +1442,52 @@ mod tests {
     }
 
     #[test]
+    fn ledger_parent_descriptor_resists_path_replacement() {
+        let name = random_operation_id().unwrap();
+        let original_dir =
+            std::env::temp_dir().join(format!("symthaea-ledger-authority-{name}"));
+        let moved_dir = original_dir.with_extension("moved");
+        let replacement_dir = original_dir.with_extension("replacement");
+        std::fs::create_dir(&original_dir).unwrap();
+
+        let ledger_path = original_dir.join("system-transactions.jsonl");
+        let ledger = TransactionLedger::open_at(&ledger_path).unwrap();
+
+        let transaction =
+            SystemTransaction::begin(MutationKind::GcCollect, "ledger-fd-test-0000001", None, b"gc")
+                .unwrap();
+        assert!(matches!(
+            ledger.admit(transaction.clone()).unwrap(),
+            TransactionAdmission::New(_)
+        ));
+
+        std::fs::rename(&original_dir, &moved_dir).unwrap();
+        std::fs::create_dir(&replacement_dir).unwrap();
+        std::fs::write(
+            replacement_dir.join("system-transactions.jsonl"),
+            b"{not-the-bound-ledger}\n",
+        )
+        .unwrap();
+
+        let receipt = ledger.lookup(&transaction.request_id).unwrap();
+        assert_eq!(
+            receipt.unwrap().transaction_id,
+            transaction.transaction_id
+        );
+
+        let moved_contents =
+            std::fs::read_to_string(moved_dir.join("system-transactions.jsonl")).unwrap();
+        assert!(moved_contents.contains(&transaction.transaction_id));
+        assert_eq!(
+            std::fs::read_to_string(replacement_dir.join("system-transactions.jsonl")).unwrap(),
+            "{not-the-bound-ledger}\n"
+        );
+
+        let _ = std::fs::remove_dir_all(moved_dir);
+        let _ = std::fs::remove_dir_all(replacement_dir);
+    }
+
+    #[test]
     fn transaction_ids_are_random_and_unique() {
         let a = SystemTransaction::begin(MutationKind::Rollback, "request-a-00000001", None, b"rollback").unwrap();
         let b = SystemTransaction::begin(MutationKind::Rollback, "request-b-00000001", None, b"rollback").unwrap();
