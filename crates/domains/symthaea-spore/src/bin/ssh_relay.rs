@@ -53,9 +53,12 @@ async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
     } else {
         "/bin/sh"
     };
-    // Preserve other ambient variables as needed, but never inherit PATH:
-    // a privileged relay must resolve tools only from trusted system locations.
+    // Do not inherit the caller's environment. A privileged relay must have
+    // a hermetic, deterministic execution environment; otherwise future Nix,
+    // shell, locale, proxy, or tool-specific variables can become implicit
+    // authority inputs.
     let mut command = tokio::process::Command::new(shell);
+    command.env_clear();
     // Bash privileged mode disables startup-file hooks and imported shell
     // functions, adding a process-local guard against ambient code injection.
     if shell.ends_with("/bash") {
@@ -71,44 +74,9 @@ async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
         "NIX_PATH",
         "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos:nixos-config=/etc/nixos/configuration.nix",
     );
-    command.env_remove("NIX_CONFIG");
-    command.env_remove("NIX_USER_CONF_FILES");
-    // Non-interactive Bash and POSIX shells can execute startup files named by
-    // these environment variables. A privileged relay must not inherit them.
-    // Dynamic-library preload/search variables are likewise excluded so an
-    // ambient process environment cannot replace code loaded by a child.
-    for variable in [
-        "BASH_ENV",
-        "ENV",
-        "LD_PRELOAD",
-        "LD_LIBRARY_PATH",
-        "PYTHONHOME",
-        "PYTHONPATH",
-        "PERL5OPT",
-        "RUBYOPT",
-        "NODE_OPTIONS",
-        "NODE_PATH",
-        // Do not allow a caller-controlled environment to redirect privileged
-        // Nix state, store, logs, configuration, daemon socket, or user directories.
-
-        "NIX_REMOTE",
-        "NIX_DAEMON_SOCKET_PATH",
-        "NIX_STORE_DIR",
-        "NIX_DATA_DIR",
-        "NIX_LOG_DIR",
-        "NIX_STATE_DIR",
-        "NIX_CONF_DIR",
-        "NIX_CONFIG_HOME",
-        "NIX_STATE_HOME",
-        "NIX_CACHE_HOME",
-        "XDG_CONFIG_HOME",
-        "XDG_STATE_HOME",
-        "XDG_CACHE_HOME",
-        "XDG_CONFIG_DIRS",
-        "NIX_IGNORE_SYMLINK_STORE",
-    ] {
-        command.env_remove(variable);
-    }
+    // Keep text-processing and diagnostics deterministic across hosts.
+    command.env("LANG", "C");
+    command.env("LC_ALL", "C");
     let output = command.output().await?;
     Ok(CmdResult {
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
@@ -8255,6 +8223,23 @@ mod tests {
             luks_passphrase: "luks-secret".into(),
             extra_disks: vec!["/dev/vdd".into()],
         }
+    }
+
+    #[tokio::test]
+    async fn privileged_command_environment_is_hermetic_and_deterministic() {
+        let result = run_cmd(
+            "printf 'HOME=%s\\nNIX_CONFIG=%s\\nNIXOS_NO_CHECK=%s\\nLD_PRELOAD=%s\\nLANG=%s\\nLC_ALL=%s\\nPATH=%s\\n' \\             "\${HOME-unset}" "\${NIX_CONFIG-unset}" "\${NIXOS_NO_CHECK-unset}" "\${LD_PRELOAD-unset}" "\$LANG" "\$LC_ALL" "\$PATH"",
+        )
+        .await
+        .expect("privileged command should run");
+
+        assert!(result.stdout.contains("HOME=unset\\n"), "ambient HOME leaked: {}", result.stdout);
+        assert!(result.stdout.contains("NIX_CONFIG=unset\\n"), "ambient NIX_CONFIG leaked: {}", result.stdout);
+        assert!(result.stdout.contains("NIXOS_NO_CHECK=unset\\n"), "NIXOS_NO_CHECK must not cross the privileged boundary: {}", result.stdout);
+        assert!(result.stdout.contains("LD_PRELOAD=unset\\n"), "LD_PRELOAD leaked: {}", result.stdout);
+        assert!(result.stdout.contains("LANG=C\\n"), "locale must be deterministic: {}", result.stdout);
+        assert!(result.stdout.contains("LC_ALL=C\\n"), "locale must be deterministic: {}", result.stdout);
+        assert!(result.stdout.includes("PATH=/run/current-system/sw/bin") || result.stdout.includes("/run/current-system/sw/bin"), "trusted PATH missing: {}", result.stdout);
     }
 
     #[test]
