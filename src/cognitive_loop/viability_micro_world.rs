@@ -960,6 +960,8 @@ pub fn run_homeostatic_agent_scenario<P: MicroWorldPredictor>(
     let mut min_actual_viability_margin = f64::INFINITY;
     let mut oracle_regret_sum = 0.0;
     let mut perturbations_applied = 0usize;
+    let mut execution_failures = 0usize;
+    let mut terminated_on_execution_failure = false;
     let mut actions = Vec::with_capacity(max_cycles as usize);
     let mut steps = 0u64;
 
@@ -1010,7 +1012,26 @@ pub fn run_homeostatic_agent_scenario<P: MicroWorldPredictor>(
             })
             .expect("policy action id must be unique");
 
-        let after = world.step(action);
+        let after = match world.try_step(action) {
+            Ok(after) => after,
+            Err(failure) => {
+                execution_failures += 1;
+                terminated_on_execution_failure = true;
+                fabric
+                    .cancel_prediction(
+                        action_id,
+                        before.cycle,
+                        format!("execution_failure:{}", failure.as_str()),
+                        vec![format!(
+                            "sim://viability-micro-world/execution-failure/{}/{}",
+                            before.digest(),
+                            action_id
+                        )],
+                    )
+                    .expect("execution failure must close its pre-action prediction");
+                break;
+            }
+        };
         min_actual_viability_margin = min_actual_viability_margin.min(
             after.energy.min(after.integrity) - 0.08,
         );
@@ -1053,6 +1074,7 @@ pub fn run_homeostatic_agent_scenario<P: MicroWorldPredictor>(
     }
 
     let final_state = world.observe();
+    let denom = steps.max(1) as f64;
     HomeostaticRunReport {
         steps,
         survived: final_state.is_viable(),
@@ -1068,6 +1090,8 @@ pub fn run_homeostatic_agent_scenario<P: MicroWorldPredictor>(
         },
         mean_oracle_horizon_regret: oracle_regret_sum / denom,
         perturbations_applied,
+        execution_failures,
+        terminated_on_execution_failure,
         cumulative_prediction_error: cumulative_error,
         actions,
     }
@@ -1157,7 +1181,26 @@ pub fn run_homeostatic_agent_horizon_scenario<P: MicroWorldPredictor>(
             })
             .expect("policy action id must be unique");
 
-        let after = world.step(action);
+        let after = match world.try_step(action) {
+            Ok(after) => after,
+            Err(failure) => {
+                execution_failures += 1;
+                terminated_on_execution_failure = true;
+                fabric
+                    .cancel_prediction(
+                        action_id,
+                        before.cycle,
+                        format!("execution_failure:{}", failure.as_str()),
+                        vec![format!(
+                            "sim://viability-micro-world/execution-failure/{}/{}",
+                            before.digest(),
+                            action_id
+                        )],
+                    )
+                    .expect("execution failure must close its pre-action prediction");
+                break;
+            }
+        };
         min_actual_viability_margin = min_actual_viability_margin.min(
             after.energy.min(after.integrity) - 0.08,
         );
@@ -1219,6 +1262,8 @@ pub fn run_homeostatic_agent_horizon_scenario<P: MicroWorldPredictor>(
         },
         mean_oracle_horizon_regret: oracle_regret_sum / denom,
         perturbations_applied,
+        execution_failures,
+        terminated_on_execution_failure,
         cumulative_prediction_error: cumulative_error,
         actions,
     }
