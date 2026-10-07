@@ -77,18 +77,49 @@ def main() -> None:
         '.args(["-c"',
     )
 
+    # Shell-backed execution is tolerated only in this explicit read-only
+    # diagnostic census. Every other websocket command arm must be shell-free.
+    # This turns the old "mutation allowlist" into a closed-world policy:
+    # a newly added consequential arm cannot silently inherit run_cmd().
+    SHELL_ALLOWED_READ_ONLY = {
+        "probe_hardware",
+        "scan_apps",
+        "deep_scan",
+        "gc_analyze",
+        "diagnose",
+        "netboot_info",
+        "list_images",
+        "inventory",
+    }
+
     ordered = sorted(
         ((index, name) for name, index in arm_indexes.items()),
         key=lambda item: item[0],
     )
     for position, (start, name) in enumerate(ordered):
-        if name not in MUTATIONS:
-            continue
         end = ordered[position + 1][0] if position + 1 < len(ordered) else len(lines)
         body = "\n".join(lines[start:end])
-        for needle in forbidden:
-            if needle in body:
-                fail(f'mutation arm {name!r} contains forbidden shell boundary {needle!r}')
+        has_shell_executor = any(
+            needle in body for needle in ("run_cmd(", "run_cmd_with_stdin(")
+        )
+
+        if has_shell_executor and name not in SHELL_ALLOWED_READ_ONLY:
+            fail(
+                f'command arm {name!r} contains shell-backed execution; '
+                "only explicitly enumerated read-only diagnostic arms may use it"
+            )
+
+        if name in MUTATIONS:
+            for needle in forbidden:
+                if needle in body:
+                    fail(f'mutation arm {name!r} contains forbidden shell boundary {needle!r}')
+
+        if name in SHELL_ALLOWED_READ_ONLY and has_shell_executor:
+            if "client_msg." in body:
+                fail(
+                    f'read-only diagnostic arm {name!r} interpolates command-message '
+                    "state into its shell authority surface"
+                )
 
     # The pre-install check is non-destructive, but it accepts a browser-selected
     # disk. Keep that value out of generated shell source: the script must receive
