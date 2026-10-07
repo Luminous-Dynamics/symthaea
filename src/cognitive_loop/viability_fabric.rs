@@ -791,7 +791,10 @@ mod tests {
             evidence_refs: Vec::new(),
         };
 
-        assert_eq!(fabric.observe_action(outcome), Err("missing pre-action prediction"));
+        assert_eq!(
+            fabric.observe_action(outcome),
+            Err("outcome already contains a prediction")
+        );
         assert!(fabric.outcomes().is_empty());
     }
 
