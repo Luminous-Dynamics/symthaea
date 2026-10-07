@@ -165,6 +165,7 @@ jobs:
           assert report["remediation_uncertainty_substitution_blocked"] is True
           assert report["remediation_uncertainty_point_estimate_binding_blocked"] is True
           assert report["remediation_uncertainty_inference_scope_blocked"] is True
+          assert report["remediation_uncertainty_proportion_domain_blocked"] is True
           assert report["remediation_uncertainty_statistical_design_substitution_blocked"] is True
           assert report["remediation_uncertainty_design_observation_substitution_blocked"] is True
           assert report["remediation_uncertainty_dependence_substitution_blocked"] is True
