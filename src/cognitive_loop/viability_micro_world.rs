@@ -902,6 +902,8 @@ pub struct HomeostaticHorizonRunReport {
     pub mean_min_viability_margin: f64,
     /// Minimum actually observed viability margin after executed actions.
     pub min_actual_viability_margin: f64,
+    /// Mean regret against the deterministic ground-truth horizon optimum.
+    pub mean_oracle_horizon_regret: f64,
     pub mean_min_confidence: f64,
     pub perturbations_applied: usize,
     pub cumulative_prediction_error: f64,
@@ -919,6 +921,8 @@ pub struct HomeostaticRunReport {
     pub final_threat: f64,
     pub final_progress: f64,
     pub min_actual_viability_margin: f64,
+    /// Mean regret against the deterministic four-step ground-truth optimum.
+    pub mean_oracle_horizon_regret: f64,
     pub perturbations_applied: usize,
     pub cumulative_prediction_error: f64,
     pub actions: Vec<MicroAction>,
@@ -954,6 +958,7 @@ pub fn run_homeostatic_agent_scenario<P: MicroWorldPredictor>(
     let mut fabric = ViabilityFabric::new(max_cycles as usize + 1);
     let mut cumulative_error = 0.0;
     let mut min_actual_viability_margin = f64::INFINITY;
+    let mut oracle_regret_sum = 0.0;
     let mut perturbations_applied = 0usize;
     let mut actions = Vec::with_capacity(max_cycles as usize);
     let mut steps = 0u64;
@@ -968,6 +973,13 @@ pub fn run_homeostatic_agent_scenario<P: MicroWorldPredictor>(
 
         let before = world.observe();
         let (action, _policy_prediction) = policy.choose(predictor, before);
+        oracle_regret_sum +=
+            oracle_horizon_regret(
+                before,
+                action,
+                BENCHMARK_REGRET_HORIZON,
+                BENCHMARK_REGRET_DISCOUNT,
+            );
         let action_id = steps + 1;
         let predicted_raw = predictor.predict(before, action);
         let prediction_confidence = predictor.prediction_confidence(action);
@@ -1054,6 +1066,7 @@ pub fn run_homeostatic_agent_scenario<P: MicroWorldPredictor>(
         } else {
             final_state.energy.min(final_state.integrity) - 0.08
         },
+        mean_oracle_horizon_regret: oracle_regret_sum / denom,
         perturbations_applied,
         cumulative_prediction_error: cumulative_error,
         actions,
@@ -1092,6 +1105,7 @@ pub fn run_homeostatic_agent_horizon_scenario<P: MicroWorldPredictor>(
     let mut confidence_sum = 0.0;
     let mut margin_sum = 0.0;
     let mut min_actual_viability_margin = f64::INFINITY;
+    let mut oracle_regret_sum = 0.0;
     let mut perturbations_applied = 0usize;
     let mut actions = Vec::with_capacity(max_cycles as usize);
     let mut steps = 0u64;
@@ -1107,6 +1121,12 @@ pub fn run_homeostatic_agent_horizon_scenario<P: MicroWorldPredictor>(
         let before = world.observe();
         let (action, _predicted_terminal, rollout) =
             policy.choose_horizon(predictor, before, horizon, discount);
+        oracle_regret_sum += oracle_horizon_regret(
+            before,
+            action,
+            horizon.min(5),
+            discount,
+        );
         let action_id = steps + 1;
         let predicted_first = predictor.predict(before, action);
         let first_confidence = predictor.prediction_confidence(action);
@@ -1197,6 +1217,7 @@ pub fn run_homeostatic_agent_horizon_scenario<P: MicroWorldPredictor>(
         } else {
             final_state.energy.min(final_state.integrity) - 0.08
         },
+        mean_oracle_horizon_regret: oracle_regret_sum / denom,
         perturbations_applied,
         cumulative_prediction_error: cumulative_error,
         actions,
@@ -1414,6 +1435,56 @@ pub fn evaluate_predictor_suite<P: MicroWorldPredictor>(
     }
 }
 
+const BENCHMARK_REGRET_HORIZON: usize = 4;
+const BENCHMARK_REGRET_DISCOUNT: f64 = 0.8;
+
+/// Ground-truth utility of an action sequence under the same bounded objective used by the
+/// policy. These functions are evaluation-only and are never exposed to the predictor.
+fn oracle_action_utility(
+    state: MicroWorldObservation,
+    action: MicroAction,
+    discount: f64,
+) -> (f64, MicroWorldObservation) {
+    let next = transition(state, action);
+    let margin = next.energy.min(next.integrity) - 0.08;
+    let immediate = HomeostaticPolicy::score(next, state, action)
+        - (0.12 - margin).max(0.0) * 4.0;
+    (immediate, next)
+}
+
+fn oracle_best_continuation(
+    state: MicroWorldObservation,
+    depth: usize,
+    discount: f64,
+) -> f64 {
+    if depth == 0 {
+        return 0.0;
+    }
+
+    MicroAction::ALL
+        .into_iter()
+        .map(|action| {
+            let (immediate, next) = oracle_action_utility(state, action, discount);
+            immediate + discount * oracle_best_continuation(next, depth - 1, discount)
+        })
+        .fold(f64::NEG_INFINITY, f64::max)
+}
+
+fn oracle_horizon_regret(
+    state: MicroWorldObservation,
+    chosen_action: MicroAction,
+    horizon: usize,
+    discount: f64,
+) -> f64 {
+    let horizon = horizon.max(1).min(5);
+    let best = oracle_best_continuation(state, horizon, discount);
+    let (chosen_immediate, chosen_next) =
+        oracle_action_utility(state, chosen_action, discount);
+    let chosen = chosen_immediate
+        + discount * oracle_best_continuation(chosen_next, horizon - 1, discount);
+    (best - chosen).max(0.0)
+}
+
 fn blend_prediction(
     current: MicroWorldObservation,
     predicted: MicroWorldObservation,
@@ -1604,6 +1675,50 @@ mod tests {
         assert_eq!(factors.external_knowledge, state.knowledge);
         assert_eq!(factors.external_threat, state.threat);
         assert_eq!(factors.external_progress, state.progress);
+    }
+
+    #[test]
+    fn horizon_policy_has_lower_stressed_long_horizon_regret() {
+        struct Oracle;
+        impl MicroWorldPredictor for Oracle {
+            fn predict(
+                &self,
+                state: MicroWorldObservation,
+                action: MicroAction,
+            ) -> MicroWorldObservation {
+                transition(state, action)
+            }
+
+            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
+                1.0
+            }
+        }
+
+        let stressed = benchmark_scenarios()
+            .into_iter()
+            .find(|scenario| scenario.name == "stressed")
+            .expect("stressed scenario exists");
+
+        let mut reactive_oracle = Oracle;
+        let mut horizon_oracle = Oracle;
+        let reactive =
+            run_homeostatic_agent_scenario(&mut reactive_oracle, &stressed, 32);
+        let horizon = run_homeostatic_agent_horizon_scenario(
+            &mut horizon_oracle,
+            &stressed,
+            32,
+            4,
+            0.8,
+        );
+
+        assert!(reactive.survived);
+        assert!(horizon.survived);
+        assert_eq!(reactive.perturbations_applied, 2);
+        assert_eq!(horizon.perturbations_applied, 2);
+        assert!(horizon.mean_oracle_horizon_regret < reactive.mean_oracle_horizon_regret);
+        assert!(horizon.mean_oracle_horizon_regret < 0.05);
+        assert!(horizon.min_actual_viability_margin.is_finite());
+        assert!(reactive.min_actual_viability_margin.is_finite());
     }
 
     #[test]
