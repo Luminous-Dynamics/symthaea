@@ -111,6 +111,17 @@ jobs:
       - name: Verify locked dependency graph
         run: cargo fetch --locked
 
+      - name: Capture native toolchain context
+        run: |
+          {
+            echo "BROCA_NATIVE_TOOLCHAIN_CONTEXT<<EOF"
+            cc --version | head -n 1
+            clang --version | head -n 1
+            ld --version | head -n 1
+            ldd --version | head -n 1
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -186,6 +197,19 @@ jobs:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-broca-freeze-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml', 'Cargo.toml', 'crates/domains/symthaea-broca/Cargo.toml', '.cargo/config.toml', '.cargo/config') }}
 
+      - name: Verify locked dependency graph
+        run: cargo fetch --locked
+
+      - name: Capture native toolchain context
+        run: |
+          {
+            echo "BROCA_NATIVE_TOOLCHAIN_CONTEXT<<EOF"
+            cc --version | head -n 1
+            clang --version | head -n 1
+            ld --version | head -n 1
+            ldd --version | head -n 1
+            echo "EOF"
+          } >> "$GITHUB_ENV"
       - name: Install system dependencies
         run: |
           sudo apt-get update
