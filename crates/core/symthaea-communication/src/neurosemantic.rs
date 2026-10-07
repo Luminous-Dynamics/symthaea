@@ -4751,6 +4751,14 @@ mod tests {
             )
             .is_err()
         );
+        let mut legacy_v2 = valid.clone();
+        legacy_v2.schema_version = 2;
+        assert!(
+            NeurosemanticRemediationMeasurementArtifact::from_json_bytes(
+                &serde_json::to_vec(&legacy_v2).unwrap()
+            )
+            .is_err()
+        );
         let mut bad_uncertainty = valid.clone();
         if let NeurosemanticRemediationUncertainty::Interval { upper_numerator, .. } =
             &mut bad_uncertainty.measurements[0].uncertainty
