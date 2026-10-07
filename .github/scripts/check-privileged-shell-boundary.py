@@ -86,6 +86,19 @@ def main() -> None:
             if needle in body:
                 fail(f'mutation arm {name!r} contains forbidden shell boundary {needle!r}')
 
+    # Nested interpreters inside generated privileged scripts create a second
+    # parsing authority underneath the already-controlled relay interpreter.
+    # Keep this global because the relevant helpers live outside the mutation arms.
+    nested_interpreters = (
+        "chroot /mnt /bin/sh -c",
+        "chroot /mnt /bin/bash -c",
+        "chroot /mnt sh -c",
+        "chroot /mnt bash -c",
+    )
+    for needle in nested_interpreters:
+        if needle in text:
+            fail(f"relay source contains forbidden nested interpreter {needle!r}")
+
     print(
         "privileged-shell-boundary: PASS: "
         f"checked {len(MUTATIONS)} consequential mutation arms; "
