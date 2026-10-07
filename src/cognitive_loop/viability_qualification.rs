@@ -51,13 +51,7 @@ impl ActionConditionedTransitionModel for super::goal_world::WorldModelBridge {
     }
 
     fn action_count(&self) -> usize {
-        self.action_samples(usize::MAX)
-            .map(|_| 0)
-            .unwrap_or_else(|| {
-                // The bridge intentionally does not expose its private action-vector length.
-                // Qualification therefore validates action indices through the prediction call.
-                64
-            })
+        self.action_count()
     }
 
     fn predict_next_state(&self, state: &[f64], action: usize) -> Option<Vec<f64>> {
@@ -708,6 +702,13 @@ mod tests {
         fn prediction_confidence(&self, _action: MicroAction) -> f64 {
             1.0
         }
+    }
+
+    #[test]
+    fn shared_transition_adapter_rejects_invalid_action() {
+        let model = super::goal_world::WorldModelBridge::with_actions(2);
+        assert!(ActionConditionedTransitionOde::new(&model, 2, 0.1).is_none());
+        assert!(roll_transition_model_trajectory(&model, &[0.0; 64], 2, 0.1, 0.1, 32).is_none());
     }
 
     #[test]
