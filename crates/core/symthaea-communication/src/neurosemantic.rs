@@ -4817,6 +4817,23 @@ mod tests {
     }
 
     #[test]
+    fn remediation_failure_rate_direction_cannot_claim_higher_is_better() {
+        let mut definition = NeurosemanticRemediationMetricDefinition {
+            schema_version: NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
+            metric_ref: "metric-direction".into(),
+            kind: NeurosemanticRemediationMeasurementKind::Forgetfulness,
+            estimand_ref: "forgetfulness-failure-rate".into(),
+            scope_ref: "forget-set-v1".into(),
+            unit_ref: "proportion".into(),
+            aggregation_ref: "per-item-rate".into(),
+            direction: NeurosemanticRemediationMetricDirection::HigherIsBetter,
+        };
+        assert!(definition.validate().is_err());
+        definition.direction = NeurosemanticRemediationMetricDirection::LowerIsBetter;
+        assert!(definition.validate().is_ok());
+    }
+
+    #[test]
     fn remediation_wilson_score_interval_is_numerically_reproducible() {
         assert_eq!(
             recompute_wilson_score_95_interval(0, 2, 4).unwrap(),
