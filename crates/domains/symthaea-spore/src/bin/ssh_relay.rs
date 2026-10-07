@@ -3901,60 +3901,42 @@ async fn freeze_image_namespace(image_dir: String) -> Result<(), String> {
 
 async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
     let image_dir = validate_image_path(image_dir)?;
-    use std::os::unix::fs::MetadataExt;
 
-    let dir = tokio::fs::symlink_metadata(&image_dir)
-        .await
-        .map_err(|error| format!("image directory postcondition probe failed: {error}"))?;
-    if !dir.is_dir() {
-        return Err("image destination is not a directory".into());
-    }
-    let mode = dir.mode() & 0o777;
-    if !matches!(mode, 0o700 | 0o500) || dir.uid() != unsafe { libc::geteuid() } {
-        return Err(format!(
-            "image destination has unsafe ownership or mode {:04o}; require relay-owned 0700 or frozen 0500",
-            mode
-        ));
-    }
-
-    let configuration = std::path::Path::new(&image_dir).join("configuration.nix");
-    let configuration_metadata = tokio::fs::symlink_metadata(&configuration)
-        .await
-        .map_err(|error| format!("image configuration sidecar postcondition probe failed: {error}"))?;
-    if !configuration_metadata.file_type().is_file()
-        || configuration_metadata.len() == 0
-        || configuration_metadata.uid() != unsafe { libc::geteuid() }
-        || configuration_metadata.mode() & 0o077 != 0
-    {
+    // Qualification is performed against exact opened inodes. This keeps the
+    // archive integrity probe from re-resolving a mutable pathname after the
+    // namespace has been checked.
+    let Some((configuration, configuration_commitment)) =
+        open_image_artifact_with_commitment(&image_dir, "configuration.nix").await?
+    else {
+        return Ok(false);
+    };
+    drop(configuration);
+    if configuration_commitment.size == 0 {
         return Ok(false);
     }
 
     for artifact in ["system.btrfs.zst", "system.tar.gz"] {
-        let path = std::path::Path::new(&image_dir).join(artifact);
-        let Ok(metadata) = tokio::fs::symlink_metadata(&path).await else {
+        let Some((file, commitment)) =
+            open_image_artifact_with_commitment(&image_dir, artifact).await?
+        else {
             continue;
         };
-        if !metadata.file_type().is_file()
-            || metadata.len() == 0
-            || metadata.uid() != unsafe { libc::geteuid() }
-            || metadata.mode() & 0o077 != 0
-        {
-            continue;
-        }
 
-        let safe_path = path.to_string_lossy().into_owned();
-        let check = if artifact.ends_with(".zst") {
-            run_privileged_args("zstd", &["-t", "--", &safe_path]).await
+        let check = if artifact == "system.btrfs.zst" {
+            run_privileged_args_with_stdin("zstd", &["-t", "-"], file).await
         } else {
-            run_privileged_args("tar", &["-tzf", &safe_path]).await
+            run_privileged_args_with_stdin("tar", &["-tzf", "-"], file).await
         }
         .map_err(|error| format!("image archive integrity probe failed: {error}"))?;
-        if check.exit_status == 0 {
+
+        if check.exit_status == 0 && commitment.size > 0 {
             return Ok(true);
         }
     }
+
     Ok(false)
 }
+
 
 fn open_image_artifact_with_commitment_blocking(
     image_dir: &str,
