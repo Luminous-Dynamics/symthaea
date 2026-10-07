@@ -1454,30 +1454,37 @@ fn tpm2_postinstall() -> &'static str {
 # ── TPM2 Auto-Unlock Enrollment ──
 echo "STAGE: Enrolling TPM2 auto-unlock..."
 
-# Check TPM availability
-if [ ! -e /dev/tpmrm0 ]; then
-  echo "WARNING: TPM 2.0 not detected. Skipping auto-unlock enrollment."
-  echo "You will need to enter your passphrase at every boot."
-else
-  # Find the LUKS device
-  LUKS_DEV=$(blkid -t TYPE=crypto_LUKS -o device 2>/dev/null | head -1)
-  if [ -n "$LUKS_DEV" ]; then
-    # Enroll TPM2 with PCR 0 (firmware) and PCR 7 (Secure Boot state)
-    # The passphrase is required to authorize the enrollment
-    echo "Enrolling TPM2 on $LUKS_DEV (PCR 0+7)..."
-    systemd-cryptenroll "$LUKS_DEV" --tpm2-device=auto --tpm2-pcrs=0+7 2>&1 || echo "WARNING: TPM2 enrollment failed. You can retry after first boot with: sudo systemd-cryptenroll $LUKS_DEV --tpm2-device=auto --tpm2-pcrs=0+7"
+# CRYPT_PART is established by the single-luks transaction before this hook runs.
+if [ -z "${CRYPT_PART:-}" ] || [ ! -b "$CRYPT_PART" ]; then
+  echo "ERROR: transaction-selected encrypted root device is unavailable."
+  exit 1
+fi
 
-    # Update NixOS config to use systemd initrd (required for TPM2 unlock)
-    if [ -f /mnt/etc/nixos/configuration.nix ]; then
-      # Add systemd initrd and TPM2 config
-      sed -i '/boot.initrd.luks.devices/a\    cryptTabExtraOpts = [ "tpm2-device=auto" ];' /mnt/etc/nixos/configuration.nix 2>/dev/null || true
-      sed -i '/imports = /a\  boot.initrd.systemd.enable = true;' /mnt/etc/nixos/configuration.nix 2>/dev/null || true
-      echo "  TPM2 enrollment complete. Disk will auto-unlock at boot."
-      echo "  Passphrase is kept as fallback (firmware updates will require it)."
-    fi
-  else
-    echo "WARNING: No LUKS device found. TPM2 enrollment skipped."
+if [ ! -e /dev/tpmrm0 ]; then
+  echo "ERROR: TPM 2.0 requested but no TPM device was detected."
+  exit 1
+fi
+
+echo "Enrolling TPM2 on $CRYPT_PART (PCR 0+7)..."
+if ! systemd-cryptenroll "$CRYPT_PART" --tpm2-device=auto --tpm2-pcrs=0+7 2>&1; then
+  echo "ERROR: TPM2 enrollment failed on the transaction-selected encrypted root."
+  exit 1
+fi
+
+# Update NixOS config to use systemd initrd (required for TPM2 unlock).
+if [ -f /mnt/etc/nixos/configuration.nix ]; then
+  if ! sed -i '/boot.initrd.luks.devices/a\    cryptTabExtraOpts = [ "tpm2-device=auto" ];' /mnt/etc/nixos/configuration.nix 2>/dev/null; then
+    echo "ERROR: unable to apply TPM2 crypttab configuration."
+    exit 1
   fi
+  if ! sed -i '/imports = /a\  boot.initrd.systemd.enable = true;' /mnt/etc/nixos/configuration.nix 2>/dev/null; then
+    echo "ERROR: unable to enable systemd initrd for TPM2."
+    exit 1
+  fi
+  echo "  TPM2 enrollment complete for $CRYPT_PART."
+else
+  echo "ERROR: installed configuration.nix is unavailable for TPM2 setup."
+  exit 1
 fi
 "#
 }
@@ -1487,19 +1494,23 @@ fn fido2_postinstall() -> &'static str {
     r#"
 # ── FIDO2/YubiKey Enrollment ──
 echo "STAGE: Enrolling FIDO2 security key..."
-if ls /dev/hidraw* >/dev/null 2>&1; then
-    LUKS_DEV=$(blkid -t TYPE=crypto_LUKS -o device 2>/dev/null | head -1)
-    if [ -n "$LUKS_DEV" ]; then
-        echo "Enrolling FIDO2 device on $LUKS_DEV..."
-        echo "Touch your security key when it blinks."
-        systemd-cryptenroll "$LUKS_DEV" --fido2-device=auto 2>&1 || echo "WARNING: FIDO2 enrollment failed. Passphrase still works."
-    else
-        echo "WARNING: No LUKS device found. Skipping FIDO2 enrollment."
-    fi
-else
-    echo "WARNING: No FIDO2 device detected. Skipping enrollment."
-    echo "You can enroll later with: systemd-cryptenroll /dev/<device> --fido2-device=auto"
+
+if [ -z "${CRYPT_PART:-}" ] || [ ! -b "$CRYPT_PART" ]; then
+  echo "ERROR: transaction-selected encrypted root device is unavailable."
+  exit 1
 fi
+
+if ! ls /dev/hidraw* >/dev/null 2>&1; then
+  echo "ERROR: FIDO2 requested but no HID security-key device was detected."
+  exit 1
+fi
+
+echo "Enrolling FIDO2 device on $CRYPT_PART..."
+if ! systemd-cryptenroll "$CRYPT_PART" --fido2-device=auto 2>&1; then
+  echo "ERROR: FIDO2 enrollment failed on the transaction-selected encrypted root."
+  exit 1
+fi
+echo "  FIDO2 enrollment complete for $CRYPT_PART."
 "#
 }
 
@@ -6254,6 +6265,17 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     continue;
                 }
                 let requires_luks = client_msg.layout == "single-luks";
+                if (client_msg.tpm2_unlock || client_msg.fido2_unlock) && !requires_luks {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(
+                                "TPM2/FIDO2 disk unlock requires the single-luks layout so enrollment can bind to the transaction-selected LUKS root.",
+                            )
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
                 if requires_luks {
                     if client_msg.luks_passphrase.is_empty() {
                         let _ = ws_tx
@@ -12188,6 +12210,18 @@ mod tests {
         assert_eq!(std::fs::read(&archive).unwrap(), b"replacement-bytes");
 
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn hardware_token_unlock_hooks_bind_only_to_transaction_selected_luks_root() {
+        let tpm = tpm2_postinstall();
+        let fido = fido2_postinstall();
+        assert!(tpm.contains("$CRYPT_PART"));
+        assert!(fido.contains("$CRYPT_PART"));
+        assert!(!tpm.contains('blkid -t TYPE=crypto_LUKS'));
+        assert!(!fido.contains('blkid -t TYPE=crypto_LUKS'));
+        assert!(tpm.contains("ERROR: TPM 2.0 requested"));
+        assert!(fido.contains("ERROR: FIDO2 requested"));
     }
 
     #[test]
