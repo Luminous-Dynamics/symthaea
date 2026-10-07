@@ -695,6 +695,25 @@ mod tests {
     }
 
     #[test]
+    fn transitive_order_satisfies_shared_resource_hazard() {
+        let r = resource("hv");
+        let graph = ExecutionGraph::new(
+            vec![
+                ExecutionNode::new(1, op(8), vec![ResourceUse::new(r.clone(), AccessKind::Write)]),
+                ExecutionNode::new(2, op(8), vec![ResourceUse::new(r.clone(), AccessKind::Read)]),
+                ExecutionNode::new(3, op(8), vec![ResourceUse::new(r.clone(), AccessKind::ReadWrite)]),
+            ],
+            vec![
+                DependencyEdge::new(1, 2, r.clone(), DependencyKind::ReadAfterWrite),
+                DependencyEdge::new(2, 3, r, DependencyKind::WriteAfterRead),
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(graph.topological_order().unwrap(), vec![1, 2, 3]);
+    }
+
+    #[test]
     fn digest_and_order_are_insertion_order_independent() {
         let r = resource("hv");
         let first = ExecutionGraph::new(
