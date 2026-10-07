@@ -1392,7 +1392,9 @@ impl CandidatePathway {
     /// Compute the canonical semantic digest committed by experimental designs.
     ///
     /// The digest covers candidate identity, pathway kind, functional performance,
-    /// operating capabilities, burdens, evidence, and candidate derivation lineage.
+    /// operating capabilities, burdens, and candidate derivation lineage. Evidence
+    /// records and linked evidence IDs are intentionally excluded because they are
+    /// an evolving provenance surface committed separately by the assessment receipt.
     pub fn canonical_digest(&self) -> Result<String, AssessmentError> {
         canonical_candidate_pathway_hash(self)
     }
@@ -8479,11 +8481,31 @@ mod tests {
         );
         let baseline = c.canonical_digest().unwrap();
 
-        let mut changed = c;
+        let mut changed = c.clone();
         changed.evidence[0].source.artifact_digest = "changed-artifact-digest".into();
-        let changed_digest = changed.canonical_digest().unwrap();
+        changed.evidence[0].confidence = 0.8;
+        changed.evidence.push(evidence(
+            "e2",
+            "source-b",
+            EvidenceKind::Reported,
+            EvidenceStance::Contradicts,
+            0.4,
+        ));
+        changed.performance
+            .get_mut("service_life_years")
+            .unwrap()
+            .evidence_ids = vec!["different-evidence-link".into()];
+        changed.burdens
+            .get_mut(&Dimension::Water)
+            .unwrap()
+            .evidence_ids = vec!["different-burden-evidence-link".into()];
+        assert_eq!(baseline, changed.canonical_digest().unwrap());
 
-        assert_eq!(baseline, changed_digest);
+        changed.performance
+            .get_mut("service_life_years")
+            .unwrap()
+            .interval = Interval::new(1.0, 1.5).unwrap();
+        assert_ne!(baseline, changed.canonical_digest().unwrap());
     }
 
     #[test]
