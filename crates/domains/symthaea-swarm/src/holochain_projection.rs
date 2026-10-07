@@ -48,6 +48,9 @@ pub struct ReceiptSelectionContext {
     pub collection_len: u32,
     pub selected_index: u32,
     pub selected_receipt_sha256: [u8; 32],
+    /// Digest of the complete selection decision, including rejected and
+    /// not-evaluated candidates.
+    pub selection_decision_sha256: [u8; 32],
     pub selection_policy: String,
     pub selection_policy_version: u16,
 }
@@ -64,7 +67,10 @@ impl ReceiptSelectionContext {
                 "selection_policy",
             ));
         }
-        if self.collection_sha256 == [0; 32] || self.selected_receipt_sha256 == [0; 32] {
+        if self.collection_sha256 == [0; 32]
+            || self.selected_receipt_sha256 == [0; 32]
+            || self.selection_decision_sha256 == [0; 32]
+        {
             return Err(HolochainProjectionError::ZeroDigest);
         }
         Ok(())
@@ -157,6 +163,7 @@ impl HolochainEvidenceAnchor {
                 put_u32(&mut out, selection.collection_len);
                 put_u32(&mut out, selection.selected_index);
                 out.extend_from_slice(&selection.selected_receipt_sha256);
+                out.extend_from_slice(&selection.selection_decision_sha256);
                 put_string(&mut out, &selection.selection_policy);
                 put_u16(&mut out, selection.selection_policy_version);
             }
@@ -206,6 +213,7 @@ mod tests {
                 collection_len: 2,
                 selected_index: 1,
                 selected_receipt_sha256: [5; 32],
+                selection_decision_sha256: [6; 32],
                 selection_policy: "rfc9942/priority-first-valid-v1".into(),
                 selection_policy_version: 1,
             }),
