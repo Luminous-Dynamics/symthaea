@@ -198,6 +198,21 @@ spectrum. It specifically probes coordinate indexing, packed-word boundaries, pa
 construction, and the decoder's interpretation of Hamming geometry under representation
 isomorphism.
 
+The same metamorphic check now includes exact decoder work-ledger equality (`weights_examined`,
+`error_patterns_examined`, `syndrome_column_xors`, and `matching_error_patterns`) and explicit
+fail-closed equivalence for invalid observation dimensions and invalid bounds. These guards keep
+representation changes from silently changing the searched state space or error-handling class.
+
+## Execution identity and receipt integrity
+
+The qualification workflow does not treat the event payload alone as sufficient provenance. It
+binds the current repository, triggering repository, and head repository by numeric repository ID,
+then re-fetches the live Actions run and requires its repository ID, exact head SHA, head ref,
+workflow ID/path/name, and (for pull-request events) PR head/base SHAs and repository IDs to agree
+with the event. The receipt records these validated values as schema v12 fields. This makes a
+successful receipt evidence about the actual executed run rather than only about the triggering
+payload.
+
 ## Walsh/dual-fiber structure
 
 A metric-orthogonal witness is obtained from the Boolean Walsh characters

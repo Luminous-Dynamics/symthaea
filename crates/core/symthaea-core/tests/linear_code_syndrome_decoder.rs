@@ -1428,6 +1428,33 @@ fn coordinate_permutation_equivariance_preserves_bounded_decoder_semantics() {
         let permuted_decoder =
             BoundedDistanceSyndromeDecoder::from_code(&permuted_code).expect("permuted decoder");
 
+        let invalid_observation = BinaryCodeword::zero(code.dimension() + 1);
+        let (original_invalid_dimension, original_invalid_dimension_work) =
+            original_decoder.decode_with_work(&invalid_observation, bound);
+        let (permuted_invalid_dimension, permuted_invalid_dimension_work) =
+            permuted_decoder.decode_with_work(&invalid_observation, bound);
+        assert_eq!(original_invalid_dimension, permuted_invalid_dimension);
+        assert_eq!(original_invalid_dimension_work, permuted_invalid_dimension_work);
+        assert!(matches!(
+            original_invalid_dimension,
+            BoundedDistanceDecode::InvalidObservationDimension { .. }
+        ));
+        assert_eq!(original_invalid_dimension_work, Default::default());
+
+        let valid_observation = BinaryCodeword::zero(code.dimension());
+        let invalid_bound = code.dimension() + 1;
+        let (original_invalid_bound, original_invalid_bound_work) =
+            original_decoder.decode_with_work(&valid_observation, invalid_bound);
+        let (permuted_invalid_bound, permuted_invalid_bound_work) =
+            permuted_decoder.decode_with_work(&valid_observation, invalid_bound);
+        assert_eq!(original_invalid_bound, permuted_invalid_bound);
+        assert_eq!(original_invalid_bound_work, permuted_invalid_bound_work);
+        assert!(matches!(
+            original_invalid_bound,
+            BoundedDistanceDecode::InvalidBound { .. }
+        ));
+        assert_eq!(original_invalid_bound_work, Default::default());
+
         for observation in observations {
             let permuted_observation = permute_codeword(observation, permutation);
             let original = original_decoder.decode_with_minimum_list(observation, bound, 64);
@@ -1511,6 +1538,26 @@ fn coordinate_permutation_equivariance_preserves_bounded_decoder_semantics() {
             let observed_codewords = canonicalize_words(permuted.nearest_codewords.clone());
             assert_eq!(observed_codewords, expected_codewords);
             assert_eq!(permuted.list_complete, original.list_complete);
+
+            let (original_work_outcome, original_work) =
+                original_decoder.decode_with_work(observation, bound);
+            let (permuted_work_outcome, permuted_work) =
+                permuted_decoder.decode_with_work(&permuted_observation, bound);
+            assert_eq!(original_work_outcome, original.outcome);
+            assert_eq!(permuted_work_outcome, permuted.outcome);
+            assert_eq!(permuted_work.weights_examined, original_work.weights_examined);
+            assert_eq!(
+                permuted_work.error_patterns_examined,
+                original_work.error_patterns_examined
+            );
+            assert_eq!(
+                permuted_work.syndrome_column_xors,
+                original_work.syndrome_column_xors
+            );
+            assert_eq!(
+                permuted_work.matching_error_patterns,
+                original_work.matching_error_patterns
+            );
         }
     }
 
@@ -1532,7 +1579,7 @@ fn coordinate_permutation_equivariance_preserves_bounded_decoder_semantics() {
     check(&random, &random_permutation, &probes, 1);
 
     println!(
-        "COORDINATE_PERMUTATION_EQUIVARIANCE=boundary_observations={};boundary_dimension=8;boundary_bound=2;random_dimension=73;random_rank=8;random_probes=32;random_bound=1;list_surface_checked=true;distance_preserved=true;error_equivariance=true;codeword_equivariance=true;no_match_equivariance=true",
+        "COORDINATE_PERMUTATION_EQUIVARIANCE=boundary_observations={};boundary_dimension=8;boundary_bound=2;random_dimension=73;random_rank=8;random_probes=32;random_bound=1;list_surface_checked=true;distance_preserved=true;error_equivariance=true;codeword_equivariance=true;work_ledger_equivariance=true;invalid_input_equivariance=true;no_match_equivariance=true",
         boundary_observations.len()
     );
 }
