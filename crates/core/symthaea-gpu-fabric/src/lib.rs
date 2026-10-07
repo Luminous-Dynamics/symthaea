@@ -143,6 +143,21 @@ impl OperationPlan {
             }
         }
 
+        for (index, input) in self.inputs.iter().enumerate() {
+            if input.alignment == 0 || !input.alignment.is_power_of_two() {
+                return Err(PlanError::InvalidAlignment {
+                    field: format!("input[{index}]"),
+                    alignment: input.alignment,
+                });
+            }
+        }
+        if self.output.alignment == 0 || !self.output.alignment.is_power_of_two() {
+            return Err(PlanError::InvalidAlignment {
+                field: "output".to_owned(),
+                alignment: self.output.alignment,
+            });
+        }
+
         if self.output.bytes != required_bytes {
             return Err(PlanError::ShapeMismatch {
                 field: "output".to_owned(),
@@ -285,7 +300,7 @@ impl CpuReferenceExecutor {
                     driver_identity: None,
                     resource_limits: plan.limits,
                     input_digest,
-                    output_digest: digest_bytes(output.as_bytes()),
+                    output_digest: digest_hypervector(&output),
                     determinism: plan.determinism,
                 };
 
@@ -358,7 +373,7 @@ impl ExecutionReceipt {
     }
 
     pub fn verify_output(&self, output: &BinaryHypervector) -> Result<(), ReceiptError> {
-        let digest = digest_bytes(output.as_bytes());
+        let digest = digest_hypervector(output);
         if digest != self.output_digest {
             return Err(ReceiptError::OutputDigestMismatch);
         }
@@ -374,6 +389,8 @@ pub enum PlanError {
     ZeroDimensions,
     #[error("expected {expected} inputs, got {actual}")]
     InputCount { expected: usize, actual: usize },
+    #[error("{field} has invalid alignment {alignment}; alignment must be a non-zero power of two")]
+    InvalidAlignment { field: String, alignment: u32 },
     #[error("{field} requires {expected} bytes, got {actual}")]
     ShapeMismatch { field: String, expected: u64, actual: u64 },
     #[error("input budget exceeded: {bytes} > {max}")]
@@ -451,6 +468,10 @@ fn digest_bytes(bytes: &[u8]) -> String {
     hasher.update(b"symthaea.gpu-fabric.bytes\0");
     hasher.update(bytes);
     hasher.finalize().to_hex().to_string()
+}
+
+fn digest_hypervector(vector: &BinaryHypervector) -> String {
+    digest_hypervectors(std::slice::from_ref(vector))
 }
 
 fn digest_hypervectors(vectors: &[BinaryHypervector]) -> String {
@@ -531,6 +552,16 @@ mod tests {
     }
 
     #[test]
+    fn invalid_alignment_is_rejected() {
+        let mut plan = OperationPlan::new(GpuOperation::HdcBindXor { dimensions: 64 });
+        plan.inputs[0].alignment = 3;
+        assert!(matches!(
+            plan.validate(),
+            Err(PlanError::InvalidAlignment { .. })
+        ));
+    }
+
+    #[test]
     fn oversized_output_is_rejected_before_execution() {
         let mut plan = OperationPlan::new(GpuOperation::HdcBindXor { dimensions: 64 });
         plan.limits.max_output_bytes = 1;
@@ -587,6 +618,22 @@ mod tests {
             receipt.verify_plan(&plan),
             Err(ReceiptError::UnexpectedAccelerationEvidence)
         ));
+    }
+
+    #[test]
+    fn output_digest_binds_dimensions() {
+        let plan = OperationPlan::new(GpuOperation::HdcBindXor { dimensions: 8 });
+        let left = BinaryHypervector::from_bytes(8, vec![0xaa]).unwrap();
+        let right = BinaryHypervector::from_bytes(8, vec![0x55]).unwrap();
+        let (output, receipt) = CpuReferenceExecutor::execute(&plan, &[left, right]).unwrap();
+
+        let different_shape =
+            BinaryHypervector::from_bytes(7, vec![output.as_bytes()[0] & 0x7f]).unwrap();
+        assert!(matches!(
+            receipt.verify_output(&different_shape),
+            Err(ReceiptError::OutputDigestMismatch)
+        ));
+        receipt.verify_output(&output).unwrap();
     }
 
     #[test]
