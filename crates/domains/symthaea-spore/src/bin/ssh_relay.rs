@@ -6398,52 +6398,101 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                 )
                 .await;
 
-                let switch_result = match generation_result {
-                    Ok(r) if r.exit_status == 0 => {
-                        run_privileged_args(
+                match generation_result {
+                    Ok(generation_result) if generation_result.exit_status != 0 => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx.send(Message::Text(serde_json::json!({
+                            "type":"exit",
+                            "code": protocol_exit_code(generation_result.exit_status, outcome),
+                            "data": generation_result.stdout.chars().take(2000).collect::<String>(),
+                            "transaction": transaction.receipt(outcome)
+                        }).to_string())).await;
+                    }
+                    Ok(generation_result) => {
+                        // The generation pointer has moved at this point. Activation is
+                        // therefore a second consequential effect: any activation failure
+                        // is indeterminate rather than an ordinary child failure.
+                        match run_privileged_args(
                             "/nix/var/nix/profiles/system/bin/switch-to-configuration",
                             &["switch"],
                         )
                         .await
-                    }
-                    Ok(r) => Ok(r),
-                    Err(error) => Err(error),
-                };
-
-                match switch_result {
-                    Ok(r) => {
-                        let observed_outcome = if r.exit_status == 0 {
-                            match current_system_generation().await {
-                                Ok(generation) if generation == requested_generation => {
-                                    TransactionOutcome::ObservedSuccess
-                                }
-                                Ok(generation) => {
-                                    eprintln!(
-                                        "[{}] {} switch returned 0 but generation {} is current, requested {}",
-                                        peer_addr, transaction.log_line(), generation, r#gen
-                                    );
+                        {
+                            Ok(activation_result) => {
+                                let observed_outcome = if activation_result.exit_status == 0 {
+                                    match current_system_generation().await {
+                                        Ok(generation) if generation == requested_generation => {
+                                            TransactionOutcome::ObservedSuccess
+                                        }
+                                        Ok(generation) => {
+                                            eprintln!(
+                                                "[{}] {} switch returned 0 but generation {} is current, requested {}",
+                                                peer_addr, transaction.log_line(), generation, r#gen
+                                            );
+                                            TransactionOutcome::Indeterminate
+                                        }
+                                        Err(error) => {
+                                            eprintln!(
+                                                "[{}] {} generation post-state probe failed: {}",
+                                                peer_addr, transaction.log_line(), error
+                                            );
+                                            TransactionOutcome::Indeterminate
+                                        }
+                                    }
+                                } else {
                                     TransactionOutcome::Indeterminate
-                                }
-                                Err(error) => {
-                                    eprintln!(
-                                        "[{}] {} generation post-state probe failed: {}",
-                                        peer_addr, transaction.log_line(), error
-                                    );
-                                    TransactionOutcome::Indeterminate
-                                }
+                                };
+                                let response_code =
+                                    if observed_outcome == TransactionOutcome::ObservedSuccess {
+                                        0
+                                    } else {
+                                        1
+                                    };
+                                let data = if activation_result.stdout.is_empty() {
+                                    activation_result.stderr.chars().take(2000).collect::<String>()
+                                } else {
+                                    activation_result.stdout.chars().take(2000).collect::<String>()
+                                };
+                                let outcome = finalize_transaction(
+                                    &transaction_ledger,
+                                    &transaction,
+                                    observed_outcome,
+                                    &peer_addr,
+                                );
+                                let _ = ws_tx.send(Message::Text(serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(response_code, outcome),
+                                    "data": data,
+                                    "transaction": transaction.receipt(outcome)
+                                }).to_string())).await;
                             }
-                        } else {
-                            TransactionOutcome::Failed
-                        };
-                        let outcome = finalize_transaction(
-                            &transaction_ledger,
-                            &transaction,
-                            observed_outcome,
-                            &peer_addr,
-                        );
-                        let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":protocol_exit_code(r.exit_status, outcome),"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
+                            Err(error) => {
+                                let outcome = finalize_transaction(
+                                    &transaction_ledger,
+                                    &transaction,
+                                    TransactionOutcome::Indeterminate,
+                                    &peer_addr,
+                                );
+                                let _ = ws_tx
+                                    .send(Message::Text(
+                                        serde_json::json!({
+                                            "type":"exit",
+                                            "code": protocol_exit_code(1, outcome),
+                                            "data": format!("Generation activation could not be observed after the generation pointer moved: {}", error),
+                                            "transaction": transaction.receipt(outcome)
+                                        })
+                                        .to_string(),
+                                    ))
+                                    .await;
+                            }
+                        }
                     }
-                    Err(e) => {
+                    Err(error) => {
                         let outcome = finalize_transaction(
                             &transaction_ledger,
                             &transaction,
@@ -6455,7 +6504,7 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                                 serde_json::json!({
                                     "type":"exit",
                                     "code": protocol_exit_code(1, outcome),
-                                    "data": format!("Generation switch execution could not be observed: {}", e),
+                                    "data": format!("Generation selection could not be observed: {}", error),
                                     "transaction": transaction.receipt(outcome)
                                 })
                                 .to_string(),
@@ -6463,7 +6512,6 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
                             .await;
                     }
                 }
-            }
 
             "list_services" => {
                 eprintln!("[{}] Listing services...", peer_addr);
