@@ -877,6 +877,68 @@ fn main() -> Result<(), String> {
         .collect::<Result<_, _>>()?;
     let computation_byte_refs: Vec<&[u8]> =
         computation_bytes.iter().map(Vec::as_slice).collect();
+    let statistical_sampling_frame =
+        symthaea_communication::NeurosemanticRemediationStatisticalSamplingFrameArtifact {
+            schema_version:
+                symthaea_communication::NEUROSEMANTIC_REMEDIATION_STATISTICAL_SAMPLING_FRAME_SCHEMA_VERSION,
+            frame_ref: "synthetic-forget-sampling-frame-v1".into(),
+            source_dataset_manifest_hash: forget_set_manifest.source_dataset_manifest_hash.clone(),
+            member_artifact_hashes: forget_set_manifest.member_artifact_hashes.clone(),
+        };
+    let statistical_sampling_frame_bytes =
+        serde_json::to_vec(&statistical_sampling_frame).map_err(|e| e.to_string())?;
+    let statistical_sampling_frame_byte_refs: Vec<&[u8]> =
+        vec![statistical_sampling_frame_bytes.as_slice()];
+
+    let statistical_execution =
+        symthaea_communication::NeurosemanticRemediationStatisticalExecutionArtifact {
+            schema_version:
+                symthaea_communication::NEUROSEMANTIC_REMEDIATION_STATISTICAL_EXECUTION_SCHEMA_VERSION,
+            execution_ref: "synthetic-statistical-execution-v1".into(),
+            design_ref: "synthetic-statistical-design-v1".into(),
+            metric_ref: metric_forgetfulness.metric_ref.clone(),
+            metric_definition_hash: metric_forgetfulness.fingerprint()?,
+            observation_set_hash: observation_sets[0]
+                .fingerprint(&metric_forgetfulness.aggregation_ref)
+                .unwrap(),
+            sampling_frame_hash: statistical_sampling_frame.fingerprint()?,
+            selected_subject_artifact_hashes: observation_sets[0]
+                .observations
+                .iter()
+                .map(|observation| observation.subject_artifact_hash.clone())
+                .collect(),
+            inclusion_probabilities: statistical_sampling_frame
+                .member_artifact_hashes
+                .iter()
+                .map(|subject_artifact_hash| {
+                    symthaea_communication::NeurosemanticRemediationSamplingInclusionProbability {
+                        subject_artifact_hash: subject_artifact_hash.clone(),
+                        probability_numerator: 1,
+                        probability_denominator: 1,
+                    }
+                })
+                .collect(),
+            selection_procedure_ref: "synthetic-complete-frame-selection-v1".into(),
+            dependence_model:
+                symthaea_communication::NeurosemanticRemediationStatisticalDependenceModel::IndependentObservationUnits,
+            dependence_assignments: observation_sets[0]
+                .observations
+                .iter()
+                .map(|observation| {
+                    symthaea_communication::NeurosemanticRemediationStatisticalDependenceAssignment {
+                        subject_artifact_hash: observation.subject_artifact_hash.clone(),
+                        dependence_group_ref: None,
+                    }
+                })
+                .collect(),
+            study_protocol_hash: study_protocol_hash.clone(),
+            execution_revision: execution_revision.clone(),
+        };
+    let statistical_execution_bytes =
+        serde_json::to_vec(&statistical_execution).map_err(|e| e.to_string())?;
+    let statistical_execution_byte_refs: Vec<&[u8]> =
+        vec![statistical_execution_bytes.as_slice()];
+
     let statistical_design = NeurosemanticRemediationStatisticalDesignArtifact {
         schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_STATISTICAL_DESIGN_SCHEMA_VERSION,
         design_ref: "synthetic-statistical-design-v1".into(),
@@ -897,6 +959,7 @@ fn main() -> Result<(), String> {
         assumptions_hash: symthaea_communication::content_hash(
             b"independent Bernoulli trials; fixed binary outcome; no clustering correction declared",
         ),
+        statistical_execution_hash: statistical_execution.fingerprint()?,
         execution_revision: execution_revision.clone(),
     };
     let statistical_design_bytes =
@@ -1133,14 +1196,16 @@ fn main() -> Result<(), String> {
     let remediation_measurement_computation_verified =
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
-                &measurement_bytes,
-                &computation_byte_refs,
-                &observation_set_byte_refs,
-                &population_manifest_byte_refs,
-                &uncertainty_computation_byte_refs,
-                &uncertainty_assumption_byte_refs,
-                &statistical_design_byte_refs,
-            )
+            &measurement_bytes,
+                            &computation_byte_refs,
+                            &observation_set_byte_refs,
+                            &population_manifest_byte_refs,
+                            &uncertainty_computation_byte_refs,
+                            &uncertainty_assumption_byte_refs,
+                            &statistical_design_byte_refs,,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_ok();
     let remediation_wilson_uncertainty_numerically_recomputed =
         remediation_measurement_computation_verified;
@@ -1152,14 +1217,16 @@ fn main() -> Result<(), String> {
         let forged_refs: Vec<&[u8]> = forged_bytes.iter().map(Vec::as_slice).collect();
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
-                &measurement_bytes,
-                &forged_refs,
-                &observation_set_byte_refs,
-                &population_manifest_byte_refs,
-                &uncertainty_computation_byte_refs,
-                &uncertainty_assumption_byte_refs,
-                &statistical_design_byte_refs,
-            )
+            &measurement_bytes,
+                            &forged_refs,
+                            &observation_set_byte_refs,
+                            &population_manifest_byte_refs,
+                            &uncertainty_computation_byte_refs,
+                            &uncertainty_assumption_byte_refs,
+                            &statistical_design_byte_refs,,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
     let remediation_observation_substitution_blocked = {
@@ -1171,14 +1238,16 @@ fn main() -> Result<(), String> {
         let supplied_refs: Vec<&[u8]> = supplied.iter().map(Vec::as_slice).collect();
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
-                &measurement_bytes,
-                &computation_byte_refs,
-                &supplied_refs,
-                &population_manifest_byte_refs,
-                &uncertainty_computation_byte_refs,
-                &uncertainty_assumption_byte_refs,
-                &statistical_design_byte_refs,
-            )
+            &measurement_bytes,
+                            &computation_byte_refs,
+                            &supplied_refs,
+                            &population_manifest_byte_refs,
+                            &uncertainty_computation_byte_refs,
+                            &uncertainty_assumption_byte_refs,
+                            &statistical_design_byte_refs,,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
     let remediation_observation_omission_blocked = {
@@ -1190,14 +1259,16 @@ fn main() -> Result<(), String> {
         let supplied_refs: Vec<&[u8]> = supplied.iter().map(Vec::as_slice).collect();
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
-                &measurement_bytes,
-                &computation_byte_refs,
-                &supplied_refs,
-                &population_manifest_byte_refs,
-                &uncertainty_computation_byte_refs,
-                &uncertainty_assumption_byte_refs,
-                &statistical_design_byte_refs,
-            )
+            &measurement_bytes,
+                            &computation_byte_refs,
+                            &supplied_refs,
+                            &population_manifest_byte_refs,
+                            &uncertainty_computation_byte_refs,
+                            &uncertainty_assumption_byte_refs,
+                            &statistical_design_byte_refs,,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
     let remediation_observation_duplicate_blocked = {
@@ -1209,14 +1280,16 @@ fn main() -> Result<(), String> {
         let supplied_refs: Vec<&[u8]> = supplied.iter().map(Vec::as_slice).collect();
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
-                &measurement_bytes,
-                &computation_byte_refs,
-                &supplied_refs,
-                &population_manifest_byte_refs,
-                &uncertainty_computation_byte_refs,
-                &uncertainty_assumption_byte_refs,
-                &statistical_design_byte_refs,
-            )
+            &measurement_bytes,
+                            &computation_byte_refs,
+                            &supplied_refs,
+                            &population_manifest_byte_refs,
+                            &uncertainty_computation_byte_refs,
+                            &uncertainty_assumption_byte_refs,
+                            &statistical_design_byte_refs,,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
     let remediation_observation_scope_substitution_blocked = {
@@ -1228,14 +1301,16 @@ fn main() -> Result<(), String> {
         let supplied_refs: Vec<&[u8]> = supplied.iter().map(Vec::as_slice).collect();
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
-                &measurement_bytes,
-                &computation_byte_refs,
-                &supplied_refs,
-                &population_manifest_byte_refs,
-                &uncertainty_computation_byte_refs,
-                &uncertainty_assumption_byte_refs,
-                &statistical_design_byte_refs,
-            )
+            &measurement_bytes,
+                            &computation_byte_refs,
+                            &supplied_refs,
+                            &population_manifest_byte_refs,
+                            &uncertainty_computation_byte_refs,
+                            &uncertainty_assumption_byte_refs,
+                            &statistical_design_byte_refs,,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
     let remediation_observation_population_substitution_blocked = {
@@ -1248,14 +1323,16 @@ fn main() -> Result<(), String> {
         let supplied_refs: Vec<&[u8]> = supplied.iter().map(Vec::as_slice).collect();
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
-                &measurement_bytes,
-                &computation_byte_refs,
-                &supplied_refs,
-                &population_manifest_byte_refs,
-                &uncertainty_computation_byte_refs,
-                &uncertainty_assumption_byte_refs,
-                &statistical_design_byte_refs,
-            )
+            &measurement_bytes,
+                            &computation_byte_refs,
+                            &supplied_refs,
+                            &population_manifest_byte_refs,
+                            &uncertainty_computation_byte_refs,
+                            &uncertainty_assumption_byte_refs,
+                            &statistical_design_byte_refs,,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
     let remediation_fairness_group_substitution_blocked = {
@@ -1267,14 +1344,16 @@ fn main() -> Result<(), String> {
         let supplied_refs: Vec<&[u8]> = supplied.iter().map(Vec::as_slice).collect();
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
-                &measurement_bytes,
-                &computation_byte_refs,
-                &supplied_refs,
-                &population_manifest_byte_refs,
-                &uncertainty_computation_byte_refs,
-                &uncertainty_assumption_byte_refs,
-                &statistical_design_byte_refs,
-            )
+            &measurement_bytes,
+                            &computation_byte_refs,
+                            &supplied_refs,
+                            &population_manifest_byte_refs,
+                            &uncertainty_computation_byte_refs,
+                            &uncertainty_assumption_byte_refs,
+                            &statistical_design_byte_refs,,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
     let remediation_observation_membership_cherry_pick_blocked = {
@@ -1286,14 +1365,16 @@ fn main() -> Result<(), String> {
         let supplied_refs: Vec<&[u8]> = supplied.iter().map(Vec::as_slice).collect();
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
-                &measurement_bytes,
-                &computation_byte_refs,
-                &supplied_refs,
-                &population_manifest_byte_refs,
-                &uncertainty_computation_byte_refs,
-                &uncertainty_assumption_byte_refs,
-                &statistical_design_byte_refs,
-            )
+            &measurement_bytes,
+                            &computation_byte_refs,
+                            &supplied_refs,
+                            &population_manifest_byte_refs,
+                            &uncertainty_computation_byte_refs,
+                            &uncertainty_assumption_byte_refs,
+                            &statistical_design_byte_refs,,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
     let remediation_metric_direction_mismatch_blocked = {
@@ -1308,14 +1389,16 @@ fn main() -> Result<(), String> {
         let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
-                &measurement_bytes,
-                &computation_byte_refs,
-                &observation_set_byte_refs,
-                &population_manifest_byte_refs,
-                &[bytes.as_slice()],
-                &uncertainty_assumption_byte_refs,
-                &statistical_design_byte_refs,
-            )
+            &measurement_bytes,
+                            &computation_byte_refs,
+                            &observation_set_byte_refs,
+                            &population_manifest_byte_refs,
+                            &[bytes.as_slice()],
+                            &uncertainty_assumption_byte_refs,
+                            &statistical_design_byte_refs,,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
     let remediation_uncertainty_target_mismatch_blocked = {
@@ -1347,14 +1430,16 @@ fn main() -> Result<(), String> {
         forged_impact.measurement_artifact_hash = forged_measurement.fingerprint()?;
         forged_impact
             .verify_measurement_computation_bundle_bytes(
-                &forged_measurement_bytes,
-                &computation_byte_refs,
-                &observation_set_byte_refs,
-                &population_manifest_byte_refs,
-                &[uncertainty_bytes.as_slice()],
-                &uncertainty_assumption_byte_refs,
-                &statistical_design_byte_refs,
-            )
+            &forged_measurement_bytes,
+                            &computation_byte_refs,
+                            &observation_set_byte_refs,
+                            &population_manifest_byte_refs,
+                            &[uncertainty_bytes.as_slice()],
+                            &uncertainty_assumption_byte_refs,
+                            &statistical_design_byte_refs,,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
     let remediation_uncertainty_proportion_domain_blocked = {
@@ -1394,15 +1479,16 @@ fn main() -> Result<(), String> {
         forged_impact.measurement_artifact_hash = forged_measurement.fingerprint()?;
         forged_impact
             .verify_measurement_computation_bundle_bytes(
-                &forged_measurement_bytes,
-                &measurement_bytes,
-                &computation_byte_refs,
-                &observation_set_byte_refs,
-                &population_manifest_byte_refs,
-                &[bytes.as_slice()],
-                &uncertainty_assumption_byte_refs,
-                &statistical_design_byte_refs,
-            )
+            &forged_measurement_bytes,
+                            &computation_byte_refs,
+                            &observation_set_byte_refs,
+                            &population_manifest_byte_refs,
+                            &[bytes.as_slice()],
+                            &uncertainty_assumption_byte_refs,
+                            &statistical_design_byte_refs,,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
     let remediation_uncertainty_statistical_design_substitution_blocked = {
@@ -1431,14 +1517,16 @@ fn main() -> Result<(), String> {
         forged_impact.measurement_artifact_hash = forged_measurement.fingerprint()?;
         forged_impact
             .verify_measurement_computation_bundle_bytes(
-                &forged_measurement_bytes,
-                &computation_byte_refs,
-                &observation_set_byte_refs,
-                &population_manifest_byte_refs,
-                &[forged_uncertainty_bytes.as_slice()],
-                &uncertainty_assumption_byte_refs,
-                &[alternate_design_bytes.as_slice()],
-            )
+            &forged_measurement_bytes,
+                            &computation_byte_refs,
+                            &observation_set_byte_refs,
+                            &population_manifest_byte_refs,
+                            &[forged_uncertainty_bytes.as_slice()],
+                            &uncertainty_assumption_byte_refs,
+                            &[alternate_design_bytes.as_slice()],,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
 
@@ -1470,14 +1558,16 @@ fn main() -> Result<(), String> {
         forged_impact.measurement_artifact_hash = forged_measurement.fingerprint()?;
         forged_impact
             .verify_measurement_computation_bundle_bytes(
-                &forged_measurement_bytes,
-                &computation_byte_refs,
-                &observation_set_byte_refs,
-                &population_manifest_byte_refs,
-                &[forged_uncertainty_bytes.as_slice()],
-                &uncertainty_assumption_byte_refs,
-                &[alternate_design_bytes.as_slice()],
-            )
+            &forged_measurement_bytes,
+                            &computation_byte_refs,
+                            &observation_set_byte_refs,
+                            &population_manifest_byte_refs,
+                            &[forged_uncertainty_bytes.as_slice()],
+                            &uncertainty_assumption_byte_refs,
+                            &[alternate_design_bytes.as_slice()],,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
 
@@ -1506,13 +1596,154 @@ fn main() -> Result<(), String> {
         forged_impact.measurement_artifact_hash = forged_measurement.fingerprint()?;
         forged_impact
             .verify_measurement_computation_bundle_bytes(
+            &forged_measurement_bytes,
+                            &computation_byte_refs,
+                            &observation_set_byte_refs,
+                            &population_manifest_byte_refs,
+                            &[forged_uncertainty_bytes.as_slice()],
+                            &uncertainty_assumption_byte_refs,
+                            &[design_bytes.as_slice()],,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
+            .is_err()
+    };
+
+    let remediation_uncertainty_statistical_execution_substitution_blocked = {
+        let mut forged_frame = statistical_sampling_frame.clone();
+        forged_frame.member_artifact_hashes.pop();
+        let forged_frame_bytes =
+            serde_json::to_vec(&forged_frame).map_err(|e| e.to_string())?;
+
+        let mut forged_execution = statistical_execution.clone();
+        forged_execution.sampling_frame_hash = forged_frame.fingerprint()?;
+        let forged_execution_bytes =
+            serde_json::to_vec(&forged_execution).map_err(|e| e.to_string())?;
+        let mut forged_design = statistical_design.clone();
+        forged_design.statistical_execution_hash = forged_execution.fingerprint()?;
+        let forged_design_bytes =
+            serde_json::to_vec(&forged_design).map_err(|e| e.to_string())?;
+        let mut forged_uncertainty = uncertainty_computation.clone();
+        forged_uncertainty.statistical_design_hash = forged_design.fingerprint()?;
+        let forged_uncertainty_bytes =
+            serde_json::to_vec(&forged_uncertainty).map_err(|e| e.to_string())?;
+        let mut forged_measurement = measurement.clone();
+        forged_measurement.measurements[0].uncertainty =
+            NeurosemanticRemediationUncertainty::Interval {
+                lower_numerator: 0,
+                upper_numerator: 6_577,
+                scale: 4,
+                confidence_level_bps: 9_500,
+                uncertainty_method_ref: "wilson-score-95-v1".into(),
+                uncertainty_computation_artifact_hash:
+                    symthaea_communication::content_hash(&forged_uncertainty_bytes),
+            };
+        let forged_measurement_bytes =
+            serde_json::to_vec(&forged_measurement).map_err(|e| e.to_string())?;
+        let mut forged_impact = remediation_impact.clone();
+        forged_impact.measurement_artifact_hash = forged_measurement.fingerprint()?;
+        forged_impact
+            .verify_measurement_computation_bundle_bytes(
                 &forged_measurement_bytes,
                 &computation_byte_refs,
                 &observation_set_byte_refs,
                 &population_manifest_byte_refs,
                 &[forged_uncertainty_bytes.as_slice()],
                 &uncertainty_assumption_byte_refs,
-                &[design_bytes.as_slice()],
+                &[forged_design_bytes.as_slice()],
+                &[forged_frame_bytes.as_slice()],
+                &[forged_execution_bytes.as_slice()],
+            )
+            .is_err()
+    };
+
+    let remediation_uncertainty_inclusion_probability_substitution_blocked = {
+        let mut forged_execution = statistical_execution.clone();
+        forged_execution.inclusion_probabilities[0].probability_numerator = 0;
+        let forged_execution_bytes =
+            serde_json::to_vec(&forged_execution).map_err(|e| e.to_string())?;
+        let mut forged_design = statistical_design.clone();
+        forged_design.statistical_execution_hash = forged_execution.fingerprint()
+            .unwrap_or_else(|_| symthaea_communication::content_hash(&forged_execution_bytes));
+        let forged_design_bytes =
+            serde_json::to_vec(&forged_design).map_err(|e| e.to_string())?;
+        let mut forged_uncertainty = uncertainty_computation.clone();
+        forged_uncertainty.statistical_design_hash = forged_design.fingerprint()?;
+        let forged_uncertainty_bytes =
+            serde_json::to_vec(&forged_uncertainty).map_err(|e| e.to_string())?;
+        let mut forged_measurement = measurement.clone();
+        forged_measurement.measurements[0].uncertainty =
+            NeurosemanticRemediationUncertainty::Interval {
+                lower_numerator: 0,
+                upper_numerator: 6_577,
+                scale: 4,
+                confidence_level_bps: 9_500,
+                uncertainty_method_ref: "wilson-score-95-v1".into(),
+                uncertainty_computation_artifact_hash:
+                    symthaea_communication::content_hash(&forged_uncertainty_bytes),
+            };
+        let forged_measurement_bytes =
+            serde_json::to_vec(&forged_measurement).map_err(|e| e.to_string())?;
+        let mut forged_impact = remediation_impact.clone();
+        forged_impact.measurement_artifact_hash = forged_measurement.fingerprint()?;
+        forged_impact
+            .verify_measurement_computation_bundle_bytes(
+                &forged_measurement_bytes,
+                &computation_byte_refs,
+                &observation_set_byte_refs,
+                &population_manifest_byte_refs,
+                &[forged_uncertainty_bytes.as_slice()],
+                &uncertainty_assumption_byte_refs,
+                &[forged_design_bytes.as_slice()],
+                &statistical_sampling_frame_byte_refs,
+                &[forged_execution_bytes.as_slice()],
+            )
+            .is_err()
+    };
+
+    let remediation_uncertainty_dependence_execution_blocked = {
+        let mut forged_execution = statistical_execution.clone();
+        forged_execution.dependence_model =
+            symthaea_communication::NeurosemanticRemediationStatisticalDependenceModel::Clustered;
+        forged_execution.dependence_assignments.iter_mut().for_each(|assignment| {
+            assignment.dependence_group_ref = Some("synthetic-cluster-a".into());
+        });
+        let forged_execution_bytes =
+            serde_json::to_vec(&forged_execution).map_err(|e| e.to_string())?;
+        let mut forged_design = statistical_design.clone();
+        forged_design.statistical_execution_hash = forged_execution.fingerprint()?;
+        let forged_design_bytes =
+            serde_json::to_vec(&forged_design).map_err(|e| e.to_string())?;
+        let mut forged_uncertainty = uncertainty_computation.clone();
+        forged_uncertainty.statistical_design_hash = forged_design.fingerprint()?;
+        let forged_uncertainty_bytes =
+            serde_json::to_vec(&forged_uncertainty).map_err(|e| e.to_string())?;
+        let mut forged_measurement = measurement.clone();
+        forged_measurement.measurements[0].uncertainty =
+            NeurosemanticRemediationUncertainty::Interval {
+                lower_numerator: 0,
+                upper_numerator: 6_577,
+                scale: 4,
+                confidence_level_bps: 9_500,
+                uncertainty_method_ref: "wilson-score-95-v1".into(),
+                uncertainty_computation_artifact_hash:
+                    symthaea_communication::content_hash(&forged_uncertainty_bytes),
+            };
+        let forged_measurement_bytes =
+            serde_json::to_vec(&forged_measurement).map_err(|e| e.to_string())?;
+        let mut forged_impact = remediation_impact.clone();
+        forged_impact.measurement_artifact_hash = forged_measurement.fingerprint()?;
+        forged_impact
+            .verify_measurement_computation_bundle_bytes(
+                &forged_measurement_bytes,
+                &computation_byte_refs,
+                &observation_set_byte_refs,
+                &population_manifest_byte_refs,
+                &[forged_uncertainty_bytes.as_slice()],
+                &uncertainty_assumption_byte_refs,
+                &[forged_design_bytes.as_slice()],
+                &statistical_sampling_frame_byte_refs,
+                &[forged_execution_bytes.as_slice()],
             )
             .is_err()
     };
@@ -1523,14 +1754,16 @@ fn main() -> Result<(), String> {
         let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
-                &measurement_bytes,
-                &computation_byte_refs,
-                &observation_set_byte_refs,
-                &population_manifest_byte_refs,
-                &[bytes.as_slice()],
-                &uncertainty_assumption_byte_refs,
-                &statistical_design_byte_refs,
-            )
+            &measurement_bytes,
+                            &computation_byte_refs,
+                            &observation_set_byte_refs,
+                            &population_manifest_byte_refs,
+                            &[bytes.as_slice()],
+                            &uncertainty_assumption_byte_refs,
+                            &statistical_design_byte_refs,,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
     let remediation_uncertainty_assumptions_substitution_blocked = {
@@ -1538,13 +1771,16 @@ fn main() -> Result<(), String> {
         forged.extend_from_slice(b"-tampered");
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
-                &measurement_bytes,
-                &computation_byte_refs,
-                &observation_set_byte_refs,
-                &population_manifest_byte_refs,
-                &uncertainty_computation_byte_refs,
-                &[forged.as_slice()],
-            )
+            &measurement_bytes,
+                            &computation_byte_refs,
+                            &observation_set_byte_refs,
+                            &population_manifest_byte_refs,
+                            &uncertainty_computation_byte_refs,
+                            &[forged.as_slice()],,
+            &statistical_design_byte_refs,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
     let remediation_canonical_population_identity_substitution_blocked = {
@@ -1558,14 +1794,16 @@ fn main() -> Result<(), String> {
         populations.push(alternate_forget_population_bytes.as_slice());
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
-                &measurement_bytes,
-                &computation_byte_refs,
-                &supplied_refs,
-                &populations,
-                &uncertainty_computation_byte_refs,
-                &uncertainty_assumption_byte_refs,
-                &statistical_design_byte_refs,
-            )
+            &measurement_bytes,
+                            &computation_byte_refs,
+                            &supplied_refs,
+                            &populations,
+                            &uncertainty_computation_byte_refs,
+                            &uncertainty_assumption_byte_refs,
+                            &statistical_design_byte_refs,,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
     let remediation_measurement_schema_v2_rejected = {
@@ -1580,14 +1818,16 @@ fn main() -> Result<(), String> {
         let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
-                &measurement_bytes,
-                &computation_byte_refs,
-                &observation_set_byte_refs,
-                &population_manifest_byte_refs,
-                &[bytes.as_slice()],
-                &uncertainty_assumption_byte_refs,
-                &statistical_design_byte_refs,
-            )
+            &measurement_bytes,
+                            &computation_byte_refs,
+                            &observation_set_byte_refs,
+                            &population_manifest_byte_refs,
+                            &[bytes.as_slice()],
+                            &uncertainty_assumption_byte_refs,
+                            &statistical_design_byte_refs,,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
     let remediation_computation_substitution_blocked = {
@@ -1596,14 +1836,16 @@ fn main() -> Result<(), String> {
         let forged_refs: Vec<&[u8]> = forged.iter().map(Vec::as_slice).collect();
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
-                &measurement_bytes,
-                &forged_refs,
-                &observation_set_byte_refs,
-                &population_manifest_byte_refs,
-                &uncertainty_computation_byte_refs,
-                &uncertainty_assumption_byte_refs,
-                &statistical_design_byte_refs,
-            )
+            &measurement_bytes,
+                            &forged_refs,
+                            &observation_set_byte_refs,
+                            &population_manifest_byte_refs,
+                            &uncertainty_computation_byte_refs,
+                            &uncertainty_assumption_byte_refs,
+                            &statistical_design_byte_refs,,
+            &statistical_sampling_frame_byte_refs,
+            &statistical_execution_byte_refs,
+        )
             .is_err()
     };
     let remediation_measurement_worst_case_binding_blocked = {
@@ -2286,6 +2528,14 @@ fn main() -> Result<(), String> {
         "remediation_uncertainty_point_estimate_binding_blocked": remediation_uncertainty_point_estimate_binding_blocked,
         "remediation_uncertainty_inference_scope_blocked": remediation_uncertainty_inference_scope_blocked,
         "remediation_uncertainty_proportion_domain_blocked": remediation_uncertainty_proportion_domain_blocked,
+        "remediation_uncertainty_statistical_execution_verified":
+            remediation_measurement_computation_verified,
+        "remediation_uncertainty_statistical_execution_substitution_blocked":
+            remediation_uncertainty_statistical_execution_substitution_blocked,
+        "remediation_uncertainty_inclusion_probability_substitution_blocked":
+            remediation_uncertainty_inclusion_probability_substitution_blocked,
+        "remediation_uncertainty_dependence_execution_blocked":
+            remediation_uncertainty_dependence_execution_blocked,
         "remediation_uncertainty_assumptions_substitution_blocked": remediation_uncertainty_assumptions_substitution_blocked,
         "remediation_observation_population_substitution_blocked": remediation_observation_population_substitution_blocked,
         "remediation_observation_membership_cherry_pick_blocked": remediation_observation_membership_cherry_pick_blocked,
