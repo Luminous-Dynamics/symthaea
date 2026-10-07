@@ -65,8 +65,8 @@ impl ReceiptSelectionContext {
     pub fn from_decision(
         decision: &crate::rfc9942_selection::ReceiptSelectionDecision,
     ) -> Result<Self, HolochainProjectionError> {
-        decision
-            .validate()
+        let selection_decision_sha256 = decision
+            .validated_digest()
             .map_err(|_| HolochainProjectionError::InvalidReceiptSelection)?;
 
         let selected_index = decision
@@ -81,7 +81,7 @@ impl ReceiptSelectionContext {
             collection_len: decision.collection_len,
             selected_index,
             selected_receipt_sha256,
-            selection_decision_sha256: decision.digest(),
+            selection_decision_sha256,
             selection_policy: decision.policy_id.to_owned(),
             selection_policy_version: decision.policy_version,
         })
