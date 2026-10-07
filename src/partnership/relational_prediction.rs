@@ -1815,7 +1815,38 @@ impl ForecastInferenceBinding {
     }
 }
 
-/// Machine-readable record of the inference-selection branch asserted by the
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ForecastInferenceSelectionPath {
+    NestedFixedHorizonBootstrap,
+    StopAssumptionFailure,
+}
+
+impl ForecastInferenceSelectionPath {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::NestedFixedHorizonBootstrap => "nested-fixed-horizon-bootstrap",
+            Self::StopAssumptionFailure => "stop-assumption-failure",
+        }
+    }
+
+    fn for_plan(plan: &ForecastInferencePlan) -> Self {
+        if plan.method_selection_rule_id == CANONICAL_INFERENCE_SELECTION_RULE_ID
+            && plan.method_selection_rule_spec_sha256
+                == CANONICAL_INFERENCE_SELECTION_RULE_SPEC_SHA256
+            && plan.procedure_id == CANONICAL_INFERENCE_SELECTION_PROCEDURE_ID
+            && plan.dependence_method_id == CANONICAL_INFERENCE_SELECTION_DEPENDENCE_ID
+            && plan.resampling_method_id == CANONICAL_INFERENCE_SELECTION_RESAMPLING_ID
+            && plan.small_sample_policy_id == CANONICAL_INFERENCE_SELECTION_SMALL_SAMPLE_POLICY_ID
+            && plan.multiplicity_policy_id == CANONICAL_INFERENCE_SELECTION_MULTIPLICITY_POLICY_ID
+        {
+            Self::NestedFixedHorizonBootstrap
+        } else {
+            Self::StopAssumptionFailure
+        }
+    }
+}
+
+/// Machine-readable record of the inference-selection branch derived from the
 /// prespecified decision rule.
 ///
 /// This receipt sits above the validated pre-inference binding. It records the
