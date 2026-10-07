@@ -986,7 +986,7 @@ fn evaluate_learning_response(
 
     for (shock_state, action) in &shock_states {
         let mut model = base_model.clone();
-        let predictor = FepWorldModelPredictor {
+        let mut predictor = FepWorldModelPredictor {
             bridge: &mut model,
         };
 
@@ -1175,7 +1175,7 @@ fn evaluate_sequential_learning_response(
         .collect::<Vec<_>>();
 
     let mut model = base_model.clone();
-    let predictor = FepWorldModelPredictor {
+    let mut predictor = FepWorldModelPredictor {
         bridge: &mut model,
     };
 
