@@ -21,7 +21,11 @@ pub enum BackendKind {
 }
 
 impl BackendKind {
-    pub const fn accelerated(self) -> bool {
+    /// Whether this backend is capable of executing accelerated work.
+    ///
+    /// This is deliberately distinct from an execution receipt's `accelerated`
+    /// claim. A backend may run through a software implementation.
+    pub const fn supports_acceleration(self) -> bool {
         matches!(self, Self::WebGpu | Self::Vulkan)
     }
 }
@@ -350,24 +354,29 @@ impl ExecutionReceipt {
         {
             return Err(ReceiptError::KernelMismatch);
         }
-        if self.accelerated != self.backend.accelerated() {
+        if self.backend == BackendKind::CpuReference && self.accelerated {
             return Err(ReceiptError::AccelerationClaimMismatch);
         }
         if self.resource_limits != plan.limits {
             return Err(ReceiptError::ResourceLimitsMismatch);
         }
+        if self.backend == BackendKind::CpuReference
+            && (self.implementation_digest.is_some()
+                || self.device_identity.is_some()
+                || self.driver_identity.is_some())
+        {
+            return Err(ReceiptError::UnexpectedAccelerationEvidence);
+        }
         if self.accelerated {
+            if !self.backend.supports_acceleration() {
+                return Err(ReceiptError::AccelerationClaimMismatch);
+            }
             if self.implementation_digest.as_deref().is_none_or(str::is_empty)
                 || self.device_identity.as_deref().is_none_or(str::is_empty)
                 || self.driver_identity.as_deref().is_none_or(str::is_empty)
             {
                 return Err(ReceiptError::AccelerationEvidenceMissing);
             }
-        } else if self.implementation_digest.is_some()
-            || self.device_identity.is_some()
-            || self.driver_identity.is_some()
-        {
-            return Err(ReceiptError::UnexpectedAccelerationEvidence);
         }
         Ok(())
     }
@@ -604,6 +613,55 @@ mod tests {
         receipt.device_identity = Some("device".to_owned());
         receipt.driver_identity = Some("driver".to_owned());
         receipt.verify_plan(&plan).unwrap();
+    }
+
+    #[test]
+    fn non_cpu_backend_can_be_qualified_without_acceleration_claim() {
+        let plan = OperationPlan::new(GpuOperation::HdcBindXor { dimensions: 8 });
+        let receipt = ExecutionReceipt {
+            version: RECEIPT_VERSION,
+            backend: BackendKind::Vulkan,
+            accelerated: false,
+            operation: plan.operation,
+            plan_digest: plan.digest_hex(),
+            kernel_id: plan.operation.kernel_id().to_owned(),
+            semantic_kernel_digest: plan.operation.semantic_kernel_digest(),
+            implementation_digest: Some("impl".to_owned()),
+            device_identity: Some("device".to_owned()),
+            driver_identity: Some("driver".to_owned()),
+            resource_limits: plan.limits,
+            input_digest: "input".to_owned(),
+            output_digest: "output".to_owned(),
+            determinism: plan.determinism,
+        };
+
+        receipt.verify_plan(&plan).unwrap();
+    }
+
+    #[test]
+    fn cpu_receipt_cannot_claim_acceleration() {
+        let plan = OperationPlan::new(GpuOperation::HdcBindXor { dimensions: 8 });
+        let receipt = ExecutionReceipt {
+            version: RECEIPT_VERSION,
+            backend: BackendKind::CpuReference,
+            accelerated: true,
+            operation: plan.operation,
+            plan_digest: plan.digest_hex(),
+            kernel_id: plan.operation.kernel_id().to_owned(),
+            semantic_kernel_digest: plan.operation.semantic_kernel_digest(),
+            implementation_digest: None,
+            device_identity: None,
+            driver_identity: None,
+            resource_limits: plan.limits,
+            input_digest: "input".to_owned(),
+            output_digest: "output".to_owned(),
+            determinism: plan.determinism,
+        };
+
+        assert!(matches!(
+            receipt.verify_plan(&plan),
+            Err(ReceiptError::AccelerationClaimMismatch)
+        ));
     }
 
     #[test]
