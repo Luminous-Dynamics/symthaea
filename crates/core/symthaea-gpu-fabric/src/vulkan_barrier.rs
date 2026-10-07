@@ -19,7 +19,7 @@ const MAX_WORKLOAD_NODES: usize = 64;
 const WORKGROUP_SIZE: u32 = 64;
 const VULKAN_API_VERSION: u32 = vk::API_VERSION_1_3;
 const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
-const RECEIPT_VERSION: u16 = 2;
+const RECEIPT_VERSION: u16 = 3;
 
 const WGSL: &str = r#"
 @group(0) @binding(0)
@@ -117,6 +117,8 @@ pub enum VulkanBarrierReceiptError {
     PhysicalDeviceApiVersion,
     #[error("receipt expected timeline value does not match the synchronization plan")]
     TimelineExpected,
+    #[error("receipt completion lowering digest mismatch")]
+    CompletionLoweringDigest,
     #[error("receipt observed timeline value {observed} is below expected {expected}")]
     TimelineCompletion { expected: u64, observed: u64 },
 }
@@ -129,6 +131,7 @@ pub struct VulkanBarrierExecutionReceipt {
     pub sync_plan_digest: String,
     pub barrier_digest: String,
     pub barrier_lowering_digest: String,
+    pub completion_lowering_digest: String,
     pub node_count: u32,
     pub barrier_count: u32,
     pub resource_digests: BTreeMap<ResourceId, String>,
@@ -137,6 +140,7 @@ pub struct VulkanBarrierExecutionReceipt {
     pub completion_observed: u64,
     pub vulkan_api_version: u32,
     pub physical_device_api_version: u32,
+    pub queue_family_index: u32,
 }
 
 impl VulkanBarrierExecutionReceipt {
@@ -205,14 +209,14 @@ impl VulkanBarrierExecutionReceipt {
         if self.physical_device_api_version < VULKAN_API_VERSION {
             return Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersion);
         }
-        let expected_completion = plan
-            .submissions
-            .iter()
-            .map(|submission| submission.signal.value)
-            .max()
-            .unwrap_or(0);
+        let expected_completion = expected_final_timeline_value(plan);
         if self.completion_expected != expected_completion {
             return Err(VulkanBarrierReceiptError::TimelineExpected);
+        }
+        if self.completion_lowering_digest
+            != completion_lowering_digest(plan, expected_completion, self.queue_family_index)
+        {
+            return Err(VulkanBarrierReceiptError::CompletionLoweringDigest);
         }
         if self.completion_observed < self.completion_expected {
             return Err(VulkanBarrierReceiptError::TimelineCompletion {
@@ -238,6 +242,7 @@ pub struct VulkanBarrierWorkloadRuntime {
     max_storage_buffer_range: u64,
     max_compute_workgroup_count_x: u32,
     physical_device_api_version: u32,
+    queue_family_index: u32,
 }
 
 impl VulkanBarrierWorkloadRuntime {
@@ -399,6 +404,7 @@ impl VulkanBarrierWorkloadRuntime {
             max_storage_buffer_range: u64::from(props.limits.max_storage_buffer_range),
             max_compute_workgroup_count_x: props.limits.max_compute_work_group_count[0],
             physical_device_api_version: props.api_version,
+            queue_family_index: family,
         })
     }
 
@@ -522,12 +528,7 @@ impl VulkanBarrierWorkloadRuntime {
                 .end_command_buffer(command_guard.command())
                 .map_err(VulkanBarrierError::Vk)?;
         }
-        let completion_expected = plan
-            .submissions
-            .iter()
-            .map(|submission| submission.signal.value)
-            .max()
-            .unwrap_or(0);
+        let completion_expected = expected_final_timeline_value(plan);
         if completion_expected == 0 && !schedule.nodes.is_empty() {
             return Err(VulkanBarrierError::TimelineCompletionNotReached {
                 expected: 1,
@@ -610,6 +611,11 @@ impl VulkanBarrierWorkloadRuntime {
             barrier_digest: barrier_digest(plan),
             barrier_lowering_digest: barrier_lowering_digest(plan, &storage_sizes)
                 .map_err(VulkanBarrierError::Receipt)?,
+            completion_lowering_digest: completion_lowering_digest(
+                plan,
+                completion_expected,
+                self.queue_family_index,
+            ),
             node_count: schedule.nodes.len() as u32,
             barrier_count: plan.submissions.iter().map(|s| s.barriers.len() as u32).sum(),
             resource_digests: digests,
@@ -618,6 +624,7 @@ impl VulkanBarrierWorkloadRuntime {
             completion_observed,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: self.physical_device_api_version,
+            queue_family_index: self.queue_family_index,
         };
         receipt.verify_against(graph, schedule, plan, &observed).map_err(VulkanBarrierError::Receipt)?;
         Ok((observed, receipt))
@@ -935,6 +942,38 @@ fn barrier_access_masks(kind: DependencyKind) -> (vk::AccessFlags2, vk::AccessFl
             vk::AccessFlags2::SHADER_STORAGE_WRITE,
         ),
     }
+}
+
+fn expected_final_timeline_value(plan: &VulkanSyncPlan) -> u64 {
+    plan.submissions
+        .iter()
+        .map(|submission| submission.signal.value)
+        .max()
+        .unwrap_or(0)
+}
+
+fn completion_lowering_digest(
+    plan: &VulkanSyncPlan,
+    completion_expected: u64,
+    queue_family_index: u32,
+) -> String {
+    let mut h = Hasher::new();
+    h.update(b"symthaea.gpu-fabric.vulkan-completion-lowering.v1\0");
+    h.update(b"semaphore-type:timeline\0");
+    h.update(b"initial-value:0\0");
+    h.update(b"submit-api:vkQueueSubmit2\0");
+    h.update(b"signal-api:VkSemaphoreSubmitInfo\0");
+    h.update(&vk::PipelineStageFlags2::COMPUTE_SHADER.as_raw().to_le_bytes());
+    h.update(b"wait-api:vkWaitSemaphores\0");
+    h.update(b"counter-api:vkGetSemaphoreCounterValue\0");
+    h.update(&VULKAN_TIMELINE_TIMEOUT_NS.to_le_bytes());
+    h.update(&queue_family_index.to_le_bytes());
+    h.update(&0_u32.to_le_bytes()); // queue index within selected family
+    h.update(&0_u32.to_le_bytes()); // semaphore device index
+    h.update(&1_u32.to_le_bytes()); // command-buffer device mask
+    h.update(&completion_expected.to_le_bytes());
+    h.update(&(plan.submissions.len() as u32).to_le_bytes());
+    h.finalize().to_hex().to_string()
 }
 
 fn barrier_lowering_digest(
@@ -1414,6 +1453,11 @@ mod tests {
             sync_plan_digest: plan.digest_hex().unwrap(),
             barrier_digest: barrier_digest(&plan),
             barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
+            completion_lowering_digest: completion_lowering_digest(
+                &plan,
+                expected_final_timeline_value(&plan),
+                0,
+            ),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -1422,6 +1466,7 @@ mod tests {
             completion_observed: 0,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            queue_family_index: 0,
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -1451,6 +1496,11 @@ mod tests {
             sync_plan_digest: plan.digest_hex().unwrap(),
             barrier_digest: barrier_digest(&plan),
             barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
+            completion_lowering_digest: completion_lowering_digest(
+                &plan,
+                expected_final_timeline_value(&plan),
+                0,
+            ),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -1459,6 +1509,7 @@ mod tests {
             completion_observed: 1,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            queue_family_index: 0,
         };
         receipt.vulkan_api_version = vk::API_VERSION_1_2;
         assert!(matches!(
@@ -1489,6 +1540,11 @@ mod tests {
             sync_plan_digest: plan.digest_hex().unwrap(),
             barrier_digest: barrier_digest(&plan),
             barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
+            completion_lowering_digest: completion_lowering_digest(
+                &plan,
+                expected_final_timeline_value(&plan),
+                0,
+            ),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -1497,6 +1553,7 @@ mod tests {
             completion_observed: 1,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: vk::API_VERSION_1_2,
+            queue_family_index: 0,
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -1529,14 +1586,20 @@ mod tests {
             sync_plan_digest: plan.digest_hex().unwrap(),
             barrier_digest: barrier_digest(&plan),
             barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
+            completion_lowering_digest: completion_lowering_digest(
+                &plan,
+                expected_final_timeline_value(&plan),
+                0,
+            ),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
             resource_storage_sizes: storage_sizes,
-            completion_expected: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
-            completion_observed: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
+            completion_expected: expected_final_timeline_value(&plan),
+            completion_observed: expected_final_timeline_value(&plan),
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            queue_family_index: 0,
         };
         receipt.barrier_lowering_digest = String::from("tampered");
 
@@ -1571,14 +1634,20 @@ mod tests {
             sync_plan_digest: plan.digest_hex().unwrap(),
             barrier_digest: barrier_digest(&plan),
             barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
+            completion_lowering_digest: completion_lowering_digest(
+                &plan,
+                expected_final_timeline_value(&plan),
+                0,
+            ),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
             resource_storage_sizes: storage_sizes.clone(),
-            completion_expected: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
-            completion_observed: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
+            completion_expected: expected_final_timeline_value(&plan),
+            completion_observed: expected_final_timeline_value(&plan),
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            queue_family_index: 0,
         };
 
         storage_sizes.insert(ResourceId::new("mid").unwrap(), 8);
@@ -1616,20 +1685,113 @@ mod tests {
             sync_plan_digest: plan.digest_hex().unwrap(),
             barrier_digest: barrier_digest(&plan),
             barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
+            completion_lowering_digest: completion_lowering_digest(
+                &plan,
+                expected_final_timeline_value(&plan),
+                0,
+            ),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
             resource_storage_sizes: storage_sizes,
-            completion_expected: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
-            completion_observed: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
+            completion_expected: expected_final_timeline_value(&plan),
+            completion_observed: expected_final_timeline_value(&plan),
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            queue_family_index: 0,
         };
         receipt.barrier_digest = String::from("tampered");
 
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
             Err(VulkanBarrierReceiptError::BarrierDigest)
+        ));
+    }
+
+    #[test]
+    fn receipt_rejects_tampered_completion_lowering_digest() {
+        let (graph, schedule, plan, initial) = fixture();
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        let digests = final_state
+            .iter()
+            .map(|(resource, value)| (resource.clone(), resource_digest(value)))
+            .collect::<BTreeMap<_, _>>();
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| (
+                resource.clone(),
+                rounded_storage_bytes(value.as_bytes().len() as u64),
+            ))
+            .collect::<BTreeMap<_, _>>();
+        let mut receipt = VulkanBarrierExecutionReceipt {
+            version: RECEIPT_VERSION,
+            graph_digest: graph.digest_hex().unwrap(),
+            schedule_digest: schedule.digest_hex().unwrap(),
+            sync_plan_digest: plan.digest_hex().unwrap(),
+            barrier_digest: barrier_digest(&plan),
+            barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
+            completion_lowering_digest: completion_lowering_digest(
+                &plan,
+                expected_final_timeline_value(&plan),
+                0,
+            ),
+            node_count: schedule.nodes.len() as u32,
+            barrier_count: 1,
+            resource_digests: digests,
+            resource_storage_sizes: storage_sizes,
+            completion_expected: expected_final_timeline_value(&plan),
+            completion_observed: expected_final_timeline_value(&plan),
+            vulkan_api_version: VULKAN_API_VERSION,
+            physical_device_api_version: VULKAN_API_VERSION,
+            queue_family_index: 0,
+        };
+        receipt.completion_lowering_digest = String::from("tampered");
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::CompletionLoweringDigest)
+        ));
+    }
+
+    #[test]
+    fn receipt_rejects_tampered_queue_family_binding() {
+        let (graph, schedule, plan, initial) = fixture();
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        let digests = final_state
+            .iter()
+            .map(|(resource, value)| (resource.clone(), resource_digest(value)))
+            .collect::<BTreeMap<_, _>>();
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| (
+                resource.clone(),
+                rounded_storage_bytes(value.as_bytes().len() as u64),
+            ))
+            .collect::<BTreeMap<_, _>>();
+        let receipt = VulkanBarrierExecutionReceipt {
+            version: RECEIPT_VERSION,
+            graph_digest: graph.digest_hex().unwrap(),
+            schedule_digest: schedule.digest_hex().unwrap(),
+            sync_plan_digest: plan.digest_hex().unwrap(),
+            barrier_digest: barrier_digest(&plan),
+            barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
+            completion_lowering_digest: completion_lowering_digest(
+                &plan,
+                expected_final_timeline_value(&plan),
+                0,
+            ),
+            node_count: schedule.nodes.len() as u32,
+            barrier_count: 1,
+            resource_digests: digests,
+            resource_storage_sizes: storage_sizes,
+            completion_expected: expected_final_timeline_value(&plan),
+            completion_observed: expected_final_timeline_value(&plan),
+            vulkan_api_version: VULKAN_API_VERSION,
+            physical_device_api_version: VULKAN_API_VERSION,
+            queue_family_index: 7,
+        };
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::CompletionLoweringDigest)
         ));
     }
 
