@@ -1078,6 +1078,7 @@ impl NixOSExecutor {
         (result, witness)
     }
 
+    #[cfg(feature = "systemd-observer")]
     /// Execute one authorized Service action and construct the canonical receipt from
     /// the same consumed authority, correlated JobRemoved evidence, and observer state.
     ///
