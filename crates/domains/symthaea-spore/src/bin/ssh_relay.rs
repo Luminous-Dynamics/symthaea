@@ -3872,6 +3872,93 @@ async fn restore_verified_archive(
     })
 }
 
+fn find_configuration_swap_orphans(
+    target_dir_path: &std::path::Path,
+) -> Result<Vec<std::path::PathBuf>, String> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    let directory = match std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(target_dir_path)
+    {
+        Ok(directory) => directory,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => {
+            return Err(format!(
+                "unable to open configuration directory for orphan-swap scan: {error}"
+            ))
+        }
+    };
+
+    let mut orphans = Vec::new();
+    for entry in std::fs::read_dir(target_dir_path)
+        .map_err(|error| format!("unable to enumerate configuration directory: {error}"))?
+    {
+        let entry =
+            entry.map_err(|error| format!("unable to inspect configuration directory entry: {error}"))?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        const PREFIX: &str = ".configuration.nix.swap.";
+        if !name.starts_with(PREFIX) {
+            continue;
+        }
+        let suffix = &name[PREFIX.len()..];
+        if suffix.len() != 32 || !suffix.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(format!(
+                "configuration directory contains an invalid swap artifact name: {}",
+                entry.path().display()
+            ));
+        }
+
+        let metadata = std::fs::symlink_metadata(entry.path()).map_err(|error| {
+            format!(
+                "unable to inspect configuration swap artifact {}: {error}",
+                entry.path().display()
+            )
+        })?;
+        if !metadata.file_type().is_file() {
+            return Err(format!(
+                "configuration swap artifact {} is not a regular file",
+                entry.path().display()
+            ));
+        }
+        if metadata.uid() != unsafe { libc::geteuid() } {
+            return Err(format!(
+                "configuration swap artifact {} is not owned by the relay user",
+                entry.path().display()
+            ));
+        }
+        if metadata.permissions().mode() & 0o777 != 0o600 {
+            return Err(format!(
+                "configuration swap artifact {} has unsafe permissions {:04o}",
+                entry.path().display(),
+                metadata.permissions().mode() & 0o777
+            ));
+        }
+        orphans.push(entry.path());
+    }
+
+    drop(directory);
+    Ok(orphans)
+}
+
+fn ensure_no_orphan_configuration_swaps() -> Result<(), String> {
+    let orphans = find_configuration_swap_orphans(std::path::Path::new("/etc/nixos"))?;
+    if orphans.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "manual recovery required: {} orphaned configuration swap artifact(s) remain: {}",
+        orphans.len(),
+        orphans
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    ))
+}
+
 #[derive(Debug)]
 struct ConfigurationSwap {
     target_dir: std::fs::File,
@@ -7701,6 +7788,18 @@ echo '}'
                     }
                 };
 
+                if let Err(error) = ensure_no_orphan_configuration_swaps() {
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Configuration recovery fence is active: {error}"
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    continue;
+                }
+
                 let Some(transaction) = admit_mutation_transaction(
                     &mut ws_tx,
                     &transaction_ledger,
@@ -9429,6 +9528,11 @@ async fn main() {
         }
     };
 
+    if let Err(error) = ensure_no_orphan_configuration_swaps() {
+        eprintln!("ERROR: Configuration recovery fence: {}", error);
+        std::process::exit(1);
+    }
+
     let addr = format!("{}:{}", bind_addr, port);
     let listener = match TcpListener::bind(&addr).await {
         Ok(l) => l,
@@ -10032,6 +10136,46 @@ mod tests {
         let error = freeze_image_namespace_blocking(dir.to_str().unwrap())
             .expect_err("image freeze must reject symlink artifacts");
         assert!(error.contains("unable to open image namespace artifact") || error.contains("non-regular"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn process_identity_parser_requires_pid_and_start_time() {
+        assert_eq!(
+            parse_process_identity("1234:5678\n"),
+            Some((1234, 5678))
+        );
+        assert_eq!(parse_process_identity("1234"), None);
+        assert_eq!(parse_process_identity("0:5678"), None);
+        assert_eq!(parse_process_identity("1234:not-a-number"), None);
+        assert_eq!(parse_process_identity("garbage:5678"), None);
+    }
+
+    #[test]
+    fn orphan_configuration_swaps_are_detected_and_require_private_regular_files() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = "0123456789abcdef0123456789abcdef";
+        let dir = std::env::temp_dir().join("nixforhumanity-orphan-swap-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        assert!(find_configuration_swap_orphans(&dir).unwrap().is_empty());
+
+        let swap = dir.join(format!(".configuration.nix.swap.{transaction_id}"));
+        std::fs::write(&swap, b"old-config").unwrap();
+        std::fs::set_permissions(&swap, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        let orphans = find_configuration_swap_orphans(&dir).unwrap();
+        assert_eq!(orphans, vec![swap.clone()]);
+
+        std::fs::remove_file(&swap).unwrap();
+        std::os::unix::fs::symlink("/etc/passwd", &swap).unwrap();
+        let error = find_configuration_swap_orphans(&dir)
+            .expect_err("swap symlink must fail closed");
+        assert!(error.contains("is not a regular file"));
 
         let _ = std::fs::remove_dir_all(dir);
     }
