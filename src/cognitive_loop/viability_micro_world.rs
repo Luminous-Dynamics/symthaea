@@ -923,6 +923,7 @@ pub fn run_homeostatic_agent_scenario<P: MicroWorldPredictor>(
         fabric
             .predict_action(ActionPrediction {
                 action_id,
+                pre_state_digest: before.digest(),
                 action_label: action.label().to_string(),
                 cycle: before.cycle,
                 predicted_world_delta: Some(signed_delta_with_confidence(
@@ -1061,6 +1062,7 @@ pub fn run_homeostatic_agent_horizon_scenario<P: MicroWorldPredictor>(
         fabric
             .predict_action(ActionPrediction {
                 action_id,
+                pre_state_digest: before.digest(),
                 action_label: action.label().to_string(),
                 cycle: before.cycle,
                 predicted_world_delta: Some(signed_delta_with_confidence(
@@ -1222,6 +1224,7 @@ fn evaluate_predictor_scenario<P: MicroWorldPredictor>(
         fabric
             .predict_action(ActionPrediction {
                 action_id,
+                pre_state_digest: before.digest(),
                 action_label: action.label().to_string(),
                 cycle: before.cycle,
                 predicted_world_delta: Some(predicted_world_delta),
