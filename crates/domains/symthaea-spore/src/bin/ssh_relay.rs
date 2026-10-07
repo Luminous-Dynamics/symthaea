@@ -1680,7 +1680,14 @@ fn system_config_patch(msg: &ClientMessage, transaction_dir: &str) -> String {
 cp "{staged}" /mnt/etc/nixos/system-config.nix
 # Add import to configuration.nix. The source path is fixed; all browser-derived
 # configuration content remains in the staged file, not in this shell source.
-sed -i 's|imports = [|imports = [ ./system-config.nix|' /mnt/etc/nixos/configuration.nix 2>/dev/null ||   echo "  (config patch: manual import needed)"
+if ! sed -i 's|imports = [|imports = [ ./system-config.nix|' /mnt/etc/nixos/configuration.nix 2>/dev/null; then
+  echo "ERROR: failed to apply system-config.nix import."
+  exit 1
+fi
+if ! grep -Fq 'imports = [ ./system-config.nix' /mnt/etc/nixos/configuration.nix; then
+  echo "ERROR: system-config.nix import postcondition was not observed."
+  exit 1
+fi
 "#,
         staged = staged,
     )
