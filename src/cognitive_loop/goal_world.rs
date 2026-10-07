@@ -137,6 +137,8 @@ pub struct WorldModelBridge {
     action_deltas: Vec<Vec<f32>>,
     /// Number of observed transitions for each action.
     action_samples: Vec<u64>,
+    /// EMA of pre-update transition prediction error for each action.
+    action_errors: Vec<f32>,
     /// Online learning rate for action-conditioned deltas.
     action_learning_rate: f32,
     /// Total predictions made
@@ -164,6 +166,7 @@ impl WorldModelBridge {
         Self {
             action_deltas: (0..num_actions).map(|_| vec![0.0; level_dims[0]]).collect(),
             action_samples: vec![0; num_actions],
+            action_errors: vec![0.0; num_actions],
             action_learning_rate: 0.2,
             level_states: level_dims.iter().map(|&d| vec![0.0; d]).collect(),
             level_dims,
@@ -282,6 +285,14 @@ impl WorldModelBridge {
             .sum::<f32>()
             / self.level_dims[0] as f32;
 
+        let samples_before = self.action_samples[action];
+        let error_ema_alpha = 0.2_f32;
+        self.action_errors[action] = if samples_before == 0 {
+            error
+        } else {
+            (1.0 - error_ema_alpha) * self.action_errors[action] + error_ema_alpha * error
+        };
+
         let delta = &mut self.action_deltas[action];
         let alpha = self.action_learning_rate;
         for i in 0..self.level_dims[0] {
@@ -299,14 +310,24 @@ impl WorldModelBridge {
 
     /// Confidence in an action-conditioned prediction.
     ///
-    /// Confidence starts at zero and asymptotically approaches one as evidence
-    /// accumulates. This is deliberately evidence-weighted rather than a claim
-    /// that repeated observations establish causal truth.
+    /// Confidence is jointly evidence- and accuracy-weighted. More samples increase
+    /// confidence, while persistent prediction error suppresses it. Repetition alone
+    /// therefore cannot make a bad model appear trustworthy.
     pub fn action_confidence(&self, action: usize) -> Option<f32> {
-        self.action_samples.get(action).map(|&samples| {
-            let n = samples as f32;
-            (n / (n + 8.0)).clamp(0.0, 1.0)
-        })
+        self.action_samples
+            .get(action)
+            .zip(self.action_errors.get(action))
+            .map(|(&samples, &error)| {
+                let n = samples as f32;
+                let evidence = n / (n + 8.0);
+                let accuracy = (1.0 - error.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+                (evidence * accuracy).clamp(0.0, 1.0)
+            })
+    }
+
+    /// EMA of the latest prediction error for an action.
+    pub fn action_error(&self, action: usize) -> Option<f32> {
+        self.action_errors.get(action).copied()
     }
 
     /// Reset the world model
@@ -319,6 +340,7 @@ impl WorldModelBridge {
             deltas.fill(0.0);
         }
         self.action_samples.fill(0);
+        self.action_errors.fill(0.0);
         self.total_predictions = 0;
         self.avg_error = 0.0;
     }
@@ -392,6 +414,32 @@ mod tests {
             .sum::<f32>()
             / 64.0;
         assert!(final_error < first_error);
+    }
+
+    #[test]
+    fn action_confidence_penalizes_prediction_error() {
+        let mut model = WorldModelBridge::with_actions(1);
+        let before = vec![0.0f32; 64];
+        let bad_after = vec![1.0f32; 64];
+
+        model.observe_action_transition(0, &before, &bad_after).unwrap();
+        assert_eq!(model.action_error(0), Some(1.0));
+        assert_eq!(model.action_confidence(0), Some(0.0));
+    }
+
+    #[test]
+    fn action_confidence_grows_with_accurate_evidence() {
+        let mut model = WorldModelBridge::with_actions(1);
+        let before = vec![0.0f32; 64];
+        let after = vec![0.1f32; 64];
+
+        for _ in 0..32 {
+            model.observe_action_transition(0, &before, &after).unwrap();
+        }
+
+        let confidence = model.action_confidence(0).unwrap();
+        assert!(confidence > 0.5);
+        assert!(confidence <= 1.0);
     }
 
     #[test]
