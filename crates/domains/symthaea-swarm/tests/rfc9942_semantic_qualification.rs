@@ -1134,7 +1134,8 @@ fn rfc9942_unprotected_receipt_priority_is_explicit_transport_provenance() {
 
     // The two inner Receipts authenticate the same Merkle root but use distinct
     // external AAD contexts. Their signatures therefore remain distinct semantic
-    // artifacts while the outer Signature_With_Receipt signs only the application payload.
+    // artifacts while the outer COSE signature authenticates the protected
+    // headers/AAD and application payload, not the unprotected receipt collection.
     let make_receipt = |aad: &[u8]| {
         let unsigned = Rfc9942ReceiptEnvelope::new(
             COSE_ES256_ALGORITHM_ID,
