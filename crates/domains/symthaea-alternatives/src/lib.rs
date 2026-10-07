@@ -1403,9 +1403,11 @@ impl CandidatePathway {
         }
         for performance in self.performance.values() {
             performance.validate()?;
+            validate_unique_evidence_refs(&performance.evidence_ids)?;
         }
         for capability in self.operating_capabilities.values() {
             capability.validate()?;
+            validate_unique_evidence_refs(&capability.evidence_ids)?;
         }
         let evidence_ids = self
             .evidence
@@ -1495,6 +1497,7 @@ impl CandidatePathway {
         }
         for estimate in self.burdens.values() {
             Interval::new(estimate.interval.lower, estimate.interval.upper)?;
+            validate_unique_evidence_refs(&estimate.evidence_ids)?;
             if estimate.unit.is_empty() || estimate.scope.is_empty() {
                 return Err(AssessmentError::EmptyBurdenScale);
             }
@@ -2127,6 +2130,18 @@ impl CandidatePathway {
             QualificationState::Hypothesis
         }
     }
+}
+
+fn validate_unique_evidence_refs(evidence_ids: &[String]) -> Result<(), AssessmentError> {
+    let mut seen = BTreeSet::new();
+    for evidence_id in evidence_ids {
+        if !seen.insert(evidence_id) {
+            return Err(AssessmentError::DuplicateLinkedEvidenceReference(
+                evidence_id.clone(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn requirement_conflicts(
@@ -3041,6 +3056,8 @@ pub enum AssessmentError {
         /// Procedure digest carried by the uncertainty analysis.
         actual_procedure_digest: String,
     },
+    /// A quantitative estimate lists the same evidence identifier more than once.
+    DuplicateLinkedEvidenceReference(String),
     /// A burden references unknown evidence.
     MissingEvidenceReference(String),
     /// Explicit experimental-design provenance is structurally incomplete.
@@ -3433,6 +3450,9 @@ impl std::fmt::Display for AssessmentError {
                 f,
                 "evidence {evidence_id} procedure digest {actual_procedure_digest} does not match uncertainty procedure digest {expected_procedure_digest}"
             ),
+            Self::DuplicateLinkedEvidenceReference(id) => {
+                write!(f, "evidence reference {id} is duplicated within a quantitative estimate")
+            }
             Self::MissingEvidenceReference(id) => {
                 write!(f, "missing evidence reference {id}")
             }
@@ -7413,6 +7433,34 @@ mod tests {
                 .assess(&fixture_requirement(), &[c], None)
                 .unwrap_err(),
             AssessmentError::MissingEvidenceUnit("unitless".into())
+        );
+    }
+
+    #[test]
+    fn duplicate_linked_evidence_reference_fails_closed() {
+        let mut c = candidate(
+            "duplicate-evidence-reference",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "e1",
+                "source",
+                EvidenceKind::Reported,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.burdens
+            .get_mut(&Dimension::Water)
+            .expect("fixture has water burden")
+            .evidence_ids = vec!["e1".into(), "e1".into()];
+
+        assert_eq!(
+            AlternativesEngine
+                .assess(&fixture_requirement(), &[c], None)
+                .unwrap_err(),
+            AssessmentError::DuplicateLinkedEvidenceReference("e1".into())
         );
     }
 
