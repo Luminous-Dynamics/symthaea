@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 46;
+pub const SCHEMA_VERSION: u16 = 47
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-v65";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-v66";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -522,6 +522,34 @@ impl CalibrationTraceabilityInputBinding {
     }
 }
 
+/// Exact external identity for the authoritative declared input frontier of a
+/// measurement model.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeasurementModelInputFrontierRef {
+    /// Stable identity of the authoritative model-input frontier record.
+    pub frontier_id: String,
+    /// Revision of the authoritative model-input frontier record.
+    pub frontier_revision: String,
+    /// Digest of the exact authoritative model-input frontier.
+    pub frontier_digest: String,
+    /// Number of input quantities declared by the authoritative frontier.
+    pub input_count: usize,
+}
+
+impl MeasurementModelInputFrontierRef {
+    /// Validate the external input-frontier identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.frontier_id.is_empty()
+            || self.frontier_revision.is_empty()
+            || self.frontier_digest.is_empty()
+            || self.input_count == 0
+        {
+            return Err(AssessmentError::InvalidMeasurementModelInputFrontier);
+        }
+        Ok(())
+    }
+}
+
 /// Explicit branched/network representation of metrological traceability.
 ///
 /// This is a structural graph declaration, not a certification that the
@@ -538,11 +566,13 @@ pub struct CalibrationTraceabilityTopology {
     pub measurement_model_revision: String,
     /// Digest of the exact measurement model.
     pub measurement_model_digest: String,
+    /// Exact authoritative measurement-model input frontier.
+    pub input_frontier: MeasurementModelInputFrontierRef,
     /// Exact measurement-model input-to-branch bindings.
     ///
     /// These bindings identify which top-level traceability branch is declared
-    /// for each model input. They do not assert that the binding set is
-    /// scientifically complete or that the input contribution is adequate.
+    /// for each model input. They must match the authoritative frontier's
+    /// exact input count and canonical input-set digest.
     pub input_bindings: Vec<CalibrationTraceabilityInputBinding>,
     /// Terminal specified reference-standard node identities.
     pub reference_node_ids: Vec<String>,
@@ -570,6 +600,10 @@ impl CalibrationTraceabilityTopology {
         {
             return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
         }
+        self.input_frontier.validate()?;
+        if self.input_bindings.is_empty() {
+            return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
+        }
         let mut seen_input_quantities = BTreeSet::new();
         for binding in &self.input_bindings {
             binding.validate()?;
@@ -578,6 +612,31 @@ impl CalibrationTraceabilityTopology {
                     binding.input_quantity_id.clone(),
                 ));
             }
+        }
+        if self.input_frontier.input_count != self.input_bindings.len() {
+            return Err(
+                AssessmentError::MeasurementModelInputFrontierCountMismatch {
+                    frontier_id: self.input_frontier.frontier_id.clone(),
+                    expected_input_count: self.input_frontier.input_count,
+                    actual_input_count: self.input_bindings.len(),
+                },
+            );
+        }
+        let input_quantity_ids = seen_input_quantities
+            .iter()
+            .copied()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        let expected_frontier_digest =
+            canonical_measurement_model_input_frontier_digest(&input_quantity_ids)?;
+        if self.input_frontier.frontier_digest != expected_frontier_digest {
+            return Err(
+                AssessmentError::MeasurementModelInputFrontierDigestMismatch {
+                    frontier_id: self.input_frontier.frontier_id.clone(),
+                    expected_frontier_digest,
+                    actual_frontier_digest: self.input_frontier.frontier_digest.clone(),
+                },
+            );
         }
         let mut nodes_by_id = BTreeMap::<String, &CalibrationTraceabilityNodeRef>::new();
         for node in &self.nodes {
@@ -782,6 +841,24 @@ impl CalibrationTraceabilityTopology {
         hasher.update(&bytes);
         Ok(hasher.finalize().to_hex().to_string())
     }
+}
+
+/// Compute the canonical digest of an authoritative measurement-model input frontier.
+fn canonical_measurement_model_input_frontier_digest(
+    input_quantity_ids: &[String],
+) -> Result<String, AssessmentError> {
+    let mut canonical = input_quantity_ids.to_vec();
+    canonical.sort();
+    let mut unique = canonical.iter().map(String::as_str).collect::<Vec<_>>();
+    unique.dedup();
+    if unique.len() != canonical.len() {
+        return Err(AssessmentError::DuplicateMeasurementModelInputQuantity);
+    }
+    let bytes = serde_json::to_vec(&unique).map_err(|_| AssessmentError::NonFinite)?;
+    let mut hasher = Hasher::new();
+    hasher.update(b"symthaea:measurement-model-input-frontier:v1\n");
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
 }
 
 /// Exact provenance reference for a physical or operational observation.
@@ -3793,6 +3870,28 @@ pub enum AssessmentError {
     },
     /// An explicitly named reference node is missing.
     CalibrationTraceabilityReferenceMissing,
+    /// The measurement-model input frontier reference is structurally incomplete.
+    InvalidMeasurementModelInputFrontier,
+    /// The topology binding count differs from the authoritative input frontier.
+    MeasurementModelInputFrontierCountMismatch {
+        /// Frontier identity.
+        frontier_id: String,
+        /// Declared authoritative input count.
+        expected_input_count: usize,
+        /// Actual topology binding count.
+        actual_input_count: usize,
+    },
+    /// The topology input set does not match the authoritative input frontier digest.
+    MeasurementModelInputFrontierDigestMismatch {
+        /// Frontier identity.
+        frontier_id: String,
+        /// Digest computed from the topology's input set.
+        expected_frontier_digest: String,
+        /// Digest supplied by the authoritative frontier reference.
+        actual_frontier_digest: String,
+    },
+    /// The model-input frontier itself contains a duplicate input quantity.
+    DuplicateMeasurementModelInputQuantity,
     /// The uncertainty evaluation's topology digest does not match the observation topology.
     MeasurementUncertaintyEvaluationCalibrationTopologyMismatch {
         /// Uncertainty identity.
@@ -4301,6 +4400,28 @@ impl std::fmt::Display for AssessmentError {
             ),
             Self::CalibrationTraceabilityReferenceMissing => {
                 write!(f, "calibration traceability reference node is missing")
+            }
+            Self::InvalidMeasurementModelInputFrontier => {
+                write!(f, "measurement-model input frontier reference is incomplete")
+            }
+            Self::MeasurementModelInputFrontierCountMismatch {
+                frontier_id,
+                expected_input_count,
+                actual_input_count,
+            } => write!(
+                f,
+                "measurement-model input frontier {frontier_id} declares {expected_input_count} inputs but topology binds {actual_input_count}"
+            ),
+            Self::MeasurementModelInputFrontierDigestMismatch {
+                frontier_id,
+                expected_frontier_digest,
+                actual_frontier_digest,
+            } => write!(
+                f,
+                "measurement-model input frontier {frontier_id} digest {actual_frontier_digest} does not match topology input set digest {expected_frontier_digest}"
+            ),
+            Self::DuplicateMeasurementModelInputQuantity => {
+                write!(f, "measurement-model input frontier contains duplicate input quantity")
             }
             Self::MeasurementUncertaintyEvaluationCalibrationTopologyMismatch {
                 uncertainty_id,
@@ -8037,11 +8158,20 @@ mod tests {
             experimental_target_id: None,
         };
 
+        let input_frontier_digest =
+            canonical_measurement_model_input_frontier_digest(&["input-primary".into()])
+                .unwrap();
         let mut topology = CalibrationTraceabilityTopology {
             result_node_id: "result".into(),
             measurement_model_id: "model-v1".into(),
             measurement_model_revision: "r1".into(),
             measurement_model_digest: "model-digest-v1".into(),
+            input_frontier: MeasurementModelInputFrontierRef {
+                frontier_id: "model-input-frontier-v1".into(),
+                frontier_revision: "r1".into(),
+                frontier_digest: input_frontier_digest,
+                input_count: 1,
+            },
             input_bindings: vec![CalibrationTraceabilityInputBinding {
                 input_quantity_id: "input-primary".into(),
                 node_id: "calibration".into(),
@@ -8155,11 +8285,23 @@ mod tests {
             .expect("fixture calibration chain exists")
             .clone();
 
+        let input_frontier_digest =
+            canonical_measurement_model_input_frontier_digest(&[
+                "fixture-input-a".into(),
+                "fixture-input-b".into(),
+            ])
+            .unwrap();
         let topology = CalibrationTraceabilityTopology {
             result_node_id: "result".into(),
             measurement_model_id: "fixture-measurement-model-v1".into(),
             measurement_model_revision: "v1".into(),
             measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
+            input_frontier: MeasurementModelInputFrontierRef {
+                frontier_id: "fixture-input-frontier-v1".into(),
+                frontier_revision: "v1".into(),
+                frontier_digest: input_frontier_digest,
+                input_count: 2,
+            },
             input_bindings: vec![
                 CalibrationTraceabilityInputBinding {
                     input_quantity_id: "fixture-input-a".into(),
@@ -8359,11 +8501,20 @@ mod tests {
             .expect("fixture observation exists")
             .clone();
 
+        let input_frontier_digest =
+            canonical_measurement_model_input_frontier_digest(&["fixture-input".into()])
+                .unwrap();
         let topology = CalibrationTraceabilityTopology {
             result_node_id: "result".into(),
             measurement_model_id: "fixture-measurement-model-v1".into(),
             measurement_model_revision: "v1".into(),
             measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
+            input_frontier: MeasurementModelInputFrontierRef {
+                frontier_id: "fixture-input-frontier-v1".into(),
+                frontier_revision: "v1".into(),
+                frontier_digest: input_frontier_digest,
+                input_count: 1,
+            },
             input_bindings: vec![CalibrationTraceabilityInputBinding {
                 input_quantity_id: "fixture-input".into(),
                 node_id: "calibration".into(),
