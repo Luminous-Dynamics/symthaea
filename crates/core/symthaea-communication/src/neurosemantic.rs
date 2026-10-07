@@ -525,7 +525,8 @@ pub struct NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact {
     pub execution_revision: String,
 }
 
-pub const NEUROSEMANTIC_REMEDIATION_STATISTICAL_RANDOMNESS_COMMITMENT_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_REMEDIATION_STATISTICAL_RANDOMNESS_COMMITMENT_SCHEMA_VERSION: u16 = 2;
+pub const NEUROSEMANTIC_REMEDIATION_RANDOMIZATION_SEED_HEX_BYTES: usize = 64;
 
 impl NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact {
     pub fn validate(&self) -> Result<(), String> {
@@ -571,22 +572,35 @@ impl NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact {
     }
 }
 
-fn splitmix64_step(state: &mut u64) -> u64 {
-    *state = state.wrapping_add(0x9E3779B97F4A7C15);
-    let mut value = *state;
-    value = (value ^ (value >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
-    value = (value ^ (value >> 27)).wrapping_mul(0x94D049BB133111EB);
-    value ^ (value >> 31)
+fn valid_randomization_seed_hex(seed_hex: &str) -> bool {
+    seed_hex.len() == NEUROSEMANTIC_REMEDIATION_RANDOMIZATION_SEED_HEX_BYTES
+        && seed_hex
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
 }
 
-fn unbiased_bounded_u64(state: &mut u64, bound: u64) -> u64 {
+fn randomness_stream_u64(seed_hex: &str, counter: u64) -> u64 {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-neurosemantic-statistical-selection-v2 ");
+    hasher.update(seed_hex.as_bytes());
+    hasher.update(&counter.to_le_bytes());
+    let digest = hasher.finalize();
+    u64::from_le_bytes(
+        digest.as_bytes()[..8]
+            .try_into()
+            .expect("BLAKE3 digest always contains at least 8 bytes"),
+    )
+}
+
+fn unbiased_bounded_seeded_u64(seed_hex: &str, counter: &mut u64, bound: u64) -> u64 {
     debug_assert!(bound > 0);
     if bound == 1 {
         return 0;
     }
     let threshold = bound.wrapping_neg() % bound;
     loop {
-        let value = splitmix64_step(state);
+        let value = randomness_stream_u64(seed_hex, *counter);
+        *counter = counter.wrapping_add(1);
         if value >= threshold {
             return value % bound;
         }
@@ -596,20 +610,22 @@ fn unbiased_bounded_u64(state: &mut u64, bound: u64) -> u64 {
 fn replay_simple_random_without_replacement(
     frame_member_artifact_hashes: &[String],
     sample_size: usize,
-    seed: u64,
+    seed_hex: &str,
 ) -> Result<Vec<String>, String> {
     if frame_member_artifact_hashes.is_empty()
         || sample_size == 0
         || sample_size > frame_member_artifact_hashes.len()
+        || !valid_randomization_seed_hex(seed_hex)
     {
         return Err("neurosemantic remediation simple-random selection bounds are invalid".into());
     }
     let mut candidates = frame_member_artifact_hashes.to_vec();
     candidates.sort();
-    let mut state = seed;
+    let mut counter = 0u64;
     for index in 0..sample_size {
         let remaining = candidates.len() - index;
-        let offset = unbiased_bounded_u64(&mut state, remaining as u64) as usize;
+        let offset =
+            unbiased_bounded_seeded_u64(seed_hex, &mut counter, remaining as u64) as usize;
         candidates.swap(index, index + offset);
     }
     candidates.truncate(sample_size);
@@ -617,11 +633,12 @@ fn replay_simple_random_without_replacement(
     Ok(candidates)
 }
 
+
 /// Content-addressed replay record for a supported deterministic sampling procedure.
 ///
-/// The verifier independently replays the procedure against the frozen frame. The seed is
-/// evidence of the executed draw only; preregistration or an authoritative randomness source
-/// remains necessary for an empirical claim of unbiased randomization.
+/// The verifier independently replays the procedure against the frozen frame. The 256-bit seed
+/// material is evidence of the executed draw only; preregistration or an authoritative randomness
+/// source remains necessary for an empirical claim of unbiased randomization.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NeurosemanticRemediationStatisticalSelectionTraceArtifact {
     pub schema_version: u16,
@@ -629,14 +646,15 @@ pub struct NeurosemanticRemediationStatisticalSelectionTraceArtifact {
     pub sampling_frame_hash: String,
     pub selection_procedure_ref: String,
     pub randomness_commitment_hash: String,
-    pub randomization_seed_u64: u64,
+    /// Canonical lowercase hexadecimal encoding of 256 bits of selection seed material.
+    pub randomization_seed_hex: String,
     pub sample_size: u32,
     pub selected_subject_artifact_hashes: Vec<String>,
     pub study_protocol_hash: String,
     pub execution_revision: String,
 }
 
-pub const NEUROSEMANTIC_REMEDIATION_STATISTICAL_SELECTION_TRACE_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_REMEDIATION_STATISTICAL_SELECTION_TRACE_SCHEMA_VERSION: u16 = 2;
 
 impl NeurosemanticRemediationStatisticalSelectionTraceArtifact {
     pub fn validate(&self) -> Result<(), String> {
@@ -653,6 +671,7 @@ impl NeurosemanticRemediationStatisticalSelectionTraceArtifact {
             || self.selected_subject_artifact_hashes.iter().any(|hash| !valid_blake3_digest(hash))
             || !valid_blake3_digest(&self.study_protocol_hash)
             || !valid_execution_revision(&self.execution_revision)
+            || !valid_randomization_seed_hex(&self.randomization_seed_hex)
         {
             return Err("neurosemantic remediation statistical selection trace fields are invalid".into());
         }
@@ -2155,7 +2174,7 @@ impl NeurosemanticRemediationImpactArtifact {
                     || randomness_commitment.selection_procedure_ref
                         != selection_trace.selection_procedure_ref
                     || randomness_commitment.randomization_seed_hash
-                        != content_hash(&selection_trace.randomization_seed_u64.to_le_bytes())
+                        != content_hash(selection_trace.randomization_seed_hex.as_bytes())
                     || randomness_commitment.study_protocol_hash != self.study_protocol_hash
                     || randomness_commitment.execution_revision != self.execution_revision
                 {
@@ -2201,7 +2220,7 @@ impl NeurosemanticRemediationImpactArtifact {
                     || replay_simple_random_without_replacement(
                         &sampling_frame.member_artifact_hashes,
                         selection_trace.sample_size as usize,
-                        selection_trace.randomization_seed_u64,
+                        &selection_trace.randomization_seed_hex,
                     )? != selection_trace.selected_subject_artifact_hashes
                     || execution
                         .selected_subject_artifact_hashes
