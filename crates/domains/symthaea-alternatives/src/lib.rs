@@ -996,6 +996,11 @@ impl EvidenceRecord {
             return Err(AssessmentError::MissingObservationUnit(self.kind));
         }
         match (&self.uncertainty, observation_required) {
+            (Some(_), false) if self.observation.is_none() => {
+                return Err(AssessmentError::UnboundMeasurementUncertainty(
+                    self.id.clone(),
+                ));
+            }
             (Some(uncertainty), _) => {
                 uncertainty.validate()?;
                 if let Some(unit) = &self.unit {
@@ -2885,6 +2890,8 @@ pub enum AssessmentError {
     MissingMeasurementUncertainty(EvidenceKind),
     /// A physical/operational observation lacks an explicit unit.
     MissingObservationUnit(EvidenceKind),
+    /// An uncertainty reference is present without observation provenance to bind it.
+    UnboundMeasurementUncertainty(String),
     /// Measurement-uncertainty reference is structurally incomplete.
     InvalidMeasurementUncertainty,
     /// Evaluation provenance names a different uncertainty scope than its parent.
@@ -3296,6 +3303,9 @@ impl std::fmt::Display for AssessmentError {
             }
             Self::MissingObservationUnit(kind) => {
                 write!(f, "{kind:?} evidence is missing its explicit measurement unit")
+            }
+            Self::UnboundMeasurementUncertainty(evidence_id) => {
+                write!(f, "evidence {evidence_id} carries measurement uncertainty without observation provenance")
             }
             Self::InvalidMeasurementUncertainty => {
                 write!(f, "measurement uncertainty reference is incomplete")
@@ -5084,6 +5094,34 @@ mod tests {
         assert_eq!(
             e.validate().unwrap_err(),
             AssessmentError::MissingMeasurementUncertainty(EvidenceKind::Observed)
+        );
+    }
+
+    #[test]
+    fn unbound_measurement_uncertainty_fails_closed() {
+        let mut c = candidate(
+            "unbound-uncertainty",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "reported",
+                "source",
+                EvidenceKind::Reported,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut uncertainty = test_uncertainty(&["component"]);
+        uncertainty.uncertainty_id = "reported-uncertainty".into();
+        c.evidence[0].unit = Some("unit".into());
+        c.evidence[0].uncertainty = Some(uncertainty);
+
+        assert_eq!(
+            AlternativesEngine
+                .assess(&fixture_requirement(), &[c], None)
+                .unwrap_err(),
+            AssessmentError::UnboundMeasurementUncertainty("reported".into())
         );
     }
 
