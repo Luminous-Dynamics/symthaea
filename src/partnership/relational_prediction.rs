@@ -1892,7 +1892,12 @@ impl ForecastInferenceSelectionReceipt {
             selection_blake3: String::new(),
         };
         receipt.selection_blake3 = inference_selection_digest(&receipt);
-        receipt.validate_against_binding(binding, plan, qualification_identity_blake3, dependence_profile_blake3)?;
+        receipt.validate_against_binding(
+            binding,
+            plan,
+            qualification_identity_blake3,
+            dependence_profile_blake3,
+        )?;
         Ok(receipt)
     }
 
