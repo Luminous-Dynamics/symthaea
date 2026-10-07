@@ -1078,6 +1078,116 @@ impl NixOSExecutor {
         (result, witness)
     }
 
+    /// Execute one authorized Service action and construct the canonical receipt from
+    /// the same consumed authority, correlated JobRemoved evidence, and observer state.
+    ///
+    /// The receipt is returned only after the operation has yielded a verified post-state
+    /// observation. When a non-zero stability requirement is bound into the authority,
+    /// the final receipt observation is the second sample of the stability window.
+    pub async fn execute_authorized_service_with_receipt(
+        &mut self,
+        command: NixOSCommand,
+        authority: NixLocalExecutionAuthorityV1,
+    ) -> (
+        ExecutionResult,
+        Option<NixPostStateReceiptV1>,
+    ) {
+        let NixOSCommand::Service { operation, unit } = &command else {
+            let (result, _witness) = self
+                .execute_authorized_with_witness(command, authority)
+                .await;
+            return (result, None);
+        };
+
+        let authorization = match authority.historical_authorization_record() {
+            Ok(record) => record,
+            Err(error) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!(
+                            "Service authority could not reconstruct authorization evidence: {error}"
+                        ),
+                        safety_level: command.safety_level(),
+                    },
+                    None,
+                );
+            }
+        };
+
+        let expectation = match authority.service_post_state_expectation() {
+            Ok(expectation) => expectation,
+            Err(error) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!(
+                            "Service authority could not supply post-state expectation: {error}"
+                        ),
+                        safety_level: command.safety_level(),
+                    },
+                    None,
+                );
+            }
+        };
+
+        let (result, witness, observation) =
+            self.execute_authorized_with_witness(command.clone(), authority)
+                .await;
+
+        let (Some(witness), Some(observation)) = (witness, observation) else {
+            return (result, None);
+        };
+
+        let (final_observation, stability) = if expectation.required_stability_us == 0 {
+            (observation, None)
+        } else {
+            let completed_job = match observation.as_ref().systemd_job.clone() {
+                Some(job) => job,
+                None => return (result, None),
+            };
+
+            let observer = match NixSystemdReadOnlyObserverV1::connect_system().await {
+                Ok(observer) => observer,
+                Err(_) => return (result, None),
+            };
+
+            match observer
+                .observe_service_post_state_after_stability_window(
+                    *operation,
+                    unit,
+                    expectation.authorized_generation,
+                    completed_job,
+                    expectation.required_stability_us,
+                )
+                .await
+            {
+                Ok((observation, stability)) => (observation, Some(stability)),
+                Err(_) => return (result, None),
+            }
+        };
+
+        let receipt = NixPostStateReceiptV1::build_proven_from_live_execution_witness(
+            self
+                .latest_authorization_intent_for_receipt(&expectation)
+                .unwrap_or_else(|_| {
+                    // This branch is unreachable for a consumed authority that successfully
+                    // produced the observation, but it cannot be allowed to fabricate an intent.
+                    NixActionIntentV1::invalid_forbidden_placeholder()
+                }),
+            &authorization,
+            &expectation,
+            &final_observation,
+            stability.as_ref(),
+            witness,
+            "nixward-systemd-observer-v1",
+            "1",
+        );
+
+        match receipt {
+            Ok(receipt) => (result, Some(receipt)),
+            Err(_) => (result, None),
+        }
+    }
+
     #[cfg(feature = "systemd-observer")]
     async fn execute_authorized_service_with_witness(
         &mut self,
