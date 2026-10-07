@@ -1587,10 +1587,16 @@ fn update_schedule_f64(hasher: &mut Sha256, value: f64) {
     hasher.update(value.to_bits().to_le_bytes());
 }
 
+/// In-crate witness proving that a qualification was replayed against its exact source
+/// sequence before an inference binding was minted. Its private construction prevents
+/// callers from forging the witness through a public struct literal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct VerifiedQualificationReplay;
+
 /// Pre-inference binding gate for a forecast-accuracy qualification.
 ///
 /// This artifact deliberately performs no statistical inference. It binds one
-/// validated qualification, its retained loss differential vector, a measured
+/// replay-verified qualification, its retained loss differential vector, a measured
 /// dependence profile, and one frozen inference plan. A future inferential
 /// result should consume this binding rather than accepting those components
 /// independently.
@@ -1609,14 +1615,17 @@ pub struct ForecastInferenceBinding {
     pub test_samples: usize,
     pub forecast_horizon: f64,
     pub binding_blake3: String,
+    replay_verified: VerifiedQualificationReplay,
 }
 
 impl ForecastInferenceBinding {
     pub fn from_single(
+        samples: &[RelationalPredictionSample],
         plan: &ForecastInferencePlan,
         qualification: &HeldOutRelationalPredictionQualification,
         dependence: &ForecastLossDependenceProfile,
     ) -> Result<Self, RelationalPredictionError> {
+        qualification.verify_against_samples(samples, qualification.config)?;
         let horizon = qualification.observed.minimum_outcome_horizon;
         let binding = Self {
             analysis_level: "single-window".to_string(),
@@ -1634,6 +1643,7 @@ impl ForecastInferenceBinding {
             test_samples: qualification.config.test_samples,
             forecast_horizon: horizon,
             binding_blake3: String::new(),
+            replay_verified: VerifiedQualificationReplay,
         };
         let mut binding = binding;
         binding.binding_blake3 = inference_binding_digest(&binding);
@@ -1642,10 +1652,12 @@ impl ForecastInferenceBinding {
     }
 
     pub fn from_rolling(
+        samples: &[RelationalPredictionSample],
         plan: &ForecastInferencePlan,
         qualification: &RollingOriginRelationalPredictionQualification,
         dependence: &RollingForecastLossDependenceProfile,
     ) -> Result<Self, RelationalPredictionError> {
+        qualification.verify_against_samples(samples, qualification.config)?;
         let binding = Self {
             analysis_level: "rolling-origin".to_string(),
             origin_schedule_sha256: plan.origin_schedule_sha256.clone(),
@@ -1662,6 +1674,7 @@ impl ForecastInferenceBinding {
             test_samples: qualification.config.test_samples,
             forecast_horizon: qualification.config.forecast_horizon,
             binding_blake3: String::new(),
+            replay_verified: VerifiedQualificationReplay,
         };
         let mut binding = binding;
         binding.binding_blake3 = inference_binding_digest(&binding);
@@ -1885,11 +1898,13 @@ pub struct ForecastInferenceSelectionReceipt {
 
 impl ForecastInferenceSelectionReceipt {
     pub fn from_single(
+        samples: &[RelationalPredictionSample],
         plan: &ForecastInferencePlan,
         qualification: &HeldOutRelationalPredictionQualification,
         dependence: &ForecastLossDependenceProfile,
     ) -> Result<Self, RelationalPredictionError> {
-        let binding = ForecastInferenceBinding::from_single(plan, qualification, dependence)?;
+        let binding =
+            ForecastInferenceBinding::from_single(samples, plan, qualification, dependence)?;
         dependence.validate()?;
         let dependence_profile_blake3 = forecast_loss_dependence_profile_digest(dependence);
         Self::from_binding(
@@ -1901,11 +1916,13 @@ impl ForecastInferenceSelectionReceipt {
     }
 
     pub fn from_rolling(
+        samples: &[RelationalPredictionSample],
         plan: &ForecastInferencePlan,
         qualification: &RollingOriginRelationalPredictionQualification,
         dependence: &RollingForecastLossDependenceProfile,
     ) -> Result<Self, RelationalPredictionError> {
-        let binding = ForecastInferenceBinding::from_rolling(plan, qualification, dependence)?;
+        let binding =
+            ForecastInferenceBinding::from_rolling(samples, plan, qualification, dependence)?;
         dependence.validate()?;
         let dependence_profile_blake3 = rolling_forecast_loss_dependence_profile_digest(dependence);
         Self::from_binding(
@@ -4437,6 +4454,7 @@ fn inference_selection_digest(receipt: &ForecastInferenceSelectionReceipt) -> St
 fn inference_binding_digest(binding: &ForecastInferenceBinding) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"relational-prediction-inference-binding/v1");
+    hasher.update(b"qualification-replay-verified/v1");
     update_string(&mut hasher, &binding.analysis_level);
     update_string(&mut hasher, &binding.origin_schedule_sha256);
     update_string(&mut hasher, &binding.qualification_identity_blake3);
@@ -5545,7 +5563,7 @@ mod tests {
 
         let dependence = qualification.relational_loss_dependence(8).unwrap();
         let binding =
-            ForecastInferenceBinding::from_single(&plan, &qualification, &dependence).unwrap();
+            ForecastInferenceBinding::from_single(&samples, &plan, &qualification, &dependence).unwrap();
         binding.validate_against_single(&plan, &qualification, &dependence)
             .unwrap();
 
@@ -5605,7 +5623,7 @@ mod tests {
 
         let dependence = qualification.relational_loss_dependence(3, 2).unwrap();
         let binding =
-            ForecastInferenceBinding::from_rolling(&plan, &qualification, &dependence).unwrap();
+            ForecastInferenceBinding::from_rolling(&samples, &plan, &qualification, &dependence).unwrap();
         binding.validate_against_rolling(&plan, &qualification, &dependence)
             .unwrap();
         assert_eq!(
@@ -5993,7 +6011,7 @@ mod tests {
         assert_eq!(stopped.decision_path_id, "stop-assumption-failure");
         assert_eq!(
             receipt.validate_against_binding(
-                &ForecastInferenceBinding::from_rolling(&plan, &qualification, &dependence).unwrap(),
+                &ForecastInferenceBinding::from_rolling(&samples, &plan, &qualification, &dependence).unwrap(),
                 &alternate_plan,
                 &qualification.qualification_identity_blake3,
                 &rolling_forecast_loss_dependence_profile_digest(&dependence),
