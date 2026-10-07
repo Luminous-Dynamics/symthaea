@@ -395,6 +395,18 @@ mod tests {
     }
 
     #[test]
+    fn selection_decision_digest_is_bound() {
+        let mut first = anchor();
+        let before = first.canonical_bytes().unwrap();
+        first
+            .receipt_selection
+            .as_mut()
+            .unwrap()
+            .selection_decision_sha256[0] ^= 1;
+        assert_ne!(before, first.canonical_bytes().unwrap());
+    }
+
+    #[test]
     fn native_action_hash_binding_is_canonical() {
         let mut first = anchor();
         let before = first.canonical_bytes().unwrap();
@@ -405,6 +417,14 @@ mod tests {
             HolochainActionHash::from_raw([9; HOLOCHAIN_ACTION_HASH_BYTES]),
             Err(HolochainProjectionError::InvalidActionHashType)
         );
+    }
+
+    #[test]
+    fn selection_dependency_identity_is_canonical() {
+        let mut first = anchor();
+        let before = first.canonical_bytes().unwrap();
+        first.selection_decision_action_hash = Some(valid_action_hash(9));
+        assert_ne!(before, first.canonical_bytes().unwrap());
     }
 
     #[test]
