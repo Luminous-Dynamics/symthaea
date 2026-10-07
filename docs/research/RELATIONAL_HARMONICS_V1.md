@@ -429,7 +429,7 @@ Three null families should be retained:
 - channel decoupling;
 - incremental relational shift that keeps synchrony and non-relational context fixed while disrupting only the added relational channels.
 
-Do not infer statistical significance from a single split or from raw means across dependent rolling windows. Preserve per-origin loss vectors and defer inferential testing until the dependence structure and multiplicity strategy are prespecified.
+Do not infer statistical significance from a single split or from raw means across dependent rolling windows. Preserve per-target loss vectors and defer inferential testing until the dependence structure and multiplicity strategy are prespecified. Each compound qualification also carries a parent input commitment shared by every retained null trace, while each null retains its own local replay commitment over the exact source slice and null configuration; this keeps compound identity and local replay independently auditable.
 
 ### RH-005 — common-driver and partner-null calibration
 
