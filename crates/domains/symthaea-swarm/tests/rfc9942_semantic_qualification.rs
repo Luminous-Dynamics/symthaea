@@ -1772,7 +1772,10 @@ fn rfc9942_verified_inclusion_state_preserves_duplicate_leaf_position() {
     let expected_candidate_leaf: [u8; 32] =
         sha2::Sha256::digest(&candidate_leaf_input).into();
     assert_eq!(first_state.proof().proof_index(), 0);
+    let expected_proof_sha256: [u8; 32] =
+        sha2::Sha256::digest(&proof_at_zero).into();
     assert_eq!(first_state.proof().inclusion_leaf_index(), Some(0));
+    assert_eq!(first_state.proof_sha256(), expected_proof_sha256);
     assert_eq!(
         first_state.proof().inclusion_candidate_leaf(),
         Some(expected_candidate_leaf)
@@ -1874,6 +1877,10 @@ fn rfc9942_consistency_state_records_selected_proof_index() {
 
     assert_eq!(state.proof().proof_index(), 1);
     assert_eq!(state.proof().consistency_heads(), Some((older, newer)));
+
+    let expected_proof_sha256: [u8; 32] =
+        sha2::Sha256::digest(&valid_proof).into();
+    assert_eq!(state.proof_sha256(), expected_proof_sha256);
 
     let expected_payload_sha256: [u8; 32] = sha2::Sha256::digest(&newer.root()).into();
     assert_eq!(state.payload_sha256(), expected_payload_sha256);
