@@ -905,6 +905,16 @@ impl NixSystemdReadOnlyObserverV1 {
             });
         }
 
+        let definition_content = self
+            .capture_service_definition_content(&expected_unit)
+            .await?;
+        if definition_content.as_ref().manager_owner != manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        let definition_content_digest = definition_content
+            .digest()
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?;
+
         let observation = build_observation_from_properties(
             operation,
             &expected_unit,
@@ -913,6 +923,7 @@ impl NixSystemdReadOnlyObserverV1 {
             &manager_owner,
             &service_result,
             &unit_properties,
+            &definition_content_digest,
             job,
         )?;
 
