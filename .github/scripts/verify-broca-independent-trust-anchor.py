@@ -303,6 +303,24 @@ def post_status(sha: str, state: str, description: str, target_url: str) -> None
     )
 
 
+def trusted_file_blob(path: str) -> str:
+    try:
+        output = subprocess.check_output(
+            ["git", "rev-parse", f"HEAD:{path}"],
+            text=True,
+            stderr=subprocess.STDOUT,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise VerificationError(
+            f"unable to resolve trusted verifier file blob for {path}: {error}"
+        ) from error
+    if not re.fullmatch(r"[0-9a-f]{40}", output):
+        raise VerificationError(
+            f"trusted verifier file blob for {path} is not canonical: {output!r}"
+        )
+    return output
+
+
 def trusted_checkout_identity() -> str:
     try:
         output = subprocess.check_output(
@@ -325,6 +343,7 @@ def trusted_checkout_identity() -> str:
 
 def main() -> int:
     verifier_head = trusted_checkout_identity()
+    policy_blob = trusted_file_blob(POLICY_PATH.as_posix())
     target_url = f"https://github.com/{REPOSITORY}/actions/runs/{TRIGGER_RUN_ID}"
 
     receipt: dict[str, Any] = {
@@ -332,6 +351,8 @@ def main() -> int:
         "qualification_result": "NOT_PASS",
         "trust_anchor": {
             "commit_sha": verifier_head,
+            "policy_path": POLICY_PATH.as_posix(),
+            "policy_blob_sha": policy_blob,
             "workflow_name": "Broca Independent Trust Anchor",
             "status_context": STATUS_CONTEXT,
         },
