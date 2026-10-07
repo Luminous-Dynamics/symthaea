@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-observation-attestation"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Detached cryptographic attestation adapter for Symthaea observation-fabric receipts"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["attestation", "cryptography", "ed25519", "provenance", "evidence"]
+categories = ["cryptography", "science"]
+
+[dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { version = "2.1.0", features = ["rand_core"] }
+serde = { workspace = true }
+symthaea-core = { path = "../symthaea-core" }
