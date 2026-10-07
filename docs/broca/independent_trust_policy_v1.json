@@ -4,12 +4,12 @@
   "pull_request": 6951,
   "base_branch": "feat/broca-morph-compilation-provenance-v1",
   "base_sha": "707698fbd7ef52ca6f5c9740bf9b61ee220da2b0",
-  "approved_head_sha": "2ef5562080a151212613b3c5886b367792bab9b3",
+  "approved_head_sha": "090d221ad85347ced5f0b125da55fa952b279710",
   "approved_files": [
     {
       "path": ".github/workflows/broca-feature-matrix.yml",
       "status": "modified",
-      "blob_sha": "6241200a575f5df5fa9f0d60c3038d0771c782cf"
+      "blob_sha": "b8e9dc964f335bad996e080ef5ca1e98ed2b1c6b"
     },
     {
       "path": "crates/domains/symthaea-broca/Cargo.toml",
@@ -29,7 +29,7 @@
     {
       "path": "crates/domains/symthaea-broca/src/lexical_binding.rs",
       "status": "modified",
-      "blob_sha": "8a557b1336fa5108bcd8dfb3f67a19e1eea1630e"
+      "blob_sha": "de684c3b58fab0eaceddda4ed8a93d67aef2363b"
     },
     {
       "path": "crates/domains/symthaea-broca/src/lib.rs",
@@ -39,7 +39,7 @@
     {
       "path": "docs/broca/unimorph_compiler_contract.md",
       "status": "added",
-      "blob_sha": "8da8b4db33095aba6a6cf933d3ebd6dacaaee671"
+      "blob_sha": "300b2338cf88f9011a22112651002adff51194f7"
     },
     {
       "path": "docs/broca/unimorph_eng_4_selection_manifest.json",
