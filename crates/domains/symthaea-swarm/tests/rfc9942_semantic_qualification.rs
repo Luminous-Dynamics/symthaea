@@ -700,6 +700,10 @@ fn rfc9942_semantic_state_cannot_confuse_valid_signature_with_wrong_entry() {
         .unwrap();
     assert_eq!(state.algorithm_id(), COSE_ES256_ALGORITHM_ID);
     assert_eq!(state.vds_id(), 1);
+    assert_eq!(
+        state.payload_mode(),
+        symthaea_swarm::semantic_evidence_vds::Rfc9942PayloadMode::Attached
+    );
     let expected_receipt_payload_sha256: [u8; 32] =
         sha2::Sha256::digest(receipt.payload().attached_root().unwrap()).into();
     assert_eq!(state.payload_sha256(), expected_receipt_payload_sha256);
@@ -766,6 +770,10 @@ fn rfc9942_consistency_state_binds_signature_to_detached_root() {
         .unwrap();
     assert_eq!(state.algorithm_id(), COSE_ES256_ALGORITHM_ID);
     assert_eq!(state.vds_id(), 1);
+    assert_eq!(
+        state.payload_mode(),
+        symthaea_swarm::semantic_evidence_vds::Rfc9942PayloadMode::Detached
+    );
     let expected_newer_root_sha256: [u8; 32] = sha2::Sha256::digest(root).into();
     assert_eq!(state.payload_sha256(), expected_newer_root_sha256);
     assert_eq!(
@@ -1200,6 +1208,14 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
         .verify_es256_inclusion_receipt_state(0, &key, &key, &[], &[], None)
         .unwrap();
     assert_eq!(
+        detached_state.outer_payload_mode(),
+        symthaea_swarm::semantic_evidence_vds::Rfc9942PayloadMode::Attached
+    );
+    assert_eq!(
+        detached_state.receipt().payload_mode(),
+        symthaea_swarm::semantic_evidence_vds::Rfc9942PayloadMode::Detached
+    );
+    assert_eq!(
         detached_state.receipt().proof().inclusion_head().unwrap().tree_size(),
         2
     );
@@ -1212,6 +1228,10 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
         .unwrap();
 
     assert_eq!(state.outer_algorithm_id(), COSE_ES256_ALGORITHM_ID);
+    assert_eq!(
+        state.outer_payload_mode(),
+        symthaea_swarm::semantic_evidence_vds::Rfc9942PayloadMode::Attached
+    );
     let expected_key_fingerprint: [u8; 32] = sha2::Sha256::digest(&key).into();
     let expected_empty_aad_fingerprint: [u8; 32] = sha2::Sha256::digest(&[]).into();
     let expected_outer_header_fingerprint: [u8; 32] =
