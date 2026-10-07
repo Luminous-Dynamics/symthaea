@@ -26,22 +26,24 @@
     },
     {
       "id": "R4",
-      "when": "single-window qualification has fewer than 4 held-out target samples",
-      "then": "stop-assumption-failure"
+      "when": "single-window qualification is below the evaluator's structural minimum of 4 held-out target samples",
+      "then": "stop-assumption-failure",
+      "note": "This is an evaluator admissibility floor, not a claim that 4 samples provide adequate power or inferential precision."
     },
     {
       "id": "R5",
-      "when": "rolling-origin qualification has fewer than 4 origins, or held-out target windows are not disjoint",
-      "then": "stop-assumption-failure"
+      "when": "rolling-origin qualification is below the evaluator's structural minimum of 4 origins, or held-out target windows are not disjoint",
+      "then": "stop-assumption-failure",
+      "note": "The origin floor is a structural prerequisite for this evidence packet, not a claim that 4 origins make an inferential result reliable."
     },
     {
       "id": "R6",
-      "when": "measured loss-dependence profile is valid and the design remains within this fixed-horizon v1 scope",
+      "when": "measured loss-dependence profile is valid, the separately prespecified small-sample adequacy policy admits the design, and the analysis remains within this fixed-horizon v1 scope",
       "then": "nested-forecast-bootstrap-v1"
     },
     {
       "id": "R7",
-      "when": "dependence characterization is missing/invalid, a second unregistered inferential method is requested, or a joint multi-horizon analysis is introduced",
+      "when": "dependence characterization is missing/invalid, the small-sample adequacy policy rejects the design, a second unregistered inferential method is requested, or a joint multi-horizon analysis is introduced",
       "then": "stop-assumption-failure"
     }
   ],
@@ -54,6 +56,7 @@
     "rule_execution": "external-procedural",
     "branch_recording": "ForecastInferenceSelectionReceipt",
     "result_dependent_method_switching": false,
-    "temporal_preregistration_proof_in_code": false
+    "temporal_preregistration_proof_in_code": false,
+    "structural_floors_are_not_adequacy_claims": true
   }
 }
