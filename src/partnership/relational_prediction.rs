@@ -1111,6 +1111,30 @@ impl HeldOutRelationalPredictionEvidence {
         Ok(profile)
     }
 
+    pub fn relational_loss_differentials(
+        &self,
+    ) -> Result<Vec<RelationalForecastLossDifferential>, RelationalPredictionError> {
+        self.validate()?;
+        Ok(self.relational_loss_differentials.clone())
+    }
+
+    pub fn relational_loss_dependence(
+        &self,
+        max_lag: usize,
+    ) -> Result<ForecastLossDependenceProfile, RelationalPredictionError> {
+        self.validate()?;
+        let mut profile = ForecastLossDependenceProfile::compute(
+            &self
+                .relational_loss_differentials
+                .iter()
+                .map(|item| item.loss_differential)
+                .collect::<Vec<_>>(),
+            max_lag,
+        )?;
+        profile.evaluation_input_blake3 = Some(self.evaluation_input_blake3.clone());
+        Ok(profile)
+    }
+
     pub fn verify_against_samples(
         &self,
         samples: &[RelationalPredictionSample],
@@ -1931,6 +1955,35 @@ impl RollingOriginRelationalPredictionQualification {
         }
 
         Ok(())
+    }
+
+    pub fn relational_loss_differentials(
+        &self,
+    ) -> Result<Vec<RelationalForecastLossDifferential>, RelationalPredictionError> {
+        self.validate()?;
+        Ok(self.relational_loss_differentials.clone())
+    }
+
+    pub fn relational_loss_dependence(
+        &self,
+        max_lag_within_origin: usize,
+        max_lag_across_origins: usize,
+    ) -> Result<RollingForecastLossDependenceProfile, RelationalPredictionError> {
+        self.validate()?;
+        let mut profile = RollingForecastLossDependenceProfile::compute(
+            &self.relational_loss_differentials,
+            self.config.origin_count,
+            self.config.test_samples,
+            max_lag_within_origin,
+            max_lag_across_origins,
+        )?;
+        let binding = self.evaluation_input_blake3.clone();
+        for child in &mut profile.per_origin {
+            child.evaluation_input_blake3 = Some(binding.clone());
+        }
+        profile.across_origin_mean_profile.evaluation_input_blake3 = Some(binding.clone());
+        profile.evaluation_input_blake3 = Some(binding);
+        Ok(profile)
     }
 
     pub fn verify_against_samples(
@@ -3383,6 +3436,7 @@ fn validate_loss_differentials(
             || differential.sample_index != expected_sample
             || !differential.feature_time.is_finite()
             || !differential.outcome_time.is_finite()
+            || differential.outcome_time <= differential.feature_time
             || !differential.observed_outcome.is_finite()
             || !differential.non_relational_squared_error.is_finite()
             || !differential.relational_squared_error.is_finite()
@@ -4730,6 +4784,77 @@ mod tests {
         assert_eq!(
             tampered_null.validate(),
             Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn qualification_retains_and_commits_target_loss_differentials() {
+        let samples = build_samples(0.5);
+        let qualification = HeldOutRelationalPredictionQualification::compute(
+            &samples,
+            config(),
+            12,
+            provenance(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            qualification.relational_loss_differentials.len(),
+            config().test_samples
+        );
+        assert_eq!(
+            qualification.relational_loss_differentials_blake3,
+            loss_differentials_digest(
+                &qualification.evaluation_input_blake3,
+                &qualification.relational_loss_differentials
+            )
+        );
+        qualification.relational_loss_dependence(8).unwrap();
+
+        let mut tampered = qualification.clone();
+        tampered.relational_loss_differentials[0].loss_differential += 0.01;
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
+    fn rolling_qualification_retains_and_commits_target_loss_differentials() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+        let qualification = RollingOriginRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            8,
+            provenance(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            qualification.relational_loss_differentials.len(),
+            config.origin_count * config.test_samples
+        );
+        assert_eq!(
+            qualification.relational_loss_differentials_blake3,
+            loss_differentials_digest(
+                &qualification.evaluation_input_blake3,
+                &qualification.relational_loss_differentials
+            )
+        );
+        let profile = qualification.relational_loss_dependence(3, 2).unwrap();
+        assert_eq!(
+            profile.evaluation_input_blake3.as_deref(),
+            Some(qualification.evaluation_input_blake3.as_str())
         );
     }
 
