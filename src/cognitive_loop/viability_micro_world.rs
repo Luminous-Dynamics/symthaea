@@ -696,6 +696,26 @@ pub const DEFAULT_HORIZON_CONFIDENCE_DECAY: f64 = 0.85;
 pub struct HomeostaticPolicy;
 
 impl HomeostaticPolicy {
+    /// Expose the benchmark objective for independent qualification without exposing
+    /// the policy's internal implementation details.
+    pub fn benchmark_action_score(
+        predicted: MicroWorldObservation,
+        current: MicroWorldObservation,
+        action: MicroAction,
+    ) -> f64 {
+        Self::score(predicted, current, action)
+    }
+
+    /// Score an action exactly as the reactive policy does, including confidence blending.
+    pub fn benchmark_predicted_action_score(
+        predicted: MicroWorldObservation,
+        current: MicroWorldObservation,
+        action: MicroAction,
+        confidence: f64,
+    ) -> f64 {
+        Self::score(blend_prediction(current, predicted, confidence), current, action)
+    }
+
     fn score(predicted: MicroWorldObservation, current: MicroWorldObservation, action: MicroAction) -> f64 {
         let viability_pressure = (0.30 - predicted.energy).max(0.0)
             + (0.30 - predicted.integrity).max(0.0)
@@ -832,6 +852,7 @@ impl HomeostaticPolicy {
         predictor: &P,
         current: MicroWorldObservation,
         depth: usize,
+        confidence_decay: f64,
     ) -> MicroAction {
         MicroAction::ALL
             .into_iter()
