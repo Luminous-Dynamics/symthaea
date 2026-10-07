@@ -283,6 +283,232 @@ pub struct RelationalForecastLossDifferential {
     pub loss_differential: f64,
 }
 
+/// Descriptive dependence structure of one ordered loss-differential series.
+///
+/// This is a characterization artifact, not an inferential test.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ForecastLossDependenceProfile {
+    pub sample_count: usize,
+    pub max_lag: usize,
+    pub mean: f64,
+    pub variance: f64,
+    pub autocovariances: Vec<f64>,
+    pub autocorrelations: Vec<f64>,
+    pub lag_one_autocorrelation: Option<f64>,
+    pub first_nonpositive_autocorrelation_lag: Option<usize>,
+    pub max_absolute_autocorrelation_lag: Option<usize>,
+    pub max_absolute_autocorrelation: f64,
+    pub bartlett_long_run_variance: f64,
+    pub effective_sample_size: Option<f64>,
+    pub status: EvidenceStatus,
+}
+
+/// Two-level dependence characterization for disjoint rolling origins.
+///
+/// Each target window is characterized independently, avoiding artificial
+/// adjacency between the end of one origin and the beginning of another.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RollingForecastLossDependenceProfile {
+    pub origin_count: usize,
+    pub test_samples: usize,
+    pub max_lag_within_origin: usize,
+    pub max_lag_across_origins: usize,
+    pub per_origin: Vec<ForecastLossDependenceProfile>,
+    pub origin_mean_differentials: Vec<f64>,
+    pub across_origin_mean_profile: ForecastLossDependenceProfile,
+    pub status: EvidenceStatus,
+}
+
+impl ForecastLossDependenceProfile {
+    /// Compute a deterministic descriptive profile for an ordered loss series.
+    ///
+    /// Autocovariances use a 1/n denominator. The Bartlett long-run variance
+    /// is truncated at max_lag using weights 1 - k/(max_lag + 1).
+    pub fn compute(
+        losses: &[f64],
+        max_lag: usize,
+    ) -> Result<Self, RelationalPredictionError> {
+        if losses.len() < 4 {
+            return Err(RelationalPredictionError::InsufficientSamples(losses.len()));
+        }
+        if losses.iter().any(|value| !value.is_finite()) {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let max_lag = max_lag.min(losses.len() - 1);
+        let n = losses.len() as f64;
+        let mean = losses.iter().sum::<f64>() / n;
+        if !mean.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let variance = losses
+            .iter()
+            .map(|value| {
+                let centered = *value - mean;
+                centered * centered
+            })
+            .sum::<f64>()
+            / n;
+        if !variance.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let mut autocovariances = Vec::with_capacity(max_lag + 1);
+        let mut autocorrelations = Vec::with_capacity(max_lag + 1);
+
+        for lag in 0..=max_lag {
+            let mut covariance = 0.0;
+            for index in lag..losses.len() {
+                covariance += (losses[index] - mean) * (losses[index - lag] - mean);
+                if !covariance.is_finite() {
+                    return Err(RelationalPredictionError::ModelFitFailed);
+                }
+            }
+            covariance /= n;
+            if !covariance.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+            autocovariances.push(covariance);
+
+            let correlation = if variance <= 1e-20 {
+                0.0
+            } else {
+                covariance / variance
+            };
+            if !correlation.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+            autocorrelations.push(correlation.clamp(-1.0, 1.0));
+        }
+
+        let mut bartlett_long_run_variance = autocovariances[0];
+        let bandwidth = max_lag + 1;
+        for lag in 1..=max_lag {
+            let weight = 1.0 - lag as f64 / bandwidth as f64;
+            bartlett_long_run_variance += 2.0 * weight * autocovariances[lag];
+            if !bartlett_long_run_variance.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+        }
+
+        let lag_one_autocorrelation = (max_lag >= 1).then(|| autocorrelations[1]);
+        let first_nonpositive_autocorrelation_lag = autocorrelations
+            .iter()
+            .enumerate()
+            .skip(1)
+            .find_map(|(lag, correlation)| (*correlation <= 0.0).then_some(lag));
+        let (max_absolute_autocorrelation_lag, max_absolute_autocorrelation) = autocorrelations
+            .iter()
+            .enumerate()
+            .skip(1)
+            .map(|(lag, correlation)| (lag, correlation.abs()))
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .map_or((None, 0.0), |(lag, magnitude)| (Some(lag), magnitude));
+
+        let effective_sample_size = if bartlett_long_run_variance > 1e-20 && variance > 1e-20 {
+            let value = n * variance / bartlett_long_run_variance;
+            value.is_finite().then_some(value.max(1.0).min(n))
+        } else {
+            None
+        };
+
+        Ok(Self {
+            sample_count: losses.len(),
+            max_lag,
+            mean,
+            variance,
+            autocovariances,
+            autocorrelations,
+            lag_one_autocorrelation,
+            first_nonpositive_autocorrelation_lag,
+            max_absolute_autocorrelation_lag,
+            max_absolute_autocorrelation,
+            bartlett_long_run_variance,
+            effective_sample_size,
+            status: EvidenceStatus::Measured,
+        })
+    }
+}
+
+impl RollingForecastLossDependenceProfile {
+    /// Characterize serial dependence within each disjoint target window and
+    /// dependence between origin-level mean differentials separately.
+    ///
+    /// Origins are never concatenated into one time series because that would
+    /// manufacture adjacency across distinct held-out windows.
+    pub fn compute(
+        differentials: &[RelationalForecastLossDifferential],
+        origin_count: usize,
+        test_samples: usize,
+        max_lag_within_origin: usize,
+        max_lag_across_origins: usize,
+    ) -> Result<Self, RelationalPredictionError> {
+        if origin_count == 0 || test_samples < 4 {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        let expected = origin_count
+            .checked_mul(test_samples)
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+        if differentials.len() != expected {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        let mut per_origin = Vec::with_capacity(origin_count);
+        let mut origin_mean_differentials = Vec::with_capacity(origin_count);
+
+        for origin_index in 0..origin_count {
+            let start = origin_index * test_samples;
+            let end = start + test_samples;
+            let slice = &differentials[start..end];
+
+            for (sample_index, differential) in slice.iter().enumerate() {
+                if differential.origin_index != origin_index
+                    || differential.sample_index != sample_index
+                    || !differential.loss_differential.is_finite()
+                {
+                    return Err(RelationalPredictionError::InvalidSplit);
+                }
+            }
+
+            let losses = slice
+                .iter()
+                .map(|differential| differential.loss_differential)
+                .collect::<Vec<_>>();
+            per_origin.push(ForecastLossDependenceProfile::compute(
+                &losses,
+                max_lag_within_origin,
+            )?);
+
+            let mean = losses.iter().sum::<f64>() / losses.len() as f64;
+            if !mean.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+            origin_mean_differentials.push(mean);
+        }
+
+        let across_lag = max_lag_across_origins.min(origin_count.saturating_sub(1));
+        if origin_count < 4 {
+            return Err(RelationalPredictionError::InsufficientSamples(origin_count));
+        }
+        let across_origin_mean_profile = ForecastLossDependenceProfile::compute(
+            &origin_mean_differentials,
+            across_lag,
+        )?;
+
+        Ok(Self {
+            origin_count,
+            test_samples,
+            max_lag_within_origin,
+            max_lag_across_origins: across_lag,
+            per_origin,
+            origin_mean_differentials,
+            across_origin_mean_profile,
+            status: EvidenceStatus::Measured,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct FittedLinearModel {
     coefficients: Vec<f64>,
@@ -640,6 +866,21 @@ impl HeldOutRelationalPredictionEvidence {
         relational_loss_differentials_from_records(0, &self.records)
     }
 
+    /// Describe dependence in the ordered held-out loss differential sequence.
+    pub fn relational_loss_dependence(
+        &self,
+        max_lag: usize,
+    ) -> Result<ForecastLossDependenceProfile, RelationalPredictionError> {
+        let differentials = self.relational_loss_differentials()?;
+        ForecastLossDependenceProfile::compute(
+            &differentials
+                .iter()
+                .map(|item| item.loss_differential)
+                .collect::<Vec<_>>(),
+            max_lag,
+        )
+    }
+
     pub fn verify_against_samples(
         &self,
         samples: &[RelationalPredictionSample],
@@ -978,6 +1219,23 @@ impl RollingOriginRelationalPredictionEvidence {
         }
 
         Ok(differentials)
+    }
+
+    /// Characterize serial dependence within each disjoint target window and
+    /// dependence between origin-level mean differentials separately.
+    pub fn relational_loss_dependence(
+        &self,
+        max_lag_within_origin: usize,
+        max_lag_across_origins: usize,
+    ) -> Result<RollingForecastLossDependenceProfile, RelationalPredictionError> {
+        let differentials = self.relational_loss_differentials()?;
+        RollingForecastLossDependenceProfile::compute(
+            &differentials,
+            self.config.origin_count,
+            self.config.test_samples,
+            max_lag_within_origin,
+            max_lag_across_origins,
+        )
     }
 
     pub fn verify_against_samples(
@@ -3161,6 +3419,129 @@ mod tests {
             gap_samples: 4,
             ridge_lambda: 1e-8,
         }
+    }
+
+    #[test]
+    fn loss_dependence_profile_recovers_positive_serial_structure() {
+        let losses = vec![1.0, 0.8, 0.64, 0.512, 0.4096, 0.32768, 0.262144, 0.2097152];
+        let profile = ForecastLossDependenceProfile::compute(&losses, 4).unwrap();
+
+        assert_eq!(profile.sample_count, losses.len());
+        assert_eq!(profile.max_lag, 4);
+        assert!(profile.variance > 0.0);
+        assert!(profile.lag_one_autocorrelation.unwrap() > 0.5);
+        assert!(profile.max_absolute_autocorrelation > 0.5);
+        assert!(profile.bartlett_long_run_variance.is_finite());
+        assert!(profile.effective_sample_size.unwrap() < losses.len() as f64);
+    }
+
+    #[test]
+    fn loss_dependence_profile_clamps_declared_lag_and_handles_constant_losses() {
+        let losses = vec![0.25, 0.25, 0.25, 0.25];
+        let profile = ForecastLossDependenceProfile::compute(&losses, 99).unwrap();
+
+        assert_eq!(profile.max_lag, 3);
+        assert_eq!(profile.variance, 0.0);
+        assert_eq!(profile.autocorrelations, vec![0.0; 4]);
+        assert_eq!(profile.effective_sample_size, None);
+    }
+
+    #[test]
+    fn rolling_loss_dependence_does_not_create_cross_origin_adjacency() {
+        let differentials = (0..4)
+            .flat_map(|origin| {
+                (0..4).map(move |sample_index| RelationalForecastLossDifferential {
+                    origin_index: origin,
+                    sample_index,
+                    feature_time: (origin * 10 + sample_index) as f64,
+                    outcome_time: (origin * 10 + sample_index + 1) as f64,
+                    observed_outcome: 0.0,
+                    non_relational_squared_error: 1.0,
+                    relational_squared_error: 0.75,
+                    loss_differential: 0.1 * (origin + 1) as f64,
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let profile = RollingForecastLossDependenceProfile::compute(
+            &differentials,
+            4,
+            4,
+            2,
+            2,
+        )
+        .unwrap();
+
+        assert_eq!(profile.origin_count, 4);
+        assert_eq!(profile.per_origin.len(), 4);
+        assert_eq!(profile.origin_mean_differentials, vec![0.1, 0.2, 0.3, 0.4]);
+        assert!(profile.across_origin_mean_profile.lag_one_autocorrelation.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn rolling_loss_dependence_rejects_origin_swap() {
+        let mut differentials = (0..4)
+            .flat_map(|origin| {
+                (0..4).map(move |sample_index| RelationalForecastLossDifferential {
+                    origin_index: origin,
+                    sample_index,
+                    feature_time: (origin * 10 + sample_index) as f64,
+                    outcome_time: (origin * 10 + sample_index + 1) as f64,
+                    observed_outcome: 0.0,
+                    non_relational_squared_error: 1.0,
+                    relational_squared_error: 0.5,
+                    loss_differential: 0.1,
+                })
+            })
+            .collect::<Vec<_>>();
+        differentials.swap(0, 4);
+
+        assert_eq!(
+            RollingForecastLossDependenceProfile::compute(&differentials, 4, 4, 2, 1),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_exposes_loss_dependence_profile() {
+        let samples = build_samples(0.5);
+        let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            provenance(),
+        )
+        .unwrap();
+
+        let profile = evidence.relational_loss_dependence(8).unwrap();
+        assert_eq!(profile.sample_count, config().test_samples);
+        assert!(profile.autocorrelations.iter().all(|value| value.is_finite()));
+    }
+
+    #[test]
+    fn rolling_evidence_exposes_two_level_loss_dependence_profile() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+        let evidence = RollingOriginRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config,
+            provenance(),
+        )
+        .unwrap();
+
+        let profile = evidence.relational_loss_dependence(3, 2).unwrap();
+        assert_eq!(profile.origin_count, config.origin_count);
+        assert_eq!(profile.per_origin.len(), config.origin_count);
+        assert_eq!(profile.origin_mean_differentials.len(), config.origin_count);
+        assert_eq!(profile.across_origin_mean_profile.sample_count, config.origin_count);
     }
 
     #[test]
