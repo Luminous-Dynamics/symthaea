@@ -4,7 +4,7 @@
 //! resource hazards and a deterministic partial order. Backends may lower that
 //! order to their own synchronization primitives.
 
-use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
@@ -413,6 +413,7 @@ impl ExecutionGraph {
             .map(|byte| format!("{byte:02x}"))
             .collect())
     }
+}
 
 fn edge_kind_is_valid(
     from: &ExecutionNode,
