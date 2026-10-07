@@ -30,8 +30,19 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
 
+      - name: Prepare isolated GPU Fabric workspace
+        run: |
+          rm -rf .ci/gpu-fabric-workspace
+          mkdir -p .ci/gpu-fabric-workspace/src
+          cp -R crates/core/symthaea-gpu-fabric/src/. .ci/gpu-fabric-workspace/src/
+          cp Cargo.lock .ci/gpu-fabric-workspace/Cargo.lock
+          cp crates/core/symthaea-gpu-fabric/Cargo.toml .ci/gpu-fabric-workspace/Cargo.toml
+          sed -i -e 's/edition.workspace = true/edition = "2024"/' -e 's/license.workspace = true/license = "AGPL-3.0-or-later"/' -e 's/blake3 = { workspace = true }/blake3 = "1.5"/' -e 's/serde = { workspace = true }/serde = { version = "1.0", features = ["derive"] }/' -e 's/thiserror = { workspace = true }/thiserror = "=1.0.69"/' .ci/gpu-fabric-workspace/Cargo.toml
+
       - name: Compile barrier workload harness
-        run: cargo test --locked -p symthaea-gpu-fabric --features vulkan --lib
+        working-directory: .ci/gpu-fabric-workspace
+        run: cargo test --locked --features vulkan --lib
 
       - name: Execute real workload barrier qualification
-        run: cargo test --locked -p symthaea-gpu-fabric --features vulkan --lib -- --ignored --nocapture
+        working-directory: .ci/gpu-fabric-workspace
+        run: cargo test --locked --features vulkan --lib -- --ignored --nocapture
