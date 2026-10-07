@@ -211,7 +211,7 @@ jobs:
           OUTPUT="$(cargo +1.96.1 test --locked \
             --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
             --test linear_code_syndrome_decoder \
-            small_fixture_fixed_parity_check_spec_agrees_with_all_syndrome_oracles -- --nocapture 2>&1)
+            small_fixture_fixed_parity_check_spec_agrees_with_all_syndrome_oracles -- --nocapture 2>&1)"
           COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^FIXED_SYNDROME_SPEC=')"
           test "$COUNT" -eq 1
           LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^FIXED_SYNDROME_SPEC=//p')"
