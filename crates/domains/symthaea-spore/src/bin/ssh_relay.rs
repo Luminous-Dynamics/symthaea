@@ -9377,36 +9377,22 @@ echo '}'
                 };
 
                 let outcome = finalize_transaction(
-                            &transaction_ledger,
-                            &transaction,
-                            observed_outcome,
-                            &peer_addr,
-                        );
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                serde_json::json!({
-                                    "type":"exit",
-                                    "code":protocol_exit_code(r.exit_status, outcome),
-                                    "data":r.stdout,
-                                    "transaction":transaction.receipt(outcome)
-                                })
-                                .to_string(),
-                            ))
-                            .await;
-                    }
-                    Err(e) => {
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                serde_json::json!({
-                                    "type": "error",
-                                    "message": format!("Restore failed: {}", e),
-                                    "transaction": transaction.receipt(finalize_transaction(&transaction_ledger, &transaction, TransactionOutcome::Indeterminate, &peer_addr))
-                                })
-                                .to_string(),
-                            ))
-                            .await;
-                    }
-                }
+                    &transaction_ledger,
+                    &transaction,
+                    observed_outcome,
+                    &peer_addr,
+                );
+                let _ = ws_tx
+                    .send(Message::Text(
+                        serde_json::json!({
+                            "type":"exit",
+                            "code":protocol_exit_code(result.exit_status, outcome),
+                            "data":result.stdout,
+                            "transaction":transaction.receipt(outcome)
+                        })
+                        .to_string(),
+                    ))
+                    .await;
             }
 
             "list_images" => {
