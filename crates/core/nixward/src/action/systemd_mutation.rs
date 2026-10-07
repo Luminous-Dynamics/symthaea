@@ -38,6 +38,8 @@ pub enum NixSystemdMutationTransportErrorV1 {
     InvalidManagerOwner,
     #[error("systemd manager incarnation changed before lifecycle dispatch")]
     ManagerOwnerChanged,
+    #[error("D-Bus daemon incarnation changed before lifecycle dispatch")]
+    BusIncarnationChanged,
     #[error("systemd returned an invalid Job object path")]
     InvalidJobObjectPath,
 }
