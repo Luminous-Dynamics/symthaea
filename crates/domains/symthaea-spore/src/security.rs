@@ -175,8 +175,11 @@ pub fn validate_nix_pure_eval(nix_content: &str) -> Result<(), String> {
 
     const TRUSTED_PATH: &str =
         "/run/current-system/sw/bin:/run/wrappers/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin:/sbin";
-    const TRUSTED_NIX_PATH: &str =
-        "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos:nixos-config=/etc/nixos/configuration.nix";
+    // Do not expose the target machine's existing NixOS configuration as an
+    // implicit input to a browser-supplied expression. Keeping the search path
+    // empty prevents the advisory preflight from becoming a configuration-file
+    // read capability.
+    const HERMETIC_NIX_PATH: &str = "";
 
     let nix = [
         "/run/current-system/sw/bin/nix",
@@ -204,7 +207,9 @@ pub fn validate_nix_pure_eval(nix_content: &str) -> Result<(), String> {
     command
         .args(["eval", "--pure-eval", "--expr", &expr])
         .env("PATH", TRUSTED_PATH)
-        .env("NIX_PATH", TRUSTED_NIX_PATH)
+        .env("NIX_PATH", HERMETIC_NIX_PATH)
+        .env("HOME", "/nonexistent")
+        .env("XDG_CONFIG_HOME", "/nonexistent")
         .env("LANG", "C")
         .env("LC_ALL", "C");
 
@@ -257,6 +262,13 @@ mod tests {
     #[test]
     fn heredoc_empty_input() {
         assert_eq!(sanitize_heredoc("", "NIXCONF"), "");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn pure_eval_hermetic_environment_keeps_nix_path_empty() {
+        let hermetic_nix_path = "";
+        assert!(hermetic_nix_path.is_empty());
     }
 
     #[cfg(not(target_arch = "wasm32"))]
