@@ -266,6 +266,8 @@ Rolling-origin evidence is characterized at two levels rather than by concatenat
 
 The resulting artifact is intentionally descriptive. A large positive lag-1 autocorrelation, a low effective sample size, or a large long-run variance does not establish or refute predictive superiority. Instead, it identifies conditions that must be respected by the later inferential procedure. Recent forecast-evaluation work recommends accounting for dependence in the loss differential and shows that strong serial dependence can materially distort ordinary equal-accuracy tests. citeturn859792search1turn859792search4
 
+The dependence profile returned through an evidence packet also retains that packet's exact evaluator BLAKE3 commitment. This prevents a detached dependence report from being mistaken for a characterization of a different source/evaluation run. Free-standing profiles may still be computed for exploratory diagnostics, but those are intentionally unbound and should not be promoted into qualification evidence.
+
 The implementation therefore stops at dependence characterization → method selection rather than jumping directly to a p-value. For nested RelationalAugmented versus NonRelationalContext forecasts, dedicated nested-model procedures remain the relevant candidate class; the eventual choice must also commit to forecast horizon, dependence estimator, small-sample treatment, bootstrap/self-normalization strategy if used, and multiplicity rules before examining the real test results. citeturn859792search7turn859792search5
 
 
