@@ -4108,9 +4108,9 @@ async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
         };
 
         let check = if artifact == "system.btrfs.zst" {
-            run_privileged_args_with_stdin("zstd", &["-t", "-"], file).await
+            run_privileged_args_with_stdin("zstd", &["-t", "-"], &file).await
         } else {
-            run_privileged_args_with_stdin("tar", &["-tzf", "-"], file).await
+            run_privileged_args_with_stdin("tar", &["-tzf", "-"], &file).await
         }
         .map_err(|error| format!("image archive integrity probe failed: {error}"))?;
 
@@ -12534,7 +12534,7 @@ mod tests {
         drop(replacement);
         std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o400)).unwrap();
 
-        let output = run_privileged_args_with_stdin("cat", &[], file).await.unwrap();
+        let output = run_privileged_args_with_stdin("cat", &[], &file).await.unwrap();
         assert_eq!(output.exit_status, 0);
         assert_eq!(output.stdout.as_bytes(), bytes);
 
