@@ -592,6 +592,11 @@ pub const NEUROSEMANTIC_REMEDIATION_UNCERTAINTY_COMPUTATION_SCHEMA_VERSION: u16 
 const MAX_NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITIONS: usize = 32;
 const MAX_NEUROSEMANTIC_REMEDIATION_METRIC_TEXT_BYTES: usize = 256;
 const MAX_NEUROSEMANTIC_REMEDIATION_OBSERVATIONS: usize = 4096;
+const NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF: &str = "wilson-score-95-v1";
+const NEUROSEMANTIC_REMEDIATION_WILSON_95_ASSUMPTIONS_REF: &str =
+    "independent-bernoulli-trials-v1";
+const NEUROSEMANTIC_REMEDIATION_WILSON_95_ASSUMPTIONS_BYTES: &[u8] =
+    b"independent Bernoulli trials; fixed binary outcome; no clustering correction declared";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NeurosemanticRemediationMeasurementArtifact {
@@ -1317,6 +1322,35 @@ impl NeurosemanticRemediationImpactArtifact {
                     || uncertainty.execution_revision != self.execution_revision
                 {
                     return Err("neurosemantic remediation uncertainty computation binding mismatch".into());
+                }
+
+                if uncertainty.method_ref == NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF {
+                    if uncertainty.confidence_level_bps != 9_500
+                        || uncertainty.assumptions_ref
+                            != NEUROSEMANTIC_REMEDIATION_WILSON_95_ASSUMPTIONS_REF
+                        || uncertainty.assumptions_hash
+                            != content_hash(NEUROSEMANTIC_REMEDIATION_WILSON_95_ASSUMPTIONS_BYTES)
+                    {
+                        return Err(
+                            "neurosemantic remediation Wilson uncertainty assumptions are invalid"
+                                .into(),
+                        );
+                    }
+                    let (expected_lower, expected_upper, expected_scale) =
+                        recompute_wilson_score_95_interval(
+                            computation.failure_count,
+                            computation.observed_sample_count,
+                            uncertainty.scale,
+                        )?;
+                    if uncertainty.lower_numerator != expected_lower
+                        || uncertainty.upper_numerator != expected_upper
+                        || uncertainty.scale != expected_scale
+                    {
+                        return Err(
+                            "neurosemantic remediation Wilson uncertainty calculation mismatch"
+                                .into(),
+                        );
+                    }
                 }
             }
 
@@ -3492,6 +3526,46 @@ fn sorted_hashes(values: &[String]) -> Vec<&str> {
     sorted
 }
 
+fn recompute_wilson_score_95_interval(
+    failure_count: u64,
+    observed_count: u64,
+    scale: u32,
+) -> Result<(i64, i64, u32), String> {
+    if observed_count == 0 || scale > 9 {
+        return Err(
+            "neurosemantic remediation Wilson interval requires 1..=9 scale and observations"
+                .into(),
+        );
+    }
+    let n = observed_count as f64;
+    let p = failure_count as f64 / n;
+    let z = 1.959963984540054_f64;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / n;
+    let center = (p + z2 / (2.0 * n)) / denominator;
+    let radical = (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt();
+    let half_width = z * radical / denominator;
+    let lower = (center - half_width).clamp(0.0, 1.0);
+    let upper = (center + half_width).clamp(0.0, 1.0);
+    if !lower.is_finite() || !upper.is_finite() || lower > upper {
+        return Err("neurosemantic remediation Wilson interval is not finite".into());
+    }
+    let factor = 10_f64.powi(i32::try_from(scale).map_err(|_| {
+        "neurosemantic remediation Wilson scale conversion failed".to_string()
+    })?);
+    if !factor.is_finite() || factor <= 0.0 {
+        return Err("neurosemantic remediation Wilson scale factor is invalid".into());
+    }
+    let lower_numerator = (lower * factor).floor();
+    let upper_numerator = (upper * factor).ceil();
+    if lower_numerator < i64::MIN as f64
+        || upper_numerator > i64::MAX as f64
+    {
+        return Err("neurosemantic remediation Wilson interval exceeds fixed-point range".into());
+    }
+    Ok((lower_numerator as i64, upper_numerator as i64, scale))
+}
+
 fn recompute_metric_ratio(
     observation_set: &NeurosemanticRemediationObservationSetArtifact,
     aggregation_ref: &str,
@@ -4730,6 +4804,19 @@ mod tests {
         assert!(assumptions_invalid.validate().is_err());
 
         let _ = metric_definition;
+    }
+
+    #[test]
+    fn remediation_wilson_score_interval_is_numerically_reproducible() {
+        assert_eq!(
+            recompute_wilson_score_95_interval(0, 2, 4).unwrap(),
+            (0, 6_577, 4)
+        );
+        let (lower, upper, scale) =
+            recompute_wilson_score_95_interval(1, 2, 4).unwrap();
+        assert_eq!(scale, 4);
+        assert!(lower > 0);
+        assert!(upper < 10_000);
     }
 
     #[test]
