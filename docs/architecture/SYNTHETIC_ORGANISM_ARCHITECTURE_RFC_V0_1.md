@@ -684,6 +684,12 @@ evidence-weighted confidence. Confidence rises with repeated accurate transition
 suppressed by persistent prediction error. A predictor can therefore be routed into a
 policy only after accumulating actual transition evidence.
 
+The micro-world policy layer now evaluates finite counterfactual horizons. It tracks the
+minimum confidence and minimum predicted viability margin across the imagined trajectory,
+and subtracts explicit uncertainty/risk penalties from candidate utility. This is a
+measurement-oriented bridge from prediction to actionable control; it is not yet an
+embodiment claim.
+
 The first benchmark questions are therefore:
 
 1. Can a predictor beat persistence?
@@ -691,6 +697,8 @@ The first benchmark questions are therefore:
 3. Does prediction error remain attributable to a pre-action forecast?
 4. Do identical runs produce identical evidence?
 5. Does learning transfer to a different deterministic scenario when the test phase is frozen?
+6. Does multi-step counterfactual planning improve action selection without mutating the predictor during evaluation?
+7. Does the planner preserve a positive predicted viability margin under uncertainty?
 
 No current result from this harness should be interpreted as evidence of consciousness
 or biological life.
