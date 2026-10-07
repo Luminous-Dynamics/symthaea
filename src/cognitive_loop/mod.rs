@@ -322,8 +322,10 @@ pub mod power_budget;
 /// Typed causal state contracts for persistence, prediction, homeostasis, and recovery.
 pub mod viability_fabric;
 pub use viability_fabric::{
-    ActionOutcome, ActionPrediction, LifecyclePhase, PredictionErrorLedger, ViabilityBand,
-    ViabilityDelta, ViabilityFabric, ViabilitySignal, ViabilityState, ViabilityVariable,
+    ActionOutcome, ActionPrediction, CognitiveResourceMode, LifecyclePhase,
+    PredictionCancellation, PredictionErrorLedger, RegulationDecision, RegulationThresholds,
+    ViabilityBand, ViabilityDelta, ViabilityFabric, ViabilitySignal, ViabilityState,
+    ViabilityVariable,
 };
 pub mod viability_micro_world;
 pub use viability_micro_world::{
