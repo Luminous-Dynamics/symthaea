@@ -484,6 +484,46 @@ impl ForecastLossDependenceProfile {
             return Err(RelationalPredictionError::ModelFitFailed);
         }
 
+        let expected_zero_lag = if self.variance > 1e-20 { 1.0 } else { 0.0 };
+        if (self.autocorrelations[0] - expected_zero_lag).abs() > 1e-12 {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        if self.lag_one_autocorrelation.is_some_and(|value| {
+            self.max_lag < 1 || (value - self.autocorrelations[1]).abs() > 1e-12
+        }) {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+        if self.max_lag == 0 && self.lag_one_autocorrelation.is_some() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let expected_first_nonpositive = self
+            .autocorrelations
+            .iter()
+            .enumerate()
+            .skip(1)
+            .find_map(|(lag, correlation)| (*correlation <= 0.0).then_some(lag));
+        if self.first_nonpositive_autocorrelation_lag != expected_first_nonpositive {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let expected_max = self
+            .autocorrelations
+            .iter()
+            .enumerate()
+            .skip(1)
+            .map(|(lag, correlation)| (lag, correlation.abs()))
+            .max_by(|(_, a), (_, b)| {
+                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map_or((None, 0.0), |(lag, magnitude)| (Some(lag), magnitude));
+        if self.max_absolute_autocorrelation_lag != expected_max.0
+            || (self.max_absolute_autocorrelation - expected_max.1).abs() > 1e-12
+        {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
         if self.effective_sample_size.is_some_and(|value| {
             !value.is_finite() || value < 1.0 || value > self.sample_count as f64
         }) {
@@ -3607,6 +3647,13 @@ mod tests {
         assert!(profile.effective_sample_size.unwrap() < losses.len() as f64);
         profile.validate().unwrap();
         assert!(profile.to_json().unwrap().contains(DEPENDENCE_PROFILE_SCHEMA));
+
+        let mut tampered = profile.clone();
+        tampered.max_absolute_autocorrelation = 0.0;
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::ModelFitFailed)
+        );
     }
 
     #[test]
