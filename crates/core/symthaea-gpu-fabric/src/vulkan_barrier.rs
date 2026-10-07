@@ -958,9 +958,13 @@ fn completion_lowering_digest(
     queue_family_index: u32,
 ) -> String {
     let mut h = Hasher::new();
-    h.update(b"symthaea.gpu-fabric.vulkan-completion-lowering.v1\0");
+    h.update(b"symthaea.gpu-fabric.vulkan-completion-lowering.v2\0");
     h.update(b"semaphore-type:timeline\0");
     h.update(b"initial-value:0\0");
+    h.update(b"recording-policy:single-primary-command-buffer\0");
+    h.update(b"submission-policy:single-vkQueueSubmit2-batch\0");
+    h.update(b"signal-policy:single-final-signal\0");
+    h.update(b"completion-policy:max-plan-signal-value\0");
     h.update(b"submit-api:vkQueueSubmit2\0");
     h.update(b"signal-api:VkSemaphoreSubmitInfo\0");
     h.update(&vk::PipelineStageFlags2::COMPUTE_SHADER.as_raw().to_le_bytes());
@@ -973,6 +977,9 @@ fn completion_lowering_digest(
     h.update(&1_u32.to_le_bytes()); // command-buffer device mask
     h.update(&completion_expected.to_le_bytes());
     h.update(&(plan.submissions.len() as u32).to_le_bytes());
+    h.update(&1_u32.to_le_bytes()); // command-buffer count
+    h.update(&1_u32.to_le_bytes()); // queue-submit batch count
+    h.update(&1_u32.to_le_bytes()); // final signal count
     h.finalize().to_hex().to_string()
 }
 
@@ -1709,6 +1716,25 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn completion_lowering_digest_binds_final_timeline_policy() {
+        let (_, _, mut plan, _) = fixture();
+        let baseline = completion_lowering_digest(
+            &plan,
+            expected_final_timeline_value(&plan),
+            0,
+        );
+        plan.submissions[1].signal.value += 1;
+        assert_ne!(
+            baseline,
+            completion_lowering_digest(
+                &plan,
+                expected_final_timeline_value(&plan),
+                0,
+            )
+        );
+    }
+
     fn receipt_rejects_tampered_completion_lowering_digest() {
         let (graph, schedule, plan, initial) = fixture();
         let final_state = simulate(&graph, &schedule, &initial).unwrap();
