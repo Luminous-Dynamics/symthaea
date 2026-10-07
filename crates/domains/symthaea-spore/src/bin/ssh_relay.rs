@@ -3020,7 +3020,7 @@ fn open_image_artifact_with_commitment_blocking(
         ));
     }
 
-    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    use std::os::unix::fs::PermissionsExt;
     let directory = std::fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
@@ -3376,7 +3376,6 @@ async fn restore_verified_configuration(
     .map_err(|error| format!("configuration restore task failed: {error}"))?
 }
 
-async fn verify_image_artifact_commitment(
 async fn verify_image_artifact_commitment(
     image_dir: &str,
     expected: &ArtifactCommitment,
