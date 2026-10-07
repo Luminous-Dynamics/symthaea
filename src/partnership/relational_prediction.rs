@@ -4848,7 +4848,7 @@ fn make_surrogate(
 mod tests {
     const CANONICAL_SELECTION_RULE_ID: &str = "relational-inference-selection-rule-v1";
     const CANONICAL_SELECTION_RULE_SPEC_SHA256: &str =
-        "d4fe1c9b5bdc84b333e17b4bd4075e00c1e7b6de2826c4cd4a715fd1c56ba0e2";
+        "e15bc4daec6ddbf705c5b8e03e6e96f63c7e50306703bef98bbbbe1b4fc53ec1";
     use super::*;
 
     fn deterministic_sequence(i: usize, frequency: f64, phase: f64) -> f64 {
@@ -5695,6 +5695,7 @@ mod tests {
         );
         assert_eq!(value["decision_semantics"]["result_dependent_method_switching"], false);
         assert_eq!(value["decision_semantics"]["temporal_preregistration_proof_in_code"], false);
+        assert_eq!(value["decision_semantics"]["structural_floors_are_not_adequacy_claims"], true);
     }
 
     #[test]
