@@ -4525,6 +4525,440 @@ fn validate_preservation_path(value: &str) -> Result<String, String> {
     Ok(path.to_owned())
 }
 
+fn preservation_process_exists(name: &str) -> bool {
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return false;
+    };
+    entries.filter_map(Result::ok).any(|entry| {
+        let file_name = entry.file_name();
+        let pid = file_name.to_string_lossy();
+        if !pid.bytes().all(|byte| byte.is_ascii_digit()) {
+            return false;
+        }
+        std::fs::read_to_string(entry.path().join("comm"))
+            .map(|comm| comm.trim() == name)
+            .unwrap_or(false)
+    })
+}
+
+fn preservation_user_uid(username: &str) -> Result<Option<u32>, String> {
+    let username = std::ffi::CString::new(username)
+        .map_err(|_| format!("preservation account name contains NUL: {username:?}"))?;
+    let mut pwd = unsafe { std::mem::zeroed::<libc::passwd>() };
+    let mut result = std::ptr::null_mut();
+    let mut buffer = vec![0u8; 4096];
+
+    loop {
+        let rc = unsafe {
+            libc::getpwnam_r(
+                username.as_ptr(),
+                &mut pwd,
+                buffer.as_mut_ptr() as *mut libc::c_char,
+                buffer.len(),
+                &mut result,
+            )
+        };
+        match rc {
+            0 => return Ok(result.as_ref().map(|entry| entry.pw_uid)),
+            libc::ERANGE => {
+                if buffer.len() >= 1024 * 1024 {
+                    return Err("preservation account lookup buffer exceeded 1 MiB".into());
+                }
+                buffer.resize(buffer.len() * 2, 0);
+            }
+            error => {
+                return Err(format!(
+                    "preservation account lookup for {username:?} failed with errno {error}"
+                ))
+            }
+        }
+    }
+}
+
+fn preservation_archive_component(value: &str) -> String {
+    let mut component: String = value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .take(80)
+        .collect();
+    if component.is_empty() {
+        component.push_str("image");
+    }
+    let digest = blake3::hash(value.as_bytes()).to_hex();
+    format!("{component}-{}", &digest[..8])
+}
+
+fn preservation_human_size(bytes: u64) -> String {
+    const UNITS: &[&str] = &["B", "KiB", "MiB", "GiB", "TiB"];
+    let mut value = bytes as f64;
+    let mut unit = 0usize;
+    while value >= 1024.0 && unit + 1 < UNITS.len() {
+        value /= 1024.0;
+        unit += 1;
+    }
+    if unit == 0 {
+        format!("{} B", bytes)
+    } else {
+        format!("{value:.1} {}", UNITS[unit])
+    }
+}
+
+async fn run_privileged_to_file(
+    program: &str,
+    args: &[&str],
+    output_path: &str,
+) -> Result<CmdResult, String> {
+    let executable = trusted_typed_executable(program)
+        .map_err(|error| format!("typed preservation executable rejected: {error}"))?;
+    let output_file = create_private_runtime_file(output_path, 0o600)
+        .map_err(|error| format!("unable to create preservation archive {output_path}: {error}"))?;
+
+    let mut command = privileged_process(executable.as_ref());
+    command.args(args);
+    command.stdout(std::process::Stdio::from(output_file));
+    command.stderr(std::process::Stdio::piped());
+
+    let output = command
+        .output()
+        .await
+        .map_err(|error| format!("unable to execute preservation archive command: {error}"))?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
+async fn run_privileged_pipeline_to_gzip(
+    program: &str,
+    args: &[&str],
+    output_path: &str,
+    uid: Option<u32>,
+) -> Result<CmdResult, String> {
+    let executable = trusted_typed_executable(program)
+        .map_err(|error| format!("typed preservation executable rejected: {error}"))?;
+    let gzip_executable = trusted_typed_executable("gzip")
+        .map_err(|error| format!("typed preservation gzip executable rejected: {error}"))?;
+    let output_file = create_private_runtime_file(output_path, 0o600)
+        .map_err(|error| format!("unable to create preservation archive {output_path}: {error}"))?;
+
+    let mut producer = privileged_process(executable.as_ref());
+    producer.args(args);
+    if let Some(uid) = uid {
+        producer.uid(uid);
+    }
+    producer
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+
+    let mut producer_child = producer
+        .spawn()
+        .await
+        .map_err(|error| format!("unable to start preservation producer: {error}"))?;
+    let producer_stdout = match producer_child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            let _ = producer_child.kill().await;
+            let _ = producer_child.wait().await;
+            let _ = tokio::fs::remove_file(output_path).await;
+            return Err("preservation producer did not expose stdout for gzip pipeline".into());
+        }
+    };
+
+    let mut gzip = privileged_process(gzip_executable.as_ref());
+    gzip.arg("-c")
+        .stdin(std::process::Stdio::from(producer_stdout))
+        .stdout(std::process::Stdio::from(output_file))
+        .stderr(std::process::Stdio::piped());
+
+    let mut gzip_child = match gzip.spawn().await {
+        Ok(child) => child,
+        Err(error) => {
+            let _ = producer_child.kill().await;
+            let _ = producer_child.wait().await;
+            let _ = tokio::fs::remove_file(output_path).await;
+            return Err(format!("unable to start preservation gzip stage: {error}"));
+        }
+    };
+
+    let (producer_result, gzip_result) = tokio::join!(
+        producer_child.wait_with_output(),
+        gzip_child.wait_with_output()
+    );
+    let producer_result =
+        producer_result.map_err(|error| format!("preservation producer wait failed: {error}"))?;
+    let gzip_result =
+        gzip_result.map_err(|error| format!("preservation gzip wait failed: {error}"))?;
+
+    if !producer_result.status.success() || !gzip_result.status.success() {
+        let _ = tokio::fs::remove_file(output_path).await;
+        return Err(format!(
+            "preservation pipeline failed: producer={:?}, gzip={:?}",
+            producer_result.status.code(),
+            gzip_result.status.code()
+        ));
+    }
+
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&producer_result.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&producer_result.stderr).to_string(),
+        exit_status: 0,
+    })
+}
+
+async fn validate_preservation_archive(path: &str) -> Result<u64, String> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    let metadata = tokio::fs::symlink_metadata(path)
+        .await
+        .map_err(|error| format!("preservation archive metadata failed: {error}"))?;
+    if !metadata.file_type().is_file()
+        || metadata.uid() != unsafe { libc::geteuid() }
+        || metadata.permissions().mode() & 0o077 != 0
+        || metadata.len() == 0
+    {
+        return Err(format!(
+            "preservation archive {path} failed ownership, permission, or size checks"
+        ));
+    }
+
+    let gzip = run_privileged_args("gzip", &["-t", "--", path])
+        .await
+        .map_err(|error| format!("preservation gzip integrity check failed: {error}"))?;
+    if gzip.exit_status != 0 {
+        return Err(format!("preservation archive {path} is not valid gzip"));
+    }
+    let tar = run_privileged_args("tar", &["-tzf", path])
+        .await
+        .map_err(|error| format!("preservation tar integrity check failed: {error}"))?;
+    if tar.exit_status != 0 {
+        return Err(format!("preservation archive {path} is not a valid tar archive"));
+    }
+    Ok(metadata.len())
+}
+
+async fn preservation_tar_archive(
+    archive_path: &str,
+    working_dir: &str,
+    member: &str,
+) -> Result<u64, String> {
+    let result = run_privileged_to_file(
+        "tar",
+        &["-czf", "-", "-C", working_dir, member],
+        archive_path,
+    )
+    .await?;
+    if result.exit_status != 0 {
+        let _ = tokio::fs::remove_file(archive_path).await;
+        return Err(format!(
+            "tar preservation failed for {member}: {}",
+            result.stderr.chars().take(500).collect::<String>()
+        ));
+    }
+    validate_preservation_archive(archive_path).await
+}
+
+async fn preserve_data_native(
+    backup_dir: &str,
+    transaction_dir: &str,
+) -> Result<serde_json::Value, String> {
+    let backup_dir = validate_preservation_path(backup_dir)?;
+    let mut items = Vec::new();
+
+    if let Ok(info) = run_privileged_args("docker", &["info"]).await {
+        if info.exit_status == 0 {
+            let images = run_privileged_args(
+                "docker",
+                &["images", "--format", "{{.Repository}}:{{.Tag}}"],
+            )
+            .await
+            .map_err(|error| format!("unable to enumerate Docker images: {error}"))?;
+            if images.exit_status != 0 {
+                return Err(format!(
+                    "Docker image inventory failed: {}",
+                    images.stderr.chars().take(500).collect::<String>()
+                ));
+            }
+
+            for image in images
+                .stdout
+                .lines()
+                .map(str::trim)
+                .filter(|image| !image.is_empty() && !image.contains("<none>"))
+                .take(20)
+            {
+                let archive = format!(
+                    "{backup_dir}/docker-{}.tar.gz",
+                    preservation_archive_component(image)
+                );
+                run_privileged_pipeline_to_gzip("docker", &["save", image], &archive, None)
+                    .await?;
+                let size = validate_preservation_archive(&archive).await?;
+                items.push(serde_json::json!({
+                    "type": "docker_image",
+                    "name": image,
+                    "size": preservation_human_size(size),
+                    "path": archive
+                }));
+            }
+        }
+    }
+
+    if preservation_process_exists("postgres") {
+        let uid = preservation_user_uid("postgres")?
+            .ok_or_else(|| "PostgreSQL is running but the postgres account is unavailable".to_string())?;
+        let archive = format!("{backup_dir}/postgresql-all.sql.gz");
+        run_privileged_pipeline_to_gzip("pg_dumpall", &[], &archive, Some(uid)).await?;
+        let size = validate_preservation_archive(&archive).await?;
+        items.push(serde_json::json!({
+            "type": "postgresql",
+            "name": "all databases",
+            "size": preservation_human_size(size),
+            "path": archive
+        }));
+    }
+
+    if preservation_process_exists("mysqld") {
+        let archive = format!("{backup_dir}/mysql-all.sql.gz");
+        run_privileged_pipeline_to_gzip(
+            "mysqldump",
+            &["--all-databases"],
+            &archive,
+            None,
+        )
+        .await?;
+        let size = validate_preservation_archive(&archive).await?;
+        items.push(serde_json::json!({
+            "type": "mysql",
+            "name": "all databases",
+            "size": preservation_human_size(size),
+            "path": archive
+        }));
+    }
+
+    for webdir in ["/var/www", "/srv/http", "/usr/share/nginx/html"] {
+        let path = std::path::Path::new(webdir);
+        if path.is_dir()
+            && std::fs::read_dir(path)
+                .map(|mut entries| entries.next().is_some())
+                .unwrap_or(false)
+        {
+            let parent = path.parent().unwrap_or(std::path::Path::new("/"));
+            let member = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .ok_or_else(|| format!("invalid preservation web path {webdir}"))?;
+            let archive = format!("{backup_dir}/{member}.tar.gz");
+            let size =
+                preservation_tar_archive(&archive, parent.to_str().unwrap_or("/"), member).await?;
+            items.push(serde_json::json!({
+                "type": "webdata",
+                "name": webdir,
+                "size": preservation_human_size(size),
+                "path": archive
+            }));
+        }
+    }
+
+    if std::path::Path::new("/var/spool/cron").is_dir() {
+        let archive = format!("{backup_dir}/crontabs.tar.gz");
+        let size = preservation_tar_archive(&archive, "/var/spool", "cron").await?;
+        items.push(serde_json::json!({
+            "type": "crontabs",
+            "name": "all crontabs",
+            "size": "small",
+            "path": archive
+        }));
+    }
+
+    let mut ssh_sources = Vec::new();
+    if std::path::Path::new("/root/.ssh").is_dir() {
+        ssh_sources.push("/root/.ssh".to_string());
+    }
+    if let Ok(entries) = std::fs::read_dir("/home") {
+        for entry in entries.flatten() {
+            let path = entry.path().join(".ssh");
+            if path.is_dir() {
+                ssh_sources.push(path.to_string_lossy().into_owned());
+            }
+        }
+    }
+    if !ssh_sources.is_empty() {
+        let list_path = format!("{transaction_dir}/ssh-sources");
+        let mut encoded = Vec::new();
+        for path in &ssh_sources {
+            encoded.extend_from_slice(path.as_bytes());
+            encoded.push(0);
+        }
+        write_private_file(&list_path, &encoded, 0o600)
+            .map_err(|error| format!("unable to stage SSH preservation manifest: {error}"))?;
+        let archive = format!("{backup_dir}/ssh-keys.tar.gz");
+        let result = run_privileged_to_file(
+            "tar",
+            &["-czf", "-", "--null", "--files-from", &list_path],
+            &archive,
+        )
+        .await?;
+        let _ = tokio::fs::remove_file(&list_path).await;
+        if result.exit_status != 0 {
+            let _ = tokio::fs::remove_file(&archive).await;
+            return Err(format!(
+                "SSH preservation failed: {}",
+                result.stderr.chars().take(500).collect::<String>()
+            ));
+        }
+        let size = validate_preservation_archive(&archive).await?;
+        items.push(serde_json::json!({
+            "type": "ssh_keys",
+            "name": "SSH keys and config",
+            "size": "small",
+            "path": archive
+        }));
+    }
+
+    let etc_archive = format!("{backup_dir}/etc-backup.tar.gz");
+    let etc_size = preservation_tar_archive(&etc_archive, "/", "etc").await?;
+    items.push(serde_json::json!({
+        "type": "system_config",
+        "name": "/etc",
+        "size": preservation_human_size(etc_size),
+        "path": etc_archive
+    }));
+
+    let home_size = match run_privileged_args("du", &["-sh", "/home"]).await {
+        Ok(result) if result.exit_status == 0 => result
+            .stdout
+            .split_whitespace()
+            .next()
+            .unwrap_or("unknown")
+            .to_string(),
+        _ => "unknown".to_string(),
+    };
+    items.push(serde_json::json!({
+        "type": "home_dirs",
+        "name": format!("/home ({home_size})"),
+        "size": home_size,
+        "path": "not backed up — requires explicit user-directed preservation"
+    }));
+
+    let total_size = match run_privileged_args("du", &["-sh", &backup_dir]).await {
+        Ok(result) if result.exit_status == 0 => result.stdout.split_whitespace().next().unwrap_or("unknown").to_string(),
+        _ => "unknown".to_string(),
+    };
+
+    Ok(serde_json::json!({
+        "backup_dir": backup_dir,
+        "items": items,
+        "total_size": total_size
+    }))
+}
+
 async fn verify_preservation_artifacts(backup_dir: &str) -> Result<bool, String> {
     let path = validate_preservation_path(backup_dir)?;
 
