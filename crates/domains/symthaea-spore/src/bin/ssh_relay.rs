@@ -8228,18 +8228,26 @@ mod tests {
     #[tokio::test]
     async fn privileged_command_environment_is_hermetic_and_deterministic() {
         let result = run_cmd(
-            "printf 'HOME=%s\\nNIX_CONFIG=%s\\nNIXOS_NO_CHECK=%s\\nLD_PRELOAD=%s\\nLANG=%s\\nLC_ALL=%s\\nPATH=%s\\n' \\             "\${HOME-unset}" "\${NIX_CONFIG-unset}" "\${NIXOS_NO_CHECK-unset}" "\${LD_PRELOAD-unset}" "\$LANG" "\$LC_ALL" "\$PATH"",
+            r#"printf 'HOME=%s\nNIX_CONFIG=%s\nNIXOS_NO_CHECK=%s\nLD_PRELOAD=%s\nLANG=%s\nLC_ALL=%s\nPATH=%s\n' "${HOME-unset}" "${NIX_CONFIG-unset}" "${NIXOS_NO_CHECK-unset}" "${LD_PRELOAD-unset}" "$LANG" "$LC_ALL" "$PATH""#,
         )
         .await
         .expect("privileged command should run");
 
-        assert!(result.stdout.contains("HOME=unset\\n"), "ambient HOME leaked: {}", result.stdout);
-        assert!(result.stdout.contains("NIX_CONFIG=unset\\n"), "ambient NIX_CONFIG leaked: {}", result.stdout);
-        assert!(result.stdout.contains("NIXOS_NO_CHECK=unset\\n"), "NIXOS_NO_CHECK must not cross the privileged boundary: {}", result.stdout);
-        assert!(result.stdout.contains("LD_PRELOAD=unset\\n"), "LD_PRELOAD leaked: {}", result.stdout);
-        assert!(result.stdout.contains("LANG=C\\n"), "locale must be deterministic: {}", result.stdout);
-        assert!(result.stdout.contains("LC_ALL=C\\n"), "locale must be deterministic: {}", result.stdout);
-        assert!(result.stdout.includes("PATH=/run/current-system/sw/bin") || result.stdout.includes("/run/current-system/sw/bin"), "trusted PATH missing: {}", result.stdout);
+        assert!(result.stdout.contains("HOME=unset\n"), "ambient HOME leaked: {}", result.stdout);
+        assert!(result.stdout.contains("NIX_CONFIG=unset\n"), "ambient NIX_CONFIG leaked: {}", result.stdout);
+        assert!(
+            result.stdout.contains("NIXOS_NO_CHECK=unset\n"),
+            "NIXOS_NO_CHECK must not cross the privileged boundary: {}",
+            result.stdout
+        );
+        assert!(result.stdout.contains("LD_PRELOAD=unset\n"), "LD_PRELOAD leaked: {}", result.stdout);
+        assert!(result.stdout.contains("LANG=C\n"), "locale must be deterministic: {}", result.stdout);
+        assert!(result.stdout.contains("LC_ALL=C\n"), "locale must be deterministic: {}", result.stdout);
+        assert!(
+            result.stdout.contains("/run/current-system/sw/bin"),
+            "trusted PATH missing: {}",
+            result.stdout
+        );
     }
 
     #[test]
