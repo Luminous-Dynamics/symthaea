@@ -74,15 +74,14 @@ jobs:
           LIVE_RUN_PR_BASE_REPO_ID="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].base.repo.id else 0 end')"
           LIVE_RUN_PR_BASE_REPO_NAME="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].base.repo.full_name else "" end')"
           test "$LIVE_RUN_REPO_ID" = "$CURRENT_REPO_ID"
-          test "$LIVE_RUN_HEAD_SHA" = "$EVENT_HEAD_SHA"
           test "$LIVE_RUN_HEAD_REF" = "$EVENT_HEAD_REF"
           test "$LIVE_RUN_WORKFLOW_ID" = "375128913"
           test "$LIVE_RUN_WORKFLOW_PATH" = ".github/workflows/hdc-linear-code-syndrome-qualify.yml"
           test "$LIVE_RUN_WORKFLOW_NAME" = "HDC Linear-Code Bounded Decoder Qualification"
           test "$LIVE_RUN_EVENT" = "$GITHUB_EVENT_NAME"
-          if test "$GITHUB_EVENT_NAME" = "push"; then
-            test "$LIVE_RUN_PR_COUNT" -eq 0
-          fi
+          test "$GITHUB_EVENT_NAME" = "pull_request"
+          test -n "$SYNTHETIC_MERGE_SHA"
+          test "$LIVE_RUN_HEAD_SHA" = "$SYNTHETIC_MERGE_SHA"
           test -n "$GITHUB_WORKFLOW_SHA"
           WORKFLOW_PATH=".github/workflows/hdc-linear-code-syndrome-qualify.yml"
           CHECKED_OUT_WORKFLOW_SHA256="$(sha256sum "$WORKFLOW_PATH" | cut -d" " -f1)"
@@ -129,6 +128,7 @@ jobs:
           echo "live_run_repo_id=$LIVE_RUN_REPO_ID" >> "$GITHUB_OUTPUT"
           echo "live_run_head_sha=$LIVE_RUN_HEAD_SHA" >> "$GITHUB_OUTPUT"
           echo "live_run_head_ref=$LIVE_RUN_HEAD_REF" >> "$GITHUB_OUTPUT"
+          echo "live_run_head_is_synthetic_merge=true" >> "$GITHUB_OUTPUT"
           echo "live_run_workflow_id=$LIVE_RUN_WORKFLOW_ID" >> "$GITHUB_OUTPUT"
           echo "live_run_workflow_path=$LIVE_RUN_WORKFLOW_PATH" >> "$GITHUB_OUTPUT"
           echo "live_run_workflow_name=$LIVE_RUN_WORKFLOW_NAME" >> "$GITHUB_OUTPUT"
