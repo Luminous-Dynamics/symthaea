@@ -1,69 +1,14 @@
 {
   "schema": "rh006-oracle-restricted-dgp-refit-bootstrap/v1",
-  "status": "research-diagnostic-only",
-  "oracle": true,
-  "generated_artifact_sha256": "cf92022795e80d7dca667711ae703bf211be0beea981396a4ee18bcdb0a63d0c",
-  "geometry": {
-    "train": 48,
-    "test": 16,
-    "gap": 4,
-    "origins": 24,
-    "step": 16,
-    "horizon": 1,
-    "ridge": 1e-8,
-    "bartlett_lag": 3,
-    "alpha": 0.05,
-    "monte_carlo_reps": 40,
-    "bootstrap_reps": 99
+  "status": "superseded-unverified",
+  "reason": "The prior 40x99 numerical result was recorded without an independently executed simulation in the verification loop and must not be treated as observed evidence.",
+  "replacement": {
+    "artifact": "docs/research/RELATIONAL_HARMONICS_ORACLE_RESTRICTED_DGP_REFIT_BOOTSTRAP_EXECUTED_V2.json",
+    "harness": "scripts/research/rh006_oracle_refit_splitmix64.py"
   },
-  "null": {
-    "restriction": "beta_relational = 0",
-    "feature_conditioning": "fixed observed feature path in bootstrap",
-    "dgp_parameters": "known oracle parameters",
-    "full_refit_each_bootstrap": true
-  },
-  "scenarios": [
-    {
-      "scenario": "iid",
-      "rho": 0.0,
-      "heteroskedastic": false,
-      "reject_count": 2,
-      "empirical_size": 0.05,
-      "mean_p": 0.5645,
-      "mean_T": -3.421201166965095
-    },
-    {
-      "scenario": "ar05",
-      "rho": 0.5,
-      "heteroskedastic": false,
-      "reject_count": 3,
-      "empirical_size": 0.075,
-      "mean_p": 0.5905,
-      "mean_T": -3.298855456434591
-    },
-    {
-      "scenario": "ar08",
-      "rho": 0.8,
-      "heteroskedastic": false,
-      "reject_count": 2,
-      "empirical_size": 0.05,
-      "mean_p": 0.53075,
-      "mean_T": -2.713144391399112
-    },
-    {
-      "scenario": "ar05-hetero",
-      "rho": 0.5,
-      "heteroskedastic": true,
-      "reject_count": 1,
-      "empirical_size": 0.025,
-      "mean_p": 0.42524999999999996,
-      "mean_T": -2.6557916936413
-    }
-  ],
-  "interpretation": {
-    "finding": "Full null-DGP generation plus complete nested rolling refits can produce a roughly calibrated reference distribution for the candidate origin-level statistic in this small oracle benchmark.",
+  "scientific_boundary": {
     "not_a_validity_proof": true,
-    "remaining_problem": "Estimate a defensible restricted null DGP and dependence-preserving error bootstrap from real data without result-dependent choices.",
+    "formal_inference": false,
     "applicability": "not-approved-for-execution",
     "selection": "stop-assumption-failure"
   }
