@@ -25,6 +25,8 @@ const SNAPSHOT_MANIFEST: &str =
 const SELECTION_MANIFEST: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../docs/broca/unimorph_eng_4_selection_manifest.md"));
 
+const EXPECTED_RAW_URI: &str =
+    "https://raw.githubusercontent.com/unimorph/eng/66e0e9e8e2dcd196da081a25a48e5c1fe3d8b49b/eng";
 const EXPECTED_COMMIT: &str = "66e0e9e8e2dcd196da081a25a48e5c1fe3d8b49b";
 const EXPECTED_BLOB_SHA: &str = "8eae5ed242e87e50f6bd182133277f50fe93cef3";
 const EXPECTED_ARTIFACT_BLAKE3: &str =
@@ -115,7 +117,8 @@ fn main() -> Result<()> {
         "- BLAKE3-256: ",
     )?;
 
-    if commit != EXPECTED_COMMIT
+    if uri != EXPECTED_RAW_URI
+        || commit != EXPECTED_COMMIT
         || blob != EXPECTED_BLOB_SHA
         || artifact_len != EXPECTED_ARTIFACT_BYTES
         || artifact_blake3 != EXPECTED_ARTIFACT_BLAKE3
@@ -217,13 +220,16 @@ fn main() -> Result<()> {
     }
 
     println!(
-        "BROCA_UNIMORPH_FREEZE_AUDIT PASS artifact_bytes={} artifact_blake3={} git_blob={} selection_blake3={} records={} rows_bytes={}",
+        "BROCA_UNIMORPH_FREEZE_AUDIT PASS artifact_bytes={} artifact_blake3={} git_blob={} selection_blake3={} records={} rows_bytes={} compiler_revision={} parser_revision={} build_context_revision={}",
         artifact.len(),
         actual_b3,
         actual_blob,
         witness.source_selection_blake3,
         slices.len(),
-        selected_bytes.len()
+        selected_bytes.len(),
+        symthaea_broca::UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION,
+        symthaea_broca::UNIMORPH_TSV_SOURCE_PARSER_REVISION,
+        symthaea_broca::UNIMORPH_TSV_COMPILER_BUILD_CONTEXT_REVISION,
     );
     Ok(())
 }
@@ -237,6 +243,11 @@ fn verify_checked_in_manifests() -> Result<()> {
             bail!("{name} is empty");
         }
     }
+
+    if !SNAPSHOT_MANIFEST.contains(EXPECTED_RAW_URI) {
+        bail!("snapshot manifest does not contain the immutable raw URI");
+    }
+
     for required in [
         EXPECTED_COMMIT,
         EXPECTED_BLOB_SHA,
@@ -247,9 +258,29 @@ fn verify_checked_in_manifests() -> Result<()> {
             bail!("checked-in manifests are missing expected identity {required}");
         }
     }
+
     if SELECTION_MANIFEST.matches("eng4:line:").count() != EXPECTED_SELECTION_COUNT {
         bail!("selection manifest does not enumerate exactly seven frozen records");
     }
+
+    for ((record_id, offset, length, digest), expected_row) in
+        EXPECTED_SLICES.iter().zip(EXPECTED_ROWS.iter())
+    {
+        let table_row =
+            format!("| {record_id} | {line} | {offset} | {length} | {digest} |",
+                line = EXPECTED_SLICES
+                    .iter()
+                    .position(|entry| entry.0 == *record_id)
+                    .map(|index| index + 1)
+                    .unwrap_or_default());
+        if !SELECTION_MANIFEST.contains(&table_row) {
+            bail!("selection manifest is missing exact table entry for {record_id}");
+        }
+        if !SELECTION_MANIFEST.contains(expected_row.trim_end_matches('\n')) {
+            bail!("selection manifest is missing exact selected record text for {record_id}");
+        }
+    }
+
     Ok(())
 }
 
