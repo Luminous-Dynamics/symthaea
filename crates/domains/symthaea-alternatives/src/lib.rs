@@ -8573,7 +8573,8 @@ mod tests {
             input_frontier: MeasurementModelInputFrontierRef {
                 frontier_id: "fixture-input-frontier-v1".into(),
                 frontier_revision: "v1".into(),
-                frontier_digest: input_frontier_digest,
+                frontier_digest: "fixture-input-frontier-record-digest-v1".into(),
+                input_set_digest: input_frontier_digest,
                 measurement_model_id: "fixture-measurement-model-v1".into(),
                 measurement_model_revision: "v1".into(),
                 measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
