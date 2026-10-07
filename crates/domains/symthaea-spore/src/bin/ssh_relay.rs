@@ -278,6 +278,22 @@ fn cleanup_sensitive_file(path: &str) -> Result<(), String> {
     }
 }
 
+fn cleanup_sensitive_files(paths: &[String]) -> Result<(), String> {
+    let mut first_error = None;
+    for path in paths {
+        if let Err(error) = cleanup_sensitive_file(path) {
+            if first_error.is_none() {
+                first_error = Some(error);
+            }
+        }
+    }
+    match first_error {
+        Some(error) => Err(error),
+        None => Ok(()),
+    }
+}
+
+
 fn prepare_transaction_runtime(
     log_path: &str,
     status_path: &str,
@@ -6088,8 +6104,8 @@ echo "  User password set."
                     };
                     if let Err(error) = luks_file.write_all(client_msg.luks_passphrase.as_bytes()) {
                         drop(luks_file);
-                        let _ = tokio::fs::remove_file(&luks_key_path).await;
-                        let _ = tokio::fs::remove_file(format!("{transaction_dir}/user-password")).await;
+                        let _ = cleanup_sensitive_file(&luks_key_path);
+                        let _ = cleanup_sensitive_file(&format!("{transaction_dir}/user-password"));
                         let _ = ws_tx
                             .send(Message::Text(
                                 RelayMessage::error(&format!("Failed to stage LUKS2 passphrase: {}", error)).to_json(),
@@ -6147,7 +6163,7 @@ echo "  User password set."
                 // SECURITY: Direct file write eliminates SCRIPTEOF heredoc injection.
                 if let Err(error) = write_private_file(&script_path, script.as_bytes(), 0o700) {
                     for secret_path in &staged_secret_paths {
-                        let _ = tokio::fs::remove_file(secret_path).await;
+                        let _ = cleanup_sensitive_file(secret_path);
                     }
                     let _ = ws_tx
                         .send(Message::Text(
@@ -6340,7 +6356,7 @@ echo "  User password set."
                     .await
                     .ok()
                     .flatten();
-                let (exit_code, observed_outcome) = match install_exit_code {
+                let (mut exit_code, mut observed_outcome) = match install_exit_code {
                     Some(0) => match verify_installed_configuration(
                         (!client_msg.configuration_nix.is_empty())
                             .then_some(client_msg.configuration_nix.as_bytes()),
@@ -6366,6 +6382,28 @@ echo "  User password set."
                     Some(code) => (code, TransactionOutcome::Failed),
                     None => (1, TransactionOutcome::Indeterminate),
                 };
+                let secret_cleanup = cleanup_sensitive_files(&staged_secret_paths);
+                if let Err(error) = &secret_cleanup {
+                    eprintln!(
+                        "[{}] {} staged install secret cleanup failed: {}",
+                        peer_addr,
+                        transaction.log_line(),
+                        error
+                    );
+                }
+
+                let secret_cleanup = cleanup_sensitive_files(&staged_secret_paths);
+                if let Err(error) = &secret_cleanup {
+                    eprintln!(
+                        "[{}] {} staged install secret cleanup failed: {}",
+                        peer_addr,
+                        transaction.log_line(),
+                        error
+                    );
+                    exit_code = 1;
+                    observed_outcome = TransactionOutcome::Indeterminate;
+                }
+
                 let outcome = finalize_transaction(
                     &transaction_ledger,
                     &transaction,
