@@ -5918,6 +5918,7 @@ mod tests {
             metric_definition_hash: content_hash(b"metric-definition"),
             observation_set_hash: content_hash(b"observation-set"),
             sampling_frame_hash: content_hash(b"sampling-frame"),
+            selection_trace_hash: content_hash(b"selection-trace"),
             selected_subject_artifact_hashes: vec![content_hash(b"subject-1")],
             inclusion_probabilities: vec![
                 NeurosemanticRemediationSamplingInclusionProbability {
