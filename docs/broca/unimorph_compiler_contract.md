@@ -119,7 +119,7 @@ UniMorph compiler receipts carry three generated identities:
 
 - `compiler_implementation_revision`: a content-addressed BLAKE3 identity of the complete `lexical_binding.rs` compiler module plus the build-time identity mechanism.
 - `source_parser_revision`: a content-addressed BLAKE3 identity of the explicitly delimited accepted source-format parser surface plus the build-time identity mechanism.
-- `compiler_build_context_revision`: a content-addressed BLAKE3 identity of the Broca crate manifest, workspace manifest, checked-in `Cargo.lock`, pinned `rust-toolchain.toml`, actual `rustc --version --verbose` identity, actual `cargo --version --verbose` identity, configured rustc/workspace-wrapper values, enabled Cargo feature set, `CARGO_ENCODED_RUSTFLAGS`, target triple, and build host.
+- `compiler_build_context_revision`: a content-addressed BLAKE3 identity of the Broca crate manifest, workspace manifest, checked-in `Cargo.lock`, pinned `rust-toolchain.toml`, repository-local `.cargo/config.toml` and `.cargo/config` presence/content, actual `rustc --version --verbose` identity, actual `cargo --version --verbose` identity, configured rustc/workspace-wrapper values, enabled Cargo feature set, `CARGO_ENCODED_RUSTFLAGS`, target triple, and build host.
 
 The build-context identity is deliberately separate from executable source identity. Rust source alone is not a complete reproducibility boundary when dependency resolution, the actual compiler or Cargo binary, compiler wrappers, feature selection, compiler flags, or compilation target changes.
 
