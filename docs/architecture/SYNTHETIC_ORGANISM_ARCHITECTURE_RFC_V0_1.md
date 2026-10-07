@@ -383,6 +383,18 @@ post-change validation passes
 
 This mirrors the project's fail-closed evidence discipline.
 
+For world-model adaptation, retention must be stratified rather than treated as generic
+"forgetting": environment-specific knowledge may need revision, while invariant dynamics
+must remain protected. The qualification layer therefore uses both isolated-shock
+regression checks and a cumulative adaptation stream that re-tests previously learned
+shock transitions and invariant anchors after later updates. This follows recent
+continual-world-model work on differential retention and revision latency
+([Anand, Duraiswami, & Manocha, 2026, arXiv:2610.03713](https://arxiv.org/abs/2610.03713)).
+
+The evidence boundary is intentionally empirical: adaptation is not considered safe merely
+because the new observation is fit better; later updates must also be checked for
+regression of protected dynamics and previously acquired knowledge.
+
 ## 8. Sleep / consolidation
 
 The existing dream/consolidation direction should become part of the viability loop.
