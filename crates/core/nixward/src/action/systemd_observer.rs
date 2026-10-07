@@ -848,7 +848,16 @@ impl NixSystemdReadOnlyObserverV1 {
             .await
         {
             Ok(properties) => properties,
-            Err(NixSystemdObserverErrorV1::Dbus(_)) => return Ok(None),
+            Err(NixSystemdObserverErrorV1::Dbus(error)) => {
+                if matches!(
+                    &error,
+                    zbus::Error::MethodError(name, _, _)
+                        if name.as_str() == "org.freedesktop.DBus.Error.UnknownObject"
+                ) {
+                    return Ok(None);
+                }
+                return Err(NixSystemdObserverErrorV1::Dbus(error));
+            }
             Err(error) => return Err(error),
         };
 
