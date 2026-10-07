@@ -11138,10 +11138,12 @@ mod tests {
         .unwrap();
 
         assert!(child_pid > 0);
-        assert_eq!(
-            std::fs::read_to_string(&pid).unwrap().trim(),
-            child_pid.to_string()
-        );
+        let identity = parse_process_identity(
+            &std::fs::read_to_string(&pid).unwrap(),
+        )
+        .expect("background worker PID file must bind PID to process start time");
+        assert_eq!(identity.0, child_pid);
+        assert!(identity.1 > 0);
         assert_eq!(
             std::fs::metadata(&log).unwrap().permissions().mode() & 0o777,
             0o600
