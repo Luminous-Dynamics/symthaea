@@ -215,10 +215,7 @@ ref, and event type to agree with the triggering event. For a pull-request run, 
 binds that run SHA to the event's synthetic merge SHA while independently binding the PR-head SHA to
 the checkout and PR association. The receipt records these validated values in schema v19.
 
-The same execution boundary also revalidates the uploaded artifact against the live run after upload,
-so the artifact identifier, run, repository, exact PR head, and digest are evidence fields rather
-than self-asserted metadata alone. This makes a successful receipt evidence about the actual executed
-run rather than only about the triggering payload.
+The same execution boundary also revalidates the uploaded artifact against the live run after upload. The artifact name binds the exact PR-head SHA, while the artifact's `workflow_run.head_sha` is checked against the synthetic merge SHA used for the pull-request execution. The receipt records both identities separately, so a successful receipt cannot conflate the research subject with GitHub's merge-ref execution object.
 
 ## Walsh/dual-fiber structure
 
