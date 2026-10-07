@@ -3621,17 +3621,33 @@ async fn run_nmcli_wifi_connection_up(
 }
 
 async fn verify_wifi_connection(profile_name: &str) -> Result<bool, String> {
-    let result = run_cmd("nmcli -t -f NAME,DEVICE connection show --active").await
+    let mut command = privileged_process("nmcli");
+    command
+        .arg("-t")
+        .arg("-f")
+        .arg("NAME,DEVICE")
+        .arg("connection")
+        .arg("show")
+        .arg("--active");
+    let output = command
+        .output()
+        .await
         .map_err(|error| format!("Wi-Fi postcondition probe failed: {error}"))?;
-    if result.exit_status != 0 {
+    if !output.status.success() {
         return Err(format!(
             "Wi-Fi postcondition probe exited with {}: {}",
-            result.exit_status,
-            result.stderr.chars().take(200).collect::<String>()
+            output.status.code().unwrap_or(1),
+            String::from_utf8_lossy(&output.stderr)
+                .chars()
+                .take(200)
+                .collect::<String>()
         ));
     }
 
-    Ok(wifi_connection_observed(&result.stdout, profile_name))
+    Ok(wifi_connection_observed(
+        &String::from_utf8_lossy(&output.stdout),
+        profile_name,
+    ))
 }
 fn configuration_bytes_match(actual: &[u8], expected: &[u8]) -> bool {
     blake3::hash(actual) == blake3::hash(expected)
