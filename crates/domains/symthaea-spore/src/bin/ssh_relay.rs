@@ -225,7 +225,7 @@ async fn spawn_privileged_background_process(
             .truncate(true)
             .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
             .open(pid_path)?;
-        pid_file.write_all(format!("{pid}\n").as_bytes())?;
+        pid_file.write_all(format!("{pid}:{start_time}\n").as_bytes())?;
         pid_file.sync_all()?;
         Ok(())
     })();
@@ -285,12 +285,57 @@ async fn read_transaction_status(path: &str) -> Result<Option<u32>, std::io::Err
     }
 }
 
-fn process_id_is_alive(pid: u32) -> bool {
+fn read_process_start_time_ticks(pid: u32) -> Result<u64, std::io::Error> {
+    if pid == 0 || pid > libc::pid_t::MAX as u32 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "invalid process id",
+        ));
+    }
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat"))?;
+    let close_paren = stat.rfind(')').ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidData, "malformed /proc/<pid>/stat")
+    })?;
+    let fields: Vec<&str> = stat[close_paren + 1..].split_whitespace().collect();
+    fields
+        .get(19)
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "missing process start time in /proc/<pid>/stat",
+            )
+        })?
+        .parse::<u64>()
+        .map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "invalid process start time in /proc/<pid>/stat",
+            )
+        })
+}
+
+fn parse_process_identity(value: &str) -> Option<(u32, u64)> {
+    let (pid, start_time) = value.trim().split_once(':')?;
+    let pid = pid.parse::<u32>().ok()?;
+    let start_time = start_time.parse::<u64>().ok()?;
+    if pid == 0 || pid > libc::pid_t::MAX as u32 {
+        return None;
+    }
+    Some((pid, start_time))
+}
+
+fn process_id_is_alive(pid: u32, expected_start_time: u64) -> bool {
     if pid == 0 || pid > libc::pid_t::MAX as u32 {
         return false;
     }
-    let result = unsafe { libc::kill(pid as libc::pid_t, 0) };
-    result == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
+    match read_process_start_time_ticks(pid) {
+        Ok(actual) if actual != expected_start_time => false,
+        Err(_) => false,
+        Ok(_) => {
+            let result = unsafe { libc::kill(pid as libc::pid_t, 0) };
+            result == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
+        }
+    }
 }
 
 
@@ -4497,7 +4542,11 @@ async fn install_process_is_alive(transaction_id: &str) -> bool {
         Ok(value) => value,
         Err(_) => return false,
     };
-    let pid = match pid_text.trim().parse::<i32>() {
+    let (pid, expected_start_time) = match parse_process_identity(&pid_text) {
+        Some(identity) => identity,
+        None => return false,
+    };
+    let pid = match i32::try_from(pid) {
         Ok(pid) if pid > 0 => pid,
         _ => return false,
     };
@@ -4525,11 +4574,7 @@ async fn install_process_is_alive(transaction_id: &str) -> bool {
         return false;
     }
 
-    match unsafe { libc::kill(pid, 0) } {
-        0 => true,
-        -1 => std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM),
-        _ => false,
-    }
+    process_id_is_alive(pid as u32, expected_start_time)
 }
 
 async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin>(
@@ -5564,12 +5609,12 @@ echo "  User password set."
                     {
                         break;
                     }
-                    let pid = tokio::fs::read_to_string(&pid_path)
+                    let identity = tokio::fs::read_to_string(&pid_path)
                         .await
                         .ok()
-                        .and_then(|text| text.trim().parse::<u32>().ok())
-                        .unwrap_or(0);
-                    if !process_id_is_alive(pid) {
+                        .and_then(|text| parse_process_identity(&text));
+                    let (pid, start_time) = identity.unwrap_or((0, 0));
+                    if !process_id_is_alive(pid, start_time) {
                         break;
                     }
                 }
@@ -7514,12 +7559,12 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                     {
                         break;
                     }
-                    let pid = tokio::fs::read_to_string(&gc_pid)
+                    let identity = tokio::fs::read_to_string(&gc_pid)
                         .await
                         .ok()
-                        .and_then(|text| text.trim().parse::<u32>().ok())
-                        .unwrap_or(0);
-                    if !process_id_is_alive(pid) {
+                        .and_then(|text| parse_process_identity(&text));
+                    let (pid, start_time) = identity.unwrap_or((0, 0));
+                    if !process_id_is_alive(pid, start_time) {
                         break;
                     }
                 }
