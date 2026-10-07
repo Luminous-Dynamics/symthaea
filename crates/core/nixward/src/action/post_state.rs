@@ -606,7 +606,7 @@ impl NixPostStateReceiptV1 {
         expectation: &NixServicePostStateExpectationV1,
         observation: &NixVerifiedPostStateObservationV1,
         stability: Option<&NixVerifiedPostStateStabilityEvidenceV1>,
-        witness: &NixLiveExecutionWitnessV1,
+        witness: NixLiveExecutionWitnessV1,
         observer_identity: impl Into<String>,
         observer_version: impl Into<String>,
     ) -> Result<Self, NixPostStateErrorV1> {
@@ -630,7 +630,7 @@ impl NixPostStateReceiptV1 {
         stability: Option<&NixVerifiedPostStateStabilityEvidenceV1>,
         observer_identity: impl Into<String>,
         observer_version: impl Into<String>,
-        witness: Option<&NixLiveExecutionWitnessV1>,
+        witness: Option<NixLiveExecutionWitnessV1>,
     ) -> Result<Self, NixPostStateErrorV1> {
         let action_intent_digest = intent
             .digest()
@@ -698,7 +698,7 @@ impl NixPostStateReceiptV1 {
         }
 
         let assessment = evaluate_postcondition(expectation, observation)?;
-        if let Some(witness) = witness {
+        if let Some(witness) = witness.as_ref() {
             validate_live_execution_witness(
                 witness,
                 intent,
@@ -714,7 +714,7 @@ impl NixPostStateReceiptV1 {
                 } else {
                     match (
                         stability.map(NixVerifiedPostStateStabilityEvidenceV1::as_ref),
-                        witness,
+                        witness.as_ref(),
                     ) {
                         (Some(stability), Some(_))
                             if stability.required_window_us >= expectation.required_stability_us =>
@@ -751,8 +751,8 @@ impl NixPostStateReceiptV1 {
         let receipt = Self {
             action_intent_digest,
             authorization_record_digest,
-            approval_request_id: witness.map(|value| value.approval_request_id().to_string()),
-            approval_projection_digest: witness.map(|value| value.projection_digest().to_string()),
+            approval_request_id: witness.as_ref().map(|value| value.approval_request_id().to_string()),
+            approval_projection_digest: witness.as_ref().map(|value| value.projection_digest().to_string()),
             effect_digest: expectation.effect_digest()?,
             target_unit: expectation.unit.clone(),
             authorized_generation: expectation.authorized_generation,
