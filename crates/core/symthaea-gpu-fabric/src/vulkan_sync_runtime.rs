@@ -145,7 +145,7 @@ impl VulkanSyncRuntime {
 
     pub fn execute(&mut self, plan: &VulkanSyncPlan) -> Result<Vec<u64>, VulkanSyncRuntimeError> {
         plan.digest_hex().map_err(VulkanSyncRuntimeError::Plan)?;
-        self.reset_semaphores()?;
+        self.reset_semaphores();
         if plan.submissions.len() != plan.assignments.len() {
             return Err(VulkanSyncRuntimeError::SubmissionCountMismatch);
         }
@@ -240,11 +240,10 @@ impl VulkanSyncRuntime {
         Ok(final_values)
     }
 
-    fn reset_semaphores(&mut self) -> Result<(), VulkanSyncRuntimeError> {
+    fn reset_semaphores(&mut self) {
         for (_, semaphore) in self.semaphores.drain(..) {
             unsafe { self.device.destroy_semaphore(semaphore, None); }
         }
-        Ok(())
     }
 
     fn ensure_semaphores(&mut self, queue_count: u16) -> Result<(), VulkanSyncRuntimeError> {
