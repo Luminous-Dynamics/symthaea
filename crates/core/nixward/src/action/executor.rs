@@ -951,14 +951,14 @@ impl NixOSExecutor {
         }
 
         if matches!(&command, NixOSCommand::Service { .. }) && !self.dry_run {
-            #[cfg(feature = "systemd-mutation")]
+            #[cfg(all(feature = "systemd-mutation", feature = "systemd-observer"))]
             {
                 return self
                     .execute_authorized_service_native(command, authority)
                     .await;
             }
 
-            #[cfg(not(feature = "systemd-mutation"))]
+            #[cfg(not(all(feature = "systemd-mutation", feature = "systemd-observer")))]
             {
                 return (
                     ExecutionResult::Blocked {
@@ -1062,7 +1062,7 @@ impl NixOSExecutor {
         (result, witness)
     }
 
-    #[cfg(feature = "systemd-mutation")]
+    #[cfg(all(feature = "systemd-mutation", feature = "systemd-observer"))]
     async fn execute_authorized_service_native(
         &mut self,
         command: NixOSCommand,
