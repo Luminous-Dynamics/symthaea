@@ -63,5 +63,12 @@
       "record_blake3": "68a55886f3a052a603a873234c9a60a2cfcfbfff7b70eb6c25c04ce5c73fcf28",
       "row": "eat\teating\tV;V.PTCP;PRS\n"
     }
-  ]
+  ],
+  "language_tag": "en",
+  "dialect_scope": "en-unspecified",
+  "rule_set_id": "unimorph-eng-4",
+  "compilation_provenance": "unimorph-eng-4-selection",
+  "compiler_id": "symthaea-unimorph-tsv-compiler",
+  "compiler_version": "broca-unimorph-tsv-compiler-v1",
+  "normalization_policy": "trim-one-line-ending-sort-feature-tokens-sort-output-rules-v1"
 }
