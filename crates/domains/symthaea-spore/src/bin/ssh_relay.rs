@@ -10160,6 +10160,31 @@ mod tests {
         let _ = std::fs::remove_dir_all(dir);
     }
 
+    #[tokio::test]
+    async fn transaction_status_reader_rejects_symlink_sidecars() {
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!("nixforhumanity-status-{transaction_id}"));
+        std::fs::create_dir(&dir).unwrap();
+
+        let real = dir.join("real-status");
+        let status = dir.join("status");
+        std::fs::write(&real, b"0\n").unwrap();
+        std::os::unix::fs::symlink(&real, &status).unwrap();
+
+        let error = read_transaction_status(status.to_str().unwrap())
+            .await
+            .expect_err("status observer must not follow a symlink");
+        assert!(
+            matches!(
+                error.raw_os_error(),
+                Some(libc::ELOOP) | Some(libc::ENOENT)
+            ),
+            "unexpected symlink rejection error: {error}"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
     #[test]
     fn process_identity_parser_requires_pid_and_start_time() {
         assert_eq!(
