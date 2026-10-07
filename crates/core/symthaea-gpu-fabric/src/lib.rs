@@ -118,6 +118,10 @@ impl OperationPlan {
             return Err(PlanError::UnsupportedVersion(self.version));
         }
 
+        if matches!(self.operation, GpuOperation::HdcBindXor { dimensions: 0 }) {
+            return Err(PlanError::ZeroDimensions);
+        }
+
         if self.inputs.len() != self.operation.input_count() {
             return Err(PlanError::InputCount {
                 expected: self.operation.input_count(),
@@ -195,6 +199,9 @@ pub struct BinaryHypervector {
 
 impl BinaryHypervector {
     pub fn from_bytes(dimensions: u32, bytes: Vec<u8>) -> Result<Self, VectorError> {
+        if dimensions == 0 {
+            return Err(VectorError::ZeroDimensions);
+        }
         let expected = packed_bytes(dimensions) as usize;
         if bytes.len() != expected {
             return Err(VectorError::ByteLength {
@@ -318,6 +325,22 @@ impl ExecutionReceipt {
         if self.accelerated != self.backend.accelerated() {
             return Err(ReceiptError::AccelerationClaimMismatch);
         }
+        if self.resource_limits != plan.limits {
+            return Err(ReceiptError::ResourceLimitsMismatch);
+        }
+        if self.accelerated {
+            if self.implementation_digest.as_deref().is_none_or(str::is_empty)
+                || self.device_identity.as_deref().is_none_or(str::is_empty)
+                || self.driver_identity.as_deref().is_none_or(str::is_empty)
+            {
+                return Err(ReceiptError::AccelerationEvidenceMissing);
+            }
+        } else if self.implementation_digest.is_some()
+            || self.device_identity.is_some()
+            || self.driver_identity.is_some()
+        {
+            return Err(ReceiptError::UnexpectedAccelerationEvidence);
+        }
         Ok(())
     }
 
@@ -334,6 +357,8 @@ impl ExecutionReceipt {
 pub enum PlanError {
     #[error("unsupported plan version {0}")]
     UnsupportedVersion(u16),
+    #[error("HDC dimensions must be non-zero")]
+    ZeroDimensions,
     #[error("expected {expected} inputs, got {actual}")]
     InputCount { expected: usize, actual: usize },
     #[error("{field} requires {expected} bytes, got {actual}")]
@@ -348,6 +373,8 @@ pub enum PlanError {
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum VectorError {
+    #[error("HDC dimensions must be non-zero")]
+    ZeroDimensions,
     #[error("dimension {dimensions} requires {expected} bytes, got {actual}")]
     ByteLength {
         dimensions: u32,
@@ -384,6 +411,12 @@ pub enum ReceiptError {
     KernelMismatch,
     #[error("acceleration claim does not match backend")]
     AccelerationClaimMismatch,
+    #[error("receipt resource limits do not match the plan")]
+    ResourceLimitsMismatch,
+    #[error("accelerated receipt is missing implementation/device/driver evidence")]
+    AccelerationEvidenceMissing,
+    #[error("CPU receipt contains acceleration-only implementation/device/driver evidence")]
+    UnexpectedAccelerationEvidence,
     #[error("output digest mismatch")]
     OutputDigestMismatch,
 }
