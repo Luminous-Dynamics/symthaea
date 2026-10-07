@@ -1,0 +1,67 @@
+{
+  "schema_version": "broca-unimorph-selection-manifest-v1",
+  "upstream_repository": "unimorph/eng",
+  "immutable_commit": "66e0e9e8e2dcd196da081a25a48e5c1fe3d8b49b",
+  "git_blob_sha": "8eae5ed242e87e50f6bd182133277f50fe93cef3",
+  "artifact_blake3": "c4a677818237fb1060d2541272e2da1d5b6bfd2ae40df00b9187d1ae8566426f",
+  "artifact_byte_length": 18022905,
+  "aggregate_source_selection_blake3": "74585e2733a2d036cc396ebb5be77796d10b0de78814ad798731b2b96efbd726",
+  "records": [
+    {
+      "record_id": "eng4:line:1",
+      "source_line": 1,
+      "byte_offset": 0,
+      "byte_length": 26,
+      "record_blake3": "d9374b6a84663b09917a521a865d73749386c059281bbd9ba3cbc92435f049f3",
+      "row": "microtome\tmicrotomes\tN;PL\n"
+    },
+    {
+      "record_id": "eng4:line:2",
+      "source_line": 2,
+      "byte_offset": 26,
+      "byte_length": 32,
+      "record_blake3": "907603894b6fe571ab7698f4e54e93dc2f0b707e210df91c9ae870b2c6449e67",
+      "row": "microtome\tmicrotomes\tV;PRS;3;SG\n"
+    },
+    {
+      "record_id": "eng4:line:3",
+      "source_line": 3,
+      "byte_offset": 58,
+      "byte_length": 35,
+      "record_blake3": "333a1e0f859e7be770e54645652a9c0da696a4ff3ae8ae50f8c113f93cbc2273",
+      "row": "microtome\tmicrotoming\tV;V.PTCP;PRS\n"
+    },
+    {
+      "record_id": "eng4:line:4",
+      "source_line": 4,
+      "byte_offset": 93,
+      "byte_length": 27,
+      "record_blake3": "3038dfd4dc2907b1d43cbd38f907673bec2ffc037903a65218e2642b0d5d0193",
+      "row": "microtome\tmicrotomed\tV;PST\n"
+    },
+    {
+      "record_id": "eng4:line:5",
+      "source_line": 5,
+      "byte_offset": 120,
+      "byte_length": 34,
+      "record_blake3": "fe340586f544413839e9a00c7993f09f51f26cf92b609468fff47a311f8d2f3f",
+      "row": "microtome\tmicrotomed\tV;V.PTCP;PST\n"
+    },
+    {
+      "record_id": "eng4:line:6",
+      "source_line": 6,
+      "byte_offset": 154,
+      "byte_length": 20,
+      "record_blake3": "9db132698ce145c60901a0f287a93b531c9986efccefe4ed8ff94c0a4d272a03",
+      "row": "eat\teats\tV;PRS;3;SG\n"
+    },
+    {
+      "record_id": "eng4:line:7",
+      "source_line": 7,
+      "byte_offset": 174,
+      "byte_length": 24,
+      "record_blake3": "68a55886f3a052a603a873234c9a60a2cfcfbfff7b70eb6c25c04ce5c73fcf28",
+      "row": "eat\teating\tV;V.PTCP;PRS\n"
+    }
+  ]
+}
