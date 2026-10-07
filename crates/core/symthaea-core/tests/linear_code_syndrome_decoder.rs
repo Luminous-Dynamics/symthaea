@@ -252,6 +252,69 @@ fn small_fixture_kernel_equals_code_and_syndrome_cosets_are_exact() {
 }
 
 #[test]
+fn small_fixture_coset_leader_profile_matches_decoder_without_codeword_oracle() {
+    let code = boundary_code();
+    let decoder = BoundedDistanceSyndromeDecoder::from_code(&code).expect("decoder");
+    let checks = independent_parity_check_rows(&code);
+    let profile = independent_coset_leader_profile(&checks, code.dimension());
+
+    assert_eq!(profile.len(), 64);
+    assert!(profile.iter().all(|(distance, matches)| *distance <= 4 && *matches > 0));
+
+    let mut minimum_distance_histogram = [0usize; 5];
+    let mut total_minimum_matches = 0usize;
+    let mut maximum_minimum_multiplicity = 0usize;
+
+    for mask in 0..(1usize << code.dimension()) {
+        let observation = error_from_mask(mask, code.dimension());
+        let syndrome = independent_syndrome(mask as u64, &checks) as usize;
+        let (expected_distance, expected_matches) = profile[syndrome];
+        assert!(expected_distance <= 4);
+        assert!(expected_matches > 0);
+
+        let (outcome, work) = decoder.decode_with_work(&observation, 4);
+        assert_eq!(work.matching_error_patterns, expected_matches);
+
+        match outcome {
+            BoundedDistanceDecode::Unique { distance, .. } => {
+                assert_eq!(expected_matches, 1);
+                assert_eq!(distance, expected_distance);
+            }
+            BoundedDistanceDecode::Ambiguous {
+                distance,
+                matching_error_patterns,
+            } => {
+                assert!(expected_matches > 1);
+                assert_eq!(distance, expected_distance);
+                assert_eq!(matching_error_patterns, expected_matches);
+            }
+            other => panic!(
+                "covering-radius bound must produce a minimum syndrome representative: {other:?}"
+            ),
+        }
+
+        minimum_distance_histogram[expected_distance] += 1;
+        total_minimum_matches += expected_matches;
+        maximum_minimum_multiplicity =
+            maximum_minimum_multiplicity.max(expected_matches);
+    }
+
+    assert_eq!(
+        minimum_distance_histogram,
+        [1usize, 32usize, 88usize, 96usize, 39usize]
+    );
+    assert_eq!(total_minimum_matches, 484);
+    assert_eq!(maximum_minimum_multiplicity, 4);
+
+    println!(
+        "SYNDROME_COSET_LEADER_ORACLE=dimension={};syndromes={};observations={};minimum_weight_histogram=0:1,1:32,2:88,3:96,4:39;total_minimum_matches={total_minimum_matches};maximum_minimum_multiplicity={maximum_minimum_multiplicity};independent_coset_oracle=true;codeword_enumeration=false",
+        code.dimension(),
+        profile.len(),
+        1usize << code.dimension(),
+    );
+}
+
+#[test]
 fn small_fixture_production_syndrome_matches_independent_oracle_and_is_linear() {
     let code = boundary_code();
     let parity_check = ParityCheckMatrix::from_code(&code).expect("parity-check matrix");
@@ -867,6 +930,24 @@ fn independent_parity_check_rows(code: &RandomLinearCode) -> Vec<u64> {
     }
     assert_eq!(checks.len(), dimension - independent_rank);
     checks
+}
+
+fn independent_coset_leader_profile(checks: &[u64], dimension: usize) -> Vec<(usize, usize)> {
+    let syndrome_count = 1usize << checks.len();
+    let mut profile = vec![(usize::MAX, 0usize); syndrome_count];
+
+    for mask in 0..(1usize << dimension) {
+        let syndrome = independent_syndrome(mask as u64, checks) as usize;
+        let weight = mask.count_ones() as usize;
+        let entry = &mut profile[syndrome];
+        match weight.cmp(&entry.0) {
+            std::cmp::Ordering::Less => *entry = (weight, 1),
+            std::cmp::Ordering::Equal => entry.1 += 1,
+            std::cmp::Ordering::Greater => {}
+        }
+    }
+
+    profile
 }
 
 fn independent_syndrome(mask: u64, checks: &[u64]) -> u64 {
