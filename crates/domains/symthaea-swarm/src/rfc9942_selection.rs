@@ -247,6 +247,15 @@ impl ReceiptSelectionDecision {
         hasher.update(&canonical);
         *hasher.finalize().as_bytes()
     }
+
+    /// Digest an internally consistent selection decision.
+    ///
+    /// This is the boundary for durable publication: malformed
+    /// candidate/selection relationships are rejected first.
+    pub fn validated_digest(&self) -> Result<[u8; 32], ReceiptSelectionDecisionError> {
+        self.validate()?;
+        Ok(self.digest())
+    }
 }
 
 /// Evaluate receipts strictly in RFC 9942 priority order.
@@ -380,7 +389,7 @@ where
         }
     }
 
-    ReceiptSelectionDecision {
+    let decision = ReceiptSelectionDecision {
         collection_sha256: sha256(collection_bytes),
         collection_len: collection.len() as u32,
         policy_id: POLICY_ID,
@@ -388,7 +397,9 @@ where
         selected_index,
         selected_receipt_sha256,
         candidates,
-    }
+    };
+    debug_assert!(decision.validate().is_ok());
+    decision
 }
 
 fn sha256(bytes: &[u8]) -> [u8; 32] {
