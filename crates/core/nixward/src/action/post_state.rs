@@ -683,6 +683,16 @@ impl NixPostStateReceiptV1 {
             )?;
         }
 
+        if let Some(witness) = witness {
+            validate_live_execution_witness(
+                witness,
+                intent,
+                expectation,
+                &action_intent_digest,
+                authorization,
+            )?;
+        }
+
         let claim = match assessment {
             NixPostconditionAssessmentV1::Satisfied => {
                 if expectation.required_stability_us == 0 {
@@ -1527,6 +1537,49 @@ fn put_opt_u32(h: &mut Hasher, value: Option<u32>) {
     }
 }
 
+fn validate_live_execution_witness(
+    witness: &NixLiveExecutionWitnessV1,
+    intent: &NixActionIntentV1,
+    expectation: &NixServicePostStateExpectationV1,
+    action_intent_digest: &str,
+    authorization: &NixExecutionAuthorizationRecordV1,
+) -> Result<(), NixPostStateErrorV1> {
+    if witness.action_intent_digest() != action_intent_digest
+        || authorization.action_intent_digest != action_intent_digest
+        || witness.pre_state_identity() != intent.pre_state_identity.as_deref()
+    {
+        return Err(NixPostStateErrorV1::LiveExecutionWitnessMismatch);
+    }
+
+    match &intent.action {
+        NixActionDescriptorV1::Service { operation, unit } => {
+            let Some(context) = intent.service_effect_context() else {
+                return Err(NixPostStateErrorV1::MissingServiceEffectContext);
+            };
+            if context.operation != *operation
+                || context.unit != *unit
+                || expectation.operation != *operation
+                || expectation.unit != *unit
+                || witness.service_definition_content_digest()
+                    != Some(context.authorized_definition_content_digest.as_str())
+                || witness.pre_invocation_id() != context.pre_invocation_id.as_deref()
+                || expectation.pre_invocation_id.as_deref() != witness.pre_invocation_id()
+            {
+                return Err(NixPostStateErrorV1::LiveExecutionWitnessMismatch);
+            }
+        }
+        _ => {
+            if witness.service_definition_content_digest().is_some()
+                || witness.pre_invocation_id().is_some()
+            {
+                return Err(NixPostStateErrorV1::LiveExecutionWitnessMismatch);
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum NixPostStateErrorV1 {
     #[error("empty required field: {0}")]
@@ -1625,6 +1678,10 @@ pub enum NixPostStateErrorV1 {
     MissingBoundPreState,
     #[error("bound pre-state identity is malformed")]
     InvalidBoundPreState,
+    #[error("live execution provenance is required for a Proven receipt")]
+    MissingLiveExecutionWitness,
+    #[error("live execution provenance does not match the bound authorization lineage")]
+    LiveExecutionWitnessMismatch,
 }
 
 #[cfg(test)]
