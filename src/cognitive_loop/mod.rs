@@ -329,7 +329,8 @@ pub use viability_fabric::{
 };
 pub mod viability_micro_world;
 pub use viability_micro_world::{
-    benchmark_scenarios, evaluate_predictor, evaluate_predictor_suite, run_homeostatic_agent,
+    benchmark_scenarios, evaluate_predictor, evaluate_predictor_suite, evaluate_predictor_suite_fresh,
+    run_homeostatic_agent,
     HomeostaticPolicy, HomeostaticRunReport, MicroAction, MicroWorldObservation,
     MicroWorldPredictor, MicroWorldReport, MicroWorldScenario, MicroWorldSuiteReport,
     PersistencePredictor, WorldModelBridgePredictor,
