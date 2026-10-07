@@ -11,7 +11,7 @@ use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{ExecutionSchedule, ScheduleError, MAX_GRAPH_NODES};
+use crate::{DependencyKind, ExecutionSchedule, ResourceId, ScheduleError, MAX_GRAPH_NODES};
 
 pub const VULKAN_SYNC_PLAN_VERSION: u16 = 1;
 pub const MAX_VULKAN_LOGICAL_QUEUES: u16 = 64;
