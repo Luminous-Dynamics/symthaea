@@ -46,6 +46,21 @@ struct CmdResult {
     pub exit_status: u32,
 }
 
+fn privileged_process(program: &str) -> tokio::process::Command {
+    let mut command = tokio::process::Command::new(program);
+    command.env_clear();
+    const TRUSTED_PATH: &str =
+        "/run/current-system/sw/bin:/run/wrappers/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin:/sbin";
+    command.env("PATH", TRUSTED_PATH);
+    command.env(
+        "NIX_PATH",
+        "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos:nixos-config=/etc/nixos/configuration.nix",
+    );
+    command.env("LANG", "C");
+    command.env("LC_ALL", "C");
+    command
+}
+
 fn privileged_shell_command(cmd: &str) -> tokio::process::Command {
     // Use /bin/sh (POSIX, always available) as fallback if bash isn't in PATH.
     let shell = if std::path::Path::new("/bin/bash").exists() {
@@ -55,30 +70,13 @@ fn privileged_shell_command(cmd: &str) -> tokio::process::Command {
     } else {
         "/bin/sh"
     };
-    // Do not inherit the caller's environment. A privileged relay must have
-    // a hermetic, deterministic execution environment; otherwise future Nix,
-    // shell, locale, proxy, or tool-specific variables can become implicit
-    // authority inputs.
-    let mut command = tokio::process::Command::new(shell);
-    command.env_clear();
+    let mut command = privileged_process(shell);
     // Bash privileged mode disables startup-file hooks and imported shell
     // functions, adding a process-local guard against ambient code injection.
     if shell.ends_with("/bash") {
         command.arg("-p");
     }
     command.arg("-c").arg(cmd);
-    const TRUSTED_PATH: &str =
-        "/run/current-system/sw/bin:/run/wrappers/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin:/sbin";
-    command.env("PATH", TRUSTED_PATH);
-    // Pin NIX_PATH as well: Nix evaluation must not inherit an ambient
-    // caller-controlled search path in this privileged execution boundary.
-    command.env(
-        "NIX_PATH",
-        "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos:nixos-config=/etc/nixos/configuration.nix",
-    );
-    // Keep text-processing and diagnostics deterministic across hosts.
-    command.env("LANG", "C");
-    command.env("LC_ALL", "C");
     command
 }
 
@@ -3198,18 +3196,186 @@ fn restore_artifact_step_for_committed_archive(
     artifact_name: &str,
 ) -> Result<&'static str, String> {
     match artifact_name {
-        "system.btrfs.zst" => {
-            Ok("echo \"Restoring committed btrfs snapshot...\"; zstd -d - | btrfs receive /mnt/ 2>&1")
-        }
-        "system.tar.gz" => {
-            Ok("echo \"Restoring committed tar archive...\"; tar -xzf - -C /mnt/ 2>&1")
-        }
+        "system.btrfs.zst" => Ok("zstd -d | btrfs receive /mnt/"),
+        "system.tar.gz" => Ok("tar -xzf - -C /mnt/"),
         _ => Err(format!(
             "image artifact commitment names unsupported restore artifact: {artifact_name}"
         )),
     }
 }
 
+async fn restore_verified_archive(
+    artifact_name: &str,
+    input: std::fs::File,
+) -> Result<CmdResult, String> {
+    let (stdout, stderr, exit_status) = match artifact_name {
+        "system.tar.gz" => {
+            let mut command = privileged_process("tar");
+            command
+                .arg("--no-absolute-names")
+                .arg("-xzf")
+                .arg("-")
+                .arg("-C")
+                .arg("/mnt/")
+                .stdin(std::process::Stdio::from(input));
+            let output = command
+                .output()
+                .await
+                .map_err(|error| format!("unable to start typed tar restore: {error}"))?;
+            (
+                String::from_utf8_lossy(&output.stdout).to_string(),
+                String::from_utf8_lossy(&output.stderr).to_string(),
+                output.status.code().unwrap_or(1) as u32,
+            )
+        }
+        "system.btrfs.zst" => {
+            let mut decoder = privileged_process("zstd");
+            decoder
+                .arg("-d")
+                .stdin(std::process::Stdio::from(input))
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped());
+
+            let mut decoder_child = decoder
+                .spawn()
+                .map_err(|error| format!("unable to start typed zstd restore: {error}"))?;
+            let decoder_stdout = decoder_child
+                .stdout
+                .take()
+                .ok_or_else(|| "typed zstd restore did not expose stdout".to_string())?;
+
+            let mut receiver = privileged_process("btrfs");
+            receiver
+                .arg("receive")
+                .arg("/mnt/")
+                .stdin(decoder_stdout)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped());
+            let mut receiver_child = receiver
+                .spawn()
+                .map_err(|error| format!("unable to start typed btrfs receive: {error}"))?;
+
+            let (receiver_output, decoder_output) = tokio::join!(
+                receiver_child.wait_with_output(),
+                decoder_child.wait_with_output()
+            );
+            let receiver_output = receiver_output
+                .map_err(|error| format!("typed btrfs receive wait failed: {error}"))?;
+            let decoder_output = decoder_output
+                .map_err(|error| format!("typed zstd restore wait failed: {error}"))?;
+
+            let mut stdout = String::from_utf8_lossy(&decoder_output.stdout).to_string();
+            stdout.push_str(&String::from_utf8_lossy(&receiver_output.stdout));
+            let mut stderr = String::from_utf8_lossy(&decoder_output.stderr).to_string();
+            stderr.push_str(&String::from_utf8_lossy(&receiver_output.stderr));
+
+            let exit_status = if decoder_output.status.success()
+                && receiver_output.status.success()
+            {
+                0
+            } else if receiver_output.status.code().unwrap_or(1) != 0 {
+                receiver_output.status.code().unwrap_or(1) as u32
+            } else {
+                decoder_output.status.code().unwrap_or(1) as u32
+            };
+            (stdout, stderr, exit_status)
+        }
+        _ => {
+            return Err(format!(
+                "image artifact commitment names unsupported restore artifact: {artifact_name}"
+            ))
+        }
+    };
+
+    Ok(CmdResult {
+        stdout,
+        stderr,
+        exit_status,
+    })
+}
+
+fn restore_verified_configuration_blocking(
+    input: std::fs::File,
+    transaction_id: &str,
+) -> Result<(), String> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    if transaction_id.len() != 32
+        || !transaction_id.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err("restore transaction identifier is invalid".into());
+    }
+
+    let target_dir_path = std::path::Path::new("/mnt/etc/nixos");
+    let target_dir = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(target_dir_path)
+        .map_err(|error| format!("unable to open restore configuration directory: {error}"))?;
+    let dir_metadata = target_dir
+        .metadata()
+        .map_err(|error| format!("unable to inspect restore configuration directory: {error}"))?;
+    if !dir_metadata.file_type().is_dir() {
+        return Err("restore configuration target is not a directory".into());
+    }
+
+    let temp_name = format!(".configuration.nix.restore.{transaction_id}");
+    let temp_path = target_dir_path.join(&temp_name);
+    let mut output = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .mode(0o600)
+        .open(&temp_path)
+        .map_err(|error| {
+            format!(
+                "unable to create atomic restore configuration staging file {}: {error}",
+                temp_path.display()
+            )
+        })?;
+
+    let copy_result = std::io::copy(&mut &input, &mut output)
+        .and_then(|_| output.sync_all())
+        .map_err(|error| {
+            format!(
+                "unable to copy verified configuration into staging file {}: {error}",
+                temp_path.display()
+            )
+        });
+    if let Err(error) = copy_result {
+        drop(output);
+        let _ = std::fs::remove_file(&temp_path);
+        return Err(error);
+    }
+
+    let final_path = target_dir_path.join("configuration.nix");
+    if let Err(error) = std::fs::rename(&temp_path, &final_path) {
+        drop(output);
+        let _ = std::fs::remove_file(&temp_path);
+        return Err(format!(
+            "unable to atomically install restored configuration {}: {error}",
+            final_path.display()
+        ));
+    }
+
+    target_dir
+        .sync_all()
+        .map_err(|error| format!("unable to synchronize restored configuration directory: {error}"))
+}
+
+async fn restore_verified_configuration(
+    input: std::fs::File,
+    transaction_id: &str,
+) -> Result<(), String> {
+    let transaction_id = transaction_id.to_string();
+    tokio::task::spawn_blocking(move || {
+        restore_verified_configuration_blocking(input, &transaction_id)
+    })
+    .await
+    .map_err(|error| format!("configuration restore task failed: {error}"))?
+}
+
+async fn verify_image_artifact_commitment(
 async fn verify_image_artifact_commitment(
     image_dir: &str,
     expected: &ArtifactCommitment,
@@ -7647,64 +7813,73 @@ echo "COMPLETE"
                     transaction.log_line(),
                     image_path
                 );
-                let restore_artifact_step = restore_artifact_step_for_committed_archive(
-                    &image_artifact_commitment.name,
-                )
-                .expect("artifact commitment validator must accept only supported image artifacts");
-                let script = restore_artifact_step.to_owned();
+                let restore_artifact_step =
+                    restore_artifact_step_for_committed_archive(&image_artifact_commitment.name)
+                        .expect("artifact commitment validator must accept only supported image artifacts");
+                if restore_artifact_step.contains("/tmp/nixforhumanity-image-") {
+                    unreachable!("typed restore steps must not reopen image artifact pathnames");
+                }
 
-                match run_cmd_with_stdin(&script, image_archive_file).await {
-                    Ok(r) => {
-                        let observed_outcome = if r.exit_status != 0 {
-                            TransactionOutcome::Failed
-                        } else {
-                            match run_cmd_with_stdin(
-                                restore_configuration_from_verified_stdin(),
-                                image_configuration_file,
+                let restore_result =
+                    restore_verified_archive(&image_artifact_commitment.name, image_archive_file)
+                        .await;
+
+                let (result, observed_outcome) = match restore_result {
+                    Ok(r) if r.exit_status == 0 => {
+                        match restore_verified_configuration(
+                            image_configuration_file,
+                            &transaction.transaction_id,
+                        )
+                        .await
+                        {
+                            Ok(()) => match verify_restored_image_postcondition(
+                                &image_configuration_commitment,
                             )
                             .await
                             {
-                                Ok(config) if config.exit_status == 0 => {
-                                    match verify_restored_image_postcondition(
-                                        &image_configuration_commitment,
-                                    )
-                                    .await
-                                    {
-                                        Ok(true) => TransactionOutcome::ObservedSuccess,
-                                        Ok(false) => TransactionOutcome::Failed,
-                                        Err(error) => {
-                                            eprintln!(
-                                                "[{}] {} restore postcondition probe failed: {}",
-                                                peer_addr,
-                                                transaction.log_line(),
-                                                error
-                                            );
-                                            TransactionOutcome::Indeterminate
-                                        }
-                                    }
-                                }
-                                Ok(config) => {
-                                    eprintln!(
-                                        "[{}] {} configuration restore command exited with {}: {}",
-                                        peer_addr,
-                                        transaction.log_line(),
-                                        config.exit_status,
-                                        config.stderr.chars().take(200).collect::<String>()
-                                    );
-                                    TransactionOutcome::Failed
-                                }
+                                Ok(true) => (r, TransactionOutcome::ObservedSuccess),
+                                Ok(false) => (r, TransactionOutcome::Failed),
                                 Err(error) => {
                                     eprintln!(
-                                        "[{}] {} configuration restore command could not be started: {}",
+                                        "[{}] {} restore postcondition probe failed: {}",
                                         peer_addr,
                                         transaction.log_line(),
                                         error
                                     );
-                                    TransactionOutcome::Indeterminate
+                                    (r, TransactionOutcome::Indeterminate)
                                 }
+                            },
+                            Err(error) => {
+                                eprintln!(
+                                    "[{}] {} configuration restore from verified descriptor failed: {}",
+                                    peer_addr,
+                                    transaction.log_line(),
+                                    error
+                                );
+                                (r, TransactionOutcome::Indeterminate)
                             }
-                        };
-                        let outcome = finalize_transaction(
+                        }
+                    }
+                    Ok(r) => (r, TransactionOutcome::Failed),
+                    Err(error) => {
+                        eprintln!(
+                            "[{}] {} typed image restore could not be started: {}",
+                            peer_addr,
+                            transaction.log_line(),
+                            error
+                        );
+                        (
+                            CmdResult {
+                                stdout: String::new(),
+                                stderr: error,
+                                exit_status: 1,
+                            },
+                            TransactionOutcome::Indeterminate,
+                        )
+                    }
+                };
+
+                let outcome = finalize_transaction(
                             &transaction_ledger,
                             &transaction,
                             observed_outcome,
@@ -9052,6 +9227,21 @@ mod tests {
             );
         }
         assert!(restore_artifact_step_for_committed_archive("unknown").is_err());
+    }
+
+    #[test]
+    fn typed_restore_command_selection_is_not_a_shell_script() {
+        assert_eq!(
+            restore_artifact_step_for_committed_archive("system.btrfs.zst").unwrap(),
+            "zstd -d | btrfs receive /mnt/"
+        );
+        assert_eq!(
+            restore_artifact_step_for_committed_archive("system.tar.gz").unwrap(),
+            "tar -xzf - -C /mnt/"
+        );
+        assert!(!restore_artifact_step_for_committed_archive("system.tar.gz")
+            .unwrap()
+            .contains("/tmp/nixforhumanity-image-"));
     }
 
     #[test]
