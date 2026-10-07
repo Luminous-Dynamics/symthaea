@@ -49,6 +49,10 @@ pub enum VulkanSyncRuntimeError {
     ReceiptSubmissionCountMismatch,
     #[error("receipt timeline value count does not match the synchronization plan")]
     ReceiptValueCountMismatch,
+    #[error("receipt Vulkan API version does not match the qualified runtime")]
+    ReceiptApiVersionMismatch,
+    #[error("receipt expected timeline values do not match the synchronization plan")]
+    ReceiptExpectedValuesMismatch,
     #[error("receipt completion mismatch on queue {queue}: expected {expected}, observed {observed}")]
     ReceiptCompletionMismatch { queue: u16, expected: u64, observed: u64 },
 }
@@ -80,6 +84,9 @@ impl VulkanSyncExecutionReceipt {
         if self.queue_count != plan.queue_count {
             return Err(VulkanSyncRuntimeError::ReceiptQueueCountMismatch);
         }
+        if self.vulkan_api_version != VULKAN_SYNC_API_VERSION {
+            return Err(VulkanSyncRuntimeError::ReceiptApiVersionMismatch);
+        }
         if self.submitted_nodes != plan.submissions.len() as u32 {
             return Err(VulkanSyncRuntimeError::ReceiptSubmissionCountMismatch);
         }
@@ -87,6 +94,14 @@ impl VulkanSyncExecutionReceipt {
             || self.observed_final_values.len() != usize::from(plan.queue_count)
         {
             return Err(VulkanSyncRuntimeError::ReceiptValueCountMismatch);
+        }
+        let mut plan_final_values = vec![0_u64; usize::from(plan.queue_count)];
+        for submission in &plan.submissions {
+            let index = usize::from(submission.signal.queue.get());
+            plan_final_values[index] = plan_final_values[index].max(submission.signal.value);
+        }
+        if self.expected_final_values != plan_final_values {
+            return Err(VulkanSyncRuntimeError::ReceiptExpectedValuesMismatch);
         }
         for queue_index in 0..usize::from(plan.queue_count) {
             if self.observed_final_values[queue_index] < self.expected_final_values[queue_index] {
@@ -427,6 +442,23 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn sync_receipt_cannot_lower_expected_completion_values() {
+        let plan = test_plan();
+        let receipt = VulkanSyncExecutionReceipt {
+            version: VULKAN_SYNC_RECEIPT_VERSION,
+            sync_plan_digest: plan.digest_hex().unwrap(),
+            queue_count: plan.queue_count,
+            submitted_nodes: plan.submissions.len() as u32,
+            expected_final_values: vec![0, 0],
+            observed_final_values: vec![1, 1],
+            vulkan_api_version: VULKAN_SYNC_API_VERSION,
+        };
+        assert!(matches!(
+            receipt.verify_against(&plan),
+            Err(VulkanSyncRuntimeError::ReceiptExpectedValuesMismatch)
+        ));
+    }
     #[test]
     fn sync_receipt_rejects_unreached_timeline() {
         let plan = test_plan();
