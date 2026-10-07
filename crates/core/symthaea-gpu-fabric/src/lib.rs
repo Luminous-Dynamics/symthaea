@@ -46,7 +46,7 @@ impl GpuOperation {
         }
     }
 
-    pub fn semantic_kernel_digest(self) -> String {
+    pub fn semantic_semantic_kernel_digest(self) -> String {
         semantic_digest(self.kernel_id().as_bytes())
     }
 
@@ -279,7 +279,7 @@ impl CpuReferenceExecutor {
                     operation: plan.operation,
                     plan_digest: plan.digest_hex(),
                     kernel_id: plan.operation.kernel_id().to_owned(),
-                    kernel_digest: plan.operation.kernel_digest(),
+                    semantic_kernel_digest: plan.operation.semantic_kernel_digest(),
                     implementation_digest: None,
                     device_identity: None,
                     driver_identity: None,
@@ -303,7 +303,7 @@ pub struct ExecutionReceipt {
     pub operation: GpuOperation,
     pub plan_digest: String,
     pub kernel_id: String,
-    pub kernel_digest: String,
+    pub semantic_kernel_digest: String,
     /// Digest of the concrete backend implementation. Present for accelerated
     /// execution only; this is intentionally separate from semantic kernel identity.
     pub implementation_digest: Option<String>,
@@ -331,7 +331,7 @@ impl ExecutionReceipt {
             return Err(ReceiptError::PlanDigestMismatch);
         }
         if self.kernel_id != plan.operation.kernel_id()
-            || self.kernel_digest != plan.operation.kernel_digest()
+            || self.semantic_kernel_digest != plan.operation.semantic_kernel_digest()
         {
             return Err(ReceiptError::KernelMismatch);
         }
@@ -464,7 +464,7 @@ fn digest_hypervectors(vectors: &[BinaryHypervector]) -> String {
     hasher.finalize().to_hex().to_string()
 }
 
-fn semantic_kernel_digest(bytes: &[u8]) -> String {
+fn semantic_semantic_kernel_digest(bytes: &[u8]) -> String {
     let mut hasher = Hasher::new();
     hasher.update(b"symthaea.gpu-fabric.semantic-kernel\0");
     hasher.update(bytes);
@@ -507,8 +507,8 @@ mod tests {
         assert_eq!(plan.digest(), plan.digest());
         assert_ne!(plan.digest_hex(), "");
         assert_eq!(
-            plan.operation.semantic_kernel_digest(),
-            plan.operation.semantic_kernel_digest()
+            plan.operation.semantic_semantic_kernel_digest(),
+            plan.operation.semantic_semantic_kernel_digest()
         );
     }
 
@@ -518,6 +518,17 @@ mod tests {
         let original = bounded.digest_hex();
         bounded.limits.max_output_bytes -= 1;
         assert_ne!(original, bounded.digest_hex());
+    }
+
+    #[test]
+    #[test]
+    fn zero_dimensions_are_rejected() {
+        let plan = OperationPlan::new(GpuOperation::HdcBindXor { dimensions: 0 });
+        assert!(matches!(plan.validate(), Err(PlanError::ZeroDimensions)));
+        assert!(matches!(
+            BinaryHypervector::from_bytes(0, Vec::new()),
+            Err(VectorError::ZeroDimensions)
+        ));
     }
 
     #[test]
@@ -532,6 +543,52 @@ mod tests {
     fn noncanonical_tail_bits_are_rejected() {
         let error = BinaryHypervector::from_bytes(13, vec![0, 0b1110_0000]).unwrap_err();
         assert_eq!(error, VectorError::NonCanonicalTailBits);
+    }
+
+    #[test]
+    #[test]
+    fn accelerated_receipts_require_concrete_execution_evidence() {
+        let plan = OperationPlan::new(GpuOperation::HdcBindXor { dimensions: 8 });
+        let mut receipt = ExecutionReceipt {
+            version: RECEIPT_VERSION,
+            backend: BackendKind::Vulkan,
+            accelerated: true,
+            operation: plan.operation,
+            plan_digest: plan.digest_hex(),
+            kernel_id: plan.operation.kernel_id().to_owned(),
+            semantic_kernel_digest: plan.operation.semantic_kernel_digest(),
+            implementation_digest: None,
+            device_identity: None,
+            driver_identity: None,
+            resource_limits: plan.limits,
+            input_digest: "input".to_owned(),
+            output_digest: "output".to_owned(),
+            determinism: plan.determinism,
+        };
+
+        assert!(matches!(
+            receipt.verify_plan(&plan),
+            Err(ReceiptError::AccelerationEvidenceMissing)
+        ));
+
+        receipt.implementation_digest = Some("impl".to_owned());
+        receipt.device_identity = Some("device".to_owned());
+        receipt.driver_identity = Some("driver".to_owned());
+        receipt.verify_plan(&plan).unwrap();
+    }
+
+    #[test]
+    fn cpu_receipts_reject_acceleration_only_evidence() {
+        let plan = OperationPlan::new(GpuOperation::HdcBindXor { dimensions: 8 });
+        let left = BinaryHypervector::from_bytes(8, vec![0xaa]).unwrap();
+        let right = BinaryHypervector::from_bytes(8, vec![0x55]).unwrap();
+        let (_, mut receipt) = CpuReferenceExecutor::execute(&plan, &[left, right]).unwrap();
+
+        receipt.device_identity = Some("unexpected".to_owned());
+        assert!(matches!(
+            receipt.verify_plan(&plan),
+            Err(ReceiptError::UnexpectedAccelerationEvidence)
+        ));
     }
 
     #[test]
@@ -558,8 +615,8 @@ mod tests {
             operation: GpuOperation::HdcBindXor { dimensions: 8 },
             plan_digest: String::new(),
             kernel_id: HDC_BIND_XOR_KERNEL_ID.to_owned(),
-            kernel_digest: GpuOperation::HdcBindXor { dimensions: 8 }
-                .kernel_digest(),
+            semantic_kernel_digest: GpuOperation::HdcBindXor { dimensions: 8 }
+                .semantic_kernel_digest(),
             implementation_digest: None,
             device_identity: None,
             driver_identity: None,
