@@ -258,6 +258,9 @@ pub struct NixServicePostStateObservationV1 {
     pub systemd_job: Option<NixSystemdJobEvidenceV1>,
     /// Unique D-Bus owner of org.freedesktop.systemd1 for this observation.
     pub systemd_manager_owner: Option<String>,
+    /// D-Bus daemon incarnation captured with the observer epoch.
+    #[serde(default)]
+    pub systemd_bus_id: Option<String>,
     pub invocation_id: Option<String>,
     /// systemd StateChangeTimestampMonotonic represented as monotonic microseconds.
     pub state_change_at_monotonic_us: u64,
@@ -281,6 +284,9 @@ impl NixServicePostStateObservationV1 {
         )?;
         if let Some(owner) = self.systemd_manager_owner.as_deref() {
             validate_unique_manager_owner(owner)?;
+        }
+        if let Some(bus_id) = self.systemd_bus_id.as_deref() {
+            validate_bus_id(bus_id)?;
         }
         if let Some(job) = &self.systemd_job {
             job.validate_shape()?;
@@ -325,6 +331,8 @@ pub struct NixPostStateStabilitySampleV1 {
     pub definition_content_digest: String,
     pub state_digest: String,
     pub manager_owner: String,
+    #[serde(default)]
+    pub bus_id: Option<String>,
     pub invocation_id: Option<String>,
     pub state_change_at_monotonic_us: u64,
     pub captured_at_monotonic_us: u64,
@@ -345,6 +353,9 @@ impl NixPostStateStabilitySampleV1 {
         )?;
         validate_digest(&self.state_digest, "stability state digest")?;
         validate_unique_manager_owner(&self.manager_owner)?;
+        if let Some(bus_id) = self.bus_id.as_deref() {
+            validate_bus_id(bus_id)?;
+        }
         validate_optional_invocation_id(self.invocation_id.as_deref(), "stability invocation id")?;
         if self.captured_at_monotonic_us < self.state_change_at_monotonic_us {
             return Err(NixPostStateErrorV1::ObservationBeforeStateChange);
@@ -505,6 +516,7 @@ fn validate_stability_against_observation(
                 .systemd_manager_owner
                 .as_deref()
                 .ok_or(NixPostStateErrorV1::MissingManagerOwner)?
+        || last.bus_id != observation.systemd_bus_id
         || last.invocation_id != observation.invocation_id
         || last.state_change_at_monotonic_us != observation.state_change_at_monotonic_us
         || last.captured_at_monotonic_us > observation.observed_at_monotonic_us
