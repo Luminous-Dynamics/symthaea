@@ -228,6 +228,8 @@ For rolling-origin bundles, the packet also retains `origin_starts`, the exact s
 
 The evidence packet is intentionally not a self-contained copy of the training dataset. It retains enough of the held-out computation to independently reconstruct test predictions and verify the reported losses, while the caller-attested source-data SHA-256 remains the commitment to the underlying source artifact. Full coefficient-training replay still requires access to the exact source data identified by that digest.
 
+Each single and rolling qualification bundle can also emit a compact JSON qualification receipt. The receipt carries both evaluator-input and full qualification-identity commitments, the complete target-level loss-differential vector and its commitment, origin schedule information, observed score summaries, and all retained null traces. Single-window receipts use schema `relational-prediction-qualification/v1`; rolling receipts use `relational-prediction-rolling-qualification/v1`. The receipt is a transport/audit representation, not a substitute for the underlying source artifact or for replay against that source.
+
 Serialization is an evidence transport mechanism, not an inference procedure. A valid packet proves that the recorded computation is internally self-consistent; it does not prove that the source data are scientifically appropriate, that the target is truly independent, or that the measured predictive difference is causal.
 
 ## 9. Repeated rolling-origin evaluation
