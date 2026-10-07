@@ -49,12 +49,339 @@ jobs:
               workflowBlobSha: process.env.EXPECTED_WORKFLOW_BLOB_SHA,
             };
 
-            if (context.repo.owner + '/' + context.repo.repo !== expected.repository) {
-              throw new Error('trusted verifier executed for the wrong repository');
+            const expectedFiles = [
+              '.github/workflows/hdc-linear-code-syndrome-qualify.yml',
+              'crates/core/symthaea-core/src/hdc/mod.rs',
+              'crates/core/symthaea-core/src/hdc/syndrome_decoder.rs',
+              'crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs',
+              'docs/research/HDC_LINEAR_CODE_BOUNDED_DECODER.md',
+            ].sort();
+
+            const expectedSourceBlobShas = {
+              '.github/workflows/hdc-linear-code-syndrome-qualify.yml':
+                'ba165cb9fcdd77c9ab83926369897cd56c8d4933',
+              'crates/core/symthaea-core/src/hdc/mod.rs':
+                '17b297a167b57f22070a50115f4967b820f911c1',
+              'crates/core/symthaea-core/src/hdc/syndrome_decoder.rs':
+                'cdb2010231e64632e04e5fe2e81a89fddd69d1cd',
+              'crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs':
+                '8cfa7e9b38c185427da7b04d73221d86194cca24',
+              'docs/research/HDC_LINEAR_CODE_BOUNDED_DECODER.md':
+                '9cfb2817beaf5c0b3676a4d1b495cc98fb7f52fc',
+            };
+
+            const requiredSteps = [
+              'Checkout exact research head',
+              'Record exact research head and parent',
+              'Enforce stacked research surface',
+              'Install pinned Rust toolchain',
+              'Verify pinned Rust toolchain',
+              'Capture runner provenance',
+              'Capture source provenance',
+              'Focused formatting',
+              'Build isolated stacked harness',
+              'Existing linear-code unit suite',
+              'Existing ambiguity qualification',
+              'Independent syndrome decoder qualification',
+              'Capture fixed syndrome specification oracle',
+              'Capture syndrome quotient metric ledger',
+              'Capture full syndrome quotient distance spectrum',
+              'Capture executable spectrum-label blind-spot adversary',
+              'Capture exact syndrome fiber difference closure',
+              'Capture Walsh dual-fiber structure',
+              'Capture syndrome/coset invariant ledger',
+              'Capture exhaustive syndrome oracle and linearity ledger',
+              'Capture exact minimum-syndrome multiplicity ledger',
+              'Verify explicit minimum-syndrome list truncation',
+              'Prove factorization ambiguity is separate',
+              'Capture coordinate permutation equivariance',
+              'Capture syndrome decoder ledger',
+              'Capture generator-basis equivariance',
+              'Capture composed metamorphic invariance',
+              'Capture random-code list and independent-oracle sweep',
+              'Capture deterministic random-code sweep',
+              'Capture beyond-radius semantics',
+              'Strict Clippy',
+              'Emit qualification receipt',
+              'Upload qualification receipt',
+              'Revalidate uploaded artifact provenance',
+              'Publish artifact provenance summary',
+            ];
+
+            function evaluate(evidence) {
+              const jobs = evidence.jobs ?? [];
+              const firstJobSteps =
+                jobs.length === 1 && Array.isArray(jobs[0].steps)
+                  ? jobs[0].steps
+                  : [];
+
+              const stepConclusions = {};
+              for (const name of requiredSteps) {
+                const matches = firstJobSteps.filter((step) => step.name === name);
+                stepConclusions[name] = matches.map((step) => step.conclusion);
+              }
+
+              const exactStepSurface =
+                jobs.length === 1 &&
+                jobs[0].name === 'Exact-head bounded syndrome qualification' &&
+                firstJobSteps.length === requiredSteps.length &&
+                JSON.stringify(firstJobSteps.map((step) => step.name)) ===
+                  JSON.stringify(requiredSteps);
+
+              const requiredStepsSucceeded = requiredSteps.every(
+                (name) =>
+                  stepConclusions[name].length === 1 &&
+                  stepConclusions[name][0] === 'success'
+              );
+
+              const artifacts = evidence.artifacts ?? [];
+              const expectedArtifactName =
+                'hdc-linear-code-bounded-decoder-' +
+                expected.subject +
+                '-run-' +
+                evidence.run.id +
+                '-attempt-' +
+                evidence.run.run_attempt;
+
+              const artifactMatches = artifacts.filter(
+                (artifact) => artifact.name === expectedArtifactName
+              );
+
+              const artifact = artifactMatches[0] ?? null;
+              const artifactVerified =
+                artifacts.length === 1 &&
+                artifactMatches.length === 1 &&
+                artifact.expired === false &&
+                artifact.size_in_bytes > 0 &&
+                artifact.workflow_run?.id === evidence.run.id &&
+                artifact.workflow_run?.repository_id === expected.repositoryId &&
+                artifact.workflow_run?.head_repository_id === expected.repositoryId &&
+                artifact.workflow_run?.head_sha === expected.subject &&
+                typeof artifact.digest === 'string' &&
+                artifact.digest.startsWith('sha256:');
+
+              const sourceIdentityVerified =
+                JSON.stringify(evidence.sourceBlobShas) ===
+                  JSON.stringify(expectedSourceBlobShas) &&
+                evidence.workflowFileSha === expected.workflowBlobSha;
+
+              const changedFiles = [...(evidence.compare.files ?? [])]
+                .map((file) => file.filename)
+                .sort();
+
+              const checks = {
+                verifier_on_main: evidence.contextRef === 'refs/heads/main',
+                repository_identity:
+                  evidence.contextRepository === expected.repository &&
+                  Number(evidence.run.repository?.id) === expected.repositoryId,
+                run_identity:
+                  evidence.run.workflow_id === expected.workflowId &&
+                  evidence.run.path === expected.workflowPath &&
+                  evidence.run.name === expected.workflowName &&
+                  evidence.run.event === 'pull_request' &&
+                  evidence.run.conclusion === 'success' &&
+                  evidence.run.head_branch === expected.branch &&
+                  evidence.run.head_sha === expected.subject,
+                pr_identity:
+                  evidence.pr.number === expected.pr &&
+                  evidence.pr.head.ref === expected.branch &&
+                  evidence.pr.head.sha === expected.subject &&
+                  Number(evidence.pr.head.repo?.id) === expected.repositoryId &&
+                  evidence.pr.head.repo?.full_name === expected.repository &&
+                  evidence.pr.base.ref === expected.baseBranch &&
+                  evidence.pr.base.sha === expected.parent &&
+                  Number(evidence.pr.base.repo?.id) === expected.repositoryId &&
+                  evidence.pr.base.repo?.full_name === expected.repository,
+                run_pr_association:
+                  Array.isArray(evidence.run.pull_requests) &&
+                  evidence.run.pull_requests.length === 1 &&
+                  evidence.run.pull_requests[0].number === expected.pr &&
+                  evidence.run.pull_requests[0].head.sha === expected.subject &&
+                  Number(evidence.run.pull_requests[0].head.repo?.id) === expected.repositoryId &&
+                  evidence.run.pull_requests[0].head.repo?.full_name === expected.repository,
+                ancestry:
+                  evidence.parentCommit.sha === expected.subject &&
+                  evidence.parentCommit.parents?.[0]?.sha === expected.parent,
+                comparison:
+                  evidence.compare.status === 'ahead' &&
+                  evidence.compare.ahead_by > 0 &&
+                  evidence.compare.behind_by === 0 &&
+                  evidence.compare.merge_base_commit?.sha === expected.parent &&
+                  JSON.stringify(changedFiles) === JSON.stringify(expectedFiles),
+                workflow_definition: evidence.workflowFileSha === expected.workflowBlobSha,
+                exact_step_surface: exactStepSurface,
+                required_steps_succeeded: requiredStepsSucceeded,
+                artifact_verified: artifactVerified,
+                source_identity_verified: sourceIdentityVerified,
+              };
+
+              return {
+                qualificationResult:
+                  Object.values(checks).every(Boolean) ? 'PASS' : 'NOT_PASS',
+                checks,
+                artifact,
+                stepConclusions,
+                changedFiles,
+              };
             }
-            if (context.ref !== 'refs/heads/main') {
-              throw new Error('trusted verifier is not executing from main');
+
+            function syntheticEvidence() {
+              const runId = 1;
+              return {
+                contextRef: 'refs/heads/main',
+                contextRepository: expected.repository,
+                run: {
+                  id: runId,
+                  run_attempt: 1,
+                  repository: { id: expected.repositoryId },
+                  workflow_id: expected.workflowId,
+                  path: expected.workflowPath,
+                  name: expected.workflowName,
+                  event: 'pull_request',
+                  conclusion: 'success',
+                  head_branch: expected.branch,
+                  head_sha: expected.subject,
+                  pull_requests: [
+                    {
+                      number: expected.pr,
+                      head: {
+                        sha: expected.subject,
+                        ref: expected.branch,
+                        repo: {
+                          id: expected.repositoryId,
+                          full_name: expected.repository,
+                        },
+                      },
+                      base: {
+                        sha: expected.parent,
+                        ref: expected.baseBranch,
+                        repo: {
+                          id: expected.repositoryId,
+                          full_name: expected.repository,
+                        },
+                      },
+                    },
+                  ],
+                },
+                pr: {
+                  number: expected.pr,
+                  head: {
+                    sha: expected.subject,
+                    ref: expected.branch,
+                    repo: {
+                      id: expected.repositoryId,
+                      full_name: expected.repository,
+                    },
+                  },
+                  base: {
+                    sha: expected.parent,
+                    ref: expected.baseBranch,
+                    repo: {
+                      id: expected.repositoryId,
+                      full_name: expected.repository,
+                    },
+                  },
+                },
+                parentCommit: {
+                  sha: expected.subject,
+                  parents: [{ sha: expected.parent }],
+                },
+                compare: {
+                  status: 'ahead',
+                  ahead_by: 1,
+                  behind_by: 0,
+                  merge_base_commit: { sha: expected.parent },
+                  files: expectedFiles.map((filename) => ({ filename })),
+                },
+                workflowFileSha: expected.workflowBlobSha,
+                sourceBlobShas: { ...expectedSourceBlobShas },
+                jobs: [
+                  {
+                    name: 'Exact-head bounded syndrome qualification',
+                    steps: requiredSteps.map((name) => ({ name, conclusion: 'success' })),
+                  },
+                ],
+                artifacts: [
+                  {
+                    name:
+                      'hdc-linear-code-bounded-decoder-' +
+                      expected.subject +
+                      '-run-' +
+                      runId +
+                      '-attempt-1',
+                    expired: false,
+                    size_in_bytes: 1,
+                    digest: 'sha256:' + 'a'.repeat(64),
+                    workflow_run: {
+                      id: runId,
+                      repository_id: expected.repositoryId,
+                      head_repository_id: expected.repositoryId,
+                      head_sha: expected.subject,
+                    },
+                  },
+                ],
+              };
             }
+
+            const attackCases = [
+              ['verifier_ref', (e) => { e.contextRef = 'refs/heads/research/evil'; }],
+              ['repository_id', (e) => { e.run.repository.id += 1; }],
+              ['run_workflow_id', (e) => { e.run.workflow_id += 1; }],
+              ['run_event', (e) => { e.run.event = 'push'; }],
+              ['run_conclusion', (e) => { e.run.conclusion = 'failure'; }],
+              ['run_head_sha', (e) => { e.run.head_sha = '0'.repeat(40); }],
+              ['run_pr_number', (e) => { e.run.pull_requests[0].number += 1; }],
+              ['run_pr_head_repo', (e) => { e.run.pull_requests[0].head.repo.full_name = 'attacker/clone'; }],
+              ['pr_head_sha', (e) => { e.pr.head.sha = '0'.repeat(40); }],
+              ['pr_head_repo_id', (e) => { e.pr.head.repo.id += 1; }],
+              ['pr_base_sha', (e) => { e.pr.base.sha = '0'.repeat(40); }],
+              ['parent_sha', (e) => { e.parentCommit.parents[0].sha = '0'.repeat(40); }],
+              ['merge_base_sha', (e) => { e.compare.merge_base_commit.sha = '0'.repeat(40); }],
+              ['changed_file_surface', (e) => { e.compare.files.push({ filename: 'untrusted.txt' }); }],
+              ['workflow_blob_sha', (e) => { e.workflowFileSha = '0'.repeat(40); }],
+              ['source_blob_sha', (e) => {
+                e.sourceBlobShas['crates/core/symthaea-core/src/hdc/syndrome_decoder.rs'] = '0'.repeat(40);
+              }],
+              ['job_step_name', (e) => { e.jobs[0].steps[0].name = 'forged step'; }],
+              ['job_step_conclusion', (e) => { e.jobs[0].steps[20].conclusion = 'failure'; }],
+              ['extra_job_step', (e) => { e.jobs[0].steps.push({ name: 'unreviewed step', conclusion: 'success' }); }],
+              ['artifact_name', (e) => { e.artifacts[0].name = 'decoy'; }],
+              ['artifact_expired', (e) => { e.artifacts[0].expired = true; }],
+              ['artifact_head_sha', (e) => { e.artifacts[0].workflow_run.head_sha = '0'.repeat(40); }],
+              ['artifact_digest', (e) => { e.artifacts[0].digest = ''; }],
+              ['artifact_repository_id', (e) => { e.artifacts[0].workflow_run.repository_id += 1; }],
+              ['artifact_extra_decoy', (e) => {
+                e.artifacts.push({
+                  name: 'decoy',
+                  expired: false,
+                  size_in_bytes: 1,
+                  digest: 'sha256:' + 'b'.repeat(64),
+                  workflow_run: {
+                    id: e.run.id,
+                    repository_id: expected.repositoryId,
+                    head_repository_id: expected.repositoryId,
+                    head_sha: expected.subject,
+                  },
+                });
+              }],
+            ];
+
+            const adversarialResults = [];
+            for (const [name, mutate] of attackCases) {
+              const mutated = JSON.parse(JSON.stringify(syntheticEvidence()));
+              mutate(mutated);
+              const observed = evaluate(mutated).qualificationResult;
+              adversarialResults.push({
+                mutation: name,
+                expected: 'NOT_PASS',
+                observed,
+                passed: observed === 'NOT_PASS',
+              });
+            }
+
+            const adversarialCorpusPassed =
+              adversarialResults.length === attackCases.length &&
+              adversarialResults.every((result) => result.passed);
 
             const runId = context.payload.workflow_run?.id;
             if (!Number.isInteger(runId) || runId <= 0) {
@@ -99,14 +426,6 @@ jobs:
               .map((file) => file.filename)
               .sort();
 
-            const expectedFiles = [
-              '.github/workflows/hdc-linear-code-syndrome-qualify.yml',
-              'crates/core/symthaea-core/src/hdc/mod.rs',
-              'crates/core/symthaea-core/src/hdc/syndrome_decoder.rs',
-              'crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs',
-              'docs/research/HDC_LINEAR_CODE_BOUNDED_DECODER.md',
-            ].sort();
-
             const workflowFile = await github.rest.repos.getContent({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -116,99 +435,6 @@ jobs:
             if (Array.isArray(workflowFile.data)) {
               throw new Error('qualification workflow path resolved to a directory');
             }
-
-            const requiredSteps = [
-              'Checkout exact research head',
-              'Record exact research head and parent',
-              'Enforce stacked research surface',
-              'Install pinned Rust toolchain',
-              'Verify pinned Rust toolchain',
-              'Capture runner provenance',
-              'Capture source provenance',
-              'Focused formatting',
-              'Build isolated stacked harness',
-              'Existing linear-code unit suite',
-              'Existing ambiguity qualification',
-              'Independent syndrome decoder qualification',
-              'Capture fixed syndrome specification oracle',
-              'Capture syndrome quotient metric ledger',
-              'Capture full syndrome quotient distance spectrum',
-              'Capture executable spectrum-label blind-spot adversary',
-              'Capture exact syndrome fiber difference closure',
-              'Capture Walsh dual-fiber structure',
-              'Capture syndrome/coset invariant ledger',
-              'Capture exhaustive syndrome oracle and linearity ledger',
-              'Capture exact minimum-syndrome multiplicity ledger',
-              'Verify explicit minimum-syndrome list truncation',
-              'Prove factorization ambiguity is separate',
-              'Capture coordinate permutation equivariance',
-              'Capture syndrome decoder ledger',
-              'Capture generator-basis equivariance',
-              'Capture composed metamorphic invariance',
-              'Capture random-code list and independent-oracle sweep',
-              'Capture deterministic random-code sweep',
-              'Capture beyond-radius semantics',
-              'Strict Clippy',
-              'Emit qualification receipt',
-              'Upload qualification receipt',
-              'Revalidate uploaded artifact provenance',
-              'Publish artifact provenance summary',
-            ];
-
-            const stepConclusions = {};
-            for (const name of requiredSteps) {
-              const matches = jobs
-                .flatMap((job) => job.steps ?? [])
-                .filter((step) => step.name === name);
-              stepConclusions[name] = matches.map((step) => step.conclusion);
-            }
-
-            const exactStepSurface =
-              jobs.length === 1 &&
-              jobs[0].name === 'Exact-head bounded syndrome qualification' &&
-              jobs[0].steps.length === requiredSteps.length &&
-              JSON.stringify(jobs[0].steps.map((step) => step.name)) ===
-                JSON.stringify(requiredSteps);
-
-            const requiredStepsSucceeded = requiredSteps.every(
-              (name) =>
-                stepConclusions[name].length === 1 &&
-                stepConclusions[name][0] === 'success'
-            );
-
-            const artifacts = await github.paginate(
-              github.rest.actions.listWorkflowRunArtifacts,
-              {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                run_id: run.id,
-                per_page: 100,
-              }
-            );
-
-            const expectedArtifactName =
-              'hdc-linear-code-bounded-decoder-' +
-              expected.subject +
-              '-run-' +
-              run.id +
-              '-attempt-' +
-              run.run_attempt;
-
-            const artifactMatches = artifacts.filter(
-              (artifact) => artifact.name === expectedArtifactName
-            );
-
-            const artifactVerified =
-              artifacts.length === 1 &&
-              artifactMatches.length === 1 &&
-              artifactMatches[0].expired === false &&
-              artifactMatches[0].size_in_bytes > 0 &&
-              artifactMatches[0].workflow_run?.id === run.id &&
-              artifactMatches[0].workflow_run?.repository_id === expected.repositoryId &&
-              artifactMatches[0].workflow_run?.head_repository_id === expected.repositoryId &&
-              artifactMatches[0].workflow_run?.head_sha === expected.subject &&
-              typeof artifactMatches[0].digest === 'string' &&
-              artifactMatches[0].digest.startsWith('sha256:');
 
             const sourceBlobShas = {};
             for (const file of expectedFiles) {
@@ -224,82 +450,51 @@ jobs:
               sourceBlobShas[file] = content.data.sha;
             }
 
-            const expectedSourceBlobShas = {
-              '.github/workflows/hdc-linear-code-syndrome-qualify.yml':
-                'ba165cb9fcdd77c9ab83926369897cd56c8d4933',
-              'crates/core/symthaea-core/src/hdc/mod.rs':
-                '17b297a167b57f22070a50115f4967b820f911c1',
-              'crates/core/symthaea-core/src/hdc/syndrome_decoder.rs':
-                'cdb2010231e64632e04e5fe2e81a89fddd69d1cd',
-              'crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs':
-                '8cfa7e9b38c185427da7b04d73221d86194cca24',
-              'docs/research/HDC_LINEAR_CODE_BOUNDED_DECODER.md':
-                '9cfb2817beaf5c0b3676a4d1b495cc98fb7f52fc',
+            const liveEvidence = {
+              contextRef: context.ref,
+              contextRepository: context.repo.owner + '/' + context.repo.repo,
+              run,
+              jobs,
+              pr,
+              parentCommit,
+              compare: {
+                status: compare.status,
+                ahead_by: compare.ahead_by,
+                behind_by: compare.behind_by,
+                merge_base_commit: compare.merge_base_commit,
+                files: compare.files ?? [],
+              },
+              workflowFileSha: workflowFile.data.sha,
+              sourceBlobShas,
+              artifacts: await github.paginate(
+                github.rest.actions.listWorkflowRunArtifacts,
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: run.id,
+                  per_page: 100,
+                }
+              ),
             };
 
-            const sourceIdentityVerified =
-              JSON.stringify(sourceBlobShas) ===
-                JSON.stringify(expectedSourceBlobShas) &&
-              workflowFile.data.sha === expected.workflowBlobSha;
-
-            const checks = {
-              verifier_on_main: context.ref === 'refs/heads/main',
-              repository_identity:
-                context.repo.owner + '/' + context.repo.repo === expected.repository &&
-                Number(run.repository?.id) === expected.repositoryId,
-              run_identity:
-                run.workflow_id === expected.workflowId &&
-                run.path === expected.workflowPath &&
-                run.name === expected.workflowName &&
-                run.event === 'pull_request' &&
-                run.conclusion === 'success' &&
-                run.head_branch === expected.branch &&
-                run.head_sha === expected.subject,
-              pr_identity:
-                pr.number === expected.pr &&
-                pr.head.ref === expected.branch &&
-                pr.head.sha === expected.subject &&
-                Number(pr.head.repo?.id) === expected.repositoryId &&
-                pr.head.repo?.full_name === expected.repository &&
-                pr.base.ref === expected.baseBranch &&
-                pr.base.sha === expected.parent &&
-                Number(pr.base.repo?.id) === expected.repositoryId &&
-                pr.base.repo?.full_name === expected.repository,
-              run_pr_association:
-                Array.isArray(run.pull_requests) &&
-                run.pull_requests.length === 1 &&
-                run.pull_requests[0].number === expected.pr &&
-                run.pull_requests[0].head.sha === expected.subject &&
-                Number(run.pull_requests[0].head.repo?.id) === expected.repositoryId &&
-                run.pull_requests[0].head.repo?.full_name === expected.repository,
-              ancestry:
-                parentCommit.sha === expected.subject &&
-                parentCommit.parents?.[0]?.sha === expected.parent,
-              comparison:
-                compare.status === 'ahead' &&
-                compare.ahead_by > 0 &&
-                compare.behind_by === 0 &&
-                compare.merge_base_commit?.sha === expected.parent &&
-                JSON.stringify(changedFiles) === JSON.stringify(expectedFiles),
-              workflow_definition:
-                workflowFile.data.sha === expected.workflowBlobSha,
-              exact_step_surface: exactStepSurface,
-              required_steps_succeeded: requiredStepsSucceeded,
-              artifact_verified: artifactVerified,
-              source_identity_verified: sourceIdentityVerified,
-            };
-
-            const qualificationResult =
-              Object.values(checks).every(Boolean) ? 'PASS' : 'NOT_PASS';
+            const liveEvaluation = evaluate(liveEvidence);
 
             const receipt = {
-              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v1',
-              qualification_result: qualificationResult,
+              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v2',
+              qualification_result:
+                adversarialCorpusPassed && liveEvaluation.qualificationResult === 'PASS'
+                  ? 'PASS'
+                  : 'NOT_PASS',
               trusted_verifier: {
                 repository: expected.repository,
                 verifier_ref: context.ref,
                 verifier_sha: context.sha,
                 workflow_run_id: run.id,
+              },
+              adversarial_verifier_corpus: {
+                test_count: adversarialResults.length,
+                passed: adversarialCorpusPassed,
+                cases: adversarialResults,
               },
               subject: {
                 pr_number: expected.pr,
@@ -320,40 +515,41 @@ jobs:
                 head_branch: run.head_branch,
               },
               comparison: {
-                status: compare.status,
-                ahead_by: compare.ahead_by,
-                behind_by: compare.behind_by,
-                merge_base_sha: compare.merge_base_commit?.sha ?? null,
-                changed_files: changedFiles,
+                status: liveEvidence.compare.status,
+                ahead_by: liveEvidence.compare.ahead_by,
+                behind_by: liveEvidence.compare.behind_by,
+                merge_base_sha: liveEvidence.compare.merge_base_commit?.sha ?? null,
+                changed_files: liveEvaluation.changedFiles,
                 expected_files: expectedFiles,
               },
               workflow_definition: {
-                observed_blob_sha: workflowFile.data.sha,
+                observed_blob_sha: liveEvidence.workflowFileSha,
                 expected_blob_sha: expected.workflowBlobSha,
               },
               source_identity: {
-                observed_blob_shas: sourceBlobShas,
+                observed_blob_shas: liveEvidence.sourceBlobShas,
                 expected_blob_shas: expectedSourceBlobShas,
               },
               jobs: {
-                count: jobs.length,
-                name: jobs[0]?.name ?? null,
-                exact_step_surface: exactStepSurface,
-                required_steps_succeeded: requiredStepsSucceeded,
-                step_conclusions: stepConclusions,
+                count: liveEvidence.jobs.length,
+                name: liveEvidence.jobs[0]?.name ?? null,
+                exact_step_surface: liveEvaluation.checks.exact_step_surface,
+                required_steps_succeeded: liveEvaluation.checks.required_steps_succeeded,
+                step_conclusions: liveEvaluation.stepConclusions,
               },
-              artifact: artifactMatches[0] ?? null,
-              checks,
+              artifact: liveEvaluation.artifact,
+              live_checks: liveEvaluation.checks,
             };
 
             const outputPath = path.join(
               process.env.RUNNER_TEMP,
-              'HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V1.json'
+              'HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V2.json'
             );
             fs.writeFileSync(outputPath, JSON.stringify(receipt, null, 2) + '\n');
-            core.info('Independent qualification result: ' + qualificationResult);
+            core.info('Independent verifier adversarial corpus: ' + (adversarialCorpusPassed ? 'PASS' : 'NOT_PASS'));
+            core.info('Independent qualification result: ' + receipt.qualification_result);
 
-            if (qualificationResult !== 'PASS') {
+            if (receipt.qualification_result !== 'PASS') {
               core.setFailed('Independent verifier refused to qualify the triggering run');
             }
       - name: Upload independent qualification receipt
@@ -361,6 +557,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hdc-linear-code-bounded-decoder-independent-run-receipt
-          path: ${{ runner.temp }}/HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V1.json
+          path: ${{ runner.temp }}/HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V2.json
           if-no-files-found: error
           retention-days: 90
