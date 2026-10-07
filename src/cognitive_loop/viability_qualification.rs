@@ -189,6 +189,7 @@ pub fn roll_transition_model_trajectory<M: ActionConditionedTransitionModel + ?S
     max_steps: usize,
 ) -> Option<ContinuousTransitionRollout> {
     if state.len() != model.state_dimension()
+        || state.iter().any(|value| !value.is_finite())
         || !horizon_seconds.is_finite()
         || horizon_seconds <= 0.0
         || max_steps == 0
@@ -221,7 +222,9 @@ pub fn roll_transition_model_trajectory<M: ActionConditionedTransitionModel + ?S
         .states
         .last()
         .cloned()
-        .filter(|values| values.len() == state.len())?;
+        .filter(|values| {
+            values.len() == state.len() && values.iter().all(|value| value.is_finite())
+        })?;
 
     Some(ContinuousTransitionRollout {
         action,
@@ -605,6 +608,11 @@ fn evaluate_multi_horizon<M: ActionConditionedTransitionModel + ?Sized>(
                     else {
                         return false;
                     };
+                    if next.len() != model.state_dimension()
+                        || next.iter().any(|value| !value.is_finite())
+                    {
+                        return false;
+                    }
                     discrete_predicted = next;
                     true
                 });
