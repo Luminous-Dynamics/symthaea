@@ -679,17 +679,6 @@ impl NixPostStateReceiptV1 {
                 expectation,
                 &action_intent_digest,
                 authorization,
-                &authorization_record_digest,
-            )?;
-        }
-
-        if let Some(witness) = witness {
-            validate_live_execution_witness(
-                witness,
-                intent,
-                expectation,
-                &action_intent_digest,
-                authorization,
             )?;
         }
 
