@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 45;
+pub const SCHEMA_VERSION: u16 = 46;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-v64";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-v65";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -502,6 +502,26 @@ impl CalibrationTraceabilityEdge {
     }
 }
 
+/// Exact identity binding between a measurement-model input quantity and the
+/// top-level traceability node carrying that input's declared lineage.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CalibrationTraceabilityInputBinding {
+    /// Stable identity of the exact input quantity in the external measurement model.
+    pub input_quantity_id: String,
+    /// Topology node at which the input quantity's traceability branch begins.
+    pub node_id: String,
+}
+
+impl CalibrationTraceabilityInputBinding {
+    /// Validate one input-to-branch binding structurally.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.input_quantity_id.is_empty() || self.node_id.is_empty() {
+            return Err(AssessmentError::InvalidCalibrationTraceabilityInputBinding);
+        }
+        Ok(())
+    }
+}
+
 /// Explicit branched/network representation of metrological traceability.
 ///
 /// This is a structural graph declaration, not a certification that the
@@ -512,6 +532,18 @@ impl CalibrationTraceabilityEdge {
 pub struct CalibrationTraceabilityTopology {
     /// Node representing the measurement result under assessment.
     pub result_node_id: String,
+    /// Exact measurement-model identity governing the traceability topology.
+    pub measurement_model_id: String,
+    /// Revision of the exact measurement model.
+    pub measurement_model_revision: String,
+    /// Digest of the exact measurement model.
+    pub measurement_model_digest: String,
+    /// Exact measurement-model input-to-branch bindings.
+    ///
+    /// These bindings identify which top-level traceability branch is declared
+    /// for each model input. They do not assert that the binding set is
+    /// scientifically complete or that the input contribution is adequate.
+    pub input_bindings: Vec<CalibrationTraceabilityInputBinding>,
     /// Terminal specified reference-standard node identities.
     pub reference_node_ids: Vec<String>,
     /// Complete declared graph node set.
@@ -529,10 +561,23 @@ impl CalibrationTraceabilityTopology {
         calibration_chain_refs: &[CalibrationTraceabilityRef],
     ) -> Result<(), AssessmentError> {
         if self.result_node_id.is_empty()
+            || self.measurement_model_id.is_empty()
+            || self.measurement_model_revision.is_empty()
+            || self.measurement_model_digest.is_empty()
+            || self.input_bindings.is_empty()
             || self.reference_node_ids.is_empty()
             || self.nodes.is_empty()
         {
             return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
+        }
+        let mut seen_input_quantities = BTreeSet::new();
+        for binding in &self.input_bindings {
+            binding.validate()?;
+            if !seen_input_quantities.insert(binding.input_quantity_id.as_str()) {
+                return Err(AssessmentError::DuplicateCalibrationTraceabilityInputBinding(
+                    binding.input_quantity_id.clone(),
+                ));
+            }
         }
         let mut nodes_by_id = BTreeMap::<String, &CalibrationTraceabilityNodeRef>::new();
         for node in &self.nodes {
@@ -603,6 +648,26 @@ impl CalibrationTraceabilityTopology {
                 .get_mut(&edge.to_node_id)
                 .expect("validated edge target exists")
                 .insert(edge.from_node_id.clone());
+        }
+        let result_children = adjacency
+            .get(&self.result_node_id)
+            .cloned()
+            .unwrap_or_default();
+        for binding in &self.input_bindings {
+            if !nodes_by_id.contains_key(&binding.node_id) {
+                return Err(AssessmentError::CalibrationTraceabilityInputBindingNodeMissing {
+                    input_quantity_id: binding.input_quantity_id.clone(),
+                    node_id: binding.node_id.clone(),
+                });
+            }
+            if !result_children.contains(&binding.node_id) {
+                return Err(
+                    AssessmentError::CalibrationTraceabilityInputBindingNotDirectChild {
+                        input_quantity_id: binding.input_quantity_id.clone(),
+                        node_id: binding.node_id.clone(),
+                    },
+                );
+            }
         }
         for reference_id in &self.reference_node_ids {
             if adjacency
@@ -704,6 +769,11 @@ impl CalibrationTraceabilityTopology {
             a.from_node_id
                 .cmp(&b.from_node_id)
                 .then_with(|| a.to_node_id.cmp(&b.to_node_id))
+        });
+        canonical.input_bindings.sort_by(|a, b| {
+            a.input_quantity_id
+                .cmp(&b.input_quantity_id)
+                .then_with(|| a.node_id.cmp(&b.node_id))
         });
         canonical.reference_node_ids.sort();
         let bytes = serde_json::to_vec(&canonical).map_err(|_| AssessmentError::NonFinite)?;
@@ -1400,6 +1470,24 @@ impl EvidenceRecord {
                                 actual_procedure_digest: uncertainty.procedure_digest.clone(),
                             },
                         );
+                    }
+                    if let Some(topology) = &observation.calibration_topology {
+                        if topology.measurement_model_id != uncertainty.measurement_model_id
+                            || topology.measurement_model_revision
+                                != uncertainty.measurement_model_revision
+                            || topology.measurement_model_digest != uncertainty.measurement_model_digest
+                        {
+                            return Err(
+                                AssessmentError::CalibrationTraceabilityMeasurementModelMismatch {
+                                    expected_model_id: uncertainty.measurement_model_id.clone(),
+                                    expected_model_revision: uncertainty.measurement_model_revision.clone(),
+                                    expected_model_digest: uncertainty.measurement_model_digest.clone(),
+                                    actual_model_id: topology.measurement_model_id.clone(),
+                                    actual_model_revision: topology.measurement_model_revision.clone(),
+                                    actual_model_digest: topology.measurement_model_digest.clone(),
+                                },
+                            );
+                        }
                     }
                     match (
                         &observation.calibration_topology,
@@ -3659,6 +3747,39 @@ pub enum AssessmentError {
     CalibrationTraceabilityDeadEnd,
     /// A declared linear calibration-chain link is absent from the topology.
     CalibrationTraceabilityChainLinkMissing { calibration_id: String },
+    /// A measurement-model input binding is structurally empty.
+    InvalidCalibrationTraceabilityInputBinding,
+    /// Two input quantities are assigned duplicate branch bindings.
+    DuplicateCalibrationTraceabilityInputBinding(String),
+    /// An input binding references a missing topology node.
+    CalibrationTraceabilityInputBindingNodeMissing {
+        /// Exact model input identity.
+        input_quantity_id: String,
+        /// Referenced topology node identity.
+        node_id: String,
+    },
+    /// An input binding does not anchor to a direct child of the measurement result.
+    CalibrationTraceabilityInputBindingNotDirectChild {
+        /// Exact model input identity.
+        input_quantity_id: String,
+        /// Referenced topology node identity.
+        node_id: String,
+    },
+    /// The topology's measurement-model scope disagrees with the uncertainty evaluation.
+    CalibrationTraceabilityMeasurementModelMismatch {
+        /// Expected model identity.
+        expected_model_id: String,
+        /// Expected model revision.
+        expected_model_revision: String,
+        /// Expected model digest.
+        expected_model_digest: String,
+        /// Actual topology model identity.
+        actual_model_id: String,
+        /// Actual topology model revision.
+        actual_model_revision: String,
+        /// Actual topology model digest.
+        actual_model_digest: String,
+    },
     /// The ordered linear calibration traversal contains a duplicate exact link.
     DuplicateCalibrationTraceabilityLink {
         /// Calibration record identity.
@@ -4137,6 +4258,38 @@ impl std::fmt::Display for AssessmentError {
                     "calibration chain link {calibration_id} is missing from traceability topology"
                 )
             },
+            Self::InvalidCalibrationTraceabilityInputBinding => {
+                write!(f, "calibration traceability input binding is empty")
+            }
+            Self::DuplicateCalibrationTraceabilityInputBinding(input_quantity_id) => write!(
+                f,
+                "duplicate calibration traceability input binding for {input_quantity_id}"
+            ),
+            Self::CalibrationTraceabilityInputBindingNodeMissing {
+                input_quantity_id,
+                node_id,
+            } => write!(
+                f,
+                "calibration traceability input {input_quantity_id} references missing node {node_id}"
+            ),
+            Self::CalibrationTraceabilityInputBindingNotDirectChild {
+                input_quantity_id,
+                node_id,
+            } => write!(
+                f,
+                "calibration traceability input {input_quantity_id} is not anchored at direct result child {node_id}"
+            ),
+            Self::CalibrationTraceabilityMeasurementModelMismatch {
+                expected_model_id,
+                expected_model_revision,
+                expected_model_digest,
+                actual_model_id,
+                actual_model_revision,
+                actual_model_digest,
+            } => write!(
+                f,
+                "calibration traceability measurement model mismatch: expected {expected_model_id}/{expected_model_revision}/{expected_model_digest}, actual {actual_model_id}/{actual_model_revision}/{actual_model_digest}"
+            ),
             Self::DuplicateCalibrationTraceabilityLink {
                 calibration_id,
                 calibration_revision,
@@ -7886,6 +8039,13 @@ mod tests {
 
         let mut topology = CalibrationTraceabilityTopology {
             result_node_id: "result".into(),
+            measurement_model_id: "model-v1".into(),
+            measurement_model_revision: "r1".into(),
+            measurement_model_digest: "model-digest-v1".into(),
+            input_bindings: vec![CalibrationTraceabilityInputBinding {
+                input_quantity_id: "input-primary".into(),
+                node_id: "calibration".into(),
+            }],
             reference_node_ids: vec!["reference-b".into(), "reference-a".into()],
             nodes: vec![
                 CalibrationTraceabilityNodeRef {
@@ -7940,6 +8100,7 @@ mod tests {
         let first = topology.canonical_digest().unwrap();
         topology.nodes.reverse();
         topology.edges.reverse();
+        topology.input_bindings.reverse();
         topology.reference_node_ids.reverse();
         let second = topology.canonical_digest().unwrap();
         assert_eq!(first, second);
@@ -7996,6 +8157,19 @@ mod tests {
 
         let topology = CalibrationTraceabilityTopology {
             result_node_id: "result".into(),
+            measurement_model_id: "fixture-measurement-model-v1".into(),
+            measurement_model_revision: "v1".into(),
+            measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
+            input_bindings: vec![
+                CalibrationTraceabilityInputBinding {
+                    input_quantity_id: "fixture-input-a".into(),
+                    node_id: "calibration".into(),
+                },
+                CalibrationTraceabilityInputBinding {
+                    input_quantity_id: "fixture-input-b".into(),
+                    node_id: "calibration".into(),
+                },
+            ],
             reference_node_ids: vec!["reference-si".into(), "reference-time".into()],
             nodes: vec![
                 CalibrationTraceabilityNodeRef {
