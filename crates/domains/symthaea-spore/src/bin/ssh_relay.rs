@@ -99,8 +99,8 @@ fn trusted_typed_executable(
     const SYSTEM_BIN: &str = "/run/current-system/sw/bin/";
 
     let basename = match program {
-        "btrfs" | "gzip" | "lsblk" | "nix" | "nix-collect-garbage" | "nix-env"
-        | "nix-instantiate" | "nixos-rebuild" | "nixos-version" | "nmcli" | "systemctl"
+        "btrfs" | "docker" | "du" | "gzip" | "lsblk" | "nix" | "nix-collect-garbage" | "nix-env"
+        | "nix-instantiate" | "nixos-rebuild" | "mysqldump" | "nixos-version" | "nmcli" | "pg_dumpall" | "systemctl"
         | "tar" | "uname" | "zstd" => Some(program),
         _ => None,
     };
