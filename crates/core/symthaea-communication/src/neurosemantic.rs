@@ -1323,6 +1323,22 @@ impl NeurosemanticRemediationImpactArtifact {
                 .find(|candidate| content_hash(candidate) == observation_set.population_manifest_hash)
                 .ok_or_else(|| "neurosemantic remediation population manifest is missing".to_string())?;
 
+            let expected_population_hash = match computation.kind {
+                NeurosemanticRemediationMeasurementKind::Forgetfulness
+                | NeurosemanticRemediationMeasurementKind::RecoveryRisk
+                | NeurosemanticRemediationMeasurementKind::RepresentationResidual => {
+                    &self.forget_set_manifest_hash
+                }
+                NeurosemanticRemediationMeasurementKind::UtilityImpact => &self.retain_set_manifest_hash,
+                NeurosemanticRemediationMeasurementKind::FairnessImpact => &self.evaluation_split_manifest_hash,
+            };
+            if observation_set.population_manifest_hash != *expected_population_hash {
+                return Err(
+                    "neurosemantic remediation observation set population does not match the canonical impact population"
+                        .into(),
+                );
+            }
+
             match computation.kind {
                 NeurosemanticRemediationMeasurementKind::Forgetfulness
                 | NeurosemanticRemediationMeasurementKind::RecoveryRisk
@@ -4852,6 +4868,24 @@ mod tests {
         assert!(out_of_population
             .validate(&definition.aggregation_ref)
             .is_err());
+    }
+
+    #[test]
+    fn remediation_alternate_population_identity_is_not_membership_equivalent() {
+        let canonical = NeurosemanticRemediationEvaluationSetManifest {
+            schema_version: NEUROSEMANTIC_REMEDIATION_EVALUATION_SET_SCHEMA_VERSION,
+            set_ref: "forget-canonical".into(),
+            set_kind: NeurosemanticRemediationEvaluationSetKind::Forget,
+            source_dataset_manifest_hash: content_hash(b"dataset"),
+            member_artifact_hashes: vec![content_hash(b"a"), content_hash(b"b")],
+        };
+        let mut alternate = canonical.clone();
+        alternate.set_ref = "forget-alternate".into();
+        assert_eq!(
+            sorted_hashes(&canonical.member_artifact_hashes),
+            sorted_hashes(&alternate.member_artifact_hashes)
+        );
+        assert_ne!(canonical.fingerprint().unwrap(), alternate.fingerprint().unwrap());
     }
 
     #[test]
