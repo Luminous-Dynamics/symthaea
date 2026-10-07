@@ -524,6 +524,8 @@ pub struct EnvironmentQueryQualificationReport {
     pub sequence_length: usize,
     pub probe_states: u64,
     pub mean_path_mae: f64,
+    /// F1 over the set of state channels whose value changes at each queried step.
+    pub mean_changed_channel_f1: f64,
     pub mean_terminal_mae: f64,
     pub mean_min_viability_margin_error: f64,
     /// Agreement over all queries; invalid answers count as disagreements.
@@ -799,6 +801,7 @@ fn evaluate_environment_query_bank<M: ActionConditionedTransitionModel + ?Sized>
     let sequence_count = QUERY_ACTIONS.len().pow(QUERY_SEQUENCE_LENGTH as u32);
     let total_queries = probes.len().saturating_mul(sequence_count);
     let mut path_error = 0.0;
+    let mut changed_channel_f1 = 0.0;
     let mut terminal_error = 0.0;
     let mut margin_error = 0.0;
     let mut survival_agreement = 0u64;
@@ -822,11 +825,15 @@ fn evaluate_environment_query_bank<M: ActionConditionedTransitionModel + ?Sized>
                         .min(predicted_state.get(1).copied().unwrap_or(f64::NAN))
                         - 0.08;
                     let mut query_path_error = 0.0;
+                    let mut query_changed_channel_f1 = 0.0;
+                    let mut oracle_encoded = encode_micro_world_state(oracle_state);
 
                     for action in sequence {
                         oracle_state = transition(oracle_state, action);
+                        let oracle_next_encoded = encode_micro_world_state(oracle_state);
 
                         if predicted_valid {
+                            let previous_predicted = predicted_state.clone();
                             let Some(next) =
                                 model.predict_next_state(&predicted_state, action.index())
                             else {
@@ -851,6 +858,45 @@ fn evaluate_environment_query_bank<M: ActionConditionedTransitionModel + ?Sized>
                             };
                             query_path_error +=
                                 predicted_intermediate.mean_absolute_delta(oracle_state);
+
+                            const CHANGE_THRESHOLD: f64 = 1e-4;
+                            let mut true_changed = 0u32;
+                            let mut predicted_changed = 0u32;
+                            let mut true_positive = 0u32;
+                            for index in 0..5 {
+                                let actual_changed =
+                                    (oracle_next_encoded[index] - oracle_encoded[index]).abs()
+                                        > CHANGE_THRESHOLD;
+                                let model_changed =
+                                    (predicted_state[index] - previous_predicted[index]).abs()
+                                        > CHANGE_THRESHOLD;
+                                true_changed += actual_changed as u32;
+                                predicted_changed += model_changed as u32;
+                                if actual_changed && model_changed {
+                                    true_positive += 1;
+                                }
+                            }
+                            if true_changed == 0 && predicted_changed == 0 {
+                                query_changed_channel_f1 += 1.0;
+                            } else if true_changed + predicted_changed > 0 {
+                                let precision = if predicted_changed == 0 {
+                                    0.0
+                                } else {
+                                    true_positive as f64 / predicted_changed as f64
+                                };
+                                let recall = if true_changed == 0 {
+                                    0.0
+                                } else {
+                                    true_positive as f64 / true_changed as f64
+                                };
+                                let f1 = if precision + recall <= f64::EPSILON {
+                                    0.0
+                                } else {
+                                    2.0 * precision * recall / (precision + recall)
+                                };
+                                query_changed_channel_f1 += f1;
+                            }
+
                             let margin = predicted_state[0].min(predicted_state[1]) - 0.08;
                             predicted_min_margin = predicted_min_margin.min(margin);
                         }
@@ -858,6 +904,7 @@ fn evaluate_environment_query_bank<M: ActionConditionedTransitionModel + ?Sized>
                         oracle_min_margin = oracle_min_margin.min(
                             oracle_state.energy.min(oracle_state.integrity) - 0.08,
                         );
+                        oracle_encoded = oracle_next_encoded;
                     }
 
                     if predicted_valid && predicted_state.len() >= 5 {
@@ -870,6 +917,8 @@ fn evaluate_environment_query_bank<M: ActionConditionedTransitionModel + ?Sized>
                             progress: predicted_state[4],
                         };
                         path_error += query_path_error / QUERY_SEQUENCE_LENGTH as f64;
+                        changed_channel_f1 +=
+                            query_changed_channel_f1 / QUERY_SEQUENCE_LENGTH as f64;
                         terminal_error +=
                             predicted_terminal.mean_absolute_delta(oracle_state);
                         margin_error += (predicted_min_margin - oracle_min_margin).abs();
@@ -903,6 +952,7 @@ fn evaluate_environment_query_bank<M: ActionConditionedTransitionModel + ?Sized>
         sequence_length: QUERY_SEQUENCE_LENGTH,
         probe_states: probes.len() as u64,
         mean_path_mae: path_error / valid_denominator,
+        mean_changed_channel_f1: changed_channel_f1 / valid_denominator,
         mean_terminal_mae: terminal_error / valid_denominator,
         mean_min_viability_margin_error: margin_error / valid_denominator,
         survival_agreement: survival_agreement as f64 / query_denominator,
@@ -1750,6 +1800,48 @@ mod tests {
     }
 
     #[test]
+    fn oracle_environment_queries_have_perfect_changed_channel_f1() {
+        struct OracleTransitionModel;
+
+        impl ActionConditionedTransitionModel for OracleTransitionModel {
+            fn state_dimension(&self) -> usize {
+                64
+            }
+
+            fn action_count(&self) -> usize {
+                MicroAction::ALL.len()
+            }
+
+            fn predict_next_state(&self, state: &[f64], action: usize) -> Option<Vec<f64>> {
+                if state.len() != 64 || action >= MicroAction::ALL.len() {
+                    return None;
+                }
+                let state_observation = MicroWorldObservation {
+                    cycle: 0,
+                    energy: state[0],
+                    integrity: state[1],
+                    knowledge: state[2],
+                    threat: state[3],
+                    progress: state[4],
+                };
+                Some(encode_micro_world_state(
+                    transition(state_observation, MicroAction::ALL[action]),
+                ))
+            }
+        }
+
+        let report = evaluate_environment_query_bank(
+            &OracleTransitionModel,
+            &benchmark_scenarios()[0],
+        );
+
+        assert!(report.is_scoreable());
+        assert!((report.mean_changed_channel_f1 - 1.0).abs() < 1e-12);
+        assert!(report.mean_path_mae < 1e-12);
+        assert!(report.mean_terminal_mae < 1e-12);
+    }
+
+    #[test]
     fn invalid_environment_query_answers_are_counted_as_disagreements() {
         #[derive(Debug, Default)]
         struct InvalidPredictor;
@@ -1779,6 +1871,7 @@ mod tests {
         assert!(!report.is_scoreable());
         assert_eq!(report.survival_agreement, 0.0);
         assert_eq!(report.mean_path_mae, 0.0);
+        assert_eq!(report.mean_changed_channel_f1, 0.0);
         assert_eq!(report.mean_terminal_mae, 0.0);
         assert_eq!(report.mean_min_viability_margin_error, 0.0);
     }
