@@ -251,6 +251,17 @@ pub struct NixActionIntentV1 {
 }
 
 impl NixActionIntentV1 {
+    /// Validate that this exact Service intent was built from observer-sealed
+    /// definition evidence. The sealed evidence is never serialized into the
+    /// intent; this method only validates the binding before approval issuance.
+    pub fn validate_service_definition_content_capture(
+        &self,
+        content: &NixVerifiedServiceDefinitionContentV1,
+    ) -> Result<(), NixAuthorizationErrorV1> {
+        validate_service_definition_capture(self, content)?;
+        Ok(())
+    }
+
     /// Build a governed intent from a typed NixOS command.
     ///
     /// V1 refuses free-form custom commands rather than pretending shell text has
