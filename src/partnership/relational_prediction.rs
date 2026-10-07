@@ -1367,7 +1367,7 @@ impl RollingOriginRelationalPredictionQualification {
                     || null_trace.status != EvidenceStatus::Proxy
                     || null_trace.config != held_out_config
                     || null_trace.requested_surrogate_count != self.surrogate_count
-                    || null_trace.evaluation_input_blake3 != self.evaluation_input_blake3
+                    || null_trace.qualification_input_blake3 != self.evaluation_input_blake3
                     || (null_trace.observed_relational_mse - expected_mse).abs() > 1e-12
                 {
                     return Err(RelationalPredictionError::InvalidSplit);
@@ -1488,6 +1488,22 @@ impl RollingOriginRelationalPredictionQualification {
         }
 
         let evaluation_input_blake3 = rolling_evaluation_input_digest(samples, config);
+
+        // The per-origin null traces are computed from local held-out slices,
+        // so their replay commitments remain origin-local. Bind a separate
+        // parent qualification commitment onto every retained child trace so
+        // the compound bundle cannot mix traces from different source/config
+        // identities.
+        for nulls in [
+            &mut circular_shift_nulls,
+            &mut feature_decoupling_nulls,
+            &mut incremental_relational_nulls,
+        ] {
+            for null_trace in nulls {
+                null_trace.qualification_input_blake3 = evaluation_input_blake3.clone();
+            }
+        }
+
         let qualification_identity_blake3 = rolling_qualification_identity_digest(
             &evaluation_input_blake3,
             &provenance,
@@ -1649,7 +1665,15 @@ pub struct PredictionNullSummary {
     pub exceedance_fraction: f64,
     /// Commitment over the exact samples, holdout configuration, null family,
     /// feature family, and requested surrogate count.
+    ///
+    /// This is the null-local replay commitment. It deliberately remains
+    /// distinct from the parent qualification commitment below.
     pub evaluation_input_blake3: String,
+    /// Parent qualification commitment. Compound qualification bundles bind
+    /// every retained null trace to one shared exact source/configuration
+    /// identity. Standalone null traces initialize this to their local
+    /// evaluation-input commitment until embedded in a parent bundle.
+    pub qualification_input_blake3: String,
     pub status: EvidenceStatus,
 }
 
@@ -1740,6 +1764,7 @@ impl PredictionNullSummary {
             minimum_surrogate_mse,
             exceedance_count,
             exceedance_fraction: exceedance_count as f64 / count as f64,
+            qualification_input_blake3: evaluation_input_digest(samples, config),
             evaluation_input_blake3,
             status: EvidenceStatus::Proxy,
         })
@@ -1767,7 +1792,8 @@ impl PredictionNullSummary {
             "minimum_surrogate_mse": self.minimum_surrogate_mse,
             "exceedance_count": self.exceedance_count,
             "exceedance_fraction": self.exceedance_fraction,
-            "evaluation_input_blake3": &self.evaluation_input_blake3
+            "evaluation_input_blake3": &self.evaluation_input_blake3,
+            "qualification_input_blake3": &self.qualification_input_blake3
         }).to_string())
     }
 
@@ -1786,6 +1812,7 @@ impl PredictionNullSummary {
         let expected_count = self.requested_surrogate_count.min(capacity);
 
         if !is_hex_digest(&self.evaluation_input_blake3, 64)
+            || !is_hex_digest(&self.qualification_input_blake3, 64)
             || self.requested_surrogate_count == 0
             || self.surrogate_count != expected_count
             || self.surrogate_count == 0
@@ -1871,7 +1898,9 @@ impl PredictionNullSummary {
             self.feature_set,
             self.requested_surrogate_count,
         );
-        if expected != self.evaluation_input_blake3 {
+        if expected != self.evaluation_input_blake3
+            || evaluation_input_digest(samples, config) != self.qualification_input_blake3
+        {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
         }
 
@@ -2004,7 +2033,7 @@ impl HeldOutRelationalPredictionQualification {
                 || null_trace.status != EvidenceStatus::Proxy
                 || null_trace.config != self.config
                 || null_trace.requested_surrogate_count != self.surrogate_count
-                || null_trace.evaluation_input_blake3 != self.evaluation_input_blake3
+                || null_trace.qualification_input_blake3 != self.evaluation_input_blake3
                 || (null_trace.observed_relational_mse - expected_mse).abs() > 1e-12
             {
                 return Err(RelationalPredictionError::InvalidSplit);
@@ -3799,6 +3828,18 @@ mod tests {
 
         let expected_digest = evaluation_input_digest(&samples, config());
         assert_eq!(qualification.evaluation_input_blake3, expected_digest);
+        assert_eq!(
+            qualification.circular_shift_null.qualification_input_blake3,
+            expected_digest
+        );
+        assert_eq!(
+            qualification.feature_decoupling_null.qualification_input_blake3,
+            expected_digest
+        );
+        assert_eq!(
+            qualification.incremental_relational_null.qualification_input_blake3,
+            expected_digest
+        );
         qualification.validate().unwrap();
 
         let mut tampered_top_level = qualification.clone();
@@ -3810,7 +3851,7 @@ mod tests {
         );
 
         let mut tampered_null = qualification.clone();
-        tampered_null.circular_shift_null.evaluation_input_blake3 =
+        tampered_null.circular_shift_null.qualification_input_blake3 =
             "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210".to_string();
         assert_eq!(
             tampered_null.validate(),
@@ -4420,6 +4461,30 @@ mod tests {
     }
 
     #[test]
+    fn null_trace_parent_binding_does_not_replace_local_replay_commitment() {
+        let samples = build_samples(0.5);
+        let config = config();
+
+        let mut trace = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config,
+            PredictionNullFamily::IncrementalRelationalShift,
+            PredictionFeatureSet::RelationalAugmented,
+            8,
+        )
+        .unwrap();
+
+        let local_digest = trace.evaluation_input_blake3.clone();
+        assert_eq!(trace.qualification_input_blake3, evaluation_input_digest(&samples, config));
+        trace.qualification_input_blake3 =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string();
+
+        assert_eq!(trace.validate_trace(), Ok(()));
+        trace.verify_against_samples(&samples, config).unwrap();
+        assert_eq!(trace.evaluation_input_blake3, local_digest);
+    }
+
+    #[test]
     fn rolling_qualification_rejects_tampered_summary_aggregate_mse() {
         let samples = build_samples(0.5);
         let config = RollingOriginRelationalPredictionConfig {
@@ -4474,9 +4539,18 @@ mod tests {
             )
             .unwrap();
         qualification.validate().unwrap();
+        assert!(
+            qualification
+                .circular_shift_nulls
+                .iter()
+                .chain(&qualification.feature_decoupling_nulls)
+                .chain(&qualification.incremental_relational_nulls)
+                .all(|trace| trace.qualification_input_blake3
+                    == qualification.evaluation_input_blake3)
+        );
 
         let mut tampered = qualification.clone();
-        tampered.incremental_relational_nulls[2].evaluation_input_blake3 =
+        tampered.incremental_relational_nulls[2].qualification_input_blake3 =
             "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210".to_string();
 
         assert_eq!(
