@@ -150,15 +150,6 @@ fn privileged_script_command(path: &str) -> tokio::process::Command {
     command.arg(path);
     command
 }
-async fn run_privileged_script(path: &str) -> Result<CmdResult, std::io::Error> {
-    let output = privileged_script_command(path).output().await?;
-    Ok(CmdResult {
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-        exit_status: output.status.code().unwrap_or(1) as u32,
-    })
-}
-
 async fn run_privileged_script_with_args(
     path: &str,
     args: &[&str],
@@ -4541,7 +4532,7 @@ fn preservation_process_exists(name: &str) -> bool {
     })
 }
 
-fn preservation_user_uid(username: &str) -> Result<Option<u32>, String> {
+fn preservation_user_identity(username: &str) -> Result<Option<(u32, u32)>, String> {
     let username = std::ffi::CString::new(username)
         .map_err(|_| format!("preservation account name contains NUL: {username:?}"))?;
     let mut pwd = unsafe { std::mem::zeroed::<libc::passwd>() };
@@ -4559,7 +4550,7 @@ fn preservation_user_uid(username: &str) -> Result<Option<u32>, String> {
             )
         };
         match rc {
-            0 => return Ok(result.as_ref().map(|entry| entry.pw_uid)),
+            0 => return Ok(result.as_ref().map(|entry| (entry.pw_uid, entry.pw_gid))),
             libc::ERANGE => {
                 if buffer.len() >= 1024 * 1024 {
                     return Err("preservation account lookup buffer exceeded 1 MiB".into());
@@ -4639,7 +4630,7 @@ async fn run_privileged_pipeline_to_gzip(
     program: &str,
     args: &[&str],
     output_path: &str,
-    uid: Option<u32>,
+    identity: Option<(u32, u32)>,
 ) -> Result<CmdResult, String> {
     let executable = trusted_typed_executable(program)
         .map_err(|error| format!("typed preservation executable rejected: {error}"))?;
@@ -4650,8 +4641,9 @@ async fn run_privileged_pipeline_to_gzip(
 
     let mut producer = privileged_process(executable.as_ref());
     producer.args(args);
-    if let Some(uid) = uid {
+    if let Some((uid, gid)) = identity {
         producer.uid(uid);
+        producer.gid(gid);
     }
     producer
         .stdout(std::process::Stdio::piped())
@@ -4811,10 +4803,10 @@ async fn preserve_data_native(
     }
 
     if preservation_process_exists("postgres") {
-        let uid = preservation_user_uid("postgres")?
+        let identity = preservation_user_identity("postgres")?
             .ok_or_else(|| "PostgreSQL is running but the postgres account is unavailable".to_string())?;
         let archive = format!("{backup_dir}/postgresql-all.sql.gz");
-        run_privileged_pipeline_to_gzip("pg_dumpall", &[], &archive, Some(uid)).await?;
+        run_privileged_pipeline_to_gzip("pg_dumpall", &[], &archive, Some(identity)).await?;
         let size = validate_preservation_archive(&archive).await?;
         items.push(serde_json::json!({
             "type": "postgresql",
