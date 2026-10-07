@@ -1,1766 +1,1166 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Deterministic micro-world for qualifying organism-like closed-loop behavior.
+//! Viability Fabric: typed causal state for organism-like closed-loop cognition.
 //!
-//! This is deliberately a small benchmark environment, not a claim that Symthaea is
-//! already embodied. It supplies:
-//! - observable state;
-//! - deterministic action consequences;
-//! - a ground-truth transition oracle;
-//! - a weak persistence baseline;
-//! - an episode evaluator that can later accept real world/self-model predictors.
+//! This module deliberately contains orchestration/data contracts rather than a second
+//! cognitive architecture. It connects existing perception, interoception, prediction,
+//! action, self-model, and homeostatic subsystems through explicit observations and
+//! prediction errors.
 //!
-//! The benchmark is useful because it makes "prediction -> action -> consequence" a
-//! falsifiable interface before any physical robot or external model is involved.
+//! Scientific boundary: these types measure engineering properties such as persistence,
+//! prediction, regulation, and recovery. They are not a consciousness or life detector.
 
-use super::goal_world::WorldModelBridge;
-use super::viability_fabric::{
-    ActionOutcome, ActionPrediction, PredictionErrorLedger, ViabilityDelta, ViabilityFabric,
-};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
-/// Small action space designed to exercise trade-offs between energy, integrity,
-/// knowledge, threat, and progress.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum MicroAction {
-    Observe,
-    Explore,
-    Harvest,
-    Repair,
-    Rest,
-    Retreat,
+/// Lifecycle phases that can change resource allocation and consolidation behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LifecyclePhase {
+    Active,
+    Recovery,
+    Consolidation,
 }
 
-impl MicroAction {
-    pub const ALL: [Self; 6] = [
-        Self::Observe,
-        Self::Explore,
-        Self::Harvest,
-        Self::Repair,
-        Self::Rest,
-        Self::Retreat,
-    ];
-
-    pub fn index(self) -> usize {
-        match self {
-            Self::Observe => 0,
-            Self::Explore => 1,
-            Self::Harvest => 2,
-            Self::Repair => 3,
-            Self::Rest => 4,
-            Self::Retreat => 5,
-        }
-    }
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Observe => "observe",
-            Self::Explore => "explore",
-            Self::Harvest => "harvest",
-            Self::Repair => "repair",
-            Self::Rest => "rest",
-            Self::Retreat => "retreat",
-        }
+impl Default for LifecyclePhase {
+    fn default() -> Self {
+        Self::Active
     }
 }
 
-/// The externally observable state of the benchmark organism/environment.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct MicroWorldObservation {
+/// A bounded scalar with explicit provenance.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ViabilitySignal {
+    pub value: f64,
+    pub confidence: f64,
     pub cycle: u64,
-    pub energy: f64,
-    pub integrity: f64,
-    pub knowledge: f64,
-    pub threat: f64,
-    pub progress: f64,
+    pub producer: String,
 }
 
-impl MicroWorldObservation {
-    fn clamp(self) -> Self {
+impl ViabilitySignal {
+    pub fn new(value: f64, confidence: f64, cycle: u64, producer: impl Into<String>) -> Self {
+        debug_assert!(value.is_finite(), "ViabilitySignal value must be finite");
+        debug_assert!(confidence.is_finite(), "ViabilitySignal confidence must be finite");
         Self {
-            cycle: self.cycle,
-            energy: self.energy.clamp(0.0, 1.0),
-            integrity: self.integrity.clamp(0.0, 1.0),
-            knowledge: self.knowledge.clamp(0.0, 1.0),
-            threat: self.threat.clamp(0.0, 1.0),
-            progress: self.progress.clamp(0.0, 1.0),
+            value: value.clamp(0.0, 1.0),
+            confidence: confidence.clamp(0.0, 1.0),
+            cycle,
+            producer: producer.into(),
         }
     }
 
-    pub fn digest(self) -> u64 {
-        let mut h = 0xcbf29ce484222325u64;
-        for value in [
-            self.cycle as f64,
-            self.energy,
-            self.integrity,
-            self.knowledge,
-            self.threat,
-            self.progress,
-        ] {
-            for byte in value.to_bits().to_le_bytes() {
-                h ^= byte as u64;
-                h = h.wrapping_mul(0x100000001b3);
-            }
-        }
-        h
-    }
-
-    pub fn is_viable(self) -> bool {
-        self.energy > 0.08 && self.integrity > 0.08
-    }
-
-    pub fn mean_absolute_delta(self, other: Self) -> f64 {
-        let values_a = [self.energy, self.integrity, self.knowledge, self.threat, self.progress];
-        let values_b = [other.energy, other.integrity, other.knowledge, other.threat, other.progress];
-        values_a
-            .iter()
-            .zip(values_b.iter())
-            .map(|(a, b)| (a - b).abs())
-            .sum::<f64>()
-            / values_a.len() as f64
+    pub fn is_valid(&self) -> bool {
+        self.value.is_finite()
+            && self.confidence.is_finite()
+            && self.confidence >= 0.0
+            && self.confidence <= 1.0
+            && !self.producer.is_empty()
     }
 }
 
-/// Deterministic environment with no randomness and no external I/O.
-#[derive(Debug, Clone)]
-pub struct MicroWorld {
-    observation: MicroWorldObservation,
-    initial: MicroWorldObservation,
-    max_cycles: u64,
+/// A signed consequence of an action. Unlike a viability signal, this is intentionally
+/// not clamped to [0,1]: negative outcomes must remain observable.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ViabilityDelta {
+    pub value: f64,
+    pub confidence: f64,
 }
 
-impl Default for MicroWorld {
-    fn default() -> Self {
-        Self::new(
-            MicroWorldObservation {
-                cycle: 0,
-                energy: 0.65,
-                integrity: 0.80,
-                knowledge: 0.15,
-                threat: 0.20,
-                progress: 0.0,
-            },
-            64,
-        )
-    }
-}
-
-impl MicroWorld {
-    pub fn new(initial: MicroWorldObservation, max_cycles: u64) -> Self {
+impl ViabilityDelta {
+    pub fn new(value: f64, confidence: f64) -> Self {
+        debug_assert!(value.is_finite(), "ViabilityDelta value must be finite");
+        debug_assert!(confidence.is_finite(), "ViabilityDelta confidence must be finite");
         Self {
-            observation: initial.clamp(),
-            initial: initial.clamp(),
-            max_cycles,
+            value,
+            confidence: confidence.clamp(0.0, 1.0),
         }
     }
 
-    pub fn reset(&mut self) {
-        self.observation = self.initial;
-    }
-
-    pub fn observe(&self) -> MicroWorldObservation {
-        self.observation
-    }
-
-    pub fn done(&self) -> bool {
-        self.observation.cycle >= self.max_cycles || !self.observation.is_viable()
-    }
-
-    pub fn step(&mut self, action: MicroAction) -> MicroWorldObservation {
-        self.observation = transition(self.observation, action);
-        self.observation
-    }
-
-    pub fn perturb(&mut self, perturbation: MicroPerturbation) -> MicroWorldObservation {
-        self.observation = perturbation.apply(self.observation);
-        self.observation
+    pub fn is_valid(&self) -> bool {
+        self.value.is_finite()
+            && self.confidence.is_finite()
+            && self.confidence >= 0.0
+            && self.confidence <= 1.0
     }
 }
 
-/// Train/evaluate a fresh predictor independently on each scenario.
-///
-/// Unlike evaluate_predictor_suite, this prevents learning on scenario A from
-/// changing the initial conditions for scenario B. It is the preferred benchmark
-/// for reporting generalization across environments.
-pub fn evaluate_predictor_suite_fresh<P, F>(
-    mut factory: F,
-    max_cycles: u64,
-) -> MicroWorldSuiteReport
-where
-    P: MicroWorldPredictor,
-    F: FnMut() -> P,
-{
-    let scenarios = benchmark_scenarios();
-    let mut reports = Vec::with_capacity(scenarios.len());
+/// Preferred, tolerated, and critical operating bands for an internal variable.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ViabilityBand {
+    pub preferred: (f64, f64),
+    pub tolerated: (f64, f64),
+    pub critical: (f64, f64),
+}
 
-    for scenario in &scenarios {
-        let mut predictor = factory();
-        reports.push(evaluate_predictor_scenario(
-            &mut predictor,
-            scenario,
-            max_cycles,
-        ));
+impl ViabilityBand {
+    pub fn contains_preferred(&self, value: f64) -> bool {
+        value >= self.preferred.0 && value <= self.preferred.1
     }
 
-    let episodes = reports.len();
-    let denom = episodes.max(1) as f64;
-    MicroWorldSuiteReport {
-        episodes,
-        total_steps: reports.iter().map(|r| r.steps).sum(),
-        mean_baseline_mae: reports.iter().map(|r| r.baseline_mae).sum::<f64>() / denom,
-        mean_predictor_mae: reports.iter().map(|r| r.predictor_mae).sum::<f64>() / denom,
-        mean_improvement: reports
-            .iter()
-            .map(MicroWorldReport::improvement_over_baseline)
-            .sum::<f64>()
-            / denom,
-        survival_rate: reports.iter().map(|r| r.survival_ratio).sum::<f64>() / denom,
+    pub fn contains_tolerated(&self, value: f64) -> bool {
+        value >= self.tolerated.0 && value <= self.tolerated.1
+    }
+
+    pub fn is_critical(&self, value: f64) -> bool {
+        value < self.critical.0 || value > self.critical.1
+    }
+
+    pub fn validate(&self) -> bool {
+        self.critical.0.is_finite()
+            && self.critical.1.is_finite()
+            && self.tolerated.0.is_finite()
+            && self.tolerated.1.is_finite()
+            && self.preferred.0.is_finite()
+            && self.preferred.1.is_finite()
+            && (0.0..=1.0).contains(&self.critical.0)
+            && (0.0..=1.0).contains(&self.critical.1)
+            && (0.0..=1.0).contains(&self.tolerated.0)
+            && (0.0..=1.0).contains(&self.tolerated.1)
+            && (0.0..=1.0).contains(&self.preferred.0)
+            && (0.0..=1.0).contains(&self.preferred.1)
+            && self.critical.0 <= self.critical.1
+            && self.critical.0 <= self.tolerated.0
+            && self.tolerated.0 <= self.tolerated.1
+            && self.tolerated.0 <= self.preferred.0
+            && self.preferred.0 <= self.preferred.1
+            && self.preferred.1 <= self.tolerated.1
+            && self.tolerated.1 <= self.critical.1
     }
 }
 
-/// Adapt a fresh predictor on one scenario, then evaluate it on the next scenario
-/// with learning disabled during evaluation. This makes cross-scenario transfer
-/// measurable instead of conflating it with within-episode online adaptation.
-pub fn evaluate_predictor_generalization<P, F>(
-    mut factory: F,
-    train_cycles: u64,
-    test_cycles: u64,
-) -> Vec<MicroWorldGeneralizationReport>
-where
-    P: MicroWorldPredictor,
-    F: FnMut() -> P,
-{
-    let scenarios = benchmark_scenarios();
-    let mut reports = Vec::with_capacity(scenarios.len());
-
-    for (index, train_scenario) in scenarios.iter().enumerate() {
-        let test_scenario = &scenarios[(index + 1) % scenarios.len()];
-        let mut predictor = factory();
-
-        let mut train_world = MicroWorld::new(train_scenario.initial, train_cycles);
-        let mut train_steps = 0u64;
-        while !train_world.done() && train_steps < train_cycles {
-            for (cycle, perturbation) in train_scenario.perturbations {
-                if *cycle == train_steps {
-                    train_world.perturb(*perturbation);
-                }
-            }
-            let before = train_world.observe();
-            let action = train_scenario.schedule[train_steps as usize % train_scenario.schedule.len()];
-            let _ = predictor.predict(before, action);
-            let after = train_world.step(action);
-            predictor.observe_transition(before, action, after);
-            train_steps += 1;
-        }
-
-        let mut test_world = MicroWorld::new(test_scenario.initial, test_cycles);
-        let mut baseline_error = 0.0;
-        let mut predictor_error = 0.0;
-        let mut test_steps = 0u64;
-
-        while !test_world.done() && test_steps < test_cycles {
-            let before = test_world.observe();
-            let action = test_scenario.schedule[test_steps as usize % test_scenario.schedule.len()];
-            let predicted = predictor.predict(before, action);
-            let after = test_world.step(action);
-
-            predictor_error += predicted.mean_absolute_delta(after);
-            baseline_error += PersistencePredictor::default()
-                .predict(before, action)
-                .mean_absolute_delta(after);
-
-            // Deliberately no observe_transition() here: the held-out score is frozen.
-            test_steps += 1;
-        }
-
-        let denom = test_steps.max(1) as f64;
-        let baseline_mae = baseline_error / denom;
-        let predictor_mae = predictor_error / denom;
-        let improvement = if baseline_mae <= f64::EPSILON {
-            0.0
-        } else {
-            (baseline_mae - predictor_mae) / baseline_mae
-        };
-
-        reports.push(MicroWorldGeneralizationReport {
-            train_steps,
-            test_steps,
-            baseline_mae,
-            predictor_mae,
-            improvement_over_baseline: improvement,
-            held_out_scenario: test_scenario.name,
-        });
-    }
-
-    reports
-}
-
-/// Ground-truth deterministic transition function.
-///
-/// The action effects are intentionally simple enough that a learned predictor can
-/// discover them, while the threat-dependent explore/harvest effects prevent a naive
-/// constant-delta model from being perfect.
-pub fn transition(state: MicroWorldObservation, action: MicroAction) -> MicroWorldObservation {
-    let mut next = state;
-    next.cycle = state.cycle.saturating_add(1);
-
-    match action {
-        MicroAction::Observe => {
-            next.energy -= 0.025;
-            next.knowledge += 0.045 * (1.0 - state.knowledge);
-            next.threat -= 0.012;
-        }
-        MicroAction::Explore => {
-            let pulse = (((state.cycle.wrapping_mul(17) + 5) % 11) as f64) / 10.0;
-            next.energy -= 0.105 + 0.025 * pulse;
-            next.knowledge += 0.13 * (1.0 - state.knowledge);
-            next.threat += 0.05 + 0.10 * pulse * (1.0 - state.threat);
-            next.integrity -= 0.02 + 0.04 * pulse * state.threat;
-            next.progress += 0.075 * (1.0 - state.progress);
-        }
-        MicroAction::Harvest => {
-            let efficiency = 0.55 + 0.45 * (1.0 - state.threat);
-            next.energy += 0.17 * efficiency;
-            next.threat += 0.02 * state.threat;
-            next.integrity -= 0.015 + 0.025 * state.threat;
-            next.progress += 0.03 * efficiency * (1.0 - state.progress);
-        }
-        MicroAction::Repair => {
-            next.energy -= 0.09;
-            next.integrity += 0.20 * (1.0 - state.integrity);
-            next.threat -= 0.015;
-        }
-        MicroAction::Rest => {
-            next.energy += 0.16 * (1.0 - state.energy);
-            next.threat -= 0.08 * state.threat;
-            next.integrity += 0.035 * (1.0 - state.integrity);
-        }
-        MicroAction::Retreat => {
-            next.energy -= 0.045;
-            next.threat -= 0.20 * state.threat;
-            next.progress -= 0.015 * state.progress;
-            next.integrity += 0.015 * (1.0 - state.integrity);
-        }
-    }
-
-    next.clamp()
-}
-
-/// Generalization report: predictor is adapted on one scenario and evaluated on a
-/// different scenario without further updates during the test phase.
+/// Named internal variable with an observed value, operating band, and prediction error.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MicroWorldGeneralizationReport {
-    pub train_steps: u64,
-    pub test_steps: u64,
-    pub baseline_mae: f64,
-    pub predictor_mae: f64,
-    pub improvement_over_baseline: f64,
-    pub held_out_scenario: &'static str,
+pub struct ViabilityVariable {
+    pub observation: ViabilitySignal,
+    pub band: ViabilityBand,
+    pub rate_of_change: f64,
+    pub prediction: Option<ViabilitySignal>,
+    pub prediction_error: Option<f64>,
 }
 
-impl MicroWorldGeneralizationReport {
-    pub fn beat_persistence(&self) -> bool {
-        self.predictor_mae < self.baseline_mae
-    }
-}
-
-/// Deterministic perturbations injected by the environment.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub enum MicroPerturbation {
-    EnergyDrain(f64),
-    IntegrityDamage(f64),
-    ThreatSpike(f64),
-    ProgressLoss(f64),
-}
-
-impl MicroPerturbation {
-    fn apply(self, state: MicroWorldObservation) -> MicroWorldObservation {
-        let mut next = state;
-        match self {
-            Self::EnergyDrain(amount) => next.energy -= amount.abs(),
-            Self::IntegrityDamage(amount) => next.integrity -= amount.abs(),
-            Self::ThreatSpike(amount) => next.threat += amount.abs(),
-            Self::ProgressLoss(amount) => next.progress -= amount.abs(),
-        }
-        next.clamp()
-    }
-}
-
-/// A deterministic benchmark scenario with explicit environmental perturbations.
-#[derive(Debug, Clone)]
-pub struct MicroWorldScenario {
-    pub name: &'static str,
-    pub initial: MicroWorldObservation,
-    pub schedule: &'static [MicroAction],
-    pub perturbations: &'static [(u64, MicroPerturbation)],
-}
-
-static NOMINAL_SCHEDULE: [MicroAction; 6] = [
-    MicroAction::Observe,
-    MicroAction::Explore,
-    MicroAction::Harvest,
-    MicroAction::Repair,
-    MicroAction::Rest,
-    MicroAction::Retreat,
-];
-
-static STRESSED_SCHEDULE: [MicroAction; 6] = [
-    MicroAction::Harvest,
-    MicroAction::Rest,
-    MicroAction::Repair,
-    MicroAction::Retreat,
-    MicroAction::Observe,
-    MicroAction::Harvest,
-];
-
-static DAMAGED_SCHEDULE: [MicroAction; 6] = [
-    MicroAction::Repair,
-    MicroAction::Rest,
-    MicroAction::Harvest,
-    MicroAction::Explore,
-    MicroAction::Observe,
-    MicroAction::Retreat,
-];
-
-static KNOWLEDGE_RICH_SCHEDULE: [MicroAction; 6] = [
-    MicroAction::Explore,
-    MicroAction::Explore,
-    MicroAction::Harvest,
-    MicroAction::Rest,
-    MicroAction::Observe,
-    MicroAction::Retreat,
-];
-
-static STRESS_PERTURBATIONS: [(u64, MicroPerturbation); 2] = [
-    (4, MicroPerturbation::ThreatSpike(0.35)),
-    (8, MicroPerturbation::IntegrityDamage(0.18)),
-];
-
-pub fn benchmark_scenarios() -> Vec<MicroWorldScenario> {
-    vec![
-        MicroWorldScenario {
-            name: "nominal",
-            initial: MicroWorld::default().observe(),
-            schedule: &NOMINAL_SCHEDULE,
-            perturbations: &[],
-        },
-        MicroWorldScenario {
-            name: "stressed",
-            initial: MicroWorldObservation {
-                cycle: 0,
-                energy: 0.30,
-                integrity: 0.35,
-                knowledge: 0.25,
-                threat: 0.65,
-                progress: 0.05,
-            },
-            schedule: &STRESSED_SCHEDULE,
-            perturbations: &STRESS_PERTURBATIONS,
-        },
-        MicroWorldScenario {
-            name: "damaged",
-            initial: MicroWorldObservation {
-                cycle: 0,
-                energy: 0.50,
-                integrity: 0.20,
-                knowledge: 0.40,
-                threat: 0.35,
-                progress: 0.10,
-            },
-            schedule: &DAMAGED_SCHEDULE,
-            perturbations: &[],
-        },
-        MicroWorldScenario {
-            name: "knowledge_rich",
-            initial: MicroWorldObservation {
-                cycle: 0,
-                energy: 0.80,
-                integrity: 0.90,
-                knowledge: 0.80,
-                threat: 0.10,
-                progress: 0.40,
-            },
-            schedule: &KNOWLEDGE_RICH_SCHEDULE,
-            perturbations: &[],
-        },
-    ]
-}
-
-/// Predictor interface for the benchmark harness.
-///
-/// A production predictor can later be backed by WorldModelBridge, a learned latent
-/// model, or a specialist decision/world model. The environment never trusts the
-/// predictor; it only scores it.
-pub trait MicroWorldPredictor {
-    fn predict(&self, state: MicroWorldObservation, action: MicroAction)
-        -> MicroWorldObservation;
-
-    /// Confidence in the forecast. Zero means the forecast should not materially
-    /// override the currently observed state.
-    fn prediction_confidence(&self, _action: MicroAction) -> f64 {
-        0.0
-    }
-
-    /// Optional online learning hook. The default is a fixed predictor.
-    fn observe_transition(
-        &mut self,
-        _before: MicroWorldObservation,
-        _action: MicroAction,
-        _after: MicroWorldObservation,
-    ) {
-    }
-}
-
-#[derive(Debug)]
-pub struct WorldModelBridgePredictor {
-    bridge: WorldModelBridge,
-}
-
-impl Default for WorldModelBridgePredictor {
-    fn default() -> Self {
-        Self {
-            bridge: WorldModelBridge::with_actions(MicroAction::ALL.len()),
-        }
-    }
-}
-
-impl WorldModelBridgePredictor {
-    pub fn model(&self) -> &WorldModelBridge {
-        &self.bridge
-    }
-}
-
-impl MicroWorldPredictor for WorldModelBridgePredictor {
-    fn predict(
-        &self,
-        state: MicroWorldObservation,
-        action: MicroAction,
-    ) -> MicroWorldObservation {
-        let encoded = encode_observation(state);
-        let Some(predicted) = self.bridge.predict_action(action.index(), &encoded) else {
-            return state;
-        };
-        decode_observation(state.cycle.saturating_add(1), &predicted)
-    }
-
-    fn prediction_confidence(&self, action: MicroAction) -> f64 {
-        self.bridge
-            .action_confidence(action.index())
-            .unwrap_or(0.0) as f64
-    }
-
-    fn observe_transition(
-        &mut self,
-        before: MicroWorldObservation,
-        action: MicroAction,
-        after: MicroWorldObservation,
-    ) {
-        let before_encoded = encode_observation(before);
-        let after_encoded = encode_observation(after);
-        let _ = self
-            .bridge
-            .observe_action_transition(action.index(), &before_encoded, &after_encoded);
-    }
-}
-
-fn encode_observation(state: MicroWorldObservation) -> Vec<f32> {
-    let mut encoded = vec![0.0f32; 64];
-    encoded[0] = state.energy as f32;
-    encoded[1] = state.integrity as f32;
-    encoded[2] = state.knowledge as f32;
-    encoded[3] = state.threat as f32;
-    encoded[4] = state.progress as f32;
-    encoded
-}
-
-fn decode_observation(cycle: u64, encoded: &[f32]) -> MicroWorldObservation {
-    let get = |index: usize| encoded.get(index).copied().unwrap_or(0.0) as f64;
-    MicroWorldObservation {
-        cycle,
-        energy: get(0),
-        integrity: get(1),
-        knowledge: get(2),
-        threat: get(3),
-        progress: get(4),
-    }
-    .clamp()
-}
-
-/// Weak baseline: assumes the world remains unchanged after every action.
-#[derive(Debug, Default)]
-pub struct PersistencePredictor;
-
-impl MicroWorldPredictor for PersistencePredictor {
-    fn predict(
-        &self,
-        state: MicroWorldObservation,
-        _action: MicroAction,
-    ) -> MicroWorldObservation {
-        MicroWorldObservation {
-            cycle: state.cycle.saturating_add(1),
-            ..state
-        }
-    }
-}
-
-/// Factorized view of the synthetic organism's state.
-///
-/// Internal variables are the quantities directly tied to persistence and regulation;
-/// external variables describe learned/world-facing consequences. Keeping the factors
-/// explicit prevents the benchmark from collapsing "world state" and "self state" into
-/// one undifferentiated scalar.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct MicroWorldFactorization {
-    pub internal_energy: f64,
-    pub internal_integrity: f64,
-    pub external_knowledge: f64,
-    pub external_threat: f64,
-    pub external_progress: f64,
-}
-
-impl MicroWorldObservation {
-    pub fn factorized(self) -> MicroWorldFactorization {
-        MicroWorldFactorization {
-            internal_energy: self.energy,
-            internal_integrity: self.integrity,
-            external_knowledge: self.knowledge,
-            external_threat: self.threat,
-            external_progress: self.progress,
-        }
-    }
-}
-
-/// Minimal homeostatic policy used to qualify whether a predictor can support
-/// survival-aware action selection.
-///
-/// This policy is intentionally simple and inspectable. The research variable is the
-/// predictor: replace it with Symthaea's world-model path and measure what changes.
-#[derive(Debug, Default)]
-pub struct HomeostaticPolicy;
-
-impl HomeostaticPolicy {
-    fn score(predicted: MicroWorldObservation, current: MicroWorldObservation, action: MicroAction) -> f64 {
-        let viability_pressure = (0.30 - predicted.energy).max(0.0)
-            + (0.30 - predicted.integrity).max(0.0)
-            + (predicted.threat - 0.60).max(0.0);
-
-        let mut score = predicted.progress * 1.50
-            + predicted.knowledge * 0.35
-            + predicted.energy * 0.50
-            + predicted.integrity * 0.70
-            - predicted.threat * 1.20
-            - viability_pressure * 2.0;
-
-        // Hysteretic-looking policy biases make the survival objective explicit without
-        // allowing the action to bypass the predictor.
-        if current.energy < 0.25 {
-            if action == MicroAction::Rest {
-                score += 0.80;
-            }
-            if action == MicroAction::Harvest {
-                score += 0.50;
-            }
-        }
-        if current.integrity < 0.35 && action == MicroAction::Repair {
-            score += 1.10;
-        }
-        if current.threat > 0.65 {
-            if action == MicroAction::Retreat {
-                score += 1.10;
-            }
-            if action == MicroAction::Observe {
-                score += 0.20;
-            }
-        }
-
-        score
-    }
-
-    /// Evaluate candidate actions over several predicted future steps.
+impl ViabilityVariable {
+    /// Anticipatory pressure from movement toward/through a preferred-band boundary.
     ///
-    /// Prediction remains side-effect-free. Uncertainty is propagated by decaying
-    /// confidence over the horizon, so a distant low-confidence forecast cannot
-    /// dominate near-term evidence.
-    pub fn choose_horizon<P: MicroWorldPredictor>(
-        &self,
-        predictor: &P,
-        current: MicroWorldObservation,
-        horizon: usize,
-        discount: f64,
-    ) -> (MicroAction, MicroWorldObservation, CounterfactualRollout) {
-        let horizon = horizon.max(1);
-        let discount = discount.clamp(0.0, 1.0);
-
-        let mut best_action = MicroAction::Observe;
-        let mut best_state = current;
-        let mut best_rollout = CounterfactualRollout::default();
-        let mut best_utility = f64::NEG_INFINITY;
-
-        for first_action in MicroAction::ALL {
-            let mut state = current;
-            let mut actions = Vec::with_capacity(horizon);
-            let mut min_confidence = 1.0;
-            let mut min_viability_margin = f64::INFINITY;
-            let mut utility = 0.0;
-
-            for depth in 0..horizon {
-                let action = if depth == 0 {
-                    first_action
-                } else {
-                    self.greedy_future_action(predictor, state)
-                };
-                let raw = predictor.predict(&state, action);
-                let confidence = predictor.prediction_confidence(action).clamp(0.0, 1.0);
-                let blended = blend_prediction(state, raw, confidence);
-
-                min_confidence = min_confidence.min(confidence);
-                min_viability_margin =
-                    min_viability_margin.min(blended.energy.min(blended.integrity) - 0.08);
-
-                let depth_discount = discount.powi(depth as i32);
-                let immediate = Self::score(blended, state, action);
-                let uncertainty_penalty = (1.0 - confidence) * 0.35;
-                let viability_penalty =
-                    ((0.12 - (blended.energy.min(blended.integrity) - 0.08)).max(0.0) * 4.0);
-                utility += depth_discount * (immediate - uncertainty_penalty - viability_penalty);
-
-                actions.push(action);
-                state = blended;
-            }
-
-            let rollout = CounterfactualRollout {
-                actions,
-                terminal_state: state,
-                min_confidence,
-                min_viability_margin,
-                discounted_utility: utility,
-            };
-
-            if utility > best_utility
-                || (utility == best_utility
-                    && rollout.min_viability_margin > best_rollout.min_viability_margin)
-            {
-                best_utility = utility;
-                best_action = first_action;
-                best_state = rollout.terminal_state;
-                best_rollout = rollout;
-            }
+    /// This is deliberately bounded and conservative: worsening motion only adds pressure;
+    /// improving motion does not erase pressure caused by the current absolute state.
+    pub fn anticipatory_pressure(&self) -> f64 {
+        let value = self.observation.value;
+        let rate = self.rate_of_change;
+        if !value.is_finite() || !rate.is_finite() || !self.band.validate() {
+            return 1.0;
         }
 
-        (best_action, best_state, best_rollout)
-    }
+        let (lo, hi) = self.band.preferred;
+        let tolerance_width = (self.band.tolerated.1 - self.band.tolerated.0).max(f64::EPSILON);
+        let distance = if rate > 0.0 && value >= lo {
+            (hi - value).max(0.0)
+        } else if rate < 0.0 && value <= hi {
+            (value - lo).max(0.0)
+        } else {
+            0.0
+        };
 
-    fn greedy_future_action<P: MicroWorldPredictor>(
-        &self,
-        predictor: &P,
-        current: MicroWorldObservation,
-    ) -> MicroAction {
-        MicroAction::ALL
-            .into_iter()
-            .max_by(|&a, &b| {
-                let a_state = blend_prediction(
-                    current,
-                    predictor.predict(&current, a),
-                    predictor.prediction_confidence(a).clamp(0.0, 1.0),
-                );
-                let b_state = blend_prediction(
-                    current,
-                    predictor.predict(&current, b),
-                    predictor.prediction_confidence(b).clamp(0.0, 1.0),
-                );
-                Self::score(a_state, current, a)
-                    .partial_cmp(&Self::score(b_state, current, b))
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .unwrap_or(MicroAction::Observe)
-    }
-
-    pub fn choose<P: MicroWorldPredictor>(
-        &self,
-        predictor: &P,
-        current: MicroWorldObservation,
-    ) -> (MicroAction, MicroWorldObservation) {
-        let mut best_action = MicroAction::Observe;
-        let mut best_prediction = current;
-        let mut best_score = f64::NEG_INFINITY;
-
-        for action in MicroAction::ALL {
-            let predicted_raw = predictor.predict(current, action);
-            let confidence = predictor.prediction_confidence(action).clamp(0.0, 1.0);
-            // Low-confidence predictions are blended toward the observed state rather than
-            // being allowed to dictate policy as if they were established.
-            let predicted = MicroWorldObservation {
-                cycle: predicted_raw.cycle,
-                energy: current.energy + confidence * (predicted_raw.energy - current.energy),
-                integrity: current.integrity
-                    + confidence * (predicted_raw.integrity - current.integrity),
-                knowledge: current.knowledge
-                    + confidence * (predicted_raw.knowledge - current.knowledge),
-                threat: current.threat
-                    + confidence * (predicted_raw.threat - current.threat),
-                progress: current.progress
-                    + confidence * (predicted_raw.progress - current.progress),
-            };
-            let score = Self::score(predicted, current, action);
-            if score > best_score {
-                best_score = score;
-                best_action = action;
-                best_prediction = predicted;
-            }
+        if distance <= 0.0 {
+            return 1.0_f64.min(rate.abs() / tolerance_width);
         }
 
-        (best_action, best_prediction)
+        (rate.abs() / (distance + tolerance_width)).clamp(0.0, 1.0)
+    }
+
+    pub fn normalized_pressure(&self) -> f64 {
+        let value = self.observation.value;
+        if !value.is_finite() || !self.band.validate() {
+            return 1.0;
+        }
+        if self.band.contains_preferred(value) {
+            return 0.0;
+        }
+
+        let (lo, hi) = self.band.preferred;
+        if value < lo {
+            let scale = (lo - self.band.tolerated.0).max(f64::EPSILON);
+            return ((lo - value) / scale).clamp(0.0, 1.0);
+        }
+
+        let scale = (self.band.tolerated.1 - hi).max(f64::EPSILON);
+        ((value - hi) / scale).clamp(0.0, 1.0)
     }
 }
 
-/// Evidence produced by a counterfactual action rollout.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CounterfactualRollout {
-    pub actions: Vec<MicroAction>,
-    pub terminal_state: MicroWorldObservation,
-    pub min_confidence: f64,
-    pub min_viability_margin: f64,
-    pub discounted_utility: f64,
+/// Prediction channels are kept distinct so world/self/interoceptive failures cannot hide
+/// inside one aggregate scalar.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct PredictionErrorLedger {
+    pub world: f64,
+    pub self_model: f64,
+    pub interoceptive: f64,
+    pub goal: f64,
+    pub model_confidence: f64,
+    pub execution: f64,
 }
 
-impl Default for CounterfactualRollout {
+impl Default for PredictionErrorLedger {
     fn default() -> Self {
         Self {
-            actions: Vec::new(),
-            terminal_state: MicroWorld::default().observe(),
-            min_confidence: 0.0,
-            min_viability_margin: f64::NEG_INFINITY,
-            discounted_utility: f64::NEG_INFINITY,
+            world: 0.0,
+            self_model: 0.0,
+            interoceptive: 0.0,
+            goal: 0.0,
+            model_confidence: 0.0,
+            execution: 0.0,
         }
     }
 }
 
-/// Report from a horizon-aware policy-driven closed-loop run.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct HomeostaticHorizonRunReport {
-    pub steps: u64,
-    pub horizon: usize,
-    pub survived: bool,
-    pub final_energy: f64,
-    pub final_integrity: f64,
-    pub final_progress: f64,
-    /// Mean minimum predicted viability margin across counterfactual horizons.
-    pub mean_min_viability_margin: f64,
-    /// Minimum actually observed viability margin after executed actions.
-    pub min_actual_viability_margin: f64,
-    pub mean_min_confidence: f64,
-    pub perturbations_applied: usize,
-    pub cumulative_prediction_error: f64,
-    pub actions: Vec<MicroAction>,
-}
-
-/// Report from a policy-driven closed-loop run.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct HomeostaticRunReport {
-    pub steps: u64,
-    pub survived: bool,
-    pub final_energy: f64,
-    pub final_integrity: f64,
-    pub final_knowledge: f64,
-    pub final_threat: f64,
-    pub final_progress: f64,
-    pub min_actual_viability_margin: f64,
-    pub perturbations_applied: usize,
-    pub cumulative_prediction_error: f64,
-    pub actions: Vec<MicroAction>,
-}
-
-fn nominal_scenario() -> MicroWorldScenario {
-    MicroWorldScenario {
-        name: "nominal",
-        initial: MicroWorld::default().observe(),
-        schedule: &NOMINAL_SCHEDULE,
-        perturbations: &[],
-    }
-}
-
-/// Execute perception -> prediction -> selection -> action -> observation for a
-/// deterministic environment. The nominal API is preserved for compatibility.
-pub fn run_homeostatic_agent<P: MicroWorldPredictor>(
-    predictor: &mut P,
-    max_cycles: u64,
-) -> HomeostaticRunReport {
-    let scenario = nominal_scenario();
-    run_homeostatic_agent_scenario(predictor, &scenario, max_cycles)
-}
-
-/// Execute the reactive one-step policy against a specified deterministic scenario.
-pub fn run_homeostatic_agent_scenario<P: MicroWorldPredictor>(
-    predictor: &mut P,
-    scenario: &MicroWorldScenario,
-    max_cycles: u64,
-) -> HomeostaticRunReport {
-    let mut world = MicroWorld::new(scenario.initial, max_cycles);
-    let policy = HomeostaticPolicy;
-    let mut fabric = ViabilityFabric::new(max_cycles as usize + 1);
-    let mut cumulative_error = 0.0;
-    let mut min_actual_viability_margin = f64::INFINITY;
-    let mut perturbations_applied = 0usize;
-    let mut actions = Vec::with_capacity(max_cycles as usize);
-    let mut steps = 0u64;
-
-    while !world.done() && steps < max_cycles {
-        for (cycle, perturbation) in scenario.perturbations {
-            if *cycle == steps {
-                world.perturb(*perturbation);
-                perturbations_applied += 1;
-            }
+impl PredictionErrorLedger {
+    pub fn bounded(self) -> Self {
+        Self {
+            world: self.world.clamp(0.0, 1.0),
+            self_model: self.self_model.clamp(0.0, 1.0),
+            interoceptive: self.interoceptive.clamp(0.0, 1.0),
+            goal: self.goal.clamp(0.0, 1.0),
+            model_confidence: self.model_confidence.clamp(0.0, 1.0),
+            execution: self.execution.clamp(0.0, 1.0),
         }
-
-        let before = world.observe();
-        let (action, _policy_prediction) = policy.choose(predictor, before);
-        let action_id = steps + 1;
-        let predicted_raw = predictor.predict(before, action);
-        let prediction_confidence = predictor.prediction_confidence(action);
-
-        fabric.begin_cycle(before.cycle);
-        fabric
-            .predict_action(ActionPrediction {
-                action_id,
-                pre_state_digest: before.digest(),
-                action_label: action.label().to_string(),
-                cycle: before.cycle,
-                predicted_world_delta: Some(signed_delta_with_confidence(
-                    before,
-                    predicted_raw,
-                    prediction_confidence,
-                )),
-                predicted_self_delta: Some(signed_internal_delta(
-                    before,
-                    predicted_raw,
-                    prediction_confidence,
-                )),
-                predicted_goal_delta: Some(signed_goal_delta(
-                    before,
-                    predicted_raw,
-                    prediction_confidence,
-                )),
-                authority_granted: true,
-            })
-            .expect("policy action id must be unique");
-
-        let after = world.step(action);
-        min_actual_viability_margin = min_actual_viability_margin.min(
-            after.energy.min(after.integrity) - 0.08,
-        );
-
-        let error = predicted_raw.mean_absolute_delta(after);
-        predictor.observe_transition(before, action, after);
-
-        cumulative_error += error;
-        steps += 1;
-        actions.push(action);
-
-        fabric
-            .observe_action(ActionOutcome {
-                action_id,
-                action_label: action.label().to_string(),
-                cycle: after.cycle,
-                pre_state_digest: before.digest(),
-                post_state_digest: after.digest(),
-                authority_granted: true,
-                safety_gate_passed: true,
-                prediction: None,
-                observed_effect: Some(
-                    super::viability_fabric::ViabilitySignal::new(
-                        (signed_delta(before, after).value + 1.0) * 0.5,
-                        1.0,
-                        after.cycle,
-                        "viability-micro-world",
-                    ),
-                ),
-                prediction_error: PredictionErrorLedger {
-                    world: error.clamp(0.0, 1.0),
-                    ..Default::default()
-                },
-                evidence_refs: vec![format!(
-                    "sim://viability-micro-world/policy-step/{}",
-                    after.digest()
-                )],
-            })
-            .expect("closed-loop action must have a pre-action prediction");
-    }
-
-    let final_state = world.observe();
-    HomeostaticRunReport {
-        steps,
-        survived: final_state.is_viable(),
-        final_energy: final_state.energy,
-        final_integrity: final_state.integrity,
-        final_knowledge: final_state.knowledge,
-        final_threat: final_state.threat,
-        final_progress: final_state.progress,
-        min_actual_viability_margin: if min_actual_viability_margin.is_finite() {
-            min_actual_viability_margin
-        } else {
-            final_state.energy.min(final_state.integrity) - 0.08
-        },
-        perturbations_applied,
-        cumulative_prediction_error: cumulative_error,
-        actions,
     }
 }
 
-/// Execute the horizon-aware counterfactual policy against the nominal scenario.
-pub fn run_homeostatic_agent_horizon<P: MicroWorldPredictor>(
-    predictor: &mut P,
-    max_cycles: u64,
-    horizon: usize,
-    discount: f64,
-) -> HomeostaticHorizonRunReport {
-    let scenario = nominal_scenario();
-    run_homeostatic_agent_horizon_scenario(
-        predictor,
-        &scenario,
-        max_cycles,
-        horizon,
-        discount,
-    )
-}
-
-/// Execute the horizon-aware counterfactual policy against a specified scenario.
-pub fn run_homeostatic_agent_horizon_scenario<P: MicroWorldPredictor>(
-    predictor: &mut P,
-    scenario: &MicroWorldScenario,
-    max_cycles: u64,
-    horizon: usize,
-    discount: f64,
-) -> HomeostaticHorizonRunReport {
-    let mut world = MicroWorld::new(scenario.initial, max_cycles);
-    let policy = HomeostaticPolicy;
-    let mut fabric = ViabilityFabric::new(max_cycles as usize + 1);
-    let mut cumulative_error = 0.0;
-    let mut confidence_sum = 0.0;
-    let mut margin_sum = 0.0;
-    let mut min_actual_viability_margin = f64::INFINITY;
-    let mut perturbations_applied = 0usize;
-    let mut actions = Vec::with_capacity(max_cycles as usize);
-    let mut steps = 0u64;
-
-    while !world.done() && steps < max_cycles {
-        for (cycle, perturbation) in scenario.perturbations {
-            if *cycle == steps {
-                world.perturb(*perturbation);
-                perturbations_applied += 1;
-            }
-        }
-
-        let before = world.observe();
-        let (action, _predicted_terminal, rollout) =
-            policy.choose_horizon(predictor, before, horizon, discount);
-        let action_id = steps + 1;
-        let predicted_first = predictor.predict(before, action);
-        let first_confidence = predictor.prediction_confidence(action);
-
-        fabric.begin_cycle(before.cycle);
-        fabric
-            .predict_action(ActionPrediction {
-                action_id,
-                pre_state_digest: before.digest(),
-                action_label: action.label().to_string(),
-                cycle: before.cycle,
-                predicted_world_delta: Some(signed_delta_with_confidence(
-                    before,
-                    predicted_first,
-                    first_confidence,
-                )),
-                predicted_self_delta: Some(signed_internal_delta(
-                    before,
-                    predicted_first,
-                    first_confidence,
-                )),
-                predicted_goal_delta: Some(signed_goal_delta(
-                    before,
-                    predicted_first,
-                    first_confidence,
-                )),
-                authority_granted: true,
-            })
-            .expect("policy action id must be unique");
-
-        let after = world.step(action);
-        min_actual_viability_margin = min_actual_viability_margin.min(
-            after.energy.min(after.integrity) - 0.08,
-        );
-
-        let error = predicted_first.mean_absolute_delta(after);
-        predictor.observe_transition(before, action, after);
-
-        cumulative_error += error;
-        confidence_sum += rollout.min_confidence;
-        margin_sum += rollout.min_viability_margin;
-        steps += 1;
-        actions.push(action);
-
-        fabric
-            .observe_action(ActionOutcome {
-                action_id,
-                action_label: action.label().to_string(),
-                cycle: after.cycle,
-                pre_state_digest: before.digest(),
-                post_state_digest: after.digest(),
-                authority_granted: true,
-                safety_gate_passed: true,
-                prediction: None,
-                observed_effect: Some(
-                    super::viability_fabric::ViabilitySignal::new(
-                        (signed_delta(before, after).value + 1.0) * 0.5,
-                        1.0,
-                        after.cycle,
-                        "viability-micro-world",
-                    ),
-                ),
-                prediction_error: PredictionErrorLedger {
-                    world: error.clamp(0.0, 1.0),
-                    ..Default::default()
-                },
-                evidence_refs: vec![format!(
-                    "sim://viability-micro-world/horizon-step/{}",
-                    after.digest()
-                )],
-            })
-            .expect("horizon action must have a pre-action prediction");
-    }
-
-    let final_state = world.observe();
-    let denom = steps.max(1) as f64;
-    HomeostaticHorizonRunReport {
-        steps,
-        horizon: horizon.max(1),
-        survived: final_state.is_viable(),
-        final_energy: final_state.energy,
-        final_integrity: final_state.integrity,
-        final_progress: final_state.progress,
-        mean_min_confidence: confidence_sum / denom,
-        mean_min_viability_margin: margin_sum / denom,
-        min_actual_viability_margin: if min_actual_viability_margin.is_finite() {
-            min_actual_viability_margin
-        } else {
-            final_state.energy.min(final_state.integrity) - 0.08
-        },
-        perturbations_applied,
-        cumulative_prediction_error: cumulative_error,
-        actions,
-    }
-}
-
-/// Report from a deterministic benchmark episode.
+/// Pre-action prediction. The record is created before execution.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MicroWorldReport {
-    pub steps: u64,
-    pub baseline_mae: f64,
-    pub predictor_mae: f64,
-    pub survival_ratio: f64,
-    pub final_energy: f64,
-    pub final_integrity: f64,
-    pub final_progress: f64,
-    pub min_viability_margin: f64,
-    pub perturbations_applied: usize,
-    pub ledger_outcomes: usize,
+pub struct ActionPrediction {
+    pub action_id: u64,
+    /// Digest of the exact pre-action state used to produce this prediction.
+    pub pre_state_digest: u64,
+    pub action_label: String,
+    pub cycle: u64,
+    pub predicted_world_delta: Option<ViabilityDelta>,
+    pub predicted_self_delta: Option<ViabilityDelta>,
+    pub predicted_goal_delta: Option<ViabilityDelta>,
+    pub authority_granted: bool,
 }
 
-impl MicroWorldReport {
-    pub fn improvement_over_baseline(&self) -> f64 {
-        if self.baseline_mae <= f64::EPSILON {
+/// Explicit disposition for a prediction that did not result in an observed action.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PredictionCancellation {
+    pub action_id: u64,
+    pub prediction_cycle: u64,
+    pub cancellation_cycle: u64,
+    pub reason: String,
+    #[serde(default)]
+    pub evidence_refs: Vec<String>,
+}
+
+/// Post-action observation. A prediction is never synthesized after the fact.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ActionOutcome {
+    pub action_id: u64,
+    pub action_label: String,
+    pub cycle: u64,
+    pub pre_state_digest: u64,
+    pub post_state_digest: u64,
+    pub authority_granted: bool,
+    pub safety_gate_passed: bool,
+    pub prediction: Option<ActionPrediction>,
+    pub observed_effect: Option<ViabilitySignal>,
+    pub prediction_error: PredictionErrorLedger,
+    /// Evidence/provenance references supporting the observed outcome.
+    #[serde(default)]
+    pub evidence_refs: Vec<String>,
+}
+
+/// State snapshot used by the viability fabric.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ViabilityState {
+    pub cycle: u64,
+    pub lifecycle: LifecyclePhase,
+    pub identity_coherence: Option<ViabilitySignal>,
+    pub epistemic_confidence: Option<ViabilitySignal>,
+    pub world_integrity: Option<ViabilitySignal>,
+    pub self_integrity: Option<ViabilitySignal>,
+    pub resource_pressure: BTreeMap<String, ViabilityVariable>,
+    pub prediction_errors: PredictionErrorLedger,
+}
+
+impl Default for ViabilityState {
+    fn default() -> Self {
+        Self {
+            cycle: 0,
+            lifecycle: LifecyclePhase::Active,
+            identity_coherence: None,
+            epistemic_confidence: None,
+            world_integrity: None,
+            self_integrity: None,
+            resource_pressure: BTreeMap::new(),
+            prediction_errors: PredictionErrorLedger::default(),
+        }
+    }
+}
+
+impl ViabilityState {
+    pub fn aggregate_pressure(&self) -> f64 {
+        if self.resource_pressure.is_empty() {
             0.0
         } else {
-            (self.baseline_mae - self.predictor_mae) / self.baseline_mae
+            self.resource_pressure
+                .values()
+                .map(|variable| {
+                    variable
+                        .normalized_pressure()
+                        .max(variable.anticipatory_pressure())
+                })
+                .sum::<f64>()
+                / self.resource_pressure.len() as f64
+        }
+    }
+
+    /// Derive a bounded cognitive resource decision from current viability pressure.
+    pub fn regulation_decision(&self, thresholds: RegulationThresholds) -> RegulationDecision {
+        let thresholds = if thresholds.validate() {
+            thresholds
+        } else {
+            RegulationThresholds::default()
+        };
+        RegulationDecision::from_pressure(self.regulation_pressure(), thresholds)
+    }
+
+    /// Conservative pressure signal: prediction error or resource pressure can only increase
+    /// regulation pressure. Missing optional signals are not treated as healthy evidence.
+    pub fn regulation_pressure(&self) -> f64 {
+        let resource = self.aggregate_pressure();
+        let prediction = {
+            let p = self.prediction_errors.bounded();
+            [
+                p.world,
+                p.self_model,
+                p.interoceptive,
+                p.goal,
+                p.model_confidence,
+                p.execution,
+            ]
+            .into_iter()
+            .fold(0.0_f64, f64::max)
+        };
+        resource.max(prediction)
+    }
+}
+
+/// Coarse cognitive resource modes. These are control states, not consciousness levels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CognitiveResourceMode {
+    Full,
+    Focused,
+    Recovery,
+    Survival,
+}
+
+/// Thresholds for mapping viability pressure into bounded cognitive resource allocation.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct RegulationThresholds {
+    pub focused: f64,
+    pub recovery: f64,
+    pub survival: f64,
+}
+
+impl Default for RegulationThresholds {
+    fn default() -> Self {
+        Self {
+            focused: 0.20,
+            recovery: 0.45,
+            survival: 0.75,
         }
     }
 }
 
-/// Run a fixed action schedule and score predictions against ground truth.
-///
-/// The same schedule is replayed for every predictor, which makes regressions
-/// comparable across implementations and machines.
-pub fn evaluate_predictor<P: MicroWorldPredictor>(
-    predictor: &mut P,
-    max_cycles: u64,
-) -> MicroWorldReport {
-    evaluate_predictor_scenario(
-        predictor,
-        &MicroWorldScenario {
-            name: "nominal",
-            initial: MicroWorld::default().observe(),
-            schedule: &NOMINAL_SCHEDULE,
-            perturbations: &[],
-        },
-        max_cycles,
-    )
-}
-
-fn evaluate_predictor_scenario<P: MicroWorldPredictor>(
-    predictor: &mut P,
-    scenario: &MicroWorldScenario,
-    max_cycles: u64,
-) -> MicroWorldReport {
-    let mut world = MicroWorld::new(scenario.initial, max_cycles);
-    let mut fabric = ViabilityFabric::new(max_cycles as usize + 1);
-    let mut baseline_error = 0.0;
-    let mut predictor_error = 0.0;
-    let mut steps = 0u64;
-    let mut min_viability_margin = f64::INFINITY;
-    let mut perturbations_applied = 0usize;
-
-    while !world.done() && steps < max_cycles {
-        let before = world.observe();
-        let action = scenario.schedule[steps as usize % scenario.schedule.len()];
-
-        let predicted = predictor.predict(before, action);
-        let predicted_world_delta = signed_delta_with_confidence(
-            before,
-            predicted,
-            predictor.prediction_confidence(action),
-        );
-        let action_id = steps + 1;
-
-        fabric.begin_cycle(before.cycle);
-        fabric
-            .predict_action(ActionPrediction {
-                action_id,
-                pre_state_digest: before.digest(),
-                action_label: action.label().to_string(),
-                cycle: before.cycle,
-                predicted_world_delta: Some(predicted_world_delta),
-                predicted_self_delta: Some(signed_internal_delta(
-                    before,
-                    predicted,
-                    predictor.prediction_confidence(action),
-                )),
-                predicted_goal_delta: Some(signed_goal_delta(
-                    before,
-                    predicted,
-                    predictor.prediction_confidence(action),
-                )),
-                authority_granted: true,
-            })
-            .expect("deterministic benchmark must insert unique prediction");
-
-        let after = world.step(action);
-        min_viability_margin = min_viability_margin.min(
-            after.energy.min(after.integrity) - 0.08,
-        );
-        let actual_delta = signed_delta(before, after);
-        let mae = predicted.mean_absolute_delta(after);
-        predictor.observe_transition(before, action, after);
-        let baseline = PersistencePredictor::default()
-            .predict(before, action)
-            .mean_absolute_delta(after);
-
-        predictor_error += mae;
-        baseline_error += baseline;
-        steps += 1;
-
-        fabric
-            .observe_action(ActionOutcome {
-                action_id,
-                action_label: action.label().to_string(),
-                cycle: after.cycle,
-                pre_state_digest: before.digest(),
-                post_state_digest: after.digest(),
-                authority_granted: true,
-                safety_gate_passed: true,
-                prediction: None,
-                observed_effect: Some(
-                    super::viability_fabric::ViabilitySignal::new(
-                        (actual_delta.value + 1.0) * 0.5,
-                        actual_delta.confidence,
-                        after.cycle,
-                        "viability-micro-world",
-                    ),
-                ),
-                prediction_error: PredictionErrorLedger {
-                    world: mae.clamp(0.0, 1.0),
-                    ..Default::default()
-                },
-                evidence_refs: vec![format!(
-                    "sim://viability-micro-world/episode/{}/step/{}",
-                    before.digest(),
-                    steps
-                )],
-            })
-            .expect("benchmark outcome must close pre-existing prediction");
-    }
-
-    let final_state = world.observe();
-    let denom = steps.max(1) as f64;
-
-    MicroWorldReport {
-        steps,
-        baseline_mae: baseline_error / denom,
-        predictor_mae: predictor_error / denom,
-        survival_ratio: if final_state.is_viable() { 1.0 } else { 0.0 },
-        final_energy: final_state.energy,
-        final_integrity: final_state.integrity,
-        final_progress: final_state.progress,
-        min_viability_margin: if min_viability_margin.is_finite() {
-            min_viability_margin
-        } else {
-            final_state.energy.min(final_state.integrity) - 0.08
-        },
-        perturbations_applied,
-        ledger_outcomes: fabric.outcomes().len(),
+impl RegulationThresholds {
+    pub fn validate(&self) -> bool {
+        (0.0..=1.0).contains(&self.focused)
+            && (0.0..=1.0).contains(&self.recovery)
+            && (0.0..=1.0).contains(&self.survival)
+            && self.focused <= self.recovery
+            && self.recovery <= self.survival
     }
 }
 
-/// Aggregate report across several deterministic worlds.
-///
-/// The suite prevents a future predictor from qualifying by memorizing one initial
-/// trajectory for its headline score. It measures online adaptation across multiple
-/// scenarios; use evaluate_predictor_generalization for frozen held-out transfer.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MicroWorldSuiteReport {
-    pub episodes: usize,
-    pub total_steps: u64,
-    pub mean_baseline_mae: f64,
-    pub mean_predictor_mae: f64,
-    pub mean_improvement: f64,
-    pub survival_rate: f64,
+/// Bounded cognitive response to viability pressure.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct RegulationDecision {
+    pub mode: CognitiveResourceMode,
+    pub pressure: f64,
+    pub planning_horizon_scale: f64,
+    pub exploration_scale: f64,
+    pub consolidation_priority: f64,
+    pub low_priority_cognition_scale: f64,
 }
 
-impl MicroWorldSuiteReport {
-    pub fn suite_improvement(&self) -> f64 {
-        if self.mean_baseline_mae <= f64::EPSILON {
-            0.0
+impl RegulationDecision {
+    pub fn from_pressure(pressure: f64, thresholds: RegulationThresholds) -> Self {
+        let p = pressure.clamp(0.0, 1.0);
+        let mode = if p >= thresholds.survival {
+            CognitiveResourceMode::Survival
+        } else if p >= thresholds.recovery {
+            CognitiveResourceMode::Recovery
+        } else if p >= thresholds.focused {
+            CognitiveResourceMode::Focused
         } else {
-            (self.mean_baseline_mae - self.mean_predictor_mae) / self.mean_baseline_mae
+            CognitiveResourceMode::Full
+        };
+
+        // Pressure contracts planning/exploration and reallocates computation toward
+        // stabilization. These mappings are deliberately simple and inspectable.
+        let planning_horizon_scale = (1.0 - 0.65 * p).clamp(0.25, 1.0);
+        let exploration_scale = (1.0 - p).clamp(0.0, 1.0);
+        let consolidation_priority = (0.15 + 0.85 * p).clamp(0.0, 1.0);
+        let low_priority_cognition_scale = (1.0 - 0.80 * p).clamp(0.10, 1.0);
+
+        Self {
+            mode,
+            pressure: p,
+            planning_horizon_scale,
+            exploration_scale,
+            consolidation_priority,
+            low_priority_cognition_scale,
         }
     }
 }
 
-pub fn evaluate_predictor_suite<P: MicroWorldPredictor>(
-    predictor: &mut P,
-    max_cycles: u64,
-) -> MicroWorldSuiteReport {
-    let scenarios = benchmark_scenarios();
-    let mut reports = Vec::with_capacity(scenarios.len());
+/// Minimal orchestration container. Existing organs own their domain logic; this fabric
+/// only records typed observations and action/prediction relationships.
+#[derive(Debug)]
+pub struct ViabilityFabric {
+    state: ViabilityState,
+    pending_predictions: BTreeMap<u64, ActionPrediction>,
+    outcomes: Vec<ActionOutcome>,
+    cancellations: Vec<PredictionCancellation>,
+    max_outcomes: usize,
+    max_pending_predictions: usize,
+    highest_action_id: u64,
+            pre_state_digest: 1,
+}
 
-    for scenario in &scenarios {
-        reports.push(evaluate_predictor_scenario(predictor, scenario, max_cycles));
+/// Cycle-level telemetry view of the viability fabric.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ViabilityTelemetry {
+    pub viability_cycle: u64,
+    pub viability_lifecycle: String,
+    pub viability_resource_mode: String,
+    pub viability_pressure: f64,
+    pub viability_resource_pressure: f64,
+    pub viability_world_prediction_error: f64,
+    pub viability_self_prediction_error: f64,
+    pub viability_interoceptive_prediction_error: f64,
+    pub viability_goal_prediction_error: f64,
+    pub viability_model_uncertainty: f64,
+    pub viability_execution_prediction_error: f64,
+    /// Remaining fraction of the canonical FEP thermodynamic ledger capacity.
+    pub viability_energy_reserve: f64,
+    /// Exact multiplier applied to the existing temporal planning-depth factor.
+    /// 1.0 means no viability control influence.
+    pub viability_planning_horizon_scale: f64,
+}
+
+impl CognitiveResourceMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Full => "Full",
+            Self::Focused => "Focused",
+            Self::Recovery => "Recovery",
+            Self::Survival => "Survival",
+        }
+    }
+}
+
+impl LifecyclePhase {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Active => "Active",
+            Self::Recovery => "Recovery",
+            Self::Consolidation => "Consolidation",
+        }
+    }
+}
+
+impl ViabilityState {
+    pub fn telemetry(&self) -> ViabilityTelemetry {
+        let decision = self.regulation_decision(RegulationThresholds::default());
+        ViabilityTelemetry {
+            viability_cycle: self.cycle,
+            viability_lifecycle: self.lifecycle.as_str().to_string(),
+            viability_resource_mode: decision.mode.as_str().to_string(),
+            viability_pressure: decision.pressure,
+            viability_resource_pressure: self.aggregate_pressure(),
+            viability_world_prediction_error: self.prediction_errors.world,
+            viability_self_prediction_error: self.prediction_errors.self_model,
+            viability_interoceptive_prediction_error: self.prediction_errors.interoceptive,
+            viability_goal_prediction_error: self.prediction_errors.goal,
+            viability_model_uncertainty: self.prediction_errors.model_confidence,
+            viability_execution_prediction_error: self.prediction_errors.execution,
+            viability_energy_reserve: self
+                .resource_pressure
+                .get("thermodynamic_energy_reserve")
+                .map(|v| v.observation.value)
+                .unwrap_or(0.0),
+            viability_planning_horizon_scale: 1.0,
+        }
+    }
+}
+
+impl Default for ViabilityFabric {
+    fn default() -> Self {
+        Self::new(1024)
+    }
+}
+
+impl ViabilityFabric {
+    pub fn new(max_outcomes: usize) -> Self {
+        Self {
+            state: ViabilityState::default(),
+            pending_predictions: BTreeMap::new(),
+            outcomes: Vec::with_capacity(max_outcomes.min(1024)),
+            cancellations: Vec::with_capacity(max_outcomes.min(1024)),
+            max_outcomes,
+            max_pending_predictions: max_outcomes.max(1).min(4096),
+            highest_action_id: 0,
+            pre_state_digest: 1,
+        }
     }
 
-    let episodes = reports.len();
-    let denom = episodes.max(1) as f64;
-    MicroWorldSuiteReport {
-        episodes,
-        total_steps: reports.iter().map(|r| r.steps).sum(),
-        mean_baseline_mae: reports.iter().map(|r| r.baseline_mae).sum::<f64>() / denom,
-        mean_predictor_mae: reports.iter().map(|r| r.predictor_mae).sum::<f64>() / denom,
-        mean_improvement: reports
-            .iter()
-            .map(MicroWorldReport::improvement_over_baseline)
-            .sum::<f64>()
-            / denom,
-        survival_rate: reports.iter().map(|r| r.survival_ratio).sum::<f64>() / denom,
+    pub fn state(&self) -> &ViabilityState {
+        &self.state
     }
-}
 
-fn blend_prediction(
-    current: MicroWorldObservation,
-    predicted: MicroWorldObservation,
-    confidence: f64,
-) -> MicroWorldObservation {
-    let confidence = confidence.clamp(0.0, 1.0);
-    MicroWorldObservation {
-        cycle: predicted.cycle.max(current.cycle.saturating_add(1)),
-        energy: current.energy + confidence * (predicted.energy - current.energy),
-        integrity: current.integrity + confidence * (predicted.integrity - current.integrity),
-        knowledge: current.knowledge + confidence * (predicted.knowledge - current.knowledge),
-        threat: current.threat + confidence * (predicted.threat - current.threat),
-        progress: current.progress + confidence * (predicted.progress - current.progress),
+    pub fn state_mut(&mut self) -> &mut ViabilityState {
+        &mut self.state
     }
-    .clamp()
-}
 
-fn signed_internal_delta(
-    before: MicroWorldObservation,
-    after: MicroWorldObservation,
-    confidence: f64,
-) -> ViabilityDelta {
-    ViabilityDelta::new(
-        (after.energy - before.energy) + (after.integrity - before.integrity),
-        confidence.clamp(0.0, 1.0),
-    )
-}
+    pub fn begin_cycle(&mut self, cycle: u64) {
+        self.state.cycle = cycle;
+    }
 
-fn signed_goal_delta(
-    before: MicroWorldObservation,
-    after: MicroWorldObservation,
-    confidence: f64,
-) -> ViabilityDelta {
-    ViabilityDelta::new(
-        after.progress - before.progress,
-        confidence.clamp(0.0, 1.0),
-    )
-}
+    pub fn set_lifecycle(&mut self, lifecycle: LifecyclePhase) {
+        self.state.lifecycle = lifecycle;
+    }
 
-fn signed_delta(before: MicroWorldObservation, after: MicroWorldObservation) -> ViabilityDelta {
-    signed_delta_with_confidence(before, after, 1.0)
-}
+    pub fn observe_variable(
+        &mut self,
+        name: impl Into<String>,
+        observation: ViabilitySignal,
+        band: ViabilityBand,
+        prediction: Option<ViabilitySignal>,
+    ) {
+        let key = name.into();
+        let previous = self.state.resource_pressure.get(&key);
+        let rate_of_change = previous
+            .and_then(|prev| {
+                let delta_cycle = observation.cycle.saturating_sub(prev.observation.cycle);
+                if delta_cycle == 0 {
+                    None
+                } else {
+                    Some(
+                        (observation.value - prev.observation.value)
+                            / delta_cycle as f64,
+                    )
+                }
+            })
+            .unwrap_or(0.0);
 
-fn signed_delta_with_confidence(
-    before: MicroWorldObservation,
-    after: MicroWorldObservation,
-    confidence: f64,
-) -> ViabilityDelta {
-    ViabilityDelta::new(
-        after.energy - before.energy
-            + (after.integrity - before.integrity)
-            + (after.knowledge - before.knowledge)
-            + (after.threat - before.threat)
-            + (after.progress - before.progress),
-        confidence.clamp(0.0, 1.0),
-    )
+        let prediction_error = prediction
+            .as_ref()
+            .map(|predicted| (predicted.value - observation.value).abs().clamp(0.0, 1.0));
+
+        self.state.resource_pressure.insert(
+            key,
+            ViabilityVariable {
+                observation: observation.clone(),
+                band,
+                rate_of_change,
+                prediction,
+                prediction_error,
+            },
+        );
+    }
+
+    /// Record a prediction before action execution.
+    pub fn predict_action(&mut self, prediction: ActionPrediction) -> Result<(), &'static str> {
+        if self.pending_predictions.contains_key(&prediction.action_id) {
+            return Err("duplicate action prediction");
+        }
+        if prediction.action_id <= self.highest_action_id {
+            return Err("action id is not monotonic");
+        }
+        if self.pending_predictions.len() >= self.max_pending_predictions {
+            return Err("pending prediction capacity exhausted");
+        }
+        if prediction.cycle != self.state.cycle {
+            return Err("prediction cycle does not match current cycle");
+        }
+        // Zero is a valid digest value; identity is established by exact equality
+        // with the later observed outcome, not by treating the hash as a nonce.
+        if prediction.action_label.trim().is_empty() {
+            return Err("empty action label");
+        }
+        if prediction
+            .predicted_world_delta
+            .as_ref()
+            .is_some_and(|delta| !delta.is_valid())
+            || prediction
+                .predicted_self_delta
+                .as_ref()
+                .is_some_and(|delta| !delta.is_valid())
+            || prediction
+                .predicted_goal_delta
+                .as_ref()
+                .is_some_and(|delta| !delta.is_valid())
+        {
+            return Err("invalid action prediction");
+        }
+        self.highest_action_id = prediction.action_id;
+        self.pending_predictions.insert(prediction.action_id, prediction);
+        Ok(())
+    }
+
+    /// Close a pre-existing action prediction with observed evidence.
+    ///
+    /// The prediction is removed from the pending set and attached to the outcome.
+    /// A caller cannot inject a prediction at observation time: this is deliberately
+    /// fail-closed against post-hoc rationalization.
+    pub fn observe_action(&mut self, mut outcome: ActionOutcome) -> Result<(), &'static str> {
+        // Validate caller-supplied outcome metadata before consuming the pending prediction.
+        // This preserves the pending record after rejected/tampered observations.
+        if outcome.prediction.is_some() {
+            return Err("outcome already contains a prediction");
+        }
+        if !outcome.prediction_error.world.is_finite()
+            || !outcome.prediction_error.self_model.is_finite()
+            || !outcome.prediction_error.interoceptive.is_finite()
+            || !outcome.prediction_error.goal.is_finite()
+            || !outcome.prediction_error.model_confidence.is_finite()
+            || !outcome.prediction_error.execution.is_finite()
+        {
+            return Err("non-finite prediction error");
+        }
+
+        let Some(prediction) = self.pending_predictions.get(&outcome.action_id) else {
+            return Err("missing pre-action prediction");
+        };
+
+        if prediction.action_label != outcome.action_label {
+            return Err("action label mismatch");
+        }
+        if prediction.authority_granted != outcome.authority_granted {
+            return Err("authority mismatch");
+        }
+        if prediction.pre_state_digest != outcome.pre_state_digest {
+            return Err("pre-action state digest mismatch");
+        }
+        if outcome.cycle < prediction.cycle {
+            return Err("outcome predates prediction");
+        }
+        if outcome.evidence_refs.is_empty() {
+            return Err("missing evidence reference");
+        }
+        if !outcome.evidence_refs.iter().all(|r| !r.trim().is_empty()) {
+            return Err("invalid evidence reference");
+        }
+        if let Some(effect) = &outcome.observed_effect {
+            if !effect.is_valid() {
+                return Err("invalid observed effect");
+            }
+        }
+        if prediction
+            .predicted_world_delta
+            .as_ref()
+            .is_some_and(|delta| !delta.is_valid())
+            || prediction
+                .predicted_self_delta
+                .as_ref()
+                .is_some_and(|delta| !delta.is_valid())
+            || prediction
+                .predicted_goal_delta
+                .as_ref()
+                .is_some_and(|delta| !delta.is_valid())
+        {
+            return Err("invalid action prediction");
+        }
+
+        let prediction = self
+            .pending_predictions
+            .remove(&outcome.action_id)
+            .expect("pending prediction validated immediately before removal");
+
+        outcome.prediction = Some(prediction);
+        outcome.prediction_error = outcome.prediction_error.bounded();
+
+        if self.max_outcomes > 0 && self.outcomes.len() >= self.max_outcomes {
+            self.outcomes.remove(0);
+        }
+        self.outcomes.push(outcome);
+        Ok(())
+    }
+
+    pub fn outcomes(&self) -> &[ActionOutcome] {
+        &self.outcomes
+    }
+
+    pub fn cancellations(&self) -> &[PredictionCancellation] {
+        &self.cancellations
+    }
+
+    /// Explicitly close a prediction when the action is cancelled or could not execute.
+    ///
+    /// This is preferable to silently dropping a pending prediction: long-lived
+    /// traces must distinguish "not observed" from "never happened."
+    pub fn cancel_prediction(
+        &mut self,
+        action_id: u64,
+            pre_state_digest: 1,
+        cancellation_cycle: u64,
+        reason: impl Into<String>,
+        evidence_refs: Vec<String>,
+    ) -> Result<(), &'static str> {
+        let Some(prediction) = self.pending_predictions.get(&action_id) else {
+            return Err("missing pre-action prediction");
+        };
+        if cancellation_cycle < prediction.cycle {
+            return Err("cancellation predates prediction");
+        }
+        if evidence_refs.is_empty() {
+            return Err("missing evidence reference");
+        }
+        if !evidence_refs.iter().all(|r| !r.trim().is_empty()) {
+            return Err("invalid evidence reference");
+        }
+
+        let prediction_cycle = prediction.cycle;
+        self.pending_predictions.remove(&action_id);
+
+        if self.max_outcomes > 0 && self.cancellations.len() >= self.max_outcomes {
+            self.cancellations.remove(0);
+        }
+        self.cancellations.push(PredictionCancellation {
+            action_id,
+            prediction_cycle,
+            cancellation_cycle,
+            reason: reason.into(),
+            evidence_refs,
+        });
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn perturbations_are_deterministic_and_observable() {
-        let before = MicroWorld::default().observe();
-        let mut a = MicroWorld::default();
-        let mut b = MicroWorld::default();
-        let a_state = a.perturb(MicroPerturbation::EnergyDrain(0.2));
-        let b_state = b.perturb(MicroPerturbation::EnergyDrain(0.2));
-
-        assert_eq!(a_state, b_state);
-        assert!(a_state.energy < before.energy);
+    fn band() -> ViabilityBand {
+        ViabilityBand {
+            preferred: (0.2, 0.7),
+            tolerated: (0.1, 0.85),
+            critical: (0.0, 0.95),
+        }
     }
 
     #[test]
-    fn transition_is_deterministic() {
-        let state = MicroWorld::default().observe();
+    fn band_is_ordered() {
+        assert!(band().validate());
+    }
+
+    #[test]
+    fn pressure_is_zero_inside_preferred_band() {
+        let variable = ViabilityVariable {
+            observation: ViabilitySignal::new(0.5, 1.0, 1, "test"),
+            band: band(),
+            rate_of_change: 0.0,
+            prediction: None,
+            prediction_error: None,
+        };
+        assert_eq!(variable.normalized_pressure(), 0.0);
+    }
+
+    #[test]
+    fn rate_of_change_is_derived_from_previous_observation() {
+        let mut fabric = ViabilityFabric::new(4);
+        let band = band();
+        fabric.begin_cycle(1);
+        fabric.observe_variable(
+            "load",
+            ViabilitySignal::new(0.4, 1.0, 1, "test"),
+            band,
+            None,
+        );
+        fabric.begin_cycle(2);
+        fabric.observe_variable(
+            "load",
+            ViabilitySignal::new(0.6, 1.0, 2, "test"),
+            band,
+            None,
+        );
+
+        let variable = fabric
+            .state()
+            .resource_pressure
+            .get("load")
+            .expect("load exists");
+        assert!((variable.rate_of_change - 0.2).abs() < 1e-12);
+        assert!(variable.anticipatory_pressure() > 0.0);
+    }
+
+    #[test]
+    fn pressure_rises_outside_preferred_band() {
+        let variable = ViabilityVariable {
+            observation: ViabilitySignal::new(1.0, 1.0, 1, "test"),
+            band: band(),
+            rate_of_change: 0.0,
+            prediction: None,
+            prediction_error: None,
+        };
+        assert!(variable.normalized_pressure() > 0.0);
+    }
+
+    #[test]
+    fn prediction_must_precede_action_outcome() {
+        let mut fabric = ViabilityFabric::new(4);
+        fabric.begin_cycle(7);
+
+        let outcome = ActionOutcome {
+            action_id: 42,
+            pre_state_digest: 1,
+            action_label: "test".to_string(),
+            cycle: 7,
+            post_state_digest: 2,
+            authority_granted: true,
+            safety_gate_passed: true,
+            prediction: None,
+            observed_effect: None,
+            prediction_error: PredictionErrorLedger::default(),
+            evidence_refs: Vec::new(),
+        };
+
+        assert_eq!(fabric.observe_action(outcome), Err("missing pre-action prediction"));
+    }
+
+    #[test]
+    fn signed_delta_preserves_negative_consequences() {
+        let delta = ViabilityDelta::new(-0.4, 0.9);
+        assert_eq!(delta.value, -0.4);
+        assert!(delta.is_valid());
+    }
+
+    #[test]
+    fn invalid_band_is_rejected() {
+        let invalid = ViabilityBand {
+            preferred: (0.8, 0.2),
+            tolerated: (0.1, 0.9),
+            critical: (0.0, 1.0),
+        };
+        assert!(!invalid.validate());
+    }
+
+    #[test]
+    fn post_hoc_prediction_in_outcome_is_rejected() {
+        let mut fabric = ViabilityFabric::new(4);
+        fabric.begin_cycle(7);
+
+        let injected_prediction = ActionPrediction {
+            action_id: 42,
+            pre_state_digest: 1,
+            action_label: "test".to_string(),
+            cycle: 7,
+            predicted_world_delta: None,
+            predicted_self_delta: None,
+            predicted_goal_delta: None,
+            authority_granted: true,
+        };
+
+        let outcome = ActionOutcome {
+            action_id: 42,
+            pre_state_digest: 1,
+            action_label: "test".to_string(),
+            cycle: 7,
+            post_state_digest: 2,
+            authority_granted: true,
+            safety_gate_passed: true,
+            prediction: Some(injected_prediction),
+            observed_effect: None,
+            prediction_error: PredictionErrorLedger::default(),
+            evidence_refs: Vec::new(),
+        };
+
         assert_eq!(
-            transition(state, MicroAction::Explore),
-            transition(state, MicroAction::Explore)
+            fabric.observe_action(outcome),
+            Err("outcome already contains a prediction")
         );
+        assert!(fabric.outcomes().is_empty());
     }
 
     #[test]
-    fn negative_effects_survive_world_transition() {
-        let state = MicroWorld::default().observe();
-        let next = transition(state, MicroAction::Explore);
-        assert!(next.energy < state.energy);
-        assert!(next.integrity <= state.integrity);
-    }
+    fn mismatched_pre_state_digest_does_not_consume_prediction() {
+        let mut fabric = ViabilityFabric::new(4);
+        fabric.begin_cycle(9);
+        fabric.predict_action(ActionPrediction {
+            action_id: 11,
+            pre_state_digest: 100,
+            action_label: "test".to_string(),
+            cycle: 9,
+            predicted_world_delta: None,
+            predicted_self_delta: None,
+            predicted_goal_delta: None,
+            authority_granted: true,
+        }).unwrap();
 
-    #[test]
-    fn prediction_is_side_effect_free() {
-        let mut predictor = WorldModelBridgePredictor::default();
-        let before = MicroWorld::default().observe();
-        let samples_before = predictor.model().action_samples(MicroAction::Explore.index());
-        let error_before = predictor.model().action_error(MicroAction::Explore.index());
-
-        let _ = predictor.predict(before, MicroAction::Explore);
+        let outcome = ActionOutcome {
+            action_id: 11,
+            action_label: "test".to_string(),
+            cycle: 9,
+            pre_state_digest: 101,
+            post_state_digest: 102,
+            authority_granted: true,
+            safety_gate_passed: true,
+            prediction: None,
+            observed_effect: None,
+            prediction_error: PredictionErrorLedger::default(),
+            evidence_refs: vec!["sim://digest-mismatch".to_string()],
+        };
 
         assert_eq!(
-            predictor.model().action_samples(MicroAction::Explore.index()),
-            samples_before
+            fabric.observe_action(outcome),
+            Err("pre-action state digest mismatch")
         );
+        assert_eq!(fabric.outcomes().len(), 0);
+
+        let matching = ActionOutcome {
+            action_id: 11,
+            action_label: "test".to_string(),
+            cycle: 9,
+            pre_state_digest: 100,
+            post_state_digest: 102,
+            authority_granted: true,
+            safety_gate_passed: true,
+            prediction: None,
+            observed_effect: None,
+            prediction_error: PredictionErrorLedger::default(),
+            evidence_refs: vec!["sim://digest-match".to_string()],
+        };
+        assert!(fabric.observe_action(matching).is_ok());
+    }
+
+    #[test]
+    fn rejected_tampered_outcome_does_not_consume_prediction() {
+        let mut fabric = ViabilityFabric::new(4);
+        fabric.begin_cycle(9);
+
+        let prediction = ActionPrediction {
+            action_id: 10,
+            pre_state_digest: 1,
+            action_label: "test".to_string(),
+            cycle: 9,
+            predicted_world_delta: Some(ViabilityDelta::new(-0.2, 1.0)),
+            predicted_self_delta: None,
+            predicted_goal_delta: None,
+            authority_granted: true,
+        };
+        fabric.predict_action(prediction).unwrap();
+
+        let tampered = ActionOutcome {
+            action_id: 10,
+            pre_state_digest: 1,
+            action_label: "tampered".to_string(),
+            cycle: 9,
+            post_state_digest: 2,
+            authority_granted: true,
+            safety_gate_passed: true,
+            prediction: None,
+            observed_effect: None,
+            prediction_error: PredictionErrorLedger::default(),
+            evidence_refs: vec![],
+        };
+
+        assert_eq!(fabric.observe_action(tampered), Err("action label mismatch"));
+
+        let good = ActionOutcome {
+            action_id: 10,
+            pre_state_digest: 1,
+            action_label: "test".to_string(),
+            cycle: 9,
+            post_state_digest: 2,
+            authority_granted: true,
+            safety_gate_passed: true,
+            prediction: None,
+            observed_effect: None,
+            prediction_error: PredictionErrorLedger {
+                world: 0.2,
+                ..Default::default()
+            },
+            evidence_refs: vec!["sim://micro-world/episode-1".to_string()],
+        };
+
+        assert!(fabric.observe_action(good).is_ok());
+    }
+
+    #[test]
+    fn regulation_modes_follow_pressure() {
+        let full = RegulationDecision::from_pressure(0.1, RegulationThresholds::default());
+        let focused = RegulationDecision::from_pressure(0.3, RegulationThresholds::default());
+        let recovery = RegulationDecision::from_pressure(0.6, RegulationThresholds::default());
+        let survival = RegulationDecision::from_pressure(0.9, RegulationThresholds::default());
+
+        assert_eq!(full.mode, CognitiveResourceMode::Full);
+        assert_eq!(focused.mode, CognitiveResourceMode::Focused);
+        assert_eq!(recovery.mode, CognitiveResourceMode::Recovery);
+        assert_eq!(survival.mode, CognitiveResourceMode::Survival);
+        assert!(survival.exploration_scale < full.exploration_scale);
+        assert!(survival.consolidation_priority > full.consolidation_priority);
+    }
+
+    #[test]
+    fn invalid_thresholds_fail_to_safe_defaults() {
+        let thresholds = RegulationThresholds {
+            focused: 0.8,
+            recovery: 0.2,
+            survival: 0.1,
+        };
+        let decision = RegulationDecision::from_pressure(0.5, thresholds);
+        assert_eq!(decision.mode, CognitiveResourceMode::Recovery);
+    }
+
+    #[test]
+    fn default_fabric_has_working_prediction_capacity() {
+        let mut fabric = ViabilityFabric::default();
+        fabric.begin_cycle(1);
+        let prediction = ActionPrediction {
+            action_id: 1,
+            pre_state_digest: 1,
+            action_label: "default".to_string(),
+            cycle: 1,
+            predicted_world_delta: None,
+            predicted_self_delta: None,
+            predicted_goal_delta: None,
+            authority_granted: false,
+        };
+        assert!(fabric.predict_action(prediction).is_ok());
+    }
+
+    #[test]
+    fn cancellation_closes_pending_prediction_explicitly() {
+        let mut fabric = ViabilityFabric::new(4);
+        fabric.begin_cycle(2);
+        fabric.predict_action(ActionPrediction {
+            action_id: 1,
+            pre_state_digest: 1,
+            action_label: "test".to_string(),
+            cycle: 2,
+            predicted_world_delta: None,
+            predicted_self_delta: None,
+            predicted_goal_delta: None,
+            authority_granted: false,
+        }).unwrap();
+
+        assert!(fabric
+            .cancel_prediction(1, 3, "actuator unavailable", vec!["sim://cancel/1".to_string()])
+            .is_ok());
+        assert_eq!(fabric.cancellations().len(), 1);
+        assert!(fabric.outcomes().is_empty());
+
+        let outcome = ActionOutcome {
+            action_id: 1,
+            pre_state_digest: 1,
+            action_label: "test".to_string(),
+            cycle: 3,
+            post_state_digest: 2,
+            authority_granted: false,
+            safety_gate_passed: false,
+            prediction: None,
+            observed_effect: None,
+            prediction_error: PredictionErrorLedger::default(),
+            evidence_refs: vec!["sim://cancel/1".to_string()],
+        };
+        assert_eq!(fabric.observe_action(outcome), Err("missing pre-action prediction"));
+    }
+
+    #[test]
+    fn action_ids_must_be_monotonic() {
+        let mut fabric = ViabilityFabric::new(4);
+        fabric.begin_cycle(1);
+
+        let prediction = ActionPrediction {
+            action_id: 2,
+            pre_state_digest: 1,
+            action_label: "test".to_string(),
+            cycle: 1,
+            predicted_world_delta: None,
+            predicted_self_delta: None,
+            predicted_goal_delta: None,
+            authority_granted: true,
+        };
+
+        fabric.predict_action(prediction.clone()).unwrap();
         assert_eq!(
-            predictor.model().action_error(MicroAction::Explore.index()),
-            error_before
+            fabric.predict_action(prediction),
+            Err("duplicate action prediction")
+        );
+
+        let prediction_1 = ActionPrediction {
+            action_id: 1,
+            pre_state_digest: 1,
+            action_label: "test".to_string(),
+            cycle: 1,
+            predicted_world_delta: None,
+            predicted_self_delta: None,
+            predicted_goal_delta: None,
+            authority_granted: true,
+        };
+        assert_eq!(fabric.predict_action(prediction_1), Err("action id is not monotonic"));
+    }
+
+    #[test]
+    fn pending_prediction_capacity_is_bounded() {
+        let mut fabric = ViabilityFabric::new(2);
+        fabric.begin_cycle(1);
+
+        for action_id in [1, 2] {
+            fabric.predict_action(ActionPrediction {
+                action_id,
+                pre_state_digest: 1,
+                action_label: "test".to_string(),
+                cycle: 1,
+                predicted_world_delta: None,
+                predicted_self_delta: None,
+                predicted_goal_delta: None,
+                authority_granted: true,
+            }).unwrap();
+        }
+
+        assert_eq!(
+            fabric.predict_action(ActionPrediction {
+                action_id: 3,
+            pre_state_digest: 1,
+                action_label: "test".to_string(),
+                cycle: 1,
+                predicted_world_delta: None,
+                predicted_self_delta: None,
+                predicted_goal_delta: None,
+                authority_granted: true,
+            }),
+            Err("pending prediction capacity exhausted")
         );
     }
 
     #[test]
-    fn factorized_prediction_channels_preserve_signed_effects() {
-        let before = MicroWorld::default().observe();
-        let after = transition(before, MicroAction::Explore);
-        let internal = signed_internal_delta(before, after, 1.0);
-        let goal = signed_goal_delta(before, after, 1.0);
+    fn duplicate_prediction_fails_closed() {
+        let mut fabric = ViabilityFabric::new(4);
+        fabric.begin_cycle(3);
 
-        assert!(internal.value < 0.0);
-        assert!(goal.value > 0.0);
-        assert!(internal.is_valid());
-        assert!(goal.is_valid());
-    }
+        let p = ActionPrediction {
+            action_id: 9,
+            pre_state_digest: 1,
+            action_label: "test".to_string(),
+            cycle: 3,
+            predicted_world_delta: None,
+            predicted_self_delta: None,
+            predicted_goal_delta: None,
+            authority_granted: true,
+        };
 
-    #[test]
-    fn state_factorization_is_explicit() {
-        let state = MicroWorld::default().observe();
-        let factors = state.factorized();
-        assert_eq!(factors.internal_energy, state.energy);
-        assert_eq!(factors.internal_integrity, state.integrity);
-        assert_eq!(factors.external_knowledge, state.knowledge);
-        assert_eq!(factors.external_threat, state.threat);
-        assert_eq!(factors.external_progress, state.progress);
-    }
-
-    #[test]
-    fn horizon_policy_improves_stressed_recovery_without_changing_oracle() {
-        struct Oracle;
-        impl MicroWorldPredictor for Oracle {
-            fn predict(
-                &self,
-                state: MicroWorldObservation,
-                action: MicroAction,
-            ) -> MicroWorldObservation {
-                transition(state, action)
-            }
-
-            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
-                1.0
-            }
-        }
-
-        let stressed = benchmark_scenarios()
-            .into_iter()
-            .find(|scenario| scenario.name == "stressed")
-            .expect("stressed scenario exists");
-
-        let mut reactive_oracle = Oracle;
-        let mut horizon_oracle = Oracle;
-        let reactive =
-            run_homeostatic_agent_scenario(&mut reactive_oracle, &stressed, 32);
-        let horizon = run_homeostatic_agent_horizon_scenario(
-            &mut horizon_oracle,
-            &stressed,
-            32,
-            4,
-            0.8,
-        );
-
-        assert!(reactive.survived);
-        assert!(horizon.survived);
-        assert_eq!(reactive.perturbations_applied, 2);
-        assert_eq!(horizon.perturbations_applied, 2);
-        assert!(horizon.final_integrity > reactive.final_integrity);
-        assert!(horizon.final_progress > reactive.final_progress);
-        assert!(horizon.min_actual_viability_margin.is_finite());
-        assert!(reactive.min_actual_viability_margin.is_finite());
-    }
-
-    #[test]
-    fn oracle_horizon_runner_survives_and_records_rollout_evidence() {
-        struct Oracle;
-        impl MicroWorldPredictor for Oracle {
-            fn predict(
-                &self,
-                state: MicroWorldObservation,
-                action: MicroAction,
-            ) -> MicroWorldObservation {
-                transition(state, action)
-            }
-
-            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
-                1.0
-            }
-        }
-
-        let mut predictor = Oracle;
-        let report = run_homeostatic_agent_horizon(&mut predictor, 32, 4, 0.8);
-
-        assert!(report.survived);
-        assert_eq!(report.horizon, 4);
-        assert_eq!(report.actions.len(), report.steps as usize);
-        assert!(report.mean_min_confidence >= 1.0 - 1e-12);
-        assert!(report.mean_min_viability_margin > 0.0);
-    }
-
-    #[test]
-    fn oracle_counterfactual_rollout_is_finite_and_side_effect_free() {
-        struct Oracle;
-        impl MicroWorldPredictor for Oracle {
-            fn predict(
-                &self,
-                state: MicroWorldObservation,
-                action: MicroAction,
-            ) -> MicroWorldObservation {
-                transition(state, action)
-            }
-
-            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
-                1.0
-            }
-        }
-
-        let predictor = Oracle;
-        let policy = HomeostaticPolicy;
-        let before = MicroWorld::default().observe();
-        let (_, terminal, rollout) = policy.choose_horizon(&predictor, before, 4, 0.8);
-
-        assert_eq!(rollout.actions.len(), 4);
-        assert!(rollout.discounted_utility.is_finite());
-        assert!(rollout.min_confidence >= 1.0 - 1e-12);
-        assert!(rollout.min_viability_margin.is_finite());
-        assert!(terminal.is_viable());
-    }
-
-    #[test]
-    fn uncertain_prediction_is_not_treated_as_certain() {
-        struct UncertainOracle;
-        impl MicroWorldPredictor for UncertainOracle {
-            fn predict(
-                &self,
-                state: MicroWorldObservation,
-                action: MicroAction,
-            ) -> MicroWorldObservation {
-                transition(state, action)
-            }
-
-            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
-                0.1
-            }
-        }
-
-        let predictor = UncertainOracle;
-        let policy = HomeostaticPolicy;
-        let before = MicroWorld::default().observe();
-        let (_, _, rollout) = policy.choose_horizon(&predictor, before, 3, 0.8);
-        assert!(rollout.min_confidence <= 0.1 + 1e-12);
-    }
-
-    #[test]
-    fn bridge_predictor_learns_from_repeated_transitions() {
-        let mut predictor = WorldModelBridgePredictor::default();
-        let before = MicroWorld::default().observe();
-        let after = transition(before, MicroAction::Explore);
-
-        let first = predictor.predict(before, MicroAction::Explore)
-            .mean_absolute_delta(after);
-
-        for _ in 0..32 {
-            predictor.observe_transition(before, MicroAction::Explore, after);
-        }
-
-        let learned = predictor.predict(before, MicroAction::Explore)
-            .mean_absolute_delta(after);
-
-        assert!(learned < first);
-        assert!(predictor.model().action_samples(MicroAction::Explore.index()) > 0);
-    }
-
-    #[test]
-    fn persistence_baseline_is_nonzero() {
-        let mut predictor = PersistencePredictor;
-        let report = evaluate_predictor(&mut predictor, 12);
-        assert!(report.baseline_mae > 0.0);
-        assert!(report.predictor_mae > 0.0);
-        assert_eq!(report.ledger_outcomes, report.steps as usize);
-    }
-
-    #[test]
-    fn oracle_can_be_zero_error() {
-        struct Oracle;
-        impl MicroWorldPredictor for Oracle {
-            fn predict(
-                &self,
-                state: MicroWorldObservation,
-                action: MicroAction,
-            ) -> MicroWorldObservation {
-                transition(state, action)
-            }
-
-            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
-                1.0
-            }
-        }
-
-        let mut predictor = Oracle;
-        let report = evaluate_predictor(&mut predictor, 12);
-        assert!(report.predictor_mae.abs() < 1e-12);
-        assert!(report.improvement_over_baseline() > 0.99);
-    }
-
-    #[test]
-    fn oracle_policy_survives_and_makes_progress() {
-        struct Oracle;
-        impl MicroWorldPredictor for Oracle {
-            fn predict(&self, state: MicroWorldObservation, action: MicroAction) -> MicroWorldObservation {
-                transition(state, action)
-            }
-
-            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
-                1.0
-            }
-        }
-
-        let mut predictor = Oracle;
-        let report = run_homeostatic_agent(&mut predictor, 64);
-        assert!(report.survived);
-        assert!(report.final_progress > 0.2);
-        assert_eq!(report.actions.len(), report.steps as usize);
-    }
-
-    #[test]
-    fn homeostatic_run_is_replay_stable() {
-        let mut a = PersistencePredictor;
-        let mut b = PersistencePredictor;
-        assert_eq!(run_homeostatic_agent(&mut a, 32), run_homeostatic_agent(&mut b, 32));
-    }
-
-    #[test]
-    fn stressed_scenario_contains_recovery_perturbations() {
-        let scenario = benchmark_scenarios()
-            .into_iter()
-            .find(|scenario| scenario.name == "stressed")
-            .expect("stressed scenario exists");
-        assert_eq!(scenario.perturbations.len(), 2);
-    }
-
-    #[test]
-    fn suite_has_multiple_distinct_scenarios() {
-        let scenarios = benchmark_scenarios();
-        assert!(scenarios.len() >= 4);
-        assert!(scenarios.windows(2).any(|w| w[0].initial != w[1].initial));
-    }
-
-    #[test]
-    fn generalization_freezes_learning_during_test() {
-        let reports = evaluate_predictor_generalization::<WorldModelBridgePredictor, _>(
-            WorldModelBridgePredictor::default,
-            16,
-            16,
-        );
-        assert_eq!(reports.len(), 4);
-        assert!(reports.iter().all(|r| r.train_steps > 0));
-        assert!(reports.iter().all(|r| r.test_steps > 0));
-        assert!(reports.iter().all(|r| r.predictor_mae.is_finite()));
-    }
-
-    #[test]
-    fn fresh_suite_does_not_share_predictor_state_between_episodes() {
-        let report = evaluate_predictor_suite_fresh(
-            WorldModelBridgePredictor::default,
-            24,
-        );
-        assert_eq!(report.episodes, 4);
-        assert!(report.mean_predictor_mae > 0.0);
-    }
-
-    #[test]
-    fn oracle_suite_is_zero_error() {
-        struct Oracle;
-        impl MicroWorldPredictor for Oracle {
-            fn predict(&self, state: MicroWorldObservation, action: MicroAction) -> MicroWorldObservation {
-                transition(state, action)
-            }
-
-            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
-                1.0
-            }
-        }
-
-        let mut predictor = Oracle;
-        let report = evaluate_predictor_suite(&mut predictor, 24);
-        assert_eq!(report.episodes, 4);
-        assert!(report.mean_predictor_mae.abs() < 1e-12);
-        assert!((report.survival_rate - 1.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn report_is_replay_stable() {
-        let mut a = PersistencePredictor;
-        let mut b = PersistencePredictor;
-        assert_eq!(evaluate_predictor(&mut a, 20), evaluate_predictor(&mut b, 20));
+        fabric.predict_action(p.clone()).unwrap();
+        assert_eq!(fabric.predict_action(p), Err("duplicate action prediction"));
     }
 }
