@@ -117,6 +117,9 @@ pub enum NixSystemdObserverErrorV1 {
     #[error("systemd invocation ID is unavailable")]
     InvocationIdUnavailable,
 
+    #[error("systemd invocation ID changed during definition capture")]
+    InvocationIdChanged,
+
     #[error("invalid verified post-state observation: {0}")]
     InvalidPostState(String),
 
@@ -365,15 +368,37 @@ impl NixSystemdReadOnlyObserverV1 {
         &self,
         unit: &str,
     ) -> Result<NixVerifiedServiceDefinitionContentV1, NixSystemdObserverErrorV1> {
+        self.capture_service_definition_content_internal(unit, false).await
+    }
+
+    /// Capture service definition content and require a non-zero InvocationID
+    /// that remains identical across the observation window. This is the stricter
+    /// Restart authorization path: invocation identity is temporal provenance and
+    /// deliberately remains outside the content digest.
+    pub async fn capture_service_definition_content_for_restart(
+        &self,
+        unit: &str,
+    ) -> Result<NixVerifiedServiceDefinitionContentV1, NixSystemdObserverErrorV1> {
+        self.capture_service_definition_content_internal(unit, true).await
+    }
+
+    async fn capture_service_definition_content_internal(
+        &self,
+        unit: &str,
+        require_restart_invocation: bool,
+    ) -> Result<NixVerifiedServiceDefinitionContentV1, NixSystemdObserverErrorV1> {
         let expected_unit = canonical_unit(unit)?;
         let manager_owner = self.systemd_manager_owner().await?;
         let bus_id = self.dbus_bus_id().await?;
         let object_path = self.resolve_service_unit(&expected_unit).await?;
-        let (identity, need_daemon_reload) = self
-            .read_definition_identity(&object_path, &expected_unit)
+        let (identity, need_daemon_reload, pre_invocation_id) = self
+            .read_definition_identity_and_invocation_id(&object_path, &expected_unit)
             .await?;
         if need_daemon_reload {
             return Err(NixSystemdObserverErrorV1::DefinitionNeedsDaemonReload);
+        }
+        if require_restart_invocation && pre_invocation_id.is_none() {
+            return Err(NixSystemdObserverErrorV1::InvocationIdUnavailable);
         }
 
         let source_identity_digest = identity
@@ -390,8 +415,8 @@ impl NixSystemdReadOnlyObserverV1 {
         let post_owner = self.systemd_manager_owner().await?;
         let post_bus_id = self.dbus_bus_id().await?;
         let post_object_path = self.resolve_service_unit(&expected_unit).await?;
-        let (post_identity, post_need_daemon_reload) = self
-            .read_definition_identity(&post_object_path, &expected_unit)
+        let (post_identity, post_need_daemon_reload, post_invocation_id) = self
+            .read_definition_identity_and_invocation_id(&post_object_path, &expected_unit)
             .await?;
         if post_need_daemon_reload {
             return Err(NixSystemdObserverErrorV1::DefinitionNeedsDaemonReload);
@@ -412,12 +437,16 @@ impl NixSystemdReadOnlyObserverV1 {
         {
             return Err(NixSystemdObserverErrorV1::DefinitionIdentityChanged);
         }
+        if require_restart_invocation && post_invocation_id != pre_invocation_id {
+            return Err(NixSystemdObserverErrorV1::InvocationIdChanged);
+        }
 
         let evidence = NixServiceDefinitionContentEvidenceV1 {
             unit: expected_unit,
             source_identity_digest,
             manager_owner,
             bus_id,
+            pre_invocation_id,
             files,
             captured_at_monotonic_us: monotonic_now_us()?,
         };
@@ -448,6 +477,20 @@ impl NixSystemdReadOnlyObserverV1 {
         object_path: &OwnedObjectPath,
         expected_unit: &str,
     ) -> Result<(NixSystemdUnitDefinitionIdentityV1, bool), NixSystemdObserverErrorV1> {
+        let (identity, need_daemon_reload, _) = self
+            .read_definition_identity_and_invocation_id(object_path, expected_unit)
+            .await?;
+        Ok((identity, need_daemon_reload))
+    }
+
+    async fn read_definition_identity_and_invocation_id(
+        &self,
+        object_path: &OwnedObjectPath,
+        expected_unit: &str,
+    ) -> Result<
+        (NixSystemdUnitDefinitionIdentityV1, bool, Option<String>),
+        NixSystemdObserverErrorV1,
+    > {
         validate_unit_object_path(object_path)?;
         let properties = self
             .get_all_properties(object_path, SYSTEMD_UNIT_INTERFACE)
@@ -455,7 +498,8 @@ impl NixSystemdReadOnlyObserverV1 {
         let identity = build_definition_identity_from_properties(&properties, expected_unit)?;
         let need_daemon_reload =
             required_bool(&properties, SYSTEMD_UNIT_INTERFACE, "NeedDaemonReload")?;
-        Ok((identity, need_daemon_reload))
+        let invocation_id = required_invocation_id(&properties)?;
+        Ok((identity, need_daemon_reload, invocation_id))
     }
 
     /// Arm the JobRemoved observation channel before any effect is dispatched.
