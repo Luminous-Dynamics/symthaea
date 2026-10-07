@@ -255,6 +255,10 @@ jobs:
                   id: runId,
                   run_attempt: 1,
                   repository: { id: expected.repositoryId },
+                  head_repository: {
+                    id: expected.repositoryId,
+                    full_name: expected.repository,
+                  },
                   workflow_id: expected.workflowId,
                   path: expected.workflowPath,
                   name: expected.workflowName,
@@ -403,6 +407,10 @@ jobs:
               }],
             ];
 
+            const syntheticBaseline = evaluate(syntheticEvidence());
+            const syntheticBaselinePassed =
+              syntheticBaseline.qualificationResult === 'PASS';
+
             const adversarialResults = [];
             for (const [name, mutate] of attackCases) {
               const mutated = JSON.parse(JSON.stringify(syntheticEvidence()));
@@ -417,6 +425,7 @@ jobs:
             }
 
             const adversarialCorpusPassed =
+              syntheticBaselinePassed &&
               adversarialResults.length === attackCases.length &&
               adversarialResults.every((result) => result.passed);
 
@@ -566,6 +575,8 @@ jobs:
               },
               adversarial_verifier_corpus: {
                 test_count: adversarialResults.length,
+                baseline_result: syntheticBaseline.qualificationResult,
+                baseline_passed: syntheticBaselinePassed,
                 passed: adversarialCorpusPassed,
                 cases: adversarialResults,
               },
