@@ -23,7 +23,7 @@ jobs:
   trust-anchor:
     name: Broca independent trust anchor
     if: github.event.workflow_run.event == 'pull_request'
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Checkout base-owned verifier
