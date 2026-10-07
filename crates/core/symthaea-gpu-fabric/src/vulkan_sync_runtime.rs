@@ -15,7 +15,7 @@ use ash::{vk, Device, Entry, Instance};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{VulkanQueueId, VulkanSyncPlan};
+use crate::{ExecutionSchedule, VulkanQueueId, VulkanSyncPlan};
 
 const VULKAN_SYNC_API_VERSION: u32 = vk::API_VERSION_1_3;
 const VULKAN_SYNC_RECEIPT_VERSION: u16 = 1;
@@ -218,6 +218,18 @@ impl SingleQueueVulkanSyncRuntime {
         let queue = unsafe { device.get_device_queue(queue_family_index, 0) };
 
         Ok(Self { instance, device, queue, semaphores: Vec::new() })
+    }
+
+    /// Execute only after independently verifying that the sync plan is the
+    /// canonical lowering of the supplied semantic schedule.
+    pub fn execute_verified(
+        &mut self,
+        schedule: &ExecutionSchedule,
+        plan: &VulkanSyncPlan,
+    ) -> Result<(Vec<u64>, VulkanSyncExecutionReceipt), VulkanSyncRuntimeError> {
+        plan.verify_against_schedule(schedule)
+            .map_err(VulkanSyncRuntimeError::Plan)?;
+        self.execute_with_receipt(plan)
     }
 
     pub fn execute(&mut self, plan: &VulkanSyncPlan) -> Result<Vec<u64>, VulkanSyncRuntimeError> {
@@ -476,6 +488,49 @@ mod tests {
             Err(VulkanSyncRuntimeError::ReceiptCompletionMismatch { queue: 1, .. })
         ));
     }
+    #[test]
+    fn execute_verified_requires_canonical_schedule_lowering() {
+        let r = crate::ResourceId::new("hv").unwrap();
+        let graph = crate::ExecutionGraph::new(
+            vec![
+                crate::ExecutionNode::new(
+                    1,
+                    crate::GpuOperation::HdcBindXor { dimensions: 8 },
+                    vec![crate::ResourceUse::new(r.clone(), crate::AccessKind::Write)],
+                ),
+                crate::ExecutionNode::new(
+                    2,
+                    crate::GpuOperation::HdcBindXor { dimensions: 8 },
+                    vec![crate::ResourceUse::new(r, crate::AccessKind::Read)],
+                ),
+            ],
+            vec![crate::DependencyEdge::new(
+                1,
+                2,
+                crate::ResourceId::new("hv").unwrap(),
+                crate::DependencyKind::ReadAfterWrite,
+            )],
+        )
+        .unwrap();
+        let schedule = crate::ExecutionSchedule::from_graph(&graph).unwrap();
+        let q0 = VulkanQueueId::new(0).unwrap();
+        let q1 = VulkanQueueId::new(1).unwrap();
+        let mut plan = VulkanSyncPlan::from_schedule(
+            &schedule,
+            &[
+                crate::VulkanQueueAssignment { node_id: 1, queue: q0 },
+                crate::VulkanQueueAssignment { node_id: 2, queue: q1 },
+            ],
+        )
+        .unwrap();
+        plan.submissions[1].signal.value += 1;
+
+        assert!(matches!(
+            plan.verify_against_schedule(&schedule),
+            Err(crate::VulkanSyncError::NonCanonicalLowering)
+        ));
+    }
+
     #[test]
     #[ignore = "requires a Vulkan 1.3 qualification runner"]
     fn real_vulkan_timeline_submission_reaches_completion() {
