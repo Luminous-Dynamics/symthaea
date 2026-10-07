@@ -524,7 +524,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
           HDC Linear-Code Bounded Decoder Qualification
           =============================================
-          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v16
+          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v17
           github_run_id=${{ github.run_id }}
           github_run_attempt=${{ github.run_attempt }}
           github_workflow_sha=${{ github.workflow_sha }}
@@ -636,7 +636,7 @@ jobs:
 
       - name: Revalidate uploaded artifact provenance
         id: artifact_revalidate
-        if: always() && steps.upload_receipt.outcome == "success"
+        if: always() && steps.upload_receipt.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
           EXACT_HEAD: ${{ steps.head.outputs.sha }}
