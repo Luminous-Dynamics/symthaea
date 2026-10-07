@@ -433,6 +433,8 @@ pub struct GroundedWorldModelQualificationReport {
     pub closed_loop_prediction_mae: f64,
     pub closed_loop_mean_oracle_horizon_regret: f64,
     pub closed_loop_min_actual_viability_margin: f64,
+    pub closed_loop_execution_failures: usize,
+    pub closed_loop_terminated_on_execution_failure: bool,
     pub perturbations_applied: usize,
 
     /// Time-to-recovery is measured as cycles required to regain the exact
@@ -788,6 +790,8 @@ impl FepModule {
             },
             closed_loop_mean_oracle_horizon_regret: closed_loop.mean_oracle_horizon_regret,
             closed_loop_min_actual_viability_margin: closed_loop.min_actual_viability_margin,
+            closed_loop_execution_failures: closed_loop.execution_failures,
+            closed_loop_terminated_on_execution_failure: closed_loop.terminated_on_execution_failure,
             perturbations_applied: closed_loop.perturbations_applied,
             perturbation_recovery_steps: recovery_steps,
             recovery_rate,
