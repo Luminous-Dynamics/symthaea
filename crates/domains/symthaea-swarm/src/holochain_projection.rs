@@ -116,6 +116,19 @@ impl ReceiptSelectionContext {
         })
     }
 
+    /// Build the durable selection context only after binding the decision to
+    /// the exact receipt collection it claims to describe.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn from_bound_decision(
+        decision: &crate::rfc9942_selection::ReceiptSelectionDecision,
+        collection: &crate::Rfc9942ReceiptCollection,
+    ) -> Result<Self, HolochainProjectionError> {
+        decision
+            .validate_against_collection(collection)
+            .map_err(|_| HolochainProjectionError::InvalidReceiptSelection)?;
+        Self::from_decision(decision)
+    }
+
     fn validate(&self) -> Result<(), HolochainProjectionError> {
         if self.collection_len == 0
             || self.collection_len > MAX_RECEIPT_SELECTION_CANDIDATES
