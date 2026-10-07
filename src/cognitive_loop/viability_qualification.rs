@@ -572,7 +572,7 @@ pub struct RegimeShiftAdaptationEvent {
     pub action: MicroAction,
     pub state_digest: u64,
     pub shifted_validation_mae: f64,
-    pub shifted_validation_error_fraction: f64,
+    pub shifted_validation_error_ratio: f64,
     pub invariant_anchor_mean_mae: f64,
     pub invariant_anchor_regression: f64,
     pub invariant_anchor_max_regression: f64,
@@ -611,11 +611,12 @@ impl RegimeShiftAdaptationReport {
             && self.events.iter().all(|event| {
                 event.state_digest != 0
                     && event.shifted_validation_mae.is_finite()
-                    && event.shifted_validation_error_fraction.is_finite()
+                    && event.shifted_validation_error_ratio.is_finite()
+                    && event.shifted_validation_error_ratio >= 0.0
                     && event.invariant_anchor_mean_mae.is_finite()
                     && event.invariant_anchor_regression.is_finite()
                     && event.invariant_anchor_max_regression.is_finite()
-                    && (0.0..=1.0).contains(&event.shifted_validation_error_fraction)
+                    && (0.0..=1.0).contains(&event.shifted_validation_error_ratio)
             })
             && self.pre_revision_shifted_validation_mae.is_finite()
             && self.final_shifted_validation_mae.is_finite()
@@ -626,6 +627,9 @@ impl RegimeShiftAdaptationReport {
             && self.max_invariant_anchor_regression.is_finite()
             && self.invariant_anchor_regression_event_rate.is_finite()
             && (0.0..=1.0).contains(&self.invariant_anchor_regression_event_rate)
+            && self.revision_latency_updates
+                .map(|latency| latency <= self.update_count)
+                .unwrap_or(true)
     }
 }
 
@@ -1573,14 +1577,17 @@ fn evaluate_regime_shift_adaptation(
     base_model: &super::goal_world::WorldModelBridge,
     scenario: &MicroWorldScenario,
 ) -> RegimeShiftAdaptationReport {
-    const ADAPTATION_SCHEDULE: [MicroAction; 6] = [
+    const ADAPTATION_SCHEDULE: [MicroAction; 8] = [
         MicroAction::Harvest,
         MicroAction::Observe,
+        MicroAction::Harvest,
         MicroAction::Rest,
         MicroAction::Harvest,
         MicroAction::Retreat,
+        MicroAction::Harvest,
         MicroAction::Repair,
     ];
+    const REGIME_SHIFT_STREAM_STEPS: u64 = 16;
 
     let validation_states = regime_shift_validation_states();
     let mut model = base_model.clone();
@@ -1613,11 +1620,15 @@ fn evaluate_regime_shift_adaptation(
 
     let mut events = Vec::new();
     let mut update_count = 0u64;
+    let mut stream_steps = 0u64;
     let mut stream_state = scenario.initial;
 
-    while stream_state.is_viable() && update_count < REGIME_SHIFT_MAX_UPDATES {
+    while stream_state.is_viable()
+        && stream_steps < REGIME_SHIFT_STREAM_STEPS
+        && update_count < REGIME_SHIFT_MAX_UPDATES
+    {
         let cycle = stream_state.cycle;
-        let action = ADAPTATION_SCHEDULE[update_count as usize % ADAPTATION_SCHEDULE.len()];
+        let action = ADAPTATION_SCHEDULE[stream_steps as usize % ADAPTATION_SCHEDULE.len()];
         let before = stream_state;
         let after =
             transition_with_harvest_yield_scale(
@@ -1629,14 +1640,68 @@ fn evaluate_regime_shift_adaptation(
         if action == MicroAction::Harvest {
             predictor.observe_transition(before, action, after);
             update_count = update_count.saturating_add(1);
+
+            let shifted_validation_mae = measure_shifted_harvest_validation_mae(
+                &predictor,
+                &validation_states,
+                REGIME_SHIFT_HARVEST_YIELD_SCALE,
+            );
+            let shifted_validation_error_ratio =
+                if pre_revision_shifted_validation_mae <= f64::EPSILON {
+                    0.0
+                } else {
+                    shifted_validation_mae / pre_revision_shifted_validation_mae
+                };
+
+            let current_invariant_anchor_profile =
+                measure_invariant_anchor_profile(&predictor);
+            let invariant_anchor_mean_mae =
+                if current_invariant_anchor_profile.is_empty() {
+                    0.0
+                } else {
+                    current_invariant_anchor_profile.iter().sum::<f64>()
+                        / current_invariant_anchor_profile.len() as f64
+                };
+            let invariant_anchor_regressions = current_invariant_anchor_profile
+                .iter()
+                .zip(initial_invariant_anchor_profile.iter())
+                .map(|(current, initial)| current - initial)
+                .collect::<Vec<_>>();
+            let invariant_anchor_regression =
+                invariant_anchor_mean_mae - initial_invariant_anchor_mean_mae;
+            let invariant_anchor_max_regression =
+                invariant_anchor_regressions
+                    .iter()
+                    .copied()
+                    .fold(0.0f64, f64::max);
+
+            if revision_latency_updates.is_none()
+                && shifted_validation_mae <= target_error
+            {
+                revision_latency_updates = Some(update_count);
+            }
+
+            events.push(RegimeShiftAdaptationEvent {
+                update_ordinal: update_count,
+                cycle,
+                action,
+                state_digest: before.digest(),
+                shifted_validation_mae,
+                shifted_validation_error_ratio,
+                invariant_anchor_mean_mae,
+                invariant_anchor_regression,
+                invariant_anchor_max_regression,
+            });
         }
         stream_state = after;
-        let shifted_validation_mae = measure_shifted_harvest_validation_mae(
+        stream_steps = stream_steps.saturating_add(1);
+
+        /*
             &predictor,
             &validation_states,
             REGIME_SHIFT_HARVEST_YIELD_SCALE,
         );
-        let shifted_validation_error_fraction = if pre_revision_shifted_validation_mae <= f64::EPSILON {
+        let shifted_validation_error_ratio = if pre_revision_shifted_validation_mae <= f64::EPSILON {
             0.0
         } else {
             (shifted_validation_mae / pre_revision_shifted_validation_mae).clamp(0.0, 1.0)
@@ -1676,7 +1741,7 @@ fn evaluate_regime_shift_adaptation(
             action,
             state_digest: state_digest_seed.digest(),
             shifted_validation_mae,
-            shifted_validation_error_fraction,
+            shifted_validation_error_ratio,
             invariant_anchor_mean_mae,
             invariant_anchor_regression,
             invariant_anchor_max_regression,
