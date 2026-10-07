@@ -10,7 +10,9 @@
 //! - JSON output mode for structured results
 
 use crate::action::authorization::NixLocalExecutionAuthorityV1;
-use crate::action::execution_witness::NixLiveExecutionWitnessV1;
+use crate::action::execution_witness::{
+    NixDispatchExecutableIdentityV1, NixLiveExecutionWitnessV1,
+};
 #[cfg(feature = "systemd-observer")]
 use crate::action::NixSystemdReadOnlyObserverV1;
 use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
@@ -629,6 +631,7 @@ enum ExecutionBasisV1 {
         intent_digest: String,
         approval_request_id: String,
         projection_digest: String,
+        dispatch_executable: Option<NixDispatchExecutableIdentityV1>,
     },
 }
 
@@ -640,6 +643,53 @@ enum ExecutionBasisV1 {
 /// systemctl without containing "systemctl" at the top level.
 ///
 /// Typed NixOSCommand variants are the only non-dry-run effect representation.
+fn resolve_systemctl_executable_identity() -> Result<NixDispatchExecutableIdentityV1, String> {
+    let profile_path = std::path::Path::new("/run/current-system/sw/bin/systemctl");
+    let resolved = std::fs::canonicalize(profile_path)
+        .map_err(|error| format!("cannot resolve NixOS system-profile systemctl: {error}"))?;
+
+    if !resolved.starts_with("/nix/store/") {
+        return Err(format!(
+            "refusing Service dispatch through non-Nix-store systemctl target: {}",
+            resolved.display()
+        ));
+    }
+    if resolved.file_name().and_then(|name| name.to_str()) != Some("systemctl") {
+        return Err(format!(
+            "resolved Service dispatcher is not systemctl: {}",
+            resolved.display()
+        ));
+    }
+
+    let metadata = std::fs::metadata(&resolved)
+        .map_err(|error| format!("cannot stat resolved systemctl: {error}"))?;
+    if !metadata.is_file() {
+        return Err(format!(
+            "resolved systemctl target is not a regular file: {}",
+            resolved.display()
+        ));
+    }
+
+    let bytes = std::fs::read(&resolved)
+        .map_err(|error| format!("cannot hash resolved systemctl: {error}"))?;
+    let digest = blake3::hash(&bytes).to_hex().to_string();
+
+    NixDispatchExecutableIdentityV1::new(resolved.display().to_string(), digest)
+}
+
+fn revalidate_systemctl_executable_identity(
+    expected: &NixDispatchExecutableIdentityV1,
+) -> Result<(), String> {
+    let current = resolve_systemctl_executable_identity()?;
+    if current != *expected {
+        return Err(format!(
+            "authorized systemctl executable identity changed before dispatch: approved={}@{} current={}@{}",
+            expected.path, expected.digest, current.path, current.digest
+        ));
+    }
+    Ok(())
+}
+
 fn legacy_effect_requires_typed_authority(command: &NixOSCommand) -> bool {
     matches!(
         command,
@@ -823,7 +873,15 @@ impl NixOSExecutor {
 
         let start = std::time::Instant::now();
 
-        let result = Command::new(&cmd)
+        let executable = match &basis {
+            ExecutionBasisV1::LiveAuthority {
+                dispatch_executable: Some(identity),
+                ..
+            } => identity.path.as_str(),
+            _ => cmd.as_str(),
+        };
+
+        let result = Command::new(executable)
             .args(&args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -998,10 +1056,20 @@ impl NixOSExecutor {
         let projection_digest = authority.projection_digest().to_string();
         let pre_state_identity = authority.pre_state_identity().map(str::to_owned);
 
+        let dispatch_executable = match &command {
+            NixOSCommand::Service { .. } if !self.dry_run => {
+                Some(resolve_systemctl_executable_identity()?)
+            }
+            _ => None,
+        };
+
         let witness = if self.dry_run {
             None
         } else {
-            match NixLiveExecutionWitnessV1::from_live_authority(&authority) {
+            match NixLiveExecutionWitnessV1::from_live_authority(
+                &authority,
+                dispatch_executable.as_ref(),
+            ) {
                 Ok(witness) => Some(witness),
                 Err(reason) => {
                     return (
@@ -1023,6 +1091,7 @@ impl NixOSExecutor {
                     intent_digest: intent_digest.clone(),
                     approval_request_id: approval_request_id.clone(),
                     projection_digest: projection_digest.clone(),
+                    dispatch_executable: dispatch_executable.clone(),
                 },
             )
             .await;
@@ -1227,6 +1296,19 @@ impl NixOSExecutor {
 
         let (cmd, args) = command.to_command();
 
+        if let ExecutionBasisV1::LiveAuthority {
+            dispatch_executable: Some(executable),
+            ..
+        } = &basis
+        {
+            if let Err(reason) = revalidate_systemctl_executable_identity(executable) {
+                return ExecutionResult::Blocked {
+                    reason,
+                    safety_level: safety,
+                };
+            }
+        }
+
         match &basis {
             ExecutionBasisV1::Phi { phi } => {
                 info!(
@@ -1241,6 +1323,7 @@ impl NixOSExecutor {
                 intent_digest,
                 approval_request_id,
                 projection_digest,
+                ..
             } => {
                 info!(
                     command = %cmd,
