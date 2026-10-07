@@ -415,7 +415,7 @@ fn small_fixture_quotient_metric_matches_ambient_coset_geometry() {
     }
 
     assert!(leaders.iter().all(|&distance| distance <= 4));
-    assert_eq!(*leaders.iter().max().unwrap(), 4);
+    assert_eq!(*leaders.iter().max().expect("non-empty leader profile"), 4);
     assert!(buckets.iter().all(|bucket| bucket.len() == 4));
 
     let mut pair_checks = 0usize;
@@ -424,9 +424,8 @@ fn small_fixture_quotient_metric_matches_ambient_coset_geometry() {
             let mut ambient_distance = usize::MAX;
             for &left_word in &buckets[left] {
                 for &right_word in &buckets[right] {
-                    ambient_distance = ambient_distance.min(
-                        (left_word ^ right_word).count_ones() as usize
-                    );
+                    ambient_distance = ambient_distance
+                        .min((left_word ^ right_word).count_ones() as usize);
                     pair_checks += 1;
                 }
             }
