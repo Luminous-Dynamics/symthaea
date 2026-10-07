@@ -4846,6 +4846,9 @@ fn make_surrogate(
 
 #[cfg(test)]
 mod tests {
+    const CANONICAL_SELECTION_RULE_ID: &str = "relational-inference-selection-rule-v1";
+    const CANONICAL_SELECTION_RULE_SPEC_SHA256: &str =
+        "d4fe1c9b5bdc84b333e17b4bd4075e00c1e7b6de2826c4cd4a715fd1c56ba0e2";
     use super::*;
 
     fn deterministic_sequence(i: usize, frequency: f64, phase: f64) -> f64 {
@@ -5463,8 +5466,8 @@ mod tests {
         let plan = ForecastInferencePlan::new(
             0.5,
             schedule,
-            "relational-inference-selection-rule-v1",
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            CANONICAL_SELECTION_RULE_ID,
+            CANONICAL_SELECTION_RULE_SPEC_SHA256,
             "nested-forecast-bootstrap-v1",
             "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
             "loss-dependence-bartlett-v1",
@@ -5523,8 +5526,8 @@ mod tests {
         let plan = ForecastInferencePlan::new(
             config.forecast_horizon,
             rolling_origin_schedule_sha256(config).unwrap(),
-            "relational-inference-selection-rule-v1",
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            CANONICAL_SELECTION_RULE_ID,
+            CANONICAL_SELECTION_RULE_SPEC_SHA256,
             "nested-forecast-bootstrap-v1",
             "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
             "loss-dependence-bartlett-v1",
@@ -5666,6 +5669,32 @@ mod tests {
             rule_spec_tampered.validate(),
             Err(RelationalPredictionError::InvalidEvidenceInputDigest)
         );
+    }
+
+    #[test]
+    fn canonical_selection_rule_spec_is_exactly_pinned() {
+        let spec = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/docs/research/RELATIONAL_HARMONICS_INFERENCE_SELECTION_RULE_V1.json"
+        ));
+        let mut hasher = Sha256::new();
+        hasher.update(spec);
+        assert_eq!(
+            hex::encode(hasher.finalize()),
+            CANONICAL_SELECTION_RULE_SPEC_SHA256
+        );
+
+        let value: serde_json::Value = serde_json::from_slice(spec).unwrap();
+        assert_eq!(value["schema"], "relational-prediction-inference-selection-rule/v1");
+        assert_eq!(value["rule_id"], CANONICAL_SELECTION_RULE_ID);
+        assert_eq!(value["ordered_rules"].as_array().unwrap().len(), 7);
+        assert_eq!(value["ordered_rules"][5]["id"], "R6");
+        assert_eq!(
+            value["ordered_rules"][5]["then"],
+            "nested-forecast-bootstrap-v1"
+        );
+        assert_eq!(value["decision_semantics"]["result_dependent_method_switching"], false);
+        assert_eq!(value["decision_semantics"]["temporal_preregistration_proof_in_code"], false);
     }
 
     #[test]
