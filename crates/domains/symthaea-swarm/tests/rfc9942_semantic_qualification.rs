@@ -1139,10 +1139,12 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
         .unwrap();
 
     assert_eq!(state.outer_algorithm_id(), COSE_ES256_ALGORITHM_ID);
-    assert_eq!(state.outer_verification_key_sha256(), sha2::Sha256::digest(&key).into());
-    assert_eq!(state.outer_external_aad_sha256(), sha2::Sha256::digest(&[]).into());
-    assert_eq!(state.receipt().verification_key_sha256(), sha2::Sha256::digest(&key).into());
-    assert_eq!(state.receipt().external_aad_sha256(), sha2::Sha256::digest(&[]).into());
+    let expected_key_fingerprint: [u8; 32] = sha2::Sha256::digest(&key).into();
+    let expected_empty_aad_fingerprint: [u8; 32] = sha2::Sha256::digest(&[]).into();
+    assert_eq!(state.outer_verification_key_sha256(), expected_key_fingerprint);
+    assert_eq!(state.outer_external_aad_sha256(), expected_empty_aad_fingerprint);
+    assert_eq!(state.receipt().verification_key_sha256(), expected_key_fingerprint);
+    assert_eq!(state.receipt().external_aad_sha256(), expected_empty_aad_fingerprint);
     assert_eq!(state.receipt_index(), 0);
     assert_eq!(
         state.receipt_placement(),
