@@ -107,7 +107,7 @@ fn validate_sha256_multibase(
     let digest = decode_sha256_multibase(value)?;
     if let Some(expected) = expected_hex_digest {
         let actual = hex::encode(digest);
-        if !is_lower_hex_digest(expected) || !actual.eq_ignore_ascii_case(expected) {
+        if !is_lower_hex_digest(expected) || actual != expected {
             return Err(VerificationFailure::ControllerDocumentIntegrityMismatch {
                 expected: expected.to_owned(),
                 actual,
