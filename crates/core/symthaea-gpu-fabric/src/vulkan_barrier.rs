@@ -458,7 +458,7 @@ impl VulkanBarrierWorkloadRuntime {
                 .iter()
                 .find(|n| n.id == scheduled.id)
                 .ok_or(VulkanBarrierError::UnsupportedNodeShape(scheduled.id))?;
-            let (reads, writes) = canonical_workload_resources(node)?;
+            let (reads, writes) = canonical_workload_resources(node);
             if reads.len() != 2 || writes.len() != 1 || node.resources.len() != 3 {
                 return Err(VulkanBarrierError::UnsupportedNodeShape(node.id));
             }
@@ -648,7 +648,7 @@ fn validate_initial_resources(
 
 fn canonical_workload_resources(
     node: &ExecutionNode,
-) -> Result<(Vec<&crate::ResourceUse>, Vec<&crate::ResourceUse>), VulkanBarrierError> {
+) -> (Vec<&crate::ResourceUse>, Vec<&crate::ResourceUse>) {
     let mut reads = node
         .resources
         .iter()
@@ -663,7 +663,7 @@ fn canonical_workload_resources(
     reads.sort_by(|left, right| left.resource.cmp(&right.resource));
     writes.sort_by(|left, right| left.resource.cmp(&right.resource));
 
-    Ok((reads, writes))
+    (reads, writes)
 }
 
 fn simulate(
@@ -947,8 +947,8 @@ fn barrier_lowering_digest(
     h.update(b"dst-stage:compute-shader\0");
     h.update(b"range-policy:rounded-storage-bytes\0");
     h.update(b"queue-family:ignored\0");
-    h.update(b"descriptor-policy:reads-sorted-by-resource-id\\0");
-    h.update(b"descriptor-policy:single-write-slot\\0");
+    h.update(b"descriptor-policy:reads-sorted-by-resource-id\0");
+    h.update(b"descriptor-policy:single-write-slot\0");
     h.update(b"offset-policy:zero\0");
 
     for kind in [
@@ -1252,6 +1252,26 @@ mod tests {
             barrier_lowering_digest(&plan, &storage_sizes).unwrap()
         );
         assert!(!barrier_lowering_digest(&plan, &storage_sizes).unwrap().is_empty());
+    }
+
+    #[test]
+    fn barrier_lowering_digest_binds_concrete_resource_ranges() {
+        let (_, _, plan, final_state) = fixture();
+        let mut storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| (
+                resource.clone(),
+                rounded_storage_bytes(value.as_bytes().len() as u64),
+            ))
+            .collect::<BTreeMap<_, _>>();
+        let baseline = barrier_lowering_digest(&plan, &storage_sizes).unwrap();
+
+        let mid = ResourceId::new("mid").unwrap();
+        storage_sizes.insert(mid.clone(), storage_sizes[&mid] + 4);
+        assert_ne!(
+            baseline,
+            barrier_lowering_digest(&plan, &storage_sizes).unwrap()
+        );
     }
 
     #[test]
