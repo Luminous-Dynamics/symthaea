@@ -51,7 +51,7 @@ impl ActionConditionedTransitionModel for super::goal_world::WorldModelBridge {
     }
 
     fn action_count(&self) -> usize {
-        self.action_count()
+        super::goal_world::WorldModelBridge::action_count(self)
     }
 
     fn predict_next_state(&self, state: &[f64], action: usize) -> Option<Vec<f64>> {
@@ -65,7 +65,8 @@ impl ActionConditionedTransitionModel for super::goal_world::WorldModelBridge {
     }
 
     fn action_confidence(&self, action: usize) -> Option<f64> {
-        self.action_confidence(action).map(|value| value as f64)
+        super::goal_world::WorldModelBridge::action_confidence(self, action)
+            .map(|value| value as f64)
     }
 }
 
@@ -709,6 +710,41 @@ mod tests {
         let model = super::goal_world::WorldModelBridge::with_actions(2);
         assert!(ActionConditionedTransitionOde::new(&model, 2, 0.1).is_none());
         assert!(roll_transition_model_trajectory(&model, &[0.0; 64], 2, 0.1, 0.1, 32).is_none());
+    }
+
+    #[test]
+    fn world_model_continuous_rollout_reaches_one_step_prediction_at_tau() {
+        let mut model = super::goal_world::WorldModelBridge::with_actions(2);
+        let before = vec![0.0f32; 64];
+        let mut after = before.clone();
+        after[0] = 0.25;
+        after[1] = -0.10;
+
+        for _ in 0..20 {
+            model
+                .observe_action_transition(0, &before, &after)
+                .expect("valid action/state dimensions");
+        }
+
+        let state = vec![0.0f64; 64];
+        let rollout = roll_transition_model_trajectory(
+            &model,
+            &state,
+            0,
+            0.1,
+            0.1,
+            64,
+        )
+        .expect("valid continuous rollout");
+
+        assert_eq!(rollout.one_step_prediction.len(), 64);
+        assert_eq!(rollout.terminal_state.len(), 64);
+        assert!(
+            (rollout.terminal_state[0] - rollout.one_step_prediction[0]).abs() < 2e-3
+        );
+        assert!(
+            (rollout.terminal_state[1] - rollout.one_step_prediction[1]).abs() < 2e-3
+        );
     }
 
     #[test]
