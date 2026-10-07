@@ -1088,6 +1088,47 @@ def main() -> int:
         receipt["verification"]["workflow_gates"] = final_gate_states
         receipt["verification"]["broca_jobs"] = verify_broca_jobs(int(broca_run["id"]))
 
+        # Re-read the PR and complete file snapshot immediately before publishing
+        # PASS. A force-push or base-branch movement after the initial admission
+        # checks must invalidate the verdict instead of leaving old evidence bound
+        # to a newly changed PR state.
+        final_pr = api_request("GET", f"/pulls/{pr_number}")
+        if (
+            final_pr.get("number") != pr_number
+            or final_pr.get("state") != "open"
+            or final_pr.get("draft") is not False
+            or final_pr.get("head", {}).get("sha") != pr.get("head", {}).get("sha")
+            or final_pr.get("head", {}).get("ref") != pr.get("head", {}).get("ref")
+            or final_pr.get("head", {}).get("repo", {}).get("full_name") != REPOSITORY
+            or final_pr.get("head", {}).get("repo", {}).get("id") != REPOSITORY_ID
+            or final_pr.get("base", {}).get("repo", {}).get("full_name") != REPOSITORY
+            or final_pr.get("base", {}).get("repo", {}).get("id") != REPOSITORY_ID
+        ):
+            raise StaleError(
+                "PR state/head/base/repository changed during final reconciliation"
+            )
+
+        final_pr_files = list_pr_files(pr_number)
+        final_snapshot = approved_snapshot(policy, final_pr, final_pr_files)
+        if (
+            final_pr.get("head", {}).get("sha") != TRIGGER_RUN_HEAD_SHA
+            or final_pr.get("base", {}).get("ref") != pr.get("base", {}).get("ref")
+            or final_pr.get("base", {}).get("sha") != pr.get("base", {}).get("sha")
+        ):
+            raise StaleError(
+                "PR exact-head/base identity changed during final reconciliation"
+            )
+
+        receipt["verification"]["final_reconciliation"]["pull_request"] = {
+            "number": final_pr.get("number"),
+            "head_branch": final_pr.get("head", {}).get("ref"),
+            "head_sha": final_pr.get("head", {}).get("sha"),
+            "base_branch": final_pr.get("base", {}).get("ref"),
+            "base_sha": final_pr.get("base", {}).get("sha"),
+            "base_branch_tip_sha": final_snapshot.get("base_branch_tip_sha"),
+            "file_snapshot_verified": True,
+        }
+
         workflow_paths = REQUIRED_WORKFLOWS
 
         for supporting_name in ("Workflow Syntax", "PR Governance"):
