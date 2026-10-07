@@ -434,7 +434,10 @@ pub struct HorizonQualificationPoint {
     pub horizon_steps: usize,
     pub samples: u64,
     pub mean_one_step_mae: f64,
+    /// Error of the continuous ODE rollout against the deterministic oracle.
     pub mean_terminal_mae: f64,
+    /// Error of repeatedly applying the frozen discrete predictor against the same oracle.
+    pub mean_discrete_terminal_mae: f64,
     pub terminal_to_one_step_error_ratio: f64,
 }
 
@@ -551,7 +554,8 @@ fn evaluate_multi_horizon<M: ActionConditionedTransitionModel + ?Sized>(
         let horizon_seconds = horizon_steps as f64 * QUALIFICATION_TAU;
         let mut world = MicroWorld::new(scenario.initial, max_cycles);
         let mut one_step_error = 0.0;
-        let mut terminal_error = 0.0;
+        let mut continuous_terminal_error = 0.0;
+        let mut discrete_terminal_error = 0.0;
         let mut samples = 0u64;
         let mut steps = 0u64;
 
@@ -594,6 +598,31 @@ fn evaluate_multi_horizon<M: ActionConditionedTransitionModel + ?Sized>(
                     actual_terminal = transition(actual_terminal, action);
                 }
 
+                let mut discrete_predicted = encoded.clone();
+                let discrete_valid = (0..horizon_steps).all(|_| {
+                    let Some(next) =
+                        model.predict_next_state(&discrete_predicted, action.index())
+                    else {
+                        return false;
+                    };
+                    discrete_predicted = next;
+                    true
+                });
+
+                if discrete_valid && discrete_predicted.len() >= 5 {
+                    let discrete_mae = [
+                        (discrete_predicted[0] - actual_terminal.energy).abs(),
+                        (discrete_predicted[1] - actual_terminal.integrity).abs(),
+                        (discrete_predicted[2] - actual_terminal.knowledge).abs(),
+                        (discrete_predicted[3] - actual_terminal.threat).abs(),
+                        (discrete_predicted[4] - actual_terminal.progress).abs(),
+                    ]
+                    .iter()
+                    .sum::<f64>()
+                        / 5.0;
+                    discrete_terminal_error += discrete_mae;
+                }
+
                 let predicted_terminal = MicroWorldObservation {
                     cycle: actual_terminal.cycle,
                     energy: rollout.terminal_state[0],
@@ -603,7 +632,7 @@ fn evaluate_multi_horizon<M: ActionConditionedTransitionModel + ?Sized>(
                     progress: rollout.terminal_state[4],
                 };
 
-                terminal_error += predicted_terminal.mean_absolute_delta(actual_terminal);
+                continuous_terminal_error += predicted_terminal.mean_absolute_delta(actual_terminal);
                 samples = samples.saturating_add(1);
             }
 
@@ -613,7 +642,8 @@ fn evaluate_multi_horizon<M: ActionConditionedTransitionModel + ?Sized>(
 
         let denom = samples.max(1) as f64;
         let mean_one_step_mae = one_step_error / denom;
-        let mean_terminal_mae = terminal_error / denom;
+        let mean_terminal_mae = continuous_terminal_error / denom;
+        let mean_discrete_terminal_mae = discrete_terminal_error / denom;
         let ratio = if mean_one_step_mae <= f64::EPSILON {
             if mean_terminal_mae <= f64::EPSILON { 1.0 } else { f64::INFINITY }
         } else {
@@ -625,6 +655,7 @@ fn evaluate_multi_horizon<M: ActionConditionedTransitionModel + ?Sized>(
             samples,
             mean_one_step_mae,
             mean_terminal_mae,
+            mean_discrete_terminal_mae,
             terminal_to_one_step_error_ratio: ratio,
         });
     }
