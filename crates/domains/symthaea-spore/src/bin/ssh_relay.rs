@@ -7641,9 +7641,6 @@ set -eo pipefail
 echo "STAGE: Restoring system image..."
 {restore_artifact_step}
 cp "{path}/configuration.nix" /mnt/etc/nixos/
-if [ -f "{path}/hardware-configuration.nix" ]; then
-    cp "{path}/hardware-configuration.nix" /mnt/etc/nixos/
-fi
 echo "STAGE: Image restored"
 echo "COMPLETE"
 "#,
