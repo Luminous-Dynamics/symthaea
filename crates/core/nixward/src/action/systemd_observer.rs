@@ -522,25 +522,6 @@ impl NixSystemdReadOnlyObserverV1 {
         Ok((identity, need_daemon_reload, invocation_id))
     }
 
-    async fn read_definition_identity_and_invocation_id(
-        &self,
-        object_path: &OwnedObjectPath,
-        expected_unit: &str,
-    ) -> Result<
-        (NixSystemdUnitDefinitionIdentityV1, bool, Option<String>),
-        NixSystemdObserverErrorV1,
-    > {
-        validate_unit_object_path(object_path)?;
-        let properties = self
-            .get_all_properties(object_path, SYSTEMD_UNIT_INTERFACE)
-            .await?;
-        let identity = build_definition_identity_from_properties(&properties, expected_unit)?;
-        let need_daemon_reload =
-            required_bool(&properties, SYSTEMD_UNIT_INTERFACE, "NeedDaemonReload")?;
-        let invocation_id = required_invocation_id(&properties)?;
-        Ok((identity, need_daemon_reload, invocation_id))
-    }
-
     /// Arm the JobRemoved observation channel before any effect is dispatched.
     ///
     /// zbus registers a Manager/JobRemoved match rule before this method returns.
