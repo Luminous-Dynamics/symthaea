@@ -912,6 +912,12 @@ impl NixPostStateReceiptV1 {
             "authorization record digest",
         )?;
         validate_digest(&self.effect_digest, "effect digest")?;
+        if let Some(request_id) = &self.approval_request_id {
+            require_nonempty(request_id, "approval request id")?;
+        }
+        if let Some(projection_digest) = &self.approval_projection_digest {
+            validate_digest(projection_digest, "approval projection digest")?;
+        }
         NixServiceOperationV1::new(self.target_unit.clone(), self.operation)
             .map_err(|_| NixPostStateErrorV1::InvalidServiceUnit)?;
         let expected_effect_digest = service_effect_digest(
