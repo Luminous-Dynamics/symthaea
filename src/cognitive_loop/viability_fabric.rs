@@ -402,6 +402,62 @@ pub struct ViabilityFabric {
     highest_action_id: u64,
 }
 
+/// Cycle-level telemetry view of the viability fabric.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ViabilityTelemetry {
+    pub viability_cycle: u64,
+    pub viability_lifecycle: String,
+    pub viability_resource_mode: String,
+    pub viability_pressure: f64,
+    pub viability_resource_pressure: f64,
+    pub viability_world_prediction_error: f64,
+    pub viability_self_prediction_error: f64,
+    pub viability_interoceptive_prediction_error: f64,
+    pub viability_goal_prediction_error: f64,
+    pub viability_model_uncertainty: f64,
+    pub viability_execution_prediction_error: f64,
+}
+
+impl CognitiveResourceMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Full => "Full",
+            Self::Focused => "Focused",
+            Self::Recovery => "Recovery",
+            Self::Survival => "Survival",
+        }
+    }
+}
+
+impl LifecyclePhase {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Active => "Active",
+            Self::Recovery => "Recovery",
+            Self::Consolidation => "Consolidation",
+        }
+    }
+}
+
+impl ViabilityState {
+    pub fn telemetry(&self) -> ViabilityTelemetry {
+        let decision = self.regulation_decision(RegulationThresholds::default());
+        ViabilityTelemetry {
+            viability_cycle: self.cycle,
+            viability_lifecycle: self.lifecycle.as_str().to_string(),
+            viability_resource_mode: decision.mode.as_str().to_string(),
+            viability_pressure: decision.pressure,
+            viability_resource_pressure: self.aggregate_pressure(),
+            viability_world_prediction_error: self.prediction_errors.world,
+            viability_self_prediction_error: self.prediction_errors.self_model,
+            viability_interoceptive_prediction_error: self.prediction_errors.interoceptive,
+            viability_goal_prediction_error: self.prediction_errors.goal,
+            viability_model_uncertainty: self.prediction_errors.model_confidence,
+            viability_execution_prediction_error: self.prediction_errors.execution,
+        }
+    }
+}
+
 impl Default for ViabilityFabric {
     fn default() -> Self {
         Self::new(1024)
