@@ -59,8 +59,9 @@ const TRAJECTORY_HISTORY_CAP: usize = 16;
 /// The discrete transition `s' = A * s` is converted to continuous dynamics:
 /// `ds/dt = (A * s - s) / tau`
 ///
-/// This is the standard continuous-time embedding of a discrete Markov chain
-/// (matrix exponential: `exp(t * (A-I)/tau)` recovers the discrete step at `t=tau`).
+/// This is a continuous relaxation toward the discrete transition field.
+/// It does not, in general, equal one discrete transition at `t=tau`; for
+/// a constant target the state has moved by `1 - exp(-t/tau)` of the gap.
 pub struct GenerativeModelOde {
     /// Transition matrix for the selected action (row-major: transition[from][to]).
     transition: Vec<Vec<f64>>,
@@ -204,6 +205,10 @@ pub struct FepModule {
     /// World Model Bridge for hierarchical grounded prediction.
     pub world_model: WorldModelBridge,
 
+    /// Viability Fabric joins FEP, world-model, and action/outcome evidence without adding
+    /// another field to CognitiveLoopService.
+    pub viability_fabric: super::viability_fabric::ViabilityFabric,
+
     /// FEP Active Inference Agent for full perception-action loop.
     pub agent: ActiveInferenceAgent,
 
@@ -226,6 +231,10 @@ pub struct FepModule {
 
     /// Configuration for ODE-based trajectory planning.
     pub trajectory_config: TrajectoryPlanningConfig,
+
+    /// Opt-in viability modulation of the existing temporal planning-depth factor.
+    /// Disabled by default until empirical qualification is complete.
+    viability_horizon_modulation_enabled: bool,
 
     /// Latest trajectory planning telemetry.
     pub trajectory_telemetry: TrajectoryTelemetry,
@@ -253,6 +262,7 @@ impl FepModule {
             episodic_memory,
             goal_system,
             world_model,
+            viability_fabric: super::viability_fabric::ViabilityFabric::new(1024),
             agent,
             haptic_semantic_binder,
             enhanced_bridge,
@@ -261,8 +271,111 @@ impl FepModule {
             lr_boost: 1.0,
             surprise_bridge: None,
             trajectory_config: TrajectoryPlanningConfig::default(),
+            viability_horizon_modulation_enabled: false,
             trajectory_telemetry: TrajectoryTelemetry::default(),
             trajectory_history: VecDeque::new(),
+        }
+    }
+
+    /// Refresh observational viability signals from canonical cognitive-loop state.
+    ///
+    /// This method is intentionally observational: it records current thermodynamic load,
+    /// prediction error, and evidence-adjusted prediction uncertainty without changing policy.
+    pub fn refresh_viability(
+        &mut self,
+        cycle: u64,
+        thermodynamic_load: f64,
+        average_prediction_error: f64,
+        prediction_confidence: f64,
+    ) {
+        self.viability_fabric.begin_cycle(cycle);
+        self.viability_fabric.observe_variable(
+            "thermodynamic_load",
+            super::viability_fabric::ViabilitySignal::new(
+                thermodynamic_load,
+                1.0,
+                cycle,
+                "cognitive_loop::thermodynamic_load",
+            ),
+            super::viability_fabric::ViabilityBand {
+                preferred: (0.0, 0.70),
+                tolerated: (0.0, 0.90),
+                critical: (0.0, 1.0),
+            },
+            None,
+        );
+
+        let energy_reserve = if self.ledger.capacity_j > 0.0 {
+            (self.ledger.energy_j / self.ledger.capacity_j).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        self.viability_fabric.observe_variable(
+            "thermodynamic_energy_reserve",
+            super::viability_fabric::ViabilitySignal::new(
+                energy_reserve,
+                1.0,
+                cycle,
+                "fep::thermodynamic_ledger",
+            ),
+            super::viability_fabric::ViabilityBand {
+                preferred: (0.30, 1.0),
+                tolerated: (0.10, 1.0),
+                critical: (0.0, 1.0),
+            },
+            None,
+        );
+
+        let errors = &mut self.viability_fabric.state_mut().prediction_errors;
+        errors.world = average_prediction_error.clamp(0.0, 1.0);
+
+        // A neutral prior is not itself a recovery condition. Only confidence below the
+        // existing trust floor contributes regulation pressure.
+        let trust_floor = 0.4_f64;
+        errors.model_confidence = if prediction_confidence < trust_floor {
+            ((trust_floor - prediction_confidence) / trust_floor).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+    }
+
+    /// Read the current viability telemetry snapshot.
+    pub fn viability_telemetry(&self) -> super::viability_fabric::ViabilityTelemetry {
+        let mut telemetry = self.viability_fabric.state().telemetry();
+        telemetry.viability_trace_digest = self.viability_fabric.latest_trace_digest();
+        telemetry.viability_planning_horizon_scale = self.viability_planning_horizon_scale();
+        telemetry
+    }
+
+    /// Enable the opt-in viability modulation of the existing planning-depth factor.
+    pub fn enable_viability_horizon_modulation(&mut self) {
+        self.viability_horizon_modulation_enabled = true;
+    }
+
+    /// Whether viability modulation is enabled for temporal planning depth.
+    pub fn viability_horizon_modulation_enabled(&self) -> bool {
+        self.viability_horizon_modulation_enabled
+    }
+
+    fn viability_planning_scale_from_pressure(pressure: f64) -> f64 {
+        super::viability_fabric::RegulationDecision::from_pressure(
+            pressure,
+            super::viability_fabric::RegulationThresholds::default(),
+        )
+        .planning_horizon_scale
+        .clamp(0.25, 1.0)
+    }
+
+    /// Current bounded viability multiplier for the existing planning-depth factor.
+    ///
+    /// This never changes behavior unless explicitly enabled.
+    pub fn viability_planning_horizon_scale(&self) -> f64 {
+        if !self.viability_horizon_modulation_enabled {
+            1.0
+        } else {
+            Self::viability_planning_scale_from_pressure(
+                self.viability_fabric.regulation_pressure(),
+            )
         }
     }
 
@@ -568,5 +681,19 @@ impl FepModule {
     /// Get the current effective blanket permeability.
     pub fn blanket_effective_permeability(&self) -> f64 {
         self.enhanced_bridge.blanket.permeability().effective
+    }
+}
+
+#[cfg(test)]
+mod viability_planning_tests {
+    use super::FepModule;
+
+    #[test]
+    fn viability_planning_scale_contracts_as_pressure_rises() {
+        let low = FepModule::viability_planning_scale_from_pressure(0.0);
+        let high = FepModule::viability_planning_scale_from_pressure(0.9);
+        assert!((low - 1.0).abs() < f64::EPSILON);
+        assert!((0.25..=1.0).contains(&high));
+        assert!(high < low);
     }
 }

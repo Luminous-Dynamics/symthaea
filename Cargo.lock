@@ -19530,6 +19530,17 @@ name = "symthaea-order-theory"
 version = "0.1.0"
 
 [[package]]
+name = "symthaea-observation-attestation"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "ed25519-dalek 2.1.0",
+ "serde",
+ "symthaea-core",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "symthaea-organic-chemistry"
 version = "0.1.0"
 

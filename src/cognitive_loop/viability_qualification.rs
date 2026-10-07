@@ -1,0 +1,3877 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Experimental qualification bridge between the live FEP world-model field and the
+//! deterministic synthetic organism micro-world.
+//!
+//! This is deliberately a qualification layer, not a second planner:
+//! - the existing FEP ODE planner remains untouched;
+//! - the existing FepModule::world_model becomes the predictor under test;
+//! - the deterministic micro-world remains the sole source of ground-truth consequences;
+//! - held-out evaluation freezes learning before scoring;
+//! - confidence calibration is measured explicitly instead of inferred from sample count.
+//!
+//! Scientific boundary: these metrics qualify prediction, calibration, survival, recovery,
+//! and transfer. They do not establish consciousness, sentience, subjective experience,
+//! biological life, or agency.
+
+use serde::{Deserialize, Serialize};
+
+use super::fep_module::FepModule;
+use super::viability_micro_world::{
+    benchmark_manifest_digest, benchmark_scenarios, procedural_held_out_manifest_digest,
+    procedural_held_out_scenarios, run_homeostatic_agent_horizon_scenario, MicroAction, MicroWorld,
+    transition, transition_with_harvest_yield_scale, MicroWorldObservation, MicroWorldPredictor,
+    MicroWorldScenario, PersistencePredictor, ProceduralMicroWorldScenario,
+};
+
+use crate::dynamics::ode_solvers::{
+    OdeConfig, OdeResult, OdeSolver, OdeSolverEngine, OdeSystem,
+};
+use symthaea_fep::{GenerativeModel, HiddenState};
+
+/// Common action-conditioned transition contract used by both learned and generative
+/// transition models.
+///
+/// The interface is deliberately representation-neutral: callers provide a continuous
+/// state vector and receive the model's one-step expected state. A model may optionally
+/// expose action-level confidence when it has an evidence-bearing confidence signal.
+pub trait ActionConditionedTransitionModel {
+    fn state_dimension(&self) -> usize;
+    fn action_count(&self) -> usize;
+
+    fn predict_next_state(&self, state: &[f64], action: usize) -> Option<Vec<f64>>;
+
+    fn action_confidence(&self, _action: usize) -> Option<f64> {
+        None
+    }
+}
+
+impl ActionConditionedTransitionModel for super::goal_world::WorldModelBridge {
+    fn state_dimension(&self) -> usize {
+        super::goal_world::WorldModelBridge::state_dimension(self)
+    }
+
+    fn action_count(&self) -> usize {
+        super::goal_world::WorldModelBridge::action_count(self)
+    }
+
+    fn predict_next_state(&self, state: &[f64], action: usize) -> Option<Vec<f64>> {
+        if state.len() != self.state_dimension() {
+            return None;
+        }
+
+        let input: Vec<f32> = state.iter().map(|&value| value as f32).collect();
+        self.predict_action(action, &input)
+            .map(|predicted| predicted.into_iter().map(|value| value as f64).collect())
+    }
+
+    fn action_confidence(&self, action: usize) -> Option<f64> {
+        super::goal_world::WorldModelBridge::action_confidence(self, action)
+            .map(|value| value as f64)
+    }
+}
+
+impl ActionConditionedTransitionModel for GenerativeModel {
+    fn state_dimension(&self) -> usize {
+        self.state_dim
+    }
+
+    fn action_count(&self) -> usize {
+        self.num_actions
+    }
+
+    fn predict_next_state(&self, state: &[f64], action: usize) -> Option<Vec<f64>> {
+        if state.len() != self.state_dim || action >= self.num_actions {
+            return None;
+        }
+
+        let hidden = HiddenState {
+            mean: state.to_vec(),
+            precision: vec![1.0; self.state_dim],
+            mode_probs: vec![1.0],
+            current_mode: 0,
+        };
+
+        Some(symthaea_fep::GenerativeModel::predict_next_state(
+            self, &hidden, action,
+        )
+        .mean)
+    }
+}
+
+/// Continuous extension of an action-conditioned discrete transition model.
+///
+/// The field is explicitly defined as:
+///
+/// ds/dt = (F(s,a) - s) / tau
+///
+/// For a delta model, F(s,a)=s+delta, so the field becomes a constant action-specific
+/// velocity. This is a qualification adapter, not an assertion that this extension is
+/// the only scientifically valid continuous-time realization.
+pub struct ActionConditionedTransitionOde<'a, M: ActionConditionedTransitionModel + ?Sized> {
+    pub model: &'a M,
+    pub action: usize,
+    pub tau: f64,
+    pub dim: usize,
+}
+
+impl<'a, M: ActionConditionedTransitionModel + ?Sized>
+    ActionConditionedTransitionOde<'a, M>
+{
+    pub fn new(model: &'a M, action: usize, tau: f64) -> Option<Self> {
+        let dim = model.state_dimension();
+        if dim == 0
+            || action >= model.action_count()
+            || !tau.is_finite()
+            || tau <= 0.0
+        {
+            return None;
+        }
+
+        Some(Self {
+            model,
+            action,
+            tau,
+            dim,
+        })
+    }
+}
+
+impl<M: ActionConditionedTransitionModel + ?Sized> OdeSystem
+    for ActionConditionedTransitionOde<'_, M>
+{
+    fn dimension(&self) -> usize {
+        self.dim
+    }
+
+    fn evaluate(&self, _t: f64, state: &[f64], derivative: &mut [f64]) {
+        let Some(next) = self.model.predict_next_state(state, self.action) else {
+            derivative.fill(0.0);
+            return;
+        };
+
+        if next.len() != self.dim {
+            derivative.fill(0.0);
+            return;
+        }
+
+        for i in 0..self.dim {
+            derivative[i] = (next[i] - state[i]) / self.tau;
+        }
+    }
+}
+
+/// Result of a continuous trajectory rollout through a shared transition model.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ContinuousTransitionRollout {
+    pub action: usize,
+    pub horizon_seconds: f64,
+    pub tau: f64,
+    pub ode_steps: usize,
+    pub initial_state: Vec<f64>,
+    pub one_step_prediction: Vec<f64>,
+    pub terminal_state: Vec<f64>,
+    pub action_confidence: Option<f64>,
+}
+
+/// Roll a single action through the shared transition interface using the existing
+/// Dormand-Prince ODE engine.
+///
+/// This function is intentionally isolated from runtime policy. Its purpose is to test
+/// whether a model that predicts one-step consequences also supports coherent continuous
+/// extrapolation.
+pub fn roll_transition_model_trajectory<M: ActionConditionedTransitionModel + ?Sized>(
+    model: &M,
+    state: &[f64],
+    action: usize,
+    horizon_seconds: f64,
+    tau: f64,
+    max_steps: usize,
+) -> Option<ContinuousTransitionRollout> {
+    if state.len() != model.state_dimension()
+        || state.iter().any(|value| !value.is_finite())
+        || !horizon_seconds.is_finite()
+        || horizon_seconds <= 0.0
+        || max_steps == 0
+    {
+        return None;
+    }
+
+    let one_step_prediction = model.predict_next_state(state, action)?;
+    if one_step_prediction.len() != state.len()
+        || one_step_prediction.iter().any(|value| !value.is_finite())
+    {
+        return None;
+    }
+
+    let ode_config = OdeConfig {
+        solver: OdeSolver::DormandPrince,
+        dt: 0.01,
+        tolerance: 1e-4,
+        max_step: (horizon_seconds / 5.0).max(1e-6),
+        min_step: 1e-8,
+        max_iterations: max_steps,
+    };
+    let solver = OdeSolverEngine::new(ode_config, state.len());
+    let ode_system = ActionConditionedTransitionOde::new(model, action, tau)?;
+
+    let result: OdeResult =
+        solver.solve(&ode_system, state, (0.0, horizon_seconds));
+
+    let terminal_state = result
+        .states
+        .last()
+        .cloned()
+        .filter(|values| {
+            values.len() == state.len() && values.iter().all(|value| value.is_finite())
+        })?;
+
+    Some(ContinuousTransitionRollout {
+        action,
+        horizon_seconds,
+        tau,
+        ode_steps: result.times.len(),
+        initial_state: state.to_vec(),
+        one_step_prediction,
+        terminal_state,
+        action_confidence: model.action_confidence(action),
+    })
+}
+
+/// Confidence calibration statistics for continuous one-step state forecasts.
+///
+/// realized_accuracy = 1 - MAE is valid here because every micro-world state channel
+/// is bounded to [0, 1]. This is an operational forecast score, not a claim that the
+/// model's confidence is a calibrated probability of a discrete event.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ConfidenceCalibration {
+    pub sample_count: u64,
+    pub expected_calibration_error: f64,
+    pub confidence_accuracy_mse: f64,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct CalibrationBin {
+    count: u64,
+    confidence_sum: f64,
+    accuracy_sum: f64,
+}
+
+#[derive(Debug, Clone)]
+struct CalibrationAccumulator {
+    bins: [CalibrationBin; 10],
+    squared_error_sum: f64,
+    count: u64,
+}
+
+impl Default for CalibrationAccumulator {
+    fn default() -> Self {
+        Self {
+            bins: [CalibrationBin::default(); 10],
+            squared_error_sum: 0.0,
+            count: 0,
+        }
+    }
+}
+
+impl CalibrationAccumulator {
+    fn record(&mut self, confidence: f64, mae: f64) {
+        let confidence = confidence.clamp(0.0, 1.0);
+        let realized_accuracy = (1.0 - mae.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+        let bin_index = ((confidence * 10.0).floor() as usize).min(9);
+        let bin = &mut self.bins[bin_index];
+
+        bin.count = bin.count.saturating_add(1);
+        bin.confidence_sum += confidence;
+        bin.accuracy_sum += realized_accuracy;
+
+        let squared_error = (confidence - realized_accuracy).powi(2);
+        self.squared_error_sum += squared_error;
+        self.count = self.count.saturating_add(1);
+    }
+
+    fn finish(&self) -> ConfidenceCalibration {
+        if self.count == 0 {
+            return ConfidenceCalibration {
+                sample_count: 0,
+                expected_calibration_error: 0.0,
+                confidence_accuracy_mse: 0.0,
+            };
+        }
+
+        let total = self.count as f64;
+        let expected_calibration_error = self
+            .bins
+            .iter()
+            .filter(|bin| bin.count > 0)
+            .map(|bin| {
+                let n = bin.count as f64;
+                let mean_confidence = bin.confidence_sum / n;
+                let mean_accuracy = bin.accuracy_sum / n;
+                (n / total) * (mean_confidence - mean_accuracy).abs()
+            })
+            .sum();
+
+        ConfidenceCalibration {
+            sample_count: self.count,
+            expected_calibration_error,
+            confidence_accuracy_mse: self.squared_error_sum / total,
+        }
+    }
+}
+
+/// Adapter exposing the live FepModule world-model through the deterministic
+/// micro-world predictor contract.
+struct FepWorldModelPredictor<'a> {
+    bridge: &'a mut super::goal_world::WorldModelBridge,
+}
+
+impl MicroWorldPredictor for FepWorldModelPredictor<'_> {
+    fn predict(
+        &self,
+        state: MicroWorldObservation,
+        action: MicroAction,
+    ) -> MicroWorldObservation {
+        let mut encoded = vec![0.0f32; 64];
+        encoded[0] = state.energy as f32;
+        encoded[1] = state.integrity as f32;
+        encoded[2] = state.knowledge as f32;
+        encoded[3] = state.threat as f32;
+        encoded[4] = state.progress as f32;
+
+        let Some(predicted) = self.bridge.predict_action(action.index(), &encoded) else {
+            return state;
+        };
+
+        let get = |index: usize| predicted.get(index).copied().unwrap_or(f64::NAN);
+        MicroWorldObservation {
+            cycle: state.cycle.saturating_add(1),
+            energy: get(0),
+            integrity: get(1),
+            knowledge: get(2),
+            threat: get(3),
+            progress: get(4),
+        }
+    }
+
+    fn prediction_confidence(&self, action: MicroAction) -> f64 {
+        self.bridge
+            .action_confidence(action.index())
+            .unwrap_or(0.0) as f64
+    }
+
+    fn observe_transition(
+        &mut self,
+        before: MicroWorldObservation,
+        action: MicroAction,
+        after: MicroWorldObservation,
+    ) {
+        let mut before_encoded = vec![0.0f32; 64];
+        before_encoded[0] = before.energy as f32;
+        before_encoded[1] = before.integrity as f32;
+        before_encoded[2] = before.knowledge as f32;
+        before_encoded[3] = before.threat as f32;
+        before_encoded[4] = before.progress as f32;
+
+        let mut after_encoded = vec![0.0f32; 64];
+        after_encoded[0] = after.energy as f32;
+        after_encoded[1] = after.integrity as f32;
+        after_encoded[2] = after.knowledge as f32;
+        after_encoded[3] = after.threat as f32;
+        after_encoded[4] = after.progress as f32;
+
+        let _ = self.bridge.observe_action_transition(
+            action.index(),
+            &before_encoded,
+            &after_encoded,
+        );
+    }
+}
+
+/// Result of the grounded world-model qualification experiment.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GroundedWorldModelQualificationReport {
+    /// Stable digest of the complete scenario family used by this qualification.
+    pub benchmark_manifest_digest: u64,
+    /// Stable digest of the scenario used for adaptation.
+    pub training_scenario_manifest_digest: u64,
+    /// Stable digest of the primary frozen scenario used for transfer.
+    pub held_out_scenario_manifest_digest: u64,
+    pub training_scenario: &'static str,
+    pub held_out_scenario: &'static str,
+
+    pub train_steps: u64,
+    pub train_predictor_mae: f64,
+
+    pub held_out_steps: u64,
+    pub held_out_baseline_mae: f64,
+    pub held_out_predictor_mae: f64,
+    pub held_out_improvement_over_baseline: f64,
+    pub held_out_confidence_calibration: ConfidenceCalibration,
+    pub held_out_continuous_rollout_steps: u64,
+    pub held_out_continuous_rollout_mae: f64,
+    pub held_out_multi_horizon: Vec<HorizonQualificationPoint>,
+    pub held_out_survived_fixed_schedule: bool,
+
+    /// Frozen-model policy evaluation on states induced by the model's own actions.
+    pub policy_induced_shift: PolicyInducedShiftReport,
+
+    /// Agreement between predicted action ordering and oracle action ordering.
+    pub held_out_policy_ranking: PolicyRankingQualificationReport,
+
+    /// Frozen environment-level counterfactual query bank on off-trajectory probe states.
+    pub environment_query_report: EnvironmentQueryQualificationReport,
+
+    /// Complete leave-one-scenario-out transfer matrix across the benchmark family.
+    pub cross_scenario_transfer: CrossScenarioTransferReport,
+
+    /// Frozen transfer to a procedurally generated scenario family never used for adaptation.
+    pub procedural_held_out_transfer: ProceduralHeldOutTransferReport,
+
+    /// Isolated response to perturbation-induced prediction error.
+    pub learning_response: LearningResponseReport,
+    /// Cumulative adaptation stream with explicit prior-shock and invariant-anchor retention.
+    pub sequential_learning_response: SequentialLearningResponseReport,
+    /// Prediction-error changepoint detection before regime adaptation.
+    pub change_detection: ChangeDetectionReport,
+    /// Adaptation latency for a deliberate change in one revisable environment fact.
+    pub regime_shift_adaptation: RegimeShiftAdaptationReport,
+
+    pub persistence_closed_loop_survived: bool,
+    pub persistence_closed_loop_mean_oracle_horizon_regret: f64,
+    pub persistence_recovery_rate: f64,
+    pub persistence_mean_recovery_steps: f64,
+
+    pub closed_loop_survived: bool,
+    pub closed_loop_steps: u64,
+    pub closed_loop_prediction_mae: f64,
+    pub closed_loop_mean_oracle_horizon_regret: f64,
+    pub closed_loop_min_actual_viability_margin: f64,
+    pub closed_loop_execution_failures: usize,
+    pub closed_loop_terminated_on_execution_failure: bool,
+    pub perturbations_applied: usize,
+
+    /// Time-to-recovery is measured as cycles required to regain the exact
+    /// pre-perturbation viability margin. None means no recovery occurred.
+    pub perturbation_recovery_steps: Vec<Option<u64>>,
+    pub recovery_rate: f64,
+    pub mean_recovery_steps: f64,
+}
+
+/// Per-perturbation adaptation receipt.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LearningResponseEvent {
+    pub cycle: u64,
+    pub action: MicroAction,
+    pub shock_state_digest: u64,
+    pub shock_mae_before_update: f64,
+    pub shock_mae_after_update: f64,
+    pub same_transition_improvement: f64,
+    pub neighbor_mae_before_update: f64,
+    pub neighbor_mae_after_update: f64,
+    pub neighbor_improvement: f64,
+    /// Mean error across the complete invariant anchor action set.
+    pub anchor_mean_mae_before_update: f64,
+    pub anchor_mean_mae_after_update: f64,
+    pub anchor_mean_regression: f64,
+    /// Worst single-action regression across the anchor set for this shock.
+    pub anchor_max_regression: f64,
+}
+
+/// Measures prediction-error response to deterministic perturbation shocks.
+///
+/// Each shock is scored before learning, after exactly one observed transition update on the
+/// shock itself, and again on a nearby probe state. The nearby probe prevents an update that
+/// merely memorizes the exact observed tuple from being counted as full adaptation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LearningResponseReport {
+    pub shock_count: u64,
+    pub events: Vec<LearningResponseEvent>,
+    pub mean_shock_mae_before_update: f64,
+    pub mean_shock_mae_after_update: f64,
+    pub mean_same_transition_improvement: f64,
+    pub same_transition_improvement_rate: f64,
+    pub mean_neighbor_mae_before_update: f64,
+    pub mean_neighbor_mae_after_update: f64,
+    pub mean_neighbor_improvement: f64,
+    pub neighbor_improvement_rate: f64,
+    /// Regression of a previously learned anchor transition after shock adaptation.
+    pub mean_anchor_mae_before_update: f64,
+    pub mean_anchor_mae_after_update: f64,
+    pub mean_anchor_regression: f64,
+    /// Worst single invariant-probe regression observed across all shock folds.
+    pub max_anchor_regression: f64,
+    pub anchor_regression_rate: f64,
+}
+
+impl LearningResponseReport {
+    pub fn is_populated(&self) -> bool {
+        self.shock_count > 0
+    }
+}
+
+
+/// Per-shock receipt for one cumulative adaptation stream.
+///
+/// Unlike the isolated learning-response experiment, this event belongs to one model
+/// instance that learns from every shock in sequence. Anchor regression is measured
+/// against the model's pre-stream anchor errors so later corrections cannot hide
+/// earlier forgetting.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SequentialLearningResponseEvent {
+    pub cycle: u64,
+    pub action: MicroAction,
+    pub shock_state_digest: u64,
+    pub shock_mae_before_update: f64,
+    pub shock_mae_after_update: f64,
+    pub same_transition_improvement: f64,
+    pub neighbor_mae_before_update: f64,
+    pub neighbor_mae_after_update: f64,
+    pub neighbor_improvement: f64,
+    pub anchor_mean_mae_from_initial: f64,
+    pub anchor_mean_regression_from_initial: f64,
+    pub anchor_max_regression_from_initial: f64,
+    pub prior_shock_mean_regression: f64,
+    pub prior_shock_max_regression: f64,
+    pub prior_shock_retention_rate: f64,
+}
+
+/// Measures retention across a single cumulative adaptation stream.
+///
+/// Every shock updates the same model instance. After each update, previously learned
+/// shock transitions and invariant anchors are re-tested. Revision quality and retention
+/// remain separate quantities.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SequentialLearningResponseReport {
+    pub shock_count: u64,
+    pub events: Vec<SequentialLearningResponseEvent>,
+    pub mean_shock_mae_before_update: f64,
+    pub mean_shock_mae_after_update: f64,
+    pub mean_same_transition_improvement: f64,
+    pub same_transition_improvement_rate: f64,
+    pub mean_neighbor_mae_before_update: f64,
+    pub mean_neighbor_mae_after_update: f64,
+    pub mean_neighbor_improvement: f64,
+    pub neighbor_improvement_rate: f64,
+    pub initial_anchor_mean_mae: f64,
+    pub final_anchor_mean_mae: f64,
+    pub final_anchor_regression_from_initial: f64,
+    pub max_anchor_regression_from_initial: f64,
+    pub anchor_regression_event_rate: f64,
+    pub prior_shock_retention_rate: f64,
+    pub max_prior_shock_regression: f64,
+}
+
+/// Per-observation receipt for deterministic prediction-error change detection.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChangeDetectionEvent {
+    pub observation_ordinal: u64,
+    pub state_digest: u64,
+    pub residual_mae: f64,
+    pub upper_cusum: f64,
+    pub lower_cusum: f64,
+    pub cusum_score: f64,
+    pub detection_direction: &'static str,
+    pub detected: bool,
+}
+
+/// Prediction-error change detector report.
+///
+/// The detector is intentionally separated from adaptation: it observes residuals but never
+/// updates the world model. A nominal control stream measures false alarms before the shifted
+/// regime is evaluated.
+///
+/// Episode-level receipt used to characterize detector operating behavior across
+/// independent held-out control and shift conditions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChangeDetectionEpisode {
+    pub harvest_yield_scale: f64,
+    pub state_digest: u64,
+    pub detected: bool,
+    pub detection_observation: Option<u64>,
+    pub detection_direction: &'static str,
+}
+
+/// Operating characteristics for the changepoint detector.
+///
+/// These measurements keep a single successful shift/control pair from being mistaken for
+/// detector qualification. They report episode-level false-alarm and detection behavior
+/// across multiple held-out states and both shift polarities. A gradual-drift episode is
+/// recorded as a specificity diagnostic because this CUSUM configuration targets abrupt
+/// shifts rather than gradual nonstationarity.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChangeDetectionOperatingCharacteristics {
+    pub nominal_episode_count: u64,
+    pub nominal_false_alarm_episode_rate: f64,
+    pub shift_episode_count: u64,
+    pub shift_detection_rate: f64,
+    pub decrease_shift_count: u64,
+    pub decrease_correct_direction_rate: f64,
+    pub increase_shift_count: u64,
+    pub increase_correct_direction_rate: f64,
+    pub mean_detection_delay_observations: Option<f64>,
+    pub worst_detection_delay_observations: Option<u64>,
+    pub nominal_episodes: Vec<ChangeDetectionEpisode>,
+    pub shift_episodes: Vec<ChangeDetectionEpisode>,
+    pub gradual_drift_detected: bool,
+    pub gradual_drift_events: Vec<ChangeDetectionEvent>,
+}
+
+impl ChangeDetectionOperatingCharacteristics {
+    pub fn is_populated(&self) -> bool {
+        self.nominal_episode_count > 0
+            && self.shift_episode_count > 0
+            && !self.nominal_episodes.is_empty()
+            && !self.shift_episodes.is_empty()
+    }
+
+    pub fn is_scoreable(&self) -> bool {
+        self.is_populated()
+            && self.nominal_episodes.len() as u64 == self.nominal_episode_count
+            && self.shift_episodes.len() as u64 == self.shift_episode_count
+            && self.nominal_false_alarm_episode_rate.is_finite()
+            && (0.0..=1.0).contains(&self.nominal_false_alarm_episode_rate)
+            && self.shift_detection_rate.is_finite()
+            && (0.0..=1.0).contains(&self.shift_detection_rate)
+            && self.decrease_shift_count > 0
+            && self.decrease_correct_direction_rate.is_finite()
+            && (0.0..=1.0).contains(&self.decrease_correct_direction_rate)
+            && self.increase_shift_count > 0
+            && self.increase_correct_direction_rate.is_finite()
+            && (0.0..=1.0).contains(&self.increase_correct_direction_rate)
+            && self
+                .mean_detection_delay_observations
+                .map(|value| value.is_finite() && value > 0.0)
+                .unwrap_or(true)
+            && self
+                .worst_detection_delay_observations
+                .map(|value| value > 0)
+                .unwrap_or(true)
+            && self.nominal_episodes.iter().all(|episode| {
+                episode.harvest_yield_scale.is_finite()
+                    && episode.state_digest != 0
+                    && matches!(episode.detection_direction, "increase" | "decrease" | "none")
+                    && episode.detection_observation.map_or(
+                        true,
+                        |observation| observation > 0 && observation <= CHANGE_DETECTION_CONTROL_STEPS,
+                    )
+            })
+            && self.shift_episodes.iter().all(|episode| {
+                episode.harvest_yield_scale.is_finite()
+                    && episode.harvest_yield_scale > 0.0
+                    && episode.state_digest != 0
+                    && matches!(episode.detection_direction, "increase" | "decrease" | "none")
+                    && episode.detection_observation.map_or(
+                        true,
+                        |observation| observation > 0 && observation <= CHANGE_DETECTION_SHIFT_STEPS,
+                    )
+            })
+            && !self.gradual_drift_events.is_empty()
+            && self.gradual_drift_events.iter().all(|event| {
+                event.state_digest != 0
+                    && event.residual_mae.is_finite()
+                    && event.upper_cusum.is_finite()
+                    && event.lower_cusum.is_finite()
+                    && event.cusum_score.is_finite()
+                    && matches!(event.detection_direction, "increase" | "decrease" | "none")
+            })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChangeDetectionReport {
+    pub baseline_sample_count: u64,
+    pub baseline_residual_mean: f64,
+    pub cusum_allowance: f64,
+    pub cusum_threshold: f64,
+    pub nominal_control_events: Vec<ChangeDetectionEvent>,
+    pub shifted_regime_events: Vec<ChangeDetectionEvent>,
+    pub nominal_false_alarm: bool,
+    pub shifted_regime_detected: bool,
+    pub detection_observation: Option<u64>,
+    pub detection_delay_observations: Option<u64>,
+    pub operating_characteristics: ChangeDetectionOperatingCharacteristics,
+}
+
+impl ChangeDetectionReport {
+    /// True only when the detector identifies the shifted regime and stays quiet on control.
+    pub fn operationally_separates_shift(&self) -> bool {
+        self.shifted_regime_detected && !self.nominal_false_alarm
+    }
+
+    pub fn is_populated(&self) -> bool {
+        self.baseline_sample_count > 0
+            && !self.nominal_control_events.is_empty()
+            && !self.shifted_regime_events.is_empty()
+    }
+
+    pub fn is_scoreable(&self) -> bool {
+        self.is_populated()
+            && self.baseline_residual_mean.is_finite()
+            && self.cusum_allowance.is_finite()
+            && self.cusum_allowance > 0.0
+            && self.cusum_threshold.is_finite()
+            && self.cusum_threshold > 0.0
+            && self.nominal_control_events.iter().all(|event| {
+                event.state_digest != 0
+                    && event.residual_mae.is_finite()
+                    && event.upper_cusum.is_finite()
+                    && event.lower_cusum.is_finite()
+                    && event.cusum_score.is_finite()
+                    && matches!(event.detection_direction, "increase" | "decrease" | "none")
+            })
+            && self.shifted_regime_events.iter().all(|event| {
+                event.state_digest != 0
+                    && event.residual_mae.is_finite()
+                    && event.upper_cusum.is_finite()
+                    && event.lower_cusum.is_finite()
+                    && event.cusum_score.is_finite()
+                    && matches!(event.detection_direction, "increase" | "decrease" | "none")
+            })
+            && (!self.nominal_false_alarm
+                || self
+                    .nominal_control_events
+                    .iter()
+                    .any(|event| event.detected))
+            && (self.shifted_regime_detected
+                == self
+                    .shifted_regime_events
+                    .iter()
+                    .any(|event| event.detected))
+            && self.detection_observation.map_or(
+                true,
+                |observation| observation > 0 && observation <= self.shifted_regime_events.len() as u64,
+            )
+            && self.detection_delay_observations == self.detection_observation
+            && self.operating_characteristics.is_scoreable()
+    }
+}
+
+/// Per-update receipt for adaptation to an intentionally changed environmental regime.
+///
+/// Harvest yield is the only revisable benchmark fact. All non-harvest action dynamics
+/// remain governed by the nominal transition law and are therefore protected as invariants.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RegimeShiftAdaptationEvent {
+    pub update_ordinal: u64,
+    pub cycle: u64,
+    pub action: MicroAction,
+    pub state_digest: u64,
+    pub shifted_validation_mae: f64,
+    pub shifted_validation_error_ratio: f64,
+    pub invariant_anchor_mean_mae: f64,
+    pub invariant_anchor_regression: f64,
+    pub invariant_anchor_max_regression: f64,
+}
+
+/// Revision-latency and invariant-retention report for one explicit regime change.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RegimeShiftAdaptationReport {
+    pub regime_shift_harvest_yield_scale: f64,
+    pub target_error_fraction: f64,
+    pub update_count: u64,
+    pub events: Vec<RegimeShiftAdaptationEvent>,
+    pub pre_revision_shifted_validation_mae: f64,
+    pub final_shifted_validation_mae: f64,
+    pub revision_improvement: f64,
+    pub revision_latency_updates: Option<u64>,
+    pub initial_invariant_anchor_mean_mae: f64,
+    pub final_invariant_anchor_mean_mae: f64,
+    pub final_invariant_anchor_regression: f64,
+    pub max_invariant_anchor_regression: f64,
+    pub invariant_anchor_regression_event_rate: f64,
+}
+
+impl RegimeShiftAdaptationReport {
+    pub fn is_populated(&self) -> bool {
+        self.update_count > 0 && !self.events.is_empty()
+    }
+
+    pub fn is_scoreable(&self) -> bool {
+        self.regime_shift_harvest_yield_scale.is_finite()
+            && self.regime_shift_harvest_yield_scale > 0.0
+            && self.target_error_fraction.is_finite()
+            && (0.0..=1.0).contains(&self.target_error_fraction)
+            && self.update_count > 0
+            && self.events.len() as u64 == self.update_count
+            && self.events.iter().all(|event| {
+                event.state_digest != 0
+                    && event.shifted_validation_mae.is_finite()
+                    && event.shifted_validation_error_ratio.is_finite()
+                    && event.shifted_validation_error_ratio >= 0.0
+                    && event.invariant_anchor_mean_mae.is_finite()
+                    && event.invariant_anchor_regression.is_finite()
+                    && event.invariant_anchor_max_regression.is_finite()
+                    // This is an error ratio, not a bounded probability/fraction.
+                    && event.shifted_validation_error_ratio >= 0.0
+            })
+            && self.pre_revision_shifted_validation_mae.is_finite()
+            && self.final_shifted_validation_mae.is_finite()
+            && self.revision_improvement.is_finite()
+            && self.initial_invariant_anchor_mean_mae.is_finite()
+            && self.final_invariant_anchor_mean_mae.is_finite()
+            && self.final_invariant_anchor_regression.is_finite()
+            && self.max_invariant_anchor_regression.is_finite()
+            && self.invariant_anchor_regression_event_rate.is_finite()
+            && (0.0..=1.0).contains(&self.invariant_anchor_regression_event_rate)
+            && self.revision_latency_updates
+                .map(|latency| latency <= self.update_count)
+                .unwrap_or(true)
+    }
+}
+
+impl SequentialLearningResponseReport {
+    pub fn is_populated(&self) -> bool {
+        self.shock_count > 0 && !self.events.is_empty()
+    }
+
+    /// Fail-closed predicate for a complete cumulative adaptation receipt stream.
+    pub fn is_scoreable(&self) -> bool {
+        self.shock_count > 0
+            && self.events.len() as u64 == self.shock_count
+            && self.events.iter().all(|event| {
+                event.shock_state_digest != 0
+                    && event.shock_mae_before_update.is_finite()
+                    && event.shock_mae_after_update.is_finite()
+                    && event.neighbor_mae_before_update.is_finite()
+                    && event.neighbor_mae_after_update.is_finite()
+                    && event.anchor_mean_mae_from_initial.is_finite()
+                    && event.anchor_mean_regression_from_initial.is_finite()
+                    && event.anchor_max_regression_from_initial.is_finite()
+                    && event.prior_shock_mean_regression.is_finite()
+                    && event.prior_shock_max_regression.is_finite()
+                    && event.prior_shock_retention_rate.is_finite()
+            })
+    }
+}
+
+/// Frozen transfer result for one procedurally generated held-out scenario.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProceduralHeldOutFold {
+    pub seed: u64,
+    pub manifest_digest: u64,
+    pub steps: u64,
+    pub baseline_mae: f64,
+    pub predictor_mae: f64,
+    pub improvement_over_baseline: f64,
+    pub survived_fixed_schedule: bool,
+}
+
+impl ProceduralHeldOutFold {
+    pub fn beat_persistence(&self) -> bool {
+        self.predictor_mae < self.baseline_mae
+    }
+}
+
+/// Aggregate frozen transfer over the complete procedurally generated scenario family.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProceduralHeldOutTransferReport {
+    pub manifest_digest: u64,
+    pub scenario_count: u64,
+    pub folds: Vec<ProceduralHeldOutFold>,
+    pub mean_improvement_over_baseline: f64,
+    pub worst_improvement_over_baseline: f64,
+    pub held_out_beats_persistence_rate: f64,
+    pub survival_rate: f64,
+}
+
+impl ProceduralHeldOutTransferReport {
+    pub fn all_folds_beat_persistence(&self) -> bool {
+        !self.folds.is_empty() && self.folds.iter().all(ProceduralHeldOutFold::beat_persistence)
+    }
+
+    pub fn is_scoreable(&self) -> bool {
+        self.scenario_count > 0
+            && self.folds.len() as u64 == self.scenario_count
+            && !self.folds.is_empty()
+    }
+}
+
+/// Leave-one-scenario-out transfer fold.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CrossScenarioTransferFold {
+    pub training_scenario: &'static str,
+    pub held_out_scenario: &'static str,
+    pub training_scenario_manifest_digest: u64,
+    pub held_out_scenario_manifest_digest: u64,
+    pub train_steps: u64,
+    pub held_out_steps: u64,
+    pub baseline_mae: f64,
+    pub predictor_mae: f64,
+    pub improvement_over_baseline: f64,
+}
+
+impl CrossScenarioTransferFold {
+    pub fn beat_persistence(&self) -> bool {
+        self.predictor_mae < self.baseline_mae
+    }
+}
+
+/// Frozen leave-one-scenario-out transfer across the complete benchmark family.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CrossScenarioTransferReport {
+    pub benchmark_manifest_digest: u64,
+    pub folds: Vec<CrossScenarioTransferFold>,
+    pub mean_improvement_over_baseline: f64,
+    pub worst_improvement_over_baseline: f64,
+    pub held_out_beats_persistence_rate: f64,
+}
+
+impl CrossScenarioTransferReport {
+    pub fn all_folds_beat_persistence(&self) -> bool {
+        !self.folds.is_empty() && self.folds.iter().all(CrossScenarioTransferFold::beat_persistence)
+    }
+}
+
+/// Accuracy profile for a frozen model as the temporal prediction horizon increases.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HorizonQualificationPoint {
+    pub horizon_steps: usize,
+    pub samples: u64,
+    pub mean_one_step_mae: f64,
+    /// Error of the continuous ODE rollout against the deterministic oracle.
+    pub mean_terminal_mae: f64,
+    /// Error of repeatedly applying the frozen discrete predictor against the same oracle.
+    pub mean_discrete_terminal_mae: f64,
+    pub terminal_to_one_step_error_ratio: f64,
+}
+
+impl HorizonQualificationPoint {
+    /// Whether the continuous relaxation rollout is worse than one-step prediction.
+    pub fn has_continuous_temporal_degradation(&self) -> bool {
+        self.mean_terminal_mae > self.mean_one_step_mae
+    }
+
+    /// Whether repeated frozen discrete prediction is worse than one-step prediction.
+    pub fn has_discrete_temporal_degradation(&self) -> bool {
+        self.mean_discrete_terminal_mae > self.mean_one_step_mae
+    }
+
+    /// Backward-compatible alias; prefer the channel-explicit methods above.
+    pub fn has_temporal_degradation(&self) -> bool {
+        self.has_continuous_temporal_degradation()
+    }
+}
+
+/// Result of a frozen environment-level counterfactual query bank.
+///
+/// Each query asks for the consequence of a short action sequence from a probe state,
+/// including probes that are not generated by the scenario's scheduled trajectory.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EnvironmentQueryQualificationReport {
+    pub queries: u64,
+    pub valid_queries: u64,
+    pub invalid_queries: u64,
+    pub sequence_length: usize,
+    pub probe_states: u64,
+    pub mean_path_mae: f64,
+    /// F1 over the set of state channels whose value changes at each queried step.
+    pub mean_changed_channel_f1: f64,
+    pub mean_terminal_mae: f64,
+    pub mean_min_viability_margin_error: f64,
+    /// Agreement over all queries; invalid answers count as disagreements.
+    pub survival_agreement: f64,
+}
+
+impl EnvironmentQueryQualificationReport {
+    pub fn is_populated(&self) -> bool {
+        self.queries > 0 && self.probe_states > 0 && self.sequence_length > 0
+    }
+
+    /// True only when at least one model answer was valid enough to score.
+    pub fn has_valid_answers(&self) -> bool {
+        self.valid_queries > 0
+    }
+
+    /// Fail-closed qualification predicate for the query bank.
+    pub fn is_scoreable(&self) -> bool {
+        self.is_populated() && self.has_valid_answers()
+    }
+}
+
+/// Decision-centric ranking qualification on frozen held-out states.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PolicyRankingQualificationReport {
+    pub states: u64,
+    pub top1_agreement: f64,
+    pub pairwise_agreement: f64,
+    pub pairs_evaluated: u64,
+    /// Fraction of strict action-pair comparisons where model and oracle preferences disagree.
+    pub strict_inversion_rate: f64,
+    /// Mean model-assigned advantage on those inverted pairs.
+    pub mean_predicted_advantage_on_inversions: f64,
+}
+
+impl PolicyRankingQualificationReport {
+    pub fn decision_structure_present(&self) -> bool {
+        self.top1_agreement > 0.5 || self.pairwise_agreement > 0.5
+    }
+
+    /// A positive value means the model can see an action as strongly preferable precisely
+    /// where the oracle says the opposite action is better.
+    pub fn exploitation_gap(&self) -> f64 {
+        self.mean_predicted_advantage_on_inversions
+    }
+}
+
+/// Frozen policy evaluation that deliberately lets the model induce the visited-state distribution.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PolicyInducedShiftReport {
+    pub steps: u64,
+    pub baseline_mae: f64,
+    pub predictor_mae: f64,
+    pub improvement_over_baseline: f64,
+    pub survival: bool,
+    pub min_actual_viability_margin: f64,
+    pub execution_failures: usize,
+    pub terminated_on_execution_failure: bool,
+    /// Confidence calibration restricted to actions actually selected by the frozen policy.
+    pub planner_selected_confidence_calibration: ConfidenceCalibration,
+    /// Ratio against the frozen fixed-schedule held-out predictor MAE.
+    pub shift_error_ratio: f64,
+}
+
+impl GroundedWorldModelQualificationReport {
+    pub fn transfer_beats_persistence(&self) -> bool {
+        self.held_out_predictor_mae < self.held_out_baseline_mae
+    }
+
+    pub fn all_perturbations_recovered(&self) -> bool {
+        self.recovery_rate >= 1.0
+    }
+
+    pub fn policy_regret_beats_persistence(&self) -> bool {
+        self.closed_loop_mean_oracle_horizon_regret
+            < self.persistence_closed_loop_mean_oracle_horizon_regret
+    }
+}
+
+fn evaluate_frozen_procedural_scenario<P: MicroWorldPredictor>(
+    predictor: &P,
+    scenario: &ProceduralMicroWorldScenario,
+    max_cycles: u64,
+) -> (u64, f64, f64, f64, bool) {
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let mut predictor_error = 0.0;
+    let mut baseline_error = 0.0;
+    let mut steps = 0u64;
+
+    while !world.done() && steps < max_cycles {
+        for (cycle, perturbation) in &scenario.perturbations {
+            if *cycle == steps {
+                world.perturb(*perturbation);
+            }
+        }
+
+        let before = world.observe();
+        let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+        let predicted = predictor.predict(before, action);
+        let after = world.step(action);
+
+        predictor_error += predicted.mean_absolute_delta(after);
+        baseline_error += PersistencePredictor::default()
+            .predict(before, action)
+            .mean_absolute_delta(after);
+        steps = steps.saturating_add(1);
+    }
+
+    let denominator = steps.max(1) as f64;
+    let baseline_mae = baseline_error / denominator;
+    let predictor_mae = predictor_error / denominator;
+    let improvement = if baseline_mae <= f64::EPSILON {
+        0.0
+    } else {
+        (baseline_mae - predictor_mae) / baseline_mae
+    };
+
+    (
+        steps,
+        baseline_mae,
+        predictor_mae,
+        improvement,
+        world.observe().is_viable(),
+    )
+}
+
+/// Evaluate a frozen predictor on every procedurally generated held-out scenario.
+///
+/// The generator is deterministic and content-addressed. Generated scenarios never enter
+/// adaptation; they exist solely to detect memorization of the authored benchmark family.
+fn evaluate_procedural_held_out_transfer(
+    model: &super::goal_world::WorldModelBridge,
+    test_cycles: u64,
+) -> ProceduralHeldOutTransferReport {
+    let scenarios = procedural_held_out_scenarios();
+    let mut folds = Vec::with_capacity(scenarios.len());
+
+    for scenario in &scenarios {
+        let mut fold_model = model.clone();
+        let predictor = FepWorldModelPredictor {
+            bridge: &mut fold_model,
+        };
+        let (steps, baseline_mae, predictor_mae, improvement, survived) =
+            evaluate_frozen_procedural_scenario(&predictor, scenario, test_cycles);
+
+        folds.push(ProceduralHeldOutFold {
+            seed: scenario.seed,
+            manifest_digest: scenario.manifest_digest(),
+            steps,
+            baseline_mae,
+            predictor_mae,
+            improvement_over_baseline: improvement,
+            survived_fixed_schedule: survived,
+        });
+    }
+
+    let denominator = folds.len().max(1) as f64;
+    let mean_improvement_over_baseline =
+        folds.iter().map(|fold| fold.improvement_over_baseline).sum::<f64>() / denominator;
+    let worst_improvement_over_baseline = folds
+        .iter()
+        .map(|fold| fold.improvement_over_baseline)
+        .reduce(f64::min)
+        .unwrap_or(0.0);
+    let held_out_beats_persistence_rate = folds
+        .iter()
+        .filter(|fold| fold.beat_persistence())
+        .count() as f64
+        / denominator;
+    let survival_rate = folds
+        .iter()
+        .filter(|fold| fold.survived_fixed_schedule)
+        .count() as f64
+        / denominator;
+
+    ProceduralHeldOutTransferReport {
+        manifest_digest: procedural_held_out_manifest_digest(),
+        scenario_count: folds.len() as u64,
+        folds,
+        mean_improvement_over_baseline,
+        worst_improvement_over_baseline,
+        held_out_beats_persistence_rate,
+        survival_rate,
+    }
+}
+
+fn evaluate_frozen_scenario<P: MicroWorldPredictor>(
+    predictor: &P,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+) -> (
+    u64,
+    f64,
+    f64,
+    f64,
+    ConfidenceCalibration,
+    bool,
+) {
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let mut predictor_error = 0.0;
+    let mut baseline_error = 0.0;
+    let mut steps = 0u64;
+    let mut calibration = CalibrationAccumulator::default();
+
+    while !world.done() && steps < max_cycles {
+        for (cycle, perturbation) in scenario.perturbations {
+            if *cycle == steps {
+                world.perturb(*perturbation);
+            }
+        }
+
+        let before = world.observe();
+        let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+        let predicted = predictor.predict(before, action);
+        let confidence = predictor.prediction_confidence(action);
+        let after = world.step(action);
+
+        let mae = predicted.mean_absolute_delta(after);
+        let baseline = PersistencePredictor::default()
+            .predict(before, action)
+            .mean_absolute_delta(after);
+
+        predictor_error += mae;
+        baseline_error += baseline;
+        calibration.record(confidence, mae);
+        steps = steps.saturating_add(1);
+    }
+
+    let denom = steps.max(1) as f64;
+    let baseline_mae = baseline_error / denom;
+    let predictor_mae = predictor_error / denom;
+    let improvement = if baseline_mae <= f64::EPSILON {
+        0.0
+    } else {
+        (baseline_mae - predictor_mae) / baseline_mae
+    };
+
+    (
+        steps,
+        baseline_mae,
+        predictor_mae,
+        improvement,
+        calibration.finish(),
+        world.observe().is_viable(),
+    )
+}
+
+/// Replay deterministic perturbation shocks against isolated model clones and measure
+/// the immediate learning response plus transfer to a nearby state.
+fn evaluate_learning_response(
+    base_model: &super::goal_world::WorldModelBridge,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+) -> LearningResponseReport {
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let mut shock_states = Vec::new();
+    let mut steps = 0u64;
+
+    while !world.done() && steps < max_cycles {
+        for (cycle, perturbation) in scenario.perturbations {
+            if *cycle == steps {
+                let before_shock = world.observe();
+                let shocked = perturbation.apply(before_shock);
+                let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+                shock_states.push((shocked, action));
+                world.perturb(*perturbation);
+            }
+        }
+        let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+        world.step(action);
+        steps = steps.saturating_add(1);
+    }
+
+    let mut events = Vec::with_capacity(shock_states.len());
+    let mut shock_mae_before = 0.0;
+    let mut shock_mae_after = 0.0;
+    let mut same_transition_improvements = 0.0;
+    let mut same_transition_improvement_count = 0u64;
+    let mut neighbor_mae_before = 0.0;
+    let mut neighbor_mae_after = 0.0;
+    let mut neighbor_improvements = 0.0;
+    let mut neighbor_improvement_count = 0u64;
+    // Invariant anchor set: every action from the same nominal state.
+    // The transition law is held fixed, so degradation here is adaptation-induced
+    // regression rather than legitimate environment revision.
+    let anchor_scenario = benchmark_scenarios()[0];
+    let anchor_state = anchor_scenario.initial;
+    let anchor_probes = MicroAction::ALL
+        .into_iter()
+        .map(|action| (action, transition(anchor_state, action)))
+        .collect::<Vec<_>>();
+    let mut anchor_mean_mae_before = 0.0;
+    let mut anchor_mean_mae_after = 0.0;
+    let mut anchor_mean_regressions = 0.0;
+    let mut worst_anchor_regression = 0.0;
+    let mut anchor_regression_count = 0u64;
+
+    for (shock_state, action) in &shock_states {
+        let mut model = base_model.clone();
+        let mut predictor = FepWorldModelPredictor {
+            bridge: &mut model,
+        };
+
+        let actual = transition(*shock_state, *action);
+        let before_prediction = predictor.predict(*shock_state, *action);
+        let before_mae = before_prediction.mean_absolute_delta(actual);
+        let anchor_metrics_before = anchor_probes
+            .iter()
+            .map(|(anchor_action, anchor_actual)| {
+                (
+                    *anchor_action,
+                    predictor
+                        .predict(anchor_state, *anchor_action)
+                        .mean_absolute_delta(*anchor_actual),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        // Nearby probe is scored BEFORE the update as a held-out neighbor.
+        let neighbor_state = super::viability_micro_world::MicroPerturbation::ThreatSpike(0.01)
+            .apply(*shock_state);
+        let neighbor_actual = transition(neighbor_state, *action);
+        let neighbor_before = predictor.predict(neighbor_state, *action);
+        let neighbor_before_mae = neighbor_before.mean_absolute_delta(neighbor_actual);
+
+        // This is the only adaptation update in this isolated shock fold.
+        predictor.observe_transition(*shock_state, *action, actual);
+
+        let after_prediction = predictor.predict(*shock_state, *action);
+        let after_mae = after_prediction.mean_absolute_delta(actual);
+        let same_improvement = before_mae - after_mae;
+
+        shock_mae_before += before_mae;
+        shock_mae_after += after_mae;
+        same_transition_improvements += same_improvement;
+        if same_improvement > 1e-12 {
+            same_transition_improvement_count =
+                same_transition_improvement_count.saturating_add(1);
+        }
+
+        // Re-test the SAME neighboring state after exactly one update; no second learning step
+        // is allowed, so any improvement is attributable to the single observed shock.
+        let neighbor_after = predictor.predict(neighbor_state, *action);
+        let neighbor_after_mae = neighbor_after.mean_absolute_delta(neighbor_actual);
+        let neighbor_improvement = neighbor_before_mae - neighbor_after_mae;
+        let anchor_after_metrics = anchor_metrics_before
+            .iter()
+            .map(|(anchor_action, anchor_before_mae)| {
+                let anchor_after_mae = predictor
+                    .predict(anchor_state, *anchor_action)
+                    .mean_absolute_delta(
+                        anchor_probes
+                            .iter()
+                            .find(|(action, _)| action == anchor_action)
+                            .map(|(_, actual)| *actual)
+                            .expect("anchor action must exist"),
+                    );
+                (*anchor_action, *anchor_before_mae, anchor_after_mae)
+            })
+            .collect::<Vec<_>>();
+        let anchor_count = anchor_after_metrics.len().max(1) as f64;
+        let anchor_mean_before = anchor_after_metrics
+            .iter()
+            .map(|(_, before, _)| *before)
+            .sum::<f64>()
+            / anchor_count;
+        let anchor_mean_after = anchor_after_metrics
+            .iter()
+            .map(|(_, _, after)| *after)
+            .sum::<f64>()
+            / anchor_count;
+        let anchor_mean_regression = anchor_mean_after - anchor_mean_before;
+        let event_max_anchor_regression = anchor_after_metrics
+            .iter()
+            .map(|(_, before, after)| after - before)
+            .fold(0.0f64, f64::max);
+
+        neighbor_mae_before += neighbor_before_mae;
+        neighbor_mae_after += neighbor_after_mae;
+        neighbor_improvements += neighbor_improvement;
+        anchor_mean_mae_before += anchor_mean_before;
+        anchor_mean_mae_after += anchor_mean_after;
+        anchor_mean_regressions += anchor_mean_regression;
+        worst_anchor_regression = worst_anchor_regression.max(event_max_anchor_regression);
+        if neighbor_improvement > 1e-12 {
+            neighbor_improvement_count =
+                neighbor_improvement_count.saturating_add(1);
+        }
+        if anchor_mean_regression > 1e-12 || event_max_anchor_regression > 1e-12 {
+            anchor_regression_count =
+                anchor_regression_count.saturating_add(1);
+        }
+
+        events.push(LearningResponseEvent {
+            cycle: shock_state.cycle,
+            action: *action,
+            shock_state_digest: shock_state.digest(),
+            shock_mae_before_update: before_mae,
+            shock_mae_after_update: after_mae,
+            same_transition_improvement: same_improvement,
+            neighbor_mae_before_update: neighbor_before_mae,
+            neighbor_mae_after_update: neighbor_after_mae,
+            neighbor_improvement,
+            anchor_mean_mae_before_update: anchor_mean_before,
+            anchor_mean_mae_after_update: anchor_mean_after,
+            anchor_mean_regression,
+            anchor_max_regression: event_max_anchor_regression,
+        });
+    }
+
+    let count = shock_states.len() as f64;
+    if count <= 0.0 {
+        return LearningResponseReport {
+            shock_count: 0,
+            events: Vec::new(),
+            mean_shock_mae_before_update: 0.0,
+            mean_shock_mae_after_update: 0.0,
+            mean_same_transition_improvement: 0.0,
+            same_transition_improvement_rate: 0.0,
+            mean_neighbor_mae_before_update: 0.0,
+            mean_neighbor_mae_after_update: 0.0,
+            mean_neighbor_improvement: 0.0,
+            neighbor_improvement_rate: 0.0,
+            mean_anchor_mae_before_update: 0.0,
+            mean_anchor_mae_after_update: 0.0,
+            mean_anchor_regression: 0.0,
+            max_anchor_regression: 0.0,
+            anchor_regression_rate: 0.0,
+        };
+    }
+
+    LearningResponseReport {
+        shock_count: shock_states.len() as u64,
+        events,
+        mean_shock_mae_before_update: shock_mae_before / count,
+        mean_shock_mae_after_update: shock_mae_after / count,
+        mean_same_transition_improvement: same_transition_improvements / count,
+        same_transition_improvement_rate: same_transition_improvement_count as f64 / count,
+        mean_neighbor_mae_before_update: neighbor_mae_before / count,
+        mean_neighbor_mae_after_update: neighbor_mae_after / count,
+        mean_neighbor_improvement: neighbor_improvements / count,
+        neighbor_improvement_rate: neighbor_improvement_count as f64 / count,
+        mean_anchor_mae_before_update: anchor_mean_mae_before / count,
+        mean_anchor_mae_after_update: anchor_mean_mae_after / count,
+        mean_anchor_regression: anchor_mean_regressions / count,
+        max_anchor_regression: worst_anchor_regression,
+        anchor_regression_rate: anchor_regression_count as f64 / count,
+    }
+}
+
+/// Evaluate deterministic perturbation shocks through one cumulative adaptation stream.
+///
+/// The same model clone receives every shock in order. After each update the harness
+/// rechecks the new shock, a nearby held-out neighbor, the invariant anchor set, and
+/// every previously learned shock transition. This measures cumulative adaptation and
+/// differential retention without combining them into a single pass/fail score.
+fn evaluate_sequential_learning_response(
+    base_model: &super::goal_world::WorldModelBridge,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+) -> SequentialLearningResponseReport {
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let mut shock_states = Vec::new();
+    let mut steps = 0u64;
+
+    while !world.done() && steps < max_cycles {
+        for (cycle, perturbation) in scenario.perturbations {
+            if *cycle == steps {
+                let before_shock = world.observe();
+                let shocked = perturbation.apply(before_shock);
+                let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+                shock_states.push((shocked, action));
+                world.perturb(*perturbation);
+            }
+        }
+
+        let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+        world.step(action);
+        steps = steps.saturating_add(1);
+    }
+
+    let anchor_state = benchmark_scenarios()[0].initial;
+    let anchor_probes = MicroAction::ALL
+        .into_iter()
+        .map(|action| (action, transition(anchor_state, action)))
+        .collect::<Vec<_>>();
+
+    let mut model = base_model.clone();
+    let mut predictor = FepWorldModelPredictor {
+        bridge: &mut model,
+    };
+
+    let initial_anchor_metrics = anchor_probes
+        .iter()
+        .map(|(anchor_action, anchor_actual)| {
+            (
+                *anchor_action,
+                predictor
+                    .predict(anchor_state, *anchor_action)
+                    .mean_absolute_delta(*anchor_actual),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let initial_anchor_count = initial_anchor_metrics.len().max(1) as f64;
+    let initial_anchor_mean_mae = initial_anchor_metrics
+        .iter()
+        .map(|(_, error)| *error)
+        .sum::<f64>()
+        / initial_anchor_count;
+
+    let mut events = Vec::with_capacity(shock_states.len());
+    let mut learned_shocks: Vec<(MicroWorldObservation, MicroAction, f64)> =
+        Vec::with_capacity(shock_states.len());
+
+    let mut shock_mae_before = 0.0;
+    let mut shock_mae_after = 0.0;
+    let mut same_transition_improvements = 0.0;
+    let mut same_transition_improvement_count = 0u64;
+    let mut neighbor_mae_before = 0.0;
+    let mut neighbor_mae_after = 0.0;
+    let mut neighbor_improvements = 0.0;
+    let mut neighbor_improvement_count = 0u64;
+    let mut anchor_regression_event_count = 0u64;
+    let mut prior_shock_retained_count = 0u64;
+    let mut prior_shock_evaluation_count = 0u64;
+    let mut max_anchor_regression_from_initial = 0.0f64;
+    let mut max_prior_shock_regression = 0.0f64;
+
+    for (shock_state, action) in &shock_states {
+        let actual = transition(*shock_state, *action);
+        let before_prediction = predictor.predict(*shock_state, *action);
+        let before_mae = before_prediction.mean_absolute_delta(actual);
+
+        let neighbor_state =
+            super::viability_micro_world::MicroPerturbation::ThreatSpike(0.01).apply(*shock_state);
+        let neighbor_actual = transition(neighbor_state, *action);
+        let neighbor_before = predictor.predict(neighbor_state, *action);
+        let neighbor_before_mae = neighbor_before.mean_absolute_delta(neighbor_actual);
+
+        let prior_before = learned_shocks
+            .iter()
+            .map(|(state, prior_action, baseline_mae)| {
+                (
+                    *state,
+                    *prior_action,
+                    *baseline_mae,
+                    predictor
+                        .predict(*state, *prior_action)
+                        .mean_absolute_delta(transition(*state, *prior_action)),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        predictor.observe_transition(*shock_state, *action, actual);
+
+        let after_prediction = predictor.predict(*shock_state, *action);
+        let after_mae = after_prediction.mean_absolute_delta(actual);
+        let same_improvement = before_mae - after_mae;
+
+        let neighbor_after = predictor.predict(neighbor_state, *action);
+        let neighbor_after_mae = neighbor_after.mean_absolute_delta(neighbor_actual);
+        let neighbor_improvement = neighbor_before_mae - neighbor_after_mae;
+
+        let mut prior_sum_regression = 0.0;
+        let mut prior_max_regression = 0.0;
+        let mut prior_retained = 0u64;
+
+        for (state, prior_action, baseline_mae, before_current_update_mae) in &prior_before {
+            let after_current_update_mae = predictor
+                .predict(*state, *prior_action)
+                .mean_absolute_delta(transition(*state, *prior_action));
+            let regression = after_current_update_mae - before_current_update_mae;
+            prior_sum_regression += regression;
+            prior_max_regression = prior_max_regression.max(regression);
+
+            if after_current_update_mae <= *baseline_mae + 1e-12 {
+                prior_retained += 1;
+            }
+        }
+
+        let prior_count = learned_shocks.len() as f64;
+        let prior_mean_regression = if prior_count == 0.0 {
+            0.0
+        } else {
+            prior_sum_regression / prior_count
+        };
+        let prior_retention_rate = if learned_shocks.is_empty() {
+            1.0
+        } else {
+            prior_shock_evaluation_count = prior_shock_evaluation_count
+                .saturating_add(learned_shocks.len() as u64);
+            prior_shock_retained_count = prior_shock_retained_count
+                .saturating_add(prior_retained);
+            prior_retained as f64 / learned_shocks.len() as f64
+        };
+
+        let anchor_after_metrics = anchor_probes
+            .iter()
+            .map(|(anchor_action, anchor_actual)| {
+                let after_mae = predictor
+                    .predict(anchor_state, *anchor_action)
+                    .mean_absolute_delta(*anchor_actual);
+                let initial_mae = initial_anchor_metrics
+                    .iter()
+                    .find(|(action, _)| action == anchor_action)
+                    .map(|(_, error)| *error)
+                    .unwrap_or(f64::NAN);
+                (*anchor_action, initial_mae, after_mae)
+            })
+            .collect::<Vec<_>>();
+
+        let anchor_count = anchor_after_metrics.len().max(1) as f64;
+        let anchor_mean_after = anchor_after_metrics
+            .iter()
+            .map(|(_, _, after)| *after)
+            .sum::<f64>()
+            / anchor_count;
+        let anchor_mean_regression = anchor_mean_after - initial_anchor_mean_mae;
+        let event_max_anchor_regression = anchor_after_metrics
+            .iter()
+            .map(|(_, initial, after)| after - initial)
+            .fold(0.0f64, f64::max);
+
+        if anchor_mean_regression > 1e-12 || event_max_anchor_regression > 1e-12 {
+            anchor_regression_event_count =
+                anchor_regression_event_count.saturating_add(1);
+        }
+        max_anchor_regression_from_initial =
+            max_anchor_regression_from_initial.max(event_max_anchor_regression);
+        max_prior_shock_regression = max_prior_shock_regression.max(prior_max_regression);
+
+        shock_mae_before += before_mae;
+        shock_mae_after += after_mae;
+        same_transition_improvements += same_improvement;
+        neighbor_mae_before += neighbor_before_mae;
+        neighbor_mae_after += neighbor_after_mae;
+        neighbor_improvements += neighbor_improvement;
+
+        if same_improvement > 1e-12 {
+            same_transition_improvement_count =
+                same_transition_improvement_count.saturating_add(1);
+        }
+        if neighbor_improvement > 1e-12 {
+            neighbor_improvement_count =
+                neighbor_improvement_count.saturating_add(1);
+        }
+
+        events.push(SequentialLearningResponseEvent {
+            cycle: shock_state.cycle,
+            action: *action,
+            shock_state_digest: shock_state.digest(),
+            shock_mae_before_update: before_mae,
+            shock_mae_after_update: after_mae,
+            same_transition_improvement: same_improvement,
+            neighbor_mae_before_update: neighbor_before_mae,
+            neighbor_mae_after_update: neighbor_after_mae,
+            neighbor_improvement,
+            anchor_mean_mae_from_initial: anchor_mean_after,
+            anchor_mean_regression_from_initial: anchor_mean_regression,
+            anchor_max_regression_from_initial: event_max_anchor_regression,
+            prior_shock_mean_regression: prior_mean_regression,
+            prior_shock_max_regression: prior_max_regression,
+            prior_shock_retention_rate: prior_retention_rate,
+        });
+
+        learned_shocks.push((*shock_state, *action, after_mae));
+    }
+
+    let count = shock_states.len() as f64;
+    if count <= 0.0 {
+        return SequentialLearningResponseReport {
+            shock_count: 0,
+            events: Vec::new(),
+            mean_shock_mae_before_update: 0.0,
+            mean_shock_mae_after_update: 0.0,
+            mean_same_transition_improvement: 0.0,
+            same_transition_improvement_rate: 0.0,
+            mean_neighbor_mae_before_update: 0.0,
+            mean_neighbor_mae_after_update: 0.0,
+            mean_neighbor_improvement: 0.0,
+            neighbor_improvement_rate: 0.0,
+            initial_anchor_mean_mae: 0.0,
+            final_anchor_mean_mae: 0.0,
+            final_anchor_regression_from_initial: 0.0,
+            max_anchor_regression_from_initial: 0.0,
+            anchor_regression_event_rate: 0.0,
+            prior_shock_retention_rate: 0.0,
+            max_prior_shock_regression: 0.0,
+        };
+    }
+
+    let final_anchor_mean_mae = events
+        .last()
+        .map(|event| event.anchor_mean_mae_from_initial)
+        .unwrap_or(initial_anchor_mean_mae);
+    let prior_shock_retention_rate = if prior_shock_evaluation_count == 0 {
+        1.0
+    } else {
+        prior_shock_retained_count as f64 / prior_shock_evaluation_count as f64
+    };
+
+    SequentialLearningResponseReport {
+        shock_count: shock_states.len() as u64,
+        events,
+        mean_shock_mae_before_update: shock_mae_before / count,
+        mean_shock_mae_after_update: shock_mae_after / count,
+        mean_same_transition_improvement: same_transition_improvements / count,
+        same_transition_improvement_rate: same_transition_improvement_count as f64 / count,
+        mean_neighbor_mae_before_update: neighbor_mae_before / count,
+        mean_neighbor_mae_after_update: neighbor_mae_after / count,
+        mean_neighbor_improvement: neighbor_improvements / count,
+        neighbor_improvement_rate: neighbor_improvement_count as f64 / count,
+        initial_anchor_mean_mae,
+        final_anchor_mean_mae,
+        final_anchor_regression_from_initial: final_anchor_mean_mae - initial_anchor_mean_mae,
+        max_anchor_regression_from_initial,
+        anchor_regression_event_rate: anchor_regression_event_count as f64 / count,
+        prior_shock_retention_rate,
+        max_prior_shock_regression,
+    }
+}
+
+const CHANGE_DETECTION_CONTROL_STEPS: u64 = 8;
+const CHANGE_DETECTION_SHIFT_STEPS: u64 = 8;
+const CHANGE_DETECTION_MIN_ALLOWANCE: f64 = 0.001;
+const CHANGE_DETECTION_MIN_THRESHOLD: f64 = 0.01;
+const CHANGE_DETECTION_SHIFT_SCALES: [f64; 4] = [0.60, 0.80, 1.20, 1.40];
+
+fn change_detection_control_states() -> Vec<MicroWorldObservation> {
+    // Reserve the first half of the procedural family for detector-parameter calibration.
+    // Operating-characteristic episodes use the disjoint second half below.
+    procedural_held_out_scenarios()
+        .into_iter()
+        .take(4)
+        .map(|scenario| scenario.initial)
+        .collect()
+}
+
+fn change_detector_parameters(
+    predictor: &FepWorldModelPredictor<'_>,
+) -> (f64, f64, f64, Vec<MicroWorldObservation>) {
+    let states = change_detection_control_states();
+    let residuals = states
+        .iter()
+        .map(|state| {
+            predictor
+                .predict(*state, MicroAction::Harvest)
+                .mean_absolute_delta(transition(*state, MicroAction::Harvest))
+        })
+        .collect::<Vec<_>>();
+    let sample_count = residuals.len().max(1);
+    let baseline_mean = residuals.iter().sum::<f64>() / sample_count as f64;
+    let allowance = (baseline_mean * 0.10).max(CHANGE_DETECTION_MIN_ALLOWANCE);
+    let threshold = (baseline_mean * 1.5).max(CHANGE_DETECTION_MIN_THRESHOLD);
+    (baseline_mean, allowance, threshold, states)
+}
+
+fn run_change_detector_schedule(
+    predictor: &FepWorldModelPredictor<'_>,
+    states: &[MicroWorldObservation],
+    harvest_yield_scales: &[f64],
+    baseline_mean: f64,
+    allowance: f64,
+    threshold: f64,
+) -> Vec<ChangeDetectionEvent> {
+    if states.is_empty() || harvest_yield_scales.is_empty() {
+        return Vec::new();
+    }
+
+    let mut events = Vec::with_capacity(harvest_yield_scales.len());
+    let mut upper_cusum = 0.0;
+    let mut lower_cusum = 0.0;
+
+    for (index, harvest_yield_scale) in harvest_yield_scales.iter().copied().enumerate() {
+        if !harvest_yield_scale.is_finite() || harvest_yield_scale <= 0.0 {
+            return Vec::new();
+        }
+
+        let ordinal = index as u64 + 1;
+        let state = states[index % states.len()];
+        let actual =
+            transition_with_harvest_yield_scale(state, MicroAction::Harvest, harvest_yield_scale);
+        let residual_mae = predictor
+            .predict(state, MicroAction::Harvest)
+            .mean_absolute_delta(actual);
+        upper_cusum =
+            (upper_cusum + residual_mae - baseline_mean - allowance).max(0.0);
+        lower_cusum =
+            (lower_cusum + baseline_mean - residual_mae - allowance).max(0.0);
+        let cusum_score = upper_cusum.max(lower_cusum);
+        let detected = cusum_score >= threshold;
+        let detection_direction = if upper_cusum >= threshold {
+            "increase"
+        } else if lower_cusum >= threshold {
+            "decrease"
+        } else {
+            "none"
+        };
+
+        events.push(ChangeDetectionEvent {
+            observation_ordinal: ordinal,
+            state_digest: state.digest(),
+            residual_mae,
+            upper_cusum,
+            lower_cusum,
+            cusum_score,
+            detection_direction,
+            detected,
+        });
+
+        if detected {
+            break;
+        }
+    }
+
+    events
+}
+
+fn run_change_detector(
+    predictor: &FepWorldModelPredictor<'_>,
+    states: &[MicroWorldObservation],
+    steps: u64,
+    harvest_yield_scale: f64,
+    baseline_mean: f64,
+    allowance: f64,
+    threshold: f64,
+) -> Vec<ChangeDetectionEvent> {
+    let scales = vec![harvest_yield_scale; steps as usize];
+    run_change_detector_schedule(
+        predictor,
+        states,
+        &scales,
+        baseline_mean,
+        allowance,
+        threshold,
+    )
+}
+
+/// Detect a prediction-error changepoint before adaptation.
+///
+/// The detector uses nominal residuals as a fixed reference and a two-sided CUSUM against
+/// sustained increases or decreases in prediction error. A no-shift nominal control is
+/// evaluated for false alarms before the shifted regime is evaluated. No model update occurs
+/// during detection, so the detector cannot manufacture the evidence it is supposed to observe.
+fn evaluate_change_detection(
+    base_model: &super::goal_world::WorldModelBridge,
+) -> ChangeDetectionReport {
+    let mut model = base_model.clone();
+    let predictor = FepWorldModelPredictor {
+        bridge: &mut model,
+    };
+
+    let (baseline_mean, allowance, threshold, control_states) =
+        change_detector_parameters(&predictor);
+
+    let nominal_control_events = run_change_detector(
+        &predictor,
+        &control_states,
+        CHANGE_DETECTION_CONTROL_STEPS,
+        1.0,
+        baseline_mean,
+        allowance,
+        threshold,
+    );
+    let nominal_false_alarm = nominal_control_events.iter().any(|event| event.detected);
+
+    let shifted_regime_events = run_change_detector(
+        &predictor,
+        &control_states,
+        CHANGE_DETECTION_SHIFT_STEPS,
+        REGIME_SHIFT_HARVEST_YIELD_SCALE,
+        baseline_mean,
+        allowance,
+        threshold,
+    );
+    let detection_observation = shifted_regime_events
+        .iter()
+        .find(|event| event.detected)
+        .map(|event| event.observation_ordinal);
+    let shifted_regime_detected = detection_observation.is_some();
+
+    // The first four procedural scenarios calibrate the nominal residual baseline.
+    // The remaining four are held out for operating-characteristic evaluation, so the
+    // detector is not judged only on the same states that determined its threshold.
+    let operating_states = procedural_held_out_scenarios()
+        .into_iter()
+        .skip(4)
+        .take(4)
+        .map(|scenario| scenario.initial)
+        .collect::<Vec<_>>();
+
+    let mut nominal_episodes = Vec::with_capacity(operating_states.len());
+    for state in &operating_states {
+        let events = run_change_detector(
+            &predictor,
+            &[*state],
+            CHANGE_DETECTION_CONTROL_STEPS,
+            1.0,
+            baseline_mean,
+            allowance,
+            threshold,
+        );
+        let detection = events.iter().find(|event| event.detected);
+        nominal_episodes.push(ChangeDetectionEpisode {
+            harvest_yield_scale: 1.0,
+            state_digest: state.digest(),
+            detected: detection.is_some(),
+            detection_observation: detection.map(|event| event.observation_ordinal),
+            detection_direction: detection
+                .map(|event| event.detection_direction)
+                .unwrap_or("none"),
+        });
+    }
+
+    let mut shift_episodes = Vec::with_capacity(
+        operating_states
+            .len()
+            .saturating_mul(CHANGE_DETECTION_SHIFT_SCALES.len()),
+    );
+    let mut decrease_shift_count = 0u64;
+    let mut decrease_correct_direction_count = 0u64;
+    let mut increase_shift_count = 0u64;
+    let mut increase_correct_direction_count = 0u64;
+    let mut detection_delays = Vec::new();
+
+    for harvest_yield_scale in CHANGE_DETECTION_SHIFT_SCALES {
+        let is_decrease = harvest_yield_scale < 1.0;
+        if is_decrease {
+            decrease_shift_count =
+                decrease_shift_count.saturating_add(operating_states.len() as u64);
+        } else {
+            increase_shift_count =
+                increase_shift_count.saturating_add(operating_states.len() as u64);
+        }
+
+        for state in &operating_states {
+            let events = run_change_detector(
+                &predictor,
+                &[*state],
+                CHANGE_DETECTION_SHIFT_STEPS,
+                harvest_yield_scale,
+                baseline_mean,
+                allowance,
+                threshold,
+            );
+            let detection = events.iter().find(|event| event.detected);
+            if let Some(event) = detection {
+                detection_delays.push(event.observation_ordinal);
+                if is_decrease && event.detection_direction == "decrease" {
+                    decrease_correct_direction_count =
+                        decrease_correct_direction_count.saturating_add(1);
+                }
+                if !is_decrease && event.detection_direction == "increase" {
+                    increase_correct_direction_count =
+                        increase_correct_direction_count.saturating_add(1);
+                }
+            }
+
+            shift_episodes.push(ChangeDetectionEpisode {
+                harvest_yield_scale,
+                state_digest: state.digest(),
+                detected: detection.is_some(),
+                detection_observation: detection.map(|event| event.observation_ordinal),
+                detection_direction: detection
+                    .map(|event| event.detection_direction)
+                    .unwrap_or("none"),
+            });
+        }
+    }
+
+    let nominal_false_alarm_episode_count =
+        nominal_episodes.iter().filter(|episode| episode.detected).count() as u64;
+    let shift_detected_count =
+        shift_episodes.iter().filter(|episode| episode.detected).count() as u64;
+    let shift_episode_count = shift_episodes.len() as u64;
+
+    let gradual_drift_scales = (0..CHANGE_DETECTION_SHIFT_STEPS)
+        .map(|index| {
+            if CHANGE_DETECTION_SHIFT_STEPS <= 1 {
+                REGIME_SHIFT_HARVEST_YIELD_SCALE
+            } else {
+                1.0
+                    - (1.0 - REGIME_SHIFT_HARVEST_YIELD_SCALE)
+                        * index as f64
+                        / (CHANGE_DETECTION_SHIFT_STEPS - 1) as f64
+            }
+        })
+        .collect::<Vec<_>>();
+    let gradual_drift_events = run_change_detector_schedule(
+        &predictor,
+        &operating_states,
+        &gradual_drift_scales,
+        baseline_mean,
+        allowance,
+        threshold,
+    );
+    let gradual_drift_detected = gradual_drift_events.iter().any(|event| event.detected);
+
+    let operating_characteristics = ChangeDetectionOperatingCharacteristics {
+        nominal_episode_count: nominal_episodes.len() as u64,
+        nominal_false_alarm_episode_rate: if nominal_episodes.is_empty() {
+            0.0
+        } else {
+            nominal_false_alarm_episode_count as f64 / nominal_episodes.len() as f64
+        },
+        shift_episode_count,
+        shift_detection_rate: if shift_episode_count == 0 {
+            0.0
+        } else {
+            shift_detected_count as f64 / shift_episode_count as f64
+        },
+        decrease_shift_count,
+        decrease_correct_direction_rate: if decrease_shift_count == 0 {
+            0.0
+        } else {
+            decrease_correct_direction_count as f64 / decrease_shift_count as f64
+        },
+        increase_shift_count,
+        increase_correct_direction_rate: if increase_shift_count == 0 {
+            0.0
+        } else {
+            increase_correct_direction_count as f64 / increase_shift_count as f64
+        },
+        mean_detection_delay_observations: if detection_delays.is_empty() {
+            None
+        } else {
+            Some(
+                detection_delays.iter().sum::<u64>() as f64
+                    / detection_delays.len() as f64,
+            )
+        },
+        worst_detection_delay_observations: detection_delays.iter().copied().max(),
+        nominal_episodes,
+        shift_episodes,
+        gradual_drift_detected,
+        gradual_drift_events,
+    };
+
+    ChangeDetectionReport {
+        baseline_sample_count: control_states.len() as u64,
+        baseline_residual_mean: baseline_mean,
+        cusum_allowance: allowance,
+        cusum_threshold: threshold,
+        nominal_control_events,
+        shifted_regime_events,
+        nominal_false_alarm,
+        shifted_regime_detected,
+        detection_observation,
+        detection_delay_observations: detection_observation,
+        operating_characteristics,
+    }
+}
+
+const REGIME_SHIFT_HARVEST_YIELD_SCALE: f64 = 0.60;
+const REGIME_SHIFT_TARGET_ERROR_FRACTION: f64 = 0.25;
+const REGIME_SHIFT_MAX_UPDATES: u64 = 8;
+
+fn regime_shift_validation_states() -> Vec<MicroWorldObservation> {
+    procedural_held_out_scenarios()
+        .into_iter()
+        .take(4)
+        .map(|scenario| scenario.initial)
+        .collect()
+}
+
+fn measure_shifted_harvest_validation_mae(
+    predictor: &FepWorldModelPredictor<'_>,
+    states: &[MicroWorldObservation],
+    harvest_yield_scale: f64,
+) -> f64 {
+    if states.is_empty() {
+        return 0.0;
+    }
+
+    let total = states
+        .iter()
+        .map(|state| {
+            let actual =
+                transition_with_harvest_yield_scale(*state, MicroAction::Harvest, harvest_yield_scale);
+            predictor
+                .predict(*state, MicroAction::Harvest)
+                .mean_absolute_delta(actual)
+        })
+        .sum::<f64>();
+    total / states.len() as f64
+}
+
+fn measure_invariant_anchor_profile(
+    predictor: &FepWorldModelPredictor<'_>,
+) -> Vec<f64> {
+    let states = regime_shift_validation_states();
+    if states.is_empty() {
+        return Vec::new();
+    }
+
+    MicroAction::ALL
+        .into_iter()
+        .filter(|action| *action != MicroAction::Harvest)
+        .map(|action| {
+            states
+                .iter()
+                .map(|state| {
+                    predictor
+                        .predict(*state, action)
+                        .mean_absolute_delta(transition(*state, action))
+                })
+                .sum::<f64>()
+                / states.len() as f64
+        })
+        .collect()
+}
+
+/// Measure adaptation latency after changing one explicitly revisable environment fact.
+///
+/// The model is first frozen and measured against held-out shifted-regime validation states.
+/// The same model clone then receives at most REGIME_SHIFT_MAX_UPDATES harvest observations
+/// from a deterministic shifted-regime stream. After every update, validation is re-run on
+/// states that were never used for those updates, while non-harvest action dynamics are
+/// checked against the nominal transition law as invariants.
+///
+/// Latency is the number of shifted-regime observations required to reduce validation error
+/// to REGIME_SHIFT_TARGET_ERROR_FRACTION of its pre-adaptation value. None means the target
+/// was not reached within the bounded adaptation stream.
+fn evaluate_regime_shift_adaptation(
+    base_model: &super::goal_world::WorldModelBridge,
+    scenario: &MicroWorldScenario,
+) -> RegimeShiftAdaptationReport {
+    const ADAPTATION_SCHEDULE: [MicroAction; 8] = [
+        MicroAction::Harvest,
+        MicroAction::Observe,
+        MicroAction::Harvest,
+        MicroAction::Rest,
+        MicroAction::Harvest,
+        MicroAction::Retreat,
+        MicroAction::Harvest,
+        MicroAction::Repair,
+    ];
+    const REGIME_SHIFT_STREAM_STEPS: u64 = 16;
+
+    let validation_states = regime_shift_validation_states();
+    let mut model = base_model.clone();
+    let mut predictor = FepWorldModelPredictor {
+        bridge: &mut model,
+    };
+
+    let pre_revision_shifted_validation_mae = measure_shifted_harvest_validation_mae(
+        &predictor,
+        &validation_states,
+        REGIME_SHIFT_HARVEST_YIELD_SCALE,
+    );
+
+    let initial_invariant_anchor_profile = measure_invariant_anchor_profile(&predictor);
+    let initial_invariant_anchor_mean_mae = if initial_invariant_anchor_profile.is_empty() {
+        0.0
+    } else {
+        initial_invariant_anchor_profile.iter().sum::<f64>()
+            / initial_invariant_anchor_profile.len() as f64
+    };
+
+    let target_error = pre_revision_shifted_validation_mae * REGIME_SHIFT_TARGET_ERROR_FRACTION;
+    let mut revision_latency_updates =
+        if pre_revision_shifted_validation_mae <= f64::EPSILON {
+            Some(0)
+        } else {
+            None
+        };
+
+    let mut events = Vec::new();
+    let mut update_count = 0u64;
+    let mut stream_steps = 0u64;
+    let mut stream_state = scenario.initial;
+
+    while stream_state.is_viable()
+        && stream_steps < REGIME_SHIFT_STREAM_STEPS
+        && update_count < REGIME_SHIFT_MAX_UPDATES
+    {
+        let cycle = stream_state.cycle;
+        let action = ADAPTATION_SCHEDULE[stream_steps as usize % ADAPTATION_SCHEDULE.len()];
+        let before = stream_state;
+        let after = transition_with_harvest_yield_scale(
+            before,
+            action,
+            REGIME_SHIFT_HARVEST_YIELD_SCALE,
+        );
+
+        if action == MicroAction::Harvest {
+            predictor.observe_transition(before, action, after);
+            update_count = update_count.saturating_add(1);
+
+            let shifted_validation_mae = measure_shifted_harvest_validation_mae(
+                &predictor,
+                &validation_states,
+                REGIME_SHIFT_HARVEST_YIELD_SCALE,
+            );
+            let shifted_validation_error_ratio =
+                if pre_revision_shifted_validation_mae <= f64::EPSILON {
+                    0.0
+                } else {
+                    shifted_validation_mae / pre_revision_shifted_validation_mae
+                };
+
+            let current_invariant_anchor_profile = measure_invariant_anchor_profile(&predictor);
+            let invariant_anchor_mean_mae = if current_invariant_anchor_profile.is_empty() {
+                0.0
+            } else {
+                current_invariant_anchor_profile.iter().sum::<f64>()
+                    / current_invariant_anchor_profile.len() as f64
+            };
+            let invariant_anchor_regressions = current_invariant_anchor_profile
+                .iter()
+                .zip(initial_invariant_anchor_profile.iter())
+                .map(|(current, initial)| current - initial)
+                .collect::<Vec<_>>();
+            let invariant_anchor_regression =
+                invariant_anchor_mean_mae - initial_invariant_anchor_mean_mae;
+            let invariant_anchor_max_regression = invariant_anchor_regressions
+                .iter()
+                .copied()
+                .fold(0.0f64, f64::max);
+
+            if revision_latency_updates.is_none() && shifted_validation_mae <= target_error {
+                revision_latency_updates = Some(update_count);
+            }
+
+            events.push(RegimeShiftAdaptationEvent {
+                update_ordinal: update_count,
+                cycle,
+                action,
+                state_digest: before.digest(),
+                shifted_validation_mae,
+                shifted_validation_error_ratio,
+                invariant_anchor_mean_mae,
+                invariant_anchor_regression,
+                invariant_anchor_max_regression,
+            });
+        }
+
+        stream_state = after;
+        stream_steps = stream_steps.saturating_add(1);
+    }
+
+    let final_shifted_validation_mae = events
+        .last()
+        .map(|event| event.shifted_validation_mae)
+        .unwrap_or(pre_revision_shifted_validation_mae);
+    let final_invariant_anchor_mean_mae = events
+        .last()
+        .map(|event| event.invariant_anchor_mean_mae)
+        .unwrap_or(initial_invariant_anchor_mean_mae);
+    let max_invariant_anchor_regression = events
+        .iter()
+        .map(|event| event.invariant_anchor_max_regression)
+        .fold(0.0f64, f64::max);
+    let invariant_anchor_regression_event_rate = if events.is_empty() {
+        0.0
+    } else {
+        events
+            .iter()
+            .filter(|event| event.invariant_anchor_regression > 1e-12)
+            .count() as f64
+            / events.len() as f64
+    };
+
+    RegimeShiftAdaptationReport {
+        regime_shift_harvest_yield_scale: REGIME_SHIFT_HARVEST_YIELD_SCALE,
+        target_error_fraction: REGIME_SHIFT_TARGET_ERROR_FRACTION,
+        update_count,
+        events,
+        pre_revision_shifted_validation_mae,
+        final_shifted_validation_mae,
+        revision_improvement: pre_revision_shifted_validation_mae - final_shifted_validation_mae,
+        revision_latency_updates,
+        initial_invariant_anchor_mean_mae,
+        final_invariant_anchor_mean_mae,
+        final_invariant_anchor_regression:
+            final_invariant_anchor_mean_mae - initial_invariant_anchor_mean_mae,
+        max_invariant_anchor_regression,
+        invariant_anchor_regression_event_rate,
+    }
+}
+
+/// Train an isolated copy of the exact starting world model on one scenario.
+///
+/// No caller-visible FEP state is modified. Each fold begins from the same base model,
+/// which prevents cross-fold learning leakage.
+fn train_world_model_clone(
+    base_model: &super::goal_world::WorldModelBridge,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+) -> (super::goal_world::WorldModelBridge, u64) {
+    let mut model = base_model.clone();
+    let mut predictor = FepWorldModelPredictor { bridge: &mut model };
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let mut steps = 0u64;
+
+    while !world.done() && steps < max_cycles {
+        for (cycle, perturbation) in scenario.perturbations {
+            if *cycle == steps {
+                world.perturb(*perturbation);
+            }
+        }
+
+        let before = world.observe();
+        let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+        let _ = predictor.predict(before, action);
+        let after = world.step(action);
+        predictor.observe_transition(before, action, after);
+        steps = steps.saturating_add(1);
+    }
+
+    drop(predictor);
+    (model, steps)
+}
+
+/// Evaluate complete leave-one-scenario-out transfer without learning during any
+/// held-out fold. The production world model remains untouched.
+fn evaluate_cross_scenario_transfer(
+    base_model: &super::goal_world::WorldModelBridge,
+    train_cycles: u64,
+    test_cycles: u64,
+) -> CrossScenarioTransferReport {
+    let scenarios = benchmark_scenarios();
+    let mut folds = Vec::with_capacity(
+        scenarios.len().saturating_mul(scenarios.len().saturating_sub(1)),
+    );
+
+    for (train_index, training) in scenarios.iter().enumerate() {
+        for (held_out_index, held_out) in scenarios.iter().enumerate() {
+            if held_out_index == train_index {
+                continue;
+            }
+
+            // Each train → held-out pair gets a fresh clone so future changes to the
+            // evaluation phase cannot create cross-fold state leakage.
+            let (mut trained_model, train_steps) =
+                train_world_model_clone(base_model, training, train_cycles);
+            let predictor = FepWorldModelPredictor {
+                bridge: &mut trained_model,
+            };
+            let (held_out_steps, baseline_mae, predictor_mae, improvement, _, _) =
+                evaluate_frozen_scenario(&predictor, held_out, test_cycles);
+
+            folds.push(CrossScenarioTransferFold {
+                training_scenario: training.name,
+                held_out_scenario: held_out.name,
+                training_scenario_manifest_digest: training.manifest_digest(),
+                held_out_scenario_manifest_digest: held_out.manifest_digest(),
+                train_steps,
+                held_out_steps,
+                baseline_mae,
+                predictor_mae,
+                improvement_over_baseline: improvement,
+            });
+        }
+    }
+
+    let denominator = folds.len().max(1) as f64;
+    let mean_improvement_over_baseline =
+        folds.iter().map(|fold| fold.improvement_over_baseline).sum::<f64>()
+            / denominator;
+    let worst_improvement_over_baseline = folds
+        .iter()
+        .map(|fold| fold.improvement_over_baseline)
+        .reduce(f64::min)
+        .unwrap_or(0.0);
+    let held_out_beats_persistence_rate = if folds.is_empty() {
+        0.0
+    } else {
+        folds.iter().filter(|fold| fold.beat_persistence()).count() as f64
+            / folds.len() as f64
+    };
+
+    CrossScenarioTransferReport {
+        benchmark_manifest_digest: benchmark_manifest_digest(),
+        folds,
+        mean_improvement_over_baseline,
+        worst_improvement_over_baseline: if denominator == 1.0
+            && mean_improvement_over_baseline == 0.0
+            && scenarios.len() < 2
+        {
+            0.0
+        } else {
+            worst_improvement_over_baseline
+        },
+        held_out_beats_persistence_rate,
+    }
+}
+
+const QUERY_SEQUENCE_LENGTH: usize = 3;
+const QUERY_ACTIONS: [MicroAction; 6] = MicroAction::ALL;
+
+/// Deterministic off-trajectory probe states used by the environment-level query bank.
+/// The probes are interventions from the exact scenario initial state, not states from
+/// the scheduled trajectory, so the evaluator asks questions the model was not directly
+/// trained to answer as a sequence.
+fn query_probe_states(scenario: &MicroWorldScenario) -> Vec<MicroWorldObservation> {
+    let initial = scenario.initial;
+    vec![
+        initial,
+        super::viability_micro_world::MicroPerturbation::ThreatSpike(0.20).apply(initial),
+        super::viability_micro_world::MicroPerturbation::IntegrityDamage(0.12).apply(initial),
+        super::viability_micro_world::MicroPerturbation::EnergyDrain(0.15).apply(initial),
+    ]
+}
+
+/// Evaluate all length-three action-sequence counterfactuals from deterministic probe states.
+///
+/// This is inspired by environment-level world-model evaluation: the model must answer
+/// diverse intervention queries, not merely replay its observed trajectory.
+fn evaluate_environment_query_bank<M: ActionConditionedTransitionModel + ?Sized>(
+    model: &M,
+    scenario: &MicroWorldScenario,
+) -> EnvironmentQueryQualificationReport {
+    let probes = query_probe_states(scenario);
+    let sequence_count = QUERY_ACTIONS.len().pow(QUERY_SEQUENCE_LENGTH as u32);
+    let total_queries = probes.len().saturating_mul(sequence_count);
+    let mut path_error = 0.0;
+    let mut changed_channel_f1 = 0.0;
+    let mut terminal_error = 0.0;
+    let mut margin_error = 0.0;
+    let mut survival_agreement = 0u64;
+    let mut query_count = 0u64;
+    let mut valid_query_count = 0u64;
+    let mut invalid_query_count = 0u64;
+
+    for start in &probes {
+        for first in QUERY_ACTIONS {
+            for second in QUERY_ACTIONS {
+                for third in QUERY_ACTIONS {
+                    let sequence = [first, second, third];
+                    let mut oracle_state = *start;
+                    let mut predicted_state = encode_micro_world_state(*start);
+                    let mut predicted_valid = true;
+                    let mut oracle_min_margin = oracle_state.energy.min(oracle_state.integrity) - 0.08;
+                    let mut predicted_min_margin = predicted_state
+                        .get(0)
+                        .copied()
+                        .unwrap_or(f64::NAN)
+                        .min(predicted_state.get(1).copied().unwrap_or(f64::NAN))
+                        - 0.08;
+                    let mut query_path_error = 0.0;
+                    let mut query_changed_channel_f1 = 0.0;
+                    let mut oracle_encoded = encode_micro_world_state(oracle_state);
+
+                    for action in sequence {
+                        oracle_state = transition(oracle_state, action);
+                        let oracle_next_encoded = encode_micro_world_state(oracle_state);
+
+                        if predicted_valid {
+                            let previous_predicted = predicted_state.clone();
+                            let Some(next) =
+                                model.predict_next_state(&predicted_state, action.index())
+                            else {
+                                predicted_valid = false;
+                                continue;
+                            };
+                            if next.len() != model.state_dimension()
+                                || next.iter().any(|value| !value.is_finite())
+                                || next.len() < 5
+                            {
+                                predicted_valid = false;
+                                continue;
+                            }
+                            predicted_state = next;
+                            let predicted_intermediate = MicroWorldObservation {
+                                cycle: oracle_state.cycle,
+                                energy: predicted_state[0],
+                                integrity: predicted_state[1],
+                                knowledge: predicted_state[2],
+                                threat: predicted_state[3],
+                                progress: predicted_state[4],
+                            };
+                            query_path_error +=
+                                predicted_intermediate.mean_absolute_delta(oracle_state);
+
+                            const CHANGE_THRESHOLD: f64 = 1e-4;
+                            let mut true_changed = 0u32;
+                            let mut predicted_changed = 0u32;
+                            let mut true_positive = 0u32;
+                            for index in 0..5 {
+                                let actual_changed =
+                                    (oracle_next_encoded[index] - oracle_encoded[index]).abs()
+                                        > CHANGE_THRESHOLD;
+                                let model_changed =
+                                    (predicted_state[index] - previous_predicted[index]).abs()
+                                        > CHANGE_THRESHOLD;
+                                true_changed += actual_changed as u32;
+                                predicted_changed += model_changed as u32;
+                                if actual_changed && model_changed {
+                                    true_positive += 1;
+                                }
+                            }
+                            if true_changed == 0 && predicted_changed == 0 {
+                                query_changed_channel_f1 += 1.0;
+                            } else if true_changed + predicted_changed > 0 {
+                                let precision = if predicted_changed == 0 {
+                                    0.0
+                                } else {
+                                    true_positive as f64 / predicted_changed as f64
+                                };
+                                let recall = if true_changed == 0 {
+                                    0.0
+                                } else {
+                                    true_positive as f64 / true_changed as f64
+                                };
+                                let f1 = if precision + recall <= f64::EPSILON {
+                                    0.0
+                                } else {
+                                    2.0 * precision * recall / (precision + recall)
+                                };
+                                query_changed_channel_f1 += f1;
+                            }
+
+                            let margin = predicted_state[0].min(predicted_state[1]) - 0.08;
+                            predicted_min_margin = predicted_min_margin.min(margin);
+                        }
+
+                        oracle_min_margin = oracle_min_margin.min(
+                            oracle_state.energy.min(oracle_state.integrity) - 0.08,
+                        );
+                        oracle_encoded = oracle_next_encoded;
+                    }
+
+                    if predicted_valid && predicted_state.len() >= 5 {
+                        let predicted_terminal = MicroWorldObservation {
+                            cycle: oracle_state.cycle,
+                            energy: predicted_state[0],
+                            integrity: predicted_state[1],
+                            knowledge: predicted_state[2],
+                            threat: predicted_state[3],
+                            progress: predicted_state[4],
+                        };
+                        path_error += query_path_error / QUERY_SEQUENCE_LENGTH as f64;
+                        changed_channel_f1 +=
+                            query_changed_channel_f1 / QUERY_SEQUENCE_LENGTH as f64;
+                        terminal_error +=
+                            predicted_terminal.mean_absolute_delta(oracle_state);
+                        margin_error += (predicted_min_margin - oracle_min_margin).abs();
+                        valid_query_count = valid_query_count.saturating_add(1);
+
+                        let predicted_survival =
+                            predicted_min_margin > 0.0 && predicted_terminal.is_viable();
+                        let oracle_survival =
+                            oracle_min_margin > 0.0 && oracle_state.is_viable();
+                        if predicted_survival == oracle_survival {
+                            survival_agreement = survival_agreement.saturating_add(1);
+                        }
+                    } else {
+                        // Invalid model answers are explicit disagreements, never omitted
+                        // from the query count or converted into synthetic error values.
+                        invalid_query_count = invalid_query_count.saturating_add(1);
+                    }
+
+                    query_count = query_count.saturating_add(1);
+                }
+            }
+        }
+    }
+
+    let valid_denominator = valid_query_count.max(1) as f64;
+    let query_denominator = query_count.max(1) as f64;
+    EnvironmentQueryQualificationReport {
+        queries: query_count,
+        valid_queries: valid_query_count,
+        invalid_queries: invalid_query_count,
+        sequence_length: QUERY_SEQUENCE_LENGTH,
+        probe_states: probes.len() as u64,
+        mean_path_mae: path_error / valid_denominator,
+        mean_changed_channel_f1: changed_channel_f1 / valid_denominator,
+        mean_terminal_mae: terminal_error / valid_denominator,
+        mean_min_viability_margin_error: margin_error / valid_denominator,
+        survival_agreement: survival_agreement as f64 / query_denominator,
+    }
+}
+
+const QUALIFICATION_HORIZONS: [usize; 4] = [1, 2, 4, 8];
+const QUALIFICATION_TAU: f64 = 0.1;
+const QUALIFICATION_MAX_ODE_STEPS: usize = 200;
+
+/// Frozen temporal-composition profile. No learning is permitted while scoring these points.
+fn evaluate_multi_horizon<M: ActionConditionedTransitionModel + ?Sized>(
+    model: &M,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+) -> Vec<HorizonQualificationPoint> {
+    let mut points = Vec::with_capacity(QUALIFICATION_HORIZONS.len());
+
+    for &horizon_steps in &QUALIFICATION_HORIZONS {
+        let horizon_seconds = horizon_steps as f64 * QUALIFICATION_TAU;
+        let mut world = MicroWorld::new(scenario.initial, max_cycles);
+        let mut one_step_error = 0.0;
+        let mut continuous_terminal_error = 0.0;
+        let mut discrete_terminal_error = 0.0;
+        let mut samples = 0u64;
+        let mut steps = 0u64;
+
+        while !world.done() && steps < max_cycles {
+            for (cycle, perturbation) in scenario.perturbations {
+                if *cycle == steps {
+                    world.perturb(*perturbation);
+                }
+            }
+
+            let before = world.observe();
+            let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+            let encoded = encode_micro_world_state(before);
+
+            if let Some(rollout) = roll_transition_model_trajectory(
+                model,
+                &encoded,
+                action.index(),
+                horizon_seconds,
+                QUALIFICATION_TAU,
+                QUALIFICATION_MAX_ODE_STEPS,
+            ) {
+                let one_step_actual = transition(before, action);
+                one_step_error +=
+                    rollout.one_step_prediction[0..5]
+                        .iter()
+                        .zip([
+                            one_step_actual.energy,
+                            one_step_actual.integrity,
+                            one_step_actual.knowledge,
+                            one_step_actual.threat,
+                            one_step_actual.progress,
+                        ])
+                        .map(|(predicted, actual)| (predicted - actual).abs())
+                        .sum::<f64>()
+                        / 5.0;
+
+                let mut actual_terminal = before;
+                for _ in 0..horizon_steps {
+                    actual_terminal = transition(actual_terminal, action);
+                }
+
+                let mut discrete_predicted = encoded.clone();
+                let discrete_valid = (0..horizon_steps).all(|_| {
+                    let Some(next) =
+                        model.predict_next_state(&discrete_predicted, action.index())
+                    else {
+                        return false;
+                    };
+                    if next.len() != model.state_dimension()
+                        || next.iter().any(|value| !value.is_finite())
+                    {
+                        return false;
+                    }
+                    discrete_predicted = next;
+                    true
+                });
+
+                if discrete_valid && discrete_predicted.len() >= 5 {
+                    let discrete_mae = [
+                        (discrete_predicted[0] - actual_terminal.energy).abs(),
+                        (discrete_predicted[1] - actual_terminal.integrity).abs(),
+                        (discrete_predicted[2] - actual_terminal.knowledge).abs(),
+                        (discrete_predicted[3] - actual_terminal.threat).abs(),
+                        (discrete_predicted[4] - actual_terminal.progress).abs(),
+                    ]
+                    .iter()
+                    .sum::<f64>()
+                        / 5.0;
+                    discrete_terminal_error += discrete_mae;
+                }
+
+                let predicted_terminal = MicroWorldObservation {
+                    cycle: actual_terminal.cycle,
+                    energy: rollout.terminal_state[0],
+                    integrity: rollout.terminal_state[1],
+                    knowledge: rollout.terminal_state[2],
+                    threat: rollout.terminal_state[3],
+                    progress: rollout.terminal_state[4],
+                };
+
+                continuous_terminal_error += predicted_terminal.mean_absolute_delta(actual_terminal);
+                samples = samples.saturating_add(1);
+            }
+
+            world.step(action);
+            steps = steps.saturating_add(1);
+        }
+
+        let denom = samples.max(1) as f64;
+        let mean_one_step_mae = one_step_error / denom;
+        let mean_terminal_mae = continuous_terminal_error / denom;
+        let mean_discrete_terminal_mae = discrete_terminal_error / denom;
+        let ratio = if mean_one_step_mae <= f64::EPSILON {
+            if mean_terminal_mae <= f64::EPSILON { 1.0 } else { f64::INFINITY }
+        } else {
+            mean_terminal_mae / mean_one_step_mae
+        };
+
+        points.push(HorizonQualificationPoint {
+            horizon_steps,
+            samples,
+            mean_one_step_mae,
+            mean_terminal_mae,
+            mean_discrete_terminal_mae,
+            terminal_to_one_step_error_ratio: ratio,
+        });
+    }
+
+    points
+}
+
+/// Evaluate the frozen model on states induced by its own horizon-aware policy.
+fn evaluate_policy_induced_shift<P: MicroWorldPredictor>(
+    predictor: &P,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+    policy_horizon: usize,
+    policy_discount: f64,
+    fixed_schedule_mae: f64,
+) -> PolicyInducedShiftReport {
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let policy = super::viability_micro_world::HomeostaticPolicy;
+    let persistence = PersistencePredictor::default();
+    let mut predictor_error = 0.0;
+    let mut baseline_error = 0.0;
+    let mut steps = 0u64;
+    let mut min_actual_viability_margin = f64::INFINITY;
+    let mut execution_failures = 0usize;
+    let mut terminated_on_execution_failure = false;
+    let mut selected_calibration = CalibrationAccumulator::default();
+
+    while !world.done() && steps < max_cycles {
+        for (cycle, perturbation) in scenario.perturbations {
+            if *cycle == steps {
+                world.perturb(*perturbation);
+            }
+        }
+
+        let before = world.observe();
+        let (action, _, _) =
+            policy.choose_horizon(predictor, before, policy_horizon, policy_discount);
+
+        let predicted = predictor.predict(before, action);
+        let confidence = predictor.prediction_confidence(action).clamp(0.0, 1.0);
+        let baseline = persistence.predict(before, action);
+
+        let after = match world.try_step(action) {
+            Ok(after) => after,
+            Err(_) => {
+                execution_failures += 1;
+                terminated_on_execution_failure = true;
+                break;
+            }
+        };
+
+        let prediction_mae = predicted.mean_absolute_delta(after);
+        predictor_error += prediction_mae;
+        baseline_error += baseline.mean_absolute_delta(after);
+        selected_calibration.record(confidence, prediction_mae);
+        min_actual_viability_margin = min_actual_viability_margin.min(
+            after.energy.min(after.integrity) - 0.08,
+        );
+        steps = steps.saturating_add(1);
+    }
+
+    let denom = steps.max(1) as f64;
+    let baseline_mae = baseline_error / denom;
+    let predictor_mae = predictor_error / denom;
+    let improvement = if baseline_mae <= f64::EPSILON {
+        0.0
+    } else {
+        (baseline_mae - predictor_mae) / baseline_mae
+    };
+    let shift_ratio = if fixed_schedule_mae <= f64::EPSILON {
+        if predictor_mae <= f64::EPSILON { 1.0 } else { f64::INFINITY }
+    } else {
+        predictor_mae / fixed_schedule_mae
+    };
+
+    PolicyInducedShiftReport {
+        steps,
+        baseline_mae,
+        predictor_mae,
+        improvement_over_baseline: improvement,
+        survival: world.observe().is_viable() && !terminated_on_execution_failure,
+        min_actual_viability_margin: if min_actual_viability_margin.is_finite() {
+            min_actual_viability_margin
+        } else {
+            world.observe().energy.min(world.observe().integrity) - 0.08
+        },
+        execution_failures,
+        terminated_on_execution_failure,
+        planner_selected_confidence_calibration: selected_calibration.finish(),
+        shift_error_ratio: shift_ratio,
+    }
+}
+
+fn evaluate_frozen_policy_ranking<P: MicroWorldPredictor>(
+    predictor: &P,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+) -> PolicyRankingQualificationReport {
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let mut states = 0u64;
+    let mut top1_matches = 0u64;
+    let mut pairs_evaluated = 0u64;
+    let mut pairwise_matches = 0u64;
+    let mut inversion_count = 0u64;
+    let mut inversion_advantage_sum = 0.0;
+    while !world.done() && states < max_cycles {
+        for (cycle, perturbation) in scenario.perturbations {
+            if *cycle == states {
+                world.perturb(*perturbation);
+            }
+        }
+
+        let current = world.observe();
+        let mut predicted_scores = Vec::with_capacity(MicroAction::ALL.len());
+        let mut oracle_scores = Vec::with_capacity(MicroAction::ALL.len());
+
+        for action in MicroAction::ALL {
+            let predicted = predictor.predict(current, action);
+            let confidence = predictor.prediction_confidence(action).clamp(0.0, 1.0);
+            predicted_scores.push(
+                super::viability_micro_world::HomeostaticPolicy::benchmark_predicted_action_score(
+                    predicted,
+                    current,
+                    action,
+                    confidence,
+                )
+            );
+            let oracle_next = transition(current, action);
+            oracle_scores.push(
+                super::viability_micro_world::HomeostaticPolicy::benchmark_action_score(
+                    oracle_next,
+                    current,
+                    action,
+                )
+            );
+        }
+
+        let predicted_best = predicted_scores
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(index, _)| index)
+            .unwrap_or(0);
+
+        let oracle_best = oracle_scores
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(index, _)| index)
+            .unwrap_or(0);
+
+        if predicted_best == oracle_best {
+            top1_matches = top1_matches.saturating_add(1);
+        }
+
+        for i in 0..predicted_scores.len() {
+            for j in (i + 1)..predicted_scores.len() {
+                let predicted_delta = predicted_scores[i] - predicted_scores[j];
+                let oracle_delta = oracle_scores[i] - oracle_scores[j];
+
+                if predicted_delta.abs() <= f64::EPSILON
+                    || oracle_delta.abs() <= f64::EPSILON
+                {
+                    continue;
+                }
+
+                pairs_evaluated = pairs_evaluated.saturating_add(1);
+                if predicted_delta.signum() == oracle_delta.signum() {
+                    pairwise_matches = pairwise_matches.saturating_add(1);
+                } else {
+                    inversion_count = inversion_count.saturating_add(1);
+                    if predicted_delta > 0.0 && oracle_delta < 0.0 {
+                        inversion_advantage_sum += predicted_delta;
+                    } else if predicted_delta < 0.0 && oracle_delta > 0.0 {
+                        inversion_advantage_sum += -predicted_delta;
+                    }
+                }
+            }
+        }
+
+        world.step(scenario.schedule[states as usize % scenario.schedule.len()]);
+        states = states.saturating_add(1);
+    }
+
+    PolicyRankingQualificationReport {
+        states,
+        top1_agreement: if states == 0 {
+            0.0
+        } else {
+            top1_matches as f64 / states as f64
+        },
+        pairwise_agreement: if pairs_evaluated == 0 {
+            0.0
+        } else {
+            pairwise_matches as f64 / pairs_evaluated as f64
+        },
+        pairs_evaluated,
+        strict_inversion_rate: if pairs_evaluated == 0 {
+            0.0
+        } else {
+            inversion_count as f64 / pairs_evaluated as f64
+        },
+        mean_predicted_advantage_on_inversions: if inversion_count == 0 {
+            0.0
+        } else {
+            inversion_advantage_sum / inversion_count as f64
+        },
+    }
+}
+
+fn encode_micro_world_state(state: MicroWorldObservation) -> Vec<f64> {
+    let mut encoded = vec![0.0f64; 64];
+    encoded[0] = state.energy;
+    encoded[1] = state.integrity;
+    encoded[2] = state.knowledge;
+    encoded[3] = state.threat;
+    encoded[4] = state.progress;
+    encoded
+}
+
+/// Evaluate a shared transition model's continuous extrapolation against repeated
+/// deterministic oracle transitions from the same starting state.
+fn evaluate_frozen_continuous_rollout<M: ActionConditionedTransitionModel + ?Sized>(
+    model: &M,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+    horizon_seconds: f64,
+    tau: f64,
+    max_steps: usize,
+) -> (u64, f64) {
+    if !horizon_seconds.is_finite() || horizon_seconds <= 0.0 || !tau.is_finite() || tau <= 0.0 {
+        return (0, 0.0);
+    }
+
+    let repeated_steps = (horizon_seconds / tau).round().max(1.0) as usize;
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let mut total_error = 0.0;
+    let mut samples = 0u64;
+    let mut steps = 0u64;
+
+    while !world.done() && steps < max_cycles {
+        for (cycle, perturbation) in scenario.perturbations {
+            if *cycle == steps {
+                world.perturb(*perturbation);
+            }
+        }
+
+        let before = world.observe();
+        let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+        let encoded = encode_micro_world_state(before);
+
+        if let Some(rollout) = roll_transition_model_trajectory(
+            model,
+            &encoded,
+            action.index(),
+            horizon_seconds,
+            tau,
+            max_steps,
+        ) {
+            let mut actual = before;
+            for _ in 0..repeated_steps {
+                actual = transition(actual, action);
+            }
+
+            let predicted = MicroWorldObservation {
+                cycle: actual.cycle,
+                energy: rollout.terminal_state[0],
+                integrity: rollout.terminal_state[1],
+                knowledge: rollout.terminal_state[2],
+                threat: rollout.terminal_state[3],
+                progress: rollout.terminal_state[4],
+            };
+
+            total_error += predicted.mean_absolute_delta(actual);
+            samples = samples.saturating_add(1);
+        }
+
+        world.step(action);
+        steps = steps.saturating_add(1);
+    }
+
+    (samples, total_error / samples.max(1) as f64)
+}
+
+/// Replay the already selected closed-loop actions through the deterministic oracle
+/// to measure recovery against the exact pre-perturbation viability margin.
+fn measure_recovery(
+    scenario: &MicroWorldScenario,
+    actions: &[MicroAction],
+    max_cycles: u64,
+) -> (Vec<Option<u64>>, f64, f64) {
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let mut recovery_targets: Vec<(u64, f64, Option<u64>)> = Vec::new();
+
+    for (step_index, action) in actions.iter().copied().enumerate() {
+        let step = step_index as u64;
+        if world.done() || step >= max_cycles {
+            break;
+        }
+
+        for (cycle, perturbation) in scenario.perturbations {
+            if *cycle == step {
+                let pre_margin = {
+                    let state = world.observe();
+                    state.energy.min(state.integrity) - 0.08
+                };
+                world.perturb(*perturbation);
+                recovery_targets.push((step, pre_margin, None));
+            }
+        }
+
+        let after = world.step(action);
+        let margin = after.energy.min(after.integrity) - 0.08;
+
+        for target in &mut recovery_targets {
+            if target.2.is_none() && step > target.0 && margin >= target.1 {
+                target.2 = Some(step.saturating_sub(target.0));
+            }
+        }
+    }
+
+    let recovered: Vec<Option<u64>> = recovery_targets
+        .iter()
+        .map(|(_, _, recovery)| *recovery)
+        .collect();
+
+    let recovery_rate = if recovered.is_empty() {
+        1.0
+    } else {
+        recovered.iter().filter(|value| value.is_some()).count() as f64
+            / recovered.len() as f64
+    };
+
+    let mean_recovery_steps = {
+        let values: Vec<u64> = recovered.iter().filter_map(|value| *value).collect();
+        if values.is_empty() {
+            0.0
+        } else {
+            values.iter().map(|&value| value as f64).sum::<f64>() / values.len() as f64
+        }
+    };
+
+    (recovered, recovery_rate, mean_recovery_steps)
+}
+
+impl FepModule {
+    /// Roll the current grounded world model through the same ODE engine used by
+    /// trajectory planning.
+    ///
+    /// This is an observational planning probe: it does not select an action,
+    /// update model parameters, or alter runtime policy.
+    pub fn rollout_current_world_model_trajectory(
+        &self,
+        state: &[f64],
+        action: usize,
+        horizon_seconds: f64,
+        tau: f64,
+        max_steps: usize,
+    ) -> Option<ContinuousTransitionRollout> {
+        roll_transition_model_trajectory(
+            &self.world_model,
+            state,
+            action,
+            horizon_seconds,
+            tau,
+            max_steps,
+        )
+    }
+
+    /// Experimentally qualify the live FEP WorldModelBridge against deterministic
+    /// synthetic-organism dynamics.
+    ///
+    /// The phases are intentionally ordered:
+    /// 1. train on one scenario;
+    /// 2. freeze learning and score a perturbed held-out scenario;
+    /// 3. permit online adaptation only for the separate closed-loop survival/recovery run.
+    ///
+    /// This makes transfer/calibration evidence independent from the later policy run.
+    pub fn qualify_world_model_against_micro_world(
+        &mut self,
+        train_cycles: u64,
+        held_out_cycles: u64,
+        policy_horizon: usize,
+        policy_discount: f64,
+    ) -> GroundedWorldModelQualificationReport {
+        let scenarios = benchmark_scenarios();
+        let training = &scenarios[0];
+        let held_out = &scenarios[1];
+        let manifest_digest = benchmark_manifest_digest();
+        let cross_scenario_transfer =
+            evaluate_cross_scenario_transfer(&self.world_model, train_cycles, held_out_cycles);
+
+        let mut persistence = PersistencePredictor::default();
+        let persistence_closed_loop = run_homeostatic_agent_horizon_scenario(
+            &mut persistence,
+            held_out,
+            held_out_cycles,
+            policy_horizon,
+            policy_discount,
+        );
+        let (_, persistence_recovery_rate, persistence_mean_recovery_steps) =
+            measure_recovery(held_out, &persistence_closed_loop.actions, held_out_cycles);
+
+        // Qualification must never reset or retrain the production world model in place.
+        // Clone the exact current model so the experiment is isolated from runtime state.
+        let mut qualification_world_model = self.world_model.clone();
+        let mut predictor = FepWorldModelPredictor {
+            bridge: &mut qualification_world_model,
+        };
+
+        let mut train_world = MicroWorld::new(training.initial, train_cycles);
+        let mut train_error = 0.0;
+        let mut train_steps = 0u64;
+
+        while !train_world.done() && train_steps < train_cycles {
+            for (cycle, perturbation) in training.perturbations {
+                if *cycle == train_steps {
+                    train_world.perturb(*perturbation);
+                }
+            }
+
+            let before = train_world.observe();
+            let action =
+                training.schedule[train_steps as usize % training.schedule.len()];
+            let predicted = predictor.predict(before, action);
+            let after = train_world.step(action);
+            train_error += predicted.mean_absolute_delta(after);
+            predictor.observe_transition(before, action, after);
+            train_steps = train_steps.saturating_add(1);
+        }
+
+        let (held_out_steps, held_out_baseline_mae, held_out_predictor_mae,
+            held_out_improvement, held_out_calibration, held_out_survived) =
+            evaluate_frozen_scenario(&predictor, held_out, held_out_cycles);
+
+        let (held_out_continuous_rollout_steps, held_out_continuous_rollout_mae) =
+            evaluate_frozen_continuous_rollout(
+                predictor.bridge,
+                held_out,
+                held_out_cycles,
+                0.5,
+                0.1,
+                200,
+            );
+
+        let held_out_multi_horizon =
+            evaluate_multi_horizon(predictor.bridge, held_out, held_out_cycles);
+
+        let policy_induced_shift = evaluate_policy_induced_shift(
+            &predictor,
+            held_out,
+            held_out_cycles,
+            policy_horizon,
+            policy_discount,
+            held_out_predictor_mae,
+        );
+
+        let held_out_policy_ranking =
+            evaluate_frozen_policy_ranking(&predictor, held_out, held_out_cycles);
+
+        let environment_query_report =
+            evaluate_environment_query_bank(predictor.bridge, held_out);
+
+        let procedural_held_out_transfer =
+            evaluate_procedural_held_out_transfer(predictor.bridge, held_out_cycles);
+
+        let learning_response =
+            evaluate_learning_response(predictor.bridge, held_out, held_out_cycles);
+
+        let sequential_learning_response =
+            evaluate_sequential_learning_response(predictor.bridge, held_out, held_out_cycles);
+
+        let change_detection = evaluate_change_detection(predictor.bridge);
+
+        let regime_shift_adaptation =
+            evaluate_regime_shift_adaptation(predictor.bridge, held_out);
+
+        let closed_loop = run_homeostatic_agent_horizon_scenario(
+            &mut predictor,
+            held_out,
+            held_out_cycles,
+            policy_horizon,
+            policy_discount,
+        );
+
+        let (recovery_steps, recovery_rate, mean_recovery_steps) =
+            measure_recovery(held_out, &closed_loop.actions, held_out_cycles);
+
+        GroundedWorldModelQualificationReport {
+            benchmark_manifest_digest: manifest_digest,
+            training_scenario_manifest_digest: training.manifest_digest(),
+            held_out_scenario_manifest_digest: held_out.manifest_digest(),
+            cross_scenario_transfer,
+            training_scenario: training.name,
+            held_out_scenario: held_out.name,
+            train_steps,
+            train_predictor_mae: train_error / train_steps.max(1) as f64,
+            held_out_steps,
+            held_out_baseline_mae,
+            held_out_predictor_mae,
+            held_out_improvement_over_baseline: held_out_improvement,
+            held_out_confidence_calibration: held_out_calibration,
+            held_out_continuous_rollout_steps,
+            held_out_continuous_rollout_mae,
+            held_out_multi_horizon,
+            held_out_survived_fixed_schedule: held_out_survived,
+            policy_induced_shift,
+            held_out_policy_ranking,
+            environment_query_report,
+            procedural_held_out_transfer,
+            learning_response,
+            sequential_learning_response,
+            change_detection,
+            regime_shift_adaptation,
+            persistence_closed_loop_survived: persistence_closed_loop.survived,
+            persistence_closed_loop_mean_oracle_horizon_regret:
+                persistence_closed_loop.mean_oracle_horizon_regret,
+            persistence_recovery_rate,
+            persistence_mean_recovery_steps,
+            closed_loop_survived: closed_loop.survived,
+            closed_loop_steps: closed_loop.steps,
+            closed_loop_prediction_mae: if closed_loop.steps == 0 {
+                0.0
+            } else {
+                closed_loop.cumulative_prediction_error / closed_loop.steps as f64
+            },
+            closed_loop_mean_oracle_horizon_regret: closed_loop.mean_oracle_horizon_regret,
+            closed_loop_min_actual_viability_margin: closed_loop.min_actual_viability_margin,
+            closed_loop_execution_failures: closed_loop.execution_failures,
+            closed_loop_terminated_on_execution_failure: closed_loop.terminated_on_execution_failure,
+            perturbations_applied: closed_loop.perturbations_applied,
+            perturbation_recovery_steps: recovery_steps,
+            recovery_rate,
+            mean_recovery_steps,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug, Default)]
+    struct OraclePredictor;
+
+    impl MicroWorldPredictor for OraclePredictor {
+        fn predict(
+            &self,
+            state: MicroWorldObservation,
+            action: MicroAction,
+        ) -> MicroWorldObservation {
+            super::super::viability_micro_world::transition(state, action)
+        }
+
+        fn prediction_confidence(&self, _action: MicroAction) -> f64 {
+            1.0
+        }
+    }
+
+    #[test]
+    fn shared_transition_adapter_rejects_invalid_action() {
+        let model = super::goal_world::WorldModelBridge::with_actions(2);
+        assert!(ActionConditionedTransitionOde::new(&model, 2, 0.1).is_none());
+        assert!(roll_transition_model_trajectory(&model, &[0.0; 64], 2, 0.1, 0.1, 32).is_none());
+    }
+
+    #[test]
+    fn continuous_rollout_matches_relaxation_solution_at_tau() {
+        let mut model = super::goal_world::WorldModelBridge::with_actions(2);
+        let before = vec![0.0f32; 64];
+        let mut after = before.clone();
+        after[0] = 0.25;
+        after[1] = -0.10;
+
+        for _ in 0..20 {
+            model
+                .observe_action_transition(0, &before, &after)
+                .expect("valid action/state dimensions");
+        }
+
+        let state = vec![0.0f64; 64];
+        let rollout = roll_transition_model_trajectory(
+            &model,
+            &state,
+            0,
+            0.1,
+            0.1,
+            64,
+        )
+        .expect("valid continuous rollout");
+
+        let relaxation_fraction = 1.0 - (-1.0f64).exp();
+        for index in [0usize, 1usize] {
+            let predicted = rollout.one_step_prediction[index];
+            let expected = predicted * relaxation_fraction;
+            assert!((rollout.terminal_state[index] - expected).abs() < 2e-3);
+        }
+    }
+
+    #[test]
+    fn horizon_confidence_decays_with_depth() {
+        let predictor = OraclePredictor;
+        let policy = HomeostaticPolicy;
+        let current = benchmark_scenarios()[0].initial;
+        let (_, _, rollout) = policy.choose_horizon(&predictor, current, 4, 0.8);
+
+        assert!(rollout.min_confidence < 1.0);
+        let expected = DEFAULT_HORIZON_CONFIDENCE_DECAY.powi(3);
+        assert!((rollout.min_confidence - expected).abs() < 1e-12);
+
+        let (_, _, custom_rollout) =
+            policy.choose_horizon_with_confidence_decay(&predictor, current, 4, 0.8, 0.5);
+        assert!((custom_rollout.min_confidence - 0.5_f64.powi(3)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn adversarial_predictor_produces_detectable_exploitation_gap() {
+        #[derive(Debug, Default)]
+        struct AdversarialPredictor;
+
+        impl MicroWorldPredictor for AdversarialPredictor {
+            fn predict(
+                &self,
+                state: MicroWorldObservation,
+                action: MicroAction,
+            ) -> MicroWorldObservation {
+                let mut oracle = MicroAction::ALL
+                    .into_iter()
+                    .map(|candidate| {
+                        (
+                            candidate,
+                            HomeostaticPolicy::benchmark_action_score(
+                                transition(state, candidate),
+                                state,
+                                candidate,
+                            ),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                oracle.sort_by(|(_, a), (_, b)| {
+                    b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal)
+                });
+
+                let best = oracle[0].0;
+                let second = oracle[1].0;
+                if action == best {
+                    transition(state, second)
+                } else if action == second {
+                    transition(state, best)
+                } else {
+                    transition(state, action)
+                }
+            }
+
+            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
+                1.0
+            }
+        }
+
+        let report = evaluate_frozen_policy_ranking(
+            &AdversarialPredictor,
+            &benchmark_scenarios()[0],
+            8,
+        );
+
+        assert!(report.strict_inversion_rate > 0.0);
+        assert!(report.exploitation_gap() > 0.0);
+    }
+
+    #[test]
+    fn oracle_policy_has_zero_exploitation_gap() {
+        let predictor = OraclePredictor;
+        let report = evaluate_frozen_policy_ranking(
+            &predictor,
+            &benchmark_scenarios()[0],
+            8,
+        );
+
+        assert_eq!(report.strict_inversion_rate, 0.0);
+        assert_eq!(report.exploitation_gap(), 0.0);
+    }
+
+    #[test]
+    fn oracle_policy_has_perfect_action_ranking() {
+        let predictor = OraclePredictor;
+        let report = evaluate_frozen_policy_ranking(
+            &predictor,
+            &benchmark_scenarios()[0],
+            8,
+        );
+
+        assert!(report.states > 0);
+        assert!(report.pairs_evaluated > 0);
+        assert!((report.top1_agreement - 1.0).abs() < 1e-12);
+        assert!((report.pairwise_agreement - 1.0).abs() < 1e-12);
+        assert!(report.decision_structure_present());
+    }
+
+    #[test]
+    fn benchmark_manifest_digest_is_stable_and_scenarios_are_distinct() {
+        let scenarios = benchmark_scenarios();
+        let first = benchmark_manifest_digest();
+        let second = benchmark_manifest_digest();
+
+        assert_eq!(first, second);
+        assert_ne!(first, 0);
+        let mut digests = scenarios
+            .iter()
+            .map(MicroWorldScenario::manifest_digest)
+            .collect::<Vec<_>>();
+        digests.sort_unstable();
+        digests.dedup();
+        assert_eq!(digests.len(), scenarios.len());
+    }
+
+    #[test]
+    fn leave_one_out_transfer_covers_every_cross_scenario_pair() {
+        let model = super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let scenarios = benchmark_scenarios();
+        let report = evaluate_cross_scenario_transfer(&model, 4, 4);
+
+        assert_eq!(
+            report.folds.len(),
+            scenarios.len() * (scenarios.len() - 1)
+        );
+        assert_eq!(report.benchmark_manifest_digest, benchmark_manifest_digest());
+        assert!(report.folds.iter().all(|fold| {
+            fold.training_scenario != fold.held_out_scenario
+                && fold.train_steps > 0
+                && fold.held_out_steps > 0
+        }));
+        assert!((0.0..=1.0).contains(&report.held_out_beats_persistence_rate));
+        assert!(report.worst_improvement_over_baseline <= report.mean_improvement_over_baseline);
+    }
+
+    #[test]
+    fn oracle_environment_queries_have_perfect_changed_channel_f1() {
+        struct OracleTransitionModel;
+
+        impl ActionConditionedTransitionModel for OracleTransitionModel {
+            fn state_dimension(&self) -> usize {
+                64
+            }
+
+            fn action_count(&self) -> usize {
+                MicroAction::ALL.len()
+            }
+
+            fn predict_next_state(&self, state: &[f64], action: usize) -> Option<Vec<f64>> {
+                if state.len() != 64 || action >= MicroAction::ALL.len() {
+                    return None;
+                }
+                let state_observation = MicroWorldObservation {
+                    cycle: 0,
+                    energy: state[0],
+                    integrity: state[1],
+                    knowledge: state[2],
+                    threat: state[3],
+                    progress: state[4],
+                };
+                Some(encode_micro_world_state(
+                    transition(state_observation, MicroAction::ALL[action]),
+                ))
+            }
+        }
+
+        let report = evaluate_environment_query_bank(
+            &OracleTransitionModel,
+            &benchmark_scenarios()[0],
+        );
+
+        assert!(report.is_scoreable());
+        assert!((report.mean_changed_channel_f1 - 1.0).abs() < 1e-12);
+        assert!(report.mean_path_mae < 1e-12);
+        assert!(report.mean_terminal_mae < 1e-12);
+    }
+
+    #[test]
+    fn invalid_environment_query_answers_are_counted_as_disagreements() {
+        #[derive(Debug, Default)]
+        struct InvalidPredictor;
+
+        impl ActionConditionedTransitionModel for InvalidPredictor {
+            fn state_dimension(&self) -> usize {
+                64
+            }
+
+            fn action_count(&self) -> usize {
+                MicroAction::ALL.len()
+            }
+
+            fn predict_next_state(&self, _state: &[f64], _action: usize) -> Option<Vec<f64>> {
+                None
+            }
+        }
+
+        let report = evaluate_environment_query_bank(
+            &InvalidPredictor,
+            &benchmark_scenarios()[0],
+        );
+
+        assert_eq!(report.valid_queries, 0);
+        assert_eq!(report.invalid_queries, report.queries);
+        assert!(!report.has_valid_answers());
+        assert!(!report.is_scoreable());
+        assert_eq!(report.survival_agreement, 0.0);
+        assert_eq!(report.mean_path_mae, 0.0);
+        assert_eq!(report.mean_changed_channel_f1, 0.0);
+        assert_eq!(report.mean_terminal_mae, 0.0);
+        assert_eq!(report.mean_min_viability_margin_error, 0.0);
+    }
+
+    #[test]
+    fn learning_response_is_populated_and_finite() {
+        let model = super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let report = evaluate_learning_response(
+            &model,
+            &benchmark_scenarios()[1],
+            12,
+        );
+
+        assert_eq!(report.shock_count, 2);
+        assert_eq!(report.events.len(), 2);
+        assert!(report.events.iter().all(|event| {
+            event.shock_state_digest != 0
+                && event.shock_mae_before_update.is_finite()
+                && event.shock_mae_after_update.is_finite()
+                && event.neighbor_mae_before_update.is_finite()
+                && event.neighbor_mae_after_update.is_finite()
+                && event.anchor_mae_before_update.is_finite()
+                && event.anchor_mae_after_update.is_finite()
+        }));
+        assert!(report.is_populated());
+        assert!(report.is_scoreable());
+        assert_eq!(report.events.len() as u64, report.shock_count);
+        for value in [
+            report.mean_shock_mae_before_update,
+            report.mean_shock_mae_after_update,
+            report.mean_same_transition_improvement,
+            report.same_transition_improvement_rate,
+            report.mean_neighbor_mae_before_update,
+            report.mean_neighbor_mae_after_update,
+            report.mean_neighbor_improvement,
+            report.neighbor_improvement_rate,
+            report.mean_anchor_mae_before_update,
+            report.mean_anchor_mae_after_update,
+            report.mean_anchor_regression,
+            report.max_anchor_regression,
+            report.anchor_regression_rate,
+        ] {
+            assert!(value.is_finite());
+        }
+        assert!((0.0..=1.0).contains(&report.same_transition_improvement_rate));
+        assert!((0.0..=1.0).contains(&report.neighbor_improvement_rate));
+        assert!((0.0..=1.0).contains(&report.anchor_regression_rate));
+        assert!(report.max_anchor_regression.is_finite());
+    }
+
+    #[test]
+    fn change_detection_is_populated_and_separated_from_adaptation() {
+        let base_model =
+            super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let (trained_model, train_steps) =
+            train_world_model_clone(&base_model, &benchmark_scenarios()[0], 24);
+        assert!(train_steps > 0);
+        let report = evaluate_change_detection(&trained_model);
+
+        assert!(report.is_populated());
+        assert!(report.is_scoreable());
+        assert!(!report.nominal_control_events.is_empty());
+        assert!(!report.shifted_regime_events.is_empty());
+        assert_eq!(
+            report.shifted_regime_detected,
+            report
+                .shifted_regime_events
+                .iter()
+                .any(|event| event.detected)
+        );
+        assert_eq!(
+            report.nominal_false_alarm,
+            report
+                .nominal_control_events
+                .iter()
+                .any(|event| event.detected)
+        );
+        assert!(report
+            .shifted_regime_events
+            .iter()
+            .all(|event| event.detection_direction == "none"
+                || event.detection_direction == "increase"
+                || event.detection_direction == "decrease"));
+        assert!(report.operationally_separates_shift());
+    }
+
+    #[test]
+    fn change_detection_operating_characteristics_are_populated_and_scoreable() {
+        let base_model =
+            super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let (trained_model, train_steps) =
+            train_world_model_clone(&base_model, &benchmark_scenarios()[0], 24);
+        assert!(train_steps > 0);
+        let report = evaluate_change_detection(&trained_model);
+        let operating = &report.operating_characteristics;
+
+        assert!(operating.is_populated());
+        assert!(operating.is_scoreable());
+        assert_eq!(
+            operating.nominal_episode_count,
+            operating.nominal_episodes.len() as u64
+        );
+        assert_eq!(
+            operating.shift_episode_count,
+            operating.shift_episodes.len() as u64
+        );
+        assert!(operating.nominal_false_alarm_episode_rate.is_finite());
+        assert!(operating.shift_detection_rate.is_finite());
+        assert!(operating.decrease_correct_direction_rate.is_finite());
+        assert!(operating.increase_correct_direction_rate.is_finite());
+        assert!(!operating.gradual_drift_events.is_empty());
+
+        let calibration = change_detection_control_states();
+        let held_out = procedural_held_out_scenarios()
+            .into_iter()
+            .skip(4)
+            .take(4)
+            .map(|scenario| scenario.initial)
+            .collect::<Vec<_>>();
+        assert_eq!(calibration.len(), held_out.len());
+        assert!(calibration
+            .iter()
+            .all(|state| held_out.iter().all(|other| state.digest() != other.digest())));
+    }
+
+    #[test]
+    fn malformed_shift_detection_receipts_fail_closed() {
+        let base_model =
+            super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let (trained_model, train_steps) =
+            train_world_model_clone(&base_model, &benchmark_scenarios()[0], 24);
+        assert!(train_steps > 0);
+        let mut report = evaluate_change_detection(&trained_model);
+        assert!(report.is_scoreable());
+        assert!(!report.shifted_regime_events.is_empty());
+
+        report.shifted_regime_events[0].upper_cusum = f64::NAN;
+        assert!(!report.is_scoreable());
+
+        let mut report = evaluate_change_detection(&trained_model);
+        report.shifted_regime_events[0].detection_direction = "invalid";
+        assert!(!report.is_scoreable());
+    }
+
+    #[test]
+    fn regime_error_ratio_above_one_remains_scoreable() {
+        let model = super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let mut report =
+            evaluate_regime_shift_adaptation(&model, &benchmark_scenarios()[1]);
+        assert!(report.is_scoreable());
+        assert!(!report.events.is_empty());
+
+        // A ratio > 1 means the shifted-regime error is worse than the pre-revision error.
+        // That is a legitimate diagnostic outcome, not malformed evidence.
+        report.events[0].shifted_validation_error_ratio = 2.0;
+        assert!(report.is_scoreable());
+    }
+
+    #[test]
+    fn regime_shift_adaptation_is_populated_and_scoreable() {
+        let model = super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let report = evaluate_regime_shift_adaptation(
+            &model,
+            &benchmark_scenarios()[1],
+        );
+
+        assert!(report.is_populated());
+        assert!(report.is_scoreable());
+        assert_eq!(report.events.len() as u64, report.update_count);
+        assert!(report.pre_revision_shifted_validation_mae.is_finite());
+        assert!(report.final_shifted_validation_mae.is_finite());
+        assert!(report.revision_improvement.is_finite());
+        assert!(report.target_error_fraction < 1.0);
+        assert!(report
+            .events
+            .iter()
+            .all(|event| {
+                event.action == MicroAction::Harvest
+                    && (1..=REGIME_SHIFT_MAX_UPDATES).contains(&event.update_ordinal)
+                    && event.shifted_validation_error_ratio >= 0.0
+                    && event.shifted_validation_error_ratio.is_finite()
+            }));
+        assert!(report
+            .revision_latency_updates
+            .map(|latency| latency <= report.update_count)
+            .unwrap_or(true));
+    }
+
+    #[test]
+    fn sequential_learning_response_is_populated_and_finite() {
+        let model = super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let report = evaluate_sequential_learning_response(
+            &model,
+            &benchmark_scenarios()[1],
+            12,
+        );
+
+        assert_eq!(report.shock_count, 2);
+        assert_eq!(report.events.len(), 2);
+        assert!(report.events.iter().all(|event| {
+            event.shock_state_digest != 0
+                && event.shock_mae_before_update.is_finite()
+                && event.shock_mae_after_update.is_finite()
+                && event.neighbor_mae_before_update.is_finite()
+                && event.neighbor_mae_after_update.is_finite()
+                && event.anchor_mean_mae_from_initial.is_finite()
+                && event.anchor_mean_regression_from_initial.is_finite()
+                && event.anchor_max_regression_from_initial.is_finite()
+                && event.prior_shock_mean_regression.is_finite()
+                && event.prior_shock_max_regression.is_finite()
+                && event.prior_shock_retention_rate.is_finite()
+        }));
+        assert!(report.is_populated());
+        for value in [
+            report.mean_shock_mae_before_update,
+            report.mean_shock_mae_after_update,
+            report.mean_same_transition_improvement,
+            report.same_transition_improvement_rate,
+            report.mean_neighbor_mae_before_update,
+            report.mean_neighbor_mae_after_update,
+            report.mean_neighbor_improvement,
+            report.neighbor_improvement_rate,
+            report.initial_anchor_mean_mae,
+            report.final_anchor_mean_mae,
+            report.final_anchor_regression_from_initial,
+            report.max_anchor_regression_from_initial,
+            report.anchor_regression_event_rate,
+            report.prior_shock_retention_rate,
+            report.max_prior_shock_regression,
+        ] {
+            assert!(value.is_finite());
+        }
+        assert!((0.0..=1.0).contains(&report.same_transition_improvement_rate));
+        assert!((0.0..=1.0).contains(&report.neighbor_improvement_rate));
+        assert!((0.0..=1.0).contains(&report.anchor_regression_event_rate));
+        assert!((0.0..=1.0).contains(&report.prior_shock_retention_rate));
+        assert_eq!(report.events[0].prior_shock_retention_rate, 1.0);
+    }
+
+    #[test]
+    fn procedural_held_out_manifest_is_stable_and_nonempty() {
+        let first = procedural_held_out_manifest_digest();
+        let second = procedural_held_out_manifest_digest();
+        let scenarios = procedural_held_out_scenarios();
+
+        assert_eq!(first, second);
+        assert_ne!(first, 0);
+        assert_eq!(scenarios.len(), 8);
+        assert!(scenarios.iter().all(|scenario| !scenario.schedule.is_empty()));
+        let mut digests = scenarios
+            .iter()
+            .map(ProceduralMicroWorldScenario::manifest_digest)
+            .collect::<Vec<_>>();
+        digests.sort_unstable();
+        digests.dedup();
+        assert_eq!(digests.len(), scenarios.len());
+    }
+
+    #[test]
+    fn procedural_held_out_transfer_is_frozen_and_complete() {
+        let model = super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let report = evaluate_procedural_held_out_transfer(&model, 4);
+
+        assert!(report.is_scoreable());
+        assert_eq!(report.scenario_count, 8);
+        assert_eq!(report.folds.len(), 8);
+        assert_eq!(report.manifest_digest, procedural_held_out_manifest_digest());
+        assert!((0.0..=1.0).contains(&report.held_out_beats_persistence_rate));
+        assert!((0.0..=1.0).contains(&report.survival_rate));
+    }
+
+    #[test]
+    fn environment_query_bank_is_populated_and_executed() {
+        let model = super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let report = evaluate_environment_query_bank(
+            &model,
+            &benchmark_scenarios()[0],
+        );
+
+        assert!(report.is_populated());
+        assert!(report.has_valid_answers());
+        assert!(report.is_scoreable());
+        assert_eq!(report.probe_states, 4);
+        assert_eq!(report.invalid_queries + report.valid_queries, report.queries);
+        assert_eq!(
+            report.queries,
+            4 * MicroAction::ALL.len().pow(QUERY_SEQUENCE_LENGTH as u32) as u64
+        );
+        assert!((0.0..=1.0).contains(&report.survival_agreement));
+    }
+
+    #[test]
+    fn temporal_degradation_metrics_name_their_prediction_channel() {
+        let point = HorizonQualificationPoint {
+            horizon_steps: 4,
+            samples: 1,
+            mean_one_step_mae: 0.10,
+            mean_terminal_mae: 0.20,
+            mean_discrete_terminal_mae: 0.30,
+            terminal_to_one_step_error_ratio: 2.0,
+        };
+
+        assert!(point.has_continuous_temporal_degradation());
+        assert!(point.has_discrete_temporal_degradation());
+        assert!(point.has_temporal_degradation());
+    }
+
+    #[test]
+    fn multi_horizon_profile_has_all_requested_horizons() {
+        let mut model = super::goal_world::WorldModelBridge::with_actions(6);
+        let before = vec![0.0f32; 64];
+        let mut after = before.clone();
+        after[0] = 0.20;
+        after[1] = -0.05;
+
+        for action in 0..6 {
+            for _ in 0..24 {
+                model
+                    .observe_action_transition(action, &before, &after)
+                    .expect("valid action/state dimensions");
+            }
+        }
+
+        let points = evaluate_multi_horizon(
+            &model,
+            &benchmark_scenarios()[0],
+            8,
+        );
+
+        assert_eq!(points.len(), QUALIFICATION_HORIZONS.len());
+        assert_eq!(
+            points.iter().map(|point| point.horizon_steps).collect::<Vec<_>>(),
+            QUALIFICATION_HORIZONS.to_vec()
+        );
+        assert!(points.iter().all(|point| point.samples > 0));
+    }
+
+    #[test]
+    fn frozen_policy_induced_shift_has_no_learning_side_effects() {
+        let predictor = OraclePredictor;
+        let scenario = benchmark_scenarios()[0];
+        let report = evaluate_policy_induced_shift(
+            &predictor,
+            &scenario,
+            8,
+            4,
+            0.8,
+            0.05,
+        );
+
+        assert!(report.steps > 0);
+        assert_eq!(report.execution_failures, 0);
+        assert!(!report.terminated_on_execution_failure);
+        assert!(report.predictor_mae < 1e-12);
+        assert!(report.survival);
+    }
+
+    #[test]
+    fn deliberately_overconfident_bad_predictions_are_miscalibrated() {
+        #[derive(Debug, Default)]
+        struct OverconfidentPersistence;
+
+        impl MicroWorldPredictor for OverconfidentPersistence {
+            fn predict(
+                &self,
+                state: MicroWorldObservation,
+                action: MicroAction,
+            ) -> MicroWorldObservation {
+                PersistencePredictor::default().predict(state, action)
+            }
+
+            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
+                1.0
+            }
+        }
+
+        let scenarios = benchmark_scenarios();
+        let (_, _, _, _, calibration, _) =
+            evaluate_frozen_scenario(&OverconfidentPersistence, &scenarios[0], 8);
+
+        assert!(calibration.sample_count > 0);
+        assert!(calibration.expected_calibration_error > 0.0);
+        assert!(calibration.confidence_accuracy_mse > 0.0);
+    }
+
+    #[test]
+    fn perfect_oracle_is_perfectly_calibrated() {
+        let scenarios = benchmark_scenarios();
+        let (_, baseline, predictor, improvement, calibration, survived) =
+            evaluate_frozen_scenario(&OraclePredictor, &scenarios[0], 8);
+
+        assert!(predictor.abs() < f64::EPSILON);
+        assert!(improvement > 0.0);
+        assert!(calibration.sample_count > 0);
+        assert!(calibration.expected_calibration_error < f64::EPSILON);
+        assert!(calibration.confidence_accuracy_mse < f64::EPSILON);
+        assert!(survived);
+        assert!(baseline > 0.0);
+    }
+}
