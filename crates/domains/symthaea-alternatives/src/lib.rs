@@ -8669,7 +8669,7 @@ mod tests {
         ));
 
         let mut wrong_frontier_set = topology.clone();
-        wrong_frontier_set.input_frontier.frontier_digest =
+        wrong_frontier_set.input_frontier.input_set_digest =
             canonical_measurement_model_input_frontier_digest(&[
                 "fixture-input-other".into(),
             ])
@@ -8682,7 +8682,7 @@ mod tests {
                     &observation.calibration_chain_refs,
                 )
                 .unwrap_err(),
-            AssessmentError::MeasurementModelInputFrontierDigestMismatch {
+            AssessmentError::MeasurementModelInputFrontierInputSetDigestMismatch {
                 frontier_id,
                 ..
             } if frontier_id == "fixture-input-frontier-v1"
