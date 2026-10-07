@@ -171,23 +171,28 @@ A future green qualification should report all of:
 
 Queued CI is not a pass.
 
-## Next architectural gate
+## Current architectural gate
 
-The next high-value refactor is to introduce a common transition-model interface shared by:
+The branch now includes an experimental common transition-model interface shared by:
 
 - the action-conditioned WorldModelBridge;
 - the FEP generative transition model;
-- the ODE trajectory planner.
+- the existing Dormand-Prince ODE engine through a continuous adapter.
 
-That interface should allow the same grounded transition oracle to score both models without forcing
-either model to change its own representation.
+The continuous extension is explicit:
 
-The desired comparison is then:
+ds/dt = (F(s,a) - s) / tau
+
+For the WorldModelBridge delta model this becomes a constant action-specific velocity. It is an
+experimental numerical extension, not a claim that this is the unique or biologically correct
+continuous-time realization.
+
+The remaining qualification task is to measure:
 
 **learned discrete prediction → continuous trajectory rollout → actual deterministic consequence**
 
 with separate measurements for model error, confidence calibration, planning regret, survival, and
 recovery.
 
-Only after that comparison is stable should viability-driven modulation of runtime policy be
-considered for broader qualification.
+Only after that comparison is stable should the shared transition abstraction be considered for
+runtime policy coupling or viability-driven modulation.
