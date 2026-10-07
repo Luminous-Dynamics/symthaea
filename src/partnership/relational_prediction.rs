@@ -4422,6 +4422,8 @@ fn inference_selection_digest(receipt: &ForecastInferenceSelectionReceipt) -> St
     update_string(&mut hasher, &receipt.selected_dependence_spec_sha256);
     update_string(&mut hasher, &receipt.selected_resampling_method_id);
     update_string(&mut hasher, &receipt.selected_resampling_spec_sha256);
+    update_string(&mut hasher, &receipt.selected_small_sample_policy_id);
+    update_string(&mut hasher, &receipt.selected_multiplicity_policy_id);
     hasher.finalize().to_hex().to_string()
 }
 
