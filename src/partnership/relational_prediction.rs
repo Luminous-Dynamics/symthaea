@@ -32,7 +32,7 @@
 //! assumptions; they are not generic significance tests.
 
 use super::relational_harmonics::EvidenceStatus;
-use sha2::{Digest, Sha256};
+use sha2_relational_schedule::{Digest, Sha256};
 
 const EVIDENCE_SCHEMA: &str = "relational-prediction-evidence/v4";
 const ROLLING_EVIDENCE_SCHEMA: &str = "relational-prediction-rolling-evidence/v4";
