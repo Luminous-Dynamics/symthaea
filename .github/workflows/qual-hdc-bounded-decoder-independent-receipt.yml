@@ -20,7 +20,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # pinned
         env:
           EXPECTED_PR: "6803"
-          EXPECTED_SUBJECT: "23ea3509d82eb67f7a37c7ccb34f344697617a4c"
+          EXPECTED_SUBJECT: "f4974fff42b32217f7414706deda866463b0519d"
           EXPECTED_PARENT: "164d6b94d12bb72a902bdc2164d25cd540d3ba7f"
           EXPECTED_BRANCH: "research/hdc-linear-code-bounded-decoder-v2"
           EXPECTED_BASE_BRANCH: "research/hdc-linear-code-recovery-design-v1"
@@ -67,7 +67,7 @@ jobs:
               'crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs':
                 '8cfa7e9b38c185427da7b04d73221d86194cca24',
               'docs/research/HDC_LINEAR_CODE_BOUNDED_DECODER.md':
-                '9cfb2817beaf5c0b3676a4d1b495cc98fb7f52fc',
+                'c4629f25c746eb515573d2c3ace72d24de922e55',
             };
 
             const requiredSteps = [
