@@ -434,22 +434,14 @@ async fn spawn_privileged_background_process(
         return Err(error);
     }
 
-    let status_path = status_path.to_string();
     tokio::spawn(async move {
         if let Ok(status) = child.wait().await {
             if let Some(code) = status.code() {
-                if let Ok(mut status_file) = std::fs::OpenOptions::new()
-                    .write(true)
-                    .truncate(true)
-                    .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-                    .open(&status_path)
-                {
-                    let _ = std::io::Write::write_all(
-                        &mut status_file,
-                        format!("{code}\n").as_bytes(),
-                    );
-                    let _ = status_file.sync_all();
-                }
+                let _ = std::io::Write::write_all(
+                    &mut status_file,
+                    format!("{code}\n").as_bytes(),
+                );
+                let _ = status_file.sync_all();
             }
         }
     });
@@ -11952,6 +11944,63 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(&status).unwrap(),
             ""
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn background_process_status_uses_original_inode_after_path_rename() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!("nixforhumanity-status-fd-{transaction_id}"));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let log = dir.join("worker.log");
+        let status = dir.join("worker.status");
+        let pid = dir.join("worker.pid");
+
+        let mut command = trusted_typed_process("echo").unwrap();
+        command.arg("status-fd");
+
+        let _child_pid = spawn_privileged_background_process(
+            command,
+            log.to_str().unwrap(),
+            status.to_str().unwrap(),
+            pid.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+
+        let renamed = dir.join("worker.status.moved");
+        std::fs::rename(&status, &renamed).unwrap();
+
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if read_transaction_status(renamed.to_str().unwrap())
+                    .await
+                    .unwrap()
+                    .is_some()
+                {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("completion status should reach the original inode after pathname rename");
+
+        assert_eq!(
+            read_transaction_status(renamed.to_str().unwrap())
+                .await
+                .unwrap(),
+            Some(0)
+        );
+        assert!(
+            !status.exists(),
+            "the replacement pathname must not receive completion evidence"
         );
 
         let _ = std::fs::remove_dir_all(dir);
