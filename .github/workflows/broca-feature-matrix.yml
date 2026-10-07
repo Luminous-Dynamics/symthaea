@@ -97,14 +97,8 @@ jobs:
       - name: Cache cargo registry and target
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
+          path: ~/.cargo/registry
           key: ${{ runner.os }}-broca-${{ matrix.name }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml', 'Cargo.toml', 'crates/domains/symthaea-broca/Cargo.toml', '.cargo/config.toml', '.cargo/config') }}
-          restore-keys: |
-            ${{ runner.os }}-broca-${{ matrix.name }}-
-            ${{ runner.os }}-broca-
 
       - name: Install system dependencies
         run: |
@@ -170,14 +164,8 @@ jobs:
       - name: Cache cargo registry and target
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
+          path: ~/.cargo/registry
           key: ${{ runner.os }}-broca-freeze-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml', 'Cargo.toml', 'crates/domains/symthaea-broca/Cargo.toml', '.cargo/config.toml', '.cargo/config') }}
-          restore-keys: |
-            ${{ runner.os }}-broca-freeze-
-            ${{ runner.os }}-broca-
 
       - name: Install system dependencies
         run: |
