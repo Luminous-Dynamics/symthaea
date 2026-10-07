@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Independent, base-owned Broca qualification verifier.
 
-This script is executed only from the default branch by workflow_run. PR source
+This script is executed only from the default branch by workflow_run or workflow_dispatch. PR source
 is fetched as API data and is never checked out, imported, built, or executed.
 """
 
