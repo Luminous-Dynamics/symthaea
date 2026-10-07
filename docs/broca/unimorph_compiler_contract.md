@@ -45,6 +45,8 @@ A source-backed compilation witness binds:
 
 Source slices are record selections, not arbitrary byte windows: each selected range must begin at the start of the artifact or immediately after an LF, and end at the artifact end or immediately before an LF. This prevents a valid-looking TSV row from being carved out of the middle of a larger source line.
 
+The frozen UniMorph selection is machine-authoritative in `docs/broca/unimorph_eng_4_selection_manifest.json`; the Markdown selection manifest is its human-readable projection. The JSON record's declared source line is independently checked against its byte offset in the fetched artifact.
+
 The `record_id` on a source slice is a caller-supplied label. The cryptographic identity of the selected bytes is the per-slice BLAKE3 digest plus the exact byte range; the label itself is not treated as an intrinsic upstream identifier.
 
 For the declared UniMorph compiler, source mapping is exact: the executable rule set must contain exactly one source-bound rule for every selected source record, and cannot add unbound executable rules while still claiming the same compilation witness.
