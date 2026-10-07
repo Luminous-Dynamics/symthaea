@@ -294,16 +294,13 @@ fn process_id_is_alive(pid: u32) -> bool {
 }
 
 
-/// Execute a privileged shell command with an already-open artifact as stdin.
-///
-/// The caller should open and verify the artifact first, then pass that exact
-/// descriptor here. This prevents restore from hashing one pathname and later
-/// reopening a different file for the destructive operation.
-async fn run_cmd_with_stdin(
-    cmd: &str,
+async fn run_privileged_args_with_stdin(
+    program: &str,
+    args: &[&str],
     input: std::fs::File,
 ) -> Result<CmdResult, std::io::Error> {
-    let mut command = privileged_shell_command(cmd);
+    let mut command = privileged_process(program);
+    command.args(args);
     command.stdin(std::process::Stdio::from(input));
     let output = command.output().await?;
     Ok(CmdResult {
@@ -9530,7 +9527,7 @@ mod tests {
         drop(replacement);
         std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o400)).unwrap();
 
-        let output = run_cmd_with_stdin("cat", file).await.unwrap();
+        let output = run_privileged_args_with_stdin("cat", &[], file).await.unwrap();
         assert_eq!(output.exit_status, 0);
         assert_eq!(output.stdout.as_bytes(), bytes);
 
