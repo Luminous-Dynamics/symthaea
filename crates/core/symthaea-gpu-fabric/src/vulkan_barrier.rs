@@ -420,7 +420,13 @@ impl WorkloadBuffer {
             }
             if selected.is_some() { break; }
         }
-        let (index, coherent) = selected.ok_or(VulkanBarrierError::NoHostVisibleMemory)?;
+        let (index, coherent) = match selected {
+            Some(value) => value,
+            None => {
+                unsafe { device.destroy_buffer(buffer, None); }
+                return Err(VulkanBarrierError::NoHostVisibleMemory);
+            }
+        };
         let alloc = vk::MemoryAllocateInfo::default().allocation_size(req.size).memory_type_index(index);
         let memory = match unsafe { device.allocate_memory(&alloc, None) } {
             Ok(m) => m,
