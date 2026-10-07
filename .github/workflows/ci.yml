@@ -52,6 +52,7 @@ jobs:
         with:
           fetch-depth: 0
 
+          persist-credentials: false
       - name: Check for safety-critical changes
         run: bash scripts/check-class-a-changes.sh --ci
 
@@ -61,6 +62,8 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -76,6 +79,8 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Check CognitiveLoopService field count
         run: bash scripts/check-cls-field-count.sh
@@ -86,6 +91,8 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Every workspace member has a build target
         run: bash scripts/check-workspace-targets.sh
@@ -120,6 +127,8 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       # Fails if a platform gates motor authority on Phi without also admitting a
       # SafetyAgent override and a moral verdict -- i.e. if an ethics verdict has
@@ -137,6 +146,8 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       # rustc never warns about a .rs file no `mod` declares — it just is not
       # part of the crate, so it never compiles and its tests never run. Three
@@ -184,6 +195,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -215,6 +228,8 @@ jobs:
     # tests that computed a value and never asserted on it.
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -396,6 +411,8 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -464,6 +481,8 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -499,6 +518,8 @@ jobs:
     # compiles or tests it. It builds standalone from its own directory.
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -529,6 +550,8 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -566,6 +589,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -608,6 +633,8 @@ jobs:
     # Evidence: docs/evidence/SYMTHAEA_LTC_RUNTIME_HARDENING_V0_1.md
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -665,6 +692,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -703,6 +732,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -743,6 +774,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
@@ -760,6 +793,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -846,6 +881,8 @@ jobs:
               mycelix,unstable-examples
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -900,6 +937,8 @@ jobs:
             cmd: cargo test --test pathology_resilience -- --nocapture
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -984,6 +1023,8 @@ jobs:
           - "integrity"
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -1101,6 +1142,8 @@ jobs:
       github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Check if psych-bench relevant files changed
         id: changes
@@ -1204,6 +1247,8 @@ jobs:
           - "mesh,safety-agents"
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -1264,6 +1309,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain + wasm32 target
         uses: dtolnay/rust-toolchain@1.96.0
@@ -1330,6 +1377,8 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install cargo-deny
         uses: EmbarkStudios/cargo-deny-action@v2
@@ -1343,6 +1392,8 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -1388,6 +1439,8 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
       - name: Install cargo-cyclonedx
@@ -1479,6 +1532,8 @@ jobs:
           - symthaea-spore
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -1550,6 +1605,8 @@ jobs:
             features: physics,nuclear-forensics,safety-agents
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -1606,6 +1663,8 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -1651,6 +1710,7 @@ jobs:
         with:
           fetch-depth: 0
 
+          persist-credentials: false
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
 
@@ -1698,6 +1758,7 @@ jobs:
         with:
           fetch-depth: 0
 
+          persist-credentials: false
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
 
@@ -1743,6 +1804,7 @@ jobs:
         with:
           fetch-depth: 0
 
+          persist-credentials: false
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
 
@@ -1782,6 +1844,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Install gitleaks
         run: |
           GITLEAKS_VERSION=8.21.2
