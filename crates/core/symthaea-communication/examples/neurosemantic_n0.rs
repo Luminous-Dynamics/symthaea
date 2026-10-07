@@ -2612,6 +2612,17 @@ fn main() -> Result<(), String> {
         )
         .is_err();
 
+    let remediation_uncertainty_randomization_seed_format_blocked = {
+        let mut forged_trace = statistical_selection_trace.clone();
+        forged_trace.randomization_seed_hex = "A".repeat(64);
+        let forged_bytes =
+            serde_json::to_vec(&forged_trace).map_err(|e| e.to_string())?;
+        symthaea_communication::NeurosemanticRemediationStatisticalSelectionTraceArtifact::from_json_bytes(
+            &forged_bytes,
+        )
+        .is_err()
+    };
+
     let report = serde_json::json!({
         "execution_revision": execution_revision,
         "exact_graph_roundtrip": exact_roundtrip,
@@ -2710,6 +2721,8 @@ fn main() -> Result<(), String> {
             remediation_uncertainty_selection_trace_substitution_blocked,
         "remediation_uncertainty_randomness_commitment_substitution_blocked":
             remediation_uncertainty_randomness_commitment_substitution_blocked,
+        "remediation_uncertainty_randomization_seed_format_blocked":
+            remediation_uncertainty_randomization_seed_format_blocked,
         "remediation_uncertainty_statistical_execution_substitution_blocked":
             remediation_uncertainty_statistical_execution_substitution_blocked,
         "remediation_uncertainty_inclusion_probability_substitution_blocked":
