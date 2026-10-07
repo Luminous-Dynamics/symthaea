@@ -46,7 +46,7 @@ impl GpuOperation {
         }
     }
 
-    pub fn semantic_semantic_kernel_digest(self) -> String {
+    pub fn semantic_kernel_digest(self) -> String {
         semantic_digest(self.kernel_id().as_bytes())
     }
 
@@ -464,7 +464,7 @@ fn digest_hypervectors(vectors: &[BinaryHypervector]) -> String {
     hasher.finalize().to_hex().to_string()
 }
 
-fn semantic_semantic_kernel_digest(bytes: &[u8]) -> String {
+fn semantic_kernel_digest(bytes: &[u8]) -> String {
     let mut hasher = Hasher::new();
     hasher.update(b"symthaea.gpu-fabric.semantic-kernel\0");
     hasher.update(bytes);
@@ -507,8 +507,8 @@ mod tests {
         assert_eq!(plan.digest(), plan.digest());
         assert_ne!(plan.digest_hex(), "");
         assert_eq!(
-            plan.operation.semantic_semantic_kernel_digest(),
-            plan.operation.semantic_semantic_kernel_digest()
+            plan.operation.semantic_kernel_digest(),
+            plan.operation.semantic_kernel_digest()
         );
     }
 
@@ -520,7 +520,6 @@ mod tests {
         assert_ne!(original, bounded.digest_hex());
     }
 
-    #[test]
     #[test]
     fn zero_dimensions_are_rejected() {
         let plan = OperationPlan::new(GpuOperation::HdcBindXor { dimensions: 0 });
@@ -545,7 +544,6 @@ mod tests {
         assert_eq!(error, VectorError::NonCanonicalTailBits);
     }
 
-    #[test]
     #[test]
     fn accelerated_receipts_require_concrete_execution_evidence() {
         let plan = OperationPlan::new(GpuOperation::HdcBindXor { dimensions: 8 });
