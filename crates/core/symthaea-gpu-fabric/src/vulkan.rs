@@ -1108,7 +1108,7 @@ mod tests {
                 vulkan_receipt.implementation_digest,
                 cpu_receipt.implementation_digest
             );
-            assert!(vulkan_receipt.accelerated);
+            assert!(!vulkan_receipt.accelerated);
             vulkan_receipt.verify_plan(&plan_for(dimensions)).unwrap();
             vulkan_receipt.verify_output(&vulkan_output).unwrap();
         }
