@@ -587,6 +587,8 @@ def main() -> int:
                 "command -v rustup",
                 "BROCA_RUSTUP_VERSION=$(rustup --version)",
                 "persist-credentials: false",
+                "Verify locked dependency graph",
+                "cargo fetch --locked",
                 "Capture native package context",
                 "BROCA_NATIVE_PACKAGE_CONTEXT",
                 "BROCA_FREEZE_AUDIT_OUTPUT: target/broca-unimorph-freeze/receipt.json",
