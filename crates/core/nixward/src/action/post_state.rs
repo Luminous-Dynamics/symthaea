@@ -2239,7 +2239,7 @@ mod tests {
             &intent,
             &different_authorization,
             &exp,
-            &NixVerifiedPostStateObservationV1::from_observation(obs).unwrap(),
+            &NixVerifiedPostStateObservationV1::from_observer(obs).unwrap(),
             None,
             witness,
             "systemd-observer-v1",
