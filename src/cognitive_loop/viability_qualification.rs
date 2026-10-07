@@ -523,6 +523,7 @@ pub struct EnvironmentQueryQualificationReport {
     pub invalid_queries: u64,
     pub sequence_length: usize,
     pub probe_states: u64,
+    pub mean_path_mae: f64,
     pub mean_terminal_mae: f64,
     pub mean_min_viability_margin_error: f64,
     /// Agreement over all queries; invalid answers count as disagreements.
@@ -787,6 +788,7 @@ fn evaluate_environment_query_bank<M: ActionConditionedTransitionModel + ?Sized>
     let probes = query_probe_states(scenario);
     let sequence_count = QUERY_ACTIONS.len().pow(QUERY_SEQUENCE_LENGTH as u32);
     let total_queries = probes.len().saturating_mul(sequence_count);
+    let mut path_error = 0.0;
     let mut terminal_error = 0.0;
     let mut margin_error = 0.0;
     let mut survival_agreement = 0u64;
@@ -809,6 +811,7 @@ fn evaluate_environment_query_bank<M: ActionConditionedTransitionModel + ?Sized>
                         .unwrap_or(f64::NAN)
                         .min(predicted_state.get(1).copied().unwrap_or(f64::NAN))
                         - 0.08;
+                    let mut query_path_error = 0.0;
 
                     for action in sequence {
                         oracle_state = transition(oracle_state, action);
@@ -828,6 +831,16 @@ fn evaluate_environment_query_bank<M: ActionConditionedTransitionModel + ?Sized>
                                 continue;
                             }
                             predicted_state = next;
+                            let predicted_intermediate = MicroWorldObservation {
+                                cycle: oracle_state.cycle,
+                                energy: predicted_state[0],
+                                integrity: predicted_state[1],
+                                knowledge: predicted_state[2],
+                                threat: predicted_state[3],
+                                progress: predicted_state[4],
+                            };
+                            query_path_error +=
+                                predicted_intermediate.mean_absolute_delta(oracle_state);
                             let margin = predicted_state[0].min(predicted_state[1]) - 0.08;
                             predicted_min_margin = predicted_min_margin.min(margin);
                         }
@@ -846,6 +859,7 @@ fn evaluate_environment_query_bank<M: ActionConditionedTransitionModel + ?Sized>
                             threat: predicted_state[3],
                             progress: predicted_state[4],
                         };
+                        path_error += query_path_error / QUERY_SEQUENCE_LENGTH as f64;
                         terminal_error +=
                             predicted_terminal.mean_absolute_delta(oracle_state);
                         margin_error += (predicted_min_margin - oracle_min_margin).abs();
@@ -878,6 +892,7 @@ fn evaluate_environment_query_bank<M: ActionConditionedTransitionModel + ?Sized>
         invalid_queries: invalid_query_count,
         sequence_length: QUERY_SEQUENCE_LENGTH,
         probe_states: probes.len() as u64,
+        mean_path_mae: path_error / valid_denominator,
         mean_terminal_mae: terminal_error / valid_denominator,
         mean_min_viability_margin_error: margin_error / valid_denominator,
         survival_agreement: survival_agreement as f64 / query_denominator,
@@ -1751,6 +1766,7 @@ mod tests {
         assert_eq!(report.valid_queries, 0);
         assert_eq!(report.invalid_queries, report.queries);
         assert_eq!(report.survival_agreement, 0.0);
+        assert_eq!(report.mean_path_mae, 0.0);
         assert_eq!(report.mean_terminal_mae, 0.0);
         assert_eq!(report.mean_min_viability_margin_error, 0.0);
     }
