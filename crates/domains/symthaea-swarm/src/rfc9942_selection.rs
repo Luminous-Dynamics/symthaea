@@ -203,7 +203,7 @@ impl Rfc9942SignatureWithReceipts {
                 None,
             ) => bytes.as_slice(),
             (
-                crate::semantic_evidence_vds::Rfc9942SignaturePayload::Attached(_),
+                Rfc9942SignaturePayload::Attached(_),
                 Some(_),
             ) => return Err(Rfc9942VdpError::InvalidStructure),
             (
@@ -211,7 +211,7 @@ impl Rfc9942SignatureWithReceipts {
                 Some(bytes),
             ) => bytes,
             (
-                crate::semantic_evidence_vds::Rfc9942SignaturePayload::Detached,
+                Rfc9942SignaturePayload::Detached,
                 None,
             ) => return Err(Rfc9942VdpError::DetachedPayloadRequired),
         };
@@ -219,13 +219,8 @@ impl Rfc9942SignatureWithReceipts {
         self.verify_es256(outer_public_key, outer_external_aad, detached_outer_payload)?;
 
         let collection = self.receipts().ok_or(Rfc9942VdpError::ReceiptsMissing)?;
-        let collection_bytes = collection
-            .serialized_bytes()
-            .map_or_else(|| collection.to_cbor(), ToOwned::to_owned);
-
         let decision = evaluate_priority_first_valid(
             collection,
-            &collection_bytes,
             |_index, receipt| {
                 receipt
                     .verify_es256_inclusion_state(
@@ -257,12 +252,17 @@ impl Rfc9942SignatureWithReceipts {
 
 pub fn evaluate_priority_first_valid<F>(
     collection: &Rfc9942ReceiptCollection,
-    collection_bytes: &[u8],
     mut verify: F,
 ) -> ReceiptSelectionDecision
 where
     F: FnMut(usize, &Rfc9942ReceiptEnvelope) -> Result<(), Rfc9942VdpError>,
 {
+    // Hash the exact wire representation owned by the collection. Callers
+    // cannot pair one collection with unrelated bytes.
+    let collection_bytes = collection
+        .serialized_bytes()
+        .map_or_else(|| collection.to_cbor(), ToOwned::to_owned);
+
     let mut candidates = Vec::with_capacity(collection.len());
     let mut selected_index = None;
     let mut selected_receipt_sha256 = None;
@@ -367,10 +367,8 @@ mod tests {
     #[test]
     fn first_valid_selects_in_priority_order() {
         let collection = collection();
-        let bytes = collection.to_cbor();
-        let decision = evaluate_priority_first_valid(
+            let decision = evaluate_priority_first_valid(
             &collection,
-            &bytes,
             |index, _| {
                 if index == 1 {
                     Ok(())
@@ -395,7 +393,7 @@ mod tests {
     #[test]
     fn candidates_after_selection_are_not_reported_as_rejected() {
         let collection = collection();
-        let decision = evaluate_priority_first_valid(&collection, &collection.to_cbor(), |_index, _| {
+        let decision = evaluate_priority_first_valid(&collection, |_index, _| {
             Ok(())
         });
         assert_eq!(
@@ -409,7 +407,6 @@ mod tests {
         let collection = collection();
         let decision = evaluate_priority_first_valid(
             &collection,
-            &collection.to_cbor(),
             |_index, _| Err(Rfc9942VdpError::NoMatchingProof),
         );
         assert_eq!(decision.selected_index, None);
@@ -428,15 +425,12 @@ mod tests {
     #[test]
     fn changing_rejection_reason_changes_decision_digest() {
         let collection = collection();
-        let bytes = collection.to_cbor();
-        let signature_failure = evaluate_priority_first_valid(
+            let signature_failure = evaluate_priority_first_valid(
             &collection,
-            &bytes,
             |_index, _| Err(Rfc9942VdpError::InvalidEs256Signature),
         );
         let proof_failure = evaluate_priority_first_valid(
             &collection,
-            &bytes,
             |_index, _| Err(Rfc9942VdpError::NoMatchingProof),
         );
         assert_ne!(signature_failure.digest(), proof_failure.digest());
@@ -451,12 +445,10 @@ mod tests {
         .unwrap();
         let first = evaluate_priority_first_valid(
             &collection,
-            &collection.to_cbor(),
             |index, _| if index == 0 { Ok(()) } else { Err(Rfc9942VdpError::NoMatchingProof) },
         );
         let second = evaluate_priority_first_valid(
             &reversed,
-            &reversed.to_cbor(),
             |index, _| if index == 0 { Ok(()) } else { Err(Rfc9942VdpError::NoMatchingProof) },
         );
         assert_ne!(first.collection_sha256, second.collection_sha256);
@@ -470,7 +462,6 @@ mod tests {
         assert_eq!(collection.serialized_receipt_bytes(0).unwrap(), first_bytes);
         let decision = evaluate_priority_first_valid(
             &collection,
-            &collection.to_cbor(),
             |index, _| if index == 0 { Ok(()) } else { Err(Rfc9942VdpError::NoMatchingProof) },
         );
         assert_eq!(decision.selected_receipt_sha256, Some(sha256(first_bytes)));
