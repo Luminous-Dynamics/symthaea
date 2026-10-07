@@ -1264,11 +1264,14 @@ mod tests {
             schedule_digest: schedule.digest_hex().unwrap(),
             sync_plan_digest: plan.digest_hex().unwrap(),
             barrier_digest: barrier_digest(&plan),
-            barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes),
+            barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
             resource_storage_sizes: storage_sizes.clone(),
+            completion_expected: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
+            completion_observed: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
+            vulkan_api_version: VULKAN_API_VERSION,
         };
 
         storage_sizes.insert(ResourceId::new("mid").unwrap(), 8);
@@ -1310,6 +1313,9 @@ mod tests {
             barrier_count: 1,
             resource_digests: digests,
             resource_storage_sizes: storage_sizes,
+            completion_expected: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
+            completion_observed: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
+            vulkan_api_version: VULKAN_API_VERSION,
         };
         receipt.barrier_digest = String::from("tampered");
 
