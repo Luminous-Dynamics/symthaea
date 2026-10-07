@@ -920,6 +920,14 @@ fn main() -> Result<(), String> {
         evaluation_split_manifest_bytes.as_slice(),
     ];
 
+    let alternate_forget_population = {
+        let mut candidate = forget_set_manifest.clone();
+        candidate.set_ref = "synthetic-alternate-forget-set-v1".into();
+        candidate
+    };
+    let alternate_forget_population_bytes =
+        serde_json::to_vec(&alternate_forget_population).map_err(|e| e.to_string())?;
+
     let measurement = NeurosemanticRemediationMeasurementArtifact {
         schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION,
         measurement_ref: "synthetic-remediation-measurement-v3".into(),
@@ -1271,6 +1279,41 @@ fn main() -> Result<(), String> {
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
                 &[forged.as_slice()],
+            )
+            .is_err()
+    };
+    let remediation_canonical_population_identity_substitution_blocked = {
+        let mut forged = observation_sets[0].clone();
+        forged.population_manifest_hash = alternate_forget_population.fingerprint()?;
+        let forged_bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        let mut supplied = observation_set_bytes.clone();
+        supplied[0] = forged_bytes;
+        let supplied_refs: Vec<&[u8]> = supplied.iter().map(Vec::as_slice).collect();
+        let mut populations = population_manifest_byte_refs.clone();
+        populations.push(alternate_forget_population_bytes.as_slice());
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &measurement_bytes,
+                &computation_byte_refs,
+                &supplied_refs,
+                &populations,
+                &uncertainty_computation_byte_refs,
+                &uncertainty_assumption_byte_refs,
+            )
+            .is_err()
+    };
+    let remediation_uncertainty_method_substitution_blocked = {
+        let mut forged = uncertainty_computation.clone();
+        forged.method_ref = "other-uncertainty-method-v1".into();
+        let bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &measurement_bytes,
+                &computation_byte_refs,
+                &observation_set_byte_refs,
+                &population_manifest_byte_refs,
+                &[bytes.as_slice()],
+                &uncertainty_assumption_byte_refs,
             )
             .is_err()
     };
@@ -1956,6 +1999,8 @@ fn main() -> Result<(), String> {
         "remediation_observation_duplicate_blocked": remediation_observation_duplicate_blocked,
         "remediation_observation_scope_substitution_blocked": remediation_observation_scope_substitution_blocked,
         "remediation_computation_substitution_blocked": remediation_computation_substitution_blocked,
+        "remediation_canonical_population_identity_substitution_blocked": remediation_canonical_population_identity_substitution_blocked,
+        "remediation_uncertainty_method_substitution_blocked": remediation_uncertainty_method_substitution_blocked,
         "remediation_uncertainty_substitution_blocked": remediation_uncertainty_substitution_blocked,
         "remediation_metric_direction_mismatch_blocked": remediation_metric_direction_mismatch_blocked,
         "remediation_uncertainty_point_estimate_binding_blocked": remediation_uncertainty_point_estimate_binding_blocked,
