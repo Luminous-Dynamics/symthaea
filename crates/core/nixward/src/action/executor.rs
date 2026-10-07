@@ -1227,6 +1227,47 @@ impl NixOSExecutor {
             );
         }
 
+        if operation == NixServiceOperationKindV1::Restart {
+            let expected_invocation_id = match authority.pre_invocation_id() {
+                Some(value) => value,
+                None => {
+                    return (
+                        ExecutionResult::Blocked {
+                            reason: "Restart execution authority has no bound pre-invocation identity"
+                                .to_string(),
+                            safety_level: safety,
+                        },
+                        None,
+                    );
+                }
+            };
+            let actual_invocation_id = match content.pre_invocation_id() {
+                Some(value) => value,
+                None => {
+                    return (
+                        ExecutionResult::Blocked {
+                            reason: "final Restart definition capture has no usable InvocationID"
+                                .to_string(),
+                            safety_level: safety,
+                        },
+                        None,
+                    );
+                }
+            };
+            if actual_invocation_id != expected_invocation_id {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!(
+                            "Restart InvocationID changed since approval: approved={} current={}",
+                            expected_invocation_id, actual_invocation_id
+                        ),
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        }
+
         if watcher.manager_owner() != content.as_ref().manager_owner.as_str()
             || watcher.bus_id() != content.as_ref().bus_id.as_str()
         {
