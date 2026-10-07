@@ -58,6 +58,8 @@ pub enum VulkanError {
     InsufficientComputeWorkgroupLimits,
     #[error("storage buffer range {bytes} exceeds device limit {max}")]
     StorageBufferRangeExceeded { bytes: u64, max: u64 },
+    #[error("compute dispatch group count {groups} exceeds device limit {max}")]
+    DispatchGroupCountExceeded { groups: u32, max: u32 },
     #[error("shader WGSL parsing failed: {0}")]
     ShaderParse(String),
     #[error("shader validation failed: {0}")]
@@ -153,6 +155,7 @@ pub struct VulkanExecutor {
     implementation_digest: String,
     memory_properties: vk::PhysicalDeviceMemoryProperties,
     max_storage_buffer_range: u64,
+    max_compute_workgroup_count_x: u32,
 }
 
 impl VulkanExecutor {
@@ -246,6 +249,7 @@ impl VulkanExecutor {
         }
 
         let max_storage_buffer_range = u64::from(properties.limits.max_storage_buffer_range);
+        let max_compute_workgroup_count_x = properties.limits.max_compute_work_group_count[0];
 
         let device_identity = match VulkanDeviceIdentity::from_properties(&properties) {
             Ok(identity) => identity,
@@ -408,6 +412,7 @@ impl VulkanExecutor {
             implementation_digest,
             memory_properties,
             max_storage_buffer_range,
+            max_compute_workgroup_count_x,
         })
     }
 
@@ -466,6 +471,15 @@ impl VulkanExecutor {
         rhs.write_bytes(&self.device, inputs[1].as_bytes())?;
         output.write_bytes(&self.device, &[])?;
 
+        let word_count = (physical_bytes / 4) as u32;
+        let group_count = word_count.saturating_add(WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
+        if group_count.max(1) > self.max_compute_workgroup_count_x {
+            return Err(VulkanError::DispatchGroupCountExceeded {
+                groups: group_count.max(1),
+                max: self.max_compute_workgroup_count_x,
+            });
+        }
+
         let descriptor_set = allocate_descriptor_set(
             &self.device,
             self.descriptor_pool,
@@ -495,7 +509,7 @@ impl VulkanExecutor {
             }
         };
 
-        let submit = self.record_and_submit(command_buffer, descriptor_set, physical_bytes);
+        let submit = self.record_and_submit(command_buffer, descriptor_set, group_count.max(1));
 
         unsafe {
             self.device
@@ -550,7 +564,7 @@ impl VulkanExecutor {
         &self,
         command_buffer: vk::CommandBuffer,
         descriptor_set: vk::DescriptorSet,
-        physical_bytes: u64,
+        group_count: u32,
     ) -> Result<(), VulkanError> {
         let begin_info = vk::CommandBufferBeginInfo::default()
             .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
@@ -574,11 +588,8 @@ impl VulkanExecutor {
                 &[],
             );
 
-            let word_count = (physical_bytes / 4) as u32;
-            let group_count = word_count.saturating_add(WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
-
             self.device
-                .cmd_dispatch(command_buffer, group_count.max(1), 1, 1);
+                .cmd_dispatch(command_buffer, group_count, 1, 1);
 
             self.device
                 .end_command_buffer(command_buffer)
