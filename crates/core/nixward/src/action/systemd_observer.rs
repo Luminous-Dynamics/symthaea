@@ -858,12 +858,18 @@ impl NixSystemdReadOnlyObserverV1 {
             "JobType",
         )?)?;
 
-        if let (Ok(id), Some(job_path_id)) =
-            (required_u32(&properties, SYSTEMD_JOB_INTERFACE, "Id"), job_id_from_object_path(job_object_path).ok())
-        {
-            if id != job_path_id || id == 0 {
-                return Err(NixSystemdObserverErrorV1::JobCorrelationMismatch);
-            }
+        let id = required_u32(&properties, SYSTEMD_JOB_INTERFACE, "Id")?;
+        let job_path_id = job_id_from_object_path(job_object_path)?;
+        if id == 0 || id != job_path_id {
+            return Err(NixSystemdObserverErrorV1::JobCorrelationMismatch);
+        }
+        let (job_unit, job_unit_path) = required_job_unit(&properties)?;
+        let expected_unit = self.resolve_service_unit(&canonical_unit(
+            &job_unit,
+        )?)
+        .await?;
+        if job_unit_path.as_str() != expected_unit.as_str() {
+            return Err(NixSystemdObserverErrorV1::JobCorrelationMismatch);
         }
 
         let post_owner = self.systemd_manager_owner().await?;
