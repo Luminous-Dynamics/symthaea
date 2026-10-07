@@ -4993,32 +4993,6 @@ echo "  User password set."
                     }
                 }
 
-                // Execute the install script in the background with transaction-specific
-                // PID and exit-status records. A log marker alone is never success evidence.
-                if let Err(error) = prepare_transaction_runtime(
-                    &log_path,
-                    &status_path,
-                    &pid_path,
-                ) {
-                    for secret_path in &staged_secret_paths {
-                        let _ = tokio::fs::remove_file(secret_path).await;
-                    }
-                    let _ = tokio::fs::remove_file(&script_path).await;
-                    let _ = tokio::fs::remove_file(&log_path).await;
-                    let _ = tokio::fs::remove_file(&status_path).await;
-                    let _ = tokio::fs::remove_file(&pid_path).await;
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            RelayMessage::error(&format!(
-                                "Install status staging failed: {}",
-                                error
-                            ))
-                            .to_json(),
-                        ))
-                        .await;
-                    continue;
-                }
-
                 if let Err(error) = spawn_privileged_background_script(
                     &script_path,
                     &log_path,
@@ -6886,32 +6860,6 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                 let gc_log = format!("{transaction_dir}/gc.log");
                 let gc_status = format!("{transaction_dir}/gc.status");
                 let gc_pid = format!("{transaction_dir}/gc.pid");
-                if let Err(error) = prepare_transaction_runtime(
-                    &gc_log,
-                    &gc_status,
-                    &gc_pid,
-                ) {
-                    let outcome = finalize_transaction(
-                        &transaction_ledger,
-                        &transaction,
-                        TransactionOutcome::Indeterminate,
-                        &peer_addr,
-                    );
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            serde_json::json!({
-                                "type":"exit",
-                                "code": protocol_exit_code(1, outcome),
-                                "data": format!("GC artifact setup could not be observed: {}", error),
-                                "transaction": transaction.receipt(outcome)
-                            })
-                            .to_string(),
-                        ))
-                        .await;
-                    remove_transaction_artifact_dir(&transaction_dir);
-                    continue;
-                }
-
                 let mut gc_command = privileged_process("nix-collect-garbage");
                 gc_command.args(["-d", "--delete-older-than", "30d"]);
                 if let Err(error) = spawn_privileged_background_process(
@@ -7355,48 +7303,12 @@ echo "REBUILD_COMPLETE"
                     remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
-                let launch_setup = run_cmd(&format!(
-                    "rm -f -- {} {} && touch {} {} && chmod 600 {} {}",
-                    wc_status_path,
-                    wc_pid_path,
-                    wc_status_path,
-                    wc_pid_path,
-                    wc_status_path,
-                    wc_pid_path
-                ))
-                .await;
-                if let Err(error) = launch_setup {
-                    let _ = tokio::fs::remove_file(&wc_config_path).await;
-                    let _ = tokio::fs::remove_file(&wc_preimage_path).await;
-                    let _ = tokio::fs::remove_file(&wc_script_path).await;
-                    let outcome = finalize_transaction(
-                        &transaction_ledger,
-                        &transaction,
-                        TransactionOutcome::Indeterminate,
-                        &peer_addr,
-                    );
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            serde_json::json!({
-                                "type":"exit",
-                                "code": protocol_exit_code(1, outcome),
-                                "data": format!("Rebuild status staging could not be established: {}", error),
-                                "transaction": transaction.receipt(outcome)
-                            })
-                            .to_string(),
-                        ))
-                        .await;
-                    remove_transaction_artifact_dir(&transaction_dir);
-                    continue;
-                }
-
-                if let Err(error) = run_cmd(&format!(
-                    "(bash {} > {} 2>&1; rc=$?; printf '%s\\n' \\"$rc\\" > {}) & printf '%s\\n' \\"$!\\" > {}",
-                    wc_script_path,
-                    wc_log_path,
-                    wc_status_path,
-                    wc_pid_path
-                ))
+                if let Err(error) = spawn_privileged_background_script(
+                    &wc_script_path,
+                    &wc_log_path,
+                    &wc_status_path,
+                    &wc_pid_path,
+                )
                 .await
                 {
                     let _ = tokio::fs::remove_file(&wc_config_path).await;
@@ -7425,6 +7337,7 @@ echo "REBUILD_COMPLETE"
                     remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
+
                 let _ = ws_tx
                     .send(Message::Text(
                         RelayMessage::output(
@@ -7705,18 +7618,12 @@ echo "COMPLETE"
                         continue;
                     }
                 };
+                let img_script = format!("{transaction_dir}/image.sh");
                 let img_log = format!("{transaction_dir}/image.log");
                 let img_status = format!("{transaction_dir}/image.status");
                 let img_pid = format!("{transaction_dir}/image.pid");
 
-                let setup = run_cmd(&format!(
-                    "rm -f -- {} {} {} && touch {} {} {} && chmod 600 {} {} {}",
-                    img_log, img_status, img_pid,
-                    img_log, img_status, img_pid,
-                    img_log, img_status, img_pid
-                ))
-                .await;
-                if let Err(error) = setup {
+                if let Err(error) = write_private_file(&img_script, script.as_bytes(), 0o700) {
                     let outcome = finalize_transaction(
                         &transaction_ledger,
                         &transaction,
@@ -7728,7 +7635,7 @@ echo "COMPLETE"
                             serde_json::json!({
                                 "type":"exit",
                                 "code": protocol_exit_code(1, outcome),
-                                "data": format!("Image artifact setup could not be observed: {}", error),
+                                "data": format!("Image script staging could not be established: {}", error),
                                 "transaction": transaction.receipt(outcome)
                             })
                             .to_string(),
@@ -7738,13 +7645,12 @@ echo "COMPLETE"
                     continue;
                 }
 
-                if let Err(error) = run_cmd(&format!(
-                    "(bash -c '{}' > {} 2>&1; rc=$?; printf '%s\\n' \"$rc\" > {}) & printf '%s\\n' \"$!\" > {}",
-                    script.replace('\'', "'\\''"),
-                    img_log,
-                    img_status,
-                    img_pid
-                ))
+                if let Err(error) = spawn_privileged_background_script(
+                    &img_script,
+                    &img_log,
+                    &img_status,
+                    &img_pid,
+                )
                 .await
                 {
                     let outcome = finalize_transaction(
@@ -7913,11 +7819,10 @@ echo "COMPLETE"
                         .to_string(),
                     ))
                     .await;
-                let _ = run_cmd(&format!(
-                    "rm -f -- {} {} {}",
-                    img_log, img_status, img_pid
-                ))
-                .await;
+                let _ = tokio::fs::remove_file(&img_script).await;
+                let _ = tokio::fs::remove_file(&img_log).await;
+                let _ = tokio::fs::remove_file(&img_status).await;
+                let _ = tokio::fs::remove_file(&img_pid).await;
                 remove_transaction_artifact_dir(&transaction_dir);
             }
 
