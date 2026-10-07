@@ -11,6 +11,7 @@ The model is:
 3. Represent candidate material/process/product pathways.
 4. Declare an explicit comparison scale (unit + functional/lifecycle scope + exact methodology/comparability basis identity) for every burden dimension; candidates cannot define their own cohort.
 5. Represent functional-performance values as evidence-linked, scoped measurements tied to the exact comparison/test basis rather than bare claims.
+6. Require quantitative evidence linked to a burden, performance, or operating estimate to declare the same unit as that estimate; missing evidence units fail closed.
 6. Declare the physical operating envelope explicitly and bind its evidence to the exact engineering/test basis; a candidate must demonstrate coverage of the required ranges.
 7. Keep multi-axis burdens separate.
 8. Evaluate hard constraints fail-closed.
@@ -23,6 +24,7 @@ The model is:
 15. Carry externally qualified source-admission references without verifying or upgrading them inside Symthaea.
 16. Identify a conservative next-measurement target from unresolved uncertainty.
 17. Carry explicit experimental-design provenance when a proposed measurement is actually specified: hypothesis, targeted uncertainty identities, candidate discrimination set, exact protocol identity/basis, and stopping criteria.
+18. Require usable evidence coverage for every burden dimension before a candidate can remain Pareto-eligible; the `EvidenceSupported` qualification tier requires substantive supported evidence across every burden dimension.
 
 Authority diversity is authority-scoped: multiple artifacts or rotated issuer keys under one authority do not become distinct authority groups. Only externally admitted authorities count toward higher qualification tiers. This is still not proof of epistemic or organizational independence, and the identity/admission contract is not an authenticity proof; Mycelix admission/attestation remains the authority boundary for source control. The requirement is bound to an exact subject/profile/revision/digest so the same generic function cannot be silently reused for a different BOM, product, or design revision. The design is intended to compose later with Mycelix manufacturing/BOM/routing records and a federated evidence graph, while remaining independent of Holochain versioning. The Pareto frontier is a candidate comparison set, not a recommendation or deployment authorization. Functional performance and operating capabilities use conservative intervals rather than midpoint-based pass/fail. A required operating envelope must be fully covered; partial temperature/pressure/load coverage is unresolved or failed rather than extrapolated. Time-bounded evidence is ignored by timeless assessments and evaluated only when the caller supplies an explicit assessment timestamp.
 
