@@ -250,6 +250,24 @@ The evaluator reports the per-origin scores as well as mean MSE across origins. 
 The mean is descriptive only. It is not a substitute for an inferential procedure that accounts for dependence between repeated rolling estimates.
 
 For the critical RelationalAugmented versus NonRelationalContext comparison, the replayable evidence API also exposes the target-level squared-loss differential for every held-out target: non-relational-context squared error minus relational-augmented squared error. Positive values therefore favor the relationally augmented forecast. Each differential retains its origin index, sample index, feature/outcome timestamps, and observed target, while the corresponding forecast losses remain traceable to the retained predictions. This preserves the actual loss process that a later dependence-aware nested-forecast procedure should analyze, rather than reconstructing it from an aggregate MSE after the fact. The current protocol deliberately makes held-out test windows disjoint, but training windows may still overlap across origins, so the origin-level scores are not assumed IID.
+### Loss-process dependence characterization
+
+Before formal inference, the retained target-level differentials are now characterizable as an ordered loss process without selecting a significance procedure. For a single held-out window, the descriptive profile records:
+
+- mean and variance of the loss differential;
+- autocovariance and autocorrelation vectors through a caller-supplied maximum lag;
+- first non-positive autocorrelation lag and maximum absolute non-zero-lag autocorrelation;
+- a deterministic Bartlett long-run variance estimate truncated at the declared lag;
+- an effective-sample-size diagnostic when the long-run variance estimate is finite and positive.
+
+The autocovariance convention is explicitly 1/n, and the Bartlett weights are 1 - k/(L+1) for lag k and declared maximum lag L. These are reporting conventions, not claims that the estimator is the correct inferential variance estimator for the eventual scientific analysis. The lag bandwidth must therefore be treated as part of the analysis manifest when a real run is performed.
+
+Rolling-origin evidence is characterized at two levels rather than by concatenating windows. Each disjoint held-out target window gets its own serial-dependence profile. Separately, the ordered vector of origin-level mean loss differentials receives an across-origin dependence profile. This distinction is important because concatenating disjoint windows would manufacture a false adjacency between the last target of one origin and the first target of another. It also keeps within-window temporal dependence conceptually separate from dependence induced by overlapping training sets across rolling origins.
+
+The resulting artifact is intentionally descriptive. A large positive lag-1 autocorrelation, a low effective sample size, or a large long-run variance does not establish or refute predictive superiority. Instead, it identifies conditions that must be respected by the later inferential procedure. Recent forecast-evaluation work recommends accounting for dependence in the loss differential and shows that strong serial dependence can materially distort ordinary equal-accuracy tests. citeturn859792search1turn859792search4
+
+The implementation therefore stops at dependence characterization → method selection rather than jumping directly to a p-value. For nested RelationalAugmented versus NonRelationalContext forecasts, dedicated nested-model procedures remain the relevant candidate class; the eventual choice must also commit to forecast horizon, dependence estimator, small-sample treatment, bootstrap/self-normalization strategy if used, and multiplicity rules before examining the real test results. citeturn859792search7turn859792search5
+
 
 For the critical RelationalAugmented versus NonRelationalContext comparison, the two models are nested. A future inferential lane therefore must use a method appropriate to nested forecast comparisons rather than applying an unmodified two-model IID or Diebold-Mariano-style test. The dependence structure of the retained loss differentials must be characterized first, and any bootstrap or self-normalized procedure must be prespecified together with its horizon, origin, and multiplicity rules. The current implementation deliberately stops before this inferential step. Literature on nested forecast comparison provides dedicated procedures for this setting, while recent work shows that strong dependence can materially distort ordinary predictive-accuracy tests. citeturn626983search2turn626983search9
 
