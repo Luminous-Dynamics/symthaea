@@ -1053,7 +1053,7 @@ fn evaluate_learning_response(
             mean_anchor_mae_before_update: 0.0,
             mean_anchor_mae_after_update: 0.0,
             mean_anchor_regression: 0.0,
-            mean_anchor_max_regression: 0.0,
+            max_anchor_regression: 0.0,
             anchor_regression_rate: 0.0,
         };
     }
@@ -1995,7 +1995,6 @@ impl FepModule {
             policy_induced_shift,
             held_out_policy_ranking,
             environment_query_report,
-            cross_scenario_transfer,
             procedural_held_out_transfer,
             learning_response,
             persistence_closed_loop_survived: persistence_closed_loop.survived,
