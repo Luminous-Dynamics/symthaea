@@ -178,6 +178,8 @@ The N0 implementation uses a schema-validated, content-addressed target-set reco
 
 The word independent is deliberately narrow: the protocol enforces that the verifier identity differs from the recorded effect agent. It does not establish that either identity is trustworthy or that the verifier followed its claimed procedure. A future deployment bridge must supply the relevant identity/key trust and audit semantics.
 
+Structured derivation lineage is likewise an evidence-binding layer rather than an authority oracle. The lineage record now exposes direct verification of both concrete input bytes and concrete derived-output bytes against their recorded BLAKE3 identities. Distinct logical input references cannot alias the same content hash, preventing one artifact from satisfying multiple input slots under different names. The output check establishes artifact identity only; it does not prove that the declared transformation activity was honestly executed or scientifically appropriate.
+
 For model-derived remediation, an IndependentlyVerified lifecycle receipt is still insufficient to claim preservation of utility, safety, or fairness. Any such claim requires a separate preregistered impact-evaluation artifact binding the exact pre/post model identities, derivation lineage, evaluation split/protocol, subgroup metrics, and observed behavior.
 ## Model-remediation impact evidence
 
