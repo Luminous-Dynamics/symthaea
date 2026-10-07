@@ -1217,6 +1217,55 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
 
 
 #[test]
+fn rfc9942_outer_selection_errors_precede_authentication() {
+    let empty = Rfc9942SignatureWithReceipts::new(
+        symthaea_swarm::semantic_evidence_vds::Rfc9942SignaturePayload::Attached(
+            b"candidate".to_vec(),
+        ),
+        vec![0u8; 64],
+        None,
+    );
+    let key = rfc8392_public_key();
+
+    assert_eq!(
+        empty.verify_es256_inclusion_receipt_state(
+            0, &key, &key, &[], &[], None,
+        ),
+        Err(Rfc9942VdpError::ReceiptsMissing)
+    );
+
+    // Selection is structural and deterministic. A nonexistent selected
+    // receipt must report its index error without performing cryptographic
+    // work, even when the supplied outer signature is invalid.
+    let receipts = Rfc9942ReceiptCollection::new(vec![
+        Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            Rfc9942Vdp::new(
+                Rfc9942ProofKind::Inclusion,
+                vec![Rfc9162InclusionProof::new(2, 0, vec![[0u8; 32]]).to_cbor()],
+            ).unwrap(),
+            Rfc9942ReceiptPayload::Attached([0u8; 32]),
+            vec![0u8; 64],
+        ).unwrap(),
+    ]).unwrap();
+
+    let outer = Rfc9942SignatureWithReceipts::new(
+        symthaea_swarm::semantic_evidence_vds::Rfc9942SignaturePayload::Attached(
+            b"candidate".to_vec(),
+        ),
+        vec![0u8; 64],
+        Some(receipts),
+    );
+
+    assert_eq!(
+        outer.verify_es256_inclusion_receipt_state(
+            1, &key, &key, &[], &[], None,
+        ),
+        Err(Rfc9942VdpError::ReceiptIndexOutOfBounds)
+    );
+}
+
+#[test]
 fn rfc9942_outer_signature_failure_short_circuits_inner_proof_work() {
     let candidate = b"candidate";
     let leaves = vec![candidate.to_vec(), b"other-entry".to_vec()];
