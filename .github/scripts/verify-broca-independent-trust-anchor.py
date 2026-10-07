@@ -241,6 +241,24 @@ def list_commit_pull_requests(commit_sha: str) -> list[dict[str, Any]]:
     )
 
 
+def resolve_branch_tip(branch: str) -> str:
+    commits = api_request(
+        "GET",
+        "/commits",
+        query={"sha": branch, "per_page": "1"},
+    )
+    if not isinstance(commits, list) or len(commits) != 1:
+        raise VerificationError(
+            f"unable to resolve current tip of base branch {branch!r}"
+        )
+    sha = str(commits[0].get("sha", ""))
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise VerificationError(
+            f"base branch {branch!r} has a non-canonical commit SHA: {sha!r}"
+        )
+    return sha
+
+
 def latest_required_runs(head_sha: str) -> dict[str, dict[str, Any] | None]:
     runs = list_head_runs(head_sha)
     result: dict[str, dict[str, Any] | None] = {}
@@ -447,6 +465,20 @@ def approved_snapshot(
         raise VerificationError(
             "PR base SHA does not match independently approved snapshot"
         )
+
+    approved_base_tip = policy.get("base_branch_tip_sha")
+    if not isinstance(approved_base_tip, str) or not re.fullmatch(
+        r"[0-9a-f]{40}", approved_base_tip
+    ):
+        raise VerificationError(
+            "independent trust policy has no canonical approved base-branch tip SHA"
+        )
+    live_base_tip = resolve_branch_tip(str(pr.get("base", {}).get("ref", "")))
+    if live_base_tip != approved_base_tip:
+        raise StaleError(
+            f"base branch tip moved: approved {approved_base_tip}, live {live_base_tip}"
+        )
+
     if pr.get("head", {}).get("sha") != policy.get("approved_head_sha"):
         raise VerificationError(
             "PR head SHA does not match independently approved snapshot"
@@ -457,6 +489,7 @@ def approved_snapshot(
         "pull_request": policy.get("pull_request"),
         "base_branch": policy.get("base_branch"),
         "base_sha": policy.get("base_sha"),
+        "base_branch_tip_sha": approved_base_tip,
         "approved_head_sha": policy.get("approved_head_sha"),
         "approved_files": approved,
     }
@@ -677,6 +710,9 @@ def main() -> int:
             "number": pr_number,
             "base_branch": pr.get("base", {}).get("ref"),
             "base_sha": pr.get("base", {}).get("sha"),
+            "base_branch_tip_sha": resolve_branch_tip(
+                str(pr.get("base", {}).get("ref", ""))
+            ),
             "head_branch": pr.get("head", {}).get("ref"),
             "head_sha": pr.get("head", {}).get("sha"),
             "head_repo_full_name": pr.get("head", {}).get("repo", {}).get("full_name"),
