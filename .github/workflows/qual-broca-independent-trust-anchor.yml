@@ -40,10 +40,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
+          REPOSITORY_ID: ${{ github.repository_id }}
           TRUST_ANCHOR_SHA: ${{ github.sha }}
           TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
           TRIGGER_RUN_NAME: ${{ github.event.workflow_run.name }}
           TRIGGER_RUN_EVENT: ${{ github.event.workflow_run.event }}
+          TRIGGER_RUN_REPOSITORY_ID: ${{ github.event.workflow_run.repository.id }}
           TRIGGER_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           TRIGGER_RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           TRIGGER_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
