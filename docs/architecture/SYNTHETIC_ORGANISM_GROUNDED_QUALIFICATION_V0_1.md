@@ -1,0 +1,193 @@
+# Synthetic Organism — Grounded World-Model Qualification v0.1
+
+## Purpose
+
+This experiment tests whether the existing cognitive-loop world model can participate in a causal
+prediction/action/consequence loop inside a deterministic environment.
+
+It is intentionally narrower than a consciousness or artificial-life claim.
+
+The qualification target is:
+
+**predict → act → observe consequence → quantify error → regulate/select → learn → repeat**
+
+The experiment is only considered useful when each edge is executable and independently scoreable.
+
+## Model under test
+
+The model under test is the current FepModule::world_model implementation.
+
+The qualification harness clones that exact world-model state before training. It never resets or
+re-trains the production world model in place.
+
+The clone uses the existing action-conditioned WorldModelBridge implementation and is evaluated
+against the existing deterministic viability_micro_world transition oracle.
+
+The native FEP ODE trajectory planner is deliberately not replaced or silently coupled to this
+bridge in v0.1. That separation is itself an experimental variable.
+
+## Experimental phases
+
+### A. Adaptation
+
+Train the copied action-conditioned world model on the nominal scenario.
+
+For each cycle:
+
+1. observe the deterministic state;
+2. predict the next state for the scheduled action;
+3. execute the oracle transition;
+4. observe the realized next state;
+5. update the action-conditioned model.
+
+The training score is one-step mean absolute error (MAE).
+
+### B. Frozen transfer
+
+Evaluate the trained model on the stressed scenario without calling the learning hook.
+
+The stressed scenario contains deterministic threat and integrity perturbations.
+
+The following must remain frozen during scoring:
+
+- model parameters;
+- confidence state;
+- action schedule;
+- scenario definition.
+
+This prevents held-out transfer from becoming another online-learning score.
+
+### C. Closed-loop resilience
+
+Use the same trained model as the predictor for the existing horizon-aware homeostatic policy.
+
+The environment executes the selected action, including deterministic perturbations.
+
+Online model updates are permitted in this phase only.
+
+This phase measures whether prediction actually helps a policy survive and recover rather than merely
+improving a forecast statistic.
+
+### D. Comparator
+
+Run the same closed-loop policy with the persistence predictor.
+
+This is a deliberately weak control. It is not an optimal controller and should not be described as
+one.
+
+A meaningful model contribution should improve at least one policy-level quantity without silently
+changing the policy's hard-coded viability objective.
+
+## Metrics
+
+### Prediction accuracy
+
+For each transition:
+
+MAE = mean(|predicted_channel - observed_channel|)
+
+The state channels are bounded to [0,1], so MAE is itself bounded.
+
+### Confidence calibration
+
+The bridge's scalar confidence is compared with realized continuous forecast accuracy:
+
+realized_accuracy = 1 - MAE
+
+The harness reports:
+
+- sample count;
+- ten-bin expected calibration error (ECE);
+- mean squared confidence/accuracy error.
+
+These are operational calibration metrics for the forecast-confidence signal. They are not evidence
+that the confidence is a probability of a discrete event.
+
+### Survival
+
+A run survives when the final environment state remains viable:
+
+energy > 0.08 && integrity > 0.08
+
+The minimum actually observed viability margin is also retained.
+
+### Recovery
+
+For every perturbation actually reached, recovery is the number of cycles required to regain the
+exact pre-perturbation viability margin.
+
+None means that margin was not recovered before the run ended.
+
+This prevents a system from receiving a recovery score merely for remaining above the absolute
+death boundary.
+
+### Planning quality
+
+The horizon-aware policy already computes deterministic oracle horizon regret.
+
+Lower regret means the selected action was closer to the best available action under the benchmark's
+explicit utility function.
+
+### Held-out transfer
+
+The primary transfer comparison is:
+
+trained_predictor_MAE < persistence_MAE
+
+A model that only improves during online adaptation but does not transfer to a frozen scenario has
+not yet demonstrated robust predictive structure.
+
+## Interpretation matrix
+
+| Observation | Interpretation |
+|---|---|
+| Training MAE falls, held-out MAE does not | adaptation may be memorizing scenario-specific dynamics |
+| Held-out MAE improves, confidence ECE worsens | prediction improves but confidence is not calibrated |
+| Held-out MAE improves, survival does not | predictive knowledge is not causally reaching useful action selection |
+| Survival improves, oracle regret does not | hard-coded homeostatic biases may dominate the benefit |
+| Regret improves, recovery worsens | planner may discover brittle short-term solutions |
+| Recovery improves with held-out transfer | strongest current evidence that learned prediction is functionally coupled to regulation |
+| Confidence rises on repeated bad predictions | confidence model has regressed; evidence quantity is overpowering accuracy |
+| Prediction/observation identity checks fail | evidence chain is invalid; results must not qualify the architecture |
+
+No single metric is a synthetic-organism detector.
+
+## Required evidence discipline
+
+A future green qualification should report all of:
+
+1. exact repository commit;
+2. exact scenario definitions and perturbation schedule;
+3. training/frozen boundary;
+4. model and policy configuration;
+5. prediction accuracy;
+6. confidence calibration;
+7. survival and minimum viability margin;
+8. perturbation recovery;
+9. oracle horizon regret;
+10. persistence comparator;
+11. held-out transfer;
+12. trace/invariant verification where action evidence is recorded.
+
+Queued CI is not a pass.
+
+## Next architectural gate
+
+The next high-value refactor is to introduce a common transition-model interface shared by:
+
+- the action-conditioned WorldModelBridge;
+- the FEP generative transition model;
+- the ODE trajectory planner.
+
+That interface should allow the same grounded transition oracle to score both models without forcing
+either model to change its own representation.
+
+The desired comparison is then:
+
+**learned discrete prediction → continuous trajectory rollout → actual deterministic consequence**
+
+with separate measurements for model error, confidence calibration, planning regret, survival, and
+recovery.
+
+Only after that comparison is stable should viability-driven modulation of runtime policy be
+considered for broader qualification.
