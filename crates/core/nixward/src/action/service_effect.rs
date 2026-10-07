@@ -74,7 +74,7 @@ impl NixVerifiedServiceDefinitionContentV1 {
     }
 
     /// Return the observer-derived service invocation identity from this capture epoch.
-    pub(crate) fn pre_invocation_id(&self) -> Option<&str> {
+    pub fn pre_invocation_id(&self) -> Option<&str> {
         self.evidence.pre_invocation_id.as_deref()
     }
 }
@@ -211,7 +211,7 @@ impl NixServiceEffectContextV1 {
         Ok(())
     }
 
-    pub(crate) fn from_verified_definition_content(
+    pub fn from_verified_definition_content(
         operation: NixServiceOperationKindV1,
         unit: impl Into<String>,
         authorized_generation: u64,
