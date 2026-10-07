@@ -3270,15 +3270,13 @@ async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
             continue;
         }
 
-        let safe_path = path.to_string_lossy();
-        let check_command = if artifact.ends_with(".zst") {
-            format!("zstd -t -- '{}'", safe_path)
+        let safe_path = path.to_string_lossy().into_owned();
+        let check = if artifact.ends_with(".zst") {
+            run_privileged_args("zstd", &["-t", "--", &safe_path]).await
         } else {
-            format!("tar -tzf '{}'", safe_path)
-        };
-        let check = run_cmd(&check_command)
-            .await
-            .map_err(|error| format!("image archive integrity probe failed: {error}"))?;
+            run_privileged_args("tar", &["-tzf", &safe_path]).await
+        }
+        .map_err(|error| format!("image archive integrity probe failed: {error}"))?;
         if check.exit_status == 0 {
             return Ok(true);
         }
@@ -3941,14 +3939,14 @@ async fn verify_preservation_artifacts(backup_dir: &str) -> Result<bool, String>
         }
 
         let archive = entry.path().to_string_lossy().to_string();
-        let gzip_check = run_cmd(&format!("gzip -t -- '{}'", archive))
+        let gzip_check = run_privileged_args("gzip", &["-t", "--", &archive])
             .await
             .map_err(|error| format!("preservation gzip integrity probe failed: {error}"))?;
         if gzip_check.exit_status != 0 {
             return Ok(false);
         }
         if name.ends_with(".tar.gz") {
-            let tar_check = run_cmd(&format!("tar -tzf '{}'", archive))
+            let tar_check = run_privileged_args("tar", &["-tzf", &archive])
                 .await
                 .map_err(|error| format!("preservation tar integrity probe failed: {error}"))?;
             if tar_check.exit_status != 0 {
