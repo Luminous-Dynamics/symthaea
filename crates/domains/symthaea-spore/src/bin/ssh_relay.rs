@@ -4805,6 +4805,13 @@ async fn run_nmcli_delete_wifi_profile(
     })
 }
 
+fn wifi_profile_cleanup_succeeded(result: &Result<CmdResult, String>) -> bool {
+    match result {
+        Ok(result) => result.exit_status == 0 || result.exit_status == 10,
+        Err(_) => false,
+    }
+}
+
 async fn run_nmcli_wifi_connection_up(
     profile_name: &str,
     secret_path: &str,
@@ -9922,13 +9929,24 @@ echo '}'
                 {
                     Ok(file) => file,
                     Err(error) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!(
-                                    "Failed to create protected Wi-Fi credential: {}",
-                                    error
-                                ))
-                                .to_json(),
+                                serde_json::json!({
+                                    "type": "wifi_result",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!(
+                                        "Failed to create protected Wi-Fi credential: {}",
+                                        error
+                                    ),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
                             ))
                             .await;
                         continue;
@@ -9939,14 +9957,33 @@ echo '}'
                     .and_then(|_| secret_file.sync_all())
                 {
                     drop(secret_file);
-                    let _ = cleanup_sensitive_file(&secret_path);
+                    let cleanup = cleanup_sensitive_file(&secret_path);
+                    let outcome = if cleanup.is_ok() {
+                        TransactionOutcome::Failed
+                    } else {
+                        TransactionOutcome::Indeterminate
+                    };
                     let _ = ws_tx
                         .send(Message::Text(
-                            RelayMessage::error(&format!(
-                                "Failed to flush Wi-Fi credential: {}",
-                                error
-                            ))
-                            .to_json(),
+                            serde_json::json!({
+                                "type": "wifi_result",
+                                "code": protocol_exit_code(1, outcome),
+                                "data": if outcome == TransactionOutcome::Failed {
+                                    format!("Failed to flush Wi-Fi credential: {}", error)
+                                } else {
+                                    format!(
+                                        "Failed to flush Wi-Fi credential and cleanup failed: {}",
+                                        cleanup.as_ref().err().unwrap()
+                                    )
+                                },
+                                "transaction": transaction.receipt(finalize_transaction(
+                                    &transaction_ledger,
+                                    &transaction,
+                                    outcome,
+                                    &peer_addr,
+                                ))
+                            })
+                            .to_string(),
                         ))
                         .await;
                     continue;
@@ -9968,10 +10005,7 @@ echo '}'
                     Ok(r) => {
                         let profile_cleanup = run_nmcli_delete_wifi_profile(&profile_name).await;
                         let secret_cleanup = cleanup_sensitive_file(&secret_path);
-                        let observed = if profile_cleanup
-                            .as_ref()
-                            .map(|cleanup| cleanup.exit_status == 0)
-                            .unwrap_or(false)
+                        let observed = if wifi_profile_cleanup_succeeded(&profile_cleanup)
                             && secret_cleanup.is_ok()
                         {
                             TransactionOutcome::Failed
@@ -10126,10 +10160,8 @@ echo '}'
                     }
                     Ok(r) => {
                         let profile_cleanup = run_nmcli_delete_wifi_profile(&profile_name).await;
-                        let outcome = if profile_cleanup
-                            .as_ref()
-                            .map(|cleanup| cleanup.exit_status == 0)
-                            .unwrap_or(false)
+                        let outcome = if wifi_profile_cleanup_succeeded(&profile_cleanup)
+                            && cleanup_result.is_ok()
                         {
                             TransactionOutcome::Failed
                         } else {
@@ -10142,8 +10174,10 @@ echo '}'
                                 r.stderr.chars().take(400).collect::<String>()
                             } else {
                                 format!(
-                                    "Wi-Fi activation failed and transient profile cleanup could not be observed: {:?}",
-                                    profile_cleanup.as_ref().err().or_else(|| Some(&r.stderr))
+                                    "Wi-Fi activation failed and cleanup could not be fully observed: profile={:?}, secret={:?}, detail={}",
+                                    profile_cleanup.as_ref().map(|v| v.exit_status),
+                                    cleanup_result.as_ref().err(),
+                                    r.stderr.chars().take(300).collect::<String>()
                                 )
                             },
                             "transaction": transaction.receipt(finalize_transaction(
@@ -10156,10 +10190,8 @@ echo '}'
                     }
                     Err(error) => {
                         let profile_cleanup = run_nmcli_delete_wifi_profile(&profile_name).await;
-                        let outcome = if profile_cleanup
-                            .as_ref()
-                            .map(|cleanup| cleanup.exit_status == 0)
-                            .unwrap_or(false)
+                        let outcome = if wifi_profile_cleanup_succeeded(&profile_cleanup)
+                            && cleanup_result.is_ok()
                         {
                             TransactionOutcome::Failed
                         } else {
