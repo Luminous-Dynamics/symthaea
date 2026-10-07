@@ -16,7 +16,7 @@ This manifest records an immutable external UniMorph source snapshot for Broca c
 - UTF-8 byte length: `18022905`
 - BLAKE3-256: `c4a677818237fb1060d2541272e2da1d5b6bfd2ae40df00b9187d1ae8566426f`
 
-The BLAKE3 implementation used for capture was independently checked against the standard empty-string and `abc` vectors before hashing this artifact.
+The BLAKE3 implementation used for capture was independently checked against all 35 default-hash cases in the official BLAKE3 test-vector file (blob SHA f6da91792c6cdf5c6a0f6dad01803045bb204a68), including multi-chunk boundaries. As a separate byte-encoding cross-check, recomputing Git's blob SHA-1 over `blob 18022905\0` + the captured UTF-8 bytes reproduced Git blob SHA `8eae5ed242e87e50f6bd182133277f50fe93cef3` exactly.
 
 ## Upstream metadata
 
