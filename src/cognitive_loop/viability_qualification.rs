@@ -469,6 +469,11 @@ pub struct LearningResponseReport {
     pub mean_neighbor_mae_after_update: f64,
     pub mean_neighbor_improvement: f64,
     pub neighbor_improvement_rate: f64,
+    /// Regression of a previously learned anchor transition after shock adaptation.
+    pub mean_anchor_mae_before_update: f64,
+    pub mean_anchor_mae_after_update: f64,
+    pub mean_anchor_regression: f64,
+    pub anchor_regression_rate: f64,
 }
 
 impl LearningResponseReport {
@@ -880,6 +885,14 @@ fn evaluate_learning_response(
     let mut neighbor_mae_after = 0.0;
     let mut neighbor_improvements = 0.0;
     let mut neighbor_improvement_count = 0u64;
+    let anchor_scenario = benchmark_scenarios()[0];
+    let anchor_state = anchor_scenario.initial;
+    let anchor_action = anchor_scenario.schedule[0];
+    let anchor_actual = transition(anchor_state, anchor_action);
+    let mut anchor_mae_before = 0.0;
+    let mut anchor_mae_after = 0.0;
+    let mut anchor_regressions = 0.0;
+    let mut anchor_regression_count = 0u64;
 
     for (shock_state, action) in &shock_states {
         let mut model = base_model.clone();
@@ -890,6 +903,8 @@ fn evaluate_learning_response(
         let actual = transition(*shock_state, *action);
         let before_prediction = predictor.predict(*shock_state, *action);
         let before_mae = before_prediction.mean_absolute_delta(actual);
+        let anchor_before = predictor.predict(anchor_state, anchor_action);
+        let anchor_before_mae = anchor_before.mean_absolute_delta(anchor_actual);
 
         // Nearby probe is scored BEFORE the update as a held-out neighbor.
         let neighbor_state = super::viability_micro_world::MicroPerturbation::ThreatSpike(0.01)
@@ -918,13 +933,23 @@ fn evaluate_learning_response(
         let neighbor_after = predictor.predict(neighbor_state, *action);
         let neighbor_after_mae = neighbor_after.mean_absolute_delta(neighbor_actual);
         let neighbor_improvement = neighbor_before_mae - neighbor_after_mae;
+        let anchor_after = predictor.predict(anchor_state, anchor_action);
+        let anchor_after_mae = anchor_after.mean_absolute_delta(anchor_actual);
+        let anchor_regression = anchor_after_mae - anchor_before_mae;
 
         neighbor_mae_before += neighbor_before_mae;
         neighbor_mae_after += neighbor_after_mae;
         neighbor_improvements += neighbor_improvement;
+        anchor_mae_before += anchor_before_mae;
+        anchor_mae_after += anchor_after_mae;
+        anchor_regressions += anchor_regression;
         if neighbor_improvement > 1e-12 {
             neighbor_improvement_count =
                 neighbor_improvement_count.saturating_add(1);
+        }
+        if anchor_regression > 1e-12 {
+            anchor_regression_count =
+                anchor_regression_count.saturating_add(1);
         }
     }
 
@@ -940,6 +965,10 @@ fn evaluate_learning_response(
             mean_neighbor_mae_after_update: 0.0,
             mean_neighbor_improvement: 0.0,
             neighbor_improvement_rate: 0.0,
+            mean_anchor_mae_before_update: 0.0,
+            mean_anchor_mae_after_update: 0.0,
+            mean_anchor_regression: 0.0,
+            anchor_regression_rate: 0.0,
         };
     }
 
@@ -953,6 +982,10 @@ fn evaluate_learning_response(
         mean_neighbor_mae_after_update: neighbor_mae_after / count,
         mean_neighbor_improvement: neighbor_improvements / count,
         neighbor_improvement_rate: neighbor_improvement_count as f64 / count,
+        mean_anchor_mae_before_update: anchor_mae_before / count,
+        mean_anchor_mae_after_update: anchor_mae_after / count,
+        mean_anchor_regression: anchor_regressions / count,
+        anchor_regression_rate: anchor_regression_count as f64 / count,
     }
 }
 
@@ -2195,11 +2228,16 @@ mod tests {
             report.mean_neighbor_mae_after_update,
             report.mean_neighbor_improvement,
             report.neighbor_improvement_rate,
+            report.mean_anchor_mae_before_update,
+            report.mean_anchor_mae_after_update,
+            report.mean_anchor_regression,
+            report.anchor_regression_rate,
         ] {
             assert!(value.is_finite());
         }
         assert!((0.0..=1.0).contains(&report.same_transition_improvement_rate));
         assert!((0.0..=1.0).contains(&report.neighbor_improvement_rate));
+        assert!((0.0..=1.0).contains(&report.anchor_regression_rate));
     }
 
     #[test]
