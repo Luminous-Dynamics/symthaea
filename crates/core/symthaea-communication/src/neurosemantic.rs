@@ -507,6 +507,132 @@ impl NeurosemanticRemediationStatisticalSamplingFrameArtifact {
     }
 }
 
+const NEUROSEMANTIC_REMEDIATION_SIMPLE_RANDOM_WITHOUT_REPLACEMENT_PROCEDURE_REF: &str =
+    "simple-random-without-replacement-v1";
+
+fn splitmix64_step(state: &mut u64) -> u64 {
+    *state = state.wrapping_add(0x9E3779B97F4A7C15);
+    let mut value = *state;
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D049BB133111EB);
+    value ^ (value >> 31)
+}
+
+fn unbiased_bounded_u64(state: &mut u64, bound: u64) -> u64 {
+    debug_assert!(bound > 0);
+    if bound == 1 {
+        return 0;
+    }
+    let threshold = bound.wrapping_neg() % bound;
+    loop {
+        let value = splitmix64_step(state);
+        if value >= threshold {
+            return value % bound;
+        }
+    }
+}
+
+fn replay_simple_random_without_replacement(
+    frame_member_artifact_hashes: &[String],
+    sample_size: usize,
+    seed: u64,
+) -> Result<Vec<String>, String> {
+    if frame_member_artifact_hashes.is_empty()
+        || sample_size == 0
+        || sample_size > frame_member_artifact_hashes.len()
+    {
+        return Err("neurosemantic remediation simple-random selection bounds are invalid".into());
+    }
+    let mut candidates = frame_member_artifact_hashes.to_vec();
+    candidates.sort();
+    let mut state = seed;
+    for index in 0..sample_size {
+        let remaining = candidates.len() - index;
+        let offset = unbiased_bounded_u64(&mut state, remaining as u64) as usize;
+        candidates.swap(index, index + offset);
+    }
+    candidates.truncate(sample_size);
+    candidates.sort();
+    Ok(candidates)
+}
+
+/// Content-addressed replay record for a supported deterministic sampling procedure.
+///
+/// The verifier independently replays the procedure against the frozen frame. The seed is
+/// evidence of the executed draw only; preregistration or an authoritative randomness source
+/// remains necessary for an empirical claim of unbiased randomization.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationStatisticalSelectionTraceArtifact {
+    pub schema_version: u16,
+    pub selection_ref: String,
+    pub sampling_frame_hash: String,
+    pub selection_procedure_ref: String,
+    pub randomization_seed_u64: u64,
+    pub sample_size: u32,
+    pub selected_subject_artifact_hashes: Vec<String>,
+    pub study_protocol_hash: String,
+    pub execution_revision: String,
+}
+
+pub const NEUROSEMANTIC_REMEDIATION_STATISTICAL_SELECTION_TRACE_SCHEMA_VERSION: u16 = 1;
+
+impl NeurosemanticRemediationStatisticalSelectionTraceArtifact {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version
+            != NEUROSEMANTIC_REMEDIATION_STATISTICAL_SELECTION_TRACE_SCHEMA_VERSION
+            || !valid_identifier(&self.selection_ref)
+            || !valid_blake3_digest(&self.sampling_frame_hash)
+            || !valid_identifier(&self.selection_procedure_ref)
+            || self.sample_size == 0
+            || self.selected_subject_artifact_hashes.is_empty()
+            || self.selected_subject_artifact_hashes.len() > MAX_NEUROSEMANTIC_REMEDIATION_OBSERVATIONS
+            || self.selected_subject_artifact_hashes.len() != self.sample_size as usize
+            || self.selected_subject_artifact_hashes.iter().any(|hash| !valid_blake3_digest(hash))
+            || !valid_blake3_digest(&self.study_protocol_hash)
+            || !valid_execution_revision(&self.execution_revision)
+        {
+            return Err("neurosemantic remediation statistical selection trace fields are invalid".into());
+        }
+        let unique_selected: BTreeSet<&str> = self
+            .selected_subject_artifact_hashes
+            .iter()
+            .map(String::as_str)
+            .collect();
+        if unique_selected.len() != self.selected_subject_artifact_hashes.len() {
+            return Err(
+                "neurosemantic remediation statistical selection trace contains duplicate selections"
+                    .into(),
+            );
+        }
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic remediation statistical selection trace JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let artifact: Self = serde_json::from_slice(bytes).map_err(|error| {
+            format!("neurosemantic remediation statistical selection trace JSON: {error}")
+        })?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn fingerprint(&self) -> Result<String, String> {
+        self.validate()?;
+        let mut canonical = self.clone();
+        canonical.selected_subject_artifact_hashes.sort();
+        Ok(content_hash(&serde_json::to_vec(&canonical).map_err(|error| {
+            format!(
+                "neurosemantic remediation statistical selection trace serialization: {error}"
+            )
+        })?))
+    }
+}
+
 /// One execution-time binding between an observed subject and a dependence group.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NeurosemanticRemediationStatisticalDependenceAssignment {
@@ -548,6 +674,7 @@ pub struct NeurosemanticRemediationStatisticalExecutionArtifact {
     pub metric_definition_hash: String,
     pub observation_set_hash: String,
     pub sampling_frame_hash: String,
+    pub selection_trace_hash: String,
     pub selected_subject_artifact_hashes: Vec<String>,
     pub inclusion_probabilities: Vec<NeurosemanticRemediationSamplingInclusionProbability>,
     pub selection_procedure_ref: String,
@@ -567,6 +694,7 @@ impl NeurosemanticRemediationStatisticalExecutionArtifact {
             || !valid_blake3_digest(&self.metric_definition_hash)
             || !valid_blake3_digest(&self.observation_set_hash)
             || !valid_blake3_digest(&self.sampling_frame_hash)
+            || !valid_blake3_digest(&self.selection_trace_hash)
             || self.selected_subject_artifact_hashes.is_empty()
             || self.selected_subject_artifact_hashes.len() > MAX_NEUROSEMANTIC_REMEDIATION_OBSERVATIONS
             || self.selected_subject_artifact_hashes.iter().any(|hash| !valid_blake3_digest(hash))
