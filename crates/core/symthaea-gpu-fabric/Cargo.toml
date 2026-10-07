@@ -6,8 +6,14 @@ license.workspace = true
 description = "Backend-neutral semantic GPU execution plans, CPU reference execution, and qualification receipts for Symthaea"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
 
+[features]
+default = []
+vulkan = ["dep:ash", "dep:naga"]
+
 [dependencies]
 blake3 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+ash = { workspace = true, optional = true }
+naga = { workspace = true, optional = true }
