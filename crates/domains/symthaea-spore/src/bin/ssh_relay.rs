@@ -8782,7 +8782,7 @@ echo '},'
 echo '"mounts":"'$(mount | grep /mnt | tr '\n' ' ')'"'
 echo '}'
 "#;
-                match run_cmd(script).await {
+                match run_privileged_script_source(script, &[]).await {
                     Ok(r) => {
                         let clean: String = r
                             .stdout
