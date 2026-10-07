@@ -321,7 +321,8 @@ def main() -> int:
             for name, _status in changed_files
             if name
             and not any(
-                name == prefix or name.startswith(prefix)
+                name == prefix
+                or (prefix.endswith("/") and name.startswith(prefix))
                 for prefix in ALLOWED_PATH_PREFIXES
             )
         ]
