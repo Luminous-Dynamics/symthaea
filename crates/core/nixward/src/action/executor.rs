@@ -1051,7 +1051,7 @@ impl NixOSExecutor {
             .pre_state_identity()
             .ok_or_else(|| "execution authority has no bound pre-state identity".to_string())?;
 
-        if let NixOSCommand::Service { unit, .. } = command {
+        if let NixOSCommand::Service { unit, operation } = command {
             if self.dry_run {
                 return Ok(());
             }
@@ -1072,14 +1072,7 @@ impl NixOSExecutor {
             )?;
 
             #[cfg(feature = "systemd-observer")]
-            self.validate_authorized_service_definition_content(
-                    &authority,
-                    match command {
-                        NixOSCommand::Service { operation, .. } => *operation,
-                        _ => unreachable!(),
-                    },
-                    unit,
-                )
+            self.validate_authorized_service_definition_content(&authority, *operation, unit)
                 .await?;
 
             #[cfg(not(feature = "systemd-observer"))]
