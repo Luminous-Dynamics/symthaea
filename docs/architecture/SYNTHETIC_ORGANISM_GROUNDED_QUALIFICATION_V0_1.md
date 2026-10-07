@@ -344,7 +344,7 @@ This matters because a single favorable held-out scenario can be explained by sc
 Recent 2026 continual-world-model work argues that retention should be stratified by what is expected to
 remain invariant: adaptation should revise stale environment-specific knowledge while protecting
 long-lived dynamics, and evaluation should report revision and invariant-retention behavior jointly rather
-than collapsing them into one forgetting score. citeturn248481academia18
+than collapsing them into one forgetting score (Anand, Duraiswami, & Manocha, 2026, [arXiv:2610.03713](https://arxiv.org/abs/2610.03713)).
 
 This protocol therefore treats the deterministic transition law as the invariant layer. The adaptation
 experiment records per-shock correction and separately records regression of a previously learned anchor
