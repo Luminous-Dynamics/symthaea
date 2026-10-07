@@ -10600,6 +10600,32 @@ mod tests {
     }
 
     #[test]
+    fn preservation_service_identity_returns_uid_and_gid() {
+        let root = preservation_user_identity("root")
+            .expect("root account lookup should succeed")
+            .expect("root account should exist");
+        assert!(root.0 <= u32::MAX);
+        assert!(root.1 <= u32::MAX);
+        assert!(preservation_user_identity("definitely-no-such-preservation-user")
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn preservation_archive_component_is_safe_and_stable() {
+        let component = preservation_archive_component("registry.example/image:tag/$danger");
+        assert!(component.starts_with("registry.example_image_tag__danger-"));
+        assert!(component.len() <= 89);
+        assert_eq!(
+            component,
+            preservation_archive_component("registry.example/image:tag/$danger")
+        );
+        assert!(!component.contains('/'));
+        assert!(!component.contains(':'));
+        assert!(!component.contains('$'));
+    }
+
+    #[test]
     fn typed_executor_accepts_only_trusted_program_identities() {
         assert_eq!(
             trusted_typed_executable("nix-env").unwrap().as_ref(),
