@@ -4956,106 +4956,98 @@ echo "  User password set."
                     ))
                     .await;
 
-                // Poll the log file for new output
-                let mut last_lines = 0u64;
+                // Poll the transaction log directly through the filesystem API.
+                // No shell is needed to count or tail a transaction-owned log.
+                let mut last_lines = 0usize;
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
-                    let tail_result = run_cmd(&format!(
-                        "wc -l < {} 2>/dev/null && tail -n +{} {} 2>/dev/null",
-                        log_path,
-                        last_lines + 1,
-                        log_path
-                    ))
-                    .await;
+                    if let Ok(bytes) = tokio::fs::read(&log_path).await {
+                        let text = String::from_utf8_lossy(&bytes);
+                        let lines: Vec<&str> = text.lines().collect();
+                        if lines.len() >= last_lines {
+                            for line in &lines[last_lines..] {
+                                if line.trim().is_empty() {
+                                    continue;
+                                }
 
-                    match tail_result {
-                        Ok(result) if result.exit_status == 0 => {
-                            let lines: Vec<&str> = result.stdout.lines().collect();
-                            if let Some(first) = lines.first() {
-                                if let Ok(total) = first.trim().parse::<u64>() {
-                                    // Process new lines (skip the count line)
-                                    for line in &lines[1..] {
-                                        if line.trim().is_empty() {
-                                            continue;
-                                        }
+                                if line.starts_with("STAGE: ") {
+                                    let stage_text = &line[7..];
+                                    let stage = if stage_text.contains("Prepar")
+                                        || stage_text.contains("environment")
+                                    {
+                                        NixosAnywhereStage::Connecting
+                                    } else if stage_text.contains("Partition") {
+                                        NixosAnywhereStage::Partitioning
+                                    } else if stage_text.contains("Format")
+                                        || stage_text.contains("btrfs")
+                                        || stage_text.contains("subvol")
+                                    {
+                                        NixosAnywhereStage::Partitioning
+                                    } else if stage_text.contains("Mount") {
+                                        NixosAnywhereStage::Partitioning
+                                    } else if stage_text.contains("Generat")
+                                        || stage_text.contains("config")
+                                    {
+                                        NixosAnywhereStage::Configuring
+                                    } else if stage_text.contains("Install") {
+                                        NixosAnywhereStage::Installing
+                                    } else if stage_text.contains("swap")
+                                        || stage_text.contains("Verif")
+                                    {
+                                        NixosAnywhereStage::Configuring
+                                    } else if stage_text.contains("FirstBreath") {
+                                        NixosAnywhereStage::Complete
+                                    } else {
+                                        NixosAnywhereStage::Installing
+                                    };
 
-                                        // Parse STAGE: markers
-                                        if line.starts_with("STAGE: ") {
-                                            let stage_text = &line[7..];
-                                            let stage = if stage_text.contains("Prepar")
-                                                || stage_text.contains("environment")
-                                            {
-                                                NixosAnywhereStage::Connecting
-                                            } else if stage_text.contains("Partition") {
-                                                NixosAnywhereStage::Partitioning
-                                            } else if stage_text.contains("Format")
-                                                || stage_text.contains("btrfs")
-                                                || stage_text.contains("subvol")
-                                            {
-                                                NixosAnywhereStage::Partitioning
-                                            } else if stage_text.contains("Mount") {
-                                                NixosAnywhereStage::Partitioning
-                                            } else if stage_text.contains("Generat")
-                                                || stage_text.contains("config")
-                                            {
-                                                NixosAnywhereStage::Configuring
-                                            } else if stage_text.contains("Install") {
-                                                NixosAnywhereStage::Installing
-                                            } else if stage_text.contains("swap")
-                                                || stage_text.contains("Verif")
-                                            {
-                                                NixosAnywhereStage::Configuring
-                                            } else if stage_text.contains("FirstBreath") {
-                                                NixosAnywhereStage::Complete
-                                            } else {
-                                                NixosAnywhereStage::Installing
-                                            };
+                                    let _ = ws_tx
+                                        .send(Message::Text(
+                                            RelayMessage::progress(&stage).to_json(),
+                                        ))
+                                        .await;
+                                }
 
-                                            let _ = ws_tx
-                                                .send(Message::Text(
-                                                    RelayMessage::progress(&stage).to_json(),
-                                                ))
-                                                .await;
-                                        }
+                                if let Some(stage) = parse_stage(line) {
+                                    let _ = ws_tx
+                                        .send(Message::Text(
+                                            RelayMessage::progress(&stage).to_json(),
+                                        ))
+                                        .await;
+                                }
 
-                                        if let Some(stage) = parse_stage(line) {
-                                            let _ = ws_tx
-                                                .send(Message::Text(
-                                                    RelayMessage::progress(&stage).to_json(),
-                                                ))
-                                                .await;
-                                        }
+                                let _ = ws_tx
+                                    .send(Message::Text(
+                                        RelayMessage::output(line, "stdout").to_json(),
+                                    ))
+                                    .await;
 
-                                        let _ = ws_tx
-                                            .send(Message::Text(
-                                                RelayMessage::output(line, "stdout").to_json(),
-                                            ))
-                                            .await;
-
-                                        if line.contains("COMPLETE") {
-                                            complete = true;
-                                        }
-                                    }
-                                    last_lines = total;
+                                if line.contains("COMPLETE") {
+                                    complete = true;
                                 }
                             }
+                            last_lines = lines.len();
                         }
-                        _ => {}
                     }
 
-                    // Completion is defined only by the transaction-specific status file
-                    // or by the exact child PID disappearing. No broad process matching.
-                    if let Ok(check) = run_cmd(&format!(
-                        "test -s {} || ! kill -0 \"$(cat {} 2>/dev/null)\" 2>/dev/null",
-                        status_path,
-                        pid_path
-                    ))
-                    .await
+                    // Completion is defined only by a durable status value or
+                    // by the disappearance of the exact transaction child PID.
+                    if read_transaction_status(&status_path)
+                        .await
+                        .ok()
+                        .flatten()
+                        .is_some()
                     {
-                        if check.exit_status == 0 {
-                            break;
-                        }
+                        break;
+                    }
+                    let pid = tokio::fs::read_to_string(&pid_path)
+                        .await
+                        .ok()
+                        .and_then(|text| text.trim().parse::<u32>().ok())
+                        .unwrap_or(0);
+                    if !process_id_is_alive(pid) {
+                        break;
                     }
                 }
 
@@ -5114,11 +5106,10 @@ echo "  User password set."
                     .await;
 
                 // SECURITY: Clean up temporary files containing sensitive data
-                let _ = run_cmd(&format!(
-                    "rm -f -- {} {} {} {}",
-                    script_path, log_path, status_path, pid_path
-                ))
-                .await;
+                let _ = tokio::fs::remove_file(&script_path).await;
+                let _ = tokio::fs::remove_file(&log_path).await;
+                let _ = tokio::fs::remove_file(&status_path).await;
+                let _ = tokio::fs::remove_file(&pid_path).await;
                 remove_transaction_artifact_dir(&transaction_dir);
                 eprintln!(
                     "[{}] Transaction {} artifact namespace cleaned up",
