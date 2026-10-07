@@ -146,27 +146,64 @@ fn prepare_transaction_runtime(
     Ok(())
 }
 
-async fn spawn_privileged_background_script(
-    script_path: &str,
+async fn spawn_privileged_background_process(
+    mut command: tokio::process::Command,
     log_path: &str,
     status_path: &str,
     pid_path: &str,
 ) -> Result<u32, std::io::Error> {
-    let log = std::fs::OpenOptions::new()
+    if let Err(error) = prepare_transaction_runtime(log_path, status_path, pid_path) {
+        let _ = std::fs::remove_file(log_path);
+        let _ = std::fs::remove_file(status_path);
+        let _ = std::fs::remove_file(pid_path);
+        return Err(error);
+    }
+
+    let log = match std::fs::OpenOptions::new()
         .write(true)
         .append(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open(log_path)?;
-    let log_stderr = log.try_clone()?;
-    let mut child = privileged_script_command(script_path)
+        .open(log_path)
+    {
+        Ok(file) => file,
+        Err(error) => {
+            let _ = std::fs::remove_file(log_path);
+            let _ = std::fs::remove_file(status_path);
+            let _ = std::fs::remove_file(pid_path);
+            return Err(error);
+        }
+    };
+    let log_stderr = match log.try_clone() {
+        Ok(file) => file,
+        Err(error) => {
+            let _ = std::fs::remove_file(log_path);
+            let _ = std::fs::remove_file(status_path);
+            let _ = std::fs::remove_file(pid_path);
+            return Err(error);
+        }
+    };
+
+    let mut child = match command
         .stdout(std::process::Stdio::from(log))
         .stderr(std::process::Stdio::from(log_stderr))
         .spawn()
-        .await?;
+        .await
+    {
+        Ok(child) => child,
+        Err(error) => {
+            let _ = std::fs::remove_file(log_path);
+            let _ = std::fs::remove_file(status_path);
+            let _ = std::fs::remove_file(pid_path);
+            return Err(error);
+        }
+    };
 
     let Some(pid) = child.id() else {
         let _ = child.kill().await;
         let _ = child.wait().await;
+        let _ = std::fs::remove_file(log_path);
+        let _ = std::fs::remove_file(status_path);
+        let _ = std::fs::remove_file(pid_path);
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
             "spawned child has no observable PID",
@@ -185,11 +222,13 @@ async fn spawn_privileged_background_script(
     })();
 
     if let Err(error) = pid_write_result {
-        // The mutation has already been launched, but its durable process identity
-        // could not be recorded. Contain the child immediately; the caller will
-        // finalize the transaction as indeterminate and remove the namespace.
+        // The privileged child may already have begun mutating state, but its
+        // durable identity was not recorded. Stop it immediately and fail closed.
         let _ = child.kill().await;
         let _ = child.wait().await;
+        let _ = std::fs::remove_file(log_path);
+        let _ = std::fs::remove_file(status_path);
+        let _ = std::fs::remove_file(pid_path);
         return Err(error);
     }
 
@@ -212,6 +251,21 @@ async fn spawn_privileged_background_script(
     });
 
     Ok(pid)
+}
+
+async fn spawn_privileged_background_script(
+    script_path: &str,
+    log_path: &str,
+    status_path: &str,
+    pid_path: &str,
+) -> Result<u32, std::io::Error> {
+    spawn_privileged_background_process(
+        privileged_script_command(script_path),
+        log_path,
+        status_path,
+        pid_path,
+    )
+    .await
 }
 
 async fn read_transaction_status(path: &str) -> Result<Option<u32>, std::io::Error> {
