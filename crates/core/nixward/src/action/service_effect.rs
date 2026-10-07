@@ -426,6 +426,8 @@ mod tests {
             &"aa".repeat(32),
             &"bb".repeat(32),
             &"dd".repeat(32),
+            ":1.42",
+            "0123456789abcdef0123456789abcdef",
             Some("cc".repeat(16)),
             1_000,
         )
