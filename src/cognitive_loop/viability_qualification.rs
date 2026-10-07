@@ -421,7 +421,11 @@ pub struct GroundedWorldModelQualificationReport {
     pub held_out_confidence_calibration: ConfidenceCalibration,
     pub held_out_continuous_rollout_steps: u64,
     pub held_out_continuous_rollout_mae: f64,
+    pub held_out_multi_horizon: Vec<HorizonQualificationPoint>,
     pub held_out_survived_fixed_schedule: bool,
+
+    /// Frozen-model policy evaluation on states induced by the model's own actions.
+    pub policy_induced_shift: PolicyInducedShiftReport,
 
     pub persistence_closed_loop_survived: bool,
     pub persistence_closed_loop_mean_oracle_horizon_regret: f64,
@@ -442,6 +446,38 @@ pub struct GroundedWorldModelQualificationReport {
     pub perturbation_recovery_steps: Vec<Option<u64>>,
     pub recovery_rate: f64,
     pub mean_recovery_steps: f64,
+}
+
+/// Accuracy profile for a frozen model as the temporal prediction horizon increases.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HorizonQualificationPoint {
+    pub horizon_steps: usize,
+    pub samples: u64,
+    pub mean_one_step_mae: f64,
+    pub mean_terminal_mae: f64,
+    pub terminal_to_one_step_error_ratio: f64,
+}
+
+impl HorizonQualificationPoint {
+    pub fn has_temporal_degradation(&self) -> bool {
+        self.mean_terminal_mae > self.mean_one_step_mae
+    }
+}
+
+/// Frozen policy evaluation that deliberately lets the model induce the visited-state distribution.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PolicyInducedShiftReport {
+    pub steps: u64,
+    pub baseline_mae: f64,
+    pub predictor_mae: f64,
+    pub improvement_over_baseline: f64,
+    pub survival: bool,
+    pub min_actual_viability_margin: f64,
+    pub oracle_horizon_regret: f64,
+    pub execution_failures: usize,
+    pub terminated_on_execution_failure: bool,
+    /// Ratio against the frozen fixed-schedule held-out predictor MAE.
+    pub shift_error_ratio: f64,
 }
 
 impl GroundedWorldModelQualificationReport {
@@ -520,6 +556,194 @@ fn evaluate_frozen_scenario<P: MicroWorldPredictor>(
     )
 }
 
+const QUALIFICATION_HORIZONS: [usize; 4] = [1, 2, 4, 8];
+const QUALIFICATION_TAU: f64 = 0.1;
+const QUALIFICATION_MAX_ODE_STEPS: usize = 200;
+
+/// Frozen temporal-composition profile. No learning is permitted while scoring these points.
+fn evaluate_multi_horizon<M: ActionConditionedTransitionModel + ?Sized>(
+    model: &M,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+) -> Vec<HorizonQualificationPoint> {
+    let mut points = Vec::with_capacity(QUALIFICATION_HORIZONS.len());
+
+    for &horizon_steps in &QUALIFICATION_HORIZONS {
+        let horizon_seconds = horizon_steps as f64 * QUALIFICATION_TAU;
+        let mut world = MicroWorld::new(scenario.initial, max_cycles);
+        let mut one_step_error = 0.0;
+        let mut terminal_error = 0.0;
+        let mut samples = 0u64;
+        let mut steps = 0u64;
+
+        while !world.done() && steps < max_cycles {
+            for (cycle, perturbation) in scenario.perturbations {
+                if *cycle == steps {
+                    world.perturb(*perturbation);
+                }
+            }
+
+            let before = world.observe();
+            let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+            let encoded = encode_micro_world_state(before);
+
+            if let Some(rollout) = roll_transition_model_trajectory(
+                model,
+                &encoded,
+                action.index(),
+                horizon_seconds,
+                QUALIFICATION_TAU,
+                QUALIFICATION_MAX_ODE_STEPS,
+            ) {
+                let one_step_actual = transition(before, action);
+                one_step_error +=
+                    rollout.one_step_prediction[0..5]
+                        .iter()
+                        .zip([
+                            one_step_actual.energy,
+                            one_step_actual.integrity,
+                            one_step_actual.knowledge,
+                            one_step_actual.threat,
+                            one_step_actual.progress,
+                        ])
+                        .map(|(predicted, actual)| (predicted - actual).abs())
+                        .sum::<f64>()
+                        / 5.0;
+
+                let mut actual_terminal = before;
+                for _ in 0..horizon_steps {
+                    actual_terminal = transition(actual_terminal, action);
+                }
+
+                let predicted_terminal = MicroWorldObservation {
+                    cycle: actual_terminal.cycle,
+                    energy: rollout.terminal_state[0],
+                    integrity: rollout.terminal_state[1],
+                    knowledge: rollout.terminal_state[2],
+                    threat: rollout.terminal_state[3],
+                    progress: rollout.terminal_state[4],
+                };
+
+                terminal_error += predicted_terminal.mean_absolute_delta(actual_terminal);
+                samples = samples.saturating_add(1);
+            }
+
+            world.step(action);
+            steps = steps.saturating_add(1);
+        }
+
+        let denom = samples.max(1) as f64;
+        let mean_one_step_mae = one_step_error / denom;
+        let mean_terminal_mae = terminal_error / denom;
+        let ratio = if mean_one_step_mae <= f64::EPSILON {
+            if mean_terminal_mae <= f64::EPSILON { 1.0 } else { f64::INFINITY }
+        } else {
+            mean_terminal_mae / mean_one_step_mae
+        };
+
+        points.push(HorizonQualificationPoint {
+            horizon_steps,
+            samples,
+            mean_one_step_mae,
+            mean_terminal_mae,
+            terminal_to_one_step_error_ratio: ratio,
+        });
+    }
+
+    points
+}
+
+/// Evaluate the frozen model on states induced by its own horizon-aware policy.
+fn evaluate_policy_induced_shift<P: MicroWorldPredictor>(
+    predictor: &P,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+    policy_horizon: usize,
+    policy_discount: f64,
+    fixed_schedule_mae: f64,
+) -> PolicyInducedShiftReport {
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let policy = super::viability_micro_world::HomeostaticPolicy;
+    let persistence = PersistencePredictor::default();
+    let mut predictor_error = 0.0;
+    let mut baseline_error = 0.0;
+    let mut steps = 0u64;
+    let mut min_actual_viability_margin = f64::INFINITY;
+    let mut oracle_regret_sum = 0.0;
+    let mut execution_failures = 0usize;
+    let mut terminated_on_execution_failure = false;
+
+    while !world.done() && steps < max_cycles {
+        for (cycle, perturbation) in scenario.perturbations {
+            if *cycle == steps {
+                world.perturb(*perturbation);
+            }
+        }
+
+        let before = world.observe();
+        let (action, _, _) =
+            policy.choose_horizon(predictor, before, policy_horizon, policy_discount);
+
+        oracle_regret_sum +=
+            qualification_oracle_horizon_regret(
+                before,
+                action,
+                policy_horizon.min(5),
+                policy_discount,
+            );
+
+        let predicted = predictor.predict(before, action);
+        let baseline = persistence.predict(before, action);
+
+        let after = match world.try_step(action) {
+            Ok(after) => after,
+            Err(_) => {
+                execution_failures += 1;
+                terminated_on_execution_failure = true;
+                break;
+            }
+        };
+
+        predictor_error += predicted.mean_absolute_delta(after);
+        baseline_error += baseline.mean_absolute_delta(after);
+        min_actual_viability_margin = min_actual_viability_margin.min(
+            after.energy.min(after.integrity) - 0.08,
+        );
+        steps = steps.saturating_add(1);
+    }
+
+    let denom = steps.max(1) as f64;
+    let baseline_mae = baseline_error / denom;
+    let predictor_mae = predictor_error / denom;
+    let improvement = if baseline_mae <= f64::EPSILON {
+        0.0
+    } else {
+        (baseline_mae - predictor_mae) / baseline_mae
+    };
+    let shift_ratio = if fixed_schedule_mae <= f64::EPSILON {
+        if predictor_mae <= f64::EPSILON { 1.0 } else { f64::INFINITY }
+    } else {
+        predictor_mae / fixed_schedule_mae
+    };
+
+    PolicyInducedShiftReport {
+        steps,
+        baseline_mae,
+        predictor_mae,
+        improvement_over_baseline: improvement,
+        survival: world.observe().is_viable() && !terminated_on_execution_failure,
+        min_actual_viability_margin: if min_actual_viability_margin.is_finite() {
+            min_actual_viability_margin
+        } else {
+            world.observe().energy.min(world.observe().integrity) - 0.08
+        },
+        oracle_horizon_regret: oracle_regret_sum / denom,
+        execution_failures,
+        terminated_on_execution_failure,
+        shift_error_ratio: shift_ratio,
+    }
+}
+
 fn encode_micro_world_state(state: MicroWorldObservation) -> Vec<f64> {
     let mut encoded = vec![0.0f64; 64];
     encoded[0] = state.energy;
@@ -596,6 +820,50 @@ fn evaluate_frozen_continuous_rollout<M: ActionConditionedTransitionModel + ?Siz
 
 /// Replay the already selected closed-loop actions through the deterministic oracle
 /// to measure recovery against the exact pre-perturbation viability margin.
+fn qualification_oracle_horizon_regret(
+    state: MicroWorldObservation,
+    chosen_action: MicroAction,
+    horizon: usize,
+    discount: f64,
+) -> f64 {
+    let horizon = horizon.max(1).min(5);
+
+    fn action_utility(
+        state: MicroWorldObservation,
+        action: MicroAction,
+    ) -> (f64, MicroWorldObservation) {
+        let next = transition(state, action);
+        let margin = next.energy.min(next.integrity) - 0.08;
+        let immediate = super::viability_micro_world::HomeostaticPolicy::score(next, state, action)
+            - (0.12 - margin).max(0.0) * 4.0;
+        (immediate, next)
+    }
+
+    fn best(
+        state: MicroWorldObservation,
+        depth: usize,
+        discount: f64,
+    ) -> f64 {
+        if depth == 0 {
+            return 0.0;
+        }
+
+        MicroAction::ALL
+            .into_iter()
+            .map(|action| {
+                let (immediate, next) = action_utility(state, action);
+                immediate + discount * best(next, depth - 1, discount)
+            })
+            .fold(f64::NEG_INFINITY, f64::max)
+    }
+
+    let best_value = best(state, horizon, discount);
+    let (chosen_immediate, chosen_next) = action_utility(state, chosen_action);
+    let chosen_value =
+        chosen_immediate + discount * best(chosen_next, horizon - 1, discount);
+    (best_value - chosen_value).max(0.0)
+}
+
 fn measure_recovery(
     scenario: &MicroWorldScenario,
     actions: &[MicroAction],
@@ -752,6 +1020,18 @@ impl FepModule {
                 200,
             );
 
+        let held_out_multi_horizon =
+            evaluate_multi_horizon(predictor.bridge, held_out, held_out_cycles);
+
+        let policy_induced_shift = evaluate_policy_induced_shift(
+            &predictor,
+            held_out,
+            held_out_cycles,
+            policy_horizon,
+            policy_discount,
+            held_out_predictor_mae,
+        );
+
         let closed_loop = run_homeostatic_agent_horizon_scenario(
             &mut predictor,
             held_out,
@@ -775,7 +1055,9 @@ impl FepModule {
             held_out_confidence_calibration: held_out_calibration,
             held_out_continuous_rollout_steps,
             held_out_continuous_rollout_mae,
+            held_out_multi_horizon,
             held_out_survived_fixed_schedule: held_out_survived,
+            policy_induced_shift,
             persistence_closed_loop_survived: persistence_closed_loop.survived,
             persistence_closed_loop_mean_oracle_horizon_regret:
                 persistence_closed_loop.mean_oracle_horizon_regret,
