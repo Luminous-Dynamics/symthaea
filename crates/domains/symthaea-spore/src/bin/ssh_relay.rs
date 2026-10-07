@@ -9444,12 +9444,27 @@ echo '}'
                     continue;
                 }
 
+                let target_machine_digest = match machine_binding_digest_hex() {
+                    Ok(digest) => digest,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to establish target machine identity: {error}"
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
                 let Some(transaction) = admit_mutation_transaction(
                     &mut ws_tx,
                     &transaction_ledger,
                     MutationKind::RestoreImage,
                     &client_msg.request_id,
-                    None,
+                    Some(&target_machine_digest),
                     image_path.as_bytes(),
                 ).await else {
                     continue;
