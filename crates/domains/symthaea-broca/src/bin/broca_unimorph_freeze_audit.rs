@@ -181,6 +181,19 @@ fn main() -> Result<()> {
         if record.source_line == 0 {
             bail!("frozen slice {} has invalid source line 0", record.record_id);
         }
+        let actual_source_line = artifact[..record.byte_offset]
+            .iter()
+            .filter(|byte| **byte == b'\n')
+            .count()
+            + 1;
+        if actual_source_line != record.source_line {
+            bail!(
+                "frozen slice {} declares source line {}, but its byte offset is on line {}",
+                record.record_id,
+                record.source_line,
+                actual_source_line
+            );
+        }
         selected_bytes.extend_from_slice(slice);
     }
 
