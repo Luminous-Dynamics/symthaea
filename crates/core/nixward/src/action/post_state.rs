@@ -1690,11 +1690,12 @@ fn validate_live_execution_witness(
     action_intent_digest: &str,
     authorization: &NixExecutionAuthorizationRecordV1,
 ) -> Result<(), NixPostStateErrorV1> {
+    let authorization_record_digest = authorization
+        .digest()
+        .map_err(|_| NixPostStateErrorV1::LiveExecutionWitnessMismatch)?;
     if witness.action_intent_digest() != action_intent_digest
         || authorization.action_intent_digest != action_intent_digest
-        || witness.authorization_record_digest() != &authorization.digest().map_err(
-            |_| NixPostStateErrorV1::LiveExecutionWitnessMismatch
-        )?
+        || witness.authorization_record_digest() != authorization_record_digest
         || witness.pre_state_identity() != intent.pre_state_identity.as_deref()
     {
         return Err(NixPostStateErrorV1::LiveExecutionWitnessMismatch);
@@ -2209,6 +2210,7 @@ mod tests {
         let authorization = contextual_authorization(&intent);
         let witness = NixLiveExecutionWitnessV1::for_test(
             "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            authorization.digest().unwrap(),
             "approval:test",
             "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
             intent.pre_state_identity.clone(),
