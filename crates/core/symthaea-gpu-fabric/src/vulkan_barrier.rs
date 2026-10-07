@@ -98,6 +98,8 @@ pub enum VulkanBarrierReceiptError {
     ResourceCount,
     #[error("resource digest mismatch for {0}")]
     ResourceDigest(ResourceId),
+    #[error("resource storage size mismatch for {0}")]
+    ResourceStorageSize(ResourceId),
     #[error("missing concrete storage size for barrier resource {0}")]
     MissingResourceStorageSize(ResourceId),
 }
@@ -145,14 +147,17 @@ impl VulkanBarrierExecutionReceipt {
             })
             .collect::<BTreeMap<_, _>>();
         if self.resource_storage_sizes != expected_storage_sizes {
-            return Err(VulkanBarrierReceiptError::ResourceDigest(
-                self.resource_storage_sizes
-                    .keys()
-                    .next()
-                    .cloned()
-                    .or_else(|| expected_storage_sizes.keys().next().cloned())
-                    .unwrap_or_else(|| ResourceId::new("<missing>").expect("static resource id")),
-            ));
+            let resource = self
+                .resource_storage_sizes
+                .keys()
+                .chain(expected_storage_sizes.keys())
+                .find(|resource| {
+                    self.resource_storage_sizes.get(*resource)
+                        != expected_storage_sizes.get(*resource)
+                })
+                .cloned()
+                .expect("storage-size mismatch must identify a resource");
+            return Err(VulkanBarrierReceiptError::ResourceStorageSize(resource));
         }
         if self.barrier_lowering_digest
             != barrier_lowering_digest(plan, &expected_storage_sizes)
@@ -932,8 +937,20 @@ mod tests {
 
     #[test]
     fn barrier_lowering_digest_is_distinct_from_semantic_barrier_digest() {
-        let (_, _, plan, _) = fixture();
-        assert_ne!(barrier_digest(&plan), barrier_lowering_digest(&plan));
+        let (_, _, plan, final_state) = fixture();
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| {
+                (
+                    resource.clone(),
+                    rounded_storage_bytes(value.as_bytes().len() as u64),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        assert_ne!(
+            barrier_digest(&plan),
+            barrier_lowering_digest(&plan, &storage_sizes).unwrap()
+        );
         assert!(!barrier_lowering_digest(&plan, &storage_sizes).unwrap().is_empty());
     }
 
@@ -986,7 +1003,6 @@ mod tests {
             ],
         ).unwrap();
 
-        let mut checked = false;
         let error = validate_initial_resources(&graph, &initial).unwrap_err();
         assert!(matches!(error, VulkanBarrierError::UnexpectedResource(ref resource) if resource.as_str() == "unused"));
         assert_eq!(plan.queue_count, 1);
@@ -1066,7 +1082,8 @@ mod tests {
 
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
-            Err(VulkanBarrierReceiptError::ResourceDigest(_))
+            Err(VulkanBarrierReceiptError::ResourceStorageSize(resource))
+                if resource.as_str() == "mid"
         ));
     }
 
