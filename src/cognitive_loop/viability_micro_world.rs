@@ -451,7 +451,7 @@ pub fn benchmark_scenarios() -> Vec<MicroWorldScenario> {
 /// model, or a specialist decision/world model. The environment never trusts the
 /// predictor; it only scores it.
 pub trait MicroWorldPredictor {
-    fn predict(&mut self, state: MicroWorldObservation, action: MicroAction)
+    fn predict(&self, state: MicroWorldObservation, action: MicroAction)
         -> MicroWorldObservation;
 
     /// Confidence in the forecast. Zero means the forecast should not materially
@@ -491,7 +491,7 @@ impl WorldModelBridgePredictor {
 
 impl MicroWorldPredictor for WorldModelBridgePredictor {
     fn predict(
-        &mut self,
+        &self,
         state: MicroWorldObservation,
         action: MicroAction,
     ) -> MicroWorldObservation {
@@ -551,7 +551,7 @@ pub struct PersistencePredictor;
 
 impl MicroWorldPredictor for PersistencePredictor {
     fn predict(
-        &mut self,
+        &self,
         state: MicroWorldObservation,
         _action: MicroAction,
     ) -> MicroWorldObservation {
@@ -610,7 +610,7 @@ impl HomeostaticPolicy {
 
     pub fn choose<P: MicroWorldPredictor>(
         &self,
-        predictor: &mut P,
+        predictor: &P,
         current: MicroWorldObservation,
     ) -> (MicroAction, MicroWorldObservation) {
         let mut best_action = MicroAction::Observe;
@@ -978,6 +978,25 @@ mod tests {
     }
 
     #[test]
+    fn prediction_is_side_effect_free() {
+        let mut predictor = WorldModelBridgePredictor::default();
+        let before = MicroWorld::default().observe();
+        let samples_before = predictor.model().action_samples(MicroAction::Explore.index());
+        let error_before = predictor.model().action_error(MicroAction::Explore.index());
+
+        let _ = predictor.predict(before, MicroAction::Explore);
+
+        assert_eq!(
+            predictor.model().action_samples(MicroAction::Explore.index()),
+            samples_before
+        );
+        assert_eq!(
+            predictor.model().action_error(MicroAction::Explore.index()),
+            error_before
+        );
+    }
+
+    #[test]
     fn bridge_predictor_learns_from_repeated_transitions() {
         let mut predictor = WorldModelBridgePredictor::default();
         let before = MicroWorld::default().observe();
@@ -1011,7 +1030,7 @@ mod tests {
         struct Oracle;
         impl MicroWorldPredictor for Oracle {
             fn predict(
-                &mut self,
+                &self,
                 state: MicroWorldObservation,
                 action: MicroAction,
             ) -> MicroWorldObservation {
@@ -1033,7 +1052,7 @@ mod tests {
     fn oracle_policy_survives_and_makes_progress() {
         struct Oracle;
         impl MicroWorldPredictor for Oracle {
-            fn predict(&mut self, state: MicroWorldObservation, action: MicroAction) -> MicroWorldObservation {
+            fn predict(&self, state: MicroWorldObservation, action: MicroAction) -> MicroWorldObservation {
                 transition(state, action)
             }
 
