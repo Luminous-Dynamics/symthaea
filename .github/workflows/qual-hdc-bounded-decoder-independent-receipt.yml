@@ -479,7 +479,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               path: expected.workflowPath,
-              ref: expected.subject,
+              ref: context.sha,
             });
             if (Array.isArray(workflowFile.data)) {
               throw new Error('qualification workflow path resolved to a directory');
