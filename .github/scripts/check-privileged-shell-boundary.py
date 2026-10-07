@@ -106,6 +106,40 @@ def main() -> None:
     if '&[&disk]' not in preflight_body:
         fail("pre_install_check no longer passes disk as a script argument")
 
+    # Typed execution is closed-world: bare program names must first pass
+    # through the trusted executable resolver, and the resolver must pin them
+    # to the current NixOS system closure instead of PATH search.
+    typed_start = text.find("async fn run_privileged_args(")
+    if typed_start < 0:
+        fail("run_privileged_args helper disappeared")
+    typed_end = text.find("\nfn privileged_script_command", typed_start)
+    if typed_end < 0:
+        fail("typed executor boundary could not be located")
+    typed_body = text[typed_start:typed_end]
+    if "trusted_typed_executable(program)?" not in typed_body:
+        fail("run_privileged_args lost trusted executable resolution")
+    stdin_start = text.find("async fn run_privileged_args_with_stdin(")
+    if stdin_start < 0:
+        fail("run_privileged_args_with_stdin helper disappeared")
+    stdin_end = text.find("\n/// nixos-anywhere orchestration stages.", stdin_start)
+    if stdin_end < 0:
+        fail("stdin typed executor boundary could not be located")
+    stdin_body = text[stdin_start:stdin_end]
+    if "trusted_typed_executable(program)?" not in stdin_body:
+        fail("run_privileged_args_with_stdin lost trusted executable resolution")
+
+    trusted_start = text.find("fn trusted_typed_executable(")
+    if trusted_start < 0:
+        fail("trusted_typed_executable helper disappeared")
+    trusted_end = text.find("\nasync fn run_privileged_args(", trusted_start)
+    if trusted_end < 0:
+        fail("trusted executable resolver boundary could not be located")
+    trusted_body = text[trusted_start:trusted_end]
+    if "/run/current-system/sw/bin/" not in trusted_body:
+        fail("typed executable resolver no longer pins to /run/current-system/sw/bin/")
+    if 'strip_prefix("/nix/var/nix/profiles/system/bin/")' not in trusted_body:
+        fail("typed executable resolver lost the validated system-profile exception")
+
     # Nested interpreters inside generated privileged scripts create a second
     # parsing authority underneath the already-controlled relay interpreter.
     # Keep this global because the relevant helpers live outside the mutation arms.
