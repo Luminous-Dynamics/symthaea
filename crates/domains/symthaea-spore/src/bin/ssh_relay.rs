@@ -14,6 +14,7 @@
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use std::io::{IsTerminal, Read, Seek, SeekFrom, Write};
+use std::os::unix::fs::PermissionsExt;
 use std::os::unix::fs::OpenOptionsExt;
 use std::sync::Arc;
 use std::time::Instant;
@@ -102,6 +103,116 @@ async fn run_privileged_args(program: &str, args: &[&str]) -> Result<CmdResult, 
         exit_status: output.status.code().unwrap_or(1) as u32,
     })
 }
+
+fn privileged_script_command(path: &str) -> tokio::process::Command {
+    let shell = if std::path::Path::new("/bin/bash").exists() {
+        "/bin/bash"
+    } else if std::path::Path::new("/run/current-system/sw/bin/bash").exists() {
+        "/run/current-system/sw/bin/bash"
+    } else {
+        "/bin/sh"
+    };
+    let mut command = privileged_process(shell);
+    if shell.ends_with("/bash") {
+        command.arg("-p");
+    }
+    command.arg(path);
+    command
+}
+
+fn create_private_runtime_file(path: &str, mode: u32) -> Result<std::fs::File, std::io::Error> {
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(mode)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+}
+
+fn write_private_file(path: &str, contents: &[u8], mode: u32) -> Result<(), std::io::Error> {
+    let mut file = create_private_runtime_file(path, mode)?;
+    file.write_all(contents)?;
+    file.sync_all()
+}
+
+fn prepare_transaction_runtime(
+    log_path: &str,
+    status_path: &str,
+    pid_path: &str,
+) -> Result<(), std::io::Error> {
+    create_private_runtime_file(log_path, 0o600)?;
+    create_private_runtime_file(status_path, 0o600)?;
+    create_private_runtime_file(pid_path, 0o600)?;
+    Ok(())
+}
+
+async fn spawn_privileged_background_script(
+    script_path: &str,
+    log_path: &str,
+    status_path: &str,
+    pid_path: &str,
+) -> Result<u32, std::io::Error> {
+    let log = std::fs::OpenOptions::new()
+        .write(true)
+        .append(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(log_path)?;
+    let log_stderr = log.try_clone()?;
+    let mut child = privileged_script_command(script_path)
+        .stdout(std::process::Stdio::from(log))
+        .stderr(std::process::Stdio::from(log_stderr))
+        .spawn()
+        .await?;
+    let pid = child.id().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::Other, "spawned child has no observable PID")
+    })?;
+
+    let mut pid_file = std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(pid_path)?;
+    pid_file.write_all(format!("{pid}\n").as_bytes())?;
+    pid_file.sync_all()?;
+    drop(pid_file);
+
+    let status_path = status_path.to_string();
+    tokio::spawn(async move {
+        if let Ok(status) = child.wait().await {
+            if let Some(code) = status.code() {
+                if let Ok(mut status_file) = tokio::fs::OpenOptions::new()
+                    .write(true)
+                    .truncate(true)
+                    .open(&status_path)
+                    .await
+                {
+                    use tokio::io::AsyncWriteExt;
+                    let _ = status_file.write_all(format!("{code}\n").as_bytes()).await;
+                    let _ = status_file.sync_all().await;
+                }
+            }
+        }
+    });
+
+    Ok(pid)
+}
+
+async fn read_transaction_status(path: &str) -> Result<Option<u32>, std::io::Error> {
+    match tokio::fs::read_to_string(path).await {
+        Ok(contents) => Ok(contents.trim().parse::<u32>().ok()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+fn process_id_is_alive(pid: u32) -> bool {
+    if pid == 0 || pid > libc::pid_t::MAX as u32 {
+        return false;
+    }
+    let result = unsafe { libc::kill(pid as libc::pid_t, 0) };
+    result == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
+}
+
 
 /// Execute a privileged shell command with an already-open artifact as stdin.
 ///
@@ -4722,10 +4833,8 @@ echo "  User password set."
 
                 // Write the install script directly to disk (no heredoc).
                 // SECURITY: Direct file write eliminates SCRIPTEOF heredoc injection.
-                match tokio::fs::write(&script_path, &script).await {
+                match write_private_file(&script_path, script.as_bytes(), 0o700) {
                     Ok(()) => {
-                        let _ = run_cmd(&format!("chmod +x {}", script_path)).await;
-                    }
                     Err(e) => {
                         for secret_path in &staged_secret_paths {
                             let _ = tokio::fs::remove_file(secret_path).await;
@@ -4742,8 +4851,9 @@ echo "  User password set."
                 }
 
                 // Upload verification
-                match run_cmd(&format!("test -x {}", script_path)).await {
-                    Ok(r) if r.exit_status == 0 => {
+                match std::fs::metadata(&script_path) {
+                    Ok(metadata) if metadata.is_file() && (metadata.permissions().mode() & 0o111) != 0 => {
+                        let _ = ws_tx
                         let _ = ws_tx
                             .send(Message::Text(
                                 RelayMessage::output("Install script uploaded.", "stdout")
@@ -4783,25 +4893,18 @@ echo "  User password set."
 
                 // Execute the install script in the background with transaction-specific
                 // PID and exit-status records. A log marker alone is never success evidence.
-                let setup = run_cmd(&format!(
-                    "rm -f -- {} {} && touch {} {} && chmod 600 {} {}",
-                    status_path,
-                    pid_path,
-                    status_path,
-                    pid_path,
-                    status_path,
-                    pid_path
-                ))
-                .await;
-                if let Err(error) = setup {
+                if let Err(error) = prepare_transaction_runtime(
+                    &log_path,
+                    &status_path,
+                    &pid_path,
+                ) {
                     for secret_path in &staged_secret_paths {
                         let _ = tokio::fs::remove_file(secret_path).await;
                     }
-                    let _ = run_cmd(&format!(
-                        "rm -f -- {} {} {} {}",
-                        script_path, log_path, status_path, pid_path
-                    ))
-                    .await;
+                    let _ = tokio::fs::remove_file(&script_path).await;
+                    let _ = tokio::fs::remove_file(&log_path).await;
+                    let _ = tokio::fs::remove_file(&status_path).await;
+                    let _ = tokio::fs::remove_file(&pid_path).await;
                     let _ = ws_tx
                         .send(Message::Text(
                             RelayMessage::error(&format!(
@@ -4813,23 +4916,22 @@ echo "  User password set."
                         .await;
                     continue;
                 }
-                if let Err(error) = run_cmd(&format!(
-                    "(bash {} > {} 2>&1; rc=$?; printf '%s\\n' \"$rc\" > {}) & printf '%s\\n' \"$!\" > {}",
-                    script_path,
-                    log_path,
-                    status_path,
-                    pid_path
-                ))
+
+                if let Err(error) = spawn_privileged_background_script(
+                    &script_path,
+                    &log_path,
+                    &status_path,
+                    &pid_path,
+                )
                 .await
                 {
                     for secret_path in &staged_secret_paths {
                         let _ = tokio::fs::remove_file(secret_path).await;
                     }
-                    let _ = run_cmd(&format!(
-                        "rm -f -- {} {} {} {}",
-                        script_path, log_path, status_path, pid_path
-                    ))
-                    .await;
+                    let _ = tokio::fs::remove_file(&script_path).await;
+                    let _ = tokio::fs::remove_file(&log_path).await;
+                    let _ = tokio::fs::remove_file(&status_path).await;
+                    let _ = tokio::fs::remove_file(&pid_path).await;
                     let _ = ws_tx
                         .send(Message::Text(
                             RelayMessage::error(&format!(
@@ -6893,11 +6995,10 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                         }).to_string(),
                     ))
                     .await;
-                let _ = run_cmd(&format!(
-                    "rm -f -- {} {} {}",
-                    gc_log, gc_status, gc_pid
-                ))
-                .await;
+                let _ = tokio::fs::remove_file(&script_path).await;
+                let _ = tokio::fs::remove_file(&log_path).await;
+                let _ = tokio::fs::remove_file(&status_path).await;
+                let _ = tokio::fs::remove_file(&pid_path).await;
                 remove_transaction_artifact_dir(&transaction_dir);
             }
 
