@@ -625,12 +625,12 @@ fn process_id_is_alive(pid: u32, expected_start_time: u64) -> bool {
 async fn run_privileged_args_with_stdin(
     program: &str,
     args: &[&str],
-    input: std::fs::File,
+    input: &std::fs::File,
 ) -> Result<CmdResult, std::io::Error> {
     let mut command = trusted_typed_process(program)
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::PermissionDenied, error))?;
     command.args(args);
-    command.stdin(std::process::Stdio::from(input));
+    command.stdin(std::process::Stdio::from(input.try_clone()?));
     let output = command.output().await?;
     Ok(CmdResult {
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
@@ -638,6 +638,7 @@ async fn run_privileged_args_with_stdin(
         exit_status: output.status.code().unwrap_or(1) as u32,
     })
 }
+
 
 /// nixos-anywhere orchestration stages.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -5475,10 +5476,17 @@ async fn run_privileged_pipeline_to_gzip(
 }
 
 async fn validate_preservation_archive(path: &str) -> Result<u64, String> {
-    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    use std::io::{Seek, SeekFrom};
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 
-    let metadata = tokio::fs::symlink_metadata(path)
-        .await
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+        .map_err(|error| format!("preservation archive open failed: {error}"))?;
+
+    let metadata = file
+        .metadata()
         .map_err(|error| format!("preservation archive metadata failed: {error}"))?;
     if !metadata.file_type().is_file()
         || metadata.uid() != unsafe { libc::geteuid() }
@@ -5489,20 +5497,25 @@ async fn validate_preservation_archive(path: &str) -> Result<u64, String> {
             "preservation archive {path} failed ownership, permission, or size checks"
         ));
     }
+    let expected_size = metadata.len();
 
-    let gzip = run_privileged_args("gzip", &["-t", "--", path])
+    let gzip = run_privileged_args_with_stdin("gzip", &["-t", "--"], &file)
         .await
         .map_err(|error| format!("preservation gzip integrity check failed: {error}"))?;
     if gzip.exit_status != 0 {
         return Err(format!("preservation archive {path} is not valid gzip"));
     }
-    let tar = run_privileged_args("tar", &["-tzf", path])
+
+    file.seek(SeekFrom::Start(0))
+        .map_err(|error| format!("unable to rewind preservation archive {path}: {error}"))?;
+    let tar = run_privileged_args_with_stdin("tar", &["-tzf", "-"], &file)
         .await
         .map_err(|error| format!("preservation tar integrity check failed: {error}"))?;
     if tar.exit_status != 0 {
         return Err(format!("preservation archive {path} is not a valid tar archive"));
     }
-    Ok(metadata.len())
+
+    Ok(expected_size)
 }
 
 async fn preservation_tar_archive(
