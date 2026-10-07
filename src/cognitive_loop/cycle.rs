@@ -43,13 +43,13 @@ impl CognitiveLoopService {
         // signals without changing the cognitive policy. This establishes a clean causal
         // telemetry boundary before any homeostatic control influence is enabled.
         let viability_cycle = self.stats.total_cycles as u64;
-        self.viability.begin_cycle(viability_cycle);
+        self.fep.viability_fabric.begin_cycle(viability_cycle);
         let resource_band = super::viability_fabric::ViabilityBand {
             preferred: (0.0, 0.70),
             tolerated: (0.0, 0.90),
             critical: (0.0, 1.0),
         };
-        self.viability.observe_variable(
+        self.fep.viability_fabric.observe_variable(
             "thermodynamic_load",
             super::viability_fabric::ViabilitySignal::new(
                 self.thermodynamic_load as f64,
@@ -60,12 +60,12 @@ impl CognitiveLoopService {
             resource_band,
             None,
         );
-        self.viability.state_mut().prediction_errors.world =
+        self.fep.viability_fabric.state_mut().prediction_errors.world =
             (self.stats.avg_prediction_error as f64).clamp(0.0, 1.0);
         // Treat confidence below the established trust floor as regulation pressure;
         // a neutral prior (0.5) is not itself a recovery condition.
         let trust_floor = 0.4_f64;
-        self.viability.state_mut().prediction_errors.model_confidence = if self.prediction_confidence < trust_floor {
+        self.fep.viability_fabric.state_mut().prediction_errors.model_confidence = if self.prediction_confidence < trust_floor {
             ((trust_floor - self.prediction_confidence) / trust_floor).clamp(0.0, 1.0)
         } else {
             0.0
