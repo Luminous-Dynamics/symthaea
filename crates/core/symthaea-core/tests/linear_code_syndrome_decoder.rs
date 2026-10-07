@@ -274,7 +274,11 @@ fn small_fixture_coset_leader_profile_matches_decoder_without_codeword_oracle() 
     let profile = independent_coset_leader_profile(&checks, code.dimension());
 
     assert_eq!(profile.len(), 64);
-    assert!(profile.iter().all(|(distance, matches)| *distance <= 4 && *matches > 0));
+    assert!(
+        profile
+            .iter()
+            .all(|(distance, matches)| *distance <= 4 && *matches > 0)
+    );
 
     let mut minimum_distance_histogram = [0usize; 5];
     let mut total_minimum_matches = 0usize;
@@ -310,8 +314,7 @@ fn small_fixture_coset_leader_profile_matches_decoder_without_codeword_oracle() 
 
         minimum_distance_histogram[expected_distance] += 1;
         total_minimum_matches += expected_matches;
-        maximum_minimum_multiplicity =
-            maximum_minimum_multiplicity.max(expected_matches);
+        maximum_minimum_multiplicity = maximum_minimum_multiplicity.max(expected_matches);
     }
 
     assert_eq!(minimum_distance_histogram[0], 4);
@@ -344,7 +347,10 @@ fn small_fixture_fixed_parity_check_spec_agrees_with_all_syndrome_oracles() {
     let independent_checks = independent_parity_check_rows(&code);
 
     assert_eq!(CANONICAL_BOUNDARY_CHECKS.len(), 6);
-    assert_eq!(parity_check.syndrome_dimension(), CANONICAL_BOUNDARY_CHECKS.len());
+    assert_eq!(
+        parity_check.syndrome_dimension(),
+        CANONICAL_BOUNDARY_CHECKS.len()
+    );
     assert_eq!(independent_checks.len(), CANONICAL_BOUNDARY_CHECKS.len());
 
     let mut buckets = [0usize; 64];
@@ -424,8 +430,8 @@ fn small_fixture_quotient_metric_matches_ambient_coset_geometry() {
             let mut ambient_distance = usize::MAX;
             for &left_word in &buckets[left] {
                 for &right_word in &buckets[right] {
-                    ambient_distance = ambient_distance
-                        .min((left_word ^ right_word).count_ones() as usize);
+                    ambient_distance =
+                        ambient_distance.min((left_word ^ right_word).count_ones() as usize);
                     pair_checks += 1;
                 }
             }
