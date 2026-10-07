@@ -7630,13 +7630,35 @@ mod tests {
             EvidenceStance::Supports,
             0.95,
         );
-        let reported_b = evidence(
+        let mut reported_b = evidence(
             "reported-b",
             "reported-authority-b",
             EvidenceKind::Reported,
             EvidenceStance::Supports,
             0.95,
         );
+        lifecycle_a.source.admission = Some(SourceAdmissionRef {
+            authority_id: "lca-authority-a".into(),
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission-lca".into(),
+            authority_epoch: "epoch-1".into(),
+            fault_domain_id: Some("domain-lca".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+        reported_b.source.admission = Some(SourceAdmissionRef {
+            authority_id: "reported-authority-b".into(),
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission-reported".into(),
+            authority_epoch: "epoch-1".into(),
+            fault_domain_id: Some("domain-reported".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
         let mut c = candidate(
             "single-lifecycle-authority",
             PathwayKind::ProcessSubstitution,
@@ -7721,13 +7743,35 @@ mod tests {
             EvidenceStance::Supports,
             0.95,
         );
-        let reported_b = evidence(
+        let mut reported_b = evidence(
             "reported-b",
             "reported-authority-b",
             EvidenceKind::Reported,
             EvidenceStance::Supports,
             0.95,
         );
+        manufacturing_a.source.admission = Some(SourceAdmissionRef {
+            authority_id: "manufacturing-authority-a".into(),
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission-manufacturing".into(),
+            authority_epoch: "epoch-1".into(),
+            fault_domain_id: Some("domain-manufacturing".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+        reported_b.source.admission = Some(SourceAdmissionRef {
+            authority_id: "reported-authority-b".into(),
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission-reported".into(),
+            authority_epoch: "epoch-1".into(),
+            fault_domain_id: Some("domain-reported".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
         let mut c = candidate(
             "single-manufacturing-authority",
             PathwayKind::ProcessSubstitution,
