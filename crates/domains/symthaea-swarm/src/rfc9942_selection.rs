@@ -20,8 +20,10 @@ use sha2::{Digest, Sha256};
 use crate::semantic_evidence_vds::{
     Rfc9942ReceiptCollection, Rfc9942ReceiptEnvelope, Rfc9942SignaturePayload,
     Rfc9942SignatureWithReceipts, Rfc9942VerifiedSignatureWithReceipt, Rfc9942VdpError,
+    MAX_RFC9942_RECEIPTS,
 };
 
+pub const MAX_SELECTION_CANDIDATES: usize = MAX_RFC9942_RECEIPTS;
 pub const POLICY_ID: &str = "rfc9942/priority-first-valid-v1";
 pub const POLICY_VERSION: u16 = 1;
 pub const DOMAIN: &[u8] = b"symthaea-swarm/rfc9942-receipt-selection-decision-v1";
@@ -127,6 +129,7 @@ pub struct ReceiptSelectionDecision {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReceiptSelectionDecisionError {
     EmptyCollection,
+    CollectionTooLarge,
     CandidateCountMismatch,
     CandidateIndexMismatch,
     PolicyMismatch,
@@ -144,6 +147,9 @@ impl ReceiptSelectionDecision {
     pub fn validate(&self) -> Result<(), ReceiptSelectionDecisionError> {
         if self.collection_len == 0 {
             return Err(ReceiptSelectionDecisionError::EmptyCollection);
+        }
+        if self.collection_len as usize > MAX_SELECTION_CANDIDATES {
+            return Err(ReceiptSelectionDecisionError::CollectionTooLarge);
         }
         if self.candidates.len() != self.collection_len as usize {
             return Err(ReceiptSelectionDecisionError::CandidateCountMismatch);
@@ -503,6 +509,32 @@ mod tests {
 
     #[test]
     #[test]
+    #[test]
+    fn decision_validation_rejects_oversized_collection() {
+        let mut decision = ReceiptSelectionDecision {
+            collection_sha256: [1; 32],
+            collection_len: (MAX_SELECTION_CANDIDATES as u32) + 1,
+            policy_id: POLICY_ID,
+            policy_version: POLICY_VERSION,
+            selected_index: None,
+            selected_receipt_sha256: None,
+            candidates: Vec::new(),
+        };
+        decision.candidates = (0..decision.collection_len)
+            .map(|index| ReceiptSelectionCandidate {
+                index,
+                receipt_sha256: [1; 32],
+                status: ReceiptSelectionCandidateStatus::Rejected(
+                    ReceiptSelectionRejection::NoMatchingProof,
+                ),
+            })
+            .collect();
+        assert_eq!(
+            decision.validate(),
+            Err(ReceiptSelectionDecisionError::CollectionTooLarge)
+        );
+    }
+
     fn decision_validation_rejects_zero_candidate_digest() {
         let collection = collection();
         let mut decision = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
