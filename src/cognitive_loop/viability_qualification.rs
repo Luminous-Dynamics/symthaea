@@ -582,6 +582,103 @@ pub struct ChangeDetectionEvent {
 /// updates the world model. A nominal control stream measures false alarms before the shifted
 /// regime is evaluated.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// Episode-level receipt used to characterize detector operating behavior across
+/// independent held-out control and shift conditions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChangeDetectionEpisode {
+    pub harvest_yield_scale: f64,
+    pub state_digest: u64,
+    pub detected: bool,
+    pub detection_observation: Option<u64>,
+    pub detection_direction: &'static str,
+}
+
+/// Operating characteristics for the changepoint detector.
+///
+/// These measurements keep a single successful shift/control pair from being mistaken for
+/// detector qualification. They report episode-level false-alarm and detection behavior
+/// across multiple held-out states and both shift polarities. A gradual-drift episode is
+/// recorded as a specificity diagnostic because this CUSUM configuration targets abrupt
+/// shifts rather than gradual nonstationarity.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChangeDetectionOperatingCharacteristics {
+    pub nominal_episode_count: u64,
+    pub nominal_false_alarm_episode_rate: f64,
+    pub shift_episode_count: u64,
+    pub shift_detection_rate: f64,
+    pub decrease_shift_count: u64,
+    pub decrease_correct_direction_rate: f64,
+    pub increase_shift_count: u64,
+    pub increase_correct_direction_rate: f64,
+    pub mean_detection_delay_observations: Option<f64>,
+    pub worst_detection_delay_observations: Option<u64>,
+    pub nominal_episodes: Vec<ChangeDetectionEpisode>,
+    pub shift_episodes: Vec<ChangeDetectionEpisode>,
+    pub gradual_drift_detected: bool,
+    pub gradual_drift_events: Vec<ChangeDetectionEvent>,
+}
+
+impl ChangeDetectionOperatingCharacteristics {
+    pub fn is_populated(&self) -> bool {
+        self.nominal_episode_count > 0
+            && self.shift_episode_count > 0
+            && !self.nominal_episodes.is_empty()
+            && !self.shift_episodes.is_empty()
+    }
+
+    pub fn is_scoreable(&self) -> bool {
+        self.is_populated()
+            && self.nominal_episodes.len() as u64 == self.nominal_episode_count
+            && self.shift_episodes.len() as u64 == self.shift_episode_count
+            && self.nominal_false_alarm_episode_rate.is_finite()
+            && (0.0..=1.0).contains(&self.nominal_false_alarm_episode_rate)
+            && self.shift_detection_rate.is_finite()
+            && (0.0..=1.0).contains(&self.shift_detection_rate)
+            && self.decrease_shift_count > 0
+            && self.decrease_correct_direction_rate.is_finite()
+            && (0.0..=1.0).contains(&self.decrease_correct_direction_rate)
+            && self.increase_shift_count > 0
+            && self.increase_correct_direction_rate.is_finite()
+            && (0.0..=1.0).contains(&self.increase_correct_direction_rate)
+            && self
+                .mean_detection_delay_observations
+                .map(|value| value.is_finite() && value > 0.0)
+                .unwrap_or(true)
+            && self
+                .worst_detection_delay_observations
+                .map(|value| value > 0)
+                .unwrap_or(true)
+            && self.nominal_episodes.iter().all(|episode| {
+                episode.harvest_yield_scale.is_finite()
+                    && episode.state_digest != 0
+                    && matches!(episode.detection_direction, "increase" | "decrease" | "none")
+                    && episode.detection_observation.map_or(
+                        true,
+                        |observation| observation > 0 && observation <= CHANGE_DETECTION_CONTROL_STEPS,
+                    )
+            })
+            && self.shift_episodes.iter().all(|episode| {
+                episode.harvest_yield_scale.is_finite()
+                    && episode.harvest_yield_scale > 0.0
+                    && episode.state_digest != 0
+                    && matches!(episode.detection_direction, "increase" | "decrease" | "none")
+                    && episode.detection_observation.map_or(
+                        true,
+                        |observation| observation > 0 && observation <= CHANGE_DETECTION_SHIFT_STEPS,
+                    )
+            })
+            && !self.gradual_drift_events.is_empty()
+            && self.gradual_drift_events.iter().all(|event| {
+                event.state_digest != 0
+                    && event.residual_mae.is_finite()
+                    && event.upper_cusum.is_finite()
+                    && event.lower_cusum.is_finite()
+                    && event.cusum_score.is_finite()
+                    && matches!(event.detection_direction, "increase" | "decrease" | "none")
+            })
+    }
+}
+
 pub struct ChangeDetectionReport {
     pub baseline_sample_count: u64,
     pub baseline_residual_mean: f64,
@@ -593,6 +690,7 @@ pub struct ChangeDetectionReport {
     pub shifted_regime_detected: bool,
     pub detection_observation: Option<u64>,
     pub detection_delay_observations: Option<u64>,
+    pub operating_characteristics: ChangeDetectionOperatingCharacteristics,
 }
 
 impl ChangeDetectionReport {
@@ -642,6 +740,7 @@ impl ChangeDetectionReport {
                 |observation| observation > 0 && observation <= self.shifted_regime_events.len() as u64,
             )
             && self.detection_delay_observations == self.detection_observation
+            && self.operating_characteristics.is_scoreable()
     }
 }
 
@@ -700,7 +799,8 @@ impl RegimeShiftAdaptationReport {
                     && event.invariant_anchor_mean_mae.is_finite()
                     && event.invariant_anchor_regression.is_finite()
                     && event.invariant_anchor_max_regression.is_finite()
-                    && (0.0..=1.0).contains(&event.shifted_validation_error_ratio)
+                    // This is an error ratio, not a bounded probability/fraction.
+                    && event.shifted_validation_error_ratio >= 0.0
             })
             && self.pre_revision_shifted_validation_mae.is_finite()
             && self.final_shifted_validation_mae.is_finite()
@@ -1591,6 +1691,7 @@ const CHANGE_DETECTION_CONTROL_STEPS: u64 = 8;
 const CHANGE_DETECTION_SHIFT_STEPS: u64 = 8;
 const CHANGE_DETECTION_MIN_ALLOWANCE: f64 = 0.001;
 const CHANGE_DETECTION_MIN_THRESHOLD: f64 = 0.01;
+const CHANGE_DETECTION_SHIFT_SCALES: [f64; 4] = [0.60, 0.80, 1.20, 1.40];
 
 fn change_detection_control_states() -> Vec<MicroWorldObservation> {
     procedural_held_out_scenarios()
@@ -1620,25 +1721,29 @@ fn change_detector_parameters(
     (baseline_mean, allowance, threshold, states)
 }
 
-fn run_change_detector(
+fn run_change_detector_schedule(
     predictor: &FepWorldModelPredictor<'_>,
     states: &[MicroWorldObservation],
-    steps: u64,
-    harvest_yield_scale: f64,
+    harvest_yield_scales: &[f64],
     baseline_mean: f64,
     allowance: f64,
     threshold: f64,
 ) -> Vec<ChangeDetectionEvent> {
-    if states.is_empty() || steps == 0 {
+    if states.is_empty() || harvest_yield_scales.is_empty() {
         return Vec::new();
     }
 
-    let mut events = Vec::with_capacity(steps as usize);
+    let mut events = Vec::with_capacity(harvest_yield_scales.len());
     let mut upper_cusum = 0.0;
     let mut lower_cusum = 0.0;
 
-    for ordinal in 1..=steps {
-        let state = states[((ordinal - 1) as usize) % states.len()];
+    for (index, harvest_yield_scale) in harvest_yield_scales.iter().copied().enumerate() {
+        if !harvest_yield_scale.is_finite() || harvest_yield_scale <= 0.0 {
+            return Vec::new();
+        }
+
+        let ordinal = index as u64 + 1;
+        let state = states[index % states.len()];
         let actual =
             transition_with_harvest_yield_scale(state, MicroAction::Harvest, harvest_yield_scale);
         let residual_mae = predictor
@@ -1677,12 +1782,31 @@ fn run_change_detector(
     events
 }
 
+fn run_change_detector(
+    predictor: &FepWorldModelPredictor<'_>,
+    states: &[MicroWorldObservation],
+    steps: u64,
+    harvest_yield_scale: f64,
+    baseline_mean: f64,
+    allowance: f64,
+    threshold: f64,
+) -> Vec<ChangeDetectionEvent> {
+    let scales = vec![harvest_yield_scale; steps as usize];
+    run_change_detector_schedule(
+        predictor,
+        states,
+        &scales,
+        baseline_mean,
+        allowance,
+        threshold,
+    )
+}
+
 /// Detect a prediction-error changepoint before adaptation.
 ///
-/// The detector uses nominal residuals as a fixed reference and a one-sided CUSUM against
+/// The detector uses nominal residuals as a fixed reference and a two-sided CUSUM against
 /// sustained increases or decreases in prediction error. A no-shift nominal control is
-/// evaluated for false alarms;
-/// only after that control is recorded is the shifted regime evaluated. No model update occurs
+/// evaluated for false alarms before the shifted regime is evaluated. No model update occurs
 /// during detection, so the detector cannot manufacture the evidence it is supposed to observe.
 fn evaluate_change_detection(
     base_model: &super::goal_world::WorldModelBridge,
@@ -1695,33 +1819,188 @@ fn evaluate_change_detection(
     let (baseline_mean, allowance, threshold, control_states) =
         change_detector_parameters(&predictor);
 
-    let nominal_control_events =
-        run_change_detector(
+    let nominal_control_events = run_change_detector(
+        &predictor,
+        &control_states,
+        CHANGE_DETECTION_CONTROL_STEPS,
+        1.0,
+        baseline_mean,
+        allowance,
+        threshold,
+    );
+    let nominal_false_alarm = nominal_control_events.iter().any(|event| event.detected);
+
+    let shifted_regime_events = run_change_detector(
+        &predictor,
+        &control_states,
+        CHANGE_DETECTION_SHIFT_STEPS,
+        REGIME_SHIFT_HARVEST_YIELD_SCALE,
+        baseline_mean,
+        allowance,
+        threshold,
+    );
+    let detection_observation = shifted_regime_events
+        .iter()
+        .find(|event| event.detected)
+        .map(|event| event.observation_ordinal);
+    let shifted_regime_detected = detection_observation.is_some();
+
+    // The first four procedural scenarios calibrate the nominal residual baseline.
+    // The remaining four are held out for operating-characteristic evaluation, so the
+    // detector is not judged only on the same states that determined its threshold.
+    let operating_states = procedural_held_out_scenarios()
+        .into_iter()
+        .skip(4)
+        .take(4)
+        .map(|scenario| scenario.initial)
+        .collect::<Vec<_>>();
+
+    let mut nominal_episodes = Vec::with_capacity(operating_states.len());
+    for state in &operating_states {
+        let events = run_change_detector(
             &predictor,
-            &control_states,
+            &[*state],
             CHANGE_DETECTION_CONTROL_STEPS,
             1.0,
             baseline_mean,
             allowance,
             threshold,
         );
-    let nominal_false_alarm = nominal_control_events.iter().any(|event| event.detected);
+        let detection = events.iter().find(|event| event.detected);
+        nominal_episodes.push(ChangeDetectionEpisode {
+            harvest_yield_scale: 1.0,
+            state_digest: state.digest(),
+            detected: detection.is_some(),
+            detection_observation: detection.map(|event| event.observation_ordinal),
+            detection_direction: detection
+                .map(|event| event.detection_direction)
+                .unwrap_or("none"),
+        });
+    }
 
-    let shifted_regime_events =
-        run_change_detector(
-            &predictor,
-            &control_states,
-            CHANGE_DETECTION_SHIFT_STEPS,
-            REGIME_SHIFT_HARVEST_YIELD_SCALE,
-            baseline_mean,
-            allowance,
-            threshold,
-        );
-    let detection_observation = shifted_regime_events
-        .iter()
-        .find(|event| event.detected)
-        .map(|event| event.observation_ordinal);
-    let shifted_regime_detected = detection_observation.is_some();
+    let mut shift_episodes = Vec::with_capacity(
+        operating_states
+            .len()
+            .saturating_mul(CHANGE_DETECTION_SHIFT_SCALES.len()),
+    );
+    let mut decrease_shift_count = 0u64;
+    let mut decrease_correct_direction_count = 0u64;
+    let mut increase_shift_count = 0u64;
+    let mut increase_correct_direction_count = 0u64;
+    let mut detection_delays = Vec::new();
+
+    for harvest_yield_scale in CHANGE_DETECTION_SHIFT_SCALES {
+        let is_decrease = harvest_yield_scale < 1.0;
+        if is_decrease {
+            decrease_shift_count =
+                decrease_shift_count.saturating_add(operating_states.len() as u64);
+        } else {
+            increase_shift_count =
+                increase_shift_count.saturating_add(operating_states.len() as u64);
+        }
+
+        for state in &operating_states {
+            let events = run_change_detector(
+                &predictor,
+                &[*state],
+                CHANGE_DETECTION_SHIFT_STEPS,
+                harvest_yield_scale,
+                baseline_mean,
+                allowance,
+                threshold,
+            );
+            let detection = events.iter().find(|event| event.detected);
+            if let Some(event) = detection {
+                detection_delays.push(event.observation_ordinal);
+                if is_decrease && event.detection_direction == "decrease" {
+                    decrease_correct_direction_count =
+                        decrease_correct_direction_count.saturating_add(1);
+                }
+                if !is_decrease && event.detection_direction == "increase" {
+                    increase_correct_direction_count =
+                        increase_correct_direction_count.saturating_add(1);
+                }
+            }
+
+            shift_episodes.push(ChangeDetectionEpisode {
+                harvest_yield_scale,
+                state_digest: state.digest(),
+                detected: detection.is_some(),
+                detection_observation: detection.map(|event| event.observation_ordinal),
+                detection_direction: detection
+                    .map(|event| event.detection_direction)
+                    .unwrap_or("none"),
+            });
+        }
+    }
+
+    let nominal_false_alarm_episode_count =
+        nominal_episodes.iter().filter(|episode| episode.detected).count() as u64;
+    let shift_detected_count =
+        shift_episodes.iter().filter(|episode| episode.detected).count() as u64;
+    let shift_episode_count = shift_episodes.len() as u64;
+
+    let gradual_drift_scales = (0..CHANGE_DETECTION_SHIFT_STEPS)
+        .map(|index| {
+            if CHANGE_DETECTION_SHIFT_STEPS <= 1 {
+                REGIME_SHIFT_HARVEST_YIELD_SCALE
+            } else {
+                1.0
+                    - (1.0 - REGIME_SHIFT_HARVEST_YIELD_SCALE)
+                        * index as f64
+                        / (CHANGE_DETECTION_SHIFT_STEPS - 1) as f64
+            }
+        })
+        .collect::<Vec<_>>();
+    let gradual_drift_events = run_change_detector_schedule(
+        &predictor,
+        &operating_states,
+        &gradual_drift_scales,
+        baseline_mean,
+        allowance,
+        threshold,
+    );
+    let gradual_drift_detected = gradual_drift_events.iter().any(|event| event.detected);
+
+    let operating_characteristics = ChangeDetectionOperatingCharacteristics {
+        nominal_episode_count: nominal_episodes.len() as u64,
+        nominal_false_alarm_episode_rate: if nominal_episodes.is_empty() {
+            0.0
+        } else {
+            nominal_false_alarm_episode_count as f64 / nominal_episodes.len() as f64
+        },
+        shift_episode_count,
+        shift_detection_rate: if shift_episode_count == 0 {
+            0.0
+        } else {
+            shift_detected_count as f64 / shift_episode_count as f64
+        },
+        decrease_shift_count,
+        decrease_correct_direction_rate: if decrease_shift_count == 0 {
+            0.0
+        } else {
+            decrease_correct_direction_count as f64 / decrease_shift_count as f64
+        },
+        increase_shift_count,
+        increase_correct_direction_rate: if increase_shift_count == 0 {
+            0.0
+        } else {
+            increase_correct_direction_count as f64 / increase_shift_count as f64
+        },
+        mean_detection_delay_observations: if detection_delays.is_empty() {
+            None
+        } else {
+            Some(
+                detection_delays.iter().sum::<u64>() as f64
+                    / detection_delays.len() as f64,
+            )
+        },
+        worst_detection_delay_observations: detection_delays.iter().copied().max(),
+        nominal_episodes,
+        shift_episodes,
+        gradual_drift_detected,
+        gradual_drift_events,
+    };
 
     ChangeDetectionReport {
         baseline_sample_count: control_states.len() as u64,
@@ -1734,6 +2013,7 @@ fn evaluate_change_detection(
         shifted_regime_detected,
         detection_observation,
         detection_delay_observations: detection_observation,
+        operating_characteristics,
     }
 }
 
@@ -3274,6 +3554,47 @@ mod tests {
                 || event.detection_direction == "increase"
                 || event.detection_direction == "decrease"));
         assert!(report.operationally_separates_shift());
+    }
+
+    #[test]
+    fn change_detection_operating_characteristics_are_populated_and_scoreable() {
+        let base_model =
+            super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let (trained_model, train_steps) =
+            train_world_model_clone(&base_model, &benchmark_scenarios()[0], 24);
+        assert!(train_steps > 0);
+        let report = evaluate_change_detection(&trained_model);
+        let operating = &report.operating_characteristics;
+
+        assert!(operating.is_populated());
+        assert!(operating.is_scoreable());
+        assert_eq!(
+            operating.nominal_episode_count,
+            operating.nominal_episodes.len() as u64
+        );
+        assert_eq!(
+            operating.shift_episode_count,
+            operating.shift_episodes.len() as u64
+        );
+        assert!(operating.nominal_false_alarm_episode_rate.is_finite());
+        assert!(operating.shift_detection_rate.is_finite());
+        assert!(operating.decrease_correct_direction_rate.is_finite());
+        assert!(operating.increase_correct_direction_rate.is_finite());
+        assert!(!operating.gradual_drift_events.is_empty());
+    }
+
+    #[test]
+    fn regime_error_ratio_above_one_remains_scoreable() {
+        let model = super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let mut report =
+            evaluate_regime_shift_adaptation(&model, &benchmark_scenarios()[1]);
+        assert!(report.is_scoreable());
+        assert!(!report.events.is_empty());
+
+        // A ratio > 1 means the shifted-regime error is worse than the pre-revision error.
+        // That is a legitimate diagnostic outcome, not malformed evidence.
+        report.events[0].shifted_validation_error_ratio = 2.0;
+        assert!(report.is_scoreable());
     }
 
     #[test]
