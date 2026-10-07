@@ -218,6 +218,18 @@ jobs:
           test -n "$LEDGER"
           printf "syndrome_coset_ledger=%s\\n" "$LEDGER" >> "$GITHUB_OUTPUT"
 
+      - name: Capture exhaustive syndrome oracle and linearity ledger
+        id: syndrome_oracle
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            small_fixture_production_syndrome_matches_independent_oracle_and_is_linear -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SYNDROME_ORACLE_LINEAREXHAUSTIVE=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^SYNDROME_ORACLE_LINEAREXHAUSTIVE=//p')"
+          test -n "$LEDGER"
+          printf "syndrome_oracle_linearity=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
       - name: Capture exact minimum-syndrome multiplicity ledger
         id: multiplicity_invariant
         run: |
@@ -323,7 +335,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
           HDC Linear-Code Bounded Decoder Qualification
           =============================================
-          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v7
+          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v8
           event_name=${{ github.event_name }}
           exact_head=${{ steps.head.outputs.sha }}
           event_head_ref=${{ steps.head.outputs.source_ref }}
@@ -348,6 +360,8 @@ jobs:
           syndrome_decoder_status=${{ steps.decoder_tests.outcome }}
           strict_clippy_status=${{ steps.clippy.outcome }}
           dependency_lock_sha256=${{ steps.harness.outputs.lock_sha256 }}
+          syndrome_oracle_linearity_status=${{ steps.syndrome_oracle.outcome }}
+          syndrome_oracle_linearity=${{ steps.syndrome_oracle.outputs.syndrome_oracle_linearity }}
           syndrome_coset_ledger_status=${{ steps.coset_invariants.outcome }}
           syndrome_coset_ledger=${{ steps.coset_invariants.outputs.syndrome_coset_ledger }}
           minimum_syndrome_multiplicity_status=${{ steps.multiplicity_invariant.outcome }}
@@ -363,7 +377,7 @@ jobs:
           runner_arch=${{ steps.runner.outputs.runner_arch }}
           runner_image=${{ steps.runner.outputs.runner_image }}
           runner_image_version=${{ steps.runner.outputs.runner_image_version }}
-          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
           random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
           random_syndrome_sweep=${{ steps.random_sweep.outputs.random_syndrome_sweep }}

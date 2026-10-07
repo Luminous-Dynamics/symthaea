@@ -276,6 +276,22 @@ For each usable seed whose exhaustive code geometry has unique-decoding radius b
 
 This remains a finite implementation cross-check. It is not a probabilistic claim about the entire random-code ensemble.
 
+## Syndrome-space oracle qualification
+
+The canonical [8,2,4] fixture also receives a separate exhaustive syndrome-space
+cross-check. For all 256 ambient observations, the production parity-check
+syndrome is compared against an independently reconstructed syndrome oracle.
+The test additionally checks the linearity law
+
+`H(x xor y) = H(x) xor H(y)`
+
+for all 65,536 ordered observation pairs, both for the independent oracle and the
+production parity-check implementation.
+
+This establishes the syndrome map itself as a qualified GF(2) homomorphism on
+the finite fixture, rather than inferring correctness only from successful
+decoding outcomes. It is still a finite fixture proof and makes no asymptotic
+or performance claim.
 ## Beyond-radius semantics
 
 A separate fixture tests corruption beyond the unique-decoding radius without asking the decoder to recover an arbitrarily designated clean target.
