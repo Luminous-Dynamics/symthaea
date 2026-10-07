@@ -27,6 +27,8 @@ use symthaea_communication::{
     NeurosemanticRemediationObservationRecord,
     NeurosemanticRemediationObservationSetArtifact,
     NeurosemanticRemediationMetricComputationArtifact,
+    NeurosemanticRemediationEvaluationSplitManifest,
+    NeurosemanticRemediationEvaluationSplitMember,
     NeurosemanticRemediationUncertaintyComputationArtifact,
 };
 
@@ -557,9 +559,7 @@ fn main() -> Result<(), String> {
     let recovery_evidence = b"synthetic-recovery-attack-evaluation-v1";
     let representation_residual_evidence = b"synthetic-representation-residual-probe-v1";
     let study_protocol_bytes = b"synthetic-remediation-protocol-v1";
-    let evaluation_split_manifest_bytes = b"synthetic-remediation-split-v1";
     let study_protocol_hash = symthaea_communication::content_hash(study_protocol_bytes);
-    let evaluation_split_manifest_hash = symthaea_communication::content_hash(evaluation_split_manifest_bytes);
     let lifecycle_receipt_hash = lifecycle_receipt.fingerprint()?;
     let evaluation_environment = NeurosemanticRemediationEvaluationEnvironment {
         schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_EVALUATION_ENVIRONMENT_SCHEMA_VERSION,
@@ -602,6 +602,27 @@ fn main() -> Result<(), String> {
     };
     let forget_set_manifest_bytes = serde_json::to_vec(&forget_set_manifest).map_err(|e| e.to_string())?;
     let retain_set_manifest_bytes = serde_json::to_vec(&retain_set_manifest).map_err(|e| e.to_string())?;
+
+    let evaluation_split_manifest = NeurosemanticRemediationEvaluationSplitManifest {
+        schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_EVALUATION_SPLIT_SCHEMA_VERSION,
+        split_ref: "synthetic-remediation-split-v1".into(),
+        source_dataset_manifest_hash: forget_set_manifest.source_dataset_manifest_hash.clone(),
+        members: vec![
+            NeurosemanticRemediationEvaluationSplitMember {
+                subject_artifact_hash: symthaea_communication::content_hash(b"synthetic-fairness-member-1"),
+                group_ref: "group-a".into(),
+            },
+            NeurosemanticRemediationEvaluationSplitMember {
+                subject_artifact_hash: symthaea_communication::content_hash(b"synthetic-fairness-member-2"),
+                group_ref: "group-b".into(),
+            },
+        ],
+    };
+    let evaluation_split_manifest_bytes =
+        serde_json::to_vec(&evaluation_split_manifest).map_err(|e| e.to_string())?;
+    let evaluation_split_manifest_hash = evaluation_split_manifest.fingerprint()?;
+
+
 
     let recovery_method = NeurosemanticRemediationEvaluationMethod {
         schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_EVALUATION_METHOD_SCHEMA_VERSION,
@@ -744,19 +765,19 @@ fn main() -> Result<(), String> {
         scope_ref: metric_fairness.scope_ref.clone(),
         population_manifest_hash: evaluation_split_manifest_hash.clone(),
         eligible_subject_artifact_hashes: vec![
-            symthaea_communication::content_hash(b"fairness-1"),
-            symthaea_communication::content_hash(b"fairness-2"),
+            symthaea_communication::content_hash(b"synthetic-fairness-member-1"),
+            symthaea_communication::content_hash(b"synthetic-fairness-member-2"),
         ],
         observations: vec![
             NeurosemanticRemediationObservationRecord {
                 observation_ref: "synthetic-fairness-observation-a".into(),
-                subject_artifact_hash: symthaea_communication::content_hash(b"fairness-1"),
+                subject_artifact_hash: symthaea_communication::content_hash(b"synthetic-fairness-member-1"),
                 failure_observed: false,
                 group_ref: Some("group-a".into()),
             },
             NeurosemanticRemediationObservationRecord {
                 observation_ref: "synthetic-fairness-observation-b".into(),
-                subject_artifact_hash: symthaea_communication::content_hash(b"fairness-2"),
+                subject_artifact_hash: symthaea_communication::content_hash(b"synthetic-fairness-member-2"),
                 failure_observed: false,
                 group_ref: Some("group-b".into()),
             },
@@ -1157,6 +1178,24 @@ fn main() -> Result<(), String> {
         let forged_bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
         let mut supplied = observation_set_bytes.clone();
         supplied[0] = forged_bytes;
+        let supplied_refs: Vec<&[u8]> = supplied.iter().map(Vec::as_slice).collect();
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &measurement_bytes,
+                &computation_byte_refs,
+                &supplied_refs,
+                &population_manifest_byte_refs,
+                &uncertainty_computation_byte_refs,
+                &uncertainty_assumption_byte_refs,
+            )
+            .is_err()
+    };
+    let remediation_fairness_group_substitution_blocked = {
+        let mut forged = observation_sets[2].clone();
+        forged.observations[0].group_ref = Some("group-b".into());
+        let forged_bytes = serde_json::to_vec(&forged).map_err(|e| e.to_string())?;
+        let mut supplied = observation_set_bytes.clone();
+        supplied[2] = forged_bytes;
         let supplied_refs: Vec<&[u8]> = supplied.iter().map(Vec::as_slice).collect();
         remediation_impact
             .verify_measurement_computation_bundle_bytes(
@@ -1923,6 +1962,7 @@ fn main() -> Result<(), String> {
         "remediation_uncertainty_assumptions_substitution_blocked": remediation_uncertainty_assumptions_substitution_blocked,
         "remediation_observation_population_substitution_blocked": remediation_observation_population_substitution_blocked,
         "remediation_observation_membership_cherry_pick_blocked": remediation_observation_membership_cherry_pick_blocked,
+        "remediation_fairness_group_substitution_blocked": remediation_fairness_group_substitution_blocked,
         "remediation_measurement_worst_case_binding_blocked": remediation_measurement_worst_case_binding_blocked,
         "remediation_measurement_missingness_fail_closed": remediation_measurement_missingness_fail_closed,
         "remediation_metric_definition_substitution_blocked": remediation_metric_definition_substitution_blocked,
