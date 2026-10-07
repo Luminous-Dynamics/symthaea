@@ -191,6 +191,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=RUSTC_WORKSPACE_WRAPPER");
     println!("cargo:rerun-if-env-changed=CARGO_ENCODED_RUSTFLAGS");
     println!("cargo:rerun-if-env-changed=BROCA_NATIVE_PACKAGE_CONTEXT");
+    println!("cargo:rerun-if-env-changed=BROCA_RUSTUP_VERSION");
     for variable in ["PROFILE", "DEBUG", "OPT_LEVEL", "NUM_JOBS", "RUNNER_OS", "RUNNER_ARCH", "ImageOS", "ImageVersion"] {
         println!("cargo:rerun-if-env-changed={variable}");
     }
@@ -242,6 +243,9 @@ fn main() {
     let system_packages = env::var("BROCA_NATIVE_PACKAGE_CONTEXT")
         .map(String::into_bytes)
         .unwrap_or_else(|_| system_package_identity());
+    let rustup_version = env::var("BROCA_RUSTUP_VERSION")
+        .unwrap_or_default()
+        .into_bytes();
     let profile = env::var("PROFILE").unwrap_or_default().into_bytes();
     let debug = env::var("DEBUG").unwrap_or_default().into_bytes();
     let opt_level = env::var("OPT_LEVEL").unwrap_or_default().into_bytes();
@@ -283,7 +287,7 @@ fn main() {
     // This is intentionally separate from compiler source identity: the same checked-in source
     // can have different dependency/toolchain semantics if its build context changes.
     let build_context_revision = domain_digest(
-        b"symthaea-broca-unimorph-compiler-build-context-revision-v6",
+        b"symthaea-broca-unimorph-compiler-build-context-revision-v7",
         &[
             &crate_manifest,
             &workspace_manifest,
@@ -298,6 +302,7 @@ fn main() {
             &cargo_features,
             &cargo_cfg,
             &system_packages,
+            &rustup_version,
             &profile,
             &debug,
             &opt_level,
