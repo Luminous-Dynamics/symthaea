@@ -90,7 +90,7 @@ native = ["nix", "rusqlite", "tree-sitter", "tree-sitter-nix", "tokio", "getrand
 # Use: nixward = { default-features = false }
 cli = ["clap", "clap_complete", "native"]
 tui = ["crossterm", "ratatui", "cli"]
-daemon = ["tokio/full", "native", "systemd-observer"]
+daemon = ["tokio/full", "native", "systemd-observer", "systemd-mutation"]
 systemd = ["systemd-observer", "systemd-mutation", "libsystemd"]
 # Read-only D-Bus observer capability. No libsystemd C dependency is required.
 systemd-observer = ["zbus", "native"]
