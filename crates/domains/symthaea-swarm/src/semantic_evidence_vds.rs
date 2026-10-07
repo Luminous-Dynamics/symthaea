@@ -105,6 +105,8 @@ pub enum Rfc9942VerifiedProof {
     Inclusion {
         proof_index: usize,
         head: VdsTreeHead,
+        /// Log position established by the selected RFC 9162 inclusion proof.
+        leaf_index: u64,
         candidate_leaf: [u8; 32],
     },
     Consistency {
@@ -206,6 +208,13 @@ impl Rfc9942VerifiedProof {
     pub const fn proof_index(&self) -> usize {
         match self {
             Self::Inclusion { proof_index, .. } | Self::Consistency { proof_index, .. } => *proof_index,
+        }
+    }
+
+    pub const fn inclusion_leaf_index(&self) -> Option<u64> {
+        match self {
+            Self::Inclusion { leaf_index, .. } => Some(*leaf_index),
+            Self::Consistency { .. } => None,
         }
     }
 
@@ -722,7 +731,7 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<Rfc9942VerifiedReceipt, Rfc9942VdpError> {
-        let (proof_index, head, signature_payload, authenticated_payload) =
+        let (proof_index, head, leaf_index, signature_payload, authenticated_payload) =
             match (&self.payload, detached_payload) {
                 (Rfc9942ReceiptPayload::Attached(_), Some(_)) => {
                     return Err(Rfc9942VdpError::InvalidStructure);
@@ -732,16 +741,17 @@ impl Rfc9942ReceiptEnvelope {
                         .payload
                         .attached_root()
                         .ok_or(Rfc9942VdpError::InvalidPayloadLength)?;
-                    let (proof_index, head) =
+                    let (proof_index, head, leaf_index) =
                         self.vdp.verify_inclusion_with_payload_index(candidate_entry, &root)?;
-                    (proof_index, head, None, root)
+                    (proof_index, head, leaf_index, None, root)
                 }
                 (Rfc9942ReceiptPayload::Detached, supplied) => {
                 // Inclusion proof verification derives the root first. A
                 // caller-supplied detached payload, when present, must equal
                 // that derived root byte-for-byte before signature checking.
                 self.vdp.validate_vds_id(self.vds_id)?;
-                let (proof_index, head) = self.vdp.derive_inclusion_root_index(candidate_entry)?;
+                let (proof_index, head, leaf_index) =
+                    self.vdp.derive_inclusion_root_index(candidate_entry)?;
                 if let Some(payload) = supplied {
                     if payload != head.root() {
                         return Err(Rfc9942VdpError::NoMatchingProof);
@@ -761,6 +771,7 @@ impl Rfc9942ReceiptEnvelope {
             Rfc9942VerifiedProof::Inclusion {
                 proof_index,
                 head,
+                leaf_index,
                 candidate_leaf: leaf_hash(candidate_entry),
             },
             &authenticated_payload,
@@ -1828,14 +1839,14 @@ impl Rfc9942Vdp {
         payload: &[u8],
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
         self.verify_inclusion_with_payload_index(candidate_entry, payload)
-            .map(|(_, head)| head)
+            .map(|(_, head, _)| head)
     }
 
     fn verify_inclusion_with_payload_index(
         &self,
         candidate_entry: &[u8],
         payload: &[u8],
-    ) -> Result<(usize, VdsTreeHead), Rfc9942VdpError> {
+    ) -> Result<(usize, VdsTreeHead, u64), Rfc9942VdpError> {
         if self.kind != Rfc9942ProofKind::Inclusion {
             return Err(Rfc9942VdpError::WrongProofKind);
         }
@@ -1849,7 +1860,7 @@ impl Rfc9942Vdp {
             let proof = Rfc9162InclusionProof::from_cbor(proof_bytes)?;
             let head = VdsTreeHead::new(proof.tree_size, root);
             if vds.verify_inclusion(candidate_entry, root, &proof) {
-                return Ok((proof_index, head));
+                return Ok((proof_index, head, proof.leaf_index));
             }
         }
         Err(Rfc9942VdpError::NoMatchingProof)
@@ -1863,20 +1874,24 @@ impl Rfc9942Vdp {
         candidate_entry: &[u8],
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
         self.derive_inclusion_root_index(candidate_entry)
-            .map(|(_, head)| head)
+            .map(|(_, head, _)| head)
     }
 
     fn derive_inclusion_root_index(
         &self,
         candidate_entry: &[u8],
-    ) -> Result<(usize, VdsTreeHead), Rfc9942VdpError> {
+    ) -> Result<(usize, VdsTreeHead, u64), Rfc9942VdpError> {
         if self.kind != Rfc9942ProofKind::Inclusion {
             return Err(Rfc9942VdpError::WrongProofKind);
         }
         for (proof_index, proof_bytes) in self.proofs.iter().enumerate() {
             let proof = Rfc9162InclusionProof::from_cbor(proof_bytes)?;
             if let Some(root) = derive_rfc9162_inclusion_root(candidate_entry, &proof) {
-                return Ok((proof_index, VdsTreeHead::new(proof.tree_size, root)));
+                return Ok((
+                    proof_index,
+                    VdsTreeHead::new(proof.tree_size, root),
+                    proof.leaf_index,
+                ));
             }
         }
         Err(Rfc9942VdpError::NoMatchingProof)
