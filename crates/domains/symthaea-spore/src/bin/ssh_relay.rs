@@ -491,18 +491,35 @@ async fn spawn_privileged_background_process(
     Ok(pid)
 }
 
+async fn spawn_privileged_background_script_with_args(
+    script_path: &str,
+    log_path: &str,
+    status_path: &str,
+    pid_path: &str,
+    args: &[&str],
+) -> Result<u32, std::io::Error> {
+    let script = open_trusted_script(script_path)?;
+    spawn_privileged_background_process(
+        trusted_script_process(script, args),
+        log_path,
+        status_path,
+        pid_path,
+    )
+    .await
+}
+
 async fn spawn_privileged_background_script(
     script_path: &str,
     log_path: &str,
     status_path: &str,
     pid_path: &str,
 ) -> Result<u32, std::io::Error> {
-    let script = open_trusted_script(script_path)?;
-    spawn_privileged_background_process(
-        trusted_script_process(script, &[]),
+    spawn_privileged_background_script_with_args(
+        script_path,
         log_path,
         status_path,
         pid_path,
+        &[],
     )
     .await
 }
@@ -1372,24 +1389,31 @@ fi
 }
 
 /// Pre-install disk snapshot (partition table + UUIDs — always, instant).
-fn disk_snapshot(disk: &str) -> String {
+fn disk_snapshot(transaction_dir: &str) -> String {
+    let snapshot_dir = format!("{transaction_dir}/disk-snapshot");
     format!(
         r#"
 # ── Pre-Install Disk Snapshot (Tier 1: instant) ──
+DISK="$1"
+if [ -z "$DISK" ]; then
+  echo "ERROR: install disk argument missing from snapshot authority."
+  exit 1
+fi
 echo "STAGE: Saving disk snapshot..."
-SNAPSHOT_DIR="/tmp/symthaea-pre-install-snapshot"
-mkdir -p "$SNAPSHOT_DIR"
-sfdisk -d {disk} > "$SNAPSHOT_DIR/partition-table.dump" 2>/dev/null
-dd if={disk} of="$SNAPSHOT_DIR/first-1M.img" bs=1M count=1 status=none 2>/dev/null
+SNAPSHOT_DIR="{snapshot_dir}"
+mkdir -m 700 "$SNAPSHOT_DIR"
+sfdisk -d "$DISK" > "$SNAPSHOT_DIR/partition-table.dump" 2>/dev/null
+dd if="$DISK" of="$SNAPSHOT_DIR/first-1M.img" bs=1M count=1 status=none 2>/dev/null
 blkid > "$SNAPSHOT_DIR/blkid.txt" 2>/dev/null
 lsblk -f > "$SNAPSHOT_DIR/lsblk.txt" 2>/dev/null
-fdisk -l {disk} > "$SNAPSHOT_DIR/fdisk.txt" 2>/dev/null
+fdisk -l "$DISK" > "$SNAPSHOT_DIR/fdisk.txt" 2>/dev/null
 echo "  Snapshot saved to $SNAPSHOT_DIR"
-echo "  Partition table can be restored with: sfdisk {disk} < partition-table.dump"
+echo "  Partition table can be restored with: sfdisk $DISK < partition-table.dump"
 "#,
-        disk = disk
+        snapshot_dir = snapshot_dir
     )
 }
+
 
 fn secure_boot_postinstall() -> &'static str {
     r#"
@@ -6662,7 +6686,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 let mut script = generate_install_script(&client_msg, &transaction_dir);
 
                 // Always: pre-install disk snapshot (instant, non-destructive)
-                let snapshot = disk_snapshot(&disk);
+                let snapshot = disk_snapshot(&transaction_dir);
                 script = format!("{}\n{}", snapshot, script);
 
                 // Patch configuration.nix with DE/GPU/locale — but only if the browser
@@ -6921,11 +6945,12 @@ echo "  User password set."
                     }
                 }
 
-                if let Err(error) = spawn_privileged_background_script(
+                if let Err(error) = spawn_privileged_background_script_with_args(
                     &script_path,
                     &log_path,
                     &status_path,
                     &pid_path,
+                    &[&disk],
                 )
                 .await
                 {
@@ -13236,6 +13261,19 @@ mod tests {
         assert!(!result.contains("\nNIXCONF\nrm -rf /"));
         // Should still contain the closing delimiter exactly once as the heredoc terminator
         assert_eq!(result.matches("NIXCONF").count(), 2); // opening + closing
+    }
+
+    #[test]
+    fn disk_snapshot_binds_disk_through_script_argv_and_transaction_namespace() {
+        let script = disk_snapshot(
+            "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef",
+        );
+        assert!(script.contains('DISK="$1"'));
+        assert!(script.contains(
+            "/tmp/nixforhumanity-transaction-0123456789abcdef0123456789abcdef/disk-snapshot"
+        ));
+        assert!(!script.contains("/dev/vda"));
+        assert!(!script.contains("/tmp/symthaea-pre-install-snapshot"));
     }
 
     #[test]
