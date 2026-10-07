@@ -3741,17 +3741,25 @@ fn finalize_configuration_swap_blocking(
         .map_err(|_| "configuration swap backup name contains NUL".to_string())?;
     let final_c = CString::new("configuration.nix").unwrap();
 
-    if commit {
-        unsafe {
-            libc::unlinkat(dir_fd, temp_c.as_ptr(), 0);
-            libc::unlinkat(dir_fd, backup_c.as_ptr(), 0);
+    let unlink = |name: &std::ffi::CString| -> Result<(), String> {
+        let result = unsafe { libc::unlinkat(dir_fd, name.as_ptr(), 0) };
+        if result != 0 {
+            Err(format!(
+                "unable to remove configuration swap artifact: {}",
+                std::io::Error::last_os_error()
+            ))
+        } else {
+            Ok(())
         }
+    };
+
+    if commit {
+        unlink(&temp_c)?;
+        unlink(&backup_c)?;
     } else {
         atomic_exchange_at(dir_fd, &temp_c, &final_c)?;
-        unsafe {
-            libc::unlinkat(dir_fd, temp_c.as_ptr(), 0);
-            libc::unlinkat(dir_fd, backup_c.as_ptr(), 0);
-        }
+        unlink(&temp_c)?;
+        unlink(&backup_c)?;
     }
 
     target_dir
@@ -7403,8 +7411,7 @@ echo '}'
                         let _ = ws_tx
                             .send(Message::Text(
                                 RelayMessage::error(&format!(
-                                    "Another process currently owns the system mutation fence: {}",
-                                    error
+                                    "Another process currently owns the system mutation fence: {error}"
                                 ))
                                 .to_json(),
                             ))
@@ -7439,7 +7446,7 @@ echo '}'
                                 serde_json::json!({
                                     "type":"exit",
                                     "code": protocol_exit_code(1, outcome),
-                                    "data": format!("Rebuild artifact namespace unavailable: {error}"),
+                                    "data": format!("Configuration transaction namespace unavailable: {error}"),
                                     "transaction": transaction.receipt(outcome)
                                 })
                                 .to_string(),
@@ -7450,10 +7457,6 @@ echo '}'
                 };
 
                 let candidate_path = format!("{transaction_dir}/configuration.nix");
-                let log_path = format!("{transaction_dir}/rebuild.log");
-                let status_path = format!("{transaction_dir}/rebuild.status");
-                let pid_path = format!("{transaction_dir}/rebuild.pid");
-
                 if let Err(error) =
                     write_private_file(&candidate_path, client_msg.configuration_nix.as_bytes(), 0o600)
                 {
@@ -7478,9 +7481,7 @@ echo '}'
                     continue;
                 }
 
-                let parse_result =
-                    run_privileged_args("nix-instantiate", &["--parse", &candidate_path]).await;
-                match parse_result {
+                match run_privileged_args("nix-instantiate", &["--parse", &candidate_path]).await {
                     Ok(result) if result.exit_status == 0 => {}
                     Ok(result) => {
                         remove_transaction_artifact_dir(&transaction_dir);
@@ -7584,151 +7585,117 @@ echo '}'
                     }
                 };
 
-                let mut rebuild_command = privileged_process("nixos-rebuild");
-                rebuild_command.args(["switch"]);
-                if let Err(error) = spawn_privileged_background_process(
-                    rebuild_command,
-                    &log_path,
-                    &status_path,
-                    &pid_path,
-                )
-                .await
-                {
-                    let revert = finalize_configuration_swap(swap, false).await;
-                    let observed = if revert.is_ok() {
-                        TransactionOutcome::Failed
-                    } else {
-                        TransactionOutcome::Indeterminate
-                    };
-                    remove_transaction_artifact_dir(&transaction_dir);
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            serde_json::json!({
-                                "type":"exit",
-                                "code": protocol_exit_code(1, observed),
-                                "data": format!("Rebuild launch failed: {error}; configuration rollback: {:?}", revert),
-                                "transaction": transaction.receipt(finalize_transaction(
-                                    &transaction_ledger,
-                                    &transaction,
-                                    observed,
-                                    &peer_addr,
-                                ))
-                            })
-                            .to_string(),
-                        ))
-                        .await;
-                    continue;
-                }
-
                 let _ = ws_tx
                     .send(Message::Text(
                         RelayMessage::output(
-                            &format!("Rebuilding system (transaction {})...", transaction.transaction_id),
+                            &format!(
+                                "Configuration installed atomically; rebuilding system (transaction {})...",
+                                transaction.transaction_id
+                            ),
                             "stdout",
                         )
                         .to_json(),
                     ))
                     .await;
 
-                let mut last_lines = 0usize;
-                loop {
-                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                    if let Ok(bytes) = tokio::fs::read(&log_path).await {
-                        let text = String::from_utf8_lossy(&bytes);
-                        let lines: Vec<&str> = text.lines().collect();
-                        if lines.len() >= last_lines {
-                            for line in &lines[last_lines..] {
-                                if !line.trim().is_empty() {
-                                    let _ = ws_tx
-                                        .send(Message::Text(
-                                            RelayMessage::output(line, "stdout").to_json(),
-                                        ))
-                                        .await;
-                                }
-                            }
-                            last_lines = lines.len();
-                        }
-                    }
-                    if read_transaction_status(&status_path)
-                        .await
-                        .ok()
-                        .flatten()
-                        .is_some()
-                    {
-                        break;
-                    }
-                    let pid = tokio::fs::read_to_string(&pid_path)
-                        .await
-                        .ok()
-                        .and_then(|text| text.trim().parse::<u32>().ok())
-                        .unwrap_or(0);
-                    if !process_id_is_alive(pid) {
-                        break;
-                    }
-                }
+                let rebuild_result = run_privileged_args("nixos-rebuild", &["switch"]).await;
 
-                let rebuild_exit_code = read_transaction_status(&status_path)
-                    .await
-                    .ok()
-                    .flatten();
-
-                let (exit_code, observed_outcome) = match rebuild_exit_code {
-                    Some(0) => match verify_active_configuration(
-                        client_msg.configuration_nix.as_bytes(),
-                    )
-                    .await
-                    {
-                        Ok(true) => match finalize_configuration_swap(swap, true).await {
-                            Ok(()) => (0, TransactionOutcome::ObservedSuccess),
-                            Err(error) => {
-                                eprintln!(
-                                    "[{}] {} configuration cleanup after successful rebuild failed: {}",
-                                    peer_addr,
-                                    transaction.log_line(),
-                                    error
-                                );
-                                (1, TransactionOutcome::Indeterminate)
-                            }
-                        },
-                        Ok(false) => {
-                            eprintln!(
-                                "[{}] {} rebuild returned 0 but active configuration does not match requested bytes",
-                                peer_addr,
-                                transaction.log_line()
-                            );
-                            match finalize_configuration_swap(swap, false).await {
-                                Ok(()) => (1, TransactionOutcome::Indeterminate),
+                let (exit_code, observed_outcome, retain_swap) = match rebuild_result {
+                    Ok(result) if result.exit_status == 0 => {
+                        match verify_active_configuration(client_msg.configuration_nix.as_bytes()).await {
+                            Ok(true) => match finalize_configuration_swap(swap, true).await {
+                                Ok(()) => (0, TransactionOutcome::ObservedSuccess, false),
                                 Err(error) => {
                                     eprintln!(
-                                        "[{}] {} configuration rollback after postcondition failure failed: {}",
+                                        "[{}] {} configuration swap cleanup failed after successful rebuild: {}",
                                         peer_addr,
                                         transaction.log_line(),
                                         error
                                     );
-                                    (1, TransactionOutcome::Indeterminate)
+                                    (1, TransactionOutcome::Indeterminate, false)
+                                }
+                            },
+                            Ok(false) => {
+                                eprintln!(
+                                    "[{}] {} rebuild returned 0 but requested configuration was not observed",
+                                    peer_addr,
+                                    transaction.log_line()
+                                );
+                                match finalize_configuration_swap(swap, false).await {
+                                    Ok(()) => (1, TransactionOutcome::Indeterminate, false),
+                                    Err(error) => {
+                                        eprintln!(
+                                            "[{}] {} configuration rollback after failed postcondition failed: {}",
+                                            peer_addr,
+                                            transaction.log_line(),
+                                            error
+                                        );
+                                        (1, TransactionOutcome::Indeterminate, true)
+                                    }
                                 }
                             }
+                            Err(error) => {
+                                eprintln!(
+                                    "[{}] {} configuration postcondition could not be observed; preserving swap artifacts: {}",
+                                    peer_addr,
+                                    transaction.log_line(),
+                                    error
+                                );
+                                (1, TransactionOutcome::Indeterminate, true)
+                            }
                         }
+                    }
+                    Ok(result) => match finalize_configuration_swap(swap, false).await {
+                        Ok(()) => (
+                            result.exit_status,
+                            TransactionOutcome::Failed,
+                            false,
+                        ),
                         Err(error) => {
                             eprintln!(
-                                "[{}] {} active configuration postcondition probe failed: {}",
+                                "[{}] {} configuration rollback after rebuild failure failed: {}",
                                 peer_addr,
                                 transaction.log_line(),
                                 error
                             );
-                            (1, TransactionOutcome::Indeterminate)
+                            (1, TransactionOutcome::Indeterminate, true)
                         }
                     },
-                    Some(code) => {
-                        let rollback = finalize_configuration_swap(swap, false).await;
-                        if rollback.is_err() {
-                            (1, TransactionOutcome::Indeterminate)
-                        } else {
-                            (code, TransactionOutcome::Failed)
+                    Err(error) => match finalize_configuration_swap(swap, false).await {
+                        Ok(()) => (
+                            1,
+                            TransactionOutcome::Failed,
+                            false,
+                        ),
+                        Err(rollback_error) => {
+                            eprintln!(
+                                "[{}] {} configuration rollback after rebuild launch error failed: {}",
+                                peer_addr,
+                                transaction.log_line(),
+                                rollback_error
+                            );
+                            (1, TransactionOutcome::Indeterminate, true)
                         }
-                    }
-                    None => (1, TransactionOutcome::Indeterminate),
+                    },
                 };
+
+                if !retain_swap {
+                    remove_transaction_artifact_dir(&transaction_dir);
+                } else {
+                    eprintln!(
+                        "[{}] {} preserving transaction artifact namespace for manual recovery",
+                        peer_addr,
+                        transaction.log_line()
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(
+                                "Configuration outcome is indeterminate; swap artifacts were preserved for recovery."
+                            )
+                            .to_json(),
+                        ))
+                        .await;
+                }
 
                 let outcome = finalize_transaction(
                     &transaction_ledger,
@@ -7740,18 +7707,12 @@ echo '}'
                     .send(Message::Text(
                         serde_json::json!({
                             "type":"exit",
-                            "code":protocol_exit_code(exit_code, outcome),
+                            "code": protocol_exit_code(exit_code, outcome),
                             "transaction": transaction.receipt(outcome)
                         })
                         .to_string(),
                     ))
                     .await;
-
-                let _ = tokio::fs::remove_file(&candidate_path).await;
-                let _ = tokio::fs::remove_file(&log_path).await;
-                let _ = tokio::fs::remove_file(&status_path).await;
-                let _ = tokio::fs::remove_file(&pid_path).await;
-                remove_transaction_artifact_dir(&transaction_dir);
             }
 
             // ── PXE / Network Boot ──
