@@ -64,6 +64,92 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Verify qualification action pins
+        run: |
+          set -euo pipefail
+          workflow=.github/workflows/broca-feature-matrix.yml
+          refs=$(grep -E '^[[:space:]]*-[[:space:]]*uses:' "$workflow" | sed -E 's/.*uses:[[:space:]]+([^[:space:]]+).*/\1/')
+          if printf '%s\n' "$refs" | grep -Ev '@[0-9a-f]{40}([[:space:]]+#.*)?
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master 2026-10-01
+        with:
+          toolchain: 1.96.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-broca-${{ matrix.name }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml', 'Cargo.toml', 'crates/domains/symthaea-broca/Cargo.toml', '.cargo/config.toml', '.cargo/config') }}
+          restore-keys: |
+            ${{ runner.os }}-broca-${{ matrix.name }}-
+            ${{ runner.os }}-broca-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake libasound2-dev
+
+      - name: Run feature check
+        run: ${{ matrix.command }}
+
+
+  broca-unimorph-freeze-audit:
+    name: UniMorph frozen snapshot audit
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master 2026-10-01
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-broca-freeze-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml', 'Cargo.toml', 'crates/domains/symthaea-broca/Cargo.toml', '.cargo/config.toml', '.cargo/config') }}
+          restore-keys: |
+            ${{ runner.os }}-broca-freeze-
+            ${{ runner.os }}-broca-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake
+
+      - name: Audit frozen UniMorph snapshot
+        env:
+          BROCA_FREEZE_AUDIT_OUTPUT: target/broca-unimorph-freeze/receipt.json
+        run: |
+          set -o pipefail
+          mkdir -p target/broca-unimorph-freeze
+          cargo run --locked -p symthaea-broca --bin broca-unimorph-freeze-audit |
+            tee target/broca-unimorph-freeze/audit.txt
+
+      - name: Upload frozen UniMorph audit evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: broca-unimorph-freeze-${{ github.sha }}
+          path: target/broca-unimorph-freeze/
+          retention-days: 30
+; then
+            echo "::error::qualification workflow contains an unpinned action reference"
+            exit 1
+          fi
+          test "$(grep -Fc 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' "$workflow")" -eq 2
+          test "$(grep -Fc 'dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067' "$workflow")" -eq 2
+          test "$(grep -Fc 'actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830' "$workflow")" -eq 2
+          test "$(grep -Fc 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' "$workflow")" -eq 1
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master 2026-10-01
         with:
