@@ -119,7 +119,7 @@ pub enum VulkanBarrierReceiptError {
     TimelineExpected,
     #[error("receipt completion lowering digest mismatch")]
     CompletionLoweringDigest,
-    #[error("receipt observed timeline value {observed} is below expected {expected}")]
+    #[error("receipt observed timeline value {observed} does not equal expected {expected}")]
     TimelineCompletion { expected: u64, observed: u64 },
 }
 
@@ -218,7 +218,7 @@ impl VulkanBarrierExecutionReceipt {
         {
             return Err(VulkanBarrierReceiptError::CompletionLoweringDigest);
         }
-        if self.completion_observed < self.completion_expected {
+        if self.completion_observed != self.completion_expected {
             return Err(VulkanBarrierReceiptError::TimelineCompletion {
                 expected: self.completion_expected,
                 observed: self.completion_observed,
@@ -581,7 +581,7 @@ impl VulkanBarrierWorkloadRuntime {
                 .get_semaphore_counter_value(semaphore)
                 .map_err(VulkanBarrierError::TimelineCounter)?
         };
-        if completion_observed < completion_expected {
+        if completion_observed != completion_expected {
             return Err(VulkanBarrierError::TimelineCompletionNotReached {
                 expected: completion_expected,
                 observed: completion_observed,
@@ -1733,6 +1733,46 @@ mod tests {
                 0,
             )
         );
+    }
+
+    #[test]
+    fn receipt_rejects_overshot_timeline_completion() {
+        let (graph, schedule, plan, initial) = fixture();
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        let digests = final_state
+            .iter()
+            .map(|(resource, value)| (resource.clone(), resource_digest(value)))
+            .collect::<BTreeMap<_, _>>();
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| (
+                resource.clone(),
+                rounded_storage_bytes(value.as_bytes().len() as u64),
+            ))
+            .collect::<BTreeMap<_, _>>();
+        let expected = expected_final_timeline_value(&plan);
+        let receipt = VulkanBarrierExecutionReceipt {
+            version: RECEIPT_VERSION,
+            graph_digest: graph.digest_hex().unwrap(),
+            schedule_digest: schedule.digest_hex().unwrap(),
+            sync_plan_digest: plan.digest_hex().unwrap(),
+            barrier_digest: barrier_digest(&plan),
+            barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
+            completion_lowering_digest: completion_lowering_digest(&plan, expected, 0),
+            node_count: schedule.nodes.len() as u32,
+            barrier_count: 1,
+            resource_digests: digests,
+            resource_storage_sizes: storage_sizes,
+            completion_expected: expected,
+            completion_observed: expected + 1,
+            vulkan_api_version: VULKAN_API_VERSION,
+            physical_device_api_version: VULKAN_API_VERSION,
+            queue_family_index: 0,
+        };
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::TimelineCompletion { expected: 1, observed: 2 })
+        ));
     }
 
     fn receipt_rejects_tampered_completion_lowering_digest() {
