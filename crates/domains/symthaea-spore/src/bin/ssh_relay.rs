@@ -3574,6 +3574,218 @@ async fn restore_verified_archive(
     })
 }
 
+#[derive(Debug, Clone)]
+struct ConfigurationSwap {
+    target_dir: std::path::PathBuf,
+    temp_name: String,
+    backup_name: String,
+}
+
+fn atomic_exchange_at(
+    dir_fd: libc::c_int,
+    first: &std::ffi::CString,
+    second: &std::ffi::CString,
+) -> Result<(), String> {
+    let result = unsafe {
+        libc::renameat2(
+            dir_fd,
+            first.as_ptr(),
+            dir_fd,
+            second.as_ptr(),
+            libc::RENAME_EXCHANGE,
+        )
+    };
+    if result != 0 {
+        Err(format!(
+            "atomic configuration exchange failed: {}",
+            std::io::Error::last_os_error()
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn replace_configuration_atomically_blocking(
+    target_dir_path: &std::path::Path,
+    transaction_id: &str,
+    expected_current: &[u8],
+    replacement: &[u8],
+) -> Result<ConfigurationSwap, String> {
+    use std::ffi::CString;
+    use std::io::Read;
+    use std::os::unix::fs::{AsRawFd, FromRawFd, OpenOptionsExt, PermissionsExt};
+
+    if transaction_id.len() != 32
+        || !transaction_id.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err("configuration transaction identifier is invalid".into());
+    }
+
+    let target_dir = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(target_dir_path)
+        .map_err(|error| format!("unable to open configuration directory: {error}"))?;
+    let dir_fd = target_dir.as_raw_fd();
+
+    let final_name = "configuration.nix";
+    let final_c = CString::new(final_name).unwrap();
+    let current_fd = unsafe {
+        libc::openat(
+            dir_fd,
+            final_c.as_ptr(),
+            libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if current_fd < 0 {
+        return Err(format!(
+            "unable to open current configuration for guarded replacement: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    let mut current = unsafe { std::fs::File::from_raw_fd(current_fd) };
+    let metadata = current
+        .metadata()
+        .map_err(|error| format!("unable to inspect current configuration: {error}"))?;
+    if !metadata.is_file() {
+        return Err("current configuration is not a regular file".into());
+    }
+    let mut observed = Vec::new();
+    current
+        .read_to_end(&mut observed)
+        .map_err(|error| format!("unable to read current configuration: {error}"))?;
+    if !configuration_bytes_match(&observed, expected_current) {
+        return Err(
+            "active configuration changed after transaction preparation; refusing stale overwrite"
+                .into(),
+        );
+    }
+
+    let temp_name = format!(".configuration.nix.swap.{transaction_id}");
+    let backup_name = format!(".configuration.nix.backup.{transaction_id}");
+    let temp_c = CString::new(temp_name.as_str())
+        .map_err(|_| "configuration swap staging name contains NUL".to_string())?;
+    let backup_c = CString::new(backup_name.as_str())
+        .map_err(|_| "configuration backup name contains NUL".to_string())?;
+
+    let temp_fd = unsafe {
+        libc::openat(
+            dir_fd,
+            temp_c.as_ptr(),
+            libc::O_WRONLY
+                | libc::O_CREAT
+                | libc::O_EXCL
+                | libc::O_NOFOLLOW
+                | libc::O_CLOEXEC,
+            0o600,
+        )
+    };
+    if temp_fd < 0 {
+        return Err(format!(
+            "unable to create configuration swap staging file: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    let mut temp = unsafe { std::fs::File::from_raw_fd(temp_fd) };
+    temp.set_permissions(std::fs::Permissions::from_mode(0o600))
+        .map_err(|error| format!("unable to protect configuration swap staging file: {error}"))?;
+    use std::io::Write as _;
+    temp.write_all(replacement)
+        .and_then(|_| temp.sync_all())
+        .map_err(|error| {
+            let _ = unsafe { libc::unlinkat(dir_fd, temp_c.as_ptr(), 0) };
+            format!("unable to synchronize configuration swap staging file: {error}")
+        })?;
+
+    if unsafe { libc::linkat(dir_fd, final_c.as_ptr(), dir_fd, backup_c.as_ptr(), 0) } != 0 {
+        let error = std::io::Error::last_os_error();
+        let _ = unsafe { libc::unlinkat(dir_fd, temp_c.as_ptr(), 0) };
+        return Err(format!(
+            "unable to retain current configuration backup link: {error}"
+        ));
+    }
+
+    if let Err(error) = atomic_exchange_at(dir_fd, &temp_c, &final_c) {
+        let _ = unsafe { libc::unlinkat(dir_fd, backup_c.as_ptr(), 0) };
+        let _ = unsafe { libc::unlinkat(dir_fd, temp_c.as_ptr(), 0) };
+        return Err(error);
+    }
+
+    target_dir
+        .sync_all()
+        .map_err(|error| format!("unable to synchronize configuration directory after swap: {error}"))?;
+
+    Ok(ConfigurationSwap {
+        target_dir: target_dir_path.to_path_buf(),
+        temp_name,
+        backup_name,
+    })
+}
+
+fn finalize_configuration_swap_blocking(
+    swap: &ConfigurationSwap,
+    commit: bool,
+) -> Result<(), String> {
+    use std::ffi::CString;
+    use std::os::unix::fs::{AsRawFd, OpenOptionsExt};
+
+    let target_dir = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(&swap.target_dir)
+        .map_err(|error| format!("unable to reopen configuration directory for swap finalization: {error}"))?;
+    let dir_fd = target_dir.as_raw_fd();
+    let temp_c = CString::new(swap.temp_name.as_str())
+        .map_err(|_| "configuration swap temp name contains NUL".to_string())?;
+    let backup_c = CString::new(swap.backup_name.as_str())
+        .map_err(|_| "configuration swap backup name contains NUL".to_string())?;
+    let final_c = CString::new("configuration.nix").unwrap();
+
+    if commit {
+        unsafe {
+            libc::unlinkat(dir_fd, temp_c.as_ptr(), 0);
+            libc::unlinkat(dir_fd, backup_c.as_ptr(), 0);
+        }
+    } else {
+        atomic_exchange_at(dir_fd, &temp_c, &final_c)?;
+        unsafe {
+            libc::unlinkat(dir_fd, temp_c.as_ptr(), 0);
+            libc::unlinkat(dir_fd, backup_c.as_ptr(), 0);
+        }
+    }
+
+    target_dir
+        .sync_all()
+        .map_err(|error| format!("unable to synchronize configuration directory after swap finalization: {error}"))
+}
+
+async fn replace_configuration_atomically(
+    transaction_id: &str,
+    expected_current: Vec<u8>,
+    replacement: Vec<u8>,
+) -> Result<ConfigurationSwap, String> {
+    let transaction_id = transaction_id.to_string();
+    tokio::task::spawn_blocking(move || {
+        replace_configuration_atomically_blocking(
+            std::path::Path::new("/etc/nixos"),
+            &transaction_id,
+            &expected_current,
+            &replacement,
+        )
+    })
+    .await
+    .map_err(|error| format!("configuration replacement task failed: {error}"))?
+}
+
+async fn finalize_configuration_swap(
+    swap: ConfigurationSwap,
+    commit: bool,
+) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || finalize_configuration_swap_blocking(&swap, commit))
+        .await
+        .map_err(|error| format!("configuration swap finalization task failed: {error}"))?
+}
+
 fn restore_verified_configuration_blocking(
     input: std::fs::File,
     transaction_id: &str,
@@ -7175,6 +7387,7 @@ echo '}'
                         .await;
                     continue;
                 }
+
                 let _mutation_guard = match mutation_lock.try_lock() {
                     Ok(guard) => guard,
                     Err(_) => {
@@ -7199,6 +7412,7 @@ echo '}'
                         continue;
                     }
                 };
+
                 let Some(transaction) = admit_mutation_transaction(
                     &mut ws_tx,
                     &transaction_ledger,
@@ -7206,10 +7420,11 @@ echo '}'
                     &client_msg.request_id,
                     None,
                     client_msg.configuration_nix.as_bytes(),
-                ).await else {
+                )
+                .await else {
                     continue;
                 };
-                eprintln!("[{}] {} Writing config + rebuilding...", peer_addr, transaction.log_line());
+
                 let transaction_dir = match create_transaction_artifact_dir(&transaction.transaction_id) {
                     Ok(path) => path,
                     Err(error) => {
@@ -7224,7 +7439,7 @@ echo '}'
                                 serde_json::json!({
                                     "type":"exit",
                                     "code": protocol_exit_code(1, outcome),
-                                    "data": format!("Rebuild artifact namespace unavailable: {}", error),
+                                    "data": format!("Rebuild artifact namespace unavailable: {error}"),
                                     "transaction": transaction.receipt(outcome)
                                 })
                                 .to_string(),
@@ -7233,78 +7448,20 @@ echo '}'
                         continue;
                     }
                 };
-                let wc_config_path = format!("{transaction_dir}/newconfig.nix");
-                let wc_preimage_path = format!("{transaction_dir}/config-preimage.nix");
-                let wc_script_path = format!("{transaction_dir}/rebuild.sh");
-                let wc_log_path = format!("{transaction_dir}/rebuild.log");
-                let wc_status_path = format!("{transaction_dir}/rebuild.status");
-                let wc_pid_path = format!("{transaction_dir}/rebuild.pid");
-                // Snapshot the exact active configuration before staging.
-                // The apply step refuses stale overwrites if another actor changes it.
-                if let Err(error) = tokio::fs::copy(
-                    "/etc/nixos/configuration.nix",
-                    &wc_preimage_path,
-                )
-                .await
-                {
-                    let outcome = finalize_transaction(
-                        &transaction_ledger,
-                        &transaction,
-                        TransactionOutcome::Indeterminate,
-                        &peer_addr,
-                    );
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            serde_json::json!({
-                                "type":"exit",
-                                "code": protocol_exit_code(1, outcome),
-                                "data": format!("Unable to establish config pre-state: {}", error),
-                                "transaction": transaction.receipt(outcome)
-                            })
-                            .to_string(),
-                        ))
-                        .await;
-                    remove_transaction_artifact_dir(&transaction_dir);
-                    continue;
-                }
-                if let Err(error) = tokio::fs::set_permissions(
-                    &wc_preimage_path,
-                    std::os::unix::fs::PermissionsExt::from_mode(0o600),
-                )
-                .await
-                {
-                    let _ = tokio::fs::remove_file(&wc_preimage_path).await;
-                    let outcome = finalize_transaction(
-                        &transaction_ledger,
-                        &transaction,
-                        TransactionOutcome::Indeterminate,
-                        &peer_addr,
-                    );
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            serde_json::json!({
-                                "type":"exit",
-                                "code": protocol_exit_code(1, outcome),
-                                "data": format!("Unable to protect config pre-state: {}", error),
-                                "transaction": transaction.receipt(outcome)
-                            })
-                            .to_string(),
-                        ))
-                        .await;
-                    remove_transaction_artifact_dir(&transaction_dir);
-                    continue;
-                }
 
-                // Stage browser-supplied configuration through one private, synchronized
-                // descriptor. There is no separate chmod step that can silently fail.
+                let candidate_path = format!("{transaction_dir}/configuration.nix");
+                let log_path = format!("{transaction_dir}/rebuild.log");
+                let status_path = format!("{transaction_dir}/rebuild.status");
+                let pid_path = format!("{transaction_dir}/rebuild.pid");
+
                 if let Err(error) =
-                    write_private_file(&wc_config_path, client_msg.configuration_nix.as_bytes(), 0o600)
+                    write_private_file(&candidate_path, client_msg.configuration_nix.as_bytes(), 0o600)
                 {
-                    let _ = tokio::fs::remove_file(&wc_preimage_path).await;
+                    remove_transaction_artifact_dir(&transaction_dir);
                     let outcome = finalize_transaction(
                         &transaction_ledger,
                         &transaction,
-                        TransactionOutcome::Indeterminate,
+                        TransactionOutcome::Failed,
                         &peer_addr,
                     );
                     let _ = ws_tx
@@ -7312,109 +7469,154 @@ echo '}'
                             serde_json::json!({
                                 "type":"exit",
                                 "code": protocol_exit_code(1, outcome),
-                                "data": format!("Config staging could not be established: {}", error),
+                                "data": format!("Configuration staging failed: {error}"),
                                 "transaction": transaction.receipt(outcome)
                             })
                             .to_string(),
                         ))
                         .await;
-                    remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
 
-                let rebuild_script = format!(
-                    r#"set -o pipefail
-if ! cmp -s {preimage} /etc/nixos/configuration.nix; then
-    echo "ERROR: Active configuration changed after this transaction was prepared. Refusing stale overwrite."
-    rm -f -- {config} {preimage}
-    exit 2
-fi
-if ! nix-instantiate --parse {config} > /dev/null 2>&1; then
-    echo "ERROR: Invalid Nix syntax. Keeping the active configuration unchanged."
-    rm -f -- {config} {preimage}
-    exit 1
-fi
-if ! cmp -s {preimage} /etc/nixos/configuration.nix; then
-    echo "ERROR: Active configuration changed during validation. Refusing stale overwrite."
-    rm -f -- {config} {preimage}
-    exit 2
-fi
-cp -- /etc/nixos/configuration.nix /etc/nixos/configuration.nix.bak
-cp -- {config} /etc/nixos/configuration.nix
-rm -f -- {config}
-echo "Config validated. Rebuilding..."
-set +e
-nixos-rebuild switch 2>&1
-REBUILD_EXIT=$?
-set -e
-if [ $REBUILD_EXIT -ne 0 ]; then
-    echo "ERROR: Rebuild failed. Restoring the previous configuration."
-    cp -- /etc/nixos/configuration.nix.bak /etc/nixos/configuration.nix
-    rm -f -- {preimage}
-    exit $REBUILD_EXIT
-fi
-rm -f -- {preimage}
-echo "REBUILD_COMPLETE"
-"#,
-                    config = wc_config_path,
-                    preimage = wc_preimage_path
-                );
-
-                if let Err(error) = write_private_file(&wc_script_path, rebuild_script.as_bytes(), 0o700) {
-                    let _ = tokio::fs::remove_file(&wc_config_path).await;
-                    let _ = tokio::fs::remove_file(&wc_preimage_path).await;
-                    let outcome = finalize_transaction(
-                        &transaction_ledger,
-                        &transaction,
-                        TransactionOutcome::Indeterminate,
-                        &peer_addr,
-                    );
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            serde_json::json!({
-                                "type":"exit",
-                                "code": protocol_exit_code(1, outcome),
-                                "data": format!("Rebuild script staging could not be established: {}", error),
-                                "transaction": transaction.receipt(outcome)
-                            })
-                            .to_string(),
-                        ))
-                        .await;
-                    remove_transaction_artifact_dir(&transaction_dir);
-                    continue;
+                let parse_result =
+                    run_privileged_args("nix-instantiate", &["--parse", &candidate_path]).await;
+                match parse_result {
+                    Ok(result) if result.exit_status == 0 => {}
+                    Ok(result) => {
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(result.exit_status, outcome),
+                                    "data": format!(
+                                        "Invalid Nix configuration: {}",
+                                        result.stderr.chars().take(2000).collect::<String>()
+                                    ),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                    Err(error) => {
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Configuration validation could not be observed: {error}"),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
                 }
-                if let Err(error) = spawn_privileged_background_script(
-                    &wc_script_path,
-                    &wc_log_path,
-                    &wc_status_path,
-                    &wc_pid_path,
+
+                let expected_current = match tokio::fs::read("/etc/nixos/configuration.nix").await {
+                    Ok(bytes) => bytes,
+                    Err(error) => {
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Indeterminate,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Configuration pre-state unavailable: {error}"),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let swap = match replace_configuration_atomically(
+                    &transaction.transaction_id,
+                    expected_current,
+                    client_msg.configuration_nix.as_bytes().to_vec(),
                 )
                 .await
                 {
-                    let _ = tokio::fs::remove_file(&wc_config_path).await;
-                    let _ = tokio::fs::remove_file(&wc_preimage_path).await;
-                    let _ = tokio::fs::remove_file(&wc_script_path).await;
-                    let _ = tokio::fs::remove_file(&wc_log_path).await;
-                    let _ = tokio::fs::remove_file(&wc_status_path).await;
-                    let _ = tokio::fs::remove_file(&wc_pid_path).await;
-                    let outcome = finalize_transaction(
-                        &transaction_ledger,
-                        &transaction,
-                        TransactionOutcome::Indeterminate,
-                        &peer_addr,
-                    );
+                    Ok(swap) => swap,
+                    Err(error) => {
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        let outcome = if error.contains("changed after transaction preparation") {
+                            TransactionOutcome::Failed
+                        } else {
+                            TransactionOutcome::Indeterminate
+                        };
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Configuration atomic replacement refused: {error}"),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                        continue;
+                    }
+                };
+
+                let mut rebuild_command = privileged_process("nixos-rebuild");
+                rebuild_command.args(["switch"]);
+                if let Err(error) = spawn_privileged_background_process(
+                    rebuild_command,
+                    &log_path,
+                    &status_path,
+                    &pid_path,
+                )
+                .await
+                {
+                    let revert = finalize_configuration_swap(swap, false).await;
+                    let observed = if revert.is_ok() {
+                        TransactionOutcome::Failed
+                    } else {
+                        TransactionOutcome::Indeterminate
+                    };
+                    remove_transaction_artifact_dir(&transaction_dir);
                     let _ = ws_tx
                         .send(Message::Text(
                             serde_json::json!({
                                 "type":"exit",
-                                "code": protocol_exit_code(1, outcome),
-                                "data": format!("Rebuild launch could not be observed: {}", error),
-                                "transaction": transaction.receipt(outcome)
+                                "code": protocol_exit_code(1, observed),
+                                "data": format!("Rebuild launch failed: {error}; configuration rollback: {:?}", revert),
+                                "transaction": transaction.receipt(finalize_transaction(
+                                    &transaction_ledger,
+                                    &transaction,
+                                    observed,
+                                    &peer_addr,
+                                ))
                             })
                             .to_string(),
                         ))
                         .await;
-                    remove_transaction_artifact_dir(&transaction_dir);
                     continue;
                 }
 
@@ -7427,10 +7629,11 @@ echo "REBUILD_COMPLETE"
                         .to_json(),
                     ))
                     .await;
+
                 let mut last_lines = 0usize;
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                    if let Ok(bytes) = tokio::fs::read(&wc_log_path).await {
+                    if let Ok(bytes) = tokio::fs::read(&log_path).await {
                         let text = String::from_utf8_lossy(&bytes);
                         let lines: Vec<&str> = text.lines().collect();
                         if lines.len() >= last_lines {
@@ -7441,18 +7644,12 @@ echo "REBUILD_COMPLETE"
                                             RelayMessage::output(line, "stdout").to_json(),
                                         ))
                                         .await;
-                                    if line.contains("REBUILD_COMPLETE") {
-                                        complete = true;
-                                    }
                                 }
                             }
                             last_lines = lines.len();
                         }
                     }
-                    if complete {
-                        break;
-                    }
-                    if read_transaction_status(&wc_status_path)
+                    if read_transaction_status(&status_path)
                         .await
                         .ok()
                         .flatten()
@@ -7460,7 +7657,7 @@ echo "REBUILD_COMPLETE"
                     {
                         break;
                     }
-                    let pid = tokio::fs::read_to_string(&wc_pid_path)
+                    let pid = tokio::fs::read_to_string(&pid_path)
                         .await
                         .ok()
                         .and_then(|text| text.trim().parse::<u32>().ok())
@@ -7469,31 +7666,70 @@ echo "REBUILD_COMPLETE"
                         break;
                     }
                 }
-                let rebuild_exit_code = read_transaction_status(&wc_status_path)
+
+                let rebuild_exit_code = read_transaction_status(&status_path)
                     .await
                     .ok()
                     .flatten();
+
                 let (exit_code, observed_outcome) = match rebuild_exit_code {
-                    Some(0) => match verify_active_configuration(client_msg.configuration_nix.as_bytes()).await {
-                        Ok(true) => (0, TransactionOutcome::ObservedSuccess),
+                    Some(0) => match verify_active_configuration(
+                        client_msg.configuration_nix.as_bytes(),
+                    )
+                    .await
+                    {
+                        Ok(true) => match finalize_configuration_swap(swap, true).await {
+                            Ok(()) => (0, TransactionOutcome::ObservedSuccess),
+                            Err(error) => {
+                                eprintln!(
+                                    "[{}] {} configuration cleanup after successful rebuild failed: {}",
+                                    peer_addr,
+                                    transaction.log_line(),
+                                    error
+                                );
+                                (1, TransactionOutcome::Indeterminate)
+                            }
+                        },
                         Ok(false) => {
                             eprintln!(
-                                "[{}] {} rebuild returned 0 but active configuration does not match the requested bytes",
-                                peer_addr, transaction.log_line()
+                                "[{}] {} rebuild returned 0 but active configuration does not match requested bytes",
+                                peer_addr,
+                                transaction.log_line()
                             );
-                            (1, TransactionOutcome::Indeterminate)
+                            match finalize_configuration_swap(swap, false).await {
+                                Ok(()) => (1, TransactionOutcome::Indeterminate),
+                                Err(error) => {
+                                    eprintln!(
+                                        "[{}] {} configuration rollback after postcondition failure failed: {}",
+                                        peer_addr,
+                                        transaction.log_line(),
+                                        error
+                                    );
+                                    (1, TransactionOutcome::Indeterminate)
+                                }
+                            }
                         }
                         Err(error) => {
                             eprintln!(
                                 "[{}] {} active configuration postcondition probe failed: {}",
-                                peer_addr, transaction.log_line(), error
+                                peer_addr,
+                                transaction.log_line(),
+                                error
                             );
                             (1, TransactionOutcome::Indeterminate)
                         }
                     },
-                    Some(code) => (code, TransactionOutcome::Failed),
+                    Some(code) => {
+                        let rollback = finalize_configuration_swap(swap, false).await;
+                        if rollback.is_err() {
+                            (1, TransactionOutcome::Indeterminate)
+                        } else {
+                            (code, TransactionOutcome::Failed)
+                        }
+                    }
                     None => (1, TransactionOutcome::Indeterminate),
                 };
+
                 let outcome = finalize_transaction(
                     &transaction_ledger,
                     &transaction,
@@ -7510,12 +7746,11 @@ echo "REBUILD_COMPLETE"
                         .to_string(),
                     ))
                     .await;
-                let _ = tokio::fs::remove_file(&wc_config_path).await;
-                let _ = tokio::fs::remove_file(&wc_preimage_path).await;
-                let _ = tokio::fs::remove_file(&wc_script_path).await;
-                let _ = tokio::fs::remove_file(&wc_log_path).await;
-                let _ = tokio::fs::remove_file(&wc_status_path).await;
-                let _ = tokio::fs::remove_file(&wc_pid_path).await;
+
+                let _ = tokio::fs::remove_file(&candidate_path).await;
+                let _ = tokio::fs::remove_file(&log_path).await;
+                let _ = tokio::fs::remove_file(&status_path).await;
+                let _ = tokio::fs::remove_file(&pid_path).await;
                 remove_transaction_artifact_dir(&transaction_dir);
             }
 
