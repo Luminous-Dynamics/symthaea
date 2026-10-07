@@ -205,6 +205,7 @@ pub(crate) struct TransactionReceipt {
     pub(crate) outcome: TransactionOutcome,
     pub(crate) artifact_commitment: Option<ArtifactCommitment>,
     pub(crate) configuration_commitment: Option<ArtifactCommitment>,
+    pub(crate) hardware_configuration_commitment: Option<ArtifactCommitment>,
 }
 
 impl SystemTransaction {
