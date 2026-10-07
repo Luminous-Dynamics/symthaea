@@ -224,18 +224,16 @@ impl ExecutionGraph {
                 let left = &self.nodes[left_index];
                 let right = &self.nodes[right_index];
 
-                let Some(resource) = shared_write_resource(left, right) else {
-                    continue;
-                };
-
-                if !(reachable(&adjacency, left.id, right.id)
-                    || reachable(&adjacency, right.id, left.id))
-                {
-                    return Err(GraphError::UnorderedResourceConflict {
-                        left: left.id,
-                        right: right.id,
-                        resource,
-                    });
+                for resource in shared_write_resources(left, right) {
+                    if !(reachable(&adjacency, left.id, right.id)
+                        || reachable(&adjacency, right.id, left.id))
+                    {
+                        return Err(GraphError::UnorderedResourceConflict {
+                            left: left.id,
+                            right: right.id,
+                            resource,
+                        });
+                    }
                 }
             }
         }
@@ -417,20 +415,23 @@ fn edge_kind_is_valid(
     }
 }
 
-fn shared_write_resource(left: &ExecutionNode, right: &ExecutionNode) -> Option<ResourceId> {
+fn shared_write_resources(
+    left: &ExecutionNode,
+    right: &ExecutionNode,
+) -> BTreeSet<ResourceId> {
+    let mut resources = BTreeSet::new();
+
     for left_use in &left.resources {
         if !left_use.access.is_write() {
             continue;
         }
 
-        if let Some(right_use) = right
+        if right
             .resources
             .iter()
-            .find(|use_| use_.resource == left_use.resource)
+            .any(|use_| use_.resource == left_use.resource)
         {
-            if right_use.access.is_write() || right_use.access.is_read() {
-                return Some(left_use.resource.clone());
-            }
+            resources.insert(left_use.resource.clone());
         }
     }
 
@@ -439,18 +440,16 @@ fn shared_write_resource(left: &ExecutionNode, right: &ExecutionNode) -> Option<
             continue;
         }
 
-        if let Some(left_use) = left
+        if left
             .resources
             .iter()
-            .find(|use_| use_.resource == right_use.resource)
+            .any(|use_| use_.resource == right_use.resource)
         {
-            if left_use.access.is_read() || left_use.access.is_write() {
-                return Some(right_use.resource.clone());
-            }
+            resources.insert(right_use.resource.clone());
         }
     }
 
-    None
+    resources
 }
 
 fn reachable(adjacency: &HashMap<u32, Vec<u32>>, from: u32, target: u32) -> bool {
@@ -670,6 +669,56 @@ mod tests {
             graph.validate(),
             Err(GraphError::CycleDetected(_))
         ));
+    }
+
+    #[test]
+    fn every_conflicting_resource_must_be_ordered() {
+        let first = resource("first");
+        let second = resource("second");
+        let nodes = vec![
+            ExecutionNode::new(
+                1,
+                op(8),
+                vec![
+                    ResourceUse::new(first.clone(), AccessKind::Write),
+                    ResourceUse::new(second.clone(), AccessKind::Write),
+                ],
+            ),
+            ExecutionNode::new(
+                2,
+                op(8),
+                vec![
+                    ResourceUse::new(first.clone(), AccessKind::Read),
+                    ResourceUse::new(second.clone(), AccessKind::Read),
+                ],
+            ),
+        ];
+
+        let error = ExecutionGraph::new(
+            nodes.clone(),
+            vec![DependencyEdge::new(
+                1,
+                2,
+                first,
+                DependencyKind::ReadAfterWrite,
+            )],
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            GraphError::UnorderedResourceConflict { resource, .. }
+            if resource == second
+        ));
+
+        ExecutionGraph::new(
+            nodes,
+            vec![
+                DependencyEdge::new(1, 2, resource("first"), DependencyKind::ReadAfterWrite),
+                DependencyEdge::new(1, 2, second, DependencyKind::ReadAfterWrite),
+            ],
+        )
+        .unwrap();
     }
 
     #[test]
