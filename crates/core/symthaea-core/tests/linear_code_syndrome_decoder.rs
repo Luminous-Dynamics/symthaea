@@ -252,6 +252,64 @@ fn small_fixture_kernel_equals_code_and_syndrome_cosets_are_exact() {
 }
 
 #[test]
+fn small_fixture_production_syndrome_matches_independent_oracle_and_is_linear() {
+    let code = boundary_code();
+    let parity_check = ParityCheckMatrix::from_code(&code).expect("parity-check matrix");
+    let checks = independent_parity_check_rows(&code);
+
+    assert_eq!(checks.len(), parity_check.syndrome_dimension());
+    assert_eq!(checks.len(), 6);
+
+    let mut syndromes = Vec::with_capacity(1usize << code.dimension());
+    for mask in 0..(1usize << code.dimension()) {
+        let word = error_from_mask(mask, code.dimension());
+        let production = parity_check
+            .syndrome(&word)
+            .expect("same dimension");
+        let independent = independent_syndrome(mask as u64, &checks);
+        assert_eq!(
+            production.words()[0], independent,
+            "production and independent syndrome oracles diverged: mask={mask:#x}"
+        );
+        syndromes.push(independent);
+    }
+
+    for left in 0..(1usize << code.dimension()) {
+        for right in 0..(1usize << code.dimension()) {
+            let xor = (left ^ right) as u64;
+            let expected = syndromes[left] ^ syndromes[right];
+            assert_eq!(
+                independent_syndrome(xor, &checks),
+                expected,
+                "independent syndrome map was not linear: left={left:#x} right={right:#x}"
+            );
+
+            let production_left = parity_check
+                .syndrome(&error_from_mask(left, code.dimension()))
+                .expect("same dimension");
+            let production_right = parity_check
+                .syndrome(&error_from_mask(right, code.dimension()))
+                .expect("same dimension");
+            let production_xor = parity_check
+                .syndrome(&error_from_mask(left ^ right, code.dimension()))
+                .expect("same dimension");
+            let expected_production = production_left.bound(&production_right);
+            assert_eq!(
+                production_xor, expected_production,
+                "production syndrome map was not linear: left={left:#x} right={right:#x}"
+            );
+        }
+    }
+
+    println!(
+        "SYNDROME_ORACLE_LINEAREXHAUSTIVE=dimension={};observations={};pairs={};independent_agreement=true;production_linearity=true;independent_linearity=true",
+        code.dimension(),
+        1usize << code.dimension(),
+        (1usize << code.dimension()) * (1usize << code.dimension()),
+    );
+}
+
+#[test]
 fn bounded_distance_decoder_matches_exhaustive_oracle_below_half_distance() {
     let code = boundary_code();
     let codewords = code.enumerate();
