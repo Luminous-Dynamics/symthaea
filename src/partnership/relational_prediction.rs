@@ -1381,6 +1381,10 @@ const CANONICAL_INFERENCE_SELECTION_SMALL_SAMPLE_POLICY_ID: &str =
     "small-sample-conservative-v1";
 const CANONICAL_INFERENCE_SELECTION_MULTIPLICITY_POLICY_ID: &str =
     "single-primary-comparison-v1";
+const CANONICAL_INFERENCE_ESTIMATOR_ID: &str = "fixed-ridge-standardized-v1";
+const CANONICAL_INFERENCE_ESTIMATOR_APPLICABILITY_SPEC_SHA256: &str =
+    "703ff832ca6fed91ca05d76c891ba6b2edb3bf063e7af40a23ae2c475061027e";
+const CANONICAL_INFERENCE_ESTIMATOR_APPLICABILITY_APPROVED: bool = false;
 
 /// Frozen analysis contract for future inferential qualification.
 /// This specifies the inferential procedure and all supporting choices without
@@ -1406,6 +1410,8 @@ pub struct ForecastInferencePlan {
     pub multiplicity_policy_id: String,
     pub alpha: f64,
     pub qualification_identity_blake3: String,
+    pub estimator_compatibility_id: String,
+    pub estimator_compatibility_spec_sha256: String,
     pub plan_blake3: String,
 }
 
@@ -1445,6 +1451,9 @@ impl ForecastInferencePlan {
             multiplicity_policy_id: multiplicity_policy_id.into(),
             alpha,
             qualification_identity_blake3: qualification_identity_blake3.into(),
+            estimator_compatibility_id: CANONICAL_INFERENCE_ESTIMATOR_ID.to_string(),
+            estimator_compatibility_spec_sha256:
+                CANONICAL_INFERENCE_ESTIMATOR_APPLICABILITY_SPEC_SHA256.to_string(),
             plan_blake3: String::new(),
         };
         plan.plan_blake3 = inference_plan_digest(&plan);
@@ -1473,6 +1482,8 @@ impl ForecastInferencePlan {
             || self.alpha <= 0.0
             || self.alpha >= 1.0
             || !is_hex_digest(&self.qualification_identity_blake3, 64)
+            || self.estimator_compatibility_id.trim().is_empty()
+            || !is_hex_digest(&self.estimator_compatibility_spec_sha256, 64)
             || !is_hex_digest(&self.plan_blake3, 64)
         {
             return Err(RelationalPredictionError::InvalidSplit);
@@ -1515,6 +1526,8 @@ impl ForecastInferencePlan {
             "multiplicity_policy_id": &self.multiplicity_policy_id,
             "alpha": self.alpha,
             "qualification_identity_blake3": &self.qualification_identity_blake3,
+            "estimator_compatibility_id": &self.estimator_compatibility_id,
+            "estimator_compatibility_spec_sha256": &self.estimator_compatibility_spec_sha256,
             "plan_blake3": &self.plan_blake3
         }).to_string())
     }
@@ -1851,7 +1864,11 @@ impl ForecastInferenceSelectionPath {
     }
 
     fn for_plan(plan: &ForecastInferencePlan) -> Self {
-        if plan.method_selection_rule_id == CANONICAL_INFERENCE_SELECTION_RULE_ID
+        if CANONICAL_INFERENCE_ESTIMATOR_APPLICABILITY_APPROVED
+            && plan.estimator_compatibility_id == CANONICAL_INFERENCE_ESTIMATOR_ID
+            && plan.estimator_compatibility_spec_sha256
+                == CANONICAL_INFERENCE_ESTIMATOR_APPLICABILITY_SPEC_SHA256
+            && plan.method_selection_rule_id == CANONICAL_INFERENCE_SELECTION_RULE_ID
             && plan.method_selection_rule_spec_sha256
                 == CANONICAL_INFERENCE_SELECTION_RULE_SPEC_SHA256
             && plan.procedure_id == CANONICAL_INFERENCE_SELECTION_PROCEDURE_ID
@@ -1895,6 +1912,8 @@ pub struct ForecastInferenceSelectionReceipt {
     pub selected_resampling_spec_sha256: String,
     pub selected_small_sample_policy_id: String,
     pub selected_multiplicity_policy_id: String,
+    pub estimator_compatibility_id: String,
+    pub estimator_compatibility_spec_sha256: String,
     pub selection_blake3: String,
 }
 
@@ -1960,6 +1979,8 @@ impl ForecastInferenceSelectionReceipt {
             selected_resampling_spec_sha256: plan.resampling_spec_sha256.clone(),
             selected_small_sample_policy_id: plan.small_sample_policy_id.clone(),
             selected_multiplicity_policy_id: plan.multiplicity_policy_id.clone(),
+            estimator_compatibility_id: plan.estimator_compatibility_id.clone(),
+            estimator_compatibility_spec_sha256: plan.estimator_compatibility_spec_sha256.clone(),
             selection_blake3: String::new(),
         };
         receipt.selection_blake3 = inference_selection_digest(&receipt);
@@ -1992,6 +2013,8 @@ impl ForecastInferenceSelectionReceipt {
             || !is_hex_digest(&self.selected_resampling_spec_sha256, 64)
             || self.selected_small_sample_policy_id.trim().is_empty()
             || self.selected_multiplicity_policy_id.trim().is_empty()
+            || self.estimator_compatibility_id.trim().is_empty()
+            || !is_hex_digest(&self.estimator_compatibility_spec_sha256, 64)
             || !is_hex_digest(&self.selection_blake3, 64)
         {
             return Err(RelationalPredictionError::InvalidSplit);
@@ -2027,6 +2050,9 @@ impl ForecastInferenceSelectionReceipt {
             || self.selected_resampling_spec_sha256 != plan.resampling_spec_sha256
             || self.selected_small_sample_policy_id != plan.small_sample_policy_id
             || self.selected_multiplicity_policy_id != plan.multiplicity_policy_id
+            || self.estimator_compatibility_id != plan.estimator_compatibility_id
+            || self.estimator_compatibility_spec_sha256
+                != plan.estimator_compatibility_spec_sha256
             || self.decision_path_id != ForecastInferenceSelectionPath::for_plan(plan).as_str()
         {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
@@ -2060,6 +2086,8 @@ impl ForecastInferenceSelectionReceipt {
             "selected_resampling_spec_sha256": &self.selected_resampling_spec_sha256,
             "selected_small_sample_policy_id": &self.selected_small_sample_policy_id,
             "selected_multiplicity_policy_id": &self.selected_multiplicity_policy_id,
+            "estimator_compatibility_id": &self.estimator_compatibility_id,
+            "estimator_compatibility_spec_sha256": &self.estimator_compatibility_spec_sha256,
             "selection_blake3": &self.selection_blake3
         }).to_string())
     }
@@ -4330,6 +4358,8 @@ fn inference_plan_digest(plan: &ForecastInferencePlan) -> String {
     update_string(&mut hasher, &plan.multiplicity_policy_id);
     update_f64(&mut hasher, plan.alpha);
     update_string(&mut hasher, &plan.qualification_identity_blake3);
+    update_string(&mut hasher, &plan.estimator_compatibility_id);
+    update_string(&mut hasher, &plan.estimator_compatibility_spec_sha256);
     hasher.finalize().to_hex().to_string()
 }
 
@@ -4450,6 +4480,8 @@ fn inference_selection_digest(receipt: &ForecastInferenceSelectionReceipt) -> St
     update_string(&mut hasher, &receipt.selected_resampling_spec_sha256);
     update_string(&mut hasher, &receipt.selected_small_sample_policy_id);
     update_string(&mut hasher, &receipt.selected_multiplicity_policy_id);
+    update_string(&mut hasher, &receipt.estimator_compatibility_id);
+    update_string(&mut hasher, &receipt.estimator_compatibility_spec_sha256);
     hasher.finalize().to_hex().to_string()
 }
 
@@ -5835,7 +5867,7 @@ mod tests {
         let plan = canonical_plan();
         assert_eq!(
             ForecastInferenceSelectionPath::for_plan(&plan),
-            ForecastInferenceSelectionPath::NestedFixedHorizonBootstrap
+            ForecastInferenceSelectionPath::StopAssumptionFailure
         );
 
         let mut procedure_tampered = plan.clone();
@@ -5941,6 +5973,14 @@ mod tests {
             "moving-block-bootstrap-v1"
         );
         assert_eq!(
+            value["selected_method_bundle"]["estimator_compatibility_id"],
+            CANONICAL_INFERENCE_ESTIMATOR_ID
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["estimator_compatibility_spec_sha256"],
+            CANONICAL_INFERENCE_ESTIMATOR_APPLICABILITY_SPEC_SHA256
+        );
+        assert_eq!(
             value["selected_method_bundle"]["procedure_spec_sha256"],
             CANONICAL_INFERENCE_SELECTION_PROCEDURE_SPEC_SHA256
         );
@@ -6012,7 +6052,7 @@ mod tests {
 
         receipt.validate().unwrap();
         assert_eq!(receipt.plan_blake3, plan.plan_blake3);
-        assert_eq!(receipt.decision_path_id, "nested-fixed-horizon-bootstrap");
+        assert_eq!(receipt.decision_path_id, "stop-assumption-failure");
         assert_eq!(receipt.binding_blake3, ForecastInferenceBinding::from_rolling(
             &samples,
             &plan,
