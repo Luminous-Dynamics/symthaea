@@ -120,14 +120,14 @@ pub const MORPHOPHONOLOGICAL_DERIVATION_WITNESS_VERSION: &str =
     "broca-morphophonological-derivation-witness-v2";
 
 pub const MORPHOPHONOLOGICAL_RULE_SET_VERSION: &str =
-    "broca-morphophonological-rule-set-v1";
+    "broca-morphophonological-rule-set-v2";
 pub const MORPHOPHONOLOGICAL_RULE_SELECTION_POLICY: &str =
-    "exact-feature-single-rule-v1";
+    "exact-lemma-and-feature-single-rule-v2";
 pub const MORPHOPHONOLOGICAL_RESOURCE_EVIDENCE_VERSION: &str =
     "broca-morphophonological-resource-evidence-v2";
 
 pub const MORPHOPHONOLOGICAL_COMPILATION_WITNESS_VERSION: &str =
-    "broca-morphophonological-compilation-witness-v1";
+    "broca-morphophonological-compilation-witness-v3";
 
 /// Whether an executable morphology resource is externally sourced or explicitly
 /// authored as a local/fixture resource.
@@ -315,6 +315,281 @@ impl std::fmt::Display for MorphophonologicalResourceEvidenceError {
 
 impl std::error::Error for MorphophonologicalResourceEvidenceError {}
 
+pub const UNIMORPH_TSV_SOURCE_FORMAT_VERSION: &str =
+    "unimorph-tsv-lemma-form-features-v1";
+pub const UNIMORPH_TSV_COMPILER_ID: &str = "symthaea-unimorph-tsv-compiler";
+pub const UNIMORPH_TSV_COMPILER_VERSION: &str = "broca-unimorph-tsv-compiler-v1";
+pub const UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION: &str =
+    env!("SYMTHAEA_UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION");
+pub const UNIMORPH_TSV_SOURCE_PARSER_REVISION: &str =
+    env!("SYMTHAEA_UNIMORPH_TSV_SOURCE_PARSER_REVISION");
+pub const UNIMORPH_TSV_COMPILER_BUILD_CONTEXT_REVISION: &str =
+    env!("SYMTHAEA_UNIMORPH_TSV_COMPILER_BUILD_CONTEXT_REVISION");
+pub const UNIMORPH_TSV_NORMALIZATION_POLICY: &str =
+    "trim-one-line-ending-sort-feature-tokens-sort-output-rules-v1";
+pub const UNIMORPH_TSV_FEATURE_BUNDLE_CATEGORY: &str = "unimorph-bundle";
+
+/// A parsed UniMorph-style source record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MorphophonologicalSourceRecord {
+    pub record_id: String,
+    pub lemma: String,
+    pub form: String,
+    pub feature_bundle: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MorphophonologicalUnimorphCompilerError {
+    InvalidSourceFormat,
+    EmptyRecord,
+    InvalidColumnCount,
+    EmptyLemma,
+    EmptyForm,
+    EmptyFeatureBundle,
+    EmptyFeatureToken,
+    DuplicateFeatureToken,
+    UnsupportedDerivation,
+    AmbiguousSimpleDerivation,
+    DuplicateLemmaAndFeatureBundle,
+    ResourceEvidence,
+    RuleSet(MorphophonologicalRuleSetError),
+    CompilationWitness(MorphophonologicalCompilationWitnessError),
+}
+
+impl std::fmt::Display for MorphophonologicalUnimorphCompilerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidSourceFormat => write!(f, "unsupported UniMorph TSV source format"),
+            Self::EmptyRecord => write!(f, "selected UniMorph source record is empty"),
+            Self::InvalidColumnCount => write!(f, "UniMorph source record must contain exactly three tab-separated columns"),
+            Self::EmptyLemma => write!(f, "UniMorph source record lemma must be non-empty"),
+            Self::EmptyForm => write!(f, "UniMorph source record surface form must be non-empty"),
+            Self::EmptyFeatureBundle => write!(f, "UniMorph source record feature bundle must be non-empty"),
+            Self::EmptyFeatureToken => write!(f, "UniMorph source feature bundle contains an empty token"),
+            Self::DuplicateFeatureToken => write!(f, "UniMorph source feature bundle contains a duplicate token"),
+            Self::UnsupportedDerivation => write!(f, "UniMorph source record cannot be represented by the supported deterministic rule operations"),
+            Self::AmbiguousSimpleDerivation => write!(f, "UniMorph source record admits multiple supported simple derivations"),
+            Self::DuplicateLemmaAndFeatureBundle => write!(f, "UniMorph source compilation contains duplicate lemma and feature-bundle identities"),
+            Self::ResourceEvidence => write!(f, "UniMorph source resource evidence could not be constructed"),
+            Self::RuleSet(error) => write!(f, "compiled morphophonological rule set is invalid: {error}"),
+            Self::CompilationWitness(error) => write!(f, "compiled morphophonological provenance is invalid: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for MorphophonologicalUnimorphCompilerError {}
+
+// BEGIN UNIMORPH_TSV_SOURCE_PARSER_SURFACE_V1
+pub fn normalize_unimorph_feature_bundle(
+    feature_bundle: &str,
+) -> Result<MorphologicalFeature, MorphophonologicalUnimorphCompilerError> {
+    let mut tokens = feature_bundle
+        .split(';')
+        .map(str::trim)
+        .collect::<Vec<_>>();
+    if tokens.is_empty() || tokens.iter().any(|token| token.is_empty()) {
+        return Err(MorphophonologicalUnimorphCompilerError::EmptyFeatureToken);
+    }
+    tokens.sort_unstable();
+    for window in tokens.windows(2) {
+        if window[0] == window[1] {
+            return Err(MorphophonologicalUnimorphCompilerError::DuplicateFeatureToken);
+        }
+    }
+    Ok(MorphologicalFeature {
+        category: UNIMORPH_TSV_FEATURE_BUNDLE_CATEGORY.to_string(),
+        value: tokens.join(";"),
+    })
+}
+
+fn parse_unimorph_source_record(
+    record_id: &str,
+    bytes: &[u8],
+) -> Result<MorphophonologicalSourceRecord, MorphophonologicalUnimorphCompilerError> {
+    let text = std::str::from_utf8(bytes)
+        .map_err(|_| MorphophonologicalUnimorphCompilerError::InvalidSourceFormat)?;
+    let text = text
+        .strip_suffix("\r\n")
+        .or_else(|| text.strip_suffix('\n'))
+        .unwrap_or(text);
+    if text.trim().is_empty() {
+        return Err(MorphophonologicalUnimorphCompilerError::EmptyRecord);
+    }
+    if text.contains('\n') || text.contains('\r') {
+        return Err(MorphophonologicalUnimorphCompilerError::InvalidSourceFormat);
+    }
+    let columns = text.split('\t').collect::<Vec<_>>();
+    if columns.len() != 3 {
+        return Err(MorphophonologicalUnimorphCompilerError::InvalidColumnCount);
+    }
+    let lemma = columns[0].trim();
+    let form = columns[1].trim();
+    let feature_bundle = columns[2].trim();
+    if lemma.is_empty() {
+        return Err(MorphophonologicalUnimorphCompilerError::EmptyLemma);
+    }
+    if form.is_empty() {
+        return Err(MorphophonologicalUnimorphCompilerError::EmptyForm);
+    }
+    if feature_bundle.is_empty() {
+        return Err(MorphophonologicalUnimorphCompilerError::EmptyFeatureBundle);
+    }
+    let normalized = normalize_unimorph_feature_bundle(feature_bundle)?;
+    Ok(MorphophonologicalSourceRecord {
+        record_id: record_id.to_string(),
+        lemma: lemma.to_string(),
+        form: form.to_string(),
+        feature_bundle: normalized.value,
+    })
+}
+// END UNIMORPH_TSV_SOURCE_PARSER_SURFACE_V1
+
+fn infer_simple_unimorph_operation(
+    lemma: &str,
+    form: &str,
+) -> Result<MorphophonologicalRuleOperation, MorphophonologicalUnimorphCompilerError> {
+    if lemma == form {
+        return Ok(MorphophonologicalRuleOperation::Identity);
+    }
+
+    let mut candidates = Vec::with_capacity(2);
+    if let Some(suffix) = form.strip_prefix(lemma) {
+        if !suffix.is_empty() {
+            candidates.push(MorphophonologicalRuleOperation::AppendSuffix {
+                suffix: suffix.to_string(),
+            });
+        }
+    }
+    if let Some(prefix) = form.strip_suffix(lemma) {
+        if !prefix.is_empty() {
+            candidates.push(MorphophonologicalRuleOperation::PrependPrefix {
+                prefix: prefix.to_string(),
+            });
+        }
+    }
+
+    if candidates.len() == 1 {
+        Ok(candidates.remove(0))
+    } else if candidates.len() > 1 {
+        Err(MorphophonologicalUnimorphCompilerError::AmbiguousSimpleDerivation)
+    } else {
+        Err(MorphophonologicalUnimorphCompilerError::UnsupportedDerivation)
+    }
+}
+
+impl MorphophonologicalRuleSet {
+    /// Compile selected UniMorph-style TSV records into this module's intentionally narrow
+    /// executable vocabulary. No replacement or alternation rule is guessed from a lemma/form
+    /// pair: unsupported transformations fail closed.
+    pub fn compile_unimorph_tsv_source(
+        language_tag: impl Into<String>,
+        dialect_scope: impl Into<String>,
+        resource_evidence: MorphophonologicalResourceEvidence,
+        rule_id: impl Into<String>,
+        provenance: impl Into<String>,
+        source_artifact: &[u8],
+        source_slices: Vec<MorphophonologicalSourceSlice>,
+    ) -> Result<(Self, MorphophonologicalCompilationWitness),
+        MorphophonologicalUnimorphCompilerError> {
+        resource_evidence
+            .validate()
+            .map_err(|_| MorphophonologicalUnimorphCompilerError::ResourceEvidence)?;
+        if let Some(resource_digest) = resource_evidence.source_artifact_blake3.as_deref() {
+            if resource_digest != blake3::hash(source_artifact).to_hex().to_string() {
+                return Err(MorphophonologicalUnimorphCompilerError::ResourceEvidence);
+            }
+        }
+        let source_id = resource_evidence.source_id.clone();
+        let rule_set_id = rule_id.into();
+
+        if source_slices.is_empty() {
+            return Err(MorphophonologicalUnimorphCompilerError::EmptyRecord);
+        }
+
+        let mut rules = Vec::with_capacity(source_slices.len());
+        let mut identities = HashSet::new();
+        for slice in &source_slices {
+            let end = slice
+                .byte_offset
+                .checked_add(slice.byte_length)
+                .ok_or(MorphophonologicalUnimorphCompilerError::CompilationWitness(
+                    MorphophonologicalCompilationWitnessError::SourceRangeOverflow,
+                ))?;
+            if !source_slice_is_line_bounded(source_artifact, slice) {
+                return Err(MorphophonologicalUnimorphCompilerError::CompilationWitness(
+                    MorphophonologicalCompilationWitnessError::SourceSliceNotLineBounded,
+                ));
+            }
+            let bytes = source_artifact
+                .get(slice.byte_offset..end)
+                .ok_or(MorphophonologicalUnimorphCompilerError::CompilationWitness(
+                    MorphophonologicalCompilationWitnessError::SourceSliceOutOfBounds,
+                ))?;
+            let record = parse_unimorph_source_record(&slice.record_id, bytes)?;
+            let identity = (record.lemma.clone(), record.feature_bundle.clone());
+            if !identities.insert(identity) {
+                return Err(
+                    MorphophonologicalUnimorphCompilerError::DuplicateLemmaAndFeatureBundle,
+                );
+            }
+            let operation = infer_simple_unimorph_operation(&record.lemma, &record.form)?;
+            rules.push(MorphophonologicalRule {
+                rule_id: format!("{rule_set_id}:source:{}", record.record_id),
+                source_record_id: Some(record.record_id),
+                lemma: Some(record.lemma),
+                morphology: vec![MorphologicalFeature {
+                    category: UNIMORPH_TSV_FEATURE_BUNDLE_CATEGORY.to_string(),
+                    value: record.feature_bundle,
+                }],
+                operation,
+            });
+        }
+
+        rules.sort_by(|left, right| {
+            (
+                left.lemma.as_deref().unwrap_or_default(),
+                left.morphology
+                    .first()
+                    .map(|feature| feature.value.as_str())
+                    .unwrap_or_default(),
+                left.rule_id.as_str(),
+            )
+                .cmp(&(
+                    right.lemma.as_deref().unwrap_or_default(),
+                    right
+                        .morphology
+                        .first()
+                        .map(|feature| feature.value.as_str())
+                        .unwrap_or_default(),
+                    right.rule_id.as_str(),
+                ))
+        });
+
+        let rule_set = Self::new(
+            language_tag,
+            source_id,
+            dialect_scope,
+            resource_evidence,
+            rule_set_id,
+            provenance,
+            rules,
+        )
+        .map_err(MorphophonologicalUnimorphCompilerError::RuleSet)?;
+
+        let witness = MorphophonologicalCompilationWitness::new(
+            UNIMORPH_TSV_COMPILER_ID,
+            UNIMORPH_TSV_COMPILER_VERSION,
+            UNIMORPH_TSV_NORMALIZATION_POLICY,
+            source_artifact,
+            source_slices,
+            &rule_set,
+        )
+        .map_err(MorphophonologicalUnimorphCompilerError::CompilationWitness)?;
+
+        Ok((rule_set, witness))
+    }
+}
+
 /// One exact byte range selected from a frozen source artifact for compilation.
 ///
 /// The verifier uses the offset/length to recompute the record digest from the actual source
@@ -338,6 +613,15 @@ pub struct MorphophonologicalCompilationWitness {
     pub version: String,
     pub compiler_id: String,
     pub compiler_version: String,
+    /// Exact content identity of the current UniMorph compiler source module and its build-time
+    /// identity mechanism.
+    pub compiler_implementation_revision: Option<String>,
+    /// Exact content identity of the accepted source-format parser surface and its build-time
+    /// identity mechanism.
+    pub source_parser_revision: Option<String>,
+    /// Exact content identity of the checked-in crate/workspace manifests, Cargo lockfile, and
+    /// pinned Rust toolchain used to build this compiler.
+    pub compiler_build_context_revision: Option<String>,
     pub normalization_policy: String,
     pub source_artifact_blake3: String,
     pub source_selection_blake3: String,
@@ -359,10 +643,21 @@ impl MorphophonologicalCompilationWitness {
             .validate()
             .map_err(|_| MorphophonologicalCompilationWitnessError::InvalidRuleSet)?;
 
+        let compiler_id = compiler_id.into();
+        let compiler_version = compiler_version.into();
+        let known_unimorph_compiler =
+            compiler_id == UNIMORPH_TSV_COMPILER_ID && compiler_version == UNIMORPH_TSV_COMPILER_VERSION;
+
         let witness = Self {
             version: MORPHOPHONOLOGICAL_COMPILATION_WITNESS_VERSION.to_string(),
-            compiler_id: compiler_id.into(),
-            compiler_version: compiler_version.into(),
+            compiler_id,
+            compiler_version,
+            compiler_implementation_revision: known_unimorph_compiler
+                .then(|| UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION.to_string()),
+            source_parser_revision: known_unimorph_compiler
+                .then(|| UNIMORPH_TSV_SOURCE_PARSER_REVISION.to_string()),
+            compiler_build_context_revision: known_unimorph_compiler
+                .then(|| UNIMORPH_TSV_COMPILER_BUILD_CONTEXT_REVISION.to_string()),
             normalization_policy: normalization_policy.into(),
             source_artifact_blake3: blake3::hash(source_artifact).to_hex().to_string(),
             source_selection_blake3: String::new(),
@@ -392,6 +687,50 @@ impl MorphophonologicalCompilationWitness {
                 return Err(MorphophonologicalCompilationWitnessError::EmptyMetadata);
             }
         }
+        if self.compiler_id == UNIMORPH_TSV_COMPILER_ID {
+            if self.compiler_version != UNIMORPH_TSV_COMPILER_VERSION
+                || self.compiler_implementation_revision.is_none()
+                || self.source_parser_revision.is_none()
+                || self.compiler_build_context_revision.is_none()
+            {
+                return Err(
+                    MorphophonologicalCompilationWitnessError::MissingCompilerIdentity,
+                );
+            }
+        }
+        for value in [
+            self.compiler_implementation_revision.as_deref(),
+            self.source_parser_revision.as_deref(),
+            self.compiler_build_context_revision.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if value.trim().is_empty() {
+                return Err(MorphophonologicalCompilationWitnessError::EmptyMetadata);
+            }
+        }
+        if self.compiler_id == UNIMORPH_TSV_COMPILER_ID {
+            for value in [
+                self.compiler_implementation_revision.as_deref(),
+                self.source_parser_revision.as_deref(),
+                self.compiler_build_context_revision.as_deref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                if !is_canonical_blake3_digest(value) {
+                    return Err(MorphophonologicalCompilationWitnessError::MalformedCompilerIdentity);
+                }
+            }
+        } else if self.compiler_implementation_revision.is_some()
+            || self.source_parser_revision.is_some()
+            || self.compiler_build_context_revision.is_some()
+        {
+            return Err(
+                MorphophonologicalCompilationWitnessError::CompilerIdentityNotAllowed,
+            );
+        }
         if !is_canonical_blake3_digest(&self.source_artifact_blake3)
             || !is_canonical_blake3_digest(&self.source_selection_blake3)
             || !is_canonical_blake3_digest(&self.output_rule_set_blake3)
@@ -415,6 +754,9 @@ impl MorphophonologicalCompilationWitness {
                 }
                 if !ids.insert(slice.record_id.clone()) {
                     return Err(MorphophonologicalCompilationWitnessError::DuplicateSourceRecordId);
+                }
+                if slice.byte_length == 0 {
+                    return Err(MorphophonologicalCompilationWitnessError::EmptySourceSlice);
                 }
                 let end = slice
                     .byte_offset
@@ -445,6 +787,9 @@ impl MorphophonologicalCompilationWitness {
         let surface = (
             &self.compiler_id,
             &self.compiler_version,
+            &self.compiler_implementation_revision,
+            &self.source_parser_revision,
+            &self.compiler_build_context_revision,
             &self.normalization_policy,
             &self.source_selection_blake3,
             &self.output_rule_set_blake3,
@@ -459,12 +804,77 @@ impl MorphophonologicalCompilationWitness {
 
     /// Verify that every selected source slice matches the exact source artifact bytes and that
     /// the declared compilation output is the exact current rule-set identity.
+    /// Re-execute the UniMorph TSV compiler from the exact persisted source slices and
+    /// compare both the emitted executable rule set and compilation witness with this state.
+    ///
+    /// This is stronger than checking hashes alone: the current compiler implementation must
+    /// reproduce the recorded transformation.
+    fn validate_current_unimorph_implementation(
+        &self,
+    ) -> Result<(), MorphophonologicalCompilationWitnessError> {
+        if self.compiler_implementation_revision.as_deref()
+            != Some(UNIMORPH_TSV_COMPILER_IMPLEMENTATION_REVISION)
+        {
+            return Err(
+                MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch,
+            );
+        }
+        if self.source_parser_revision.as_deref() != Some(UNIMORPH_TSV_SOURCE_PARSER_REVISION) {
+            return Err(MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch);
+        }
+        if self.compiler_build_context_revision.as_deref()
+            != Some(UNIMORPH_TSV_COMPILER_BUILD_CONTEXT_REVISION)
+        {
+            return Err(
+                MorphophonologicalCompilationWitnessError::CompilerBuildContextRevisionMismatch,
+            );
+        }
+        Ok(())
+    }
+
+    pub fn replay_unimorph_tsv_compilation(
+        &self,
+        source_artifact: &[u8],
+        output_rule_set: &MorphophonologicalRuleSet,
+    ) -> Result<(), MorphophonologicalCompilationWitnessError> {
+        self.validate_shape()?;
+        if self.compiler_id != UNIMORPH_TSV_COMPILER_ID
+            || self.compiler_version != UNIMORPH_TSV_COMPILER_VERSION
+        {
+            return Err(MorphophonologicalCompilationWitnessError::UnsupportedCompiler);
+        }
+        self.validate_current_unimorph_implementation()?;
+
+        let (recompiled_rule_set, recompiled_witness) =
+            MorphophonologicalRuleSet::compile_unimorph_tsv_source(
+                output_rule_set.language_tag.clone(),
+                output_rule_set.dialect_scope.clone(),
+                output_rule_set.resource_evidence.clone(),
+                output_rule_set.rule_id.clone(),
+                output_rule_set.provenance.clone(),
+                source_artifact,
+                self.source_slices.clone(),
+            )
+            .map_err(|_| MorphophonologicalCompilationWitnessError::CompilerReplayFailed)?;
+
+        if recompiled_rule_set != *output_rule_set {
+            return Err(MorphophonologicalCompilationWitnessError::CompilerReplayMismatch);
+        }
+        if recompiled_witness != *self {
+            return Err(MorphophonologicalCompilationWitnessError::WitnessReplayMismatch);
+        }
+        Ok(())
+    }
+
     pub fn validate_against_source_artifact_and_rule_set(
         &self,
         source_artifact: &[u8],
         output_rule_set: &MorphophonologicalRuleSet,
     ) -> Result<(), MorphophonologicalCompilationWitnessError> {
         self.validate_shape()?;
+        output_rule_set
+            .validate()
+            .map_err(|_| MorphophonologicalCompilationWitnessError::InvalidRuleSet)?;
         if self.source_artifact_blake3
             != blake3::hash(source_artifact).to_hex().to_string()
         {
@@ -472,6 +882,49 @@ impl MorphophonologicalCompilationWitness {
         }
         if self.output_rule_set_blake3 != output_rule_set.resource_blake3() {
             return Err(MorphophonologicalCompilationWitnessError::OutputRuleSetMismatch);
+        }
+        let selected_ids = self
+            .source_slices
+            .iter()
+            .map(|slice| slice.record_id.as_str())
+            .collect::<HashSet<_>>();
+        let output_ids = output_rule_set
+            .rules
+            .iter()
+            .filter_map(|rule| rule.source_record_id.as_deref())
+            .collect::<Vec<_>>();
+        if self.compiler_id == UNIMORPH_TSV_COMPILER_ID {
+            let output_id_set = output_ids.iter().copied().collect::<HashSet<_>>();
+            if output_rule_set.rules.len() != self.source_slices.len()
+                || output_ids.len() != self.source_slices.len()
+                || output_id_set.len() != output_ids.len()
+                || output_id_set != selected_ids
+            {
+                return Err(
+                    MorphophonologicalCompilationWitnessError::SourceRecordRuleMappingMismatch,
+                );
+            }
+        } else if !output_ids.is_empty() {
+            let output_id_set = output_ids.iter().copied().collect::<HashSet<_>>();
+            if output_ids.len() != self.source_slices.len()
+                || output_id_set.len() != output_ids.len()
+                || output_id_set != selected_ids
+            {
+                return Err(
+                    MorphophonologicalCompilationWitnessError::SourceRecordRuleMappingMismatch,
+                );
+            }
+        }
+        if let Some(resource_digest) = output_rule_set
+            .resource_evidence
+            .source_artifact_blake3
+            .as_deref()
+        {
+            if resource_digest != self.source_artifact_blake3 {
+                return Err(
+                    MorphophonologicalCompilationWitnessError::SourceArtifactIdentityMismatch,
+                );
+            }
         }
         if self.source_selection_blake3 != self.compute_source_selection_blake3() {
             return Err(MorphophonologicalCompilationWitnessError::SourceSelectionMismatch);
@@ -485,6 +938,9 @@ impl MorphophonologicalCompilationWitness {
                 .byte_offset
                 .checked_add(slice.byte_length)
                 .ok_or(MorphophonologicalCompilationWitnessError::SourceRangeOverflow)?;
+            if !source_slice_is_line_bounded(source_artifact, slice) {
+                return Err(MorphophonologicalCompilationWitnessError::SourceSliceNotLineBounded);
+            }
             let bytes = source_artifact
                 .get(slice.byte_offset..end)
                 .ok_or(MorphophonologicalCompilationWitnessError::SourceSliceOutOfBounds)?;
@@ -508,15 +964,29 @@ pub enum MorphophonologicalCompilationWitnessError {
     MalformedDigest,
     EmptySourceSelection,
     MalformedSourceSlice,
+    EmptySourceSlice,
+    SourceSliceNotLineBounded,
     DuplicateSourceRecordId,
     SourceRangeOverflow,
     OverlappingSourceSlices,
     SourceArtifactMismatch,
+    SourceRecordRuleMappingMismatch,
     SourceSliceOutOfBounds,
     SourceRecordMismatch { record_id: String },
+    SourceArtifactIdentityMismatch,
     SourceSelectionMismatch,
     OutputRuleSetMismatch,
     TransformationMismatch,
+    UnsupportedCompiler,
+    MissingCompilerIdentity,
+    MalformedCompilerIdentity,
+    CompilerIdentityNotAllowed,
+    CompilerImplementationRevisionMismatch,
+    SourceParserRevisionMismatch,
+    CompilerBuildContextRevisionMismatch,
+    CompilerReplayFailed,
+    CompilerReplayMismatch,
+    WitnessReplayMismatch,
 }
 
 impl std::fmt::Display for MorphophonologicalCompilationWitnessError {
@@ -528,15 +998,29 @@ impl std::fmt::Display for MorphophonologicalCompilationWitnessError {
             Self::MalformedDigest => write!(f, "morphophonological compilation witness contains a malformed BLAKE3 digest"),
             Self::EmptySourceSelection => write!(f, "morphophonological compilation witness must select at least one source record"),
             Self::MalformedSourceSlice => write!(f, "morphophonological compilation witness contains a malformed source slice"),
+            Self::EmptySourceSlice => write!(f, "morphophonological compilation witness source slice must contain at least one byte"),
+            Self::SourceSliceNotLineBounded => write!(f, "morphophonological compilation witness source slice must align to a complete source record boundary"),
             Self::DuplicateSourceRecordId => write!(f, "morphophonological compilation witness source record ids must be unique"),
             Self::SourceRangeOverflow => write!(f, "morphophonological compilation witness source range overflows"),
             Self::OverlappingSourceSlices => write!(f, "morphophonological compilation witness source slices must not overlap"),
             Self::SourceArtifactMismatch => write!(f, "morphophonological compilation witness source artifact does not match"),
+            Self::SourceRecordRuleMappingMismatch => write!(f, "morphophonological compilation witness selected source records do not map one-to-one to compiled rules"),
             Self::SourceSliceOutOfBounds => write!(f, "morphophonological compilation witness source slice is out of bounds"),
             Self::SourceRecordMismatch { record_id } => write!(f, "morphophonological compilation witness source record {record_id} does not match its exact bytes"),
+            Self::SourceArtifactIdentityMismatch => write!(f, "morphophonological compilation witness source artifact identity does not match the output rule-set resource evidence"),
             Self::SourceSelectionMismatch => write!(f, "morphophonological compilation witness source selection digest does not match its selected records"),
             Self::OutputRuleSetMismatch => write!(f, "morphophonological compilation witness output rule-set identity does not match"),
             Self::TransformationMismatch => write!(f, "morphophonological compilation witness transformation digest does not match its declared inputs"),
+            Self::UnsupportedCompiler => write!(f, "morphophonological compilation witness compiler implementation is not supported for replay"),
+            Self::MissingCompilerIdentity => write!(f, "morphophonological compilation witness is missing the implementation identity required for its declared UniMorph compiler"),
+            Self::MalformedCompilerIdentity => write!(f, "morphophonological compilation witness contains a malformed UniMorph compiler identity"),
+            Self::CompilerIdentityNotAllowed => write!(f, "morphophonological compilation witness carries compiler identity fields without a declared family-specific identity contract"),
+            Self::CompilerImplementationRevisionMismatch => write!(f, "morphophonological compilation witness compiler implementation revision does not match the current compiler"),
+            Self::SourceParserRevisionMismatch => write!(f, "morphophonological compilation witness source parser revision does not match the current parser"),
+            Self::CompilerBuildContextRevisionMismatch => write!(f, "morphophonological compilation witness compiler build-context revision does not match the current build context"),
+            Self::CompilerReplayFailed => write!(f, "morphophonological compilation witness compiler replay failed"),
+            Self::CompilerReplayMismatch => write!(f, "morphophonological compilation witness compiler replay did not reproduce the exact output rule set"),
+            Self::WitnessReplayMismatch => write!(f, "morphophonological compilation witness compiler replay did not reproduce the exact witness"),
         }
     }
 }
@@ -548,6 +1032,21 @@ fn is_canonical_blake3_digest(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn source_slice_is_line_bounded(source_artifact: &[u8], slice: &MorphophonologicalSourceSlice) -> bool {
+    let end = match slice.byte_offset.checked_add(slice.byte_length) {
+        Some(end) => end,
+        None => return false,
+    };
+    if end > source_artifact.len() || slice.byte_length == 0 {
+        return false;
+    }
+    let starts_at_line_boundary =
+        slice.byte_offset == 0 || source_artifact.get(slice.byte_offset - 1) == Some(&b'\n');
+    let ends_at_line_boundary =
+        end == source_artifact.len() || source_artifact.get(end) == Some(&b'\n');
+    starts_at_line_boundary && ends_at_line_boundary
 }
 
 /// A deliberately small deterministic operation vocabulary for executable
@@ -566,6 +1065,17 @@ pub enum MorphophonologicalRuleOperation {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MorphophonologicalRule {
     pub rule_id: String,
+    /// Exact source-record identity for rules compiled from a source artifact.
+    ///
+    /// Hand-authored/generic rules may leave this unset. Compilation-backed rule sets set it
+    /// explicitly, and the compilation witness can then require a one-to-one source mapping.
+    pub source_record_id: Option<String>,
+    /// Optional exact lemma scope. When present, the rule applies only to that lemma.
+    ///
+    /// This enables compiled paradigm data where many lemmas share the same feature bundle.
+    /// Generic and lemma-scoped candidates are not prioritized implicitly; multiple matches
+    /// remain an ambiguity and fail closed.
+    pub lemma: Option<String>,
     pub morphology: Vec<MorphologicalFeature>,
     pub operation: MorphophonologicalRuleOperation,
 }
@@ -655,6 +1165,16 @@ impl MorphophonologicalRuleSet {
             if rule.rule_id.trim().is_empty() {
                 return Err(MorphophonologicalRuleSetError::EmptyRuleId);
             }
+            if let Some(source_record_id) = rule.source_record_id.as_deref() {
+                if source_record_id.trim().is_empty() {
+                    return Err(MorphophonologicalRuleSetError::InvalidSourceRecordId);
+                }
+            }
+            if let Some(lemma) = rule.lemma.as_deref() {
+                if lemma.trim().is_empty() {
+                    return Err(MorphophonologicalRuleSetError::InvalidLemmaScope);
+                }
+            }
             if !rule_ids.insert(rule.rule_id.clone()) {
                 return Err(MorphophonologicalRuleSetError::DuplicateRuleId);
             }
@@ -669,7 +1189,10 @@ impl MorphophonologicalRuleSet {
                 }
             }
 
-            let canonical = canonical_morphology(&rule.morphology);
+            let canonical = (
+                rule.lemma.as_deref().unwrap_or_default().to_string(),
+                canonical_morphology(&rule.morphology),
+            );
             if !feature_signatures.insert(canonical) {
                 return Err(MorphophonologicalRuleSetError::AmbiguousFeatureMatch);
             }
@@ -700,6 +1223,7 @@ impl MorphophonologicalRuleSet {
             .rules
             .iter()
             .filter(|rule| canonical_morphology(&rule.morphology) == expected)
+            .filter(|rule| rule.lemma.as_deref().map_or(true, |scoped| scoped == lemma))
             .collect::<Vec<_>>();
 
         let rule = match matches.as_slice() {
@@ -828,6 +1352,8 @@ pub enum MorphophonologicalRuleSetError {
     EmptyRuleSet,
     EmptyRuleId,
     DuplicateRuleId,
+    InvalidSourceRecordId,
+    InvalidLemmaScope,
     InvalidMorphology,
     AmbiguousFeatureMatch,
     EmptyOperationOperand,
@@ -852,6 +1378,8 @@ impl std::fmt::Display for MorphophonologicalRuleSetError {
             Self::EmptyRuleSet => write!(f, "morphophonological rule set must contain at least one rule"),
             Self::EmptyRuleId => write!(f, "morphophonological rule id must be non-empty"),
             Self::DuplicateRuleId => write!(f, "morphophonological rule ids must be unique"),
+            Self::InvalidSourceRecordId => write!(f, "morphophonological rule source-record id must be non-empty"),
+            Self::InvalidLemmaScope => write!(f, "morphophonological rule lemma scope must be non-empty"),
             Self::InvalidMorphology => write!(f, "morphophonological rule morphology contains duplicate feature categories"),
             Self::AmbiguousFeatureMatch => write!(f, "morphophonological rule set contains duplicate exact feature matches"),
             Self::EmptyOperationOperand => write!(f, "morphophonological rule operation operand must be non-empty"),
@@ -1203,7 +1731,6 @@ pub enum MorphophonologicalDerivationWitnessError {
     AppliedRuleMismatch { position: usize },
     SourceArtifactDigestMismatch,
     InvalidDerivedWitness,
-}
 }
 
 impl std::fmt::Display for MorphophonologicalDerivationWitnessError {
@@ -2214,6 +2741,7 @@ mod tests {
             output_form: "walked".into(),
             language_tag: "en".into(),
             rule_id: "fixture:english-morphology:v1".into(),
+            source_record_id: None,
             rule_provenance: "fixture:rules:v1".into(),
             applied_rule_id: "fixture:past-tense".into(),
         }
@@ -2233,6 +2761,8 @@ mod tests {
             "fixture:rules:v1",
             vec![MorphophonologicalRule {
                 rule_id: "fixture:past-tense".into(),
+                source_record_id: None,
+                lemma: None,
                 morphology: vec![MorphologicalFeature {
                     category: "tense".into(),
                     value: "past".into(),
@@ -2358,6 +2888,68 @@ mod tests {
     }
 
     #[test]
+    fn morphophonological_rule_selection_binds_exact_lemma_scope() {
+        let binding = morphophonological_fixture_binding();
+        let rule_set = MorphophonologicalRuleSet::new(
+            "en",
+            "fixture:lemma-scoped-rules-v2",
+            "en-US",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "fixture:lemma-scoped-rules-v2",
+                "fixture-v2",
+            )
+            .unwrap(),
+            "fixture:english-morphology:v2",
+            "fixture:rules:v2",
+            vec![
+                MorphophonologicalRule {
+                    rule_id: "fixture:walk-past".into(),
+                    source_record_id: None,
+                    lemma: Some("walk".into()),
+                    morphology: vec![MorphologicalFeature {
+                        category: "tense".into(),
+                        value: "past".into(),
+                    }],
+                    operation: MorphophonologicalRuleOperation::AppendSuffix {
+                        suffix: "ed".into(),
+                    },
+                },
+                MorphophonologicalRule {
+                    rule_id: "fixture:jump-past".into(),
+                    source_record_id: None,
+                    lemma: Some("jump".into()),
+                    morphology: vec![MorphologicalFeature {
+                        category: "tense".into(),
+                        value: "past".into(),
+                    }],
+                    operation: MorphophonologicalRuleOperation::AppendSuffix {
+                        suffix: "ed".into(),
+                    },
+                },
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(
+            rule_set.derive("walk", &binding.constituents[0].morphology).unwrap(),
+            ("walked".into(), "fixture:walk-past".into())
+        );
+        assert_eq!(
+            rule_set.derive(
+                "jump",
+                &binding.constituents[0].morphology
+            ).unwrap(),
+            ("jumped".into(), "fixture:jump-past".into())
+        );
+        assert_eq!(
+            rule_set
+                .derive("run", &binding.constituents[0].morphology)
+                .expect_err("unscoped lemma must not borrow another lemma's rule"),
+            MorphophonologicalRuleSetError::NoMatchingRule
+        );
+    }
+
+    #[test]
     fn morphophonological_derivation_executes_and_reproduces_binding() {
         let binding = morphophonological_fixture_binding();
         let rule_set = morphophonological_fixture_rule_set();
@@ -2387,6 +2979,8 @@ mod tests {
             "fixture:rules:v1",
             vec![MorphophonologicalRule {
                 rule_id: "fixture:past-tense".into(),
+                source_record_id: None,
+                lemma: None,
                 morphology: vec![MorphologicalFeature {
                     category: "tense".into(),
                     value: "past".into(),
@@ -2421,6 +3015,54 @@ mod tests {
     }
 
     #[test]
+    fn morphophonological_rule_set_rejects_duplicate_lemma_and_feature_scope() {
+        let error = MorphophonologicalRuleSet::new(
+            "en",
+            "fixture:duplicate-lemma-scope",
+            "en-US",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "fixture:duplicate-lemma-scope",
+                "fixture-v2",
+            )
+            .unwrap(),
+            "fixture:duplicate-scope:v2",
+            "fixture:rules:v2",
+            vec![
+                MorphophonologicalRule {
+                    rule_id: "fixture:walk-one".into(),
+                    source_record_id: None,
+                    lemma: Some("walk".into()),
+                    morphology: vec![MorphologicalFeature {
+                        category: "tense".into(),
+                        value: "past".into(),
+                    }],
+                    operation: MorphophonologicalRuleOperation::AppendSuffix {
+                        suffix: "ed".into(),
+                    },
+                },
+                MorphophonologicalRule {
+                    rule_id: "fixture:walk-two".into(),
+                    source_record_id: None,
+                    lemma: Some("walk".into()),
+                    morphology: vec![MorphologicalFeature {
+                        category: "tense".into(),
+                        value: "past".into(),
+                    }],
+                    operation: MorphophonologicalRuleOperation::AppendSuffix {
+                        suffix: "t".into(),
+                    },
+                },
+            ],
+        )
+        .expect_err("duplicate exact lemma and feature scope must fail closed");
+
+        assert_eq!(
+            error,
+            MorphophonologicalRuleSetError::AmbiguousFeatureMatch
+        );
+    }
+
+    #[test]
     fn morphophonological_rule_set_rejects_ambiguous_exact_feature_rules() {
         let error = MorphophonologicalRuleSet::new(
             "en",
@@ -2436,6 +3078,8 @@ mod tests {
             vec![
                 MorphophonologicalRule {
                     rule_id: "fixture:one".into(),
+                    source_record_id: None,
+                    lemma: None,
                     morphology: vec![MorphologicalFeature {
                         category: "tense".into(),
                         value: "past".into(),
@@ -2446,6 +3090,8 @@ mod tests {
                 },
                 MorphophonologicalRule {
                     rule_id: "fixture:two".into(),
+                    source_record_id: None,
+                    lemma: None,
                     morphology: vec![MorphologicalFeature {
                         category: "tense".into(),
                         value: "past".into(),
@@ -2626,6 +3272,10 @@ mod tests {
             .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
             .expect("exact source selection and rule-set identity should replay");
 
+        assert!(witness.compiler_implementation_revision.is_none());
+        assert!(witness.source_parser_revision.is_none());
+        assert!(witness.compiler_build_context_revision.is_none());
+
         let mut tampered = artifact.to_vec();
         tampered[0] = b'X';
         assert_eq!(
@@ -2674,6 +3324,615 @@ mod tests {
     }
 
     #[test]
+    fn compilation_witness_requires_identity_for_declared_unimorph_compiler() {
+        let rule_set = morphophonological_fixture_rule_set();
+        let artifact = b"row0	fixture
+";
+        let witness = MorphophonologicalCompilationWitness {
+            version: MORPHOPHONOLOGICAL_COMPILATION_WITNESS_VERSION.into(),
+            compiler_id: UNIMORPH_TSV_COMPILER_ID.into(),
+            compiler_version: "wrong-version".into(),
+            compiler_implementation_revision: None,
+            source_parser_revision: None,
+            compiler_build_context_revision: None,
+            normalization_policy: "fixture-normalization-v1".into(),
+            source_artifact_blake3: blake3::hash(artifact).to_hex().to_string(),
+            source_selection_blake3: String::new(),
+            source_slices: vec![MorphophonologicalSourceSlice {
+                record_id: "row0".into(),
+                byte_offset: 0,
+                byte_length: artifact.len(),
+                record_blake3: blake3::hash(artifact).to_hex().to_string(),
+            }],
+            output_rule_set_blake3: rule_set.resource_blake3(),
+            transformation_blake3: String::new(),
+        };
+        assert_eq!(
+            witness.validate_shape().expect_err("declared UniMorph compiler must carry identity"),
+            MorphophonologicalCompilationWitnessError::MissingCompilerIdentity
+        );
+    }
+
+    #[test]
+    fn unimorph_compilation_rejects_extra_unbound_rule() {
+        let artifact = b"walk\twalked\tV;PST\n";
+        let (mut rule_set, witness) = MorphophonologicalRuleSet::compile_unimorph_tsv_source(
+            "en",
+            "en-unspecified",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "fixture:unimorph-tsv",
+                "fixture-snapshot-v1",
+            )
+            .unwrap(),
+            "fixture:unimorph:v1",
+            "fixture:compiler:v1",
+            artifact,
+            vec![MorphophonologicalSourceSlice {
+                record_id: "walk-past".into(),
+                byte_offset: 0,
+                byte_length: artifact.len(),
+                record_blake3: blake3::hash(artifact).to_hex().to_string(),
+            }],
+        )
+        .expect("compiler fixture");
+
+        rule_set.rules.push(MorphophonologicalRule {
+            rule_id: "fixture:unbound-extra".into(),
+            source_record_id: None,
+            lemma: None,
+            morphology: vec![MorphologicalFeature {
+                category: "extra".into(),
+                value: "V1".into(),
+            }],
+            operation: MorphophonologicalRuleOperation::Identity,
+        });
+        rule_set.validate().expect("tampered rule set remains structurally valid");
+
+        let mut tampered = witness;
+        tampered.output_rule_set_blake3 = rule_set.resource_blake3();
+        tampered.transformation_blake3 = tampered.compute_transformation_blake3();
+
+        assert_eq!(
+            tampered
+                .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
+                .expect_err("UniMorph output must contain exactly one source-bound rule per selected record"),
+            MorphophonologicalCompilationWitnessError::SourceRecordRuleMappingMismatch
+        );
+    }
+
+    #[test]
+    fn unimorph_compilation_witness_requires_source_to_rule_mapping() {
+        let artifact = b"walk\twalked\tV;PST\n";
+        let slices = vec![MorphophonologicalSourceSlice {
+            record_id: "walk-past".into(),
+            byte_offset: 0,
+            byte_length: artifact.len(),
+            record_blake3: blake3::hash(artifact).to_hex().to_string(),
+        }];
+        let (mut rule_set, witness) = MorphophonologicalRuleSet::compile_unimorph_tsv_source(
+            "en",
+            "en-unspecified",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "fixture:unimorph-tsv",
+                "fixture-snapshot-v1",
+            )
+            .unwrap(),
+            "fixture:unimorph:v1",
+            "fixture:compiler:v1",
+            artifact,
+            slices,
+        )
+        .expect("compiler fixture");
+
+        rule_set.rules[0].source_record_id = None;
+
+        let mut tampered = witness;
+        tampered.output_rule_set_blake3 = rule_set.resource_blake3();
+        tampered.transformation_blake3 = tampered.compute_transformation_blake3();
+
+        assert_eq!(
+            tampered
+                .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
+                .expect_err("UniMorph compiled rules must retain one-to-one source mapping"),
+            MorphophonologicalCompilationWitnessError::SourceRecordRuleMappingMismatch
+        );
+    }
+
+    #[test]
+    fn source_selection_boundaries_accept_crlf_and_reject_mid_ending_cuts() {
+        let artifact = b"walk\twalked\tV;PST\r\n";
+        let full = MorphophonologicalSourceSlice {
+            record_id: "walk-past".into(),
+            byte_offset: 0,
+            byte_length: artifact.len(),
+            record_blake3: blake3::hash(artifact).to_hex().to_string(),
+        };
+        assert!(source_slice_is_line_bounded(artifact, &full));
+
+        let mid_crlf = MorphophonologicalSourceSlice {
+            record_id: "walk-past-mid-crlf".into(),
+            byte_offset: 0,
+            byte_length: artifact.len() - 1,
+            record_blake3: blake3::hash(&artifact[..artifact.len() - 1])
+                .to_hex()
+                .to_string(),
+        };
+        assert!(!source_slice_is_line_bounded(artifact, &mid_crlf));
+    }
+
+    #[test]
+    fn unimorph_compilation_rejects_line_fragment_source_selection() {
+        let artifact = b"prefix walk\twalked\tV;PST suffix\n";
+        let selected = b"walk\twalked\tV;PST";
+        let offset = b"prefix ".len();
+        let slices = vec![MorphophonologicalSourceSlice {
+            record_id: "walk-past-fragment".into(),
+            byte_offset: offset,
+            byte_length: selected.len(),
+            record_blake3: blake3::hash(selected).to_hex().to_string(),
+        }];
+
+        let error = MorphophonologicalRuleSet::compile_unimorph_tsv_source(
+            "en",
+            "en-unspecified",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "fixture:unimorph-tsv",
+                "fixture-snapshot-v1",
+            )
+            .unwrap(),
+            "fixture:unimorph:v1",
+            "fixture:compiler:v1",
+            artifact,
+            slices,
+        )
+        .expect_err("a selected source record must not be carved from the middle of a line");
+
+        assert_eq!(
+            error,
+            MorphophonologicalUnimorphCompilerError::CompilationWitness(
+                MorphophonologicalCompilationWitnessError::SourceSliceNotLineBounded
+            )
+        );
+    }
+
+    #[test]
+    fn generic_compilation_witness_rejects_uncontracted_identity_fields() {
+        let rule_set = morphophonological_fixture_rule_set();
+        let artifact = b"row0\n";
+        let witness = MorphophonologicalCompilationWitness::new(
+            "fixture-compiler",
+            "fixture-compiler-v1",
+            "fixture-normalization-v1",
+            artifact,
+            vec![MorphophonologicalSourceSlice {
+                record_id: "row0".into(),
+                byte_offset: 0,
+                byte_length: artifact.len(),
+                record_blake3: blake3::hash(artifact).to_hex().to_string(),
+            }],
+            &rule_set,
+        )
+        .expect("generic compiler witness");
+
+        let mut tampered = witness;
+        tampered.compiler_implementation_revision = Some("0".repeat(64));
+        assert_eq!(
+            tampered
+                .validate_shape()
+                .expect_err("generic compiler must not smuggle an uncontracted identity"),
+            MorphophonologicalCompilationWitnessError::CompilerIdentityNotAllowed
+        );
+    }
+
+    #[test]
+    fn compilation_witness_requires_build_context_identity_for_declared_unimorph_compiler() {
+        let rule_set = morphophonological_fixture_rule_set();
+        let artifact = b"row0\n";
+        let mut witness = MorphophonologicalCompilationWitness::new(
+            UNIMORPH_TSV_COMPILER_ID,
+            UNIMORPH_TSV_COMPILER_VERSION,
+            "fixture-normalization-v1",
+            artifact,
+            vec![MorphophonologicalSourceSlice {
+                record_id: "row0".into(),
+                byte_offset: 0,
+                byte_length: artifact.len(),
+                record_blake3: blake3::hash(artifact).to_hex().to_string(),
+            }],
+            &rule_set,
+        )
+        .expect("known UniMorph compiler witness");
+
+        witness.compiler_build_context_revision = None;
+        assert_eq!(
+            witness
+                .validate_shape()
+                .expect_err("declared UniMorph compiler must carry build-context identity"),
+            MorphophonologicalCompilationWitnessError::MissingCompilerIdentity
+        );
+    }
+
+    #[test]
+    fn compilation_witness_rejects_malformed_unimorph_identity_encoding() {
+        let rule_set = morphophonological_fixture_rule_set();
+        let artifact = b"row0\n";
+        let witness = MorphophonologicalCompilationWitness::new(
+            UNIMORPH_TSV_COMPILER_ID,
+            UNIMORPH_TSV_COMPILER_VERSION,
+            "fixture-normalization-v1",
+            artifact,
+            vec![MorphophonologicalSourceSlice {
+                record_id: "row0".into(),
+                byte_offset: 0,
+                byte_length: artifact.len(),
+                record_blake3: blake3::hash(artifact).to_hex().to_string(),
+            }],
+            &rule_set,
+        )
+        .expect("known UniMorph compiler witness");
+
+        let mut tampered = witness;
+        tampered.compiler_implementation_revision = Some("not-a-digest".into());
+        assert_eq!(
+            tampered
+                .validate_shape()
+                .expect_err("UniMorph compiler identity must be canonical BLAKE3"),
+            MorphophonologicalCompilationWitnessError::MalformedCompilerIdentity
+        );
+    }
+
+    #[test]
+    fn unimorph_tsv_compiler_replays_supported_rows_and_normalization() {
+        let artifact = b"walk\twalked\tV;PST\ncat\tcat\tN;SG\n";
+        let walk_len = b"walk\twalked\tV;PST\n".len();
+        let slices = vec![
+            MorphophonologicalSourceSlice {
+                record_id: "walk-past".into(),
+                byte_offset: 0,
+                byte_length: walk_len,
+                record_blake3: blake3::hash(&artifact[..walk_len]).to_hex().to_string(),
+            },
+            MorphophonologicalSourceSlice {
+                record_id: "cat-singular".into(),
+                byte_offset: walk_len,
+                byte_length: artifact.len() - walk_len,
+                record_blake3: blake3::hash(&artifact[walk_len..]).to_hex().to_string(),
+            },
+        ];
+        let evidence = MorphophonologicalResourceEvidence::hand_authored(
+            "fixture:unimorph-tsv",
+            "fixture-snapshot-v1",
+        )
+        .unwrap();
+
+        let (rule_set, witness) = MorphophonologicalRuleSet::compile_unimorph_tsv_source(
+            "en",
+            "en-unspecified",
+            evidence,
+            "fixture:unimorph:v1",
+            "fixture:compiler:v1",
+            artifact,
+            slices.clone(),
+        )
+        .expect("supported UniMorph-style rows should compile");
+
+        assert_eq!(
+            rule_set.derive(
+                "walk",
+                &[MorphologicalFeature {
+                    category: UNIMORPH_TSV_FEATURE_BUNDLE_CATEGORY.into(),
+                    value: "PST;V".into(),
+                }],
+            )
+            .unwrap(),
+            ("walked".into(), "fixture:unimorph:v1:source:walk-past".into())
+        );
+        assert_eq!(
+            rule_set.derive(
+                "cat",
+                &[MorphologicalFeature {
+                    category: UNIMORPH_TSV_FEATURE_BUNDLE_CATEGORY.into(),
+                    value: "N;SG".into(),
+                }],
+            )
+            .unwrap(),
+            ("cat".into(), "fixture:unimorph:v1:source:cat-singular".into())
+        );
+
+        witness
+            .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
+            .expect("compiler witness should replay against exact source bytes");
+        witness
+            .replay_unimorph_tsv_compilation(artifact, &rule_set)
+            .expect("current UniMorph compiler must reproduce the exact rule set and witness");
+
+        let mut compiler_revision_tampered = witness.clone();
+        compiler_revision_tampered.compiler_implementation_revision =
+            Some("0".repeat(64));
+        assert_eq!(
+            compiler_revision_tampered
+                .replay_unimorph_tsv_compilation(artifact, &rule_set)
+                .expect_err("compiler implementation revision tampering must fail closed"),
+            MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch
+        );
+
+        let mut parser_revision_tampered = witness.clone();
+        parser_revision_tampered.source_parser_revision =
+            Some("1".repeat(64));
+        assert_eq!(
+            parser_revision_tampered
+                .replay_unimorph_tsv_compilation(artifact, &rule_set)
+                .expect_err("source parser revision tampering must fail closed"),
+            MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch
+        );
+
+        let mut build_context_tampered = witness.clone();
+        build_context_tampered.compiler_build_context_revision =
+            Some("2".repeat(64));
+        assert_eq!(
+            build_context_tampered
+                .replay_unimorph_tsv_compilation(artifact, &rule_set)
+                .expect_err("build-context revision tampering must fail closed"),
+            MorphophonologicalCompilationWitnessError::CompilerBuildContextRevisionMismatch
+        );
+
+        let mut build_context_recomputed = witness.clone();
+        build_context_recomputed.compiler_build_context_revision =
+            Some("2".repeat(64));
+        build_context_recomputed.transformation_blake3 =
+            build_context_recomputed.compute_transformation_blake3();
+        assert_eq!(
+            build_context_recomputed
+                .replay_unimorph_tsv_compilation(artifact, &rule_set)
+                .expect_err("recomputing the commitment must not self-certify a build context revision"),
+            MorphophonologicalCompilationWitnessError::CompilerBuildContextRevisionMismatch
+        );
+
+        let mut compiler_revision_recomputed = witness.clone();
+        compiler_revision_recomputed.compiler_implementation_revision =
+            Some("0".repeat(64));
+        compiler_revision_recomputed.transformation_blake3 =
+            compiler_revision_recomputed.compute_transformation_blake3();
+        assert_eq!(
+            compiler_revision_recomputed
+                .replay_unimorph_tsv_compilation(artifact, &rule_set)
+                .expect_err("recomputing the commitment must not self-certify a compiler revision"),
+            MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch
+        );
+
+        let mut parser_revision_recomputed = witness.clone();
+        parser_revision_recomputed.source_parser_revision =
+            Some("1".repeat(64));
+        parser_revision_recomputed.transformation_blake3 =
+            parser_revision_recomputed.compute_transformation_blake3();
+        assert_eq!(
+            parser_revision_recomputed
+                .replay_unimorph_tsv_compilation(artifact, &rule_set)
+                .expect_err("recomputing the commitment must not self-certify a parser revision"),
+            MorphophonologicalCompilationWitnessError::SourceParserRevisionMismatch
+        );
+
+        let mut historical_revision = witness.clone();
+        historical_revision.compiler_implementation_revision =
+            Some("3".repeat(64));
+        historical_revision.transformation_blake3 =
+            historical_revision.compute_transformation_blake3();
+        historical_revision
+            .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
+            .expect("historical structural validation should remain inspectable");
+        assert_eq!(
+            historical_revision
+                .replay_unimorph_tsv_compilation(artifact, &rule_set)
+                .expect_err("current replay must reject a historical implementation revision"),
+            MorphophonologicalCompilationWitnessError::CompilerImplementationRevisionMismatch
+        );
+
+        let mut replay_tampered = witness.clone();
+        replay_tampered.normalization_policy = "different-normalization-v0".into();
+        assert_eq!(
+            replay_tampered
+                .replay_unimorph_tsv_compilation(artifact, &rule_set)
+                .expect_err("transformation metadata tampering must fail compiler replay"),
+            MorphophonologicalCompilationWitnessError::TransformationMismatch
+        );
+
+        let mut reversed = slices;
+        reversed.reverse();
+        let (reordered_rule_set, reordered_witness) =
+            MorphophonologicalRuleSet::compile_unimorph_tsv_source(
+                "en",
+                "en-unspecified",
+                MorphophonologicalResourceEvidence::hand_authored(
+                    "fixture:unimorph-tsv",
+                    "fixture-snapshot-v1",
+                )
+                .unwrap(),
+                "fixture:unimorph:v1",
+                "fixture:compiler:v1",
+                artifact,
+                reversed,
+            )
+            .expect("source-record order must not change normalized executable output");
+        assert_eq!(rule_set.resource_blake3(), reordered_rule_set.resource_blake3());
+        assert_ne!(
+            witness.source_selection_blake3,
+            reordered_witness.source_selection_blake3
+        );
+    }
+
+    #[test]
+    fn unimorph_tsv_compiler_rejects_embedded_line_endings() {
+        let error = parse_unimorph_source_record(
+            "embedded-newline",
+            b"walk\nwalked\twalked\tV;PST",
+        )
+        .expect_err("embedded newline must not become part of a source field");
+        assert_eq!(
+            error,
+            MorphophonologicalUnimorphCompilerError::InvalidSourceFormat
+        );
+
+        let error = parse_unimorph_source_record(
+            "embedded-carriage-return",
+            b"walked\twalked\tV;PST\rjunk",
+        )
+        .expect_err("embedded carriage return must fail closed");
+        assert_eq!(
+            error,
+            MorphophonologicalUnimorphCompilerError::InvalidSourceFormat
+        );
+    }
+
+    #[test]
+    fn unimorph_tsv_compiler_rejects_duplicate_feature_tokens() {
+        assert_eq!(
+            normalize_unimorph_feature_bundle("V;PST;V")
+                .expect_err("duplicate feature token must fail closed"),
+            MorphophonologicalUnimorphCompilerError::DuplicateFeatureToken
+        );
+    }
+
+    #[test]
+    fn unimorph_tsv_compiler_rejects_duplicate_lemma_feature_identity() {
+        let artifact = b"walk\twalked\tV;PST\nwalk\twalkt\tV;PST\n";
+        let first_len = b"walk\twalked\tV;PST\n".len();
+        let slices = vec![
+            MorphophonologicalSourceSlice {
+                record_id: "walk-past-a".into(),
+                byte_offset: 0,
+                byte_length: first_len,
+                record_blake3: blake3::hash(&artifact[..first_len]).to_hex().to_string(),
+            },
+            MorphophonologicalSourceSlice {
+                record_id: "walk-past-b".into(),
+                byte_offset: first_len,
+                byte_length: artifact.len() - first_len,
+                record_blake3: blake3::hash(&artifact[first_len..]).to_hex().to_string(),
+            },
+        ];
+
+        let error = MorphophonologicalRuleSet::compile_unimorph_tsv_source(
+            "en",
+            "en-unspecified",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "fixture:unimorph-tsv",
+                "fixture-snapshot-v1",
+            )
+            .unwrap(),
+            "fixture:unimorph:v1",
+            "fixture:compiler:v1",
+            artifact,
+            slices,
+        )
+        .expect_err("duplicate lemma and feature identity must fail closed");
+
+        assert_eq!(
+            error,
+            MorphophonologicalUnimorphCompilerError::DuplicateLemmaAndFeatureBundle
+        );
+    }
+
+    #[test]
+    fn unimorph_tsv_compiler_preserves_external_resource_origin() {
+        let artifact = b"walk\twalked\tV;PST\n";
+        let evidence = MorphophonologicalResourceEvidence::external_from_artifact(
+            "fixture:external-unimorph",
+            "https://example.invalid/unimorph/eng",
+            "fixture-release-v1",
+            "CC-BY-SA-3.0",
+            artifact,
+        )
+        .unwrap();
+
+        let (rule_set, witness) = MorphophonologicalRuleSet::compile_unimorph_tsv_source(
+            "en",
+            "en-unspecified",
+            evidence,
+            "fixture:unimorph:v1",
+            "fixture:compiler:v1",
+            artifact,
+            vec![MorphophonologicalSourceSlice {
+                record_id: "walk-past".into(),
+                byte_offset: 0,
+                byte_length: artifact.len(),
+                record_blake3: blake3::hash(artifact).to_hex().to_string(),
+            }],
+        )
+        .expect("external evidence should pass through the compiler unchanged");
+
+        assert_eq!(
+            rule_set.resource_evidence.origin,
+            MorphophonologicalResourceOrigin::External
+        );
+        witness
+            .validate_against_source_artifact_and_rule_set(artifact, &rule_set)
+            .expect("external artifact evidence should replay");
+    }
+
+    #[test]
+    fn unimorph_compilation_witness_rejects_source_to_rule_mapping_drift() {
+        let artifact = b"walk\twalked\tV;PST\n";
+        let (rule_set, witness) = MorphophonologicalRuleSet::compile_unimorph_tsv_source(
+            "en",
+            "en-unspecified",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "fixture:unimorph-tsv",
+                "fixture-snapshot-v1",
+            )
+            .unwrap(),
+            "fixture:unimorph:v1",
+            "fixture:compiler:v1",
+            artifact,
+            vec![MorphophonologicalSourceSlice {
+                record_id: "walk-past".into(),
+                byte_offset: 0,
+                byte_length: artifact.len(),
+                record_blake3: blake3::hash(artifact).to_hex().to_string(),
+            }],
+        )
+        .expect("compiler fixture");
+
+        let mut tampered = rule_set;
+        tampered.rules[0].source_record_id = Some("different-record".into());
+        assert_eq!(
+            witness
+                .validate_against_source_artifact_and_rule_set(artifact, &tampered)
+                .expect_err("source-to-rule mapping drift must fail closed"),
+            MorphophonologicalCompilationWitnessError::OutputRuleSetMismatch
+        );
+    }
+
+    #[test]
+    fn unimorph_tsv_compiler_rejects_unsupported_alternation_instead_of_guessing() {
+        let artifact = b"study\tstudies\tV;PRS\n";
+        let slices = vec![MorphophonologicalSourceSlice {
+            record_id: "study-3sg".into(),
+            byte_offset: 0,
+            byte_length: artifact.len(),
+            record_blake3: blake3::hash(artifact).to_hex().to_string(),
+        }];
+
+        let error = MorphophonologicalRuleSet::compile_unimorph_tsv_source(
+            "en",
+            "en-unspecified",
+            MorphophonologicalResourceEvidence::hand_authored(
+                "fixture:unimorph-tsv",
+                "fixture-snapshot-v1",
+            )
+            .unwrap(),
+            "fixture:unimorph:v1",
+            "fixture:compiler:v1",
+            artifact,
+            slices,
+        )
+        .expect_err("unsupported y->ies alternation must fail closed");
+
+        assert_eq!(
+            error,
+            MorphophonologicalUnimorphCompilerError::UnsupportedDerivation
+        );
+    }
+
     #[test]
     fn morphophonological_resource_evidence_verifies_exact_source_artifact_bytes() {
         let artifact = b"fixture morphology resource v2\nwalk<TAB>walked<TAB>V;PST\n";
@@ -2833,4 +4092,59 @@ mod tests {
     }
 
 
+
+#[test]
+fn compilation_witness_rejects_empty_source_slice() {
+    let artifact = b"row0\n";
+    let rule_set = MorphophonologicalRuleSet::new(
+        "en",
+        "fixture:rules:v1",
+        "en-US",
+        MorphophonologicalResourceEvidence::hand_authored(
+            "fixture:rules:v1",
+            "fixture-v1",
+        )
+        .expect("fixture resource evidence"),
+        "fixture:rules:v1",
+        "fixture:rules:v1",
+        vec![MorphophonologicalRule {
+            rule_id: "fixture:identity".into(),
+            source_record_id: Some("row0".into()),
+            lemma: Some("row0".into()),
+            morphology: vec![MorphologicalFeature {
+                category: "fixture".into(),
+                value: "identity".into(),
+            }],
+            operation: MorphophonologicalRuleOperation::Identity,
+        }],
+    )
+    .expect("rule set");
+
+    let witness = MorphophonologicalCompilationWitness::new(
+        "fixture-compiler",
+        "fixture-compiler-v1",
+        "fixture-normalization-v1",
+        artifact,
+        vec![MorphophonologicalSourceSlice {
+            record_id: "row0".into(),
+            byte_offset: 0,
+            byte_length: artifact.len(),
+            record_blake3: blake3::hash(artifact).to_hex().to_string(),
+        }],
+        &rule_set,
+    )
+    .expect("compilation witness");
+
+    let mut tampered = witness;
+    tampered.source_slices[0].byte_length = 0;
+    tampered.source_slices[0].record_blake3 =
+        blake3::hash(b"").to_hex().to_string();
+
+    assert_eq!(
+        tampered.validate_shape(),
+        Err(MorphophonologicalCompilationWitnessError::EmptySourceSlice)
+    );
 }
+
+}
+

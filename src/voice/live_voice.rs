@@ -392,6 +392,13 @@ impl MorphophonologicalVerifiedLexicalPhonologicalRealizationReceipt {
             .map_err(|error| {
                 anyhow::anyhow!("invalid morphophonological source artifact: {error}")
             })?;
+        if compilation_witness.compiler_id == symthaea_broca::UNIMORPH_TSV_COMPILER_ID {
+            compilation_witness
+                .replay_unimorph_tsv_compilation(source_artifact, rule_set)
+                .map_err(|error| {
+                    anyhow::anyhow!("invalid morphophonological compiler replay: {error}")
+                })?;
+        }
         Ok(())
     }
 }
@@ -861,7 +868,7 @@ impl LiveVoice {
                 plan, frame, binding, &witness,
             )?;
         receipt.pronunciation_lexicon_evidence = pronunciation_lexicon_evidence;
-        receipt.pronunciation_lexicon_evidence_blake3 =
+        receipt.pronunciation_lexicon_evidence_blake3:
             hash_pronunciation_lexicon_evidence(&receipt.pronunciation_lexicon_evidence);
         receipt.verify_against_plan_and_current_resources(
             plan, frame, binding, &witness, &self.g2p
@@ -2794,6 +2801,8 @@ mod tests {
             "fixture:rules:v1",
             vec![MorphophonologicalRule {
                 rule_id: "fixture:identity".into(),
+                source_record_id: None,
+                lemma: None,
                 morphology: Vec::new(),
                 operation: MorphophonologicalRuleOperation::Identity,
             }],
@@ -2888,6 +2897,18 @@ mod tests {
 
         let mut receipt = receipt;
         receipt.compilation_witness = Some(compilation_witness.clone());
+
+        receipt
+            .verify_against_plan_and_rule_set_with_source_artifact(
+                &plan,
+                &frame,
+                &binding,
+                &lexical_witness,
+                &morph_witness,
+                &rule_set,
+                artifact,
+            )
+            .expect("non-UniMorph compilation witnesses must retain generic source-artifact verification");
 
         let tampered_artifact = b"rowX\n";
         assert!(
