@@ -641,7 +641,7 @@ fn main() -> Result<(), String> {
         scope_ref: "forget-set-v1".into(),
         unit_ref: "proportion".into(),
         aggregation_ref: "per-item-rate".into(),
-        direction: NeurosemanticRemediationMetricDirection::HigherIsBetter,
+        direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
     };
     let metric_utility = NeurosemanticRemediationMetricDefinition {
         schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
@@ -651,7 +651,7 @@ fn main() -> Result<(), String> {
         scope_ref: "retain-set-v1".into(),
         unit_ref: "proportion".into(),
         aggregation_ref: "per-item-rate".into(),
-        direction: NeurosemanticRemediationMetricDirection::HigherIsBetter,
+        direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
     };
     let metric_fairness = NeurosemanticRemediationMetricDefinition {
         schema_version: symthaea_communication::NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
