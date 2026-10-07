@@ -84,6 +84,7 @@ struct SelectionRecord {
 fn main() -> Result<()> {
     let selection = parse_selection_manifest()?;
     let action_refs = verify_qualification_workflow_pins()?;
+    let checked_out_head_sha = verify_qualification_checkout()?;
     verify_checked_in_manifests(&selection)?;
 
     let uri = parse_required_line(
@@ -260,6 +261,7 @@ fn main() -> Result<()> {
         &slices,
         selected_bytes.len(),
         &action_refs,
+        &checked_out_head_sha,
     )?;
     let ci_provenance = collect_ci_provenance();
     println!(
@@ -331,6 +333,38 @@ fn verify_qualification_workflow_pins() -> Result<Vec<String>> {
     }
 
     Ok(refs)
+}
+
+fn verify_qualification_checkout() -> Result<String> {
+    let expected = std::env::var("BROCA_QUALIFICATION_HEAD_SHA")
+        .context("BROCA_QUALIFICATION_HEAD_SHA is required for exact-head qualification")?;
+    if expected.len() != 40
+        || !expected
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        bail!("BROCA_QUALIFICATION_HEAD_SHA is not a canonical lowercase commit SHA");
+    }
+
+    let output = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .context("failed to resolve checked-out repository HEAD")?;
+    if !output.status.success() {
+        bail!("git rev-parse HEAD failed with status {}", output.status);
+    }
+    let actual = String::from_utf8(output.stdout)
+        .context("git rev-parse HEAD emitted non-UTF-8 output")?
+        .trim()
+        .to_owned();
+    if actual != expected {
+        bail!(
+            "exact-head qualification mismatch: expected {}, checked out {}",
+            expected,
+            actual
+        );
+    }
+    Ok(actual)
 }
 
 fn parse_selection_manifest() -> Result<SelectionManifest> {
@@ -514,6 +548,7 @@ fn write_structured_receipt(
     slices: &[MorphophonologicalSourceSlice],
     selected_bytes: usize,
     action_refs: &[String],
+    checked_out_head_sha: &str,
 ) -> Result<()> {
     let receipt_path = match std::env::var("BROCA_FREEZE_AUDIT_OUTPUT") {
         Ok(path) if !path.trim().is_empty() => path,
@@ -561,6 +596,10 @@ fn write_structured_receipt(
             "qualification_workflow_path": ".github/workflows/broca-feature-matrix.yml",
             "qualification_workflow_git_blob_sha": qualification_workflow_blob,
             "qualification_action_refs": action_refs
+        },
+        "qualification": {
+            "expected_head_sha": checked_out_head_sha,
+            "checked_out_head_sha": checked_out_head_sha
         },
         "ci": {
             "github_actions": std::env::var("GITHUB_ACTIONS").unwrap_or_else(|_| "unknown".into()),
