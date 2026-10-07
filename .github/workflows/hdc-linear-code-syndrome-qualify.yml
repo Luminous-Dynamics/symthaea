@@ -61,6 +61,7 @@ jobs:
           LIVE_RUN_WORKFLOW_ID="$(printf '%s' "$LIVE_RUN_JSON" | jq -r '.workflow_id')"
           LIVE_RUN_WORKFLOW_PATH="$(printf '%s' "$LIVE_RUN_JSON" | jq -r '.path')"
           LIVE_RUN_WORKFLOW_NAME="$(printf '%s' "$LIVE_RUN_JSON" | jq -r '.name')"
+          LIVE_RUN_EVENT="$(printf '%s' "$LIVE_RUN_JSON" | jq -r '.event')"
           LIVE_RUN_PR_COUNT="$(printf '%s' "$LIVE_RUN_JSON" | jq -r '.pull_requests | length')"
           LIVE_RUN_PR_NUMBER="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].number else 0 end')"
           LIVE_RUN_PR_HEAD_SHA="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].head.sha else "" end')"
@@ -73,6 +74,16 @@ jobs:
           test "$LIVE_RUN_WORKFLOW_ID" = "375128913"
           test "$LIVE_RUN_WORKFLOW_PATH" = ".github/workflows/hdc-linear-code-syndrome-qualify.yml"
           test "$LIVE_RUN_WORKFLOW_NAME" = "HDC Linear-Code Bounded Decoder Qualification"
+          test "$LIVE_RUN_EVENT" = "$GITHUB_EVENT_NAME"
+          test -n "$GITHUB_WORKFLOW_SHA"
+          WORKFLOW_PATH=".github/workflows/hdc-linear-code-syndrome-qualify.yml"
+          CHECKED_OUT_WORKFLOW_SHA256="$(sha256sum "$WORKFLOW_PATH" | cut -d" " -f1)"
+          EXECUTED_WORKFLOW_SHA256="$(gh api --method GET \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/contents/${WORKFLOW_PATH}?ref=${GITHUB_WORKFLOW_SHA}" \
+            --jq '.content' | tr -d '
+' | base64 --decode | sha256sum | cut -d" " -f1)"
+          test "$EXECUTED_WORKFLOW_SHA256" = "$CHECKED_OUT_WORKFLOW_SHA256"
           if test "$GITHUB_EVENT_NAME" = "pull_request"; then
             test "$LIVE_RUN_PR_COUNT" -eq 1
             test "$LIVE_RUN_PR_NUMBER" = "$GITHUB_EVENT_NUMBER"
@@ -111,6 +122,12 @@ jobs:
           echo "live_run_workflow_id=$LIVE_RUN_WORKFLOW_ID" >> "$GITHUB_OUTPUT"
           echo "live_run_workflow_path=$LIVE_RUN_WORKFLOW_PATH" >> "$GITHUB_OUTPUT"
           echo "live_run_workflow_name=$LIVE_RUN_WORKFLOW_NAME" >> "$GITHUB_OUTPUT"
+          echo "live_run_event=$LIVE_RUN_EVENT" >> "$GITHUB_OUTPUT"
+          echo "workflow_sha=$GITHUB_WORKFLOW_SHA" >> "$GITHUB_OUTPUT"
+          echo "workflow_ref=$GITHUB_WORKFLOW_REF" >> "$GITHUB_OUTPUT"
+          echo "workflow_file_sha256=$CHECKED_OUT_WORKFLOW_SHA256" >> "$GITHUB_OUTPUT"
+          echo "executed_workflow_file_sha256=$EXECUTED_WORKFLOW_SHA256" >> "$GITHUB_OUTPUT"
+          echo "workflow_definition_match=true" >> "$GITHUB_OUTPUT"
           echo "live_run_pr_count=$LIVE_RUN_PR_COUNT" >> "$GITHUB_OUTPUT"
           echo "live_run_pr_number=$LIVE_RUN_PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "live_run_pr_head_sha=$LIVE_RUN_PR_HEAD_SHA" >> "$GITHUB_OUTPUT"
@@ -473,7 +490,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
           HDC Linear-Code Bounded Decoder Qualification
           =============================================
-          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v12
+          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v13
           github_run_id=${{ github.run_id }}
           github_run_attempt=${{ github.run_attempt }}
           github_workflow_sha=${{ github.workflow_sha }}
@@ -494,6 +511,12 @@ jobs:
           live_run_workflow_id=${{ steps.head.outputs.live_run_workflow_id }}
           live_run_workflow_path=${{ steps.head.outputs.live_run_workflow_path }}
           live_run_workflow_name=${{ steps.head.outputs.live_run_workflow_name }}
+          live_run_event=${{ steps.head.outputs.live_run_event }}
+          workflow_sha=${{ steps.head.outputs.workflow_sha }}
+          workflow_ref=${{ steps.head.outputs.workflow_ref }}
+          workflow_file_sha256=${{ steps.head.outputs.workflow_file_sha256 }}
+          executed_workflow_file_sha256=${{ steps.head.outputs.executed_workflow_file_sha256 }}
+          workflow_definition_match=${{ steps.head.outputs.workflow_definition_match }}
           live_run_pr_count=${{ steps.head.outputs.live_run_pr_count }}
           live_run_pr_number=${{ steps.head.outputs.live_run_pr_number }}
           live_run_pr_head_sha=${{ steps.head.outputs.live_run_pr_head_sha }}
@@ -548,6 +571,7 @@ jobs:
           runner_arch=${{ steps.runner.outputs.runner_arch }}
           runner_image=${{ steps.runner.outputs.runner_image }}
           runner_image_version=${{ steps.runner.outputs.runner_image_version }}
+          workflow_definition_status=${{ steps.head.outputs.workflow_definition_match == 'true' && 'matched' || 'mismatch' }}
           qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.fixed_syndrome_spec.outcome == 'success' && steps.quotient_metric.outcome == 'success' && steps.quotient_spectrum.outcome == 'success' && steps.spectrum_adversary.outcome == 'success' && steps.coordinate_permutation.outcome == 'success' && steps.fiber_difference.outcome == 'success' && steps.walsh_dual_fiber.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
           random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
