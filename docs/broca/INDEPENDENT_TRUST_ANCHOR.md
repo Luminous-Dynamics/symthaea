@@ -22,7 +22,7 @@ The verifier never checks out, imports, builds, or executes pull-request source.
 - all eight Broca Feature Matrix jobs;
 - successful Workflow Syntax and PR Governance runs for that exact head.
 
-A successful verification publishes the commit status context `Broca / Independent Trust Anchor` on the exact PR head.
+A successful verification publishes the commit status context `Broca / Independent Trust Anchor` on the exact PR head. Before doing so, it requires each of the eight expected jobs to be successfully completed and verifies the critical qualification steps inside those jobs were actually executed, not merely skipped.
 
 The status only becomes a merge gate when repository branch-protection or ruleset policy explicitly requires that exact context.
 
