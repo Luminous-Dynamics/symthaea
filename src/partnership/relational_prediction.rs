@@ -499,7 +499,7 @@ impl RollingForecastLossDependenceProfile {
         Ok(Self {
             origin_count,
             test_samples,
-            max_lag_within_origin,
+            max_lag_within_origin: max_lag_within_origin.min(test_samples - 1),
             max_lag_across_origins: across_lag,
             per_origin,
             origin_mean_differentials,
