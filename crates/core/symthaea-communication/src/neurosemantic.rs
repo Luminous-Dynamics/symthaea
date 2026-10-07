@@ -397,6 +397,88 @@ pub enum NeurosemanticRemediationUncertaintyInferenceScope {
     Superpopulation,
 }
 
+/// Sampling design declared for statistical inference.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum NeurosemanticRemediationStatisticalSamplingDesign {
+    ProbabilitySample,
+    CensusOfTargetPopulation,
+    NonProbabilitySample,
+    Unknown,
+}
+
+/// Dependence structure declared for the observed analysis units.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum NeurosemanticRemediationStatisticalDependenceModel {
+    IndependentObservationUnits,
+    Clustered,
+    RepeatedMeasures,
+    Unknown,
+}
+
+/// Content-addressed statistical-design contract for an uncertainty calculation.
+///
+/// This makes method applicability explicit and independently checkable. It records what
+/// the evaluator claims about the analysis unit, outcome model, sampling design, and
+/// dependence structure; it does not itself prove those declarations are empirically true.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationStatisticalDesignArtifact {
+    pub schema_version: u16,
+    pub design_ref: String,
+    pub metric_ref: String,
+    pub metric_definition_hash: String,
+    pub observation_set_hash: String,
+    pub inference_scope: NeurosemanticRemediationUncertaintyInferenceScope,
+    pub sampling_design: NeurosemanticRemediationStatisticalSamplingDesign,
+    pub dependence_model: NeurosemanticRemediationStatisticalDependenceModel,
+    pub analysis_unit_ref: String,
+    pub outcome_model_ref: String,
+    pub study_protocol_hash: String,
+    pub assumptions_hash: String,
+    pub execution_revision: String,
+}
+
+pub const NEUROSEMANTIC_REMEDIATION_STATISTICAL_DESIGN_SCHEMA_VERSION: u16 = 1;
+
+impl NeurosemanticRemediationStatisticalDesignArtifact {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != NEUROSEMANTIC_REMEDIATION_STATISTICAL_DESIGN_SCHEMA_VERSION
+            || !valid_identifier(&self.design_ref)
+            || !valid_identifier(&self.metric_ref)
+            || !valid_blake3_digest(&self.metric_definition_hash)
+            || !valid_blake3_digest(&self.observation_set_hash)
+            || !valid_identifier(&self.analysis_unit_ref)
+            || !valid_identifier(&self.outcome_model_ref)
+            || !valid_blake3_digest(&self.study_protocol_hash)
+            || !valid_blake3_digest(&self.assumptions_hash)
+            || !valid_execution_revision(&self.execution_revision)
+        {
+            return Err("neurosemantic remediation statistical design fields are invalid".into());
+        }
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic remediation statistical design JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let artifact: Self = serde_json::from_slice(bytes).map_err(|error| {
+            format!("neurosemantic remediation statistical design JSON: {error}")
+        })?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn fingerprint(&self) -> Result<String, String> {
+        self.validate()?;
+        Ok(content_hash(&serde_json::to_vec(self).map_err(|error| {
+            format!("neurosemantic remediation statistical design serialization: {error}")
+        })?))
+    }
+}
+
 /// Content-addressed output record for a declared uncertainty calculation.
 ///
 /// This binds the uncertainty result to the exact metric definition, observation set,
@@ -416,6 +498,7 @@ pub struct NeurosemanticRemediationUncertaintyComputationArtifact {
     pub scale: u32,
     pub confidence_level_bps: u16,
     pub inference_scope: NeurosemanticRemediationUncertaintyInferenceScope,
+    pub statistical_design_hash: String,
     pub method_ref: String,
     /// Content-addressed assumptions statement used by the uncertainty procedure.
     pub assumptions_hash: String,
@@ -438,6 +521,7 @@ impl NeurosemanticRemediationUncertaintyComputationArtifact {
             || self.scale != self.point_estimate_scale
             || self.confidence_level_bps == 0
             || self.confidence_level_bps > 10_000
+            || !valid_blake3_digest(&self.statistical_design_hash)
             || !valid_identifier(&self.method_ref)
             || !valid_blake3_digest(&self.assumptions_hash)
             || !valid_identifier(&self.assumptions_ref)
@@ -677,7 +761,7 @@ pub const NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION: u16 = 3;
 pub const NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION: u16 = 1;
 pub const NEUROSEMANTIC_REMEDIATION_OBSERVATION_SET_SCHEMA_VERSION: u16 = 1;
 pub const NEUROSEMANTIC_REMEDIATION_METRIC_COMPUTATION_SCHEMA_VERSION: u16 = 1;
-pub const NEUROSEMANTIC_REMEDIATION_UNCERTAINTY_COMPUTATION_SCHEMA_VERSION: u16 = 2;
+pub const NEUROSEMANTIC_REMEDIATION_UNCERTAINTY_COMPUTATION_SCHEMA_VERSION: u16 = 3;
 const MAX_NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITIONS: usize = 32;
 const MAX_NEUROSEMANTIC_REMEDIATION_METRIC_TEXT_BYTES: usize = 256;
 const MAX_NEUROSEMANTIC_REMEDIATION_OBSERVATIONS: usize = 4096;
@@ -689,16 +773,15 @@ const NEUROSEMANTIC_REMEDIATION_WILSON_95_ASSUMPTIONS_BYTES: &[u8] =
 
 fn validate_uncertainty_method_application(
     method_ref: &str,
-    unit_ref: &str,
-    aggregation_ref: &str,
-    inference_scope: NeurosemanticRemediationUncertaintyInferenceScope,
+    definition: &NeurosemanticRemediationMetricDefinition,
+    design: &NeurosemanticRemediationStatisticalDesignArtifact,
 ) -> Result<(), String> {
     if method_ref != NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF {
         return Ok(());
     }
-    if unit_ref != "proportion"
+    if definition.unit_ref != "proportion"
         || !matches!(
-            aggregation_ref,
+            definition.aggregation_ref.as_str(),
             "per-item-rate" | "attack-success-rate" | "probe-detection-rate"
         )
     {
@@ -707,9 +790,16 @@ fn validate_uncertainty_method_application(
                 .into(),
         );
     }
-    if inference_scope != NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation {
+    if design.inference_scope != NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation
+        || design.sampling_design
+            != NeurosemanticRemediationStatisticalSamplingDesign::ProbabilitySample
+        || design.dependence_model
+            != NeurosemanticRemediationStatisticalDependenceModel::IndependentObservationUnits
+        || design.analysis_unit_ref != "subject-artifact"
+        || design.outcome_model_ref != "binary-failure-indicator-v1"
+    {
         return Err(
-            "neurosemantic remediation Wilson uncertainty method requires an explicit superpopulation inference scope"
+            "neurosemantic remediation Wilson uncertainty method requires a probability sample of independent subject-level binary outcomes"
                 .into(),
         );
     }
@@ -1309,6 +1399,7 @@ impl NeurosemanticRemediationImpactArtifact {
         population_manifest_bytes: &[&[u8]],
         uncertainty_computation_bytes: &[&[u8]],
         uncertainty_assumption_bytes: &[&[u8]],
+        statistical_design_bytes: &[&[u8]],
     ) -> Result<(), String> {
         self.validate()?;
         let measurement = self.verify_measurement_artifact_bytes(measurement_bytes)?;
@@ -1517,12 +1608,30 @@ impl NeurosemanticRemediationImpactArtifact {
                     return Err("neurosemantic remediation uncertainty computation binding mismatch".into());
                 }
 
+                let design_bytes = statistical_design_bytes
+                    .iter()
+                    .copied()
+                    .find(|candidate| content_hash(candidate) == uncertainty.statistical_design_hash)
+                    .ok_or_else(|| "neurosemantic remediation statistical design is missing".to_string())?;
+                let design =
+                    NeurosemanticRemediationStatisticalDesignArtifact::from_json_bytes(design_bytes)?;
+                if design.fingerprint()? != uncertainty.statistical_design_hash
+                    || design.metric_ref != computation.metric_ref
+                    || design.metric_definition_hash != computation.metric_definition_hash
+                    || design.observation_set_hash != computation.observation_set_hash
+                    || design.inference_scope != uncertainty.inference_scope
+                    || design.assumptions_hash != uncertainty.assumptions_hash
+                    || design.study_protocol_hash != self.study_protocol_hash
+                    || design.execution_revision != self.execution_revision
+                {
+                    return Err("neurosemantic remediation statistical design binding mismatch".into());
+                }
+
                 if uncertainty.method_ref == NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF {
                     validate_uncertainty_method_application(
                         uncertainty.method_ref.as_str(),
-                        definition.unit_ref.as_str(),
-                        definition.aggregation_ref.as_str(),
-                        uncertainty.inference_scope,
+                        definition,
+                        &design,
                     )?;
                     if uncertainty.inference_scope
                             != NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation
@@ -5046,6 +5155,7 @@ mod tests {
             scale: 4,
             confidence_level_bps: 9_500,
             inference_scope: NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation,
+            statistical_design_hash: content_hash(b"synthetic-statistical-design"),
             method_ref: "synthetic-structural-interval-v1".into(),
             assumptions_hash,
             assumptions_ref: "synthetic-structural-assumptions-v1".into(),
@@ -5092,44 +5202,112 @@ mod tests {
     }
 
     #[test]
-    fn remediation_wilson_method_cannot_target_non_proportion_estimands() {
+    fn remediation_wilson_method_cannot_target_incompatible_designs() {
+        let definition = NeurosemanticRemediationMetricDefinition {
+            schema_version: NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
+            metric_ref: "metric-direction".into(),
+            kind: NeurosemanticRemediationMeasurementKind::Forgetfulness,
+            estimand_ref: "forgetfulness-failure-rate".into(),
+            scope_ref: "forget-set-v1".into(),
+            unit_ref: "proportion".into(),
+            aggregation_ref: "per-item-rate".into(),
+            direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
+        };
+        let mut design = NeurosemanticRemediationStatisticalDesignArtifact {
+            schema_version: NEUROSEMANTIC_REMEDIATION_STATISTICAL_DESIGN_SCHEMA_VERSION,
+            design_ref: "design-wilson".into(),
+            metric_ref: definition.metric_ref.clone(),
+            metric_definition_hash: definition.fingerprint().unwrap(),
+            observation_set_hash: content_hash(b"observations"),
+            inference_scope: NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation,
+            sampling_design: NeurosemanticRemediationStatisticalSamplingDesign::ProbabilitySample,
+            dependence_model:
+                NeurosemanticRemediationStatisticalDependenceModel::IndependentObservationUnits,
+            analysis_unit_ref: "subject-artifact".into(),
+            outcome_model_ref: "binary-failure-indicator-v1".into(),
+            study_protocol_hash: content_hash(b"protocol"),
+            assumptions_hash: content_hash(b"assumptions"),
+            execution_revision: "8".repeat(40),
+        };
         assert!(validate_uncertainty_method_application(
             NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF,
-            "proportion",
-            "worst-subgroup-gap",
-            NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation,
-        )
-        .is_err());
-        assert!(validate_uncertainty_method_application(
-            NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF,
-            "count",
-            "per-item-rate",
-            NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation,
-        )
-        .is_err());
-        assert!(validate_uncertainty_method_application(
-            NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF,
-            "proportion",
-            "per-item-rate",
-            NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation,
+            &definition,
+            &design,
         )
         .is_ok());
+
+        design.dependence_model =
+            NeurosemanticRemediationStatisticalDependenceModel::Clustered;
+        assert!(validate_uncertainty_method_application(
+            NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF,
+            &definition,
+            &design,
+        )
+        .is_err());
+
+        design.dependence_model =
+            NeurosemanticRemediationStatisticalDependenceModel::IndependentObservationUnits;
+        design.sampling_design =
+            NeurosemanticRemediationStatisticalSamplingDesign::NonProbabilitySample;
+        assert!(validate_uncertainty_method_application(
+            NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF,
+            &definition,
+            &design,
+        )
+        .is_err());
+
+        design.sampling_design =
+            NeurosemanticRemediationStatisticalSamplingDesign::ProbabilitySample;
+        design.outcome_model_ref = "continuous-outcome-v1".into();
+        assert!(validate_uncertainty_method_application(
+            NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF,
+            &definition,
+            &design,
+        )
+        .is_err());
     }
 
     #[test]
     fn remediation_wilson_method_requires_superpopulation_scope() {
+        let definition = NeurosemanticRemediationMetricDefinition {
+            schema_version: NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
+            metric_ref: "metric-scope".into(),
+            kind: NeurosemanticRemediationMeasurementKind::Forgetfulness,
+            estimand_ref: "forgetfulness-failure-rate".into(),
+            scope_ref: "forget-set-v1".into(),
+            unit_ref: "proportion".into(),
+            aggregation_ref: "per-item-rate".into(),
+            direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
+        };
+        let mut design = NeurosemanticRemediationStatisticalDesignArtifact {
+            schema_version: NEUROSEMANTIC_REMEDIATION_STATISTICAL_DESIGN_SCHEMA_VERSION,
+            design_ref: "design-scope".into(),
+            metric_ref: definition.metric_ref.clone(),
+            metric_definition_hash: definition.fingerprint().unwrap(),
+            observation_set_hash: content_hash(b"observations"),
+            inference_scope: NeurosemanticRemediationUncertaintyInferenceScope::FixedEvaluationPopulation,
+            sampling_design: NeurosemanticRemediationStatisticalSamplingDesign::ProbabilitySample,
+            dependence_model:
+                NeurosemanticRemediationStatisticalDependenceModel::IndependentObservationUnits,
+            analysis_unit_ref: "subject-artifact".into(),
+            outcome_model_ref: "binary-failure-indicator-v1".into(),
+            study_protocol_hash: content_hash(b"protocol"),
+            assumptions_hash: content_hash(b"assumptions"),
+            execution_revision: "9".repeat(40),
+        };
         assert!(validate_uncertainty_method_application(
             NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF,
-            "proportion",
-            "per-item-rate",
-            NeurosemanticRemediationUncertaintyInferenceScope::FixedEvaluationPopulation,
+            &definition,
+            &design,
         )
         .is_err());
+
+        design.inference_scope =
+            NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation;
         assert!(validate_uncertainty_method_application(
             NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF,
-            "proportion",
-            "per-item-rate",
-            NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation,
+            &definition,
+            &design,
         )
         .is_ok());
     }
