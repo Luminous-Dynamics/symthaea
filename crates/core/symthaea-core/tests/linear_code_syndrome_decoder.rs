@@ -263,12 +263,11 @@ fn small_fixture_production_syndrome_matches_independent_oracle_and_is_linear() 
     let mut syndromes = Vec::with_capacity(1usize << code.dimension());
     for mask in 0..(1usize << code.dimension()) {
         let word = error_from_mask(mask, code.dimension());
-        let production = parity_check
-            .syndrome(&word)
-            .expect("same dimension");
+        let production = parity_check.syndrome(&word).expect("same dimension");
         let independent = independent_syndrome(mask as u64, &checks);
         assert_eq!(
-            production.words()[0], independent,
+            production.words()[0],
+            independent,
             "production and independent syndrome oracles diverged: mask={mask:#x}"
         );
         syndromes.push(independent);
