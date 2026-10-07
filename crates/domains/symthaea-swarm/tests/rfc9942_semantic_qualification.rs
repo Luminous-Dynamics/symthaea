@@ -1027,7 +1027,9 @@ fn rfc9942_outer_detached_payload_binds_inner_inclusion_and_outer_signature() {
     .unwrap();
     let outer_tbs = unsigned_outer.signature1_tbs(&[], Some(candidate)).unwrap();
     let outer_signature = signer.sign(&rng, &outer_tbs).unwrap().as_ref().to_vec();
-    let outer = Rfc9942SignatureWithReceipts::from_cbor(&outer_wire(
+    let expected_outer_signature_sha256: [u8; 32] =
+        sha2::Sha256::digest(&outer_signature).into();
+    let outer = Rfc9942SignatureWithReceipts::from_cbor(
         &collection,
         &outer_signature,
     ))
@@ -1049,6 +1051,10 @@ fn rfc9942_outer_detached_payload_binds_inner_inclusion_and_outer_signature() {
         symthaea_swarm::semantic_evidence_vds::Rfc9942ReceiptPlacement::Unprotected
     );
     assert_eq!(state.receipt_index(), 0);
+    assert_eq!(
+        state.outer_signature_sha256(),
+        expected_outer_signature_sha256
+    );
     assert_eq!(
         state.receipt().proof().inclusion_head(),
         Some(head)
@@ -1632,6 +1638,7 @@ fn detached_inclusion_state_derives_and_binds_root() {
     let root = head.root();
     let tbs = unsigned.signature1_tbs(&[], Some(&root)).unwrap();
     let sig = signer.sign(&rng, &tbs).unwrap().as_ref().to_vec();
+    let expected_signature_sha256: [u8; 32] = sha2::Sha256::digest(&sig).into();
     let receipt = Rfc9942ReceiptEnvelope::new(
         COSE_ES256_ALGORITHM_ID,
         vdp,
@@ -1646,6 +1653,7 @@ fn detached_inclusion_state_derives_and_binds_root() {
         state.payload_mode(),
         symthaea_swarm::semantic_evidence_vds::Rfc9942PayloadMode::Detached
     );
+    assert_eq!(state.signature_sha256(), expected_signature_sha256);
     assert_eq!(state.proof().inclusion_head(), Some(head));
     assert!(
         receipt.verify_es256_inclusion_state(candidate, &key, &[], Some(&root)).is_ok()
