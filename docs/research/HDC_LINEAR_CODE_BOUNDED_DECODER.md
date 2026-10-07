@@ -209,11 +209,16 @@ The qualification workflow is intentionally PR-event-only: `opened`, `synchroniz
 
 The qualification workflow does not treat the event payload alone as sufficient provenance. It
 binds the current repository, triggering repository, and head repository by numeric repository ID,
-then re-fetches the live Actions run and requires its repository ID, exact head SHA, head ref,
-workflow ID/path/name, and (for pull-request events) PR head/base SHAs and repository IDs to agree
-with the event. The receipt records these validated values as schema v14 fields. This makes a
-successful receipt evidence about the actual executed run rather than only about the triggering
-payload.
+then re-fetches the live Actions run and requires its repository ID, exact workflow identity, head
+ref, and event type to agree with the triggering event. For a pull-request run, GitHub's Actions run
+`head_sha` is the synthetic merge-ref SHA rather than the PR-head commit; the qualification therefore
+binds that run SHA to the event's synthetic merge SHA while independently binding the PR-head SHA to
+the checkout and PR association. The receipt records these validated values in schema v19.
+
+The same execution boundary also revalidates the uploaded artifact against the live run after upload,
+so the artifact identifier, run, repository, exact PR head, and digest are evidence fields rather
+than self-asserted metadata alone. This makes a successful receipt evidence about the actual executed
+run rather than only about the triggering payload.
 
 ## Walsh/dual-fiber structure
 
