@@ -420,7 +420,7 @@ A future green qualification should report all of:
 2. exact scenario definitions and perturbation schedule;
 3. frozen benchmark-manifest digest;
 4. training/frozen boundary;
-4. model and policy configuration;
+5. model and policy configuration;
 5. one-step and multi-horizon temporal prediction accuracy;
 6. policy-induced distribution-shift error;
 7. aggregate and planner-selected confidence calibration;
