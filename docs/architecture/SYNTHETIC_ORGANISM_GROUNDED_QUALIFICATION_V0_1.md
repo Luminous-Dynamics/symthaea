@@ -367,8 +367,9 @@ This matters because a single favorable held-out scenario can be explained by sc
 The qualification now adds a pre-adaptation change-detection stage. This stage is deliberately
 separate from model revision: it observes prediction error but does not update the world model.
 
-The detector uses a one-sided CUSUM against a fixed nominal residual reference collected from a
-nominal-trained model. It is evaluated in two deterministic streams:
+The detector uses a two-sided CUSUM against a fixed nominal residual reference collected from a
+nominal-trained model. It detects sustained residual increases or decreases, rather than assuming
+that every meaningful regime change must make the model worse. It is evaluated in two deterministic streams:
 
 1. a nominal no-shift control, used to measure false alarms;
 2. the changed harvest-yield regime, used to measure whether the detector identifies the shift.
@@ -376,8 +377,8 @@ nominal-trained model. It is evaluated in two deterministic streams:
 The shifted stream uses the same held-out state pool as the control and changes only the explicitly
 revisable harvest-yield fact. No adaptation occurs during either detector stream.
 
-The report retains per-observation residuals, cumulative CUSUM score, detection state, false-alarm
-state, detection observation, and detection delay. The detector parameters are frozen by protocol
+The report retains per-observation residuals, upper and lower cumulative CUSUM scores, detection
+direction, detection state, false-alarm state, detection observation, and detection delay. The detector parameters are frozen by protocol
 once the nominal residual reference has been established.
 
 This follows current changepoint-aware world-model work using prediction-error CUSUM to distinguish
@@ -478,6 +479,7 @@ anchor. The per-shock receipts preserve this distinction instead of hiding it be
 | Invariant anchors regress during regime revision | the plasticity mechanism is leaking into benchmark-declared invariants |
 | Nominal control fires while the shifted regime does not | the change detector has poor specificity/sensitivity for the configured residual signal and must not gate adaptation |
 | Shifted regime fires without a nominal false alarm | stronger evidence that persistent prediction error can distinguish this explicit regime change from the no-change control |
+| Detector reports an increase or decrease direction with stable control behavior | stronger evidence that the change signal is direction-aware rather than tied to a single residual polarity |
 
 No single metric is a synthetic-organism detector.
 
@@ -507,7 +509,7 @@ neighboring-probe transfer, and isolated anchor regression;
 18. cumulative adaptation response, including per-shock receipts, prior-shock retention, and
 pre-stream invariant-anchor retention;
 19. prediction-error change detection, including nominal-control false alarms, shifted-regime detection,
-per-observation residual/CUSUM receipts, and detection delay;
+per-observation residual, upper/lower-CUSUM, direction, and detection-delay receipts;
 20. regime-shift revision response, including pre/post shifted validation error, revision latency,
 per-update receipts, and invariant-anchor regression;
 21. trace/invariant verification where action evidence is recorded.
