@@ -3574,7 +3574,7 @@ async fn restore_verified_archive(
     })
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ConfigurationSwap {
     target_dir: std::fs::File,
     temp_name: String,
