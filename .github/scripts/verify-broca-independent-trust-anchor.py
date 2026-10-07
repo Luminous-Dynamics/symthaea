@@ -150,15 +150,28 @@ def require_fragments(text: str, fragments: list[str], label: str) -> None:
 
 
 def list_head_runs(head_sha: str) -> list[dict[str, Any]]:
-    return api_request(
-        "GET",
-        "/actions/runs",
-        query={
-            "head_sha": head_sha,
-            "event": "pull_request",
-            "per_page": "100",
-        },
-    ).get("workflow_runs", [])
+    runs: list[dict[str, Any]] = []
+    for page in range(1, 11):
+        page_runs = api_request(
+            "GET",
+            "/actions/runs",
+            query={
+                "head_sha": head_sha,
+                "event": "pull_request",
+                "per_page": "100",
+                "page": str(page),
+            },
+        ).get("workflow_runs", [])
+        if not isinstance(page_runs, list):
+            raise VerificationError(
+                f"unexpected workflow-run response on page {page}"
+            )
+        runs.extend(page_runs)
+        if len(page_runs) < 100:
+            return runs
+    raise VerificationError(
+        "workflow-run enumeration exceeded the independent verifier's 1000-run safety bound"
+    )
 
 
 def list_pr_files(pr_number: int) -> list[dict[str, Any]]:
@@ -372,6 +385,20 @@ def main() -> int:
         if TRIGGER_RUN_EVENT != "pull_request":
             raise StaleError(f"triggering event is not pull_request: {TRIGGER_RUN_EVENT!r}")
 
+        trigger_run = api_request("GET", f"/actions/runs/{TRIGGER_RUN_ID}")
+        if (
+            trigger_run.get("id") != TRIGGER_RUN_ID
+            or trigger_run.get("name") != TRIGGER_RUN_NAME
+            or trigger_run.get("event") != TRIGGER_RUN_EVENT
+            or trigger_run.get("head_sha") != TRIGGER_RUN_HEAD_SHA
+            or trigger_run.get("head_branch") != TRIGGER_RUN_HEAD_BRANCH
+            or trigger_run.get("run_attempt") != TRIGGER_RUN_ATTEMPT
+            or trigger_run.get("conclusion") != TRIGGER_RUN_CONCLUSION
+        ):
+            raise StaleError(
+                "workflow_run event payload does not match authoritative GitHub run state"
+            )
+
         associated = api_request(
             "GET",
             f"/commits/{TRIGGER_RUN_HEAD_SHA}/pulls",
@@ -402,6 +429,7 @@ def main() -> int:
             pr.get("state") != "open"
             or pr.get("draft") is not False
             or pr.get("head", {}).get("sha") != TRIGGER_RUN_HEAD_SHA
+            or pr.get("head", {}).get("ref") != TRIGGER_RUN_HEAD_BRANCH
             or pr.get("head", {}).get("repo", {}).get("full_name") != REPOSITORY
         ):
             raise StaleError("PR state/head/repository changed after association lookup")
