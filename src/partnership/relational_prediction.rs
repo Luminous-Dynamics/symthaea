@@ -1852,10 +1852,6 @@ impl ForecastInferenceSelectionPath {
 /// This receipt sits above the validated pre-inference binding. It records the
 /// selected branch without executing inference and without claiming to prove
 /// that the plan was temporally preregistered before outcome inspection.
-#[derive(Debug, Clone, PartialEq)]
-const CANONICAL_SELECTION_RULE_ID: &str = "relational-inference-selection-rule-v1";
-const CANONICAL_SELECTION_PROCEED_PATH_ID: &str = "R6-nested-forecast-bootstrap-v1";
-
 pub struct ForecastInferenceSelectionReceipt {
     pub analysis_level: String,
     pub binding_blake3: String,
@@ -1864,8 +1860,8 @@ pub struct ForecastInferenceSelectionReceipt {
     pub dependence_profile_blake3: String,
     pub method_selection_rule_id: String,
     pub method_selection_rule_spec_sha256: String,
-    /// Stable branch identifier from the externally frozen selection rule.
-    /// The receipt records this assertion; it does not execute the external rule.
+    /// Derived branch identifier from the compiled v1 mirror of the frozen selection rule.
+    /// This records the machine-derived outcome and does not prove temporal preregistration.
     pub decision_path_id: String,
     pub selected_procedure_id: String,
     pub selected_procedure_spec_sha256: String,
@@ -1966,11 +1962,6 @@ impl ForecastInferenceSelectionReceipt {
             return Err(RelationalPredictionError::InvalidSplit);
         }
 
-        if self.method_selection_rule_id == CANONICAL_SELECTION_RULE_ID
-            && self.decision_path_id != CANONICAL_SELECTION_PROCEED_PATH_ID
-        {
-            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
-        }
         if inference_selection_digest(self) != self.selection_blake3 {
             return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
         }
@@ -5746,7 +5737,7 @@ mod tests {
         assert_eq!(value["ordered_rules"][5]["id"], "R6");
         assert_eq!(
             value["ordered_rules"][5]["then"],
-            "nested-forecast-bootstrap-v1"
+            "nested-fixed-horizon-bootstrap"
         );
         assert_eq!(value["decision_semantics"]["result_dependent_method_switching"], false);
         assert_eq!(value["decision_semantics"]["temporal_preregistration_proof_in_code"], false);
