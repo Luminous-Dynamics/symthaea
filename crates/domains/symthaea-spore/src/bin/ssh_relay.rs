@@ -10186,6 +10186,17 @@ mod tests {
     }
 
     #[test]
+    fn process_liveness_requires_matching_start_time() {
+        let pid = std::process::id();
+        let start_time = read_process_start_time_ticks(pid).unwrap();
+        assert!(process_id_is_alive(pid, start_time));
+        assert!(
+            !process_id_is_alive(pid, start_time.wrapping_add(1)),
+            "same PID with a different process start time must be treated as non-identical"
+        );
+    }
+
+    #[test]
     fn process_identity_parser_requires_pid_and_start_time() {
         assert_eq!(
             parse_process_identity("1234:5678\n"),
