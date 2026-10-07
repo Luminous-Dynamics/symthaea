@@ -6709,7 +6709,7 @@ mod tests {
                 .find(|candidate| candidate.candidate_id == "direct")
                 .unwrap()
                 .qualification,
-            QualificationState::LifecycleQualified
+            QualificationState::EvidenceSupported
         );
     }
 
