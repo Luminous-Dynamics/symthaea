@@ -891,7 +891,9 @@ fn main() -> Result<(), String> {
     let statistical_sampling_frame_byte_refs: Vec<&[u8]> =
         vec![statistical_sampling_frame_bytes.as_slice()];
 
-    let statistical_randomization_seed_hex = format!("{:064x}", 42);
+    let statistical_randomization_seed_hex =
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+            .to_string();
     let statistical_randomness_commitment =
         symthaea_communication::NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact {
             schema_version:
@@ -1874,7 +1876,7 @@ fn main() -> Result<(), String> {
                 commitment_ref: "synthetic-alternate-randomness-commitment-v2".into(),
                 selection_procedure_ref: "simple-random-without-replacement-v2".into(),
                 randomization_seed_hash: symthaea_communication::content_hash(
-                    format!("{:064x}", 43).as_bytes(),
+                    b"1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
                 ),
                 study_protocol_hash: study_protocol_hash.clone(),
                 execution_revision: execution_revision.clone(),
