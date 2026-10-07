@@ -170,6 +170,26 @@ pub(crate) struct SystemTransaction {
     pub(crate) authorization: &'static str,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct ArtifactCommitment {
+    pub(crate) name: String,
+    pub(crate) size: u64,
+    pub(crate) digest: String,
+}
+
+fn validate_artifact_commitment(artifact: &ArtifactCommitment) -> Result<(), String> {
+    if !matches!(artifact.name.as_str(), "system.btrfs.zst" | "system.tar.gz") {
+        return Err(format!(
+            "artifact commitment has an unsupported filename: {}",
+            artifact.name
+        ));
+    }
+    if artifact.size == 0 {
+        return Err("artifact commitment must have a non-zero size".into());
+    }
+    validate_digest(&artifact.digest, "artifact_digest")
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct TransactionReceipt {
     pub(crate) schema_version: u16,
@@ -180,6 +200,7 @@ pub(crate) struct TransactionReceipt {
     pub(crate) request_digest: String,
     pub(crate) authorization: &'static str,
     pub(crate) outcome: TransactionOutcome,
+    pub(crate) artifact_commitment: Option<ArtifactCommitment>,
 }
 
 impl SystemTransaction {
@@ -219,6 +240,7 @@ impl SystemTransaction {
             request_digest: self.request_digest.clone(),
             authorization: self.authorization,
             outcome,
+            artifact_commitment: None,
         }
     }
 
@@ -302,6 +324,8 @@ struct JournalEvent {
     target_machine_digest: Option<String>,
     request_digest: String,
     outcome: Option<TransactionOutcome>,
+    #[serde(default)]
+    artifact_commitment: Option<ArtifactCommitment>,
 }
 
 #[derive(Debug, Clone)]
@@ -311,6 +335,7 @@ struct JournalRecord {
     target_machine_digest: Option<String>,
     request_digest: String,
     outcome: Option<TransactionOutcome>,
+    artifact_commitment: Option<ArtifactCommitment>,
 }
 
 impl JournalRecord {
@@ -324,6 +349,7 @@ impl JournalRecord {
             request_digest: self.request_digest.clone(),
             authorization: "websocket-bearer-authenticated",
             outcome,
+            artifact_commitment: self.artifact_commitment.clone(),
         }
     }
 }
@@ -566,6 +592,21 @@ impl TransactionLedger {
                     )
                 })?;
             }
+            if let Some(artifact) = event.artifact_commitment.as_ref() {
+                if event.mutation != MutationKind::CreateImage {
+                    return Err(format!(
+                        "transaction ledger artifact commitment on non-image mutation at line {}",
+                        line_number + 1
+                    ));
+                }
+                validate_artifact_commitment(artifact).map_err(|error| {
+                    format!(
+                        "transaction ledger invalid artifact commitment at line {}: {}",
+                        line_number + 1,
+                        error
+                    )
+                })?;
+            }
 
             if let Some(owner) = transaction_owners.get(&event.transaction_id) {
                 if owner != &event.request_id {
@@ -595,12 +636,14 @@ impl TransactionLedger {
                         target_machine_digest: event.target_machine_digest,
                         request_digest: event.request_digest,
                         outcome: None,
+                        artifact_commitment: None,
                     };
                     if let Some(existing) = records.get(&event.request_id) {
                         if existing.transaction_id != record.transaction_id
                             || existing.mutation != record.mutation
                             || existing.target_machine_digest != record.target_machine_digest
                             || existing.request_digest != record.request_digest
+                            || existing.artifact_commitment != record.artifact_commitment
                         {
                             return Err(format!(
                                 "transaction ledger contains conflicting history for request_id {}",
@@ -643,6 +686,7 @@ impl TransactionLedger {
                         }
                     } else {
                         record.outcome = Some(outcome);
+                        record.artifact_commitment = event.artifact_commitment;
                     }
                 }
                 other => {
@@ -794,6 +838,7 @@ impl TransactionLedger {
             target_machine_digest: transaction.target_machine_digest.clone(),
             request_digest: transaction.request_digest.clone(),
             outcome: None,
+            artifact_commitment: None,
         })?;
         Ok(TransactionAdmission::New(transaction))
     }
@@ -804,6 +849,12 @@ impl TransactionLedger {
         mutation: MutationKind,
         target_machine_digest: Option<&str>,
     ) -> Result<bool, String> {
+        if mutation == MutationKind::CreateImage {
+            return Ok(self
+                .successful_image_artifact(transaction_id, target_machine_digest)?
+                .is_some());
+        }
+
         validate_transaction_id(transaction_id)?;
         if let Some(digest) = target_machine_digest {
             validate_digest(digest, "target_machine_digest")?;
@@ -815,6 +866,30 @@ impl TransactionLedger {
                 && record.mutation == mutation
                 && record.target_machine_digest.as_deref() == target_machine_digest
                 && record.outcome == Some(TransactionOutcome::ObservedSuccess)
+        }))
+    }
+
+    pub(crate) fn successful_image_artifact(
+        &self,
+        transaction_id: &str,
+        target_machine_digest: Option<&str>,
+    ) -> Result<Option<ArtifactCommitment>, String> {
+        validate_transaction_id(transaction_id)?;
+        if let Some(digest) = target_machine_digest {
+            validate_digest(digest, "target_machine_digest")?;
+        }
+
+        let records = self.load()?;
+        Ok(records.values().find_map(|record| {
+            if record.transaction_id == transaction_id
+                && record.mutation == MutationKind::CreateImage
+                && record.target_machine_digest.as_deref() == target_machine_digest
+                && record.outcome == Some(TransactionOutcome::ObservedSuccess)
+            {
+                record.artifact_commitment.clone()
+            } else {
+                None
+            }
         }))
     }
 
@@ -846,6 +921,22 @@ impl TransactionLedger {
         transaction: &SystemTransaction,
         outcome: TransactionOutcome,
     ) -> Result<(), String> {
+        self.mark_completed_with_artifact(transaction, outcome, None)
+    }
+
+    pub(crate) fn mark_completed_with_artifact(
+        &self,
+        transaction: &SystemTransaction,
+        outcome: TransactionOutcome,
+        artifact_commitment: Option<ArtifactCommitment>,
+    ) -> Result<(), String> {
+        if artifact_commitment.is_some() && transaction.mutation != MutationKind::CreateImage {
+            return Err("only create_image transactions may commit an artifact".into());
+        }
+        if let Some(artifact) = artifact_commitment.as_ref() {
+            validate_artifact_commitment(artifact)?;
+        }
+
         let records = self.load()?;
         let Some(existing) = records.get(&transaction.request_id) else {
             return Err(format!(
@@ -864,9 +955,9 @@ impl TransactionLedger {
             ));
         }
         if let Some(existing_outcome) = existing.outcome {
-            if existing_outcome != outcome {
+            if existing_outcome != outcome || existing.artifact_commitment != artifact_commitment {
                 return Err(format!(
-                    "transaction request_id {} already has a different recorded outcome",
+                    "transaction request_id {} already has a different recorded completion",
                     transaction.request_id
                 ));
             }
@@ -882,6 +973,7 @@ impl TransactionLedger {
             target_machine_digest: transaction.target_machine_digest.clone(),
             request_digest: transaction.request_digest.clone(),
             outcome: Some(outcome),
+            artifact_commitment,
         })
     }
 }
