@@ -305,7 +305,75 @@ pub enum NeurosemanticRemediationUncertainty {
         scale: u32,
         confidence_level_bps: u16,
         uncertainty_method_ref: String,
+        uncertainty_computation_artifact_hash: String,
     },
+}
+
+/// Content-addressed output record for a declared uncertainty calculation.
+///
+/// This binds the uncertainty result to the exact metric definition, observation set,
+/// point estimate, method identity, confidence level, and execution revision. It does not,
+/// by itself, prove that the statistical method is appropriate or numerically correct.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationUncertaintyComputationArtifact {
+    pub schema_version: u16,
+    pub uncertainty_ref: String,
+    pub metric_ref: String,
+    pub metric_definition_hash: String,
+    pub observation_set_hash: String,
+    pub point_estimate_numerator: i64,
+    pub point_estimate_scale: u32,
+    pub lower_numerator: i64,
+    pub upper_numerator: i64,
+    pub scale: u32,
+    pub confidence_level_bps: u16,
+    pub method_ref: String,
+    pub execution_revision: String,
+}
+
+impl NeurosemanticRemediationUncertaintyComputationArtifact {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != NEUROSEMANTIC_REMEDIATION_UNCERTAINTY_COMPUTATION_SCHEMA_VERSION
+            || !valid_identifier(&self.uncertainty_ref)
+            || !valid_identifier(&self.metric_ref)
+            || !valid_blake3_digest(&self.metric_definition_hash)
+            || !valid_blake3_digest(&self.observation_set_hash)
+            || self.point_estimate_scale > 12
+            || self.scale > 12
+            || self.lower_numerator > self.upper_numerator
+            || self.point_estimate_numerator < self.lower_numerator
+            || self.point_estimate_numerator > self.upper_numerator
+            || self.scale != self.point_estimate_scale
+            || self.confidence_level_bps == 0
+            || self.confidence_level_bps > 10_000
+            || !valid_identifier(&self.method_ref)
+            || !valid_execution_revision(&self.execution_revision)
+        {
+            return Err("neurosemantic remediation uncertainty computation fields are invalid".into());
+        }
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic remediation uncertainty computation JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let artifact: Self = serde_json::from_slice(bytes).map_err(|error| {
+            format!("neurosemantic remediation uncertainty computation JSON: {error}")
+        })?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn fingerprint(&self) -> Result<String, String> {
+        self.validate()?;
+        Ok(content_hash(&serde_json::to_vec(self).map_err(|error| {
+            format!("neurosemantic remediation uncertainty computation serialization: {error}")
+        })?))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -515,6 +583,7 @@ pub const NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION: u16 = 3;
 pub const NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION: u16 = 1;
 pub const NEUROSEMANTIC_REMEDIATION_OBSERVATION_SET_SCHEMA_VERSION: u16 = 1;
 pub const NEUROSEMANTIC_REMEDIATION_METRIC_COMPUTATION_SCHEMA_VERSION: u16 = 1;
+pub const NEUROSEMANTIC_REMEDIATION_UNCERTAINTY_COMPUTATION_SCHEMA_VERSION: u16 = 1;
 const MAX_NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITIONS: usize = 32;
 const MAX_NEUROSEMANTIC_REMEDIATION_METRIC_TEXT_BYTES: usize = 256;
 const MAX_NEUROSEMANTIC_REMEDIATION_OBSERVATIONS: usize = 4096;
@@ -596,6 +665,7 @@ impl NeurosemanticRemediationMeasurementArtifact {
                     scale,
                     confidence_level_bps,
                     uncertainty_method_ref,
+                    uncertainty_computation_artifact_hash,
                 } => {
                     if lower_numerator > upper_numerator
                         || scale > 12
@@ -605,6 +675,7 @@ impl NeurosemanticRemediationMeasurementArtifact {
                         || confidence_level_bps == 0
                         || confidence_level_bps > 10_000
                         || !valid_identifier(&uncertainty_method_ref)
+                        || !valid_blake3_digest(&uncertainty_computation_artifact_hash)
                     {
                         return Err("neurosemantic remediation measurement uncertainty is invalid".into());
                     }
@@ -1095,6 +1166,7 @@ impl NeurosemanticRemediationImpactArtifact {
         computation_bytes: &[&[u8]],
         observation_set_bytes: &[&[u8]],
         population_manifest_bytes: &[&[u8]],
+        uncertainty_computation_bytes: &[&[u8]],
     ) -> Result<(), String> {
         self.validate()?;
         let measurement = self.verify_measurement_artifact_bytes(measurement_bytes)?;
@@ -1201,6 +1273,40 @@ impl NeurosemanticRemediationImpactArtifact {
                 .iter()
                 .find(|item| item.metric_ref == computation.metric_ref)
                 .ok_or_else(|| "neurosemantic remediation computation lacks a measurement".to_string())?;
+
+            if let NeurosemanticRemediationUncertainty::Interval {
+                lower_numerator,
+                upper_numerator,
+                scale,
+                confidence_level_bps,
+                uncertainty_method_ref,
+                uncertainty_computation_artifact_hash,
+            } = &measurement_item.uncertainty
+            {
+                let uncertainty_bytes = uncertainty_computation_bytes
+                    .iter()
+                    .copied()
+                    .find(|candidate| content_hash(candidate) == *uncertainty_computation_artifact_hash)
+                    .ok_or_else(|| "neurosemantic remediation uncertainty computation is missing".to_string())?;
+                let uncertainty =
+                    NeurosemanticRemediationUncertaintyComputationArtifact::from_json_bytes(uncertainty_bytes)?;
+                if uncertainty.fingerprint()? != *uncertainty_computation_artifact_hash
+                    || uncertainty.metric_ref != computation.metric_ref
+                    || uncertainty.metric_definition_hash != computation.metric_definition_hash
+                    || uncertainty.observation_set_hash != computation.observation_set_hash
+                    || uncertainty.point_estimate_numerator != computation.estimate_numerator
+                    || uncertainty.point_estimate_scale != computation.estimate_scale
+                    || uncertainty.lower_numerator != *lower_numerator
+                    || uncertainty.upper_numerator != *upper_numerator
+                    || uncertainty.scale != *scale
+                    || uncertainty.confidence_level_bps != *confidence_level_bps
+                    || uncertainty.method_ref != *uncertainty_method_ref
+                    || uncertainty.execution_revision != self.execution_revision
+                {
+                    return Err("neurosemantic remediation uncertainty computation binding mismatch".into());
+                }
+            }
+
             if measurement_item.kind != computation.kind
                 || measurement_item.eligible_sample_count != computation.eligible_sample_count
                 || measurement_item.observed_sample_count != computation.observed_sample_count
@@ -4322,6 +4428,7 @@ mod tests {
                         scale: 4,
                         confidence_level_bps: 9500,
                         uncertainty_method_ref: "wilson-interval-v1".into(),
+                        uncertainty_computation_artifact_hash: content_hash(b"typed-uncertainty-computation"),
                     },
                     eligible_sample_count: 10,
                     observed_sample_count: 10,
