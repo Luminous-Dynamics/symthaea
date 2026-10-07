@@ -1202,7 +1202,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &uncertainty_computation_byte_refs,
                             &uncertainty_assumption_byte_refs,
-                            &statistical_design_byte_refs,,
+                            &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1223,7 +1223,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &uncertainty_computation_byte_refs,
                             &uncertainty_assumption_byte_refs,
-                            &statistical_design_byte_refs,,
+                            &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1244,7 +1244,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &uncertainty_computation_byte_refs,
                             &uncertainty_assumption_byte_refs,
-                            &statistical_design_byte_refs,,
+                            &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1265,7 +1265,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &uncertainty_computation_byte_refs,
                             &uncertainty_assumption_byte_refs,
-                            &statistical_design_byte_refs,,
+                            &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1286,7 +1286,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &uncertainty_computation_byte_refs,
                             &uncertainty_assumption_byte_refs,
-                            &statistical_design_byte_refs,,
+                            &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1307,7 +1307,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &uncertainty_computation_byte_refs,
                             &uncertainty_assumption_byte_refs,
-                            &statistical_design_byte_refs,,
+                            &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1329,7 +1329,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &uncertainty_computation_byte_refs,
                             &uncertainty_assumption_byte_refs,
-                            &statistical_design_byte_refs,,
+                            &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1350,7 +1350,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &uncertainty_computation_byte_refs,
                             &uncertainty_assumption_byte_refs,
-                            &statistical_design_byte_refs,,
+                            &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1371,7 +1371,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &uncertainty_computation_byte_refs,
                             &uncertainty_assumption_byte_refs,
-                            &statistical_design_byte_refs,,
+                            &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1395,7 +1395,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &[bytes.as_slice()],
                             &uncertainty_assumption_byte_refs,
-                            &statistical_design_byte_refs,,
+                            &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1436,7 +1436,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &[uncertainty_bytes.as_slice()],
                             &uncertainty_assumption_byte_refs,
-                            &statistical_design_byte_refs,,
+                            &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1485,7 +1485,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &[bytes.as_slice()],
                             &uncertainty_assumption_byte_refs,
-                            &statistical_design_byte_refs,,
+                            &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1523,7 +1523,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &[forged_uncertainty_bytes.as_slice()],
                             &uncertainty_assumption_byte_refs,
-                            &[alternate_design_bytes.as_slice()],,
+                            &[alternate_design_bytes.as_slice()],
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1564,7 +1564,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &[forged_uncertainty_bytes.as_slice()],
                             &uncertainty_assumption_byte_refs,
-                            &[alternate_design_bytes.as_slice()],,
+                            &[alternate_design_bytes.as_slice()],
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1602,7 +1602,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &[forged_uncertainty_bytes.as_slice()],
                             &uncertainty_assumption_byte_refs,
-                            &[design_bytes.as_slice()],,
+                            &[design_bytes.as_slice()],
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1760,7 +1760,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &[bytes.as_slice()],
                             &uncertainty_assumption_byte_refs,
-                            &statistical_design_byte_refs,,
+                            &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1776,7 +1776,7 @@ fn main() -> Result<(), String> {
                             &observation_set_byte_refs,
                             &population_manifest_byte_refs,
                             &uncertainty_computation_byte_refs,
-                            &[forged.as_slice()],,
+                            &[forged.as_slice()],
             &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
@@ -1800,7 +1800,7 @@ fn main() -> Result<(), String> {
                             &populations,
                             &uncertainty_computation_byte_refs,
                             &uncertainty_assumption_byte_refs,
-                            &statistical_design_byte_refs,,
+                            &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1824,7 +1824,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &[bytes.as_slice()],
                             &uncertainty_assumption_byte_refs,
-                            &statistical_design_byte_refs,,
+                            &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
@@ -1842,7 +1842,7 @@ fn main() -> Result<(), String> {
                             &population_manifest_byte_refs,
                             &uncertainty_computation_byte_refs,
                             &uncertainty_assumption_byte_refs,
-                            &statistical_design_byte_refs,,
+                            &statistical_design_byte_refs,
             &statistical_sampling_frame_byte_refs,
             &statistical_execution_byte_refs,
         )
