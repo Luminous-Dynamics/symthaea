@@ -159,6 +159,23 @@ fn cargo_cfg_identity() -> Vec<u8> {
     cfg.join("\n").into_bytes()
 }
 
+fn system_package_identity() -> Vec<u8> {
+    let packages = ["pkg-config", "libssl-dev", "libclang-dev", "cmake"];
+    let mut entries = Vec::with_capacity(packages.len());
+    for package in packages {
+        let output = Command::new("dpkg-query")
+            .args(["-W", "-f=${Package}=${Version}", package])
+            .output();
+        let value = match output {
+            Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout).trim().to_owned(),
+            _ => format!("{package}=unavailable"),
+        };
+        entries.push(value);
+    }
+    entries.sort_unstable();
+    entries.join("\n").into_bytes()
+}
+
 fn main() {
     println!("cargo:rerun-if-changed=src/lexical_binding.rs");
     println!("cargo:rerun-if-changed=build.rs");
@@ -173,7 +190,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=RUSTC_WRAPPER");
     println!("cargo:rerun-if-env-changed=RUSTC_WORKSPACE_WRAPPER");
     println!("cargo:rerun-if-env-changed=CARGO_ENCODED_RUSTFLAGS");
-    for variable in ["PROFILE", "DEBUG", "OPT_LEVEL", "NUM_JOBS"] {
+    for variable in ["PROFILE", "DEBUG", "OPT_LEVEL", "NUM_JOBS", "RUNNER_OS", "RUNNER_ARCH", "ImageOS", "ImageVersion"] {
         println!("cargo:rerun-if-env-changed={variable}");
     }
     for (key, _) in env::vars() {
@@ -221,6 +238,7 @@ fn main() {
         env::var("RUSTC_WORKSPACE_WRAPPER").unwrap_or_default().into_bytes();
     let cargo_features = cargo_feature_identity();
     let cargo_cfg = cargo_cfg_identity();
+    let system_packages = system_package_identity();
     let profile = env::var("PROFILE").unwrap_or_default().into_bytes();
     let debug = env::var("DEBUG").unwrap_or_default().into_bytes();
     let opt_level = env::var("OPT_LEVEL").unwrap_or_default().into_bytes();
@@ -230,6 +248,10 @@ fn main() {
         .into_bytes();
     let target = env::var("TARGET").unwrap_or_default().into_bytes();
     let host = env::var("HOST").unwrap_or_default().into_bytes();
+    let runner_os = env::var("RUNNER_OS").unwrap_or_default().into_bytes();
+    let runner_arch = env::var("RUNNER_ARCH").unwrap_or_default().into_bytes();
+    let image_os = env::var("ImageOS").unwrap_or_default().into_bytes();
+    let image_version = env::var("ImageVersion").unwrap_or_default().into_bytes();
 
     // The implementation revision is an exact content identity of the compiler's source module
     // plus this build-time identity mechanism. It is deliberately not a manually maintained
@@ -258,7 +280,7 @@ fn main() {
     // This is intentionally separate from compiler source identity: the same checked-in source
     // can have different dependency/toolchain semantics if its build context changes.
     let build_context_revision = domain_digest(
-        b"symthaea-broca-unimorph-compiler-build-context-revision-v5",
+        b"symthaea-broca-unimorph-compiler-build-context-revision-v6",
         &[
             &crate_manifest,
             &workspace_manifest,
@@ -272,6 +294,7 @@ fn main() {
             &rustc_workspace_wrapper,
             &cargo_features,
             &cargo_cfg,
+            &system_packages,
             &profile,
             &debug,
             &opt_level,
@@ -279,6 +302,10 @@ fn main() {
             &rustflags,
             &target,
             &host,
+            &runner_os,
+            &runner_arch,
+            &image_os,
+            &image_version,
         ],
     );
 
