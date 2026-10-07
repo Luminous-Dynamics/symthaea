@@ -2431,6 +2431,10 @@ mod tests {
 
         let mut changed = receipt.clone();
         changed.systemd_job_id = Some(8);
+
+         let mut changed = receipt.clone();
+         changed.systemd_job_type_observed = None;
+         variants.push(changed);
         variants.push(changed);
 
         let mut changed = receipt.clone();
