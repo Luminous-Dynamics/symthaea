@@ -9485,6 +9485,88 @@ mod tests {
     }
 
     #[test]
+    fn private_runtime_file_rejects_symlink_alias() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!("nixforhumanity-runtime-{transaction_id}"));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let target = dir.join("target");
+        let alias = dir.join("runtime");
+        std::fs::write(&target, b"original").unwrap();
+        std::os::unix::fs::symlink(&target, &alias).unwrap();
+
+        let error = create_private_runtime_file(alias.to_str().unwrap(), 0o600)
+            .expect_err("O_NOFOLLOW runtime creation must reject symlink aliases");
+        assert!(
+            matches!(error.raw_os_error(), Some(libc::ELOOP | libc::EEXIST))
+                || error.kind() == std::io::ErrorKind::AlreadyExists,
+            "unexpected symlink rejection error: {error}"
+        );
+        assert_eq!(std::fs::read(&target).unwrap(), b"original");
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn background_process_records_exact_pid_status_and_output() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!("nixforhumanity-worker-{transaction_id}"));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let log = dir.join("worker.log");
+        let status = dir.join("worker.status");
+        let pid = dir.join("worker.pid");
+
+        let mut command = privileged_process("echo");
+        command.arg("worker-output");
+        let child_pid = spawn_privileged_background_process(
+            command,
+            log.to_str().unwrap(),
+            status.to_str().unwrap(),
+            pid.to_str().unwrap(),
+        )
+        .await
+        .unwrap();
+
+        assert!(child_pid > 0);
+        assert_eq!(
+            std::fs::read_to_string(&pid).unwrap().trim(),
+            child_pid.to_string()
+        );
+        assert_eq!(
+            std::fs::metadata(&log).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if read_transaction_status(status.to_str().unwrap())
+                    .await
+                    .unwrap()
+                    .is_some()
+                {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("worker exit status should become durable");
+
+        assert_eq!(read_transaction_status(status.to_str().unwrap()).await.unwrap(), Some(0));
+        let output = std::fs::read_to_string(&log).unwrap();
+        assert!(output.contains("worker-output"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn configuration_restore_consumes_stdin_and_replaces_target_atomically() {
         let step = restore_configuration_from_verified_stdin();
         assert!(step.contains("cat > \"$CONFIG_TMP\""));
