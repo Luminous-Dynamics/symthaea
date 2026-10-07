@@ -5793,6 +5793,42 @@ mod tests {
     }
 
     #[test]
+    fn canonical_method_spec_artifacts_are_exactly_pinned() {
+        let specifications = [
+            (
+                include_bytes!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/docs/research/RELATIONAL_HARMONICS_NESTED_FORECAST_BOOTSTRAP_V1.json"
+                ))
+                .as_slice(),
+                CANONICAL_INFERENCE_SELECTION_PROCEDURE_SPEC_SHA256,
+            ),
+            (
+                include_bytes!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/docs/research/RELATIONAL_HARMONICS_LOSS_DEPENDENCE_BARTLETT_V1.json"
+                ))
+                .as_slice(),
+                CANONICAL_INFERENCE_SELECTION_DEPENDENCE_SPEC_SHA256,
+            ),
+            (
+                include_bytes!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/docs/research/RELATIONAL_HARMONICS_MOVING_BLOCK_BOOTSTRAP_V1.json"
+                ))
+                .as_slice(),
+                CANONICAL_INFERENCE_SELECTION_RESAMPLING_SPEC_SHA256,
+            ),
+        ];
+
+        for (specification, expected_sha256) in specifications {
+            let mut hasher = Sha256::new();
+            hasher.update(specification);
+            assert_eq!(hex::encode(hasher.finalize()), expected_sha256);
+        }
+    }
+
+    #[test]
     fn canonical_selection_rule_spec_is_exactly_pinned() {
         let spec = include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
