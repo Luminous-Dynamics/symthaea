@@ -1069,6 +1069,11 @@ impl NixPostStateReceiptV1 {
                 {
                     return Err(NixPostStateErrorV1::InvalidClaim);
                 }
+                if self.approval_request_id.is_none()
+                    || self.approval_projection_digest.is_none()
+                {
+                    return Err(NixPostStateErrorV1::MissingLiveExecutionWitness);
+                }
             }
             _ => {}
         }
