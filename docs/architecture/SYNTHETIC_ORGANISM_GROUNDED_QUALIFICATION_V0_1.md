@@ -199,6 +199,8 @@ The report measures:
 
 - total, valid, and invalid query counts plus sequence length;
 - mean path MAE across all intermediate query steps, over valid answers only;
+- mean changed-channel F1 across intermediate steps, identifying whether the model predicts the
+  variables whose values actually change;
 - mean terminal-state MAE over valid answers only;
 - mean minimum-viability-margin error over valid answers only;
 - survival-decision agreement across all queries.
@@ -214,6 +216,10 @@ This is intentionally different from scheduled-trajectory replay: it asks the mo
 counterfactual intervention queries from states it did not receive as its normal scheduled path.
 That makes the benchmark a stronger test of whether the learned transition model supports a usable
 environment model rather than only memorizing observed action/state pairs.
+
+The changed-channel F1 is a shortcut-resistance metric. A predictor that largely copies persistent
+state can obtain deceptively good full-state overlap when only a few fields change; it should score
+poorly when it fails to identify the fields whose values changed because of the intervention.
 
 ### Planning quality
 
@@ -289,6 +295,7 @@ This matters because a single favorable held-out scenario can be explained by sc
 | Counterfactual query error is high while scheduled-trajectory error is low | the model may fit observed trajectories without supporting broader environment-level reasoning |
 | Counterfactual survival agreement is poor | the model's composed predictions are not reliable enough to support viability judgments away from the observed path |
 | Counterfactual path error is high while terminal error is modest | intermediate model dynamics may be wrong even when endpoint error partly cancels |
+| Changed-channel F1 is low while terminal overlap is high | the model may be copying persistent state while missing the causal variables altered by the action |
 | The query bank has zero valid answers | the world-model interface is not scoreable; do not interpret zero numerical error as success |
 
 No single metric is a synthetic-organism detector.
@@ -312,7 +319,7 @@ A future green qualification should report all of:
 12. persistence comparator;
 13. held-out transfer;
 14. leave-one-scenario-out transfer matrix and worst-fold result;
-15. environment-level counterfactual query-bank results;
+15. environment-level counterfactual query-bank results, including path error and changed-channel F1;
 16. trace/invariant verification where action evidence is recorded.
 
 Queued CI is not a pass.
