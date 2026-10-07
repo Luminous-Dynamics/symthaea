@@ -393,6 +393,12 @@ later learning interferes with prior knowledge. Regime-shift revision asks wheth
 appropriately revise knowledge that the benchmark has explicitly declared revisable while preserving
 knowledge declared invariant.
 
+This separation follows the current continual-world-model framing of differential retention: a changing
+environment requires legitimate revision of stale knowledge, while benchmark-declared invariants must
+remain protected. See Anand, Duraiswami, & Manocha (2026), arXiv:2610.03713
+(https://arxiv.org/abs/2610.03713), and Zhou et al. (2026), arXiv:2609.22055
+(https://arxiv.org/abs/2609.22055).
+
 ## Continual-retention interpretation
 
 Recent 2026 continual-world-model work argues that retention should be stratified by what is expected to
