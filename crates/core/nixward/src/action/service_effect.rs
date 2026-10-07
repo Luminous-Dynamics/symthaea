@@ -495,6 +495,14 @@ mod tests {
                 ..base.clone()
             },
             NixServiceEffectContextV1 {
+                authorized_manager_owner: ":1.43".into(),
+                ..base.clone()
+            },
+            NixServiceEffectContextV1 {
+                authorized_bus_id: "fedcba9876543210fedcba9876543210".into(),
+                ..base.clone()
+            },
+            NixServiceEffectContextV1 {
                 pre_invocation_id: Some("ff".repeat(16)),
                 ..base.clone()
             },
