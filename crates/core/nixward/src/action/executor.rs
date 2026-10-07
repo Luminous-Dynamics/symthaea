@@ -10,6 +10,7 @@
 //! - JSON output mode for structured results
 
 use crate::action::authorization::NixLocalExecutionAuthorityV1;
+use crate::action::execution_witness::NixLiveExecutionWitnessV1;
 #[cfg(feature = "systemd-observer")]
 use crate::action::NixSystemdReadOnlyObserverV1;
 use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
@@ -914,27 +915,52 @@ impl NixOSExecutor {
         command: NixOSCommand,
         authority: NixLocalExecutionAuthorityV1,
     ) -> ExecutionResult {
+        let (result, _witness) = self
+            .execute_authorized_with_witness(command, authority)
+            .await;
+        result
+    }
+
+    /// Execute through the consumed live authority and return a transient witness
+    /// proving the exact authorization lineage reached the final pre-dispatch gate.
+    ///
+    /// The witness is absent for dry-run execution and is never serialized. Callers
+    /// that only need the historical execution result should use execute_authorized.
+    pub(crate) async fn execute_authorized_with_witness(
+        &mut self,
+        command: NixOSCommand,
+        authority: NixLocalExecutionAuthorityV1,
+    ) -> (ExecutionResult, Option<NixLiveExecutionWitnessV1>) {
         let safety = command.safety_level();
         if let Err(reason) = command.validate_shape() {
-            return ExecutionResult::Blocked {
-                reason,
-                safety_level: safety,
-            };
+            return (
+                ExecutionResult::Blocked {
+                    reason,
+                    safety_level: safety,
+                },
+                None,
+            );
         }
         if let Err(error) = authority.validate_command(&command) {
-            return ExecutionResult::Blocked {
-                reason: format!("execution authority rejected command: {error}"),
-                safety_level: safety,
-            };
+            return (
+                ExecutionResult::Blocked {
+                    reason: format!("execution authority rejected command: {error}"),
+                    safety_level: safety,
+                },
+                None,
+            );
         }
         if let Err(reason) = self
             .validate_authorized_pre_state_identity(&authority, &command)
             .await
         {
-            return ExecutionResult::Blocked {
-                reason,
-                safety_level: safety,
-            };
+            return (
+                ExecutionResult::Blocked {
+                    reason,
+                    safety_level: safety,
+                },
+                None,
+            );
         }
 
         if let NixOSCommand::ConfigPatch {
@@ -948,17 +974,23 @@ impl NixOSExecutor {
                 let patch = match writer.set_option(option_path, value) {
                     Ok(patch) => patch,
                     Err(error) => {
-                        return ExecutionResult::FailedNoRollback {
-                            error: format!("config patch preparation failed: {error}"),
-                            rollback_error: None,
-                        };
+                        return (
+                            ExecutionResult::FailedNoRollback {
+                                error: format!("config patch preparation failed: {error}"),
+                                rollback_error: None,
+                            },
+                            None,
+                        );
                     }
                 };
                 if let Err(error) = writer.apply_patch_if_current(&patch, expected_config_digest) {
-                    return ExecutionResult::FailedNoRollback {
-                        error: format!("config patch currentness/write failed: {error}"),
-                        rollback_error: None,
-                    };
+                    return (
+                        ExecutionResult::FailedNoRollback {
+                            error: format!("config patch currentness/write failed: {error}"),
+                            rollback_error: None,
+                        },
+                        None,
+                    );
                 }
             }
         }
@@ -970,6 +1002,25 @@ impl NixOSExecutor {
         let projection_digest = authority.projection_digest().to_string();
         let pre_state_identity = authority.pre_state_identity().map(str::to_owned);
 
+        let witness = if self.dry_run {
+            None
+        } else {
+            match NixLiveExecutionWitnessV1::from_live_authority(&authority) {
+                Ok(witness) => Some(witness),
+                Err(reason) => {
+                    return (
+                        ExecutionResult::Blocked {
+                            reason,
+                            safety_level: safety,
+                        },
+                        None,
+                    );
+                }
+            }
+        };
+
+        // The witness is minted only after every final pre-dispatch freshness and
+        // content check has succeeded, immediately before the shared dispatch helper.
         let result = self
             .execute_confirmed_inner(
                 command.clone(),
@@ -988,7 +1039,7 @@ impl NixOSExecutor {
             pre_state_identity,
             &result,
         );
-        result
+        (result, witness)
     }
     /// Revalidate the state identity bound into live authority immediately before dispatch.
     ///
