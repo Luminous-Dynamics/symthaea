@@ -152,3 +152,8 @@ The Broca Feature Matrix is intentionally triggered by changes to the compiler i
 The workflow also disables persisted checkout credentials for the qualification jobs and grants the workflow only `contents: read`; the freeze audit does not require repository write access.
 
 This trigger surface is part of the evidence boundary: changing a bound qualification input without re-running the exact-head audit is treated as an invalid qualification state rather than an implicit continuation of the previous receipt.
+
+
+## Structured qualification receipt
+
+The freeze audit archives both a human-readable `audit.txt` and a machine-readable `receipt.json` when executed by the Broca Feature Matrix. The structured receipt records the immutable upstream artifact identity, exact selection records and commitment, compiler implementation/parser/build-context identities, Git blob identities for the checked-in manifests, and the GitHub run/workflow/runner provenance. The CI artifact therefore remains attributable to both the evidence inputs and the qualification execution context.
