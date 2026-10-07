@@ -7255,7 +7255,11 @@ echo "COMPLETE"
                     )
                 };
                 let durable_image_commitment =
-                    (outcome == TransactionOutcome::ObservedSuccess).then_some(image_commitment.clone());
+                    if outcome == TransactionOutcome::ObservedSuccess {
+                        image_commitment.clone()
+                    } else {
+                        None
+                    };
 
                 let _ = ws_tx
                     .send(Message::Text(
