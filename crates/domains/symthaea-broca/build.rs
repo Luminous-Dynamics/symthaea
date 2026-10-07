@@ -118,6 +118,8 @@ fn main() {
     println!("cargo:rerun-if-changed=../../../rust-toolchain.toml");
     println!("cargo:rerun-if-env-changed=RUSTC");
     println!("cargo:rerun-if-env-changed=CARGO");
+    println!("cargo:rerun-if-env-changed=RUSTC_WRAPPER");
+    println!("cargo:rerun-if-env-changed=RUSTC_WORKSPACE_WRAPPER");
     println!("cargo:rerun-if-env-changed=CARGO_ENCODED_RUSTFLAGS");
     for feature in [
         "CARGO_FEATURE_GPU",
@@ -152,6 +154,9 @@ fn main() {
     let rust_toolchain = read_required(&workspace_root.join("rust-toolchain.toml"));
     let rustc_identity = rustc_identity();
     let cargo_identity = cargo_identity();
+    let rustc_wrapper = env::var("RUSTC_WRAPPER").unwrap_or_default().into_bytes();
+    let rustc_workspace_wrapper =
+        env::var("RUSTC_WORKSPACE_WRAPPER").unwrap_or_default().into_bytes();
     let cargo_features = cargo_feature_identity();
     let rustflags = env::var("CARGO_ENCODED_RUSTFLAGS").unwrap_or_default().into_bytes();
     let target = env::var("TARGET").unwrap_or_default().into_bytes();
@@ -192,6 +197,8 @@ fn main() {
             &rust_toolchain,
             &rustc_identity,
             &cargo_identity,
+            &rustc_wrapper,
+            &rustc_workspace_wrapper,
             &cargo_features,
             &rustflags,
             &target,
