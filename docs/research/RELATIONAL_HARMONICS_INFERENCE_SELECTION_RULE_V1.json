@@ -1,0 +1,59 @@
+{
+  "schema": "relational-prediction-inference-selection-rule/v1",
+  "rule_id": "relational-inference-selection-rule-v1",
+  "scope": {
+    "analysis_family": "held-out-forecast-accuracy",
+    "primary_feature_set": "RelationalAugmented",
+    "benchmark_feature_set": "NonRelationalContext",
+    "loss": "squared_error",
+    "forecast_horizon": "fixed-single-horizon"
+  },
+  "ordered_rules": [
+    {
+      "id": "R1",
+      "when": "qualification is not validated against its exact retained input/provenance identity",
+      "then": "stop-assumption-failure"
+    },
+    {
+      "id": "R2",
+      "when": "forecast horizon is non-positive, non-finite, or inconsistent across retained targets",
+      "then": "stop-assumption-failure"
+    },
+    {
+      "id": "R3",
+      "when": "primary comparison is not the prespecified nested RelationalAugmented vs NonRelationalContext comparison",
+      "then": "stop-assumption-failure"
+    },
+    {
+      "id": "R4",
+      "when": "single-window qualification has fewer than 4 held-out target samples",
+      "then": "stop-assumption-failure"
+    },
+    {
+      "id": "R5",
+      "when": "rolling-origin qualification has fewer than 4 origins, or held-out target windows are not disjoint",
+      "then": "stop-assumption-failure"
+    },
+    {
+      "id": "R6",
+      "when": "measured loss-dependence profile is valid and the design remains within this fixed-horizon v1 scope",
+      "then": "nested-forecast-bootstrap-v1"
+    },
+    {
+      "id": "R7",
+      "when": "dependence characterization is missing/invalid, a second unregistered inferential method is requested, or a joint multi-horizon analysis is introduced",
+      "then": "stop-assumption-failure"
+    }
+  ],
+  "selected_method_bundle": {
+    "procedure_id": "nested-forecast-bootstrap-v1",
+    "dependence_method_id": "loss-dependence-bartlett-v1",
+    "resampling_method_id": "moving-block-bootstrap-v1"
+  },
+  "decision_semantics": {
+    "rule_execution": "external-procedural",
+    "branch_recording": "ForecastInferenceSelectionReceipt",
+    "result_dependent_method_switching": false,
+    "temporal_preregistration_proof_in_code": false
+  }
+}
