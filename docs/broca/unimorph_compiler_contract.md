@@ -157,3 +157,5 @@ This trigger surface is part of the evidence boundary: changing a bound qualific
 ## Structured qualification receipt
 
 The freeze audit archives both a human-readable `audit.txt` and a machine-readable `receipt.json` when executed by the Broca Feature Matrix. The structured receipt records the immutable upstream artifact identity, exact selection records and commitment, compiler implementation/parser/build-context identities, Git blob identities for the checked-in manifests, and the GitHub run/workflow/runner provenance. The CI artifact therefore remains attributable to both the evidence inputs and the qualification execution context.
+
+The qualification jobs also perform a shell-level preflight immediately after the pinned checkout and before the pinned toolchain/cache actions. It fails closed unless every `uses:` reference is a full 40-hex commit SHA and the exact approved seven-reference set is present. The freeze auditor independently re-parses those references and records them in `receipt.json` as an additional execution-boundary check.
