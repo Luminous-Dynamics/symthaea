@@ -10744,6 +10744,31 @@ mod tests {
     }
 
     #[test]
+    fn trusted_script_open_rejects_symlinks_and_unsafe_modes() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!("nixforhumanity-script-{id}"));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let script = dir.join("preflight.sh");
+        std::fs::write(&script, b"echo test\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        assert!(open_trusted_script(script.to_str().unwrap()).is_ok());
+
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(open_trusted_script(script.to_str().unwrap()).is_err());
+
+        std::fs::remove_file(&script).unwrap();
+        std::os::unix::fs::symlink("/etc/passwd", &script).unwrap();
+        assert!(open_trusted_script(script.to_str().unwrap()).is_err());
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn process_identity_parser_requires_pid_and_start_time() {
         assert_eq!(
             parse_process_identity("1234:5678\n"),
