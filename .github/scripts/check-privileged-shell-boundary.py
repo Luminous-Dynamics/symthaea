@@ -110,6 +110,42 @@ def main() -> None:
     if '&[&disk]' not in preflight_body:
         fail("pre_install_check no longer passes disk as a script argument")
 
+    if "run_privileged_script_with_args(" not in preflight_body:
+        fail("pre_install_check lost typed script execution")
+    if "privileged_script_command(" in preflight_body:
+        fail("pre_install_check arm bypasses the descriptor-bound script runner")
+
+    script_start = text.find("fn open_trusted_script(")
+    if script_start < 0:
+        fail("open_trusted_script helper disappeared")
+    script_end = text.find("\nasync fn run_privileged_script_with_args(", script_start)
+    if script_end < 0:
+        fail("trusted script helper boundary could not be located")
+    script_body = text[script_start:script_end]
+    for required in (
+        "O_NOFOLLOW",
+        "O_CLOEXEC",
+        "metadata.uid()",
+        "metadata.permissions().mode()",
+        "metadata.len() > 256 * 1024",
+    ):
+        if required not in script_body:
+            fail(f"trusted script opener lost required guard {required!r}")
+
+    runner_start = text.find("async fn run_privileged_script_with_args(")
+    runner_end = text.find("\nfn create_private_runtime_file(", runner_start)
+    if runner_start < 0 or runner_end < 0:
+        fail("descriptor-bound script runner could not be located")
+    runner_body = text[runner_start:runner_end]
+    for required in (
+        "open_trusted_script(path)?",
+        '.arg("-s")',
+        '.arg("--")',
+        '.stdin(std::process::Stdio::from(script))',
+    ):
+        if required not in runner_body:
+            fail(f"descriptor-bound script runner lost required primitive {required!r}")
+
     # Typed execution is closed-world: bare program names must first pass
     # through the trusted executable resolver, and the resolver must pin them
     # to the current NixOS system closure instead of PATH search.
