@@ -171,6 +171,11 @@ impl MicroWorld {
         self.observation = transition(self.observation, action);
         self.observation
     }
+
+    pub fn perturb(&mut self, perturbation: MicroPerturbation) -> MicroWorldObservation {
+        self.observation = perturbation.apply(self.observation);
+        self.observation
+    }
 }
 
 /// Train/evaluate a fresh predictor independently on each scenario.
@@ -236,6 +241,11 @@ where
         let mut train_world = MicroWorld::new(train_scenario.initial, train_cycles);
         let mut train_steps = 0u64;
         while !train_world.done() && train_steps < train_cycles {
+            for (cycle, perturbation) in train_scenario.perturbations {
+                if *cycle == train_steps {
+                    train_world.perturb(*perturbation);
+                }
+            }
             let before = train_world.observe();
             let action = train_scenario.schedule[train_steps as usize % train_scenario.schedule.len()];
             let _ = predictor.predict(before, action);
@@ -355,12 +365,35 @@ impl MicroWorldGeneralizationReport {
     }
 }
 
-/// A deterministic benchmark scenario with a distinct initial state and action schedule.
+/// Deterministic perturbations injected by the environment.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum MicroPerturbation {
+    EnergyDrain(f64),
+    IntegrityDamage(f64),
+    ThreatSpike(f64),
+    ProgressLoss(f64),
+}
+
+impl MicroPerturbation {
+    fn apply(self, state: MicroWorldObservation) -> MicroWorldObservation {
+        let mut next = state;
+        match self {
+            Self::EnergyDrain(amount) => next.energy -= amount.abs(),
+            Self::IntegrityDamage(amount) => next.integrity -= amount.abs(),
+            Self::ThreatSpike(amount) => next.threat += amount.abs(),
+            Self::ProgressLoss(amount) => next.progress -= amount.abs(),
+        }
+        next.clamp()
+    }
+}
+
+/// A deterministic benchmark scenario with explicit environmental perturbations.
 #[derive(Debug, Clone)]
 pub struct MicroWorldScenario {
     pub name: &'static str,
     pub initial: MicroWorldObservation,
     pub schedule: &'static [MicroAction],
+    pub perturbations: &'static [(u64, MicroPerturbation)],
 }
 
 static NOMINAL_SCHEDULE: [MicroAction; 6] = [
@@ -399,12 +432,18 @@ static KNOWLEDGE_RICH_SCHEDULE: [MicroAction; 6] = [
     MicroAction::Retreat,
 ];
 
+static STRESS_PERTURBATIONS: [(u64, MicroPerturbation); 2] = [
+    (4, MicroPerturbation::ThreatSpike(0.35)),
+    (8, MicroPerturbation::IntegrityDamage(0.18)),
+];
+
 pub fn benchmark_scenarios() -> Vec<MicroWorldScenario> {
     vec![
         MicroWorldScenario {
             name: "nominal",
             initial: MicroWorld::default().observe(),
             schedule: &NOMINAL_SCHEDULE,
+            perturbations: &[],
         },
         MicroWorldScenario {
             name: "stressed",
@@ -417,6 +456,7 @@ pub fn benchmark_scenarios() -> Vec<MicroWorldScenario> {
                 progress: 0.05,
             },
             schedule: &STRESSED_SCHEDULE,
+            perturbations: &STRESS_PERTURBATIONS,
         },
         MicroWorldScenario {
             name: "damaged",
@@ -429,6 +469,7 @@ pub fn benchmark_scenarios() -> Vec<MicroWorldScenario> {
                 progress: 0.10,
             },
             schedule: &DAMAGED_SCHEDULE,
+            perturbations: &[],
         },
         MicroWorldScenario {
             name: "knowledge_rich",
@@ -441,6 +482,7 @@ pub fn benchmark_scenarios() -> Vec<MicroWorldScenario> {
                 progress: 0.40,
             },
             schedule: &KNOWLEDGE_RICH_SCHEDULE,
+            perturbations: &[],
         },
     ]
 }
@@ -845,6 +887,11 @@ pub fn run_homeostatic_agent_horizon<P: MicroWorldPredictor>(
     let mut steps = 0u64;
 
     while !world.done() && steps < max_cycles {
+        for (cycle, perturbation) in scenario.perturbations {
+            if *cycle == steps {
+                world.perturb(*perturbation);
+            }
+        }
         let before = world.observe();
         let (action, _predicted_terminal, rollout) =
             policy.choose_horizon(predictor, before, horizon, discount);
@@ -1288,6 +1335,18 @@ fn signed_delta_with_confidence(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn perturbations_are_deterministic_and_observable() {
+        let before = MicroWorld::default().observe();
+        let mut a = MicroWorld::default();
+        let mut b = MicroWorld::default();
+        let a_state = a.perturb(MicroPerturbation::EnergyDrain(0.2));
+        let b_state = b.perturb(MicroPerturbation::EnergyDrain(0.2));
+
+        assert_eq!(a_state, b_state);
+        assert!(a_state.energy < before.energy);
+    }
 
     #[test]
     fn transition_is_deterministic() {
