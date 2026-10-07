@@ -453,6 +453,23 @@ pub struct GroundedWorldModelQualificationReport {
     pub mean_recovery_steps: f64,
 }
 
+/// Per-perturbation adaptation receipt.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LearningResponseEvent {
+    pub cycle: u64,
+    pub action: MicroAction,
+    pub shock_state_digest: u64,
+    pub shock_mae_before_update: f64,
+    pub shock_mae_after_update: f64,
+    pub same_transition_improvement: f64,
+    pub neighbor_mae_before_update: f64,
+    pub neighbor_mae_after_update: f64,
+    pub neighbor_improvement: f64,
+    pub anchor_mae_before_update: f64,
+    pub anchor_mae_after_update: f64,
+    pub anchor_regression: f64,
+}
+
 /// Measures prediction-error response to deterministic perturbation shocks.
 ///
 /// Each shock is scored before learning, after exactly one observed transition update on the
@@ -461,6 +478,7 @@ pub struct GroundedWorldModelQualificationReport {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LearningResponseReport {
     pub shock_count: u64,
+    pub events: Vec<LearningResponseEvent>,
     pub mean_shock_mae_before_update: f64,
     pub mean_shock_mae_after_update: f64,
     pub mean_same_transition_improvement: f64,
@@ -877,6 +895,7 @@ fn evaluate_learning_response(
         steps = steps.saturating_add(1);
     }
 
+    let mut events = Vec::with_capacity(shock_states.len());
     let mut shock_mae_before = 0.0;
     let mut shock_mae_after = 0.0;
     let mut same_transition_improvements = 0.0;
@@ -951,12 +970,28 @@ fn evaluate_learning_response(
             anchor_regression_count =
                 anchor_regression_count.saturating_add(1);
         }
+
+        events.push(LearningResponseEvent {
+            cycle: shock_state.cycle.saturating_sub(1),
+            action: *action,
+            shock_state_digest: shock_state.digest(),
+            shock_mae_before_update: before_mae,
+            shock_mae_after_update: after_mae,
+            same_transition_improvement: same_improvement,
+            neighbor_mae_before_update: neighbor_before_mae,
+            neighbor_mae_after_update: neighbor_after_mae,
+            neighbor_improvement,
+            anchor_mae_before_update: anchor_before_mae,
+            anchor_mae_after_update: anchor_after_mae,
+            anchor_regression,
+        });
     }
 
     let count = shock_states.len() as f64;
     if count <= 0.0 {
         return LearningResponseReport {
             shock_count: 0,
+            events: Vec::new(),
             mean_shock_mae_before_update: 0.0,
             mean_shock_mae_after_update: 0.0,
             mean_same_transition_improvement: 0.0,
@@ -974,6 +1009,7 @@ fn evaluate_learning_response(
 
     LearningResponseReport {
         shock_count: shock_states.len() as u64,
+        events,
         mean_shock_mae_before_update: shock_mae_before / count,
         mean_shock_mae_after_update: shock_mae_after / count,
         mean_same_transition_improvement: same_transition_improvements / count,
@@ -2218,6 +2254,16 @@ mod tests {
         );
 
         assert_eq!(report.shock_count, 2);
+        assert_eq!(report.events.len(), 2);
+        assert!(report.events.iter().all(|event| {
+            event.shock_state_digest != 0
+                && event.shock_mae_before_update.is_finite()
+                && event.shock_mae_after_update.is_finite()
+                && event.neighbor_mae_before_update.is_finite()
+                && event.neighbor_mae_after_update.is_finite()
+                && event.anchor_mae_before_update.is_finite()
+                && event.anchor_mae_after_update.is_finite()
+        }));
         assert!(report.is_populated());
         for value in [
             report.mean_shock_mae_before_update,
