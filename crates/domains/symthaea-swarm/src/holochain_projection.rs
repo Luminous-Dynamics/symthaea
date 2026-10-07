@@ -15,6 +15,28 @@ pub const VERSION: u16 = 1;
 pub const DOMAIN: &[u8] = b"symthaea-swarm/holochain-evidence-anchor-v1";
 pub const MAX_SELECTION_POLICY_BYTES: usize = 256;
 pub const MAX_CONTEXT_BYTES: usize = 8 * 1024;
+pub const HOLOCHAIN_ACTION_HASH_BYTES: usize = 39;
+
+/// Opaque native Holochain ActionHash bytes.
+///
+/// Symthaea deliberately does not depend on holo_hash; the future conductor
+/// adapter can convert this exact 39-byte representation into the native
+/// ActionHash and retrieve the dependency with must_get_valid_record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct HolochainActionHash([u8; HOLOCHAIN_ACTION_HASH_BYTES]);
+
+impl HolochainActionHash {
+    pub fn from_raw(bytes: [u8; HOLOCHAIN_ACTION_HASH_BYTES]) -> Result<Self, HolochainProjectionError> {
+        if bytes == [0; HOLOCHAIN_ACTION_HASH_BYTES] {
+            return Err(HolochainProjectionError::ZeroDigest);
+        }
+        Ok(Self(bytes))
+    }
+
+    pub const fn as_bytes(&self) -> &[u8; HOLOCHAIN_ACTION_HASH_BYTES] {
+        &self.0
+    }
+}
 
 /// The kind of durable object being anchored.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -117,8 +139,12 @@ pub struct HolochainEvidenceAnchor {
     pub kind: EvidenceAnchorKind,
     pub evidence_digest: [u8; 32],
     pub parent_evidence_digest: Option<[u8; 32]>,
+    /// Native ActionHash for the parent evidence entry, when already published.
+    pub parent_action_hash: Option<HolochainActionHash>,
     pub vds_root: Option<[u8; 32]>,
     pub receipt_selection: Option<ReceiptSelectionContext>,
+    /// Native ActionHash for the durable selection decision entry, when already published.
+    pub selection_decision_action_hash: Option<HolochainActionHash>,
     /// Human/application context is carried as bytes but is never interpreted
     /// by the canonical encoder.  The integrity zome can impose its own schema.
     pub context: Vec<u8>,
@@ -179,6 +205,14 @@ impl HolochainEvidenceAnchor {
             None => out.push(0),
         }
 
+        match self.parent_action_hash {
+            Some(hash) => {
+                out.push(1);
+                out.extend_from_slice(hash.as_bytes());
+            }
+            None => out.push(0),
+        }
+
         match self.vds_root {
             Some(root) => {
                 out.push(1);
@@ -197,6 +231,14 @@ impl HolochainEvidenceAnchor {
                 out.extend_from_slice(&selection.selection_decision_sha256);
                 put_string(&mut out, &selection.selection_policy);
                 put_u16(&mut out, selection.selection_policy_version);
+            }
+            None => out.push(0),
+        }
+
+        match self.selection_decision_action_hash {
+            Some(hash) => {
+                out.push(1);
+                out.extend_from_slice(hash.as_bytes());
             }
             None => out.push(0),
         }
@@ -238,6 +280,7 @@ mod tests {
             kind: EvidenceAnchorKind::Attestation,
             evidence_digest: [1; 32],
             parent_evidence_digest: Some([2; 32]),
+            parent_action_hash: Some(HolochainActionHash([7; HOLOCHAIN_ACTION_HASH_BYTES])),
             vds_root: Some([3; 32]),
             receipt_selection: Some(ReceiptSelectionContext {
                 collection_sha256: [4; 32],
@@ -248,6 +291,7 @@ mod tests {
                 selection_policy: "rfc9942/priority-first-valid-v1".into(),
                 selection_policy_version: 1,
             }),
+            selection_decision_action_hash: Some(HolochainActionHash([8; HOLOCHAIN_ACTION_HASH_BYTES])),
             context: b"qualification".to_vec(),
         }
     }
@@ -296,6 +340,15 @@ mod tests {
             invalid.validate(),
             Err(HolochainProjectionError::ZeroDigest)
         );
+    }
+
+    #[test]
+    fn native_action_hash_binding_is_canonical() {
+        let mut first = anchor();
+        let before = first.canonical_bytes().unwrap();
+        first.parent_action_hash = Some(HolochainActionHash([9; HOLOCHAIN_ACTION_HASH_BYTES]));
+        assert_ne!(before, first.canonical_bytes().unwrap());
+        assert!(HolochainActionHash::from_raw([0; HOLOCHAIN_ACTION_HASH_BYTES]).is_err());
     }
 
     #[test]
