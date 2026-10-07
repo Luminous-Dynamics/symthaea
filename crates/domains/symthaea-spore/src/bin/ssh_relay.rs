@@ -2239,7 +2239,9 @@ nixos-generate-config --root /mnt
                         staging
                     ));
                 }
-                script.push_str(&format!("rm -rf {}\n", staging));
+                // Transaction staging cleanup is owned by Rust after installation;
+                // never embed recursive deletion of the transaction namespace in the
+                // privileged install script.
             } else {
                 // Fallback: unquoted heredoc for $CRYPT_UUID expansion
                 script.push_str(&format!(
