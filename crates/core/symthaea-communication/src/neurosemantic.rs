@@ -482,8 +482,9 @@ impl NeurosemanticRemediationStatisticalDesignArtifact {
 /// Content-addressed output record for a declared uncertainty calculation.
 ///
 /// This binds the uncertainty result to the exact metric definition, observation set,
-/// point estimate, method identity, confidence level, and execution revision. It does not,
-/// by itself, prove that the statistical method is appropriate or numerically correct.
+/// point estimate, method identity, inference scope, statistical-design artifact,
+/// assumptions, and execution revision. It does not, by itself, prove that the declared
+/// statistical design assumptions are empirically true.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NeurosemanticRemediationUncertaintyComputationArtifact {
     pub schema_version: u16,
@@ -5129,6 +5130,41 @@ mod tests {
     }
 
     #[test]
+    fn remediation_statistical_design_artifact_is_bounded_and_canonical() {
+        let design = NeurosemanticRemediationStatisticalDesignArtifact {
+            schema_version: NEUROSEMANTIC_REMEDIATION_STATISTICAL_DESIGN_SCHEMA_VERSION,
+            design_ref: "design-statistical-1".into(),
+            metric_ref: "metric-statistical-1".into(),
+            metric_definition_hash: content_hash(b"metric-definition"),
+            observation_set_hash: content_hash(b"observation-set"),
+            inference_scope: NeurosemanticRemediationUncertaintyInferenceScope::Superpopulation,
+            sampling_design: NeurosemanticRemediationStatisticalSamplingDesign::ProbabilitySample,
+            dependence_model:
+                NeurosemanticRemediationStatisticalDependenceModel::IndependentObservationUnits,
+            analysis_unit_ref: "subject-artifact".into(),
+            outcome_model_ref: "binary-failure-indicator-v1".into(),
+            study_protocol_hash: content_hash(b"protocol"),
+            assumptions_hash: content_hash(b"assumptions"),
+            execution_revision: "a".repeat(40),
+        };
+        let bytes = serde_json::to_vec(&design).unwrap();
+        assert_eq!(
+            NeurosemanticRemediationStatisticalDesignArtifact::from_json_bytes(&bytes).unwrap(),
+            design
+        );
+        assert_eq!(design.fingerprint().unwrap(), content_hash(&bytes));
+
+        let mut legacy = design.clone();
+        legacy.schema_version = 0;
+        assert!(
+            NeurosemanticRemediationStatisticalDesignArtifact::from_json_bytes(
+                &serde_json::to_vec(&legacy).unwrap()
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
     fn remediation_uncertainty_computation_is_typed_and_bound() {
         let metric_definition = NeurosemanticRemediationMetricDefinition {
             schema_version: NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
@@ -5169,7 +5205,7 @@ mod tests {
         );
 
         let mut legacy = artifact.clone();
-        legacy.schema_version = 0;
+        legacy.schema_version = 2;
         assert!(
             NeurosemanticRemediationUncertaintyComputationArtifact::from_json_bytes(
                 &serde_json::to_vec(&legacy).unwrap()
