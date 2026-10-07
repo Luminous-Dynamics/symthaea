@@ -10,6 +10,7 @@
 //! - JSON output mode for structured results
 
 use crate::action::authorization::NixLocalExecutionAuthorityV1;
+use crate::action::execution_witness::NixLiveExecutionWitnessV1;
 #[cfg(feature = "systemd-observer")]
 use crate::action::NixSystemdReadOnlyObserverV1;
 use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
