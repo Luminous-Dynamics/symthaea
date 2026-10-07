@@ -255,7 +255,7 @@ The four-scenario benchmark is no longer treated as a single train/test split.
 
 The qualification layer performs a complete leave-one-scenario-out matrix:
 
-- start every fold from the same exact pre-qualification world-model state;
+- start every train → held-out pair from its own clone of the same exact pre-qualification world-model state;
 - adapt on exactly one scenario;
 - freeze the model;
 - score every other scenario without learning;
