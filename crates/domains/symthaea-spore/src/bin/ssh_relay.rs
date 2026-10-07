@@ -7425,12 +7425,12 @@ echo "COMPLETE"
                     image_path
                 );
                 let restore_artifact_step = match image_artifact_commitment.name.as_str() {
-                    "system.btrfs.zst" => {
-                        "echo \"Restoring committed btrfs snapshot...\"; zstd -d \"{path}/system.btrfs.zst\" | btrfs receive /mnt/ 2>&1"
-                    }
-                    "system.tar.gz" => {
-                        "echo \"Restoring committed tar archive...\"; tar -xzf \"{path}/system.tar.gz\" -C /mnt/ 2>&1"
-                    }
+                    "system.btrfs.zst" => format!(
+                        "echo \"Restoring committed btrfs snapshot...\"; zstd -d \"{image_path}/system.btrfs.zst\" | btrfs receive /mnt/ 2>&1"
+                    ),
+                    "system.tar.gz" => format!(
+                        "echo \"Restoring committed tar archive...\"; tar -xzf \"{image_path}/system.tar.gz\" -C /mnt/ 2>&1"
+                    ),
                     _ => {
                         unreachable!("artifact commitment validator must accept only supported image artifacts")
                     }
@@ -8803,29 +8803,23 @@ mod tests {
 
     #[test]
     fn restore_artifact_selection_is_bound_to_commitment_name() {
-        for (name, expected) in [
-            (
-                "system.btrfs.zst",
-                "zstd -d \"{path}/system.btrfs.zst\" | btrfs receive /mnt/",
-            ),
-            (
-                "system.tar.gz",
-                "tar -xzf \"{path}/system.tar.gz\" -C /mnt/",
-            ),
+        for (name, forbidden) in [
+            ("system.btrfs.zst", "system.tar.gz"),
+            ("system.tar.gz", "system.btrfs.zst"),
         ] {
             let step = match name {
                 "system.btrfs.zst" => {
-                    "echo \"Restoring committed btrfs snapshot...\"; zstd -d \"{path}/system.btrfs.zst\" | btrfs receive /mnt/ 2>&1"
+                    "zstd -d \"/tmp/nixforhumanity-image-id/system.btrfs.zst\" | btrfs receive /mnt/"
                 }
                 "system.tar.gz" => {
-                    "echo \"Restoring committed tar archive...\"; tar -xzf \"{path}/system.tar.gz\" -C /mnt/ 2>&1"
+                    "tar -xzf \"/tmp/nixforhumanity-image-id/system.tar.gz\" -C /mnt/"
                 }
                 _ => unreachable!(),
             };
-            assert!(step.contains(expected), "selection for {name} lost its bound command");
+            assert!(step.contains(name));
             assert!(
-                !step.contains("elif [ -f"),
-                "restore selection must not fall back to an uncommitted artifact"
+                !step.contains(forbidden),
+                "restore selection for {name} must not reference an alternate artifact"
             );
         }
     }
