@@ -460,11 +460,21 @@ pub struct PolicyRankingQualificationReport {
     pub top1_agreement: f64,
     pub pairwise_agreement: f64,
     pub pairs_evaluated: u64,
+    /// Fraction of strict action-pair comparisons where model and oracle preferences disagree.
+    pub strict_inversion_rate: f64,
+    /// Mean model-assigned advantage on those inverted pairs.
+    pub mean_predicted_advantage_on_inversions: f64,
 }
 
 impl PolicyRankingQualificationReport {
     pub fn decision_structure_present(&self) -> bool {
         self.top1_agreement > 0.5 || self.pairwise_agreement > 0.5
+    }
+
+    /// A positive value means the model can see an action as strongly preferable precisely
+    /// where the oracle says the opposite action is better.
+    pub fn exploitation_gap(&self) -> f64 {
+        self.mean_predicted_advantage_on_inversions
     }
 }
 
@@ -787,6 +797,8 @@ fn evaluate_frozen_policy_ranking<P: MicroWorldPredictor>(
     let mut top1_matches = 0u64;
     let mut pairs_evaluated = 0u64;
     let mut pairwise_matches = 0u64;
+    let mut inversion_count = 0u64;
+    let mut inversion_advantage_sum = 0.0;
     while !world.done() && states < max_cycles {
         for (cycle, perturbation) in scenario.perturbations {
             if *cycle == states {
@@ -851,6 +863,13 @@ fn evaluate_frozen_policy_ranking<P: MicroWorldPredictor>(
                 pairs_evaluated = pairs_evaluated.saturating_add(1);
                 if predicted_delta.signum() == oracle_delta.signum() {
                     pairwise_matches = pairwise_matches.saturating_add(1);
+                } else {
+                    inversion_count = inversion_count.saturating_add(1);
+                    if predicted_delta > 0.0 && oracle_delta < 0.0 {
+                        inversion_advantage_sum += predicted_delta;
+                    } else if predicted_delta < 0.0 && oracle_delta > 0.0 {
+                        inversion_advantage_sum += -predicted_delta;
+                    }
                 }
             }
         }
@@ -872,6 +891,16 @@ fn evaluate_frozen_policy_ranking<P: MicroWorldPredictor>(
             pairwise_matches as f64 / pairs_evaluated as f64
         },
         pairs_evaluated,
+        strict_inversion_rate: if pairs_evaluated == 0 {
+            0.0
+        } else {
+            inversion_count as f64 / pairs_evaluated as f64
+        },
+        mean_predicted_advantage_on_inversions: if inversion_count == 0 {
+            0.0
+        } else {
+            inversion_advantage_sum / inversion_count as f64
+        },
     }
 }
 
@@ -1248,6 +1277,19 @@ mod tests {
         let (_, _, custom_rollout) =
             policy.choose_horizon_with_confidence_decay(&predictor, current, 4, 0.8, 0.5);
         assert!((custom_rollout.min_confidence - 0.5_f64.powi(3)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn oracle_policy_has_zero_exploitation_gap() {
+        let predictor = OraclePredictor;
+        let report = evaluate_frozen_policy_ranking(
+            &predictor,
+            &benchmark_scenarios()[0],
+            8,
+        );
+
+        assert_eq!(report.strict_inversion_rate, 0.0);
+        assert_eq!(report.exploitation_gap(), 0.0);
     }
 
     #[test]
