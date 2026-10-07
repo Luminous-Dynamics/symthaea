@@ -778,6 +778,16 @@ impl NeurosemanticRemediationMetricDefinition {
         {
             return Err("neurosemantic remediation metric definition fields are invalid".into());
         }
+        if matches!(
+            self.aggregation_ref.as_str(),
+            "per-item-rate" | "attack-success-rate" | "probe-detection-rate" | "worst-subgroup-gap"
+        ) && self.direction != NeurosemanticRemediationMetricDirection::LowerIsBetter
+        {
+            return Err(
+                "neurosemantic remediation failure-rate metrics must declare LowerIsBetter"
+                    .into(),
+            );
+        }
         Ok(())
     }
 
@@ -3531,7 +3541,7 @@ fn recompute_wilson_score_95_interval(
     observed_count: u64,
     scale: u32,
 ) -> Result<(i64, i64, u32), String> {
-    if observed_count == 0 || scale > 9 {
+    if observed_count == 0 || failure_count > observed_count || scale > 9 {
         return Err(
             "neurosemantic remediation Wilson interval requires 1..=9 scale and observations"
                 .into(),
@@ -4126,7 +4136,7 @@ mod tests {
                     scope_ref: "forget-set-v1".into(),
                     unit_ref: "proportion".into(),
                     aggregation_ref: "per-item-rate".into(),
-                    direction: NeurosemanticRemediationMetricDirection::HigherIsBetter,
+                    direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
                 },
                 NeurosemanticRemediationMetricDefinition {
                     schema_version: NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
@@ -4490,7 +4500,7 @@ mod tests {
             scope_ref: "forget-set-v1".into(),
             unit_ref: "proportion".into(),
             aggregation_ref: "per-item-rate".into(),
-            direction: NeurosemanticRemediationMetricDirection::HigherIsBetter,
+            direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
         };
         let artifact = NeurosemanticRemediationMeasurementArtifact {
             schema_version: NEUROSEMANTIC_REMEDIATION_MEASUREMENT_SCHEMA_VERSION,
