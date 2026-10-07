@@ -4514,10 +4514,17 @@ impl NeurosemanticDerivationLineageRecord {
         {
             return Err("neurosemantic derivation lineage fields are invalid".into());
         }
-        let unique_inputs: BTreeSet<&str> =
+        let unique_input_refs: BTreeSet<&str> =
             self.input_artifact_refs.iter().map(String::as_str).collect();
-        if unique_inputs.len() != self.input_artifact_refs.len() {
-            return Err("neurosemantic derivation lineage contains duplicate input artifacts".into());
+        let unique_input_hashes: BTreeSet<&str> =
+            self.input_artifact_hashes.iter().map(String::as_str).collect();
+        if unique_input_refs.len() != self.input_artifact_refs.len()
+            || unique_input_hashes.len() != self.input_artifact_hashes.len()
+        {
+            return Err(
+                "neurosemantic derivation lineage contains duplicate input artifacts or content aliases"
+                    .into(),
+            );
         }
         Ok(())
     }
@@ -7332,6 +7339,14 @@ mod tests {
 
         let oversized = vec![b' '; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1];
         assert!(NeurosemanticDerivationLineageRecord::from_json_bytes(&oversized).is_err());
+    }
+
+    #[test]
+    fn derivation_lineage_rejects_distinct_refs_for_same_content() {
+        let mut record = synthetic_derivation_lineage_record();
+        record.input_artifact_refs = vec!["logical-input-a".into(), "logical-input-b".into()];
+        record.input_artifact_hashes[1] = record.input_artifact_hashes[0].clone();
+        assert!(record.validate().is_err());
     }
 
     #[test]
