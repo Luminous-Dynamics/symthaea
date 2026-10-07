@@ -77,6 +77,23 @@ pub struct VulkanSyncPlan {
 }
 
 impl VulkanSyncPlan {
+    /// Verify that this lowering is the canonical Vulkan projection of the source schedule.
+    pub fn verify_against_schedule(
+        &self,
+        schedule: &ExecutionSchedule,
+    ) -> Result<(), VulkanSyncError> {
+        let expected_digest = schedule.digest_hex().map_err(VulkanSyncError::Schedule)?;
+        if self.schedule_digest != expected_digest {
+            return Err(VulkanSyncError::ScheduleDigestMismatch);
+        }
+
+        let expected = Self::from_schedule(schedule, &self.assignments)?;
+        if self != &expected {
+            return Err(VulkanSyncError::NonCanonicalLowering);
+        }
+        Ok(())
+    }
+
     /// Lower a semantic schedule into logical Vulkan queues and per-queue timelines.
     ///
     /// Queue ids are logical lanes, not Vulkan queue-family indices or handles.
@@ -350,6 +367,10 @@ impl VulkanSyncPlan {
 pub enum VulkanSyncError {
     #[error("invalid execution schedule: {0}")]
     Schedule(ScheduleError),
+    #[error("sync plan schedule digest does not match the source schedule")]
+    ScheduleDigestMismatch,
+    #[error("sync plan is not the canonical lowering of the source schedule")]
+    NonCanonicalLowering,
     #[error("assignment count mismatch: expected {expected}, got {actual}")]
     AssignmentCountMismatch { expected: usize, actual: usize },
     #[error("missing queue assignment for node {0}")]
@@ -438,6 +459,9 @@ mod tests {
         assert_eq!(plan.queue_submission_order(q0).unwrap(), vec![1, 2, 3]);
         assert_eq!(plan.submissions.iter().map(|submission| submission.signal.value).collect::<Vec<_>>(), vec![1, 2, 3]);
         assert!(plan.submissions.iter().all(|submission| submission.waits.is_empty()));
+        assert_eq!(plan.submissions[1].barriers.len(), 1);
+        assert_eq!(plan.submissions[2].barriers.len(), 1);
+        plan.verify_against_schedule(&schedule).unwrap();
     }
 
     #[test]
@@ -455,6 +479,7 @@ mod tests {
         assert_eq!(plan.submissions[1].signal.value, 1);
         assert_eq!(plan.submissions[2].waits, vec![VulkanTimelineWait { producer_node: 2, producer_queue: q1, value: 1 }]);
         assert_eq!(plan.submissions[2].signal.value, 2);
+        assert!(plan.submissions.iter().all(|submission| submission.barriers.is_empty()));
     }
 
     #[test]
@@ -519,6 +544,22 @@ mod tests {
             ],
         ).unwrap_err();
         assert!(matches!(error, VulkanSyncError::AssignmentCountMismatch { .. }));
+    }
+
+    #[test]
+    fn tampered_barrier_is_rejected_against_schedule() {
+        let schedule = ExecutionSchedule::from_graph(&graph_chain()).unwrap();
+        let q0 = VulkanQueueId::new(0).unwrap();
+        let mut plan = VulkanSyncPlan::from_schedule(&schedule, &[
+            VulkanQueueAssignment { node_id: 1, queue: q0 },
+            VulkanQueueAssignment { node_id: 2, queue: q0 },
+            VulkanQueueAssignment { node_id: 3, queue: q0 },
+        ]).unwrap();
+        plan.submissions[1].barriers[0].resource = crate::ResourceId::new("tampered").unwrap();
+        assert!(matches!(
+            plan.verify_against_schedule(&schedule),
+            Err(VulkanSyncError::NonCanonicalLowering)
+        ));
     }
 
     #[test]
