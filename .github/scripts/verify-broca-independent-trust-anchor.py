@@ -55,11 +55,11 @@ EXPECTED_BROCA_JOBS = [
     "UniMorph frozen snapshot audit",
 ]
 
-REQUIRED_WORKFLOWS = [
-    "Broca Feature Matrix",
-    "Workflow Syntax",
-    "PR Governance",
-]
+REQUIRED_WORKFLOWS = {
+    "Broca Feature Matrix": ".github/workflows/broca-feature-matrix.yml",
+    "Workflow Syntax": ".github/workflows/workflow-syntax.yml",
+    "PR Governance": ".github/workflows/pr-governance.yml",
+}
 
 
 class VerificationError(Exception):
@@ -194,10 +194,13 @@ def latest_required_runs(head_sha: str) -> dict[str, dict[str, Any] | None]:
     runs = list_head_runs(head_sha)
     result: dict[str, dict[str, Any] | None] = {}
     for name in REQUIRED_WORKFLOWS:
+        expected_path = REQUIRED_WORKFLOWS[name]
         candidates = [
             run
             for run in runs
-            if run.get("name") == name and run.get("head_sha") == head_sha
+            if run.get("name") == name
+            and run.get("path") == expected_path
+            and run.get("head_sha") == head_sha
         ]
         candidates.sort(
             key=lambda run: (
@@ -724,11 +727,7 @@ def main() -> int:
         receipt["verification"]["workflow_gates"] = workflow_gate_states
         receipt["verification"]["broca_jobs"] = verify_broca_jobs(int(broca_run["id"]))
 
-        workflow_paths = {
-            "Broca Feature Matrix": ".github/workflows/broca-feature-matrix.yml",
-            "Workflow Syntax": ".github/workflows/workflow-syntax.yml",
-            "PR Governance": ".github/workflows/pr-governance.yml",
-        }
+        workflow_paths = REQUIRED_WORKFLOWS
 
         for supporting_name in ("Workflow Syntax", "PR Governance"):
             supporting_path = workflow_paths[supporting_name]
