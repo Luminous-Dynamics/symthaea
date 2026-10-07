@@ -52,6 +52,12 @@ pub enum VulkanError {
     MissingDeviceName,
     #[error("no host-visible Vulkan memory type is available")]
     NoHostVisibleMemory,
+    #[error(
+        "Vulkan device cannot support the fixed 64-thread HDC kernel workgroup"
+    )]
+    InsufficientComputeWorkgroupLimits,
+    #[error("storage buffer range {bytes} exceeds device limit {max}")]
+    StorageBufferRangeExceeded { bytes: u64, max: u64 },
     #[error("shader WGSL parsing failed: {0}")]
     ShaderParse(String),
     #[error("shader validation failed: {0}")]
@@ -136,9 +142,7 @@ impl VulkanDeviceIdentity {
 pub struct VulkanExecutor {
     instance: Instance,
     device: Device,
-    physical_device: vk::PhysicalDevice,
     queue: vk::Queue,
-    queue_family_index: u32,
     command_pool: vk::CommandPool,
     descriptor_set_layout: vk::DescriptorSetLayout,
     descriptor_pool: vk::DescriptorPool,
@@ -148,11 +152,15 @@ pub struct VulkanExecutor {
     device_identity: VulkanDeviceIdentity,
     implementation_digest: String,
     memory_properties: vk::PhysicalDeviceMemoryProperties,
+    max_storage_buffer_range: u64,
 }
 
 impl VulkanExecutor {
     /// Create a native Vulkan executor using the system Vulkan loader.
     pub fn new() -> Result<Self, VulkanError> {
+        let spirv = compile_spirv()?;
+        let implementation_digest = implementation_digest(&spirv);
+
         let entry =
             unsafe { Entry::load() }.map_err(|error| VulkanError::Loader(error.to_string()))?;
 
@@ -176,10 +184,14 @@ impl VulkanExecutor {
                 .map_err(VulkanError::Vk)?
         };
 
-        Self::from_instance(instance)
+        Self::from_instance(instance, &spirv, implementation_digest)
     }
 
-    fn from_instance(instance: Instance) -> Result<Self, VulkanError> {
+    fn from_instance(
+        instance: Instance,
+        spirv: &[u32],
+        implementation_digest: String,
+    ) -> Result<Self, VulkanError> {
         let physical_devices = match unsafe { instance.enumerate_physical_devices() } {
             Ok(devices) => devices,
             Err(error) => {
@@ -226,6 +238,15 @@ impl VulkanExecutor {
         };
 
         let properties = unsafe { instance.get_physical_device_properties(physical_device) };
+        if properties.limits.max_compute_work_group_invocations < WORKGROUP_SIZE
+            || properties.limits.max_compute_work_group_size[0] < WORKGROUP_SIZE
+        {
+            unsafe { instance.destroy_instance(None) };
+            return Err(VulkanError::InsufficientComputeWorkgroupLimits);
+        }
+
+        let max_storage_buffer_range = u64::from(properties.limits.max_storage_buffer_range);
+
         let device_identity = match VulkanDeviceIdentity::from_properties(&properties) {
             Ok(identity) => identity,
             Err(error) => {
@@ -256,7 +277,7 @@ impl VulkanExecutor {
 
         let queue = unsafe { device.get_device_queue(queue_family_index, 0) };
 
-        let shader_module = match create_shader_module(&device) {
+        let shader_module = match create_shader_module(&device, spirv) {
             Ok(module) => module,
             Err(error) => {
                 unsafe {
@@ -373,14 +394,10 @@ impl VulkanExecutor {
             }
         };
 
-        let implementation_digest = implementation_digest()?;
-
         Ok(Self {
             instance,
             device,
-            physical_device,
             queue,
-            queue_family_index,
             command_pool,
             descriptor_set_layout,
             descriptor_pool,
@@ -390,6 +407,7 @@ impl VulkanExecutor {
             device_identity,
             implementation_digest,
             memory_properties,
+            max_storage_buffer_range,
         })
     }
 
@@ -433,6 +451,12 @@ impl VulkanExecutor {
 
         let logical_bytes = packed_bytes(dimensions);
         let physical_bytes = physical_storage_bytes(logical_bytes)?;
+        if physical_bytes > self.max_storage_buffer_range {
+            return Err(VulkanError::StorageBufferRangeExceeded {
+                bytes: physical_bytes,
+                max: self.max_storage_buffer_range,
+            });
+        }
 
         let lhs = GpuBuffer::new(&self.device, &self.memory_properties, physical_bytes)?;
         let rhs = GpuBuffer::new(&self.device, &self.memory_properties, physical_bytes)?;
@@ -580,12 +604,21 @@ impl VulkanExecutor {
             return Err(VulkanError::Vk(error));
         }
 
-        let wait = unsafe { self.device.wait_for_fences(&[fence], true, u64::MAX) }
-            .map_err(VulkanError::Vk);
+        let wait = unsafe { self.device.wait_for_fences(&[fence], true, u64::MAX) };
+
+        if let Err(error) = wait {
+            // A fence wait failure after a successful submission must not let
+            // descriptor/buffer resources be released while work could still
+            // be in flight.
+            unsafe {
+                let _ = self.device.device_wait_idle();
+                self.device.destroy_fence(fence, None);
+            }
+            return Err(VulkanError::Vk(error));
+        }
 
         unsafe { self.device.destroy_fence(fence, None) };
-
-        wait
+        Ok(())
     }
 }
 
@@ -687,18 +720,6 @@ impl GpuBuffer {
                 .map_err(VulkanError::Vk)?
         };
 
-        unsafe {
-            ptr::copy_nonoverlapping(bytes.as_ptr(), mapped.cast::<u8>(), bytes.len());
-            if bytes.len() < self.allocation_size as usize {
-                ptr::write_bytes(
-                    mapped.cast::<u8>().add(bytes.len()),
-                    0,
-                    self.allocation_size as usize - bytes.len(),
-                );
-            }
-            device.unmap_memory(self.memory);
-        }
-
         if !self.coherent {
             let range = vk::MappedMemoryRange::default()
                 .memory(self.memory)
@@ -706,9 +727,33 @@ impl GpuBuffer {
                 .size(vk::WHOLE_SIZE);
 
             unsafe {
-                device
-                    .flush_mapped_memory_ranges(std::slice::from_ref(&range))
-                    .map_err(VulkanError::Vk)?;
+                ptr::copy_nonoverlapping(bytes.as_ptr(), mapped.cast::<u8>(), bytes.len());
+                if bytes.len() < self.allocation_size as usize {
+                    ptr::write_bytes(
+                        mapped.cast::<u8>().add(bytes.len()),
+                        0,
+                        self.allocation_size as usize - bytes.len(),
+                    );
+                }
+                if let Err(error) =
+                    device.flush_mapped_memory_ranges(std::slice::from_ref(&range))
+                {
+                    device.unmap_memory(self.memory);
+                    return Err(VulkanError::Vk(error));
+                }
+                device.unmap_memory(self.memory);
+            }
+        } else {
+            unsafe {
+                ptr::copy_nonoverlapping(bytes.as_ptr(), mapped.cast::<u8>(), bytes.len());
+                if bytes.len() < self.allocation_size as usize {
+                    ptr::write_bytes(
+                        mapped.cast::<u8>().add(bytes.len()),
+                        0,
+                        self.allocation_size as usize - bytes.len(),
+                    );
+                }
+                device.unmap_memory(self.memory);
             }
         }
 
@@ -718,19 +763,6 @@ impl GpuBuffer {
     fn read_bytes(&self, device: &Device, len: usize) -> Result<Vec<u8>, VulkanError> {
         if len as u64 > self.allocation_size {
             return Err(VulkanError::AllocationSizeOverflow);
-        }
-
-        if !self.coherent {
-            let range = vk::MappedMemoryRange::default()
-                .memory(self.memory)
-                .offset(0)
-                .size(vk::WHOLE_SIZE);
-
-            unsafe {
-                device
-                    .invalidate_mapped_memory_ranges(std::slice::from_ref(&range))
-                    .map_err(VulkanError::Vk)?;
-            }
         }
 
         let mapped = unsafe {
@@ -743,6 +775,22 @@ impl GpuBuffer {
                 )
                 .map_err(VulkanError::Vk)?
         };
+
+        if !self.coherent {
+            let range = vk::MappedMemoryRange::default()
+                .memory(self.memory)
+                .offset(0)
+                .size(vk::WHOLE_SIZE);
+
+            unsafe {
+                if let Err(error) =
+                    device.invalidate_mapped_memory_ranges(std::slice::from_ref(&range))
+                {
+                    device.unmap_memory(self.memory);
+                    return Err(VulkanError::Vk(error));
+                }
+            }
+        }
 
         let mut output = vec![0_u8; len];
 
@@ -764,8 +812,7 @@ impl Drop for GpuBuffer {
     }
 }
 
-fn create_shader_module(device: &Device) -> Result<vk::ShaderModule, VulkanError> {
-    let spirv = compile_spirv()?;
+fn create_shader_module(device: &Device, spirv: &[u32]) -> Result<vk::ShaderModule, VulkanError> {
     let create_info = vk::ShaderModuleCreateInfo::default().code(&spirv);
 
     unsafe {
@@ -849,11 +896,11 @@ fn allocate_descriptor_set(
     Ok(descriptor_set)
 }
 
-fn storage_write(
+fn storage_write<'a>(
     descriptor_set: vk::DescriptorSet,
     binding: u32,
-    info: &vk::DescriptorBufferInfo,
-) -> vk::WriteDescriptorSet<'static> {
+    info: &'a vk::DescriptorBufferInfo,
+) -> vk::WriteDescriptorSet<'a> {
     vk::WriteDescriptorSet::default()
         .dst_set(descriptor_set)
         .dst_binding(binding)
@@ -879,8 +926,7 @@ fn compile_spirv() -> Result<Vec<u32>, VulkanError> {
         .map_err(|error| VulkanError::ShaderSpirv(error.to_string()))
 }
 
-fn implementation_digest() -> Result<String, VulkanError> {
-    let spirv = compile_spirv()?;
+fn implementation_digest(spirv: &[u32]) -> String {
     let mut hasher = blake3::Hasher::new();
 
     hasher.update(b"symthaea.gpu-fabric.vulkan-implementation.v1\0");
@@ -891,7 +937,7 @@ fn implementation_digest() -> Result<String, VulkanError> {
         hasher.update(&word.to_le_bytes());
     }
 
-    Ok(hasher.finalize().to_hex().to_string())
+    hasher.finalize().to_hex().to_string()
 }
 
 fn packed_bytes(dimensions: u32) -> u64 {
@@ -940,7 +986,7 @@ mod tests {
         let words = compile_spirv().expect("WGSL kernel should compile");
         assert!(words.len() >= 5);
         assert_eq!(words[0], 0x0723_0203);
-        assert!(!implementation_digest().unwrap().is_empty());
+        assert!(!implementation_digest(&words).is_empty());
     }
 
     #[test]
