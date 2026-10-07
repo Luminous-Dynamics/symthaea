@@ -1191,6 +1191,11 @@ fn rfc9942_unprotected_receipt_priority_is_explicit_transport_provenance() {
         symthaea_swarm::semantic_evidence_vds::Rfc9942ReceiptPlacement::Unprotected
     );
     assert_eq!(first_state.outer_signature_sha256(), outer_signature_sha256);
+    let first_collection_sha256: [u8; 32] = sha2::Sha256::digest(&first_collection).into();
+    assert_eq!(
+        first_state.receipt_collection_sha256(),
+        first_collection_sha256
+    );
     assert_eq!(first_state.receipt().signature_sha256(), first_signature_sha256);
     assert_eq!(first_state.receipt().proof().inclusion_head(), Some(head));
 
@@ -1222,6 +1227,16 @@ fn rfc9942_unprotected_receipt_priority_is_explicit_transport_provenance() {
     assert_eq!(
         swapped_state.outer_signature_sha256(),
         first_state.outer_signature_sha256()
+    );
+    let swapped_collection_sha256: [u8; 32] =
+        sha2::Sha256::digest(&swapped_collection).into();
+    assert_eq!(
+        swapped_state.receipt_collection_sha256(),
+        swapped_collection_sha256
+    );
+    assert_ne!(
+        swapped_state.receipt_collection_sha256(),
+        first_state.receipt_collection_sha256()
     );
     assert_eq!(
         swapped_state.receipt().signature_sha256(),
