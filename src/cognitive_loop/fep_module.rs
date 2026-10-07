@@ -304,6 +304,27 @@ impl FepModule {
             None,
         );
 
+        let energy_reserve = if self.ledger.capacity_j > 0.0 {
+            (self.ledger.energy_j / self.ledger.capacity_j).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        self.viability_fabric.observe_variable(
+            "thermodynamic_energy_reserve",
+            super::viability_fabric::ViabilitySignal::new(
+                energy_reserve,
+                1.0,
+                cycle,
+                "fep::thermodynamic_ledger",
+            ),
+            super::viability_fabric::ViabilityBand {
+                preferred: (0.30, 1.0),
+                tolerated: (0.10, 1.0),
+                critical: (0.0, 1.0),
+            },
+            None,
+        );
+
         let errors = &mut self.viability_fabric.state_mut().prediction_errors;
         errors.world = average_prediction_error.clamp(0.0, 1.0);
 
