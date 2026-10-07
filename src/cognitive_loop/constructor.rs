@@ -853,6 +853,7 @@ impl CognitiveLoopService {
                     ..Default::default()
                 },
                 trajectory_telemetry: super::fep_module::TrajectoryTelemetry::default(),
+                viability_horizon_modulation_enabled: false,
                 trajectory_history: VecDeque::new(),
                 // CORRECT INITIALIZATION:
                 ledger: symthaea_core::physics::thermodynamics::ThermodynamicLedger::new(1000.0),
