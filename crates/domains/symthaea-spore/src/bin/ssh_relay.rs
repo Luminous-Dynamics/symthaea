@@ -2111,7 +2111,6 @@ fi
 cryptsetup luksFormat --type luks2 --label cryptroot \
   --pbkdf argon2id --iter-time 3000 "$CRYPT_PART" --key-file "$LUKS_KEYFILE"
 cryptsetup open "$CRYPT_PART" cryptroot --key-file "$LUKS_KEYFILE"
-rm -f "$LUKS_KEYFILE"
 CRYPT_UUID=$(blkid -s UUID -o value "$CRYPT_PART")
 echo "  LUKS UUID: $CRYPT_UUID"
 
@@ -6062,7 +6061,6 @@ if ! echo "{username}:$PW" | chroot /mnt chpasswd 2>/dev/null; then
     echo "ERROR: failed to set the requested user password."
     exit 1
 fi
-rm -f {pw_file}
 echo "  User password set."
 "#,
                         pw_file = pw_file,
@@ -6128,17 +6126,6 @@ echo "  User password set."
                     }
                     drop(luks_file);
                     staged_secret_paths.push(luks_key_path);
-                }
-
-                if !staged_secret_paths.is_empty() {
-                    // Transaction-scoped paths are derived locally from the validated
-                    // transaction identifier, so no user-controlled shell metacharacters can appear.
-                    let cleanup = staged_secret_paths
-                        .iter()
-                        .map(|path| format!("rm -f -- {}", path))
-                        .collect::<Vec<_>>()
-                        .join("; ");
-                    script = format!("trap '{}' EXIT\n{}", cleanup, script);
                 }
 
                 eprintln!(
