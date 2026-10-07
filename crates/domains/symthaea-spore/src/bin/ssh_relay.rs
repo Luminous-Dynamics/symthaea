@@ -3192,12 +3192,18 @@ async fn commit_image_bundle(image_dir: &str) -> Result<(ArtifactCommitment, Art
     Ok((archive, configuration))
 }
 
-fn restore_artifact_step_for_committed_archive(
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RestoreArchiveFormat {
+    BtrfsZstd,
+    TarGzip,
+}
+
+fn restore_archive_format_for_commitment(
     artifact_name: &str,
-) -> Result<&'static str, String> {
+) -> Result<RestoreArchiveFormat, String> {
     match artifact_name {
-        "system.btrfs.zst" => Ok("zstd -d | btrfs receive /mnt/"),
-        "system.tar.gz" => Ok("tar -xzf - -C /mnt/"),
+        "system.btrfs.zst" => Ok(RestoreArchiveFormat::BtrfsZstd),
+        "system.tar.gz" => Ok(RestoreArchiveFormat::TarGzip),
         _ => Err(format!(
             "image artifact commitment names unsupported restore artifact: {artifact_name}"
         )),
@@ -3205,11 +3211,11 @@ fn restore_artifact_step_for_committed_archive(
 }
 
 async fn restore_verified_archive(
-    artifact_name: &str,
+    format: RestoreArchiveFormat,
     input: std::fs::File,
 ) -> Result<CmdResult, String> {
-    let (stdout, stderr, exit_status) = match artifact_name {
-        "system.tar.gz" => {
+    let (stdout, stderr, exit_status) = match format {
+        RestoreArchiveFormat::TarGzip => {
             let mut command = privileged_process("tar");
             command
                 .arg("--no-absolute-names")
@@ -3228,7 +3234,7 @@ async fn restore_verified_archive(
                 output.status.code().unwrap_or(1) as u32,
             )
         }
-        "system.btrfs.zst" => {
+        RestoreArchiveFormat::BtrfsZstd => {
             let mut decoder = privileged_process("zstd");
             decoder
                 .arg("-d")
@@ -3279,11 +3285,6 @@ async fn restore_verified_archive(
                 decoder_output.status.code().unwrap_or(1) as u32
             };
             (stdout, stderr, exit_status)
-        }
-        _ => {
-            return Err(format!(
-                "image artifact commitment names unsupported restore artifact: {artifact_name}"
-            ))
         }
     };
 
@@ -7813,16 +7814,12 @@ echo "COMPLETE"
                     transaction.log_line(),
                     image_path
                 );
-                let restore_artifact_step =
-                    restore_artifact_step_for_committed_archive(&image_artifact_commitment.name)
+                let restore_archive_format =
+                    restore_archive_format_for_commitment(&image_artifact_commitment.name)
                         .expect("artifact commitment validator must accept only supported image artifacts");
-                if restore_artifact_step.contains("/tmp/nixforhumanity-image-") {
-                    unreachable!("typed restore steps must not reopen image artifact pathnames");
-                }
 
                 let restore_result =
-                    restore_verified_archive(&image_artifact_commitment.name, image_archive_file)
-                        .await;
+                    restore_verified_archive(restore_archive_format, image_archive_file).await;
 
                 let (result, observed_outcome) = match restore_result {
                     Ok(r) if r.exit_status == 0 => {
@@ -9230,18 +9227,16 @@ mod tests {
     }
 
     #[test]
-    fn typed_restore_command_selection_is_not_a_shell_script() {
+    fn restore_archive_format_is_bound_to_committed_artifact() {
         assert_eq!(
-            restore_artifact_step_for_committed_archive("system.btrfs.zst").unwrap(),
-            "zstd -d | btrfs receive /mnt/"
+            restore_archive_format_for_commitment("system.btrfs.zst").unwrap(),
+            RestoreArchiveFormat::BtrfsZstd
         );
         assert_eq!(
-            restore_artifact_step_for_committed_archive("system.tar.gz").unwrap(),
-            "tar -xzf - -C /mnt/"
+            restore_archive_format_for_commitment("system.tar.gz").unwrap(),
+            RestoreArchiveFormat::TarGzip
         );
-        assert!(!restore_artifact_step_for_committed_archive("system.tar.gz")
-            .unwrap()
-            .contains("/tmp/nixforhumanity-image-"));
+        assert!(restore_archive_format_for_commitment("unknown").is_err());
     }
 
     #[test]
