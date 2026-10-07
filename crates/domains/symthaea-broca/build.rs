@@ -190,6 +190,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=RUSTC_WRAPPER");
     println!("cargo:rerun-if-env-changed=RUSTC_WORKSPACE_WRAPPER");
     println!("cargo:rerun-if-env-changed=CARGO_ENCODED_RUSTFLAGS");
+    println!("cargo:rerun-if-env-changed=BROCA_NATIVE_PACKAGE_CONTEXT");
     for variable in ["PROFILE", "DEBUG", "OPT_LEVEL", "NUM_JOBS", "RUNNER_OS", "RUNNER_ARCH", "ImageOS", "ImageVersion"] {
         println!("cargo:rerun-if-env-changed={variable}");
     }
@@ -238,7 +239,9 @@ fn main() {
         env::var("RUSTC_WORKSPACE_WRAPPER").unwrap_or_default().into_bytes();
     let cargo_features = cargo_feature_identity();
     let cargo_cfg = cargo_cfg_identity();
-    let system_packages = system_package_identity();
+    let system_packages = env::var("BROCA_NATIVE_PACKAGE_CONTEXT")
+        .map(String::into_bytes)
+        .unwrap_or_else(|_| system_package_identity());
     let profile = env::var("PROFILE").unwrap_or_default().into_bytes();
     let debug = env::var("DEBUG").unwrap_or_default().into_bytes();
     let opt_level = env::var("OPT_LEVEL").unwrap_or_default().into_bytes();
