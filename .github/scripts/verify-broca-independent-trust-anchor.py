@@ -699,6 +699,23 @@ def main() -> int:
             "Workflow Syntax": ".github/workflows/workflow-syntax.yml",
             "PR Governance": ".github/workflows/pr-governance.yml",
         }
+
+        for supporting_name in ("Workflow Syntax", "PR Governance"):
+            supporting_path = workflow_paths[supporting_name]
+            trusted_bytes, trusted_blob = get_file(supporting_path, TRUST_ANCHOR_SHA)
+            pr_bytes, pr_blob = get_file(supporting_path, pr["head"]["sha"])
+            if trusted_blob != pr_blob or trusted_bytes != pr_bytes:
+                raise VerificationError(
+                    f"{supporting_name} workflow differs from trusted base-owned definition"
+                )
+            receipt["verification"].setdefault("supporting_workflows", {})[
+                supporting_name
+            ] = {
+                "path": supporting_path,
+                "trusted_blob_sha": trusted_blob,
+                "pr_blob_sha": pr_blob,
+                "verified": True,
+            }
         expected_path = workflow_paths[TRIGGER_RUN_NAME]
         if trigger_run.get("path") != expected_path:
             raise VerificationError(
