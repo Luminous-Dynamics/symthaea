@@ -352,6 +352,21 @@ async fn spawn_privileged_background_process(
         }
     };
 
+    let mut status_file = match std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(status_path)
+    {
+        Ok(file) => file,
+        Err(error) => {
+            let _ = std::fs::remove_file(log_path);
+            let _ = std::fs::remove_file(status_path);
+            let _ = std::fs::remove_file(pid_path);
+            return Err(error);
+        }
+    };
+
     let mut child = match command
         .stdout(std::process::Stdio::from(log))
         .stderr(std::process::Stdio::from(log_stderr))
