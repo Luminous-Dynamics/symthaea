@@ -104,14 +104,14 @@ impl VulkanSyncExecutionReceipt {
 ///
 /// Every logical queue in the lowering plan is mapped onto this single actual
 /// Vulkan queue. Cross-logical-queue waits still become real timeline waits.
-pub struct VulkanSyncRuntime {
+pub struct SingleQueueVulkanSyncRuntime {
     instance: Instance,
     device: Device,
     queue: vk::Queue,
     semaphores: Vec<(VulkanQueueId, vk::Semaphore)>,
 }
 
-impl VulkanSyncRuntime {
+impl SingleQueueVulkanSyncRuntime {
     pub fn new() -> Result<Self, VulkanSyncRuntimeError> {
         let entry = unsafe { Entry::load() }
             .map_err(|error| VulkanSyncRuntimeError::Loader(error.to_string()))?;
@@ -366,7 +366,7 @@ impl VulkanSyncRuntime {
     }
 }
 
-impl Drop for VulkanSyncRuntime {
+impl Drop for SingleQueueVulkanSyncRuntime {
     fn drop(&mut self) {
         unsafe {
             let _ = self.device.device_wait_idle();
@@ -447,7 +447,7 @@ mod tests {
     #[test]
     #[ignore = "requires a Vulkan 1.3 qualification runner"]
     fn real_vulkan_timeline_submission_reaches_completion() {
-        let mut runtime = VulkanSyncRuntime::new().expect("qualified Vulkan 1.3 device");
+        let mut runtime = SingleQueueVulkanSyncRuntime::new().expect("qualified Vulkan 1.3 device");
         let plan = test_plan();
         let final_values = runtime.execute(&plan).expect("timeline submissions complete");
         assert_eq!(final_values.len(), 2);
