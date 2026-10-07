@@ -636,6 +636,10 @@ fn rfc9942_semantic_state_cannot_confuse_valid_signature_with_wrong_entry() {
         .unwrap();
     assert_eq!(state.algorithm_id(), COSE_ES256_ALGORITHM_ID);
     assert_eq!(state.vds_id(), 1);
+    let expected_receipt_payload_sha256: [u8; 32] =
+        sha2::Sha256::digest(vds.tree_head(&[b"candidate".to_vec(), b"other-entry".to_vec()]).root())
+            .into();
+    assert_eq!(state.payload_sha256(), expected_receipt_payload_sha256);
     assert!(matches!(
         state.proof(),
         Rfc9942VerifiedProof::Inclusion { .. }
@@ -699,6 +703,8 @@ fn rfc9942_consistency_state_binds_signature_to_detached_root() {
         .unwrap();
     assert_eq!(state.algorithm_id(), COSE_ES256_ALGORITHM_ID);
     assert_eq!(state.vds_id(), 1);
+    let expected_newer_root_sha256: [u8; 32] = sha2::Sha256::digest(root).into();
+    assert_eq!(state.payload_sha256(), expected_newer_root_sha256);
     assert_eq!(
         state.proof().consistency_heads(),
         Some((older, newer))
