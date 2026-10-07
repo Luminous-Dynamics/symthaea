@@ -316,6 +316,30 @@ def main() -> int:
             for item in changed.get("files", [])
         )
 
+        relevant_files = [
+            name
+            for name, _status in changed_files
+            if name
+            and any(
+                name == prefix
+                or (prefix.endswith("/") and name.startswith(prefix))
+                for prefix in ALLOWED_PATH_PREFIXES
+            )
+        ]
+        if not relevant_files:
+            receipt["qualification_result"] = "NOT_APPLICABLE"
+            receipt["verification"]["source_scope"] = {
+                "allowed_prefixes": list(ALLOWED_PATH_PREFIXES),
+                "changed_files": [
+                    {"filename": name, "status": status}
+                    for name, status in changed_files
+                ],
+                "verified": False,
+                "relevant": False,
+            }
+            print("NOT_APPLICABLE: PR does not touch Broca qualification scope")
+            return 0
+
         disallowed = [
             name
             for name, _status in changed_files
