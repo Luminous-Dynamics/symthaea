@@ -8952,6 +8952,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn image_bundle_commitment_includes_frozen_configuration_sidecar() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-image-{}",
+            transaction_id
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o500)).unwrap();
+
+        let archive = dir.join("system.tar.gz");
+        let configuration = dir.join("configuration.nix");
+        std::fs::write(&archive, b"archive-bytes").unwrap();
+        std::fs::write(&configuration, b"{ config = true; }\n").unwrap();
+        std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o400)).unwrap();
+        std::fs::set_permissions(
+            &configuration,
+            std::fs::Permissions::from_mode(0o400),
+        )
+        .unwrap();
+
+        let (archive_commitment, configuration_commitment) =
+            commit_image_bundle(dir.to_str().unwrap()).await.unwrap();
+        assert_eq!(archive_commitment.name, "system.tar.gz");
+        assert_eq!(configuration_commitment.name, "configuration.nix");
+
+        verify_image_artifact_commitment(dir.to_str().unwrap(), &archive_commitment)
+            .await
+            .unwrap();
+        verify_image_artifact_commitment(
+            dir.to_str().unwrap(),
+            &configuration_commitment,
+        )
+        .await
+        .unwrap();
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
     async fn image_artifact_commitment_requires_one_supported_archive() {
         use std::os::unix::fs::PermissionsExt;
 
