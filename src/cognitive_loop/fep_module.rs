@@ -340,7 +340,10 @@ impl FepModule {
 
     /// Read the current viability telemetry snapshot.
     pub fn viability_telemetry(&self) -> super::viability_fabric::ViabilityTelemetry {
-        self.viability_fabric.state().telemetry()
+        let mut telemetry = self.viability_fabric.state().telemetry();
+        telemetry.viability_trace_digest = self.viability_fabric.latest_trace_digest();
+        telemetry.viability_planning_horizon_scale = self.viability_planning_horizon_scale();
+        telemetry
     }
 
     /// Enable the opt-in viability modulation of the existing planning-depth factor.
