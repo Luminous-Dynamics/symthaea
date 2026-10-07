@@ -171,3 +171,5 @@ The freeze-audit job generates a structured `receipt.json`, then creates a GitHu
 ## Exact-head qualification
 
 For pull-request-triggered qualification, both jobs set `BROCA_QUALIFICATION_HEAD_SHA` from `github.event.pull_request.head.sha` and explicitly pass that SHA to `actions/checkout`. The freeze auditor then resolves `git rev-parse HEAD` and fails closed unless it equals the requested qualification head. This prevents a successful run of the synthetic pull-request merge ref from being mistaken for evidence about the PR head itself.
+
+The machine selection manifest also binds the semantic compilation namespace (`language_tag`, `dialect_scope`, rule-set ID, compilation provenance) and compiler contract (`compiler_id`, compiler version, normalization policy). The freeze auditor consumes these fields rather than supplying them independently, while retaining hardcoded expected anchors as an independent qualification root.
