@@ -510,6 +510,67 @@ impl NeurosemanticRemediationStatisticalSamplingFrameArtifact {
 const NEUROSEMANTIC_REMEDIATION_SIMPLE_RANDOM_WITHOUT_REPLACEMENT_PROCEDURE_REF: &str =
     "simple-random-without-replacement-v1";
 
+/// Content-addressed commitment to the exact randomness input used by a selection trace.
+///
+/// The commitment can be published or preregistered before sampling. The verifier can establish
+/// that the later execution used the committed seed, but temporal precedence still requires an
+/// external publication/attestation mechanism.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact {
+    pub schema_version: u16,
+    pub commitment_ref: String,
+    pub selection_procedure_ref: String,
+    pub randomization_seed_hash: String,
+    pub study_protocol_hash: String,
+    pub execution_revision: String,
+}
+
+pub const NEUROSEMANTIC_REMEDIATION_STATISTICAL_RANDOMNESS_COMMITMENT_SCHEMA_VERSION: u16 = 1;
+
+impl NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version
+            != NEUROSEMANTIC_REMEDIATION_STATISTICAL_RANDOMNESS_COMMITMENT_SCHEMA_VERSION
+            || !valid_identifier(&self.commitment_ref)
+            || !valid_identifier(&self.selection_procedure_ref)
+            || !valid_blake3_digest(&self.randomization_seed_hash)
+            || !valid_blake3_digest(&self.study_protocol_hash)
+            || !valid_execution_revision(&self.execution_revision)
+        {
+            return Err(
+                "neurosemantic remediation statistical randomness commitment fields are invalid"
+                    .into(),
+            );
+        }
+        Ok(())
+    }
+
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES {
+            return Err(format!(
+                "neurosemantic remediation statistical randomness commitment JSON exceeds {} bytes",
+                MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            ));
+        }
+        let artifact: Self = serde_json::from_slice(bytes).map_err(|error| {
+            format!(
+                "neurosemantic remediation statistical randomness commitment JSON: {error}"
+            )
+        })?;
+        artifact.validate()?;
+        Ok(artifact)
+    }
+
+    pub fn fingerprint(&self) -> Result<String, String> {
+        self.validate()?;
+        Ok(content_hash(&serde_json::to_vec(self).map_err(|error| {
+            format!(
+                "neurosemantic remediation statistical randomness commitment serialization: {error}"
+            )
+        })?))
+    }
+}
+
 fn splitmix64_step(state: &mut u64) -> u64 {
     *state = state.wrapping_add(0x9E3779B97F4A7C15);
     let mut value = *state;
@@ -567,6 +628,7 @@ pub struct NeurosemanticRemediationStatisticalSelectionTraceArtifact {
     pub selection_ref: String,
     pub sampling_frame_hash: String,
     pub selection_procedure_ref: String,
+    pub randomness_commitment_hash: String,
     pub randomization_seed_u64: u64,
     pub sample_size: u32,
     pub selected_subject_artifact_hashes: Vec<String>,
@@ -583,6 +645,7 @@ impl NeurosemanticRemediationStatisticalSelectionTraceArtifact {
             || !valid_identifier(&self.selection_ref)
             || !valid_blake3_digest(&self.sampling_frame_hash)
             || !valid_identifier(&self.selection_procedure_ref)
+            || !valid_blake3_digest(&self.randomness_commitment_hash)
             || self.sample_size == 0
             || self.selected_subject_artifact_hashes.is_empty()
             || self.selected_subject_artifact_hashes.len() > MAX_NEUROSEMANTIC_REMEDIATION_OBSERVATIONS
@@ -2044,6 +2107,34 @@ impl NeurosemanticRemediationImpactArtifact {
                     NeurosemanticRemediationStatisticalSelectionTraceArtifact::from_json_bytes(
                         selection_trace_bytes,
                     )?;
+                let randomness_commitment_bytes = statistical_execution_bytes
+                    .iter()
+                    .copied()
+                    .find(|candidate| {
+                        content_hash(candidate) == selection_trace.randomness_commitment_hash
+                    })
+                    .ok_or_else(|| {
+                        "neurosemantic remediation statistical randomness commitment is missing"
+                            .to_string()
+                    })?;
+                let randomness_commitment =
+                    NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact::from_json_bytes(
+                        randomness_commitment_bytes,
+                    )?;
+                if randomness_commitment.fingerprint()? != selection_trace.randomness_commitment_hash
+                    || randomness_commitment.selection_procedure_ref
+                        != selection_trace.selection_procedure_ref
+                    || randomness_commitment.randomization_seed_hash
+                        != content_hash(&selection_trace.randomization_seed_u64.to_le_bytes())
+                    || randomness_commitment.study_protocol_hash != self.study_protocol_hash
+                    || randomness_commitment.execution_revision != self.execution_revision
+                {
+                    return Err(
+                        "neurosemantic remediation statistical randomness commitment binding mismatch"
+                            .into(),
+                    );
+                }
+
                 if selection_trace.fingerprint()? != execution.selection_trace_hash
                     || selection_trace.sampling_frame_hash != execution.sampling_frame_hash
                     || selection_trace.selection_procedure_ref != execution.selection_procedure_ref
@@ -5763,6 +5854,38 @@ mod tests {
         assert!(
             NeurosemanticRemediationStatisticalDesignArtifact::from_json_bytes(
                 &serde_json::to_vec(&legacy).unwrap()
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn remediation_statistical_randomness_commitment_is_bounded_and_canonical() {
+        let commitment = NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact {
+            schema_version:
+                NEUROSEMANTIC_REMEDIATION_STATISTICAL_RANDOMNESS_COMMITMENT_SCHEMA_VERSION,
+            commitment_ref: "commitment-randomness-1".into(),
+            selection_procedure_ref:
+                NEUROSEMANTIC_REMEDIATION_SIMPLE_RANDOM_WITHOUT_REPLACEMENT_PROCEDURE_REF.into(),
+            randomization_seed_hash: content_hash(&42u64.to_le_bytes()),
+            study_protocol_hash: content_hash(b"protocol"),
+            execution_revision: "a".repeat(40),
+        };
+        let bytes = serde_json::to_vec(&commitment).unwrap();
+        assert_eq!(
+            NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact::from_json_bytes(
+                &bytes
+            )
+            .unwrap(),
+            commitment
+        );
+        assert_eq!(commitment.fingerprint().unwrap(), content_hash(&bytes));
+
+        let mut stale = commitment.clone();
+        stale.schema_version = 0;
+        assert!(
+            NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact::from_json_bytes(
+                &serde_json::to_vec(&stale).unwrap()
             )
             .is_err()
         );
