@@ -1957,7 +1957,7 @@ mod tests {
             exp,
             &verified,
             verified_stability.as_ref(),
-            &witness,
+            witness,
             "systemd-observer-v1",
             "1",
         )
