@@ -4597,22 +4597,19 @@ fn canonical_requirement_hash(requirement: &FunctionalRequirement) -> Result<Str
 
 fn canonical_candidate_pathway_hash(candidate: &CandidatePathway) -> Result<String, AssessmentError> {
     let mut canonical = candidate.clone();
-    canonical.evidence.sort_by(|a, b| a.id.cmp(&b.id));
-    for record in &mut canonical.evidence {
-        if let Some(uncertainty) = &mut record.uncertainty {
-            uncertainty
-                .component_refs
-                .sort_by(|a, b| a.component_id.cmp(&b.component_id));
-        }
-    }
+    // Evidence is an evolving provenance surface, not part of the pre-experiment
+    // pathway semantics. Experimental designs bind the declared pathway payload
+    // while observation/evidence provenance is committed separately by the
+    // assessment receipt and candidate evidence digest.
+    canonical.evidence.clear();
     for estimate in canonical.performance.values_mut() {
-        estimate.evidence_ids.sort();
+        estimate.evidence_ids.clear();
     }
     for estimate in canonical.operating_capabilities.values_mut() {
-        estimate.evidence_ids.sort();
+        estimate.evidence_ids.clear();
     }
     for estimate in canonical.burdens.values_mut() {
-        estimate.evidence_ids.sort();
+        estimate.evidence_ids.clear();
     }
     let bytes = serde_json::to_vec(&canonical).map_err(|_| AssessmentError::NonFinite)?;
     let mut hasher = Hasher::new();
@@ -8326,6 +8323,81 @@ mod tests {
                 actual_design_id: "design:other".into(),
             }
         );
+    }
+
+    #[test]
+    fn experimental_design_rejects_candidate_semantic_drift() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:candidate-drift".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:candidate-drift".into(),
+            hypothesis_statement: "A measurement distinguishes the selected alternatives.".into(),
+            unresolved_uncertainty_refs: vec!["uncertainty:water".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(
+                &case.candidates,
+                &["product-redesign", "process-substitute"],
+            ),
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                uncertainty_target: None,
+            },
+            comparison_basis: basis,
+        };
+
+        let mut candidates = case.candidates.clone();
+        candidates
+            .iter_mut()
+            .find(|candidate| candidate.id == "product-redesign")
+            .expect("fixture candidate exists")
+            .performance
+            .get_mut("service_life_years")
+            .expect("fixture performance exists")
+            .interval = Interval::new(4.0, 6.0).unwrap();
+
+        let error = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                design,
+            )
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            AssessmentError::ExperimentalDesignCandidateDigestMismatch {
+                candidate_id,
+                ..
+            } if candidate_id == "product-redesign"
+        ));
     }
 
     #[test]
