@@ -23,6 +23,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::os::fd::{AsRawFd, FromRawFd};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
+use std::sync::Arc;
 
 const SCHEMA_VERSION: u16 = 1;
 const CROSS_PROCESS_LOCK_PATH: &str = "/run/nixforhumanity-system-mutation.lock";
@@ -374,28 +375,6 @@ fn validate_digest(value: &str, label: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn sync_parent_directory(path: &Path) -> Result<(), String> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| format!("journal path {} has no parent directory", path.display()))?;
-    let directory = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open(parent)
-        .map_err(|error| {
-            format!(
-                "unable to open transaction ledger directory {} for synchronization: {error}",
-                parent.display()
-            )
-        })?;
-    directory.sync_all().map_err(|error| {
-        format!(
-            "unable to synchronize transaction ledger directory {}: {error}",
-            parent.display()
-        )
-    })
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct JournalEvent {
     schema_version: u16,
@@ -450,6 +429,7 @@ pub(crate) enum TransactionAdmission {
 #[derive(Debug, Clone)]
 pub(crate) struct TransactionLedger {
     path: std::path::PathBuf,
+    directory: Arc<File>,
     fingerprint_key: [u8; 32],
 }
 
@@ -515,42 +495,89 @@ impl TransactionLedger {
                 parent.display()
             ));
         }
-        drop(directory);
+        let directory = Arc::new(directory);
 
         let fingerprint_key = load_or_create_fingerprint_key(Path::new(FINGERPRINT_KEY_PATH))?;
         Ok(Self {
             path: path.to_path_buf(),
+            directory,
             fingerprint_key,
         })
     }
 
     #[cfg(test)]
     fn open_at(path: &std::path::Path) -> Result<Self, String> {
+        let parent = path
+            .parent()
+            .ok_or_else(|| format!("transaction test ledger {} has no parent", path.display()))?;
+        let directory = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(parent)
+            .map_err(|error| {
+                format!(
+                    "unable to open transaction test ledger parent {}: {error}",
+                    parent.display()
+                )
+            })?;
+
         Ok(Self {
             path: path.to_path_buf(),
+            directory: Arc::new(directory),
             fingerprint_key: [0u8; 32],
         })
+    }
+
+    fn open_ledger_file(
+        &self,
+        flags: libc::c_int,
+        mode: libc::mode_t,
+    ) -> Result<Option<File>, String> {
+        use std::ffi::CString;
+        use std::os::unix::ffi::OsStrExt;
+
+        let name = self.path.file_name().ok_or_else(|| {
+            format!(
+                "transaction ledger path {} has no final filename",
+                self.path.display()
+            )
+        })?;
+        let name = CString::new(name.as_bytes()).map_err(|_| {
+            format!(
+                "transaction ledger filename {} contains a NUL byte",
+                self.path.display()
+            )
+        })?;
+
+        let fd = unsafe {
+            libc::openat(
+                self.directory.as_raw_fd(),
+                name.as_ptr(),
+                flags | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+                mode,
+            )
+        };
+        if fd < 0 {
+            let error = std::io::Error::last_os_error();
+            if error.kind() == std::io::ErrorKind::NotFound
+                && (flags & libc::O_CREAT) == 0
+            {
+                return Ok(None);
+            }
+            return Err(format!(
+                "unable to open transaction ledger {} through its bound parent directory: {error}",
+                self.path.display()
+            ));
+        }
+        Ok(Some(unsafe { File::from_raw_fd(fd) }))
     }
 
     fn load(&self) -> Result<HashMap<String, JournalRecord>, String> {
         // Open first, then validate the descriptor we actually received. This
         // removes the metadata/open TOCTOU window while O_NOFOLLOW rejects a
         // symlink at the final path component.
-        let file = match OpenOptions::new()
-            .read(true)
-            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-            .open(&self.path)
-        {
-            Ok(file) => file,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Ok(HashMap::new());
-            }
-            Err(error) => {
-                return Err(format!(
-                    "unable to read transaction ledger {}: {error}",
-                    self.path.display()
-                ));
-            }
+        let Some(file) = self.open_ledger_file(libc::O_RDONLY, 0)? else {
+            return Ok(HashMap::new());
         };
         let metadata = file.metadata().map_err(|error| {
             format!(
@@ -831,23 +858,16 @@ impl TransactionLedger {
             ));
         }
 
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .read(true)
-            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-            .mode(0o600)
-            .open(&self.path)
-            .map_err(|error| {
-                format!(
-                    "unable to open transaction ledger {}: {error}",
-                    self.path.display()
-                )
-            })?;
+        let Some(file) = self.open_ledger_file(
+            libc::O_RDWR | libc::O_CREAT | libc::O_APPEND,
+            0o600,
+        )? else {
+            return Err(format!(
+                "transaction ledger {} could not be opened for append",
+                self.path.display()
+            ));
+        };
 
-        // Validate the descriptor actually opened. Do not use path-based chmod:
-        // a pathname replacement after open could otherwise apply permissions to
-        // a different inode than the journal we are about to append.
         let metadata = file.metadata().map_err(|error| {
             format!(
                 "unable to inspect transaction ledger {}: {error}",
@@ -901,9 +921,14 @@ impl TransactionLedger {
             })?;
 
         // fsync(file) does not necessarily make the containing directory entry
-        // durable across power loss; sync the directory explicitly as required
-        // for crash-consistent creation of the journal file.
-        sync_parent_directory(&self.path)
+        // durable across power loss; the exact parent directory descriptor held
+        // by this ledger is synchronized explicitly.
+        self.directory.sync_all().map_err(|error| {
+            format!(
+                "unable to synchronize transaction ledger directory {}: {error}",
+                self.path.parent().unwrap_or(Path::new("/")).display()
+            )
+        })
     }
 
     pub(crate) fn admit(
