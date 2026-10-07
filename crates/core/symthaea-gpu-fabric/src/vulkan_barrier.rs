@@ -458,16 +458,7 @@ impl VulkanBarrierWorkloadRuntime {
                 .iter()
                 .find(|n| n.id == scheduled.id)
                 .ok_or(VulkanBarrierError::UnsupportedNodeShape(scheduled.id))?;
-            let reads = node
-                .resources
-                .iter()
-                .filter(|u| u.access == AccessKind::Read)
-                .collect::<Vec<_>>();
-            let writes = node
-                .resources
-                .iter()
-                .filter(|u| u.access == AccessKind::Write)
-                .collect::<Vec<_>>();
+            let (reads, writes) = canonical_workload_resources(node)?;
             if reads.len() != 2 || writes.len() != 1 || node.resources.len() != 3 {
                 return Err(VulkanBarrierError::UnsupportedNodeShape(node.id));
             }
@@ -655,6 +646,26 @@ fn validate_initial_resources(
     Ok(resources)
 }
 
+fn canonical_workload_resources(
+    node: &ExecutionNode,
+) -> Result<(Vec<&crate::ResourceUse>, Vec<&crate::ResourceUse>), VulkanBarrierError> {
+    let mut reads = node
+        .resources
+        .iter()
+        .filter(|use_| use_.access == AccessKind::Read)
+        .collect::<Vec<_>>();
+    let mut writes = node
+        .resources
+        .iter()
+        .filter(|use_| use_.access == AccessKind::Write)
+        .collect::<Vec<_>>();
+
+    reads.sort_by(|left, right| left.resource.cmp(&right.resource));
+    writes.sort_by(|left, right| left.resource.cmp(&right.resource));
+
+    Ok((reads, writes))
+}
+
 fn simulate(
     graph: &ExecutionGraph,
     schedule: &ExecutionSchedule,
@@ -663,9 +674,10 @@ fn simulate(
     let mut state = initial.clone();
     for scheduled in &schedule.nodes {
         let node = graph.nodes.iter().find(|n| n.id == scheduled.id).ok_or(VulkanBarrierError::UnsupportedNodeShape(scheduled.id))?;
-        let reads = node.resources.iter().filter(|u| u.access == AccessKind::Read).collect::<Vec<_>>();
-        let writes = node.resources.iter().filter(|u| u.access == AccessKind::Write).collect::<Vec<_>>();
-        if reads.len() != 2 || writes.len() != 1 { return Err(VulkanBarrierError::UnsupportedNodeShape(node.id)); }
+        let (reads, writes) = canonical_workload_resources(node)?;
+        if reads.len() != 2 || writes.len() != 1 {
+            return Err(VulkanBarrierError::UnsupportedNodeShape(node.id));
+        }
         let dimensions = match node.operation { GpuOperation::HdcBindXor { dimensions } => dimensions };
         let lhs = state.get(&reads[0].resource)
             .ok_or_else(|| VulkanBarrierError::MissingResource(reads[0].resource.clone()))?;
@@ -935,6 +947,8 @@ fn barrier_lowering_digest(
     h.update(b"dst-stage:compute-shader\0");
     h.update(b"range-policy:rounded-storage-bytes\0");
     h.update(b"queue-family:ignored\0");
+    h.update(b"descriptor-policy:reads-sorted-by-resource-id\\0");
+    h.update(b"descriptor-policy:single-write-slot\\0");
     h.update(b"offset-policy:zero\0");
 
     for kind in [
@@ -1248,6 +1262,29 @@ mod tests {
             barrier_lowering_digest(&plan, &empty).unwrap_err(),
             ResourceId::new("mid").unwrap()
         );
+    }
+
+    #[test]
+    fn workload_binding_is_canonical_by_resource_id() {
+        let (mut graph, schedule, plan, initial) = fixture();
+        let canonical_graph = graph.clone();
+        for node in &mut graph.nodes {
+            node.resources.reverse();
+        }
+
+        assert_eq!(graph.digest_hex().unwrap(), canonical_graph.digest_hex().unwrap());
+
+        for node in &graph.nodes {
+            let (reads, writes) = canonical_workload_resources(node).unwrap();
+            assert_eq!(reads.len(), 2);
+            assert_eq!(writes.len(), 1);
+            assert!(reads[0].resource <= reads[1].resource);
+        }
+
+        let reordered_final = simulate(&graph, &schedule, &initial).unwrap();
+        let canonical_final = simulate(&canonical_graph, &schedule, &initial).unwrap();
+        assert_eq!(reordered_final, canonical_final);
+        assert_eq!(plan.queue_count, 1);
     }
 
     #[test]
