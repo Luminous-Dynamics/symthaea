@@ -563,6 +563,25 @@ impl SequentialLearningResponseReport {
     pub fn is_populated(&self) -> bool {
         self.shock_count > 0 && !self.events.is_empty()
     }
+
+    /// Fail-closed predicate for a complete cumulative adaptation receipt stream.
+    pub fn is_scoreable(&self) -> bool {
+        self.shock_count > 0
+            && self.events.len() as u64 == self.shock_count
+            && self.events.iter().all(|event| {
+                event.shock_state_digest != 0
+                    && event.shock_mae_before_update.is_finite()
+                    && event.shock_mae_after_update.is_finite()
+                    && event.neighbor_mae_before_update.is_finite()
+                    && event.neighbor_mae_after_update.is_finite()
+                    && event.anchor_mean_mae_from_initial.is_finite()
+                    && event.anchor_mean_regression_from_initial.is_finite()
+                    && event.anchor_max_regression_from_initial.is_finite()
+                    && event.prior_shock_mean_regression.is_finite()
+                    && event.prior_shock_max_regression.is_finite()
+                    && event.prior_shock_retention_rate.is_finite()
+            })
+    }
 }
 
 /// Frozen transfer result for one procedurally generated held-out scenario.
@@ -2653,6 +2672,8 @@ mod tests {
                 && event.anchor_mae_after_update.is_finite()
         }));
         assert!(report.is_populated());
+        assert!(report.is_scoreable());
+        assert_eq!(report.events.len() as u64, report.shock_count);
         for value in [
             report.mean_shock_mae_before_update,
             report.mean_shock_mae_after_update,
