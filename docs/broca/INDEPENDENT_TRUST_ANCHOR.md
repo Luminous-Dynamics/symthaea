@@ -53,7 +53,7 @@ It does not establish linguistic validity, source correctness, semantic adequacy
 
 ## Independent snapshot lock
 
-The verifier consumes `docs/broca/independent_trust_policy_v1.json`, which is maintained outside the Broca PR. The policy records the approved PR number, base ref/base SHA, exact approved head SHA, and the Git blob SHA of every changed file. Any new Broca commit therefore invalidates the independent status until a separate base-branch policy update explicitly re-approves the new snapshot.
+The verifier consumes `docs/broca/independent_trust_policy_v1.json`, which is maintained outside the Broca PR. The policy records the approved PR number, base ref/base SHA, the current live base-branch tip SHA, exact approved head SHA, and the Git blob SHA of every changed file. Any new Broca commit or movement of the stacked base branch therefore invalidates the independent status until a separate base-branch policy update explicitly re-approves the new snapshot.
 
 
 ## Causal run binding
