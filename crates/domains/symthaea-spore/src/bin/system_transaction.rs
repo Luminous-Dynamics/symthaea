@@ -204,6 +204,7 @@ pub(crate) struct TransactionReceipt {
     pub(crate) authorization: &'static str,
     pub(crate) outcome: TransactionOutcome,
     pub(crate) artifact_commitment: Option<ArtifactCommitment>,
+    pub(crate) configuration_commitment: Option<ArtifactCommitment>,
 }
 
 impl SystemTransaction {
@@ -242,6 +243,15 @@ impl SystemTransaction {
         outcome: TransactionOutcome,
         artifact_commitment: Option<ArtifactCommitment>,
     ) -> TransactionReceipt {
+        self.receipt_with_image_artifacts(outcome, artifact_commitment, None)
+    }
+
+    pub(crate) fn receipt_with_image_artifacts(
+        &self,
+        outcome: TransactionOutcome,
+        artifact_commitment: Option<ArtifactCommitment>,
+        configuration_commitment: Option<ArtifactCommitment>,
+    ) -> TransactionReceipt {
         TransactionReceipt {
             schema_version: self.schema_version,
             request_id: self.request_id.clone(),
@@ -252,6 +262,7 @@ impl SystemTransaction {
             authorization: self.authorization,
             outcome,
             artifact_commitment,
+            configuration_commitment,
         }
     }
 
@@ -337,6 +348,8 @@ struct JournalEvent {
     outcome: Option<TransactionOutcome>,
     #[serde(default)]
     artifact_commitment: Option<ArtifactCommitment>,
+    #[serde(default)]
+    configuration_commitment: Option<ArtifactCommitment>,
 }
 
 #[derive(Debug, Clone)]
@@ -347,6 +360,7 @@ struct JournalRecord {
     request_digest: String,
     outcome: Option<TransactionOutcome>,
     artifact_commitment: Option<ArtifactCommitment>,
+    configuration_commitment: Option<ArtifactCommitment>,
 }
 
 impl JournalRecord {
@@ -361,6 +375,7 @@ impl JournalRecord {
             authorization: "websocket-bearer-authenticated",
             outcome,
             artifact_commitment: self.artifact_commitment.clone(),
+            configuration_commitment: self.configuration_commitment.clone(),
         }
     }
 }
@@ -603,20 +618,37 @@ impl TransactionLedger {
                     )
                 })?;
             }
-            if let Some(artifact) = event.artifact_commitment.as_ref() {
+            if event.artifact_commitment.is_some() || event.configuration_commitment.is_some() {
                 if event.mutation != MutationKind::CreateImage {
                     return Err(format!(
-                        "transaction ledger artifact commitment on non-image mutation at line {}",
+                        "transaction ledger image commitment on non-image mutation at line {}",
                         line_number + 1
                     ));
                 }
-                validate_artifact_commitment(artifact).map_err(|error| {
-                    format!(
-                        "transaction ledger invalid artifact commitment at line {}: {}",
-                        line_number + 1,
-                        error
-                    )
-                })?;
+                if let Some(artifact) = event.artifact_commitment.as_ref() {
+                    validate_artifact_commitment(artifact).map_err(|error| {
+                        format!(
+                            "transaction ledger invalid artifact commitment at line {}: {}",
+                            line_number + 1,
+                            error
+                        )
+                    })?;
+                }
+                if let Some(configuration) = event.configuration_commitment.as_ref() {
+                    if configuration.name != "configuration.nix" {
+                        return Err(format!(
+                            "transaction ledger configuration commitment has invalid filename at line {}",
+                            line_number + 1
+                        ));
+                    }
+                    validate_artifact_commitment(configuration).map_err(|error| {
+                        format!(
+                            "transaction ledger invalid configuration commitment at line {}: {}",
+                            line_number + 1,
+                            error
+                        )
+                    })?;
+                }
             }
 
             if let Some(owner) = transaction_owners.get(&event.transaction_id) {
@@ -641,9 +673,9 @@ impl TransactionLedger {
                             line_number + 1
                         ));
                     }
-                    if event.artifact_commitment.is_some() {
+                    if event.artifact_commitment.is_some() || event.configuration_commitment.is_some() {
                         return Err(format!(
-                            "transaction ledger start event at line {} carries an artifact commitment",
+                            "transaction ledger start event at line {} carries an image commitment",
                             line_number + 1
                         ));
                     }
@@ -654,6 +686,7 @@ impl TransactionLedger {
                         request_digest: event.request_digest,
                         outcome: None,
                         artifact_commitment: None,
+                        configuration_commitment: None,
                     };
                     if let Some(existing) = records.get(&event.request_id) {
                         if existing.transaction_id != record.transaction_id
@@ -661,6 +694,7 @@ impl TransactionLedger {
                             || existing.target_machine_digest != record.target_machine_digest
                             || existing.request_digest != record.request_digest
                             || existing.artifact_commitment != record.artifact_commitment
+                            || existing.configuration_commitment != record.configuration_commitment
                         {
                             return Err(format!(
                                 "transaction ledger contains conflicting history for request_id {}",
@@ -678,7 +712,7 @@ impl TransactionLedger {
                             line_number + 1
                         )
                     })?;
-                    if event.artifact_commitment.is_some()
+                    if (event.artifact_commitment.is_some() || event.configuration_commitment.is_some())
                         && outcome != TransactionOutcome::ObservedSuccess
                     {
                         return Err(format!(
@@ -712,6 +746,7 @@ impl TransactionLedger {
                     } else {
                         record.outcome = Some(outcome);
                         record.artifact_commitment = event.artifact_commitment;
+                        record.configuration_commitment = event.configuration_commitment;
                     }
                 }
                 other => {
@@ -864,6 +899,7 @@ impl TransactionLedger {
             request_digest: transaction.request_digest.clone(),
             outcome: None,
             artifact_commitment: None,
+            configuration_commitment: None,
         })?;
         Ok(TransactionAdmission::New(transaction))
     }
@@ -955,14 +991,40 @@ impl TransactionLedger {
         outcome: TransactionOutcome,
         artifact_commitment: Option<ArtifactCommitment>,
     ) -> Result<(), String> {
-        if artifact_commitment.is_some() && transaction.mutation != MutationKind::CreateImage {
-            return Err("only create_image transactions may commit an artifact".into());
+        self.mark_completed_with_image_artifacts(transaction, outcome, artifact_commitment, None)
+    }
+
+    pub(crate) fn mark_completed_with_image_artifacts(
+        &self,
+        transaction: &SystemTransaction,
+        outcome: TransactionOutcome,
+        artifact_commitment: Option<ArtifactCommitment>,
+        configuration_commitment: Option<ArtifactCommitment>,
+    ) -> Result<(), String> {
+        if (artifact_commitment.is_some() || configuration_commitment.is_some())
+            && transaction.mutation != MutationKind::CreateImage
+        {
+            return Err("only create_image transactions may commit image artifacts".into());
         }
-        if artifact_commitment.is_some() && outcome != TransactionOutcome::ObservedSuccess {
-            return Err("image artifact commitment requires observed_success".into());
+        if (artifact_commitment.is_some() || configuration_commitment.is_some())
+            && outcome != TransactionOutcome::ObservedSuccess
+        {
+            return Err("image artifact commitments require observed_success".into());
         }
         if let Some(artifact) = artifact_commitment.as_ref() {
             validate_artifact_commitment(artifact)?;
+            if !matches!(artifact.name.as_str(), "system.btrfs.zst" | "system.tar.gz") {
+                return Err("image archive commitment must name a supported archive".into());
+            }
+        }
+        if let Some(configuration) = configuration_commitment.as_ref() {
+            validate_artifact_commitment(configuration)?;
+            if configuration.name != "configuration.nix" {
+                return Err("configuration commitment must name configuration.nix".into());
+            }
+        }
+        if artifact_commitment.is_some() != configuration_commitment.is_some() {
+            return Err("qualified image completion must commit both archive and configuration".into());
         }
 
         let records = self.load()?;
@@ -983,7 +1045,10 @@ impl TransactionLedger {
             ));
         }
         if let Some(existing_outcome) = existing.outcome {
-            if existing_outcome != outcome || existing.artifact_commitment != artifact_commitment {
+            if existing_outcome != outcome
+                || existing.artifact_commitment != artifact_commitment
+                || existing.configuration_commitment != configuration_commitment
+            {
                 return Err(format!(
                     "transaction request_id {} already has a different recorded completion",
                     transaction.request_id
@@ -1002,6 +1067,7 @@ impl TransactionLedger {
             request_digest: transaction.request_digest.clone(),
             outcome: Some(outcome),
             artifact_commitment,
+            configuration_commitment,
         })
     }
 }
@@ -1331,6 +1397,37 @@ mod tests {
         };
         assert!(validate_artifact_commitment(&hardware).is_err());
     }
+
+    #[test]
+    fn image_completion_requires_archive_and_configuration_together() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir().join(format!("symthaea-image-bundle-{name}.jsonl"));
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let tx = SystemTransaction::begin(
+            MutationKind::CreateImage,
+            "image-bundle-request-0001",
+            Some("a".repeat(64).as_str()),
+            b"create-system-image",
+        ).unwrap();
+        assert!(matches!(ledger.admit(tx.clone()).unwrap(), TransactionAdmission::New(_)));
+
+        let archive = ArtifactCommitment {
+            name: "system.tar.gz".into(),
+            size: 1,
+            digest: "a".repeat(64),
+        };
+        assert!(
+            ledger.mark_completed_with_image_artifacts(
+                &tx,
+                TransactionOutcome::ObservedSuccess,
+                Some(archive),
+                None,
+            ).is_err(),
+            "archive-only image success must not qualify"
+        );
+        let _ = std::fs::remove_file(path);
+    }
+
 
     #[test]
     fn mutation_names_are_stable() {
