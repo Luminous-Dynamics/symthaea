@@ -4795,6 +4795,13 @@ mod tests {
             plan.validate_against_qualification(identity_b),
             Err(RelationalPredictionError::InvalidEvidenceInputDigest)
         );
+
+        let mut tampered = plan.clone();
+        tampered.procedure_id = "different-procedure".to_string();
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
     }
 
     #[test]
