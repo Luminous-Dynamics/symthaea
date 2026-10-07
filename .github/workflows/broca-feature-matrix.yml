@@ -79,6 +79,10 @@ jobs:
           test "$refs" = "$expected"
           bad_refs=$(printf '%s\n' "$refs" | awk -F@ 'NF != 2 || length($2) != 40 || $2 !~ /^[0-9a-f]+$/ { print }')
           test -z "$bad_refs"
+          test "$(grep -Ec '^permissions:$' "$workflow")" -eq 1
+          test "$(grep -Ec '^  contents: read$' "$workflow")" -eq 1
+          test "$(grep -Ec '^[[:space:]]*persist-credentials: false$' "$workflow")" -eq 2
+          test "$(grep -Ec '^[[:space:]]*toolchain: 1\.96\.0$' "$workflow")" -eq 2
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master 2026-10-01
@@ -139,6 +143,10 @@ jobs:
           test "$refs" = "$expected"
           bad_refs=$(printf '%s\n' "$refs" | awk -F@ 'NF != 2 || length($2) != 40 || $2 !~ /^[0-9a-f]+$/ { print }')
           test -z "$bad_refs"
+          test "$(grep -Ec '^permissions:$' "$workflow")" -eq 1
+          test "$(grep -Ec '^  contents: read$' "$workflow")" -eq 1
+          test "$(grep -Ec '^[[:space:]]*persist-credentials: false$' "$workflow")" -eq 2
+          test "$(grep -Ec '^[[:space:]]*toolchain: 1\.96\.0$' "$workflow")" -eq 2
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master 2026-10-01
