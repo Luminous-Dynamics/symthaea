@@ -38,6 +38,8 @@ pub enum NixSystemdMutationTransportErrorV1 {
     InvalidManagerOwner,
     #[error("systemd manager incarnation changed before lifecycle dispatch")]
     ManagerOwnerChanged,
+    #[error("D-Bus daemon incarnation changed before lifecycle dispatch")]
+    BusIncarnationChanged,
     #[error("systemd returned an invalid Job object path")]
     InvalidJobObjectPath,
 }
@@ -112,6 +114,60 @@ impl NixSystemdLifecycleMutationTransportV1 {
         Ok(job_path)
     }
 
+    /// Governed dispatch bound to both the exact systemd manager owner and
+    /// D-Bus daemon incarnation captured with the Service approval.
+    pub async fn dispatch_lifecycle_for_manager_owner_and_bus_id(
+        &self,
+        operation: &NixServiceOperationV1,
+        manager_owner: &str,
+        expected_bus_id: &str,
+    ) -> Result<OwnedObjectPath, NixSystemdMutationTransportErrorV1> {
+        operation
+            .validate_shape()
+            .map_err(|error| {
+                NixSystemdMutationTransportErrorV1::InvalidServiceOperation(error.to_string())
+            })?;
+        validate_manager_owner(manager_owner)?;
+        validate_bus_id(expected_bus_id)?;
+
+        let bus = Proxy::new(
+            &self.connection,
+            DBUS_DESTINATION,
+            DBUS_PATH,
+            DBUS_INTERFACE,
+        )
+        .await?;
+
+        let current_owner: String = bus
+            .call("GetNameOwner", &(SYSTEMD_DESTINATION,))
+            .await?;
+        if current_owner != manager_owner {
+            return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
+        }
+
+        let current_bus_id: String = bus.call("GetId", &()).await?;
+        validate_bus_id(&current_bus_id)?;
+        if current_bus_id != expected_bus_id {
+            return Err(NixSystemdMutationTransportErrorV1::BusIncarnationChanged);
+        }
+
+        let (method, _job_type) = method_and_job_type(operation.operation())?;
+        let manager = Proxy::new(
+            &self.connection,
+            manager_owner,
+            SYSTEMD_MANAGER_PATH,
+            SYSTEMD_MANAGER_INTERFACE,
+        )
+        .await?;
+
+        let job_path: OwnedObjectPath = manager
+            .call(method, &(operation.unit(), JOB_MODE_REPLACE))
+            .await?;
+
+        validate_job_object_path(&job_path)?;
+        Ok(job_path)
+    }
+
     pub fn method_name(
         operation: NixServiceOperationKindV1,
     ) -> Result<&'static str, NixSystemdMutationTransportErrorV1> {
@@ -149,6 +205,15 @@ fn validate_manager_owner(
     zbus::names::UniqueName::try_from(owner).map(|_| ()).map_err(|_| {
         NixSystemdMutationTransportErrorV1::InvalidManagerOwner
     })
+}
+
+fn validate_bus_id(
+    bus_id: &str,
+) -> Result<(), NixSystemdMutationTransportErrorV1> {
+    if bus_id.len() != 32 || !bus_id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(NixSystemdMutationTransportErrorV1::BusIncarnationChanged);
+    }
+    Ok(())
 }
 
 fn validate_job_object_path(
@@ -206,6 +271,16 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn governed_dispatch_api_requires_manager_owner_and_bus_epoch() {
+        let _method =
+            NixSystemdLifecycleMutationTransportV1::dispatch_lifecycle_for_manager_owner_and_bus_id;
+        assert!(validate_manager_owner(":1.42").is_ok());
+        assert!(validate_bus_id("0123456789abcdef0123456789abcdef").is_ok());
+        assert!(validate_bus_id("").is_err());
+        assert!(validate_bus_id("not-a-bus-id").is_err());
+    }
+
     fn lifecycle_dispatch_api_is_owner_bound_not_well_known_name_bound() {
         let _method =
             NixSystemdLifecycleMutationTransportV1::dispatch_lifecycle_for_manager_owner;
