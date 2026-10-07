@@ -8764,6 +8764,70 @@ mod tests {
         let _ = std::fs::remove_dir_all(dir);
     }
 
+    #[tokio::test]
+    async fn image_artifact_commitment_detects_exact_byte_changes() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-image-{}",
+            transaction_id
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let archive = dir.join("system.tar.gz");
+        std::fs::write(&archive, b"image-artifact-v1").unwrap();
+        std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        let commitment = commit_image_artifact(dir.to_str().unwrap()).await.unwrap();
+        assert_eq!(commitment.name, "system.tar.gz");
+        assert_eq!(commitment.size, b"image-artifact-v1".len() as u64);
+        verify_image_artifact_commitment(dir.to_str().unwrap(), &commitment)
+            .await
+            .unwrap();
+
+        std::fs::write(&archive, b"image-artifact-v2").unwrap();
+        assert!(
+            verify_image_artifact_commitment(dir.to_str().unwrap(), &commitment)
+                .await
+                .is_err(),
+            "restores must reject byte changes after image creation"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn image_artifact_commitment_requires_one_supported_archive() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-image-{}",
+            transaction_id
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        for name in ["system.btrfs.zst", "system.tar.gz"] {
+            let path = dir.join(name);
+            std::fs::write(path, b"artifact").unwrap();
+            std::fs::set_permissions(
+                dir.join(name),
+                std::fs::Permissions::from_mode(0o600),
+            )
+            .unwrap();
+        }
+
+        let error = commit_image_artifact(dir.to_str().unwrap())
+            .await
+            .expect_err("ambiguous image namespace must not be committed");
+        assert!(error.contains("multiple supported archive artifacts"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
     #[test]
     fn service_postconditions_match_requested_native_state() {
         assert!(service_postcondition_met("start", "active", "disabled"));
