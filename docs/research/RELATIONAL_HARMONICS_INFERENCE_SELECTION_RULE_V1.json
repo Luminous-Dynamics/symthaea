@@ -53,9 +53,9 @@
     "resampling_method_id": "moving-block-bootstrap-v1",
     "small_sample_policy_id": "small-sample-conservative-v1",
     "multiplicity_policy_id": "single-primary-comparison-v1",
-    "procedure_spec_sha256": "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4",
-    "dependence_spec_sha256": "8b5195edb3c93a1c4a56d48c96732dfbd14c6e1299b5ac2cf53cef55ce37caf1",
-    "resampling_spec_sha256": "ba1886b0727d5ac1fd6b107486d20c68cc5775416cdfb8eeb1887df7e2be450b"
+    "procedure_spec_sha256": "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b",
+    "dependence_spec_sha256": "0a6d4a8c4a9c96d1845af12a290e65b4c575c91678a85c79b1570b1c189553b9",
+    "resampling_spec_sha256": "b66046e1016389d126ef79abad15ab293d26a1fef9579d9578442cd1bd81d80d"
   },
   "decision_semantics": {
     "rule_execution": "compiled-v1-rule-mirror",
@@ -66,10 +66,10 @@
   },
   "method_specification_artifacts": {
     "procedure": "docs/research/RELATIONAL_HARMONICS_NESTED_FORECAST_BOOTSTRAP_V1.json",
-    "procedure_sha256": "a30fafe3505f80cd6707c7a73e5ce36c0f6d1f0d09e6429c203f37991039dce4",
+    "procedure_sha256": "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b",
     "dependence": "docs/research/RELATIONAL_HARMONICS_LOSS_DEPENDENCE_BARTLETT_V1.json",
-    "dependence_sha256": "8b5195edb3c93a1c4a56d48c96732dfbd14c6e1299b5ac2cf53cef55ce37caf1",
+    "dependence_sha256": "0a6d4a8c4a9c96d1845af12a290e65b4c575c91678a85c79b1570b1c189553b9",
     "resampling": "docs/research/RELATIONAL_HARMONICS_MOVING_BLOCK_BOOTSTRAP_V1.json",
-    "resampling_sha256": "ba1886b0727d5ac1fd6b107486d20c68cc5775416cdfb8eeb1887df7e2be450b"
+    "resampling_sha256": "b66046e1016389d126ef79abad15ab293d26a1fef9579d9578442cd1bd81d80d"
   }
 }
