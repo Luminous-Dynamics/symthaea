@@ -31,3 +31,29 @@ semantic operation plan
 ```
 
 The semantic contract does not depend on any graphics API and does not introduce a parallel provenance ontology.
+
+## Execution dependency graph
+
+The `ExecutionGraph` models semantic resource hazards independently of a
+backend. Nodes declare resource reads/writes and typed edges express
+read-after-write, write-after-read, and write-after-write ordering.
+
+The graph is validated fail-closed:
+
+- cycles and unknown nodes are rejected;
+- duplicate resource declarations and dependencies are rejected;
+- dependency kinds must agree with the declared accesses;
+- every read/write conflict must be ordered by the resulting DAG;
+- graph identifiers are bounded;
+- topological order and graph digest are independent of insertion order.
+
+The graph digest is a semantic schedule identity. Vulkan synchronization2 and
+timeline semaphores, WebGPU encoder ordering, and Prism compositor scheduling
+should be lowerings of this graph rather than independent dependency models.
+
+## Acceleration claims
+
+Backend identity and acceleration are separate facts. A software Vulkan
+qualification can legitimately produce a Vulkan execution receipt with
+`accelerated=false`. An `accelerated=true` receipt requires concrete
+implementation, device, and driver evidence.
