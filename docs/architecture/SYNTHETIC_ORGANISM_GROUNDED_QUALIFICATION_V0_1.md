@@ -179,6 +179,36 @@ The same run separately calibrates confidence only on planner-selected actions. 
 stricter than aggregate held-out calibration because selection can preferentially expose overconfident
 model errors.
 
+### Procedurally generated held-out transfer
+
+The qualification layer also evaluates a deterministic procedural family that is never used for
+adaptation.
+
+Eight explicit seeds generate scenarios by varying:
+
+- initial internal/external state;
+- six-action schedules;
+- two perturbation events, including event type, timing, and magnitude.
+
+The transition law itself is held fixed. Therefore this test measures **generalization across
+unseen state/schedule/perturbation configurations**, not zero-shot discovery of a new environment
+dynamics law.
+
+Every generated scenario has its own manifest digest, and the family has an aggregate manifest
+digest. Each scenario is scored with a fresh clone of the trained model so that no generated
+evaluation can mutate another fold.
+
+The report retains:
+
+- generated scenario count;
+- mean and worst improvement over the persistence baseline;
+- fraction of scenarios beating persistence;
+- survival rate;
+- the complete procedural-family manifest digest.
+
+A strong result here means the learned transition structure transfers beyond the four authored
+scenarios. It does not establish generalization to arbitrary environments or unseen physics.
+
 ### Environment-level counterfactual queries
 
 The frozen qualification layer now includes a deterministic query bank inspired by
@@ -297,6 +327,8 @@ This matters because a single favorable held-out scenario can be explained by sc
 | Counterfactual path error is high while terminal error is modest | intermediate model dynamics may be wrong even when endpoint error partly cancels |
 | Changed-channel F1 is low while terminal overlap is high | the model may be copying persistent state while missing the causal variables altered by the action |
 | The query bank has zero valid answers | the world-model interface is not scoreable; do not interpret zero numerical error as success |
+| Procedural held-out transfer regresses while authored transfer passes | the model may be specialized to the authored scenario family |
+| Procedural held-out transfer passes across all seeds | stronger evidence of generalization across sampled state/schedule/perturbation configurations, still bounded to this generator |
 
 No single metric is a synthetic-organism detector.
 
@@ -320,7 +352,8 @@ A future green qualification should report all of:
 13. held-out transfer;
 14. leave-one-scenario-out transfer matrix and worst-fold result;
 15. environment-level counterfactual query-bank results, including path error and changed-channel F1;
-16. trace/invariant verification where action evidence is recorded.
+16. procedurally generated held-out transfer results and procedural-family manifest digest;
+17. trace/invariant verification where action evidence is recorded.
 
 Queued CI is not a pass.
 
@@ -350,7 +383,8 @@ The current qualification gate is empirical execution of the complete protocol:
 
 with separate measurements for one-step error, discrete multi-step error, continuous extrapolation
 error, policy-induced distribution-shift error, confidence calibration, planning regret, survival,
-recovery, and the completed leave-one-scenario-out transfer matrix.
+recovery, the completed leave-one-scenario-out transfer matrix, and procedurally generated held-out
+transfer.
 
 A dedicated CI job runs the qualification module directly. The branch should not be considered
 qualified until that job has completed successfully for the exact candidate commit; queued or
