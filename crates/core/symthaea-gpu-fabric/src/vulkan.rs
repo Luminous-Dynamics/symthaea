@@ -1074,45 +1074,22 @@ mod tests {
         let executor = VulkanExecutor::new().expect("Vulkan executor should initialize");
 
         for dimensions in [1_u32, 7, 8, 9, 31, 32, 33, 127, 128, 129, 16384] {
-            let bytes = packed_bytes(dimensions) as usize;
-            let left = BinaryHypervector::from_bytes(
-                dimensions,
-                (0..bytes)
-                    .map(|index| (index as u8).wrapping_mul(0x31).wrapping_add(0x0b))
-                    .collect(),
-            )
-            .unwrap();
-            let right = BinaryHypervector::from_bytes(
-                dimensions,
-                (0..bytes)
-                    .map(|index| (index as u8).wrapping_mul(0x8d).wrapping_add(0x53))
-                    .collect::<Vec<_>>()
-                    .into_iter()
-                    .enumerate()
-                    .map(|(index, value)| {
-                        if index + 1 == bytes && dimensions % 8 != 0 {
-                            let mask = 0xff_u8 >> (8 - (dimensions % 8));
-                            value & mask
-                        } else {
-                            value
-                        }
-                    })
-                    .collect(),
-            )
-            .unwrap();
+            let plan = plan_for(dimensions);
+            let left = canonical_pattern(dimensions, 0x31, 0x0b);
+            let right = canonical_pattern(dimensions, 0x8d, 0x53);
 
             let (cpu_output, cpu_receipt) =
-                crate::CpuReferenceExecutor::execute(&plan_for(dimensions), &[left.clone(), right.clone()])
+                crate::CpuReferenceExecutor::execute(&plan, &[left.clone(), right.clone()])
                     .unwrap();
-            cpu_receipt.verify_plan(&plan_for(dimensions)).unwrap();
+            cpu_receipt.verify_plan(&plan).unwrap();
             cpu_receipt.verify_output(&cpu_output).unwrap();
 
             let (vulkan_output, vulkan_receipt) = executor
-                .execute(&plan_for(dimensions), &[left.clone(), right.clone()])
+                .execute(&plan, &[left.clone(), right.clone()])
                 .expect("Vulkan execution should succeed");
 
             let (second_output, second_receipt) = executor
-                .execute(&plan_for(dimensions), &[left, right])
+                .execute(&plan, &[left, right])
                 .expect("Vulkan executor must be reusable");
 
             assert_eq!(vulkan_output, cpu_output);
@@ -1137,5 +1114,26 @@ mod tests {
 
     fn plan_for(dimensions: u32) -> OperationPlan {
         OperationPlan::new(GpuOperation::HdcBindXor { dimensions })
+    }
+
+    fn canonical_pattern(dimensions: u32, multiplier: u8, offset: u8) -> BinaryHypervector {
+        let byte_len = packed_bytes(dimensions) as usize;
+        let mut bytes = (0..byte_len)
+            .map(|index| {
+                (index as u8)
+                    .wrapping_mul(multiplier)
+                    .wrapping_add(offset)
+            })
+            .collect::<Vec<_>>();
+
+        if dimensions % 8 != 0 {
+            let mask = 0xff_u8 >> (8 - (dimensions % 8));
+            if let Some(last) = bytes.last_mut() {
+                *last &= mask;
+            }
+        }
+
+        BinaryHypervector::from_bytes(dimensions, bytes)
+            .expect("canonical test pattern should satisfy vector invariants")
     }
 }
