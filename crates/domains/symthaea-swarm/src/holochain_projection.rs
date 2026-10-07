@@ -91,7 +91,9 @@ impl ReceiptSelectionContext {
     /// selection decision, preventing the compact anchor from disagreeing with
     /// the decision it references.
     #[cfg(feature = "semantic-receipts")]
-    pub fn from_decision(
+    /// Internal structural conversion used only after a decision has passed
+    /// the collection-bound validation performed by from_bound_decision.
+    fn from_decision(
         decision: &crate::rfc9942_selection::ReceiptSelectionDecision,
     ) -> Result<Self, HolochainProjectionError> {
         let selection_decision_sha256 = decision
