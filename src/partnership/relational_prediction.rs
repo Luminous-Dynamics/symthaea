@@ -298,6 +298,8 @@ pub struct ForecastLossDependenceProfile {
     pub variance: f64,
     pub autocovariances: Vec<f64>,
     pub autocorrelations: Vec<f64>,
+    /// Number of paired observations supporting each lag estimate.
+    pub pair_counts: Vec<usize>,
     pub lag_one_autocorrelation: Option<f64>,
     pub first_nonpositive_autocorrelation_lag: Option<usize>,
     pub max_absolute_autocorrelation_lag: Option<usize>,
@@ -363,9 +365,11 @@ impl ForecastLossDependenceProfile {
 
         let mut autocovariances = Vec::with_capacity(max_lag + 1);
         let mut autocorrelations = Vec::with_capacity(max_lag + 1);
+        let mut pair_counts = Vec::with_capacity(max_lag + 1);
 
         for lag in 0..=max_lag {
             let mut covariance = 0.0;
+            pair_counts.push(losses.len() - lag);
             for index in lag..losses.len() {
                 covariance += (losses[index] - mean) * (losses[index - lag] - mean);
                 if !covariance.is_finite() {
@@ -428,6 +432,7 @@ impl ForecastLossDependenceProfile {
             variance,
             autocovariances,
             autocorrelations,
+            pair_counts,
             lag_one_autocorrelation,
             first_nonpositive_autocorrelation_lag,
             max_absolute_autocorrelation_lag,
@@ -442,6 +447,7 @@ impl ForecastLossDependenceProfile {
             || self.max_lag >= self.sample_count
             || self.autocovariances.len() != self.max_lag + 1
             || self.autocorrelations.len() != self.max_lag + 1
+            || self.pair_counts.len() != self.max_lag + 1
             || !self.mean.is_finite()
             || !self.variance.is_finite()
             || self.variance < 0.0
@@ -457,6 +463,12 @@ impl ForecastLossDependenceProfile {
             if !is_hex_digest(digest, 64) {
                 return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
             }
+        }
+
+        if self.pair_counts.iter().enumerate().any(|(lag, count)| {
+            *count != self.sample_count - lag || *count < 1
+        }) {
+            return Err(RelationalPredictionError::ModelFitFailed);
         }
 
         if self.autocovariances.iter().any(|value| !value.is_finite())
@@ -494,6 +506,7 @@ impl ForecastLossDependenceProfile {
             "variance": self.variance,
             "autocovariances": &self.autocovariances,
             "autocorrelations": &self.autocorrelations,
+            "pair_counts": &self.pair_counts,
             "lag_one_autocorrelation": self.lag_one_autocorrelation,
             "first_nonpositive_autocorrelation_lag": self.first_nonpositive_autocorrelation_lag,
             "max_absolute_autocorrelation_lag": self.max_absolute_autocorrelation_lag,
@@ -3586,6 +3599,7 @@ mod tests {
 
         assert_eq!(profile.sample_count, losses.len());
         assert_eq!(profile.max_lag, 4);
+        assert_eq!(profile.pair_counts, vec![8, 7, 6, 5, 4]);
         assert!(profile.variance > 0.0);
         assert!(profile.lag_one_autocorrelation.unwrap() > 0.5);
         assert!(profile.max_absolute_autocorrelation > 0.5);
@@ -3603,6 +3617,7 @@ mod tests {
         assert_eq!(profile.max_lag, 3);
         assert_eq!(profile.variance, 0.0);
         assert_eq!(profile.autocorrelations, vec![0.0; 4]);
+        assert_eq!(profile.pair_counts, vec![4, 3, 2, 1]);
         assert_eq!(profile.effective_sample_size, None);
     }
 
