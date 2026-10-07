@@ -1517,6 +1517,70 @@ fn rfc9942_verified_state_records_selected_proof_index() {
     assert_eq!(state.proof().inclusion_head(), Some(head));
 }
 
+
+#[test]
+fn rfc9942_consistency_state_records_selected_proof_index() {
+    let leaves = vec![
+        b"old-a".to_vec(),
+        b"old-b".to_vec(),
+        b"new-c".to_vec(),
+        b"new-d".to_vec(),
+    ];
+    let vds = Rfc9162Sha256Vds;
+    let older = vds.tree_head(&leaves[..2].to_vec());
+    let newer = vds.tree_head(&leaves);
+
+    // Both proofs describe the same old/new tree sizes. The first is kept
+    // structurally valid but is cryptographically invalid; the second is the
+    // valid proof. The semantic capability must report which proof actually
+    // established the verified state rather than merely returning the first
+    // matching-looking entry.
+    let mut invalid_proof = vds.prove(&leaves, 2).unwrap().to_cbor();
+    let last_hash_byte = invalid_proof.len() - 1;
+    invalid_proof[last_hash_byte] ^= 0x01;
+    let valid_proof = vds.prove(&leaves, 2).unwrap().to_cbor();
+    let vdp = Rfc9942Vdp::new(
+        Rfc9942ProofKind::Consistency,
+        vec![invalid_proof, valid_proof],
+    )
+    .unwrap();
+
+    let unsigned = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp.clone(),
+        Rfc9942ReceiptPayload::Detached,
+        vec![0u8; 64],
+    )
+    .unwrap();
+
+    let rng = SystemRandom::new();
+    let signing_key = rfc8392_signing_key(&rng);
+    let signature = signing_key
+        .sign(&rng, &unsigned.signature1_tbs(&[], Some(&newer.root())).unwrap())
+        .unwrap()
+        .as_ref()
+        .to_vec();
+
+    let receipt = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp,
+        Rfc9942ReceiptPayload::Detached,
+        signature,
+    )
+    .unwrap();
+    let key = rfc8392_public_key();
+
+    let state = receipt
+        .verify_es256_consistency_state(older, &key, &[], Some(&newer.root()))
+        .unwrap();
+
+    assert_eq!(state.proof().proof_index(), 1);
+    assert_eq!(state.proof().consistency_heads(), Some((older, newer)));
+
+    let expected_payload_sha256: [u8; 32] = sha2::Sha256::digest(&newer.root()).into();
+    assert_eq!(state.payload_sha256(), expected_payload_sha256);
+}
+
 #[test]
 fn rfc9942_round_trip_preserves_unprotected_header_entry_order() {
     fn bstr(bytes: &[u8]) -> Vec<u8> {
