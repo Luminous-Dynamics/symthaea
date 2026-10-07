@@ -428,7 +428,7 @@ pub enum MicroPerturbation {
 }
 
 impl MicroPerturbation {
-    fn apply(self, state: MicroWorldObservation) -> MicroWorldObservation {
+    pub(crate) fn apply(self, state: MicroWorldObservation) -> MicroWorldObservation {
         let mut next = state;
         match self {
             Self::EnergyDrain(amount) => next.energy -= amount.abs(),
