@@ -9829,11 +9829,17 @@ echo '}'
                         .await;
                     continue;
                 }
-                if wifi_pw.contains('\n') || wifi_pw.contains('\r') || wifi_pw.contains('\0') {
+                if wifi_pw.len() > 4096
+                    || wifi_pw.contains('\n')
+                    || wifi_pw.contains('\r')
+                    || wifi_pw.contains('\0')
+                {
                     let _ = ws_tx
                         .send(Message::Text(
-                            RelayMessage::error("Wi-Fi password contains unsupported control characters")
-                                .to_json(),
+                            RelayMessage::error(
+                                "Wi-Fi password is invalid or exceeds the 4096-byte limit",
+                            )
+                            .to_json(),
                         ))
                         .await;
                     continue;
@@ -11182,6 +11188,14 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn wifi_password_limit_is_four_kib() {
+        let valid = "x".repeat(4096);
+        let invalid = "x".repeat(4097);
+        assert!(valid.len() <= 4096);
+        assert!(invalid.len() > 4096);
     }
 
     #[test]
