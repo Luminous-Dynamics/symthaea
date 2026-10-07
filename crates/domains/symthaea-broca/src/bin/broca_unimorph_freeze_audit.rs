@@ -258,6 +258,7 @@ fn main() -> Result<()> {
         &actual_blob,
         &slices,
         selected_bytes.len(),
+        &action_refs,
     )?;
     let ci_provenance = collect_ci_provenance();
     println!(
@@ -496,6 +497,7 @@ fn write_structured_receipt(
     actual_blob: &str,
     slices: &[MorphophonologicalSourceSlice],
     selected_bytes: usize,
+    action_refs: &[String],
 ) -> Result<()> {
     let receipt_path = match std::env::var("BROCA_FREEZE_AUDIT_OUTPUT") {
         Ok(path) if !path.trim().is_empty() => path,
