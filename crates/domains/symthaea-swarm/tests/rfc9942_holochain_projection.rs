@@ -86,7 +86,7 @@ fn selection_context_changes_projection_identity() {
 #[test]
 fn bound_selection_projection_requires_exact_source_collection() {
     use symthaea_swarm::rfc9942_selection::evaluate_priority_first_valid;
-    use symthaea_swarm::{
+    use symthaea_swarm::semantic_evidence_vds::{
         Rfc9942ProofKind, Rfc9942ReceiptCollection, Rfc9942ReceiptEnvelope,
         Rfc9942ReceiptPayload, Rfc9942Vdp, Rfc9162InclusionProof,
         COSE_ES256_ALGORITHM_ID,
