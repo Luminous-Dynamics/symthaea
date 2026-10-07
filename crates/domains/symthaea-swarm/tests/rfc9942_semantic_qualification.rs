@@ -1093,6 +1093,145 @@ fn rfc9942_outer_detached_payload_binds_inner_inclusion_and_outer_signature() {
     );
 }
 
+
+#[test]
+fn rfc9942_unprotected_receipt_priority_is_explicit_transport_provenance() {
+    let candidate = b"priority-candidate";
+    let leaves = vec![candidate.to_vec(), b"other-entry".to_vec()];
+    let vds = Rfc9162Sha256Vds;
+    let head = vds.tree_head(&leaves);
+    let proof = vds.inclusion_proof(&leaves, 0).unwrap().to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+
+    let key = rfc8392_public_key();
+    let rng = SystemRandom::new();
+    let signer = rfc8392_signing_key(&rng);
+
+    fn cbor_bstr(bytes: &[u8]) -> Vec<u8> {
+        assert!(bytes.len() < 256);
+        let mut out = if bytes.len() < 24 {
+            vec![0x40 | bytes.len() as u8]
+        } else {
+            vec![0x58, bytes.len() as u8]
+        };
+        out.extend_from_slice(bytes);
+        out
+    }
+
+    fn outer_wire(collection: &[u8], signature: &[u8]) -> Vec<u8> {
+        let protected = [0xa1, 0x01, 0x26]; // { alg: -7 }
+        let mut unprotected = vec![0xa1];
+        unprotected.extend_from_slice(&[0x19, 0x01, 0x8a]); // receipts: 394
+        unprotected.extend_from_slice(collection);
+
+        let mut out = vec![0xd2, 0x84];
+        out.extend_from_slice(&cbor_bstr(&protected));
+        out.extend_from_slice(&unprotected);
+        out.push(0xf6); // detached outer application payload
+        out.extend_from_slice(&cbor_bstr(signature));
+        out
+    }
+
+    // The two inner Receipts authenticate the same Merkle root but use distinct
+    // external AAD contexts. Their signatures therefore remain distinct semantic
+    // artifacts while the outer Signature_With_Receipt signs only the application payload.
+    let make_receipt = |aad: &[u8]| {
+        let unsigned = Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            vdp.clone(),
+            Rfc9942ReceiptPayload::Attached(head.root()),
+            vec![0u8; 64],
+        )
+        .unwrap();
+        let tbs = unsigned.signature1_tbs(aad, None).unwrap();
+        let signature = signer.sign(&rng, &tbs).unwrap().as_ref().to_vec();
+        let signature_sha256: [u8; 32] = sha2::Sha256::digest(&signature).into();
+        let receipt = Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            vdp.clone(),
+            Rfc9942ReceiptPayload::Attached(head.root()),
+            signature,
+        )
+        .unwrap();
+        (receipt, signature_sha256)
+    };
+
+    let (first_receipt, first_signature_sha256) = make_receipt(b"receipt-aad-a");
+    let (second_receipt, second_signature_sha256) = make_receipt(b"receipt-aad-b");
+    assert_ne!(first_signature_sha256, second_signature_sha256);
+
+    let first_collection =
+        Rfc9942ReceiptCollection::new(vec![first_receipt, second_receipt]).unwrap().to_cbor();
+
+    let unsigned_outer =
+        Rfc9942SignatureWithReceipts::from_cbor(&outer_wire(&first_collection, &[0u8; 64]))
+            .unwrap();
+    let outer_tbs = unsigned_outer.signature1_tbs(&[], Some(candidate)).unwrap();
+    let outer_signature = signer.sign(&rng, &outer_tbs).unwrap().as_ref().to_vec();
+    let outer_signature_sha256: [u8; 32] = sha2::Sha256::digest(&outer_signature).into();
+
+    let first_outer =
+        Rfc9942SignatureWithReceipts::from_cbor(&outer_wire(&first_collection, &outer_signature))
+            .unwrap();
+
+    let first_state = first_outer
+        .verify_es256_inclusion_receipt_state(
+            0,
+            &key,
+            &key,
+            b"receipt-aad-a",
+            &[],
+            Some(candidate),
+        )
+        .unwrap();
+    assert_eq!(first_state.receipt_index(), 0);
+    assert_eq!(
+        first_state.receipt_placement(),
+        symthaea_swarm::semantic_evidence_vds::Rfc9942ReceiptPlacement::Unprotected
+    );
+    assert_eq!(first_state.outer_signature_sha256(), outer_signature_sha256);
+    assert_eq!(first_state.receipt().signature_sha256(), first_signature_sha256);
+    assert_eq!(first_state.receipt().proof().inclusion_head(), Some(head));
+
+    // Reordering an unprotected priority list does not alter the outer COSE
+    // Sig_structure, so the same outer signature remains valid. The selected
+    // semantic receipt changes, and the capability exposes that transport
+    // choice through the receipt index plus the exact selected signature.
+    let swapped_collection = Rfc9942ReceiptCollection::new(vec![
+        first_outer.receipts().unwrap().receipts()[1].clone(),
+        first_outer.receipts().unwrap().receipts()[0].clone(),
+    ])
+    .unwrap()
+    .to_cbor();
+    let swapped_outer =
+        Rfc9942SignatureWithReceipts::from_cbor(&outer_wire(&swapped_collection, &outer_signature))
+            .unwrap();
+
+    let swapped_state = swapped_outer
+        .verify_es256_inclusion_receipt_state(
+            0,
+            &key,
+            &key,
+            b"receipt-aad-b",
+            &[],
+            Some(candidate),
+        )
+        .unwrap();
+    assert_eq!(swapped_state.receipt_index(), 0);
+    assert_eq!(
+        swapped_state.outer_signature_sha256(),
+        first_state.outer_signature_sha256()
+    );
+    assert_eq!(
+        swapped_state.receipt().signature_sha256(),
+        second_signature_sha256
+    );
+    assert_ne!(
+        swapped_state.receipt().signature_sha256(),
+        first_state.receipt().signature_sha256()
+    );
+}
+
 #[test]
 fn rfc9942_es256_cose_key_consistency_preserves_signature_first_order() {
     // The COSE_Key convenience helper must delegate to the canonical semantic
