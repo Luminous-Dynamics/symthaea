@@ -3439,6 +3439,28 @@ mod tests {
     }
 
     #[test]
+    fn source_selection_boundaries_accept_crlf_and_reject_mid_ending_cuts() {
+        let artifact = b"walk\twalked\tV;PST\r\n";
+        let full = MorphophonologicalSourceSlice {
+            record_id: "walk-past".into(),
+            byte_offset: 0,
+            byte_length: artifact.len(),
+            record_blake3: blake3::hash(artifact).to_hex().to_string(),
+        };
+        assert!(source_slice_is_line_bounded(artifact, &full));
+
+        let mid_crlf = MorphophonologicalSourceSlice {
+            record_id: "walk-past-mid-crlf".into(),
+            byte_offset: 0,
+            byte_length: artifact.len() - 1,
+            record_blake3: blake3::hash(&artifact[..artifact.len() - 1])
+                .to_hex()
+                .to_string(),
+        };
+        assert!(!source_slice_is_line_bounded(artifact, &mid_crlf));
+    }
+
+    #[test]
     fn unimorph_compilation_rejects_line_fragment_source_selection() {
         let artifact = b"prefix walk\twalked\tV;PST suffix\n";
         let selected = b"walk\twalked\tV;PST";
