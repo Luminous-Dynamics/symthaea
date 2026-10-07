@@ -1635,4 +1635,16 @@ mod tests {
         let r = s.cycle("final check");
         assert!(r.prediction_error.is_finite());
     }
+    #[test]
+    fn viability_telemetry_is_exposed_after_cycle() {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+        let result = service.cycle("viability telemetry check");
+        assert!(result.metadata.viability.viability_cycle > 0);
+        assert!(result.metadata.viability.viability_pressure.is_finite());
+        assert!(result.metadata.viability.viability_world_prediction_error.is_finite());
+        assert!(result.metadata.viability.viability_model_uncertainty.is_finite());
+        assert!(!result.metadata.viability.viability_resource_mode.is_empty());
+    }
+
+
 }
