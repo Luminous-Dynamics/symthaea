@@ -171,6 +171,7 @@ jobs:
           assert report["remediation_observation_membership_cherry_pick_blocked"] is True
           assert report["remediation_canonical_population_identity_substitution_blocked"] is True
           assert report["remediation_uncertainty_method_substitution_blocked"] is True
+          assert report["remediation_measurement_schema_v2_rejected"] is True
           assert report["remediation_fairness_group_substitution_blocked"] is True
           assert report["remediation_measurement_worst_case_binding_blocked"] is True
           assert report["remediation_measurement_missingness_fail_closed"] is True
