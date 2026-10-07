@@ -200,6 +200,8 @@ impl CognitiveLoopService {
             self.prediction_confidence,
         );
         metadata.viability = self.fep.viability_telemetry();
+        metadata.viability.viability_planning_horizon_scale =
+            self.fep.viability_planning_horizon_scale();
 
         metadata.cycle_duration_us = cycle_start.elapsed().as_micros() as u64;
 
