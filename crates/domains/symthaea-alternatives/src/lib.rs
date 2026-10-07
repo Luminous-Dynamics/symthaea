@@ -8662,6 +8662,62 @@ mod tests {
             } if input_quantity_id == "fixture-input" && node_id == "reference"
         ));
 
+        let mut wrong_frontier_set = topology.clone();
+        wrong_frontier_set.input_frontier.frontier_digest =
+            canonical_measurement_model_input_frontier_digest(&[
+                "fixture-input-other".into(),
+            ])
+            .unwrap();
+        assert!(matches!(
+            wrong_frontier_set
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::MeasurementModelInputFrontierDigestMismatch {
+                frontier_id,
+                ..
+            } if frontier_id == "fixture-input-frontier-v1"
+        ));
+
+        let mut wrong_frontier_count = topology.clone();
+        wrong_frontier_count.input_frontier.input_count = 1;
+        assert!(matches!(
+            wrong_frontier_count
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::MeasurementModelInputFrontierCountMismatch {
+                frontier_id,
+                expected_input_count: 1,
+                actual_input_count: 2,
+            } if frontier_id == "fixture-input-frontier-v1"
+        ));
+
+        let mut wrong_frontier_model = topology.clone();
+        wrong_frontier_model.input_frontier.measurement_model_digest =
+            "other-model-digest".into();
+        assert!(matches!(
+            wrong_frontier_model
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityInputFrontierModelMismatch {
+                topology_model_digest,
+                frontier_model_digest,
+                ..
+            } if topology_model_digest == "fixture-measurement-model-digest-v1"
+                && frontier_model_digest == "other-model-digest"
+        ));
+
         let mut wrong_model = candidate;
         {
             let evidence = &mut wrong_model.evidence[0];
