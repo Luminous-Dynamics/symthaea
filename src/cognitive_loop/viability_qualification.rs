@@ -534,6 +534,16 @@ impl EnvironmentQueryQualificationReport {
     pub fn is_populated(&self) -> bool {
         self.queries > 0 && self.probe_states > 0 && self.sequence_length > 0
     }
+
+    /// True only when at least one model answer was valid enough to score.
+    pub fn has_valid_answers(&self) -> bool {
+        self.valid_queries > 0
+    }
+
+    /// Fail-closed qualification predicate for the query bank.
+    pub fn is_scoreable(&self) -> bool {
+        self.is_populated() && self.has_valid_answers()
+    }
 }
 
 /// Decision-centric ranking qualification on frozen held-out states.
@@ -1765,6 +1775,8 @@ mod tests {
 
         assert_eq!(report.valid_queries, 0);
         assert_eq!(report.invalid_queries, report.queries);
+        assert!(!report.has_valid_answers());
+        assert!(!report.is_scoreable());
         assert_eq!(report.survival_agreement, 0.0);
         assert_eq!(report.mean_path_mae, 0.0);
         assert_eq!(report.mean_terminal_mae, 0.0);
@@ -1780,6 +1792,8 @@ mod tests {
         );
 
         assert!(report.is_populated());
+        assert!(report.has_valid_answers());
+        assert!(report.is_scoreable());
         assert_eq!(report.probe_states, 4);
         assert_eq!(report.invalid_queries + report.valid_queries, report.queries);
         assert_eq!(
