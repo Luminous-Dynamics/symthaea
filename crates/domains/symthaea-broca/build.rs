@@ -189,7 +189,7 @@ fn main() {
     // This is intentionally separate from compiler source identity: the same checked-in source
     // can have different dependency/toolchain semantics if its build context changes.
     let build_context_revision = domain_digest(
-        b"symthaea-broca-unimorph-compiler-build-context-revision-v2",
+        b"symthaea-broca-unimorph-compiler-build-context-revision-v3",
         &[
             &crate_manifest,
             &workspace_manifest,
