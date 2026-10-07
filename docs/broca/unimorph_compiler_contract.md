@@ -166,3 +166,8 @@ The CI-native dependency versions are exposed as `BROCA_NATIVE_PACKAGE_CONTEXT` 
 ## Signed qualification evidence
 
 The freeze-audit job generates a structured `receipt.json`, then creates a GitHub artifact attestation for that exact receipt and preserves the resulting attestation bundle as part of the downloadable evidence artifact. GitHub documents artifact attestations as signed provenance claims linking a subject to its workflow/build context, and documents offline verification of attestations. The attestation is limited to the freeze-audit job through job-scoped `id-token`, `attestations`, and `artifact-metadata` permissions; the other Broca jobs remain `contents: read` only.
+
+
+## Exact-head qualification
+
+For pull-request-triggered qualification, both jobs set `BROCA_QUALIFICATION_HEAD_SHA` from `github.event.pull_request.head.sha` and explicitly pass that SHA to `actions/checkout`. The freeze auditor then resolves `git rev-parse HEAD` and fails closed unless it equals the requested qualification head. This prevents a successful run of the synthetic pull-request merge ref from being mistaken for evidence about the PR head itself.
