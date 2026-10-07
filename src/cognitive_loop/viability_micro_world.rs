@@ -890,6 +890,7 @@ pub fn run_homeostatic_agent_horizon<P: MicroWorldPredictor>(
         for (cycle, perturbation) in scenario.perturbations {
             if *cycle == steps {
                 world.perturb(*perturbation);
+                perturbations_applied += 1;
             }
         }
         let before = world.observe();
@@ -1088,6 +1089,8 @@ pub struct MicroWorldReport {
     pub final_energy: f64,
     pub final_integrity: f64,
     pub final_progress: f64,
+    pub min_viability_margin: f64,
+    pub perturbations_applied: usize,
     pub ledger_outcomes: usize,
 }
 
@@ -1130,6 +1133,8 @@ fn evaluate_predictor_scenario<P: MicroWorldPredictor>(
     let mut baseline_error = 0.0;
     let mut predictor_error = 0.0;
     let mut steps = 0u64;
+    let mut min_viability_margin = f64::INFINITY;
+    let mut perturbations_applied = 0usize;
 
     while !world.done() && steps < max_cycles {
         let before = world.observe();
@@ -1165,6 +1170,9 @@ fn evaluate_predictor_scenario<P: MicroWorldPredictor>(
             .expect("deterministic benchmark must insert unique prediction");
 
         let after = world.step(action);
+        min_viability_margin = min_viability_margin.min(
+            after.energy.min(after.integrity) - 0.08,
+        );
         let actual_delta = signed_delta(before, after);
         let mae = predicted.mean_absolute_delta(after);
         predictor.observe_transition(before, action, after);
@@ -1218,6 +1226,12 @@ fn evaluate_predictor_scenario<P: MicroWorldPredictor>(
         final_energy: final_state.energy,
         final_integrity: final_state.integrity,
         final_progress: final_state.progress,
+        min_viability_margin: if min_viability_margin.is_finite() {
+            min_viability_margin
+        } else {
+            final_state.energy.min(final_state.integrity) - 0.08
+        },
+        perturbations_applied,
         ledger_outcomes: fabric.outcomes().len(),
     }
 }
@@ -1565,6 +1579,15 @@ mod tests {
         let mut a = PersistencePredictor;
         let mut b = PersistencePredictor;
         assert_eq!(run_homeostatic_agent(&mut a, 32), run_homeostatic_agent(&mut b, 32));
+    }
+
+    #[test]
+    fn stressed_scenario_contains_recovery_perturbations() {
+        let scenario = benchmark_scenarios()
+            .into_iter()
+            .find(|scenario| scenario.name == "stressed")
+            .expect("stressed scenario exists");
+        assert_eq!(scenario.perturbations.len(), 2);
     }
 
     #[test]
