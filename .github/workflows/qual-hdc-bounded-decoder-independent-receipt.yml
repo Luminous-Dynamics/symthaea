@@ -30,6 +30,7 @@ jobs:
           EXPECTED_WORKFLOW_PATH: ".github/workflows/hdc-linear-code-syndrome-qualify.yml"
           EXPECTED_WORKFLOW_NAME: "HDC Linear-Code Bounded Decoder Qualification"
           EXPECTED_WORKFLOW_BLOB_SHA: "e26dd53340d9ebf0ed1461d3d50704351d38ca33"
+          EXPECTED_MERGE_COMMIT: "88ee32b89574803b765d31fce06b043f23efae38"
         with:
           script: |
             const fs = require('fs');
@@ -47,6 +48,7 @@ jobs:
               workflowPath: process.env.EXPECTED_WORKFLOW_PATH,
               workflowName: process.env.EXPECTED_WORKFLOW_NAME,
               workflowBlobSha: process.env.EXPECTED_WORKFLOW_BLOB_SHA,
+              mergeCommit: process.env.EXPECTED_MERGE_COMMIT,
             };
 
             const expectedFiles = [
@@ -165,6 +167,21 @@ jobs:
                   JSON.stringify(expectedSourceBlobShas) &&
                 evidence.workflowFileSha === expected.workflowBlobSha;
 
+              const mergeParentSet =
+                evidence.mergeCommit?.parents?.map((parent) => parent.sha).sort() ?? [];
+              const expectedMergeParentSet = [expected.parent, expected.subject].sort();
+
+              const mergeIdentityVerified =
+                evidence.pr.merge_commit_sha === expected.mergeCommit &&
+                evidence.mergeCommit?.sha === expected.mergeCommit &&
+                evidence.mergeCommit?.parents?.length === 2 &&
+                JSON.stringify(mergeParentSet) === JSON.stringify(expectedMergeParentSet);
+
+              const mergeSourceIdentityVerified =
+                JSON.stringify(evidence.mergeSourceBlobShas) ===
+                  JSON.stringify(expectedSourceBlobShas) &&
+                evidence.mergeWorkflowFileSha === expected.workflowBlobSha;
+
               const changedFiles = [...(evidence.compare.files ?? [])]
                 .map((file) => file.filename)
                 .sort();
@@ -211,6 +228,8 @@ jobs:
                   evidence.compare.merge_base_commit?.sha === expected.parent &&
                   JSON.stringify(changedFiles) === JSON.stringify(expectedFiles),
                 workflow_definition: evidence.workflowFileSha === expected.workflowBlobSha,
+                merge_snapshot_identity: mergeIdentityVerified,
+                merge_snapshot_source_identity: mergeSourceIdentityVerified,
                 exact_step_surface: exactStepSurface,
                 required_steps_succeeded: requiredStepsSucceeded,
                 artifact_verified: artifactVerified,
@@ -283,6 +302,7 @@ jobs:
                       full_name: expected.repository,
                     },
                   },
+                  merge_commit_sha: expected.mergeCommit,
                 },
                 parentCommit: {
                   sha: expected.subject,
@@ -295,6 +315,15 @@ jobs:
                   merge_base_commit: { sha: expected.parent },
                   files: expectedFiles.map((filename) => ({ filename })),
                 },
+                mergeCommit: {
+                  sha: expected.mergeCommit,
+                  parents: [
+                    { sha: expected.parent },
+                    { sha: expected.subject },
+                  ],
+                },
+                mergeWorkflowFileSha: expected.workflowBlobSha,
+                mergeSourceBlobShas: { ...expectedSourceBlobShas },
                 workflowFileSha: expected.workflowBlobSha,
                 sourceBlobShas: { ...expectedSourceBlobShas },
                 jobs: [
@@ -343,6 +372,12 @@ jobs:
               ['workflow_blob_sha', (e) => { e.workflowFileSha = '0'.repeat(40); }],
               ['source_blob_sha', (e) => {
                 e.sourceBlobShas['crates/core/symthaea-core/src/hdc/syndrome_decoder.rs'] = '0'.repeat(40);
+              }],
+              ['merge_commit_sha', (e) => { e.pr.merge_commit_sha = '0'.repeat(40); }],
+              ['merge_parent_sha', (e) => { e.mergeCommit.parents[0].sha = '0'.repeat(40); }],
+              ['merge_workflow_blob_sha', (e) => { e.mergeWorkflowFileSha = '0'.repeat(40); }],
+              ['merge_source_blob_sha', (e) => {
+                e.mergeSourceBlobShas['crates/core/symthaea-core/src/hdc/syndrome_decoder.rs'] = '0'.repeat(40);
               }],
               ['job_step_name', (e) => { e.jobs[0].steps[0].name = 'forged step'; }],
               ['job_step_conclusion', (e) => { e.jobs[0].steps[20].conclusion = 'failure'; }],
@@ -412,6 +447,14 @@ jobs:
               pull_number: expected.pr,
             })).data;
 
+            const mergeCommit = pr.merge_commit_sha
+              ? (await github.rest.repos.getCommit({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: pr.merge_commit_sha,
+                })).data
+              : null;
+
             const parentCommit = (await github.rest.repos.getCommit({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -452,6 +495,31 @@ jobs:
               sourceBlobShas[file] = content.data.sha;
             }
 
+            const mergeWorkflowFileSha = mergeCommit
+              ? (await github.rest.repos.getContent({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  path: expected.workflowPath,
+                  ref: mergeCommit.sha,
+                })).data.sha
+              : null;
+
+            const mergeSourceBlobShas = {};
+            if (mergeCommit) {
+              for (const file of expectedFiles) {
+                const content = await github.rest.repos.getContent({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  path: file,
+                  ref: mergeCommit.sha,
+                });
+                if (Array.isArray(content.data)) {
+                  throw new Error('expected merged source path resolved to a directory: ' + file);
+                }
+                mergeSourceBlobShas[file] = content.data.sha;
+              }
+            }
+
             const liveEvidence = {
               contextRef: context.ref,
               contextRepository: context.repo.owner + '/' + context.repo.repo,
@@ -459,6 +527,9 @@ jobs:
               jobs,
               pr,
               parentCommit,
+              mergeCommit,
+              mergeWorkflowFileSha,
+              mergeSourceBlobShas,
               compare: {
                 status: compare.status,
                 ahead_by: compare.ahead_by,
@@ -482,7 +553,7 @@ jobs:
             const liveEvaluation = evaluate(liveEvidence);
 
             const receipt = {
-              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v2',
+              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v3',
               qualification_result:
                 adversarialCorpusPassed && liveEvaluation.qualificationResult === 'PASS'
                   ? 'PASS'
@@ -532,6 +603,15 @@ jobs:
                 observed_blob_shas: liveEvidence.sourceBlobShas,
                 expected_blob_shas: expectedSourceBlobShas,
               },
+              merge_snapshot: {
+                pr_merge_commit_sha: pr.merge_commit_sha ?? null,
+                observed_merge_commit_sha: liveEvidence.mergeCommit?.sha ?? null,
+                expected_merge_commit_sha: expected.mergeCommit,
+                merge_workflow_blob_sha: liveEvidence.mergeWorkflowFileSha,
+                expected_merge_workflow_blob_sha: expected.workflowBlobSha,
+                observed_source_blob_shas: liveEvidence.mergeSourceBlobShas,
+                expected_source_blob_shas: expectedSourceBlobShas,
+              },
               jobs: {
                 count: liveEvidence.jobs.length,
                 name: liveEvidence.jobs[0]?.name ?? null,
@@ -545,7 +625,7 @@ jobs:
 
             const outputPath = path.join(
               process.env.RUNNER_TEMP,
-              'HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V2.json'
+              'HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V3.json'
             );
             fs.writeFileSync(outputPath, JSON.stringify(receipt, null, 2) + '\n');
             core.info('Independent verifier adversarial corpus: ' + (adversarialCorpusPassed ? 'PASS' : 'NOT_PASS'));
