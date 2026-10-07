@@ -295,7 +295,7 @@ def verify_trust_anchor_workflow() -> str:
             "  contents: read",
             "  pull-requests: read",
             "  statuses: write",
-            "github.ref == format('refs/heads/{0}', ${{ github.event.repository.default_branch }})",
+            "github.ref == format('refs/heads/{0}', github.event.repository.default_branch)",
             "TRUST_ANCHOR_MODE: ${{ github.event_name }}",
             "MANUAL_WORKFLOW_RUN_ID: ${{ inputs.workflow_run_id }}",
             "persist-credentials: false",
