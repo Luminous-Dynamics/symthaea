@@ -263,15 +263,7 @@ impl VulkanBarrierWorkloadRuntime {
         if schedule.nodes.len() > MAX_WORKLOAD_NODES { return Err(VulkanBarrierError::WorkloadNodeLimit(schedule.nodes.len())); }
         if plan.queue_count > 1 || plan.assignments.iter().any(|a| a.queue.get() != 0) { return Err(VulkanBarrierError::MultipleLogicalQueues); }
 
-        let resources = graph.nodes.iter()
-            .flat_map(|n| n.resources.iter().map(|u| u.resource.clone()))
-            .collect::<BTreeSet<_>>();
-        for resource in &resources {
-            if !initial.contains_key(resource) { return Err(VulkanBarrierError::MissingResource(resource.clone())); }
-        }
-        if let Some(extra) = initial.keys().find(|resource| !resources.contains(*resource)) {
-            return Err(VulkanBarrierError::UnexpectedResource(extra.clone()));
-        }
+        let _resources = validate_initial_resources(graph, initial)?;
         let expected = simulate(graph, schedule, initial)?;
         let mut buffers = BTreeMap::new();
         for (resource, value) in initial {
@@ -438,6 +430,28 @@ impl VulkanBarrierWorkloadRuntime {
     }
 }
 
+fn validate_initial_resources(
+    graph: &ExecutionGraph,
+    initial: &BTreeMap<ResourceId, BinaryHypervector>,
+) -> Result<BTreeSet<ResourceId>, VulkanBarrierError> {
+    let resources = graph
+        .nodes
+        .iter()
+        .flat_map(|node| node.resources.iter().map(|use_| use_.resource.clone()))
+        .collect::<BTreeSet<_>>();
+
+    for resource in &resources {
+        if !initial.contains_key(resource) {
+            return Err(VulkanBarrierError::MissingResource(resource.clone()));
+        }
+    }
+    if let Some(extra) = initial.keys().find(|resource| !resources.contains(*resource)) {
+        return Err(VulkanBarrierError::UnexpectedResource(extra.clone()));
+    }
+
+    Ok(resources)
+}
+
 fn simulate(
     graph: &ExecutionGraph,
     schedule: &ExecutionSchedule,
@@ -450,10 +464,25 @@ fn simulate(
         let writes = node.resources.iter().filter(|u| u.access == AccessKind::Write).collect::<Vec<_>>();
         if reads.len() != 2 || writes.len() != 1 { return Err(VulkanBarrierError::UnsupportedNodeShape(node.id)); }
         let dimensions = match node.operation { GpuOperation::HdcBindXor { dimensions } => dimensions };
-        if state[&reads[0].resource].dimensions != dimensions || state[&reads[1].resource].dimensions != dimensions || state[&writes[0].resource].dimensions != dimensions {
-            return Err(VulkanBarrierError::ResourceDimensions { resource: writes[0].resource.clone(), actual: state[&writes[0].resource].dimensions, expected: dimensions });
+        let lhs = state.get(&reads[0].resource)
+            .ok_or_else(|| VulkanBarrierError::MissingResource(reads[0].resource.clone()))?;
+        let rhs = state.get(&reads[1].resource)
+            .ok_or_else(|| VulkanBarrierError::MissingResource(reads[1].resource.clone()))?;
+        let output = state.get(&writes[0].resource)
+            .ok_or_else(|| VulkanBarrierError::MissingResource(writes[0].resource.clone()))?;
+        if lhs.dimensions != dimensions || rhs.dimensions != dimensions || output.dimensions != dimensions {
+            return Err(VulkanBarrierError::ResourceDimensions {
+                resource: writes[0].resource.clone(),
+                actual: output.dimensions,
+                expected: dimensions,
+            });
         }
-        let bytes = state[&reads[0].resource].as_bytes().iter().zip(state[&reads[1].resource].as_bytes()).map(|(a,b)| a ^ b).collect::<Vec<_>>();
+        let bytes = lhs
+            .as_bytes()
+            .iter()
+            .zip(rhs.as_bytes())
+            .map(|(a, b)| a ^ b)
+            .collect::<Vec<_>>();
         state.insert(writes[0].resource.clone(), BinaryHypervector::from_bytes(dimensions, bytes).map_err(|_| VulkanBarrierError::OracleMismatch(writes[0].resource.clone()))?);
     }
     Ok(state)
@@ -908,15 +937,37 @@ mod tests {
         ).unwrap();
 
         let mut checked = false;
-        let resources = graph.nodes.iter()
-            .flat_map(|node| node.resources.iter().map(|use_| use_.resource.clone()))
-            .collect::<BTreeSet<_>>();
-        if let Some(extra) = initial.keys().find(|resource| !resources.contains(*resource)) {
-            assert_eq!(extra.as_str(), "unused");
-            checked = true;
-        }
-        assert!(checked);
+        let error = validate_initial_resources(&graph, &initial).unwrap_err();
+        assert!(matches!(error, VulkanBarrierError::UnexpectedResource(ref resource) if resource.as_str() == "unused"));
         assert_eq!(plan.queue_count, 1);
+    }
+
+    #[test]
+    fn receipt_rejects_tampered_concrete_lowering_digest() {
+        let (graph, schedule, plan, initial) = fixture();
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        let digests = final_state
+            .iter()
+            .map(|(resource, value)| (resource.clone(), resource_digest(value)))
+            .collect::<BTreeMap<_, _>>();
+
+        let mut receipt = VulkanBarrierExecutionReceipt {
+            version: RECEIPT_VERSION,
+            graph_digest: graph.digest_hex().unwrap(),
+            schedule_digest: schedule.digest_hex().unwrap(),
+            sync_plan_digest: plan.digest_hex().unwrap(),
+            barrier_digest: barrier_digest(&plan),
+            barrier_lowering_digest: barrier_lowering_digest(&plan),
+            node_count: schedule.nodes.len() as u32,
+            barrier_count: 1,
+            resource_digests: digests,
+        };
+        receipt.barrier_lowering_digest = String::from("tampered");
+
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::BarrierDigest)
+        ));
     }
 
     #[test]
@@ -934,6 +985,7 @@ mod tests {
             schedule_digest: schedule.digest_hex().unwrap(),
             sync_plan_digest: plan.digest_hex().unwrap(),
             barrier_digest: barrier_digest(&plan),
+            barrier_lowering_digest: barrier_lowering_digest(&plan),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
