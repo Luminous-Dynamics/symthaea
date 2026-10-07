@@ -1781,6 +1781,8 @@ mod tests {
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     definition_digest,
                     "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                    ":1.42",
+                    "0123456789abcdef0123456789abcdef",
                     pre_invocation_id,
                     required_stability_us,
                 )
