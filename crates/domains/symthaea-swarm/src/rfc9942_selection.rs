@@ -131,10 +131,11 @@ pub enum ReceiptSelectionDecisionError {
     CandidateIndexMismatch,
     PolicyMismatch,
     CollectionDigestZero,
+    CandidateDigestZero,
     SelectionDigestZero,
     SelectedCandidateMismatch,
     RejectedAfterSelection,
-    UnselectedCandidateMarkedSelected,
+    UnselectedCandidateMarkedNotEvaluated,
 }
 
 impl ReceiptSelectionDecision {
@@ -159,6 +160,9 @@ impl ReceiptSelectionDecision {
             if candidate.index as usize != expected_index {
                 return Err(ReceiptSelectionDecisionError::CandidateIndexMismatch);
             }
+            if candidate.receipt_sha256 == [0; 32] {
+                return Err(ReceiptSelectionDecisionError::CandidateDigestZero);
+            }
             match candidate.status {
                 ReceiptSelectionCandidateStatus::Selected => {
                     selected_count += 1;
@@ -177,7 +181,7 @@ impl ReceiptSelectionDecision {
                     if self.selected_index.is_none()
                         || candidate.index <= self.selected_index.unwrap()
                     {
-                        return Err(ReceiptSelectionDecisionError::UnselectedCandidateMarkedSelected);
+                        return Err(ReceiptSelectionDecisionError::UnselectedCandidateMarkedNotEvaluated);
                     }
                 }
             }
@@ -498,6 +502,17 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn decision_validation_rejects_zero_candidate_digest() {
+        let collection = collection();
+        let mut decision = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
+        decision.candidates[1].receipt_sha256 = [0; 32];
+        assert_eq!(
+            decision.validate(),
+            Err(ReceiptSelectionDecisionError::CandidateDigestZero)
+        );
+    }
+
     fn decision_validation_rejects_mismatched_selected_digest() {
         let collection = collection();
         let mut decision = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
