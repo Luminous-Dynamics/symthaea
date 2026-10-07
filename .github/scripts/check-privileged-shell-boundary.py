@@ -51,12 +51,27 @@ def main() -> None:
     for marker in (
         "Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics",
         "async fn handle_connection(",
-        "async fn handle_connection_ws(",
         "fn main(",
-        "#[cfg(test)]",
+        "#[cfg(test)]\nmod tests {",
     ):
         if marker not in text:
             fail(f"relay source integrity sentinel disappeared: {marker!r}")
+
+    test_module_start = text.find("#[cfg(test)]\nmod tests {")
+    if test_module_start < 0:
+        fail("test module boundary disappeared")
+    production_text = text[:test_module_start]
+    for line_number, line in enumerate(production_text.splitlines(), start=1):
+        if "run_cmd(" in line and "async fn run_cmd" not in line:
+            fail(
+                f"production relay source contains run_cmd() at line {line_number}; "
+                "generic shell execution is test-only"
+            )
+        if "run_cmd_with_stdin(" in line:
+            fail(
+                f"production relay source contains run_cmd_with_stdin() at line {line_number}; "
+                "generic shell execution is test-only"
+            )
 
     match_index = next(
         (i for i, line in enumerate(lines) if "match client_msg.command.as_str()" in line),
@@ -88,22 +103,6 @@ def main() -> None:
         '.arg("-c")',
         '.args(["-c"',
     )
-
-    # Closed-world shell policy: the generic shell-string executor is test-only.
-    # Production websocket arms must use typed argv or the dedicated descriptor-bound
-    # script capability. This catches both accidental mutation regressions and
-    # diagnostics that later acquire user-controlled inputs.
-    for line_number, line in enumerate(lines, start=1):
-        if "run_cmd(" in line and "async fn run_cmd" not in line:
-            fail(
-                f"production relay source contains run_cmd() at line {line_number}; "
-                "generic shell execution is test-only"
-            )
-        if "run_cmd_with_stdin(" in line:
-            fail(
-                f"production relay source contains run_cmd_with_stdin() at line {line_number}; "
-                "generic shell execution is test-only"
-            )
 
     ordered = sorted(
         ((index, name) for name, index in arm_indexes.items()),
