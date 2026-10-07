@@ -4427,7 +4427,7 @@ mod tests {
                         upper_numerator: 1,
                         scale: 4,
                         confidence_level_bps: 9500,
-                        uncertainty_method_ref: "wilson-interval-v1".into(),
+                        uncertainty_method_ref: "synthetic-structural-interval-v1".into(),
                         uncertainty_computation_artifact_hash: content_hash(b"typed-uncertainty-computation"),
                     },
                     eligible_sample_count: 10,
