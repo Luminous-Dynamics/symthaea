@@ -1698,9 +1698,10 @@ const CHANGE_DETECTION_MIN_THRESHOLD: f64 = 0.01;
 const CHANGE_DETECTION_SHIFT_SCALES: [f64; 4] = [0.60, 0.80, 1.20, 1.40];
 
 fn change_detection_control_states() -> Vec<MicroWorldObservation> {
+    // Reserve the first half of the procedural family for detector-parameter calibration.
+    // Operating-characteristic episodes use the disjoint second half below.
     procedural_held_out_scenarios()
         .into_iter()
-        .skip(4)
         .take(4)
         .map(|scenario| scenario.initial)
         .collect()
@@ -3585,6 +3586,18 @@ mod tests {
         assert!(operating.decrease_correct_direction_rate.is_finite());
         assert!(operating.increase_correct_direction_rate.is_finite());
         assert!(!operating.gradual_drift_events.is_empty());
+
+        let calibration = change_detection_control_states();
+        let held_out = procedural_held_out_scenarios()
+            .into_iter()
+            .skip(4)
+            .take(4)
+            .map(|scenario| scenario.initial)
+            .collect::<Vec<_>>();
+        assert_eq!(calibration.len(), held_out.len());
+        assert!(calibration
+            .iter()
+            .all(|state| held_out.iter().all(|other| state.digest() != other.digest())));
     }
 
     #[test]
