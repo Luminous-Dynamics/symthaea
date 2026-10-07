@@ -9063,7 +9063,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn verified_image_artifact_descriptor_is_rewound_for_restore() {
+    async fn verified_image_artifact_descriptor_survives_source_replacement() {
         use std::io::Write as _;
         use std::os::unix::fs::PermissionsExt;
 
@@ -9087,14 +9087,18 @@ mod tests {
         .unwrap();
         assert_eq!(commitment.size, bytes.len() as u64);
 
+        // Simulate a pathname replacement after provenance verification. The
+        // already-open descriptor must remain bound to the original inode.
+        std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let mut replacement = std::fs::OpenOptions::new().write(true).truncate(true).open(&archive).unwrap();
+        replacement.write_all(b"replacement-bytes").unwrap();
+        drop(replacement);
+        std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o400)).unwrap();
+
         let output = run_cmd_with_stdin("cat", file).await.unwrap();
         assert_eq!(output.exit_status, 0);
         assert_eq!(output.stdout.as_bytes(), bytes);
 
-        std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o600)).unwrap();
-        let mut replacement = std::fs::OpenOptions::new().write(true).open(&archive).unwrap();
-        replacement.write_all(b"replacement-bytes").unwrap();
-        drop(replacement);
         let _ = std::fs::remove_dir_all(dir);
     }
 
