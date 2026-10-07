@@ -252,15 +252,17 @@ async fn spawn_privileged_background_process(
     tokio::spawn(async move {
         if let Ok(status) = child.wait().await {
             if let Some(code) = status.code() {
-                if let Ok(mut status_file) = tokio::fs::OpenOptions::new()
+                if let Ok(mut status_file) = std::fs::OpenOptions::new()
                     .write(true)
                     .truncate(true)
+                    .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
                     .open(&status_path)
-                    .await
                 {
-                    use tokio::io::AsyncWriteExt;
-                    let _ = status_file.write_all(format!("{code}\n").as_bytes()).await;
-                    let _ = status_file.sync_all().await;
+                    let _ = std::io::Write::write_all(
+                        &mut status_file,
+                        format!("{code}\n").as_bytes(),
+                    );
+                    let _ = status_file.sync_all();
                 }
             }
         }
@@ -284,8 +286,28 @@ async fn spawn_privileged_background_script(
     .await
 }
 
+fn read_private_small_file(path: &str, max_bytes: usize) -> Result<String, std::io::Error> {
+    use std::io::Read as _;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)?;
+    let metadata = file.metadata()?;
+    if metadata.len() > max_bytes as u64 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "private transaction sidecar exceeds bounded size",
+        ));
+    }
+    let mut contents = String::with_capacity(metadata.len() as usize);
+    file.read_to_string(&mut contents)?;
+    Ok(contents)
+}
+
 async fn read_transaction_status(path: &str) -> Result<Option<u32>, std::io::Error> {
-    match tokio::fs::read_to_string(path).await {
+    match read_private_small_file(path, 128) {
         Ok(contents) => Ok(contents.trim().parse::<u32>().ok()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(error),
@@ -4632,7 +4654,7 @@ async fn install_process_is_alive(transaction_id: &str) -> bool {
         Ok(path) => path.join("install.pid"),
         Err(_) => return false,
     };
-    let pid_text = match tokio::fs::read_to_string(&pid_path).await {
+    let pid_text = match read_private_small_file(pid_path.to_str().unwrap(), 128) {
         Ok(value) => value,
         Err(_) => return false,
     };
@@ -5703,8 +5725,7 @@ echo "  User password set."
                     {
                         break;
                     }
-                    let identity = tokio::fs::read_to_string(&pid_path)
-                        .await
+                    let identity = read_private_small_file(&pid_path, 128)
                         .ok()
                         .and_then(|text| parse_process_identity(&text));
                     let (pid, start_time) = identity.unwrap_or((0, 0));
@@ -7653,8 +7674,7 @@ printf '{"store_bytes":%s,"reclaimable_bytes":%s,"dead_paths":%s,"gc_roots":%s,"
                     {
                         break;
                     }
-                    let identity = tokio::fs::read_to_string(&gc_pid)
-                        .await
+                    let identity = read_private_small_file(&gc_pid, 128)
                         .ok()
                         .and_then(|text| parse_process_identity(&text));
                     let (pid, start_time) = identity.unwrap_or((0, 0));
