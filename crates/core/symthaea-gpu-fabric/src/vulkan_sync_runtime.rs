@@ -54,6 +54,13 @@ impl VulkanSyncRuntime {
         let entry = unsafe { Entry::load() }
             .map_err(|error| VulkanSyncRuntimeError::Loader(error.to_string()))?;
 
+        let loader_version = unsafe { entry.try_enumerate_instance_version() }
+            .map_err(VulkanSyncRuntimeError::Vk)?
+            .unwrap_or(vk::API_VERSION_1_0);
+        if loader_version < VULKAN_SYNC_API_VERSION {
+            return Err(VulkanSyncRuntimeError::NoQualifiedDevice);
+        }
+
         let app_name = CString::new("symthaea-gpu-fabric-sync")
             .expect("static Vulkan application name has no NUL bytes");
         let engine_name = CString::new("Symthaea")
@@ -138,6 +145,7 @@ impl VulkanSyncRuntime {
 
     pub fn execute(&mut self, plan: &VulkanSyncPlan) -> Result<Vec<u64>, VulkanSyncRuntimeError> {
         plan.digest_hex().map_err(VulkanSyncRuntimeError::Plan)?;
+        self.reset_semaphores()?;
         if plan.submissions.len() != plan.assignments.len() {
             return Err(VulkanSyncRuntimeError::SubmissionCountMismatch);
         }
@@ -230,6 +238,13 @@ impl VulkanSyncRuntime {
         }
 
         Ok(final_values)
+    }
+
+    fn reset_semaphores(&mut self) -> Result<(), VulkanSyncRuntimeError> {
+        for (_, semaphore) in self.semaphores.drain(..) {
+            unsafe { self.device.destroy_semaphore(semaphore, None); }
+        }
+        Ok(())
     }
 
     fn ensure_semaphores(&mut self, queue_count: u16) -> Result<(), VulkanSyncRuntimeError> {
