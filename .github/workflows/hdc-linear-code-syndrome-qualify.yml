@@ -223,12 +223,13 @@ jobs:
           OUTPUT="$(cargo +1.96.1 test --locked \
             --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
             --test linear_code_syndrome_decoder \
-            small_fixture_quotient_metric_matches_ambient_coset_geometry -- --nocapture 2>&1)
+            small_fixture_quotient_metric_matches_ambient_coset_geometry -- --nocapture 2>&1)"
           COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SYNDROME_QUOTIENT_METRIC=')"
           test "$COUNT" -eq 1
           LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^SYNDROME_QUOTIENT_METRIC=//p')"
           test -n "$LEDGER"
           printf "syndrome_quotient_metric=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
       - name: Capture syndrome/coset invariant ledger
         id: coset_invariants
         run: |
