@@ -526,7 +526,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
           HDC Linear-Code Bounded Decoder Qualification
           =============================================
-          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v18
+          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v20
           github_run_id=${{ github.run_id }}
           github_run_attempt=${{ github.run_attempt }}
           github_workflow_sha=${{ github.workflow_sha }}
@@ -619,6 +619,9 @@ jobs:
           artifact_refetch_status=${{ steps.artifact_revalidate.outcome }}
           artifact_refetch_match=${{ steps.artifact_revalidate.outputs.artifact_refetch_match }}
           artifact_refetch_digest=${{ steps.artifact_revalidate.outputs.artifact_refetch_digest }}
+          artifact_refetch_head_sha=${{ steps.artifact_revalidate.outputs.artifact_refetch_head_sha }}
+          artifact_refetch_expected_merge_sha=${{ steps.artifact_revalidate.outputs.artifact_refetch_expected_merge_sha }}
+          artifact_refetch_pr_head_sha=${{ steps.artifact_revalidate.outputs.artifact_refetch_pr_head_sha }}
           qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.generator_basis_equivariance.outcome == 'success' && steps.composed_metamorphic.outcome == 'success' && steps.artifact_revalidate.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.fixed_syndrome_spec.outcome == 'success' && steps.quotient_metric.outcome == 'success' && steps.quotient_spectrum.outcome == 'success' && steps.spectrum_adversary.outcome == 'success' && steps.coordinate_permutation.outcome == 'success' && steps.fiber_difference.outcome == 'success' && steps.walsh_dual_fiber.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
           random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
@@ -642,6 +645,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           EXACT_HEAD: ${{ steps.head.outputs.sha }}
+          EXPECTED_MERGE_SHA: ${{ steps.head.outputs.synthetic_merge_sha }}
           RUN_ID: ${{ github.run_id }}
           ARTIFACT_ID: ${{ steps.upload_receipt.outputs.artifact-id }}
           EXPECTED_NAME: hdc-linear-code-bounded-decoder-${{ steps.head.outputs.sha }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
@@ -660,14 +664,17 @@ jobs:
           test "$REFETCH_NAME" = "$EXPECTED_NAME"
           test "$REFETCH_REPO_ID" = "$EXPECTED_REPO_ID"
           test "$REFETCH_RUN_ID" = "$RUN_ID"
-          test "$REFETCH_HEAD_SHA" = "$EXACT_HEAD"
+          test "$REFETCH_HEAD_SHA" = "$EXPECTED_MERGE_SHA"
           test "$REFETCH_HEAD_REPO_ID" = "$EXPECTED_REPO_ID"
+          test "$EXACT_HEAD" != "$EXPECTED_MERGE_SHA"
           test -n "$REFETCH_DIGEST"
           echo "artifact_refetch_id=$REFETCH_ID" >> "$GITHUB_OUTPUT"
           echo "artifact_refetch_name=$REFETCH_NAME" >> "$GITHUB_OUTPUT"
           echo "artifact_refetch_repo_id=$REFETCH_REPO_ID" >> "$GITHUB_OUTPUT"
           echo "artifact_refetch_run_id=$REFETCH_RUN_ID" >> "$GITHUB_OUTPUT"
           echo "artifact_refetch_head_sha=$REFETCH_HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_expected_merge_sha=$EXPECTED_MERGE_SHA" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_pr_head_sha=$EXACT_HEAD" >> "$GITHUB_OUTPUT"
           echo "artifact_refetch_head_repo_id=$REFETCH_HEAD_REPO_ID" >> "$GITHUB_OUTPUT"
           echo "artifact_refetch_digest=$REFETCH_DIGEST" >> "$GITHUB_OUTPUT"
           echo "artifact_refetch_match=true" >> "$GITHUB_OUTPUT"
