@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 44;
+pub const SCHEMA_VERSION: u16 = 45;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-v62";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-v63";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -435,6 +435,279 @@ impl CalibrationTraceabilityRef {
     }
 }
 
+/// Role of a node in a declared metrological traceability topology.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum CalibrationTraceabilityNodeKind {
+    /// The measurement result whose traceability is being declared.
+    MeasurementResult,
+    /// An intermediate calibration/comparison record.
+    CalibrationRecord,
+    /// A terminal specified reference standard or realization.
+    ReferenceStandard,
+}
+
+/// One typed node in a declared metrological traceability topology.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CalibrationTraceabilityNodeRef {
+    /// Stable topology-local node identity.
+    pub node_id: String,
+    /// Semantic role of this node.
+    pub kind: CalibrationTraceabilityNodeKind,
+    /// Stable identity of the external result/calibration/reference record.
+    pub record_id: String,
+    /// Revision of the external result/calibration/reference record.
+    pub record_revision: String,
+    /// Digest of the exact external result/calibration/reference record.
+    pub record_digest: String,
+    /// Unix timestamp at which the referenced result/calibration/reference context was used.
+    pub used_at_epoch_seconds: i64,
+}
+
+impl CalibrationTraceabilityNodeRef {
+    /// Validate one topology node's structural identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.node_id.is_empty()
+            || self.record_id.is_empty()
+            || self.record_revision.is_empty()
+            || self.record_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
+        }
+        Ok(())
+    }
+}
+
+/// One directed relation in a declared metrological traceability topology.
+///
+/// The edge direction is from a result/calibration record to the reference
+/// node it relies upon.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CalibrationTraceabilityEdge {
+    /// Node whose result/calibration depends on the referenced node.
+    pub from_node_id: String,
+    /// Node representing the reference used by the originating node.
+    pub to_node_id: String,
+}
+
+impl CalibrationTraceabilityEdge {
+    /// Validate one topology edge's endpoint identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.from_node_id.is_empty()
+            || self.to_node_id.is_empty()
+            || self.from_node_id == self.to_node_id
+        {
+            return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
+        }
+        Ok(())
+    }
+}
+
+/// Explicit branched/network representation of metrological traceability.
+///
+/// This is a structural graph declaration, not a certification that the
+/// external calibration records are authentic, complete, or scientifically
+/// sufficient. The graph must be a connected DAG from the measurement result
+/// to one or more terminal reference standards.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CalibrationTraceabilityTopology {
+    /// Node representing the measurement result under assessment.
+    pub result_node_id: String,
+    /// Terminal specified reference-standard node identities.
+    pub reference_node_ids: Vec<String>,
+    /// Complete declared graph node set.
+    pub nodes: Vec<CalibrationTraceabilityNodeRef>,
+    /// Directed dependency/traceability edges.
+    pub edges: Vec<CalibrationTraceabilityEdge>,
+}
+
+impl CalibrationTraceabilityTopology {
+    /// Validate graph integrity and bind the topology to its observation result.
+    pub fn validate_against_observation(
+        &self,
+        observation_id: &str,
+        observation_record_digest: &str,
+        calibration_chain_refs: &[CalibrationTraceabilityRef],
+    ) -> Result<(), AssessmentError> {
+        if self.result_node_id.is_empty()
+            || self.reference_node_ids.is_empty()
+            || self.nodes.is_empty()
+        {
+            return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
+        }
+        let mut nodes_by_id = BTreeMap::<String, &CalibrationTraceabilityNodeRef>::new();
+        for node in &self.nodes {
+            node.validate()?;
+            if nodes_by_id.insert(node.node_id.clone(), node).is_some() {
+                return Err(AssessmentError::DuplicateCalibrationTraceabilityNode(
+                    node.node_id.clone(),
+                ));
+            }
+        }
+        let result = nodes_by_id
+            .get(&self.result_node_id)
+            .ok_or(AssessmentError::CalibrationTraceabilityResultNodeMissing)?;
+        if result.kind != CalibrationTraceabilityNodeKind::MeasurementResult
+            || result.record_id != observation_id
+            || result.record_digest != observation_record_digest
+        {
+            return Err(AssessmentError::CalibrationTraceabilityResultObservationMismatch);
+        }
+        if self.nodes.iter().filter(|node| {
+            node.kind == CalibrationTraceabilityNodeKind::MeasurementResult
+        }).count() != 1 {
+            return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
+        }
+        if !self.nodes.iter().any(|node| {
+            node.kind == CalibrationTraceabilityNodeKind::CalibrationRecord
+        }) {
+            return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
+        }
+        let mut reference_ids = BTreeSet::new();
+        for reference_id in &self.reference_node_ids {
+            if !reference_ids.insert(reference_id) {
+                return Err(AssessmentError::DuplicateCalibrationTraceabilityReference(
+                    reference_id.clone(),
+                ));
+            }
+            let reference = nodes_by_id
+                .get(reference_id)
+                .ok_or(AssessmentError::CalibrationTraceabilityReferenceMissing)?;
+            if reference.kind != CalibrationTraceabilityNodeKind::ReferenceStandard {
+                return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
+            }
+        }
+        let mut adjacency = BTreeMap::<String, BTreeSet<String>>::new();
+        let mut reverse = BTreeMap::<String, BTreeSet<String>>::new();
+        for node_id in nodes_by_id.keys() {
+            adjacency.insert(node_id.clone(), BTreeSet::new());
+            reverse.insert(node_id.clone(), BTreeSet::new());
+        }
+        for edge in &self.edges {
+            edge.validate()?;
+            if !nodes_by_id.contains_key(&edge.from_node_id)
+                || !nodes_by_id.contains_key(&edge.to_node_id)
+            {
+                return Err(AssessmentError::CalibrationTraceabilityEdgeEndpointMissing);
+            }
+            if !adjacency
+                .get_mut(&edge.from_node_id)
+                .expect("validated edge origin exists")
+                .insert(edge.to_node_id.clone())
+            {
+                return Err(AssessmentError::DuplicateCalibrationTraceabilityEdge {
+                    from_node_id: edge.from_node_id.clone(),
+                    to_node_id: edge.to_node_id.clone(),
+                });
+            }
+            reverse
+                .get_mut(&edge.to_node_id)
+                .expect("validated edge target exists")
+                .insert(edge.from_node_id.clone());
+        }
+        for reference_id in &self.reference_node_ids {
+            if adjacency
+                .get(reference_id)
+                .is_some_and(|targets| !targets.is_empty())
+            {
+                return Err(
+                    AssessmentError::CalibrationTraceabilityReferenceHasOutgoingEdge(
+                        reference_id.clone(),
+                    ),
+                );
+            }
+        }
+        let mut indegree = BTreeMap::<String, usize>::new();
+        for node_id in nodes_by_id.keys() {
+            indegree.insert(
+                node_id.clone(),
+                reverse.get(node_id).map_or(0, BTreeSet::len),
+            );
+        }
+        let mut ready = indegree
+            .iter()
+            .filter_map(|(node_id, degree)| (*degree == 0).then_some(node_id.clone()))
+            .collect::<BTreeSet<_>>();
+        let mut topo_count = 0usize;
+        while let Some(node_id) = ready.pop_first() {
+            topo_count += 1;
+            for target in adjacency
+                .get(&node_id)
+                .into_iter()
+                .flat_map(|targets| targets.iter())
+            {
+                let degree = indegree
+                    .get_mut(target)
+                    .expect("validated topology node exists");
+                *degree -= 1;
+                if *degree == 0 {
+                    ready.insert(target.clone());
+                }
+            }
+        }
+        if topo_count != nodes_by_id.len() {
+            return Err(AssessmentError::CalibrationTraceabilityTopologyCycle);
+        }
+        let mut reachable_from_result = BTreeSet::new();
+        let mut stack = vec![self.result_node_id.clone()];
+        while let Some(node_id) = stack.pop() {
+            if !reachable_from_result.insert(node_id.clone()) {
+                continue;
+            }
+            if let Some(targets) = adjacency.get(&node_id) {
+                stack.extend(targets.iter().cloned());
+            }
+        }
+        if reachable_from_result.len() != nodes_by_id.len() {
+            return Err(AssessmentError::CalibrationTraceabilityTopologyDisconnected);
+        }
+        let mut reaches_reference = BTreeSet::new();
+        let mut reverse_stack = self.reference_node_ids.clone();
+        while let Some(node_id) = reverse_stack.pop() {
+            if !reaches_reference.insert(node_id.clone()) {
+                continue;
+            }
+            if let Some(parents) = reverse.get(&node_id) {
+                reverse_stack.extend(parents.iter().cloned());
+            }
+        }
+        if reaches_reference.len() != nodes_by_id.len() {
+            return Err(AssessmentError::CalibrationTraceabilityDeadEnd);
+        }
+        for calibration in calibration_chain_refs {
+            let represented = self.nodes.iter().any(|node| {
+                node.kind == CalibrationTraceabilityNodeKind::CalibrationRecord
+                    && node.record_id == calibration.calibration_id
+                    && node.record_revision == calibration.calibration_revision
+                    && node.record_digest == calibration.calibration_record_digest
+                    && node.used_at_epoch_seconds == calibration.used_at_epoch_seconds
+            });
+            if !represented {
+                return Err(AssessmentError::CalibrationTraceabilityChainLinkMissing {
+                    calibration_id: calibration.calibration_id.clone(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Compute the canonical digest of the complete topology.
+    pub fn canonical_digest(&self) -> Result<String, AssessmentError> {
+        let mut canonical = self.clone();
+        canonical.nodes.sort_by(|a, b| a.node_id.cmp(&b.node_id));
+        canonical.edges.sort_by(|a, b| {
+            a.from_node_id
+                .cmp(&b.from_node_id)
+                .then_with(|| a.to_node_id.cmp(&b.to_node_id))
+        });
+        canonical.reference_node_ids.sort();
+        let bytes = serde_json::to_vec(&canonical).map_err(|_| AssessmentError::NonFinite)?;
+        let mut hasher = Hasher::new();
+        hasher.update(b"symthaea:calibration-traceability-topology:v1\n");
+        hasher.update(&bytes);
+        Ok(hasher.finalize().to_hex().to_string())
+    }
+}
+
 /// Exact provenance reference for a physical or operational observation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObservationProvenanceRef {
@@ -456,6 +729,8 @@ pub struct ObservationProvenanceRef {
     pub measurement_system_id: Option<String>,
     /// Ordered exact references forming the declared calibration/traceability chain.
     pub calibration_chain_refs: Vec<CalibrationTraceabilityRef>,
+    /// Optional branched/network topology for multi-input traceability cases.
+    pub calibration_topology: Option<CalibrationTraceabilityTopology>,
     /// Optional experimental-design identity that caused this observation to be collected.
     pub experimental_design_id: Option<String>,
     /// Optional exact discrimination target within that experimental design.
@@ -496,6 +771,13 @@ impl ObservationProvenanceRef {
         }
         for calibration in &self.calibration_chain_refs {
             calibration.validate()?;
+        }
+        if let Some(topology) = &self.calibration_topology {
+            topology.validate_against_observation(
+                &self.observation_id,
+                &self.record_digest,
+                &self.calibration_chain_refs,
+            )?;
         }
         Ok(())
     }
@@ -629,6 +911,8 @@ pub struct MeasurementUncertaintyEvaluationRef {
     pub calibration_chain_digest: String,
     /// Number of calibration/traceability links used by the evaluation.
     pub calibration_chain_count: usize,
+    /// Optional digest binding the evaluation to a branched/network traceability topology.
+    pub calibration_topology_digest: Option<String>,
     /// Exact measurement-model identity evaluated by this record.
     pub measurement_model_id: String,
     /// Revision of the exact measurement model.
@@ -695,6 +979,10 @@ impl MeasurementUncertaintyEvaluationRef {
             || self.component_count == 0
             || self.calibration_chain_digest.is_empty()
             || self.calibration_chain_count == 0
+            || self
+                .calibration_topology_digest
+                .as_ref()
+                .is_some_and(String::is_empty)
             || self.measurement_model_id.is_empty()
             || self.measurement_model_revision.is_empty()
             || self.measurement_model_digest.is_empty()
@@ -1091,6 +1379,38 @@ impl EvidenceRecord {
                                 actual_procedure_digest: uncertainty.procedure_digest.clone(),
                             },
                         );
+                    }
+                    match (
+                        &observation.calibration_topology,
+                        &uncertainty.evaluation.calibration_topology_digest,
+                    ) {
+                        (Some(topology), Some(actual_digest)) => {
+                            let expected_digest = topology.canonical_digest()?;
+                            if actual_digest != &expected_digest {
+                                return Err(
+                                    AssessmentError::MeasurementUncertaintyEvaluationCalibrationTopologyMismatch {
+                                        uncertainty_id: uncertainty.uncertainty_id.clone(),
+                                        expected_topology_digest: expected_digest,
+                                        actual_topology_digest: actual_digest.clone(),
+                                    },
+                                );
+                            }
+                        }
+                        (Some(_), None) => {
+                            return Err(
+                                AssessmentError::MissingMeasurementUncertaintyCalibrationTopologyBinding(
+                                    uncertainty.uncertainty_id.clone(),
+                                ),
+                            );
+                        }
+                        (None, Some(_)) => {
+                            return Err(
+                                AssessmentError::UnboundMeasurementUncertaintyCalibrationTopology(
+                                    uncertainty.uncertainty_id.clone(),
+                                ),
+                            );
+                        }
+                        (None, None) => {}
                     }
                     let expected_calibration_chain_digest =
                         canonical_calibration_chain_hash(&observation.calibration_chain_refs)?;
@@ -3280,6 +3600,57 @@ pub enum AssessmentError {
     EmptyAssessmentSubject,
     /// External source admission reference is incomplete.
     EmptySourceAdmissionReference,
+    /// Authority admission is bound to a different source subject.
+    SourceAdmissionSubjectBindingMismatch {
+        /// Canonical subject-binding digest expected from the source identity.
+        expected_binding: String,
+        /// Subject-binding digest carried by the admission.
+        actual_binding: String,
+    },
+    /// A declared traceability topology is structurally invalid.
+    InvalidCalibrationTraceabilityTopology,
+    /// Two topology nodes use the same node identity.
+    DuplicateCalibrationTraceabilityNode(String),
+    /// A declared reference node is listed more than once.
+    DuplicateCalibrationTraceabilityReference(String),
+    /// The declared topology is missing its measurement-result node.
+    CalibrationTraceabilityResultNodeMissing,
+    /// The topology's result node does not match the observation result.
+    CalibrationTraceabilityResultObservationMismatch,
+    /// An edge names a node not present in the topology.
+    CalibrationTraceabilityEdgeEndpointMissing,
+    /// Two identical topology edges were declared.
+    DuplicateCalibrationTraceabilityEdge {
+        /// Edge origin.
+        from_node_id: String,
+        /// Edge target.
+        to_node_id: String,
+    },
+    /// A terminal reference node incorrectly has an outgoing dependency.
+    CalibrationTraceabilityReferenceHasOutgoingEdge(String),
+    /// The topology contains a cycle.
+    CalibrationTraceabilityTopologyCycle,
+    /// The topology contains a disconnected node.
+    CalibrationTraceabilityTopologyDisconnected,
+    /// A topology node cannot reach a declared terminal reference.
+    CalibrationTraceabilityDeadEnd,
+    /// A declared linear calibration-chain link is absent from the topology.
+    CalibrationTraceabilityChainLinkMissing { calibration_id: String },
+    /// An explicitly named reference node is missing.
+    CalibrationTraceabilityReferenceMissing,
+    /// The uncertainty evaluation's topology digest does not match the observation topology.
+    MeasurementUncertaintyEvaluationCalibrationTopologyMismatch {
+        /// Uncertainty identity.
+        uncertainty_id: String,
+        /// Expected topology digest.
+        expected_topology_digest: String,
+        /// Actual topology digest.
+        actual_topology_digest: String,
+    },
+    /// A topology-bound observation has no topology digest in its uncertainty evaluation.
+    MissingMeasurementUncertaintyCalibrationTopologyBinding(String),
+    /// An uncertainty evaluation carries a topology digest without an observed topology.
+    UnboundMeasurementUncertaintyCalibrationTopology(String),
     /// The admission authority does not match the evidence source authority.
     SourceAdmissionAuthorityMismatch {
         /// Authority named by the evidence source identity.
@@ -3686,6 +4057,72 @@ impl std::fmt::Display for AssessmentError {
                 f,
                 "source admission subject binding {actual_binding} does not match expected binding {expected_binding}"
             ),
+            Self::InvalidCalibrationTraceabilityTopology => {
+                write!(f, "calibration traceability topology is invalid")
+            }
+            Self::DuplicateCalibrationTraceabilityNode(node_id) => {
+                write!(f, "duplicate calibration traceability node {node_id}")
+            }
+            Self::DuplicateCalibrationTraceabilityReference(node_id) => {
+                write!(f, "duplicate calibration traceability reference node {node_id}")
+            }
+            Self::CalibrationTraceabilityResultNodeMissing => {
+                write!(f, "calibration traceability result node is missing")
+            }
+            Self::CalibrationTraceabilityResultObservationMismatch => {
+                write!(f, "calibration traceability result node does not match observation")
+            }
+            Self::CalibrationTraceabilityEdgeEndpointMissing => {
+                write!(f, "calibration traceability edge endpoint is missing")
+            }
+            Self::DuplicateCalibrationTraceabilityEdge {
+                from_node_id,
+                to_node_id,
+            } => write!(
+                f,
+                "duplicate calibration traceability edge {from_node_id}->{to_node_id}"
+            ),
+            Self::CalibrationTraceabilityReferenceHasOutgoingEdge(node_id) => {
+                write!(f, "calibration traceability reference {node_id} has an outgoing edge")
+            }
+            Self::CalibrationTraceabilityTopologyCycle => {
+                write!(f, "calibration traceability topology contains a cycle")
+            }
+            Self::CalibrationTraceabilityTopologyDisconnected => {
+                write!(f, "calibration traceability topology is disconnected")
+            }
+            Self::CalibrationTraceabilityDeadEnd => {
+                write!(f, "calibration traceability topology contains a dead end")
+            }
+            Self::CalibrationTraceabilityChainLinkMissing { calibration_id } => {
+                write!(
+                    f,
+                    "calibration chain link {calibration_id} is missing from traceability topology"
+                )
+            }
+            Self::CalibrationTraceabilityReferenceMissing => {
+                write!(f, "calibration traceability reference node is missing")
+            }
+            Self::MeasurementUncertaintyEvaluationCalibrationTopologyMismatch {
+                uncertainty_id,
+                expected_topology_digest,
+                actual_topology_digest,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} topology digest {actual_topology_digest} does not match expected {expected_topology_digest}"
+            ),
+            Self::MissingMeasurementUncertaintyCalibrationTopologyBinding(uncertainty_id) => {
+                write!(
+                    f,
+                    "uncertainty {uncertainty_id} is missing calibration topology binding"
+                )
+            }
+            Self::UnboundMeasurementUncertaintyCalibrationTopology(uncertainty_id) => {
+                write!(
+                    f,
+                    "uncertainty {uncertainty_id} carries an unbound calibration topology digest"
+                )
+            },
             Self::SourceAdmissionAuthorityMismatch {
                 source_authority_id,
                 admission_authority_id,
@@ -4766,6 +5203,7 @@ mod tests {
             calibration_record_digest: "fixture-calibration-chain-record-digest-v1".into(),
             used_at_epoch_seconds: 1_700_000_000,
         }],
+                calibration_topology: None,
                 experimental_design_id: None,
                 experimental_target_id: None,
             }),
@@ -4814,6 +5252,7 @@ mod tests {
                         ])
                         .unwrap(),
                         calibration_chain_count: 1,
+                        calibration_topology_digest: None,
                         measurement_model_id: "fixture-measurement-model-v1".into(),
                         measurement_model_revision: "v1".into(),
                         measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
@@ -4933,6 +5372,7 @@ mod tests {
                 component_count: component_refs.len(),
                 calibration_chain_digest: "test-calibration-chain-digest".into(),
                 calibration_chain_count: 1,
+                calibration_topology_digest: None,
                 measurement_model_id: "model-v1".into(),
                 measurement_model_revision: "r1".into(),
                 measurement_model_digest: "model-digest-v1".into(),
@@ -7219,6 +7659,7 @@ mod tests {
             policy_digest: "policy-digest".into(),
             admission_id: "admission".into(),
             authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
             fault_domain_id: Some("domain-a".into()),
             valid_from_epoch_seconds: Some(100),
             valid_until_epoch_seconds: Some(200),
@@ -7247,6 +7688,7 @@ mod tests {
                 policy_digest: "policy-digest".into(),
                 admission_id: "admission".into(),
                 authority_epoch: "epoch-1".into(),
+                subject_binding_digest: None,
                 fault_domain_id: Some("domain-b".into()),
                 valid_from_epoch_seconds: None,
                 valid_until_epoch_seconds: None,
@@ -7337,6 +7779,190 @@ mod tests {
     }
 
     #[test]
+    fn branched_traceability_topology_is_typed_and_uncertainty_bound() {
+        let mut candidate = candidate(
+            "branched-traceability-topology",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "branched-traceability",
+                "authority",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let observation = candidate.evidence[0]
+            .observation
+            .as_ref()
+            .expect("fixture observation exists")
+            .clone();
+        let calibration = observation
+            .calibration_chain_refs
+            .first()
+            .expect("fixture calibration chain exists")
+            .clone();
+
+        let topology = CalibrationTraceabilityTopology {
+            result_node_id: "result".into(),
+            reference_node_ids: vec!["reference-si".into(), "reference-time".into()],
+            nodes: vec![
+                CalibrationTraceabilityNodeRef {
+                    node_id: "result".into(),
+                    kind: CalibrationTraceabilityNodeKind::MeasurementResult,
+                    record_id: observation.observation_id.clone(),
+                    record_revision: "v1".into(),
+                    record_digest: observation.record_digest.clone(),
+                    used_at_epoch_seconds: 1_000,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "calibration".into(),
+                    kind: CalibrationTraceabilityNodeKind::CalibrationRecord,
+                    record_id: calibration.calibration_id.clone(),
+                    record_revision: calibration.calibration_revision.clone(),
+                    record_digest: calibration.calibration_record_digest.clone(),
+                    used_at_epoch_seconds: calibration.used_at_epoch_seconds,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "reference-si".into(),
+                    kind: CalibrationTraceabilityNodeKind::ReferenceStandard,
+                    record_id: "si-reference".into(),
+                    record_revision: "v1".into(),
+                    record_digest: "si-reference-digest".into(),
+                    used_at_epoch_seconds: 1_600,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "reference-time".into(),
+                    kind: CalibrationTraceabilityNodeKind::ReferenceStandard,
+                    record_id: "time-reference".into(),
+                    record_revision: "v1".into(),
+                    record_digest: "time-reference-digest".into(),
+                    used_at_epoch_seconds: 1_600,
+                },
+            ],
+            edges: vec![
+                CalibrationTraceabilityEdge {
+                    from_node_id: "result".into(),
+                    to_node_id: "calibration".into(),
+                },
+                CalibrationTraceabilityEdge {
+                    from_node_id: "calibration".into(),
+                    to_node_id: "reference-si".into(),
+                },
+                CalibrationTraceabilityEdge {
+                    from_node_id: "calibration".into(),
+                    to_node_id: "reference-time".into(),
+                },
+            ],
+        };
+
+        topology
+            .validate_against_observation(
+                &observation.observation_id,
+                &observation.record_digest,
+                &observation.calibration_chain_refs,
+            )
+            .unwrap();
+
+        let topology_digest = topology.canonical_digest().unwrap();
+        candidate.evidence[0]
+            .observation
+            .as_mut()
+            .unwrap()
+            .calibration_topology = Some(topology);
+        candidate.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .calibration_topology_digest = Some(topology_digest);
+
+        let uncertainty = candidate.evidence[0].uncertainty.as_ref().unwrap().clone();
+        candidate.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .binding_digest = canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[candidate.clone()], None)
+            .unwrap();
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
+
+        let mut cycle = candidate.clone();
+        cycle
+            .evidence[0]
+            .observation
+            .as_mut()
+            .unwrap()
+            .calibration_topology
+            .as_mut()
+            .unwrap()
+            .edges
+            .push(CalibrationTraceabilityEdge {
+                from_node_id: "reference-si".into(),
+                to_node_id: "calibration".into(),
+            });
+        assert!(matches!(
+            cycle.evidence[0]
+                .observation
+                .as_ref()
+                .unwrap()
+                .validate()
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityReferenceHasOutgoingEdge(_)
+                | AssessmentError::CalibrationTraceabilityTopologyCycle
+        ));
+
+        let mut disconnected = candidate.clone();
+        disconnected
+            .evidence[0]
+            .observation
+            .as_mut()
+            .unwrap()
+            .calibration_topology
+            .as_mut()
+            .unwrap()
+            .nodes
+            .push(CalibrationTraceabilityNodeRef {
+                node_id: "orphan".into(),
+                kind: CalibrationTraceabilityNodeKind::ReferenceStandard,
+                record_id: "orphan".into(),
+                record_revision: "v1".into(),
+                record_digest: "orphan-digest".into(),
+                used_at_epoch_seconds: 1_600,
+            });
+        assert!(matches!(
+            disconnected.evidence[0]
+                .observation
+                .as_ref()
+                .unwrap()
+                .validate()
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityTopologyDisconnected
+        ));
+
+        let mut topology_digest_drift = candidate;
+        topology_digest_drift
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .calibration_topology_digest = Some("wrong-topology-digest".into());
+        assert!(matches!(
+            topology_digest_drift.evidence[0]
+                .validate()
+                .unwrap_err(),
+            AssessmentError::MeasurementUncertaintyEvaluationCalibrationTopologyMismatch { .. }
+        ));
+    }
+
+    #[test]
     fn source_admission_reference_validates_without_claiming_authenticity() {
         let mut source = EvidenceSourceIdentity {
             authority_id: "authority".into(),
@@ -7350,6 +7976,7 @@ mod tests {
                 policy_digest: "policy-digest".into(),
                 admission_id: "admission".into(),
                 authority_epoch: "epoch-1".into(),
+                subject_binding_digest: None,
                 fault_domain_id: Some("domain-a".into()),
                 valid_from_epoch_seconds: Some(100),
                 valid_until_epoch_seconds: Some(200),
@@ -7431,6 +8058,7 @@ mod tests {
             policy_digest: "policy-digest".into(),
             admission_id: "admission-a".into(),
             authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
             fault_domain_id: Some("domain-a".into()),
             valid_from_epoch_seconds: None,
             valid_until_epoch_seconds: None,
@@ -7443,6 +8071,7 @@ mod tests {
             policy_digest: "policy-digest".into(),
             admission_id: "admission-b".into(),
             authority_epoch: "epoch-2".into(),
+            subject_binding_digest: None,
             fault_domain_id: Some("domain-b".into()),
             valid_from_epoch_seconds: None,
             valid_until_epoch_seconds: None,
@@ -7502,6 +8131,7 @@ mod tests {
             policy_digest: "digest".into(),
             admission_id: "admission-a".into(),
             authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
             fault_domain_id: Some("domain-a".into()),
             valid_from_epoch_seconds: None,
             valid_until_epoch_seconds: None,
@@ -7532,6 +8162,7 @@ mod tests {
             policy_digest: "policy-digest".into(),
             admission_id: "admission-1".into(),
             authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
             fault_domain_id: Some("domain-a".into()),
             valid_from_epoch_seconds: Some(0),
             valid_until_epoch_seconds: Some(100),
@@ -7796,6 +8427,7 @@ mod tests {
             policy_digest: "policy-digest".into(),
             admission_id: "admission-a".into(),
             authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
             fault_domain_id: Some("domain-a".into()),
             valid_from_epoch_seconds: None,
             valid_until_epoch_seconds: None,
@@ -7808,6 +8440,7 @@ mod tests {
             policy_digest: "policy-digest".into(),
             admission_id: "admission-b".into(),
             authority_epoch: "epoch-2".into(),
+            subject_binding_digest: None,
             fault_domain_id: Some("domain-b".into()),
             valid_from_epoch_seconds: None,
             valid_until_epoch_seconds: None,
@@ -7865,6 +8498,7 @@ mod tests {
                 policy_digest: "policy-digest".into(),
                 admission_id: admission_id.into(),
                 authority_epoch: "epoch-1".into(),
+                subject_binding_digest: None,
                 fault_domain_id: Some(domain.into()),
                 valid_from_epoch_seconds: None,
                 valid_until_epoch_seconds: None,
@@ -7931,6 +8565,7 @@ mod tests {
                 policy_digest: "policy-digest".into(),
                 admission_id: admission_id.into(),
                 authority_epoch: "epoch-1".into(),
+                subject_binding_digest: None,
                 fault_domain_id: Some(domain.into()),
                 valid_from_epoch_seconds: None,
                 valid_until_epoch_seconds: None,
@@ -8056,6 +8691,7 @@ mod tests {
             policy_digest: "policy-digest".into(),
             admission_id: "admission-lca".into(),
             authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
             fault_domain_id: Some("domain-lca".into()),
             valid_from_epoch_seconds: None,
             valid_until_epoch_seconds: None,
@@ -8067,6 +8703,7 @@ mod tests {
             policy_digest: "policy-digest".into(),
             admission_id: "admission-reported".into(),
             authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
             fault_domain_id: Some("domain-reported".into()),
             valid_from_epoch_seconds: None,
             valid_until_epoch_seconds: None,
@@ -8169,6 +8806,7 @@ mod tests {
             policy_digest: "policy-digest".into(),
             admission_id: "admission-manufacturing".into(),
             authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
             fault_domain_id: Some("domain-manufacturing".into()),
             valid_from_epoch_seconds: None,
             valid_until_epoch_seconds: None,
@@ -8180,6 +8818,7 @@ mod tests {
             policy_digest: "policy-digest".into(),
             admission_id: "admission-reported".into(),
             authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
             fault_domain_id: Some("domain-reported".into()),
             valid_from_epoch_seconds: None,
             valid_until_epoch_seconds: None,
@@ -9279,6 +9918,7 @@ mod tests {
             calibration_record_digest: "calibration-digest".into(),
                 used_at_epoch_seconds: 1_700_000_000,
             }],
+            calibration_topology: None,
             experimental_design_id: None,
             experimental_target_id: None,
         };
@@ -9479,6 +10119,7 @@ mod tests {
                 calibration_record_digest: "calibration-digest".into(),
                 used_at_epoch_seconds: 1_700_000_000,
             }],
+            calibration_topology: None,
             experimental_design_id: None,
             experimental_target_id: None,
         };
@@ -9602,6 +10243,7 @@ mod tests {
                 calibration_record_digest: "calibration-digest".into(),
                 used_at_epoch_seconds: 1_700_000_000,
             }],
+            calibration_topology: None,
             experimental_design_id: Some("design:water-v1".into()),
             experimental_target_id: Some("target:water-v1".into()),
         };
