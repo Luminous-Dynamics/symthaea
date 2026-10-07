@@ -4146,7 +4146,7 @@ mod tests {
                     scope_ref: "retain-set-v1".into(),
                     unit_ref: "proportion".into(),
                     aggregation_ref: "per-item-rate".into(),
-                    direction: NeurosemanticRemediationMetricDirection::HigherIsBetter,
+                    direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
                 },
                 NeurosemanticRemediationMetricDefinition {
                     schema_version: NEUROSEMANTIC_REMEDIATION_METRIC_DEFINITION_SCHEMA_VERSION,
@@ -4577,7 +4577,7 @@ mod tests {
             scope_ref: "retain-set-v1".into(),
             unit_ref: "proportion".into(),
             aggregation_ref: "per-item-rate".into(),
-            direction: NeurosemanticRemediationMetricDirection::HigherIsBetter,
+            direction: NeurosemanticRemediationMetricDirection::LowerIsBetter,
         };
         let mut valid = artifact.clone();
         valid.metric_definitions.extend([
