@@ -265,6 +265,24 @@ pub struct PredictionScore {
     pub mean_squared_error: f64,
 }
 
+/// Per-target squared-loss differential for the critical nested comparison.
+///
+/// Defined as non-relational context loss minus relationally augmented loss,
+/// so a positive value means the relationally augmented forecast incurred
+/// lower squared loss on that target. This is the target-level estimand for
+/// later dependence-aware inference, not itself a significance statistic.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RelationalForecastLossDifferential {
+    pub origin_index: usize,
+    pub sample_index: usize,
+    pub feature_time: f64,
+    pub outcome_time: f64,
+    pub observed_outcome: f64,
+    pub non_relational_squared_error: f64,
+    pub relational_squared_error: f64,
+    pub loss_differential: f64,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct FittedLinearModel {
     coefficients: Vec<f64>,
@@ -613,6 +631,15 @@ impl HeldOutRelationalPredictionEvidence {
         Ok(())
     }
 
+    /// Return target-level squared-loss differentials for the critical
+    /// RelationalAugmented versus NonRelationalContext comparison.
+    pub fn relational_loss_differentials(
+        &self,
+    ) -> Result<Vec<RelationalForecastLossDifferential>, RelationalPredictionError> {
+        self.validate()?;
+        relational_loss_differentials_from_records(0, &self.records)
+    }
+
     pub fn verify_against_samples(
         &self,
         samples: &[RelationalPredictionSample],
@@ -927,6 +954,30 @@ impl RollingOriginRelationalPredictionEvidence {
         }
 
         Ok(())
+    }
+
+    /// Return target-level squared-loss differentials across the disjoint
+    /// rolling test windows for the critical nested comparison.
+    pub fn relational_loss_differentials(
+        &self,
+    ) -> Result<Vec<RelationalForecastLossDifferential>, RelationalPredictionError> {
+        self.validate()?;
+
+        let capacity = self
+            .config
+            .origin_count
+            .checked_mul(self.config.test_samples)
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+        let mut differentials = Vec::with_capacity(capacity);
+
+        for (origin_index, origin) in self.origins.iter().enumerate() {
+            differentials.extend(relational_loss_differentials_from_records(
+                origin_index,
+                &origin.records,
+            )?);
+        }
+
+        Ok(differentials)
     }
 
     pub fn verify_against_samples(
@@ -2196,6 +2247,60 @@ fn feature_set_name(feature_set: PredictionFeatureSet) -> &'static str {
     }
 }
 
+fn relational_loss_differentials_from_records(
+    origin_index: usize,
+    records: &[PredictionEvidenceRecord],
+) -> Result<Vec<RelationalForecastLossDifferential>, RelationalPredictionError> {
+    let context = records
+        .iter()
+        .find(|record| record.feature_set == PredictionFeatureSet::NonRelationalContext)
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+    let relational = records
+        .iter()
+        .find(|record| record.feature_set == PredictionFeatureSet::RelationalAugmented)
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+    if context.predictions.len() != relational.predictions.len()
+        || context.observed_outcomes != relational.observed_outcomes
+        || context.feature_times != relational.feature_times
+        || context.outcome_times != relational.outcome_times
+    {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    let mut differentials = Vec::with_capacity(context.predictions.len());
+    for sample_index in 0..context.predictions.len() {
+        let outcome = context.observed_outcomes[sample_index];
+        let context_error = context.predictions[sample_index] - outcome;
+        let relational_error = relational.predictions[sample_index] - outcome;
+        let context_loss = context_error * context_error;
+        let relational_loss = relational_error * relational_error;
+        let loss_differential = context_loss - relational_loss;
+
+        if !context_error.is_finite()
+            || !relational_error.is_finite()
+            || !context_loss.is_finite()
+            || !relational_loss.is_finite()
+            || !loss_differential.is_finite()
+        {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        differentials.push(RelationalForecastLossDifferential {
+            origin_index,
+            sample_index,
+            feature_time: context.feature_times[sample_index],
+            outcome_time: context.outcome_times[sample_index],
+            observed_outcome: outcome,
+            non_relational_squared_error: context_loss,
+            relational_squared_error: relational_loss,
+            loss_differential,
+        });
+    }
+
+    Ok(differentials)
+}
+
 fn prediction_evidence_record_json(record: &PredictionEvidenceRecord) -> serde_json::Value {
     serde_json::json!({
         "feature_schema": FEATURE_SCHEMA,
@@ -2989,6 +3094,53 @@ mod tests {
     }
 
     #[test]
+    fn evidence_exposes_critical_target_level_loss_differentials() {
+        let samples = build_samples(0.5);
+        let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            provenance(),
+        )
+        .unwrap();
+
+        let differentials = evidence.relational_loss_differentials().unwrap();
+        assert_eq!(differentials.len(), config().test_samples);
+        assert!(differentials.iter().all(|item| item.origin_index == 0));
+
+        let context = evidence
+            .records
+            .iter()
+            .find(|record| record.feature_set == PredictionFeatureSet::NonRelationalContext)
+            .unwrap();
+        let relational = evidence
+            .records
+            .iter()
+            .find(|record| record.feature_set == PredictionFeatureSet::RelationalAugmented)
+            .unwrap();
+
+        let first = differentials[0];
+        let context_error = context.predictions[0] - context.observed_outcomes[0];
+        let relational_error = relational.predictions[0] - relational.observed_outcomes[0];
+
+        assert_eq!(first.sample_index, 0);
+        assert_eq!(first.feature_time, context.feature_times[0]);
+        assert_eq!(first.outcome_time, context.outcome_times[0]);
+        assert_eq!(first.observed_outcome, context.observed_outcomes[0]);
+        assert_eq!(
+            first.non_relational_squared_error,
+            context_error * context_error
+        );
+        assert_eq!(
+            first.relational_squared_error,
+            relational_error * relational_error
+        );
+        assert_eq!(
+            first.loss_differential,
+            first.non_relational_squared_error - first.relational_squared_error
+        );
+    }
+
+    #[test]
     fn evidence_trace_rejects_undersized_training_or_test_windows() {
         let samples = build_samples(0.5);
         let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
@@ -3256,6 +3408,47 @@ mod tests {
             evidence.validate(),
             Err(RelationalPredictionError::InvalidSplit)
         );
+    }
+
+    #[test]
+    fn rolling_evidence_exposes_disjoint_target_level_loss_differentials() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 2,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let evidence = RollingOriginRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config,
+            provenance(),
+        )
+        .unwrap();
+
+        let differentials = evidence.relational_loss_differentials().unwrap();
+        assert_eq!(differentials.len(), config.origin_count * config.test_samples);
+        assert_eq!(
+            differentials.iter().filter(|item| item.origin_index == 0).count(),
+            config.test_samples
+        );
+        assert_eq!(
+            differentials.iter().filter(|item| item.origin_index == 1).count(),
+            config.test_samples
+        );
+
+        for pair in differentials.windows(2) {
+            if pair[0].origin_index == pair[1].origin_index {
+                assert_eq!(pair[1].sample_index, pair[0].sample_index + 1);
+            } else {
+                assert_eq!(pair[1].origin_index, pair[0].origin_index + 1);
+                assert_eq!(pair[1].sample_index, 0);
+                assert!(pair[1].feature_time > pair[0].outcome_time);
+            }
+        }
     }
 
     #[test]
