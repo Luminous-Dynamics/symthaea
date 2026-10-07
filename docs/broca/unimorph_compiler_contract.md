@@ -47,6 +47,8 @@ Source slices are record selections, not arbitrary byte windows: each selected r
 
 The `record_id` on a source slice is a caller-supplied label. The cryptographic identity of the selected bytes is the per-slice BLAKE3 digest plus the exact byte range; the label itself is not treated as an intrinsic upstream identifier.
 
+For the declared UniMorph compiler, source mapping is exact: the executable rule set must contain exactly one source-bound rule for every selected source record, and cannot add unbound executable rules while still claiming the same compilation witness.
+
 - the exact source artifact digest
 - exact selected source byte ranges
 - exact selected-record digests
