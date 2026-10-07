@@ -1692,6 +1692,9 @@ fn validate_live_execution_witness(
 ) -> Result<(), NixPostStateErrorV1> {
     if witness.action_intent_digest() != action_intent_digest
         || authorization.action_intent_digest != action_intent_digest
+        || witness.authorization_record_digest() != &authorization.digest().map_err(
+            |_| NixPostStateErrorV1::LiveExecutionWitnessMismatch
+        )?
         || witness.pre_state_identity() != intent.pre_state_identity.as_deref()
     {
         return Err(NixPostStateErrorV1::LiveExecutionWitnessMismatch);
@@ -1941,6 +1944,7 @@ mod tests {
         };
         let witness = NixLiveExecutionWitnessV1::for_test(
             intent.digest().unwrap(),
+            authorization.digest().unwrap(),
             "approval:test",
             "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
             intent.pre_state_identity.clone(),
