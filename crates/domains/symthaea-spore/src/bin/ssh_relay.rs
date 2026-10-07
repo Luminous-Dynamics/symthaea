@@ -3350,6 +3350,20 @@ async fn verify_service_postcondition(action: &str, service: &str) -> Result<boo
 }
 
 async fn create_btrfs_image_archive(image_dir: &str) -> Result<bool, String> {
+    async fn delete_snapshot(snapshot: &str) -> Result<(), String> {
+        let result = run_privileged_args("btrfs", &["subvolume", "delete", snapshot])
+            .await
+            .map_err(|error| format!("btrfs snapshot cleanup could not be observed: {error}"))?;
+        if result.exit_status != 0 {
+            return Err(format!(
+                "btrfs snapshot cleanup failed with exit {}: {}",
+                result.exit_status,
+                result.stderr.chars().take(500).collect::<String>()
+            ));
+        }
+        Ok(())
+    }
+
     let snapshot = format!("{image_dir}/root-snapshot");
     let archive = format!("{image_dir}/system.btrfs.zst");
 
@@ -3359,10 +3373,25 @@ async fn create_btrfs_image_archive(image_dir: &str) -> Result<bool, String> {
         return Ok(false);
     }
 
-    let archive_file = create_private_runtime_file(&archive, 0o600)
-        .map_err(|error| format!("unable to create btrfs image archive: {error}"))?;
+    let archive_file = match create_private_runtime_file(&archive, 0o600) {
+        Ok(file) => file,
+        Err(error) => {
+            let cleanup = delete_snapshot(&snapshot).await;
+            return Err(format!(
+                "unable to create btrfs image archive: {error}; snapshot cleanup: {cleanup:?}"
+            ));
+        }
+    };
 
-    let mut sender = trusted_typed_process("btrfs")?;
+    let mut sender = match trusted_typed_process("btrfs") {
+        Ok(command) => command,
+        Err(error) => {
+            let cleanup = delete_snapshot(&snapshot).await;
+            return Err(format!(
+                "unable to construct trusted btrfs send command: {error}; snapshot cleanup: {cleanup:?}"
+            ));
+        }
+    };
     sender
         .arg("send")
         .arg(&snapshot)
@@ -3373,17 +3402,38 @@ async fn create_btrfs_image_archive(image_dir: &str) -> Result<bool, String> {
         Ok(child) => child,
         Err(error) => {
             let _ = tokio::fs::remove_file(&archive).await;
-            let _ = run_privileged_args("btrfs", &["subvolume", "delete", &snapshot]).await;
-            return Err(format!("unable to start btrfs send: {error}"));
+            let cleanup = delete_snapshot(&snapshot).await;
+            return Err(format!(
+                "unable to start btrfs send: {error}; snapshot cleanup: {cleanup:?}"
+            ));
         }
     };
 
-    let sender_stdout = sender_child
-        .stdout
-        .take()
-        .ok_or_else(|| "btrfs send did not expose stdout".to_string())?;
+    let sender_stdout = match sender_child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            let _ = sender_child.kill().await;
+            let _ = sender_child.wait().await;
+            let cleanup = delete_snapshot(&snapshot).await;
+            let _ = tokio::fs::remove_file(&archive).await;
+            return Err(format!(
+                "btrfs send did not expose stdout; snapshot cleanup: {cleanup:?}"
+            ));
+        }
+    };
 
-    let mut encoder = trusted_typed_process("zstd")?;
+    let mut encoder = match trusted_typed_process("zstd") {
+        Ok(command) => command,
+        Err(error) => {
+            let _ = sender_child.kill().await;
+            let _ = sender_child.wait().await;
+            let cleanup = delete_snapshot(&snapshot).await;
+            let _ = tokio::fs::remove_file(&archive).await;
+            return Err(format!(
+                "unable to construct trusted zstd encoder: {error}; snapshot cleanup: {cleanup:?}"
+            ));
+        }
+    };
     encoder
         .args(["-3", "-T0"])
         .stdin(std::process::Stdio::from(sender_stdout))
@@ -3395,9 +3445,11 @@ async fn create_btrfs_image_archive(image_dir: &str) -> Result<bool, String> {
         Err(error) => {
             let _ = sender_child.kill().await;
             let _ = sender_child.wait().await;
+            let cleanup = delete_snapshot(&snapshot).await;
             let _ = tokio::fs::remove_file(&archive).await;
-            let _ = run_privileged_args("btrfs", &["subvolume", "delete", &snapshot]).await;
-            return Err(format!("unable to start zstd image encoding: {error}"));
+            return Err(format!(
+                "unable to start zstd image encoding: {error}; snapshot cleanup: {cleanup:?}"
+            ));
         }
     };
 
@@ -3406,24 +3458,24 @@ async fn create_btrfs_image_archive(image_dir: &str) -> Result<bool, String> {
         encoder_child.wait_with_output()
     );
 
-    let snapshot_cleanup =
-        run_privileged_args("btrfs", &["subvolume", "delete", &snapshot]).await?;
+    let snapshot_cleanup = delete_snapshot(&snapshot).await;
 
     let sender_output =
         sender_output.map_err(|error| format!("btrfs send wait failed: {error}"))?;
     let encoder_output =
         encoder_output.map_err(|error| format!("zstd image encoding wait failed: {error}"))?;
 
-    if !snapshot_cleanup.status.success()
-        || !sender_output.status.success()
-        || !encoder_output.status.success()
-    {
+    if let Err(cleanup_error) = snapshot_cleanup {
+        let _ = tokio::fs::remove_file(&archive).await;
+        return Err(cleanup_error);
+    }
+
+    if !sender_output.status.success() || !encoder_output.status.success() {
         let _ = tokio::fs::remove_file(&archive).await;
         return Err(format!(
-            "btrfs image creation failed: send={:?}, zstd={:?}, snapshot_cleanup={}",
+            "btrfs image creation failed: send={:?}, zstd={:?}",
             sender_output.status.code(),
-            encoder_output.status.code(),
-            snapshot_cleanup.status.code().unwrap_or(1)
+            encoder_output.status.code()
         ));
     }
 
