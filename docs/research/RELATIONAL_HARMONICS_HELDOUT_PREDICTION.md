@@ -256,6 +256,7 @@ Before formal inference, the retained target-level differentials are now charact
 
 - mean and variance of the loss differential;
 - autocovariance and autocorrelation vectors through a caller-supplied maximum lag;
+- the number of paired observations supporting every reported lag;
 - first non-positive autocorrelation lag and maximum absolute non-zero-lag autocorrelation;
 - a deterministic Bartlett long-run variance estimate truncated at the declared lag;
 - an effective-sample-size diagnostic when the long-run variance estimate is finite and positive.
