@@ -3227,6 +3227,234 @@ async fn verify_service_postcondition(action: &str, service: &str) -> Result<boo
     verify_service_postcondition_typed(action, service).await
 }
 
+async fn create_btrfs_image_archive(image_dir: &str) -> Result<(), String> {
+    let snapshot = format!("{image_dir}/root-snapshot");
+    let archive = format!("{image_dir}/system.btrfs.zst");
+
+    let snapshot_result =
+        run_privileged_args("btrfs", &["subvolume", "snapshot", "-r", "/", &snapshot]).await?;
+    if snapshot_result.exit_status != 0 {
+        return Err(format!(
+            "btrfs root snapshot unavailable (exit {}): {}",
+            snapshot_result.exit_status,
+            snapshot_result.stderr.chars().take(500).collect::<String>()
+        ));
+    }
+
+    let archive_file = create_private_runtime_file(&archive, 0o600)
+        .map_err(|error| format!("unable to create btrfs image archive: {error}"))?;
+
+    let mut sender = privileged_process("btrfs");
+    sender
+        .arg("send")
+        .arg(&snapshot)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+
+    let mut sender_child = match sender.spawn().await {
+        Ok(child) => child,
+        Err(error) => {
+            let _ = tokio::fs::remove_file(&archive).await;
+            let _ = run_privileged_args("btrfs", &["subvolume", "delete", &snapshot]).await;
+            return Err(format!("unable to start btrfs send: {error}"));
+        }
+    };
+
+    let sender_stdout = sender_child
+        .stdout
+        .take()
+        .ok_or_else(|| "btrfs send did not expose stdout".to_string())?;
+
+    let mut encoder = privileged_process("zstd");
+    encoder
+        .args(["-3", "-T0"])
+        .stdin(std::process::Stdio::from(sender_stdout))
+        .stdout(std::process::Stdio::from(archive_file))
+        .stderr(std::process::Stdio::piped());
+
+    let mut encoder_child = match encoder.spawn().await {
+        Ok(child) => child,
+        Err(error) => {
+            let _ = sender_child.kill().await;
+            let _ = sender_child.wait().await;
+            let _ = tokio::fs::remove_file(&archive).await;
+            let _ = run_privileged_args("btrfs", &["subvolume", "delete", &snapshot]).await;
+            return Err(format!("unable to start zstd image encoding: {error}"));
+        }
+    };
+
+    let (sender_output, encoder_output) = tokio::join!(
+        sender_child.wait_with_output(),
+        encoder_child.wait_with_output()
+    );
+    let sender_output =
+        sender_output.map_err(|error| format!("btrfs send wait failed: {error}"))?;
+    let encoder_output =
+        encoder_output.map_err(|error| format!("zstd image encoding wait failed: {error}"))?;
+
+    let snapshot_cleanup =
+        run_privileged_args("btrfs", &["subvolume", "delete", &snapshot]).await?;
+
+    if !snapshot_cleanup.status.success()
+        || !sender_output.status.success()
+        || !encoder_output.status.success()
+    {
+        let _ = tokio::fs::remove_file(&archive).await;
+        return Err(format!(
+            "btrfs image creation failed: send={:?}, zstd={:?}, snapshot_cleanup={}",
+            sender_output.status.code(),
+            encoder_output.status.code(),
+            snapshot_cleanup.status.code().unwrap_or(1)
+        ));
+    }
+
+    let metadata = tokio::fs::metadata(&archive)
+        .await
+        .map_err(|error| format!("unable to inspect btrfs image archive: {error}"))?;
+    if metadata.len() == 0 {
+        let _ = tokio::fs::remove_file(&archive).await;
+        return Err("btrfs image archive is empty".into());
+    }
+
+    Ok(())
+}
+
+async fn create_tar_image_archive(image_dir: &str) -> Result<(), String> {
+    let archive = format!("{image_dir}/system.tar.gz");
+    let archive_file = create_private_runtime_file(&archive, 0o600)
+        .map_err(|error| format!("unable to create tar image archive: {error}"))?;
+
+    let mut tar = privileged_process("tar");
+    tar.args([
+        "-czf",
+        "-",
+        "--one-file-system",
+        "--exclude=/tmp",
+        "--exclude=/proc",
+        "--exclude=/sys",
+        "--exclude=/dev",
+        "--exclude=/run",
+        "/",
+    ])
+    .stdout(std::process::Stdio::from(archive_file))
+    .stderr(std::process::Stdio::piped());
+
+    let output = tar
+        .output()
+        .await
+        .map_err(|error| format!("unable to start tar image creation: {error}"))?;
+    if !output.status.success() {
+        let _ = tokio::fs::remove_file(&archive).await;
+        return Err(format!(
+            "tar image creation failed (exit {}): {}",
+            output.status.code().unwrap_or(1),
+            String::from_utf8_lossy(&output.stderr)
+                .chars()
+                .take(500)
+                .collect::<String>()
+        ));
+    }
+
+    let metadata = tokio::fs::metadata(&archive)
+        .await
+        .map_err(|error| format!("unable to inspect tar image archive: {error}"))?;
+    if metadata.len() == 0 {
+        let _ = tokio::fs::remove_file(&archive).await;
+        return Err("tar image archive is empty".into());
+    }
+
+    Ok(())
+}
+
+async fn copy_optional_image_sidecar(
+    image_dir: &str,
+    source: &str,
+    required: bool,
+) -> Result<(), String> {
+    let source_metadata = match tokio::fs::symlink_metadata(source).await {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound && !required => return Ok(()),
+        Err(error) => {
+            return Err(format!(
+                "image sidecar source {source} is unavailable: {error}"
+            ))
+        }
+    };
+    if !source_metadata.is_file() {
+        if required {
+            return Err(format!("required image sidecar source {source} is not a regular file"));
+        }
+        return Ok(());
+    }
+
+    let name = std::path::Path::new(source)
+        .file_name()
+        .ok_or_else(|| format!("image sidecar source {source} has no filename"))?;
+    let destination = std::path::Path::new(image_dir).join(name);
+    tokio::fs::copy(source, &destination)
+        .await
+        .map_err(|error| format!("unable to copy image sidecar {source}: {error}"))?;
+    Ok(())
+}
+
+async fn write_installed_packages_sidecar(image_dir: &str) -> Result<(), String> {
+    let result = run_privileged_args("nix-env", &["-qa", "--installed"]).await?;
+    if result.exit_status != 0 {
+        return Ok(());
+    }
+    let destination = format!("{image_dir}/installed-packages.txt");
+    write_private_file(&destination, result.stdout.as_bytes(), 0o600)
+        .map_err(|error| format!("unable to stage installed package inventory: {error}"))
+}
+
+fn freeze_image_namespace_blocking(image_dir: &str) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(image_dir)
+        .map_err(|error| format!("unable to open image namespace for freezing: {error}"))?;
+
+    for entry in std::fs::read_dir(image_dir)
+        .map_err(|error| format!("unable to enumerate image namespace: {error}"))?
+    {
+        let entry =
+            entry.map_err(|error| format!("unable to inspect image namespace entry: {error}"))?;
+        let metadata = std::fs::symlink_metadata(entry.path())
+            .map_err(|error| format!("unable to inspect image namespace artifact: {error}"))?;
+        if !metadata.file_type().is_file() {
+            return Err(format!(
+                "image namespace contains non-regular artifact {}",
+                entry.path().display()
+            ));
+        }
+        std::fs::set_permissions(
+            entry.path(),
+            std::fs::Permissions::from_mode(0o400),
+        )
+        .map_err(|error| {
+            format!(
+                "unable to freeze image artifact {}: {error}",
+                entry.path().display()
+            )
+        })?;
+    }
+
+    directory
+        .set_permissions(std::fs::Permissions::from_mode(0o500))
+        .map_err(|error| format!("unable to freeze image namespace permissions: {error}"))?;
+    directory
+        .sync_all()
+        .map_err(|error| format!("unable to synchronize frozen image namespace: {error}"))
+}
+
+async fn freeze_image_namespace(image_dir: String) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || freeze_image_namespace_blocking(&image_dir))
+        .await
+        .map_err(|error| format!("image namespace freeze task failed: {error}"))?
+}
+
 async fn verify_image_artifact(image_dir: &str) -> Result<bool, String> {
     let image_dir = validate_image_path(image_dir)?;
     use std::os::unix::fs::MetadataExt;
