@@ -582,6 +582,10 @@ def main() -> int:
                 "BROCA_QUALIFICATION_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}",
                 "ref: ${{ env.BROCA_QUALIFICATION_HEAD_SHA }}",
                 "toolchain: 1.96.0",
+                "runs-on: ubuntu-24.04",
+                "Verify runner-provided Rust bootstrap",
+                "command -v rustup",
+                "BROCA_RUSTUP_VERSION=$(rustup --version)",
                 "persist-credentials: false",
                 "Capture native package context",
                 "BROCA_NATIVE_PACKAGE_CONTEXT",
@@ -644,9 +648,11 @@ def main() -> int:
         require_fragments(
             build,
             [
-                "symthaea-broca-unimorph-compiler-build-context-revision-v6",
+                "symthaea-broca-unimorph-compiler-build-context-revision-v7",
                 "BROCA_NATIVE_PACKAGE_CONTEXT",
                 "rerun-if-env-changed=BROCA_NATIVE_PACKAGE_CONTEXT",
+                "BROCA_RUSTUP_VERSION",
+                "rerun-if-env-changed=BROCA_RUSTUP_VERSION",
                 "RUNNER_OS",
                 "RUNNER_ARCH",
                 "ImageOS",
