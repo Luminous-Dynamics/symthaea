@@ -393,8 +393,8 @@ impl VulkanBarrierWorkloadRuntime {
                 .create_fence(&vk::FenceCreateInfo::default(), None)
                 .map_err(VulkanBarrierError::Vk)?
         };
-        let submit =
-            vk::SubmitInfo::default().command_buffers(std::slice::from_ref(&command_guard.command()));
+        let command_buffers = [command_guard.command()];
+        let submit = vk::SubmitInfo::default().command_buffers(&command_buffers);
         if let Err(error) = unsafe {
             self.device
                 .queue_submit(self.queue, std::slice::from_ref(&submit), fence)
@@ -425,9 +425,7 @@ impl VulkanBarrierWorkloadRuntime {
         let receipt = VulkanBarrierExecutionReceipt {
             version: RECEIPT_VERSION,
             graph_digest: graph.digest_hex().map_err(VulkanBarrierError::Graph)?,
-            schedule_digest: schedule.digest_hex().map_err(|_| VulkanBarrierError::Schedule(
-                crate::ScheduleError::UnsupportedVersion(schedule.version),
-            ))?,
+            schedule_digest: schedule.digest_hex().map_err(VulkanBarrierError::Schedule)?,
             sync_plan_digest: plan.digest_hex().map_err(|e| VulkanBarrierError::SyncPlan(e))?,
             barrier_digest: barrier_digest(plan),
             barrier_lowering_digest: barrier_lowering_digest(plan),
