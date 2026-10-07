@@ -1781,6 +1781,8 @@ mod tests {
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     definition_digest,
                     "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                    ":1.42",
+                    "0123456789abcdef0123456789abcdef",
                     pre_invocation_id,
                     required_stability_us,
                 )
@@ -1843,6 +1845,8 @@ mod tests {
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     exp.authorized_definition_digest.clone(),
                     exp.authorized_definition_content_digest.clone(),
+                     ":1.42",
+                     "0123456789abcdef0123456789abcdef",
                     exp.pre_invocation_id.clone(),
                     exp.required_stability_us,
                 )
@@ -1913,6 +1917,8 @@ mod tests {
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     exp.authorized_definition_digest.clone(),
                     exp.authorized_definition_content_digest.clone(),
+                     ":1.42",
+                     "0123456789abcdef0123456789abcdef",
                     exp.pre_invocation_id.clone(),
                     exp.required_stability_us,
                 )
@@ -2199,6 +2205,8 @@ mod tests {
             &exp.unit,
             exp.authorized_generation,
             exp.authorized_definition_content_digest.clone(),
+                     ":1.42",
+                     "0123456789abcdef0123456789abcdef",
             exp.pre_invocation_id.clone(),
             exp.required_stability_us,
         );
