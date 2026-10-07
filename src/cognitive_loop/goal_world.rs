@@ -177,6 +177,14 @@ impl WorldModelBridge {
     }
 }
 
+    /// Number of action slots represented by this world-model bridge.
+    ///
+    /// Exposing the exact vocabulary size prevents generic planning adapters from
+    /// accepting an action index they cannot actually predict.
+    pub fn action_count(&self) -> usize {
+        self.action_deltas.len()
+    }
+
 impl WorldModelBridge {
     /// Update with sensory input (level 0)
     pub fn update_sensory(&mut self, input: &[f32]) {
