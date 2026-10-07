@@ -5719,8 +5719,8 @@ mod tests {
         let plan = ForecastInferencePlan::new(
             config.forecast_horizon,
             rolling_origin_schedule_sha256(config).unwrap(),
-            "relational-inference-selection-rule-v1",
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            CANONICAL_SELECTION_RULE_ID,
+            CANONICAL_SELECTION_RULE_SPEC_SHA256,
             "nested-forecast-bootstrap-v1",
             "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
             "loss-dependence-bartlett-v1",
@@ -5804,8 +5804,8 @@ mod tests {
         let plan = ForecastInferencePlan::new(
             0.5,
             single_origin_schedule_sha256(config, 0.5),
-            "relational-inference-selection-rule-v1",
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            CANONICAL_SELECTION_RULE_ID,
+            CANONICAL_SELECTION_RULE_SPEC_SHA256,
             "nested-forecast-bootstrap-v1",
             "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
             "loss-dependence-bartlett-v1",
@@ -5829,7 +5829,10 @@ mod tests {
         receipt.validate().unwrap();
         assert_eq!(receipt.analysis_level, "single-window");
         assert_eq!(receipt.selected_procedure_id, plan.procedure_id);
-        assert_eq!(receipt.dependence_profile_blake3, forecast_loss_dependence_profile_digest(&dependence));
+        assert_eq!(
+            receipt.dependence_profile_blake3,
+            forecast_loss_dependence_profile_digest(&dependence)
+        );
 
         let mut tampered = receipt.clone();
         tampered.decision_path_id.clear();
