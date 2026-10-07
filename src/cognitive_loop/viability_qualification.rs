@@ -20,7 +20,8 @@ use serde::{Deserialize, Serialize};
 use super::fep_module::FepModule;
 use super::viability_micro_world::{
     benchmark_scenarios, run_homeostatic_agent_horizon_scenario, MicroAction, MicroWorld,
-    MicroWorldObservation, MicroWorldPredictor, MicroWorldScenario, PersistencePredictor,
+    transition, MicroWorldObservation, MicroWorldPredictor, MicroWorldScenario,
+    PersistencePredictor,
 };
 
 use crate::dynamics::ode_solvers::{
@@ -418,6 +419,8 @@ pub struct GroundedWorldModelQualificationReport {
     pub held_out_predictor_mae: f64,
     pub held_out_improvement_over_baseline: f64,
     pub held_out_confidence_calibration: ConfidenceCalibration,
+    pub held_out_continuous_rollout_steps: u64,
+    pub held_out_continuous_rollout_mae: f64,
     pub held_out_survived_fixed_schedule: bool,
 
     pub persistence_closed_loop_survived: bool,
@@ -513,6 +516,80 @@ fn evaluate_frozen_scenario<P: MicroWorldPredictor>(
         calibration.finish(),
         world.observe().is_viable(),
     )
+}
+
+fn encode_micro_world_state(state: MicroWorldObservation) -> Vec<f64> {
+    let mut encoded = vec![0.0f64; 64];
+    encoded[0] = state.energy;
+    encoded[1] = state.integrity;
+    encoded[2] = state.knowledge;
+    encoded[3] = state.threat;
+    encoded[4] = state.progress;
+    encoded
+}
+
+/// Evaluate a shared transition model's continuous extrapolation against repeated
+/// deterministic oracle transitions from the same starting state.
+fn evaluate_frozen_continuous_rollout<M: ActionConditionedTransitionModel + ?Sized>(
+    model: &M,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+    horizon_seconds: f64,
+    tau: f64,
+    max_steps: usize,
+) -> (u64, f64) {
+    if !horizon_seconds.is_finite() || horizon_seconds <= 0.0 || !tau.is_finite() || tau <= 0.0 {
+        return (0, 0.0);
+    }
+
+    let repeated_steps = (horizon_seconds / tau).round().max(1.0) as usize;
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let mut total_error = 0.0;
+    let mut samples = 0u64;
+    let mut steps = 0u64;
+
+    while !world.done() && steps < max_cycles {
+        for (cycle, perturbation) in scenario.perturbations {
+            if *cycle == steps {
+                world.perturb(*perturbation);
+            }
+        }
+
+        let before = world.observe();
+        let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+        let encoded = encode_micro_world_state(before);
+
+        if let Some(rollout) = roll_transition_model_trajectory(
+            model,
+            &encoded,
+            action.index(),
+            horizon_seconds,
+            tau,
+            max_steps,
+        ) {
+            let mut actual = before;
+            for _ in 0..repeated_steps {
+                actual = transition(actual, action);
+            }
+
+            let predicted = MicroWorldObservation {
+                cycle: actual.cycle,
+                energy: rollout.terminal_state[0],
+                integrity: rollout.terminal_state[1],
+                knowledge: rollout.terminal_state[2],
+                threat: rollout.terminal_state[3],
+                progress: rollout.terminal_state[4],
+            };
+
+            total_error += predicted.mean_absolute_delta(actual);
+            samples = samples.saturating_add(1);
+        }
+
+        world.step(action);
+        steps = steps.saturating_add(1);
+    }
+
+    (samples, total_error / samples.max(1) as f64)
 }
 
 /// Replay the already selected closed-loop actions through the deterministic oracle
@@ -663,6 +740,16 @@ impl FepModule {
             held_out_improvement, held_out_calibration, held_out_survived) =
             evaluate_frozen_scenario(&predictor, held_out, held_out_cycles);
 
+        let (held_out_continuous_rollout_steps, held_out_continuous_rollout_mae) =
+            evaluate_frozen_continuous_rollout(
+                predictor.bridge,
+                held_out,
+                held_out_cycles,
+                0.5,
+                0.1,
+                200,
+            );
+
         let closed_loop = run_homeostatic_agent_horizon_scenario(
             &mut predictor,
             held_out,
@@ -684,6 +771,8 @@ impl FepModule {
             held_out_predictor_mae,
             held_out_improvement_over_baseline: held_out_improvement,
             held_out_confidence_calibration: held_out_calibration,
+            held_out_continuous_rollout_steps,
+            held_out_continuous_rollout_mae,
             held_out_survived_fixed_schedule: held_out_survived,
             persistence_closed_loop_survived: persistence_closed_loop.survived,
             persistence_closed_loop_mean_oracle_horizon_regret:
