@@ -11,6 +11,10 @@ This manifest is a deterministic compiler-input selection from unimorph_eng_4_sn
 - Artifact UTF-8 byte length: 18022905
 
 ## Selected records
+Aggregate source-selection BLAKE3-256: 74585e2733a2d036cc396ebb5be77796d10b0de78814ad798731b2b96efbd726
+
+This is the compiler's domain-separated BLAKE3 over the canonical JSON serialization of the seven source-slice objects in manifest order.
+
 
 The selected byte ranges are exact ranges into the frozen artifact. Offsets are UTF-8 byte offsets and lengths include the terminal LF byte.
 
