@@ -489,7 +489,40 @@ inside the parity-check/decoder pipeline, which is a different failure mode from
 coordinate-indexing errors.
 
 The emitted ledger is `GENERATOR_BASIS_EQUIVARIANCE`, and the workflow promotes it
-to a required gate in receipt schema v14.
+to a required gate in receipt schema v16.
+
+## Composed metamorphic invariance
+
+Single-axis metamorphic relations can miss interaction faults. The qualification suite
+therefore composes the generator-basis transformation with the 73-coordinate Hamming
+permutation used by the packed-word witness.
+
+The composed representation must produce exactly the same codeword set and canonical
+parity-check representation as applying the coordinate permutation to the original basis.
+On 64 deterministic observations, the bounded list outcome and all four decoder work
+counters must also be identical.
+
+The emitted ledger is `COMPOSED_METAMORPHIC_EQUIVARIANCE`. This is deliberately an
+interaction witness: it tests that basis presentation and coordinate representation do
+not introduce a hidden cross-term in parity-check construction or bounded decoding.
+
+## Artifact provenance revalidation
+
+Receipt provenance is now checked in both directions: before receipt emission, the live
+Actions run is bound to repository, event, head, pull-request identity, workflow identity,
+and the exact workflow-file bytes; after upload, the artifact is independently re-fetched
+through the GitHub API and required to match the current run, exact head, repository identity,
+artifact name, and a non-empty GitHub artifact digest.
+
+The artifact name includes the exact research head, workflow run ID, and run attempt, so
+two executions of the same source head cannot collapse to an indistinguishable evidence name.
+
+## Runner credential boundary
+
+The checkout now uses `persist-credentials: false`. The qualification step that needs to
+fetch the pinned public recovery parent supplies its short-lived GitHub token only to that
+inline verification step, rather than leaving credentials in the repository's local Git
+configuration available to subsequent test/build commands.
 ## 2026 coding-theory context
 
 Recent results sharpen, rather than collapse, this distinction. Silas determines the sharp typical worst-case list-size behavior of random linear codes at capacity for every finite field, while Yuan and Zhu obtain asymptotically optimal list-size scaling for fixed finite fields. These are asymptotic list-decoding results and do not certify the finite Boolean fixtures used here.
