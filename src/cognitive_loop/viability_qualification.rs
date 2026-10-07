@@ -19,9 +19,10 @@ use serde::{Deserialize, Serialize};
 
 use super::fep_module::FepModule;
 use super::viability_micro_world::{
-    benchmark_manifest_digest, benchmark_scenarios, run_homeostatic_agent_horizon_scenario,
-    MicroAction, MicroWorld, transition, MicroWorldObservation, MicroWorldPredictor,
-    MicroWorldScenario, PersistencePredictor,
+    benchmark_manifest_digest, benchmark_scenarios, procedural_held_out_manifest_digest,
+    procedural_held_out_scenarios, run_homeostatic_agent_horizon_scenario, MicroAction, MicroWorld,
+    transition, MicroWorldObservation, MicroWorldPredictor, MicroWorldScenario, PersistencePredictor,
+    ProceduralMicroWorldScenario,
 };
 
 use crate::dynamics::ode_solvers::{
@@ -425,6 +426,9 @@ pub struct GroundedWorldModelQualificationReport {
     /// Complete leave-one-scenario-out transfer matrix across the benchmark family.
     pub cross_scenario_transfer: CrossScenarioTransferReport,
 
+    /// Frozen transfer to a procedurally generated scenario family never used for adaptation.
+    pub procedural_held_out_transfer: ProceduralHeldOutTransferReport,
+
     pub persistence_closed_loop_survived: bool,
     pub persistence_closed_loop_mean_oracle_horizon_regret: f64,
     pub persistence_recovery_rate: f64,
@@ -444,6 +448,48 @@ pub struct GroundedWorldModelQualificationReport {
     pub perturbation_recovery_steps: Vec<Option<u64>>,
     pub recovery_rate: f64,
     pub mean_recovery_steps: f64,
+}
+
+/// Frozen transfer result for one procedurally generated held-out scenario.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProceduralHeldOutFold {
+    pub seed: u64,
+    pub manifest_digest: u64,
+    pub steps: u64,
+    pub baseline_mae: f64,
+    pub predictor_mae: f64,
+    pub improvement_over_baseline: f64,
+    pub survived_fixed_schedule: bool,
+}
+
+impl ProceduralHeldOutFold {
+    pub fn beat_persistence(&self) -> bool {
+        self.predictor_mae < self.baseline_mae
+    }
+}
+
+/// Aggregate frozen transfer over the complete procedurally generated scenario family.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProceduralHeldOutTransferReport {
+    pub manifest_digest: u64,
+    pub scenario_count: u64,
+    pub folds: Vec<ProceduralHeldOutFold>,
+    pub mean_improvement_over_baseline: f64,
+    pub worst_improvement_over_baseline: f64,
+    pub held_out_beats_persistence_rate: f64,
+    pub survival_rate: f64,
+}
+
+impl ProceduralHeldOutTransferReport {
+    pub fn all_folds_beat_persistence(&self) -> bool {
+        !self.folds.is_empty() && self.folds.iter().all(ProceduralHeldOutFold::beat_persistence)
+    }
+
+    pub fn is_scoreable(&self) -> bool {
+        self.scenario_count > 0
+            && self.folds.len() as u64 == self.scenario_count
+            && !self.folds.is_empty()
+    }
 }
 
 /// Leave-one-scenario-out transfer fold.
@@ -602,6 +648,112 @@ impl GroundedWorldModelQualificationReport {
     pub fn policy_regret_beats_persistence(&self) -> bool {
         self.closed_loop_mean_oracle_horizon_regret
             < self.persistence_closed_loop_mean_oracle_horizon_regret
+    }
+}
+
+fn evaluate_frozen_procedural_scenario<P: MicroWorldPredictor>(
+    predictor: &P,
+    scenario: &ProceduralMicroWorldScenario,
+    max_cycles: u64,
+) -> (u64, f64, f64, f64, bool) {
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let mut predictor_error = 0.0;
+    let mut baseline_error = 0.0;
+    let mut steps = 0u64;
+
+    while !world.done() && steps < max_cycles {
+        for (cycle, perturbation) in &scenario.perturbations {
+            if *cycle == steps {
+                world.perturb(*perturbation);
+            }
+        }
+
+        let before = world.observe();
+        let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+        let predicted = predictor.predict(before, action);
+        let after = world.step(action);
+
+        predictor_error += predicted.mean_absolute_delta(after);
+        baseline_error += PersistencePredictor::default()
+            .predict(before, action)
+            .mean_absolute_delta(after);
+        steps = steps.saturating_add(1);
+    }
+
+    let denominator = steps.max(1) as f64;
+    let baseline_mae = baseline_error / denominator;
+    let predictor_mae = predictor_error / denominator;
+    let improvement = if baseline_mae <= f64::EPSILON {
+        0.0
+    } else {
+        (baseline_mae - predictor_mae) / baseline_mae
+    };
+
+    (
+        steps,
+        baseline_mae,
+        predictor_mae,
+        improvement,
+        world.observe().is_viable(),
+    )
+}
+
+/// Evaluate a frozen predictor on every procedurally generated held-out scenario.
+///
+/// The generator is deterministic and content-addressed. Generated scenarios never enter
+/// adaptation; they exist solely to detect memorization of the authored benchmark family.
+fn evaluate_procedural_held_out_transfer(
+    model: &super::goal_world::WorldModelBridge,
+    test_cycles: u64,
+) -> ProceduralHeldOutTransferReport {
+    let scenarios = procedural_held_out_scenarios();
+    let mut folds = Vec::with_capacity(scenarios.len());
+
+    for scenario in &scenarios {
+        let predictor = FepWorldModelPredictor {
+            bridge: &mut model.clone(),
+        };
+        let (steps, baseline_mae, predictor_mae, improvement, survived) =
+            evaluate_frozen_procedural_scenario(&predictor, scenario, test_cycles);
+
+        folds.push(ProceduralHeldOutFold {
+            seed: scenario.seed,
+            manifest_digest: scenario.manifest_digest(),
+            steps,
+            baseline_mae,
+            predictor_mae,
+            improvement_over_baseline: improvement,
+            survived_fixed_schedule: survived,
+        });
+    }
+
+    let denominator = folds.len().max(1) as f64;
+    let mean_improvement_over_baseline =
+        folds.iter().map(|fold| fold.improvement_over_baseline).sum::<f64>() / denominator;
+    let worst_improvement_over_baseline = folds
+        .iter()
+        .map(|fold| fold.improvement_over_baseline)
+        .reduce(f64::min)
+        .unwrap_or(0.0);
+    let held_out_beats_persistence_rate = folds
+        .iter()
+        .filter(|fold| fold.beat_persistence())
+        .count() as f64
+        / denominator;
+    let survival_rate = folds
+        .iter()
+        .filter(|fold| fold.survived_fixed_schedule)
+        .count() as f64
+        / denominator;
+
+    ProceduralHeldOutTransferReport {
+        manifest_digest: procedural_held_out_manifest_digest(),
+        scenario_count: folds.len() as u64,
+        folds,
+        mean_improvement_over_baseline,
+        worst_improvement_over_baseline,
+        held_out_beats_persistence_rate,
+        survival_rate,
     }
 }
 
@@ -1546,6 +1698,9 @@ impl FepModule {
         let environment_query_report =
             evaluate_environment_query_bank(predictor.bridge, held_out);
 
+        let procedural_held_out_transfer =
+            evaluate_procedural_held_out_transfer(predictor.bridge, held_out_cycles);
+
         let closed_loop = run_homeostatic_agent_horizon_scenario(
             &mut predictor,
             held_out,
@@ -1579,6 +1734,7 @@ impl FepModule {
             held_out_policy_ranking,
             environment_query_report,
             cross_scenario_transfer,
+            procedural_held_out_transfer,
             persistence_closed_loop_survived: persistence_closed_loop.survived,
             persistence_closed_loop_mean_oracle_horizon_regret:
                 persistence_closed_loop.mean_oracle_horizon_regret,
@@ -1875,6 +2031,38 @@ mod tests {
         assert_eq!(report.mean_changed_channel_f1, 0.0);
         assert_eq!(report.mean_terminal_mae, 0.0);
         assert_eq!(report.mean_min_viability_margin_error, 0.0);
+    }
+
+    #[test]
+    fn procedural_held_out_manifest_is_stable_and_nonempty() {
+        let first = procedural_held_out_manifest_digest();
+        let second = procedural_held_out_manifest_digest();
+        let scenarios = procedural_held_out_scenarios();
+
+        assert_eq!(first, second);
+        assert_ne!(first, 0);
+        assert_eq!(scenarios.len(), 8);
+        assert!(scenarios.iter().all(|scenario| !scenario.schedule.is_empty()));
+        let mut digests = scenarios
+            .iter()
+            .map(ProceduralMicroWorldScenario::manifest_digest)
+            .collect::<Vec<_>>();
+        digests.sort_unstable();
+        digests.dedup();
+        assert_eq!(digests.len(), scenarios.len());
+    }
+
+    #[test]
+    fn procedural_held_out_transfer_is_frozen_and_complete() {
+        let model = super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let report = evaluate_procedural_held_out_transfer(&model, 4);
+
+        assert!(report.is_scoreable());
+        assert_eq!(report.scenario_count, 8);
+        assert_eq!(report.folds.len(), 8);
+        assert_eq!(report.manifest_digest, procedural_held_out_manifest_digest());
+        assert!((0.0..=1.0).contains(&report.held_out_beats_persistence_rate));
+        assert!((0.0..=1.0).contains(&report.survival_rate));
     }
 
     #[test]
