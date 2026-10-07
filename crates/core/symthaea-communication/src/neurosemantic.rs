@@ -526,7 +526,7 @@ pub struct NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact {
 }
 
 pub const NEUROSEMANTIC_REMEDIATION_STATISTICAL_RANDOMNESS_COMMITMENT_SCHEMA_VERSION: u16 = 2;
-pub const NEUROSEMANTIC_REMEDIATION_RANDOMIZATION_SEED_HEX_BYTES: usize = 64;
+pub const NEUROSEMANTIC_REMEDIATION_RANDOMIZATION_SEED_HEX_CHARS: usize = 64;
 
 impl NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact {
     pub fn validate(&self) -> Result<(), String> {
@@ -573,7 +573,7 @@ impl NeurosemanticRemediationStatisticalRandomnessCommitmentArtifact {
 }
 
 fn valid_randomization_seed_hex(seed_hex: &str) -> bool {
-    seed_hex.len() == NEUROSEMANTIC_REMEDIATION_RANDOMIZATION_SEED_HEX_BYTES
+    seed_hex.len() == NEUROSEMANTIC_REMEDIATION_RANDOMIZATION_SEED_HEX_CHARS
         && seed_hex
             .bytes()
             .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
@@ -5961,6 +5961,43 @@ mod tests {
         assert_ne!(first, alternate);
         assert_eq!(first.len(), 2);
         assert!(first.iter().all(|member| frame.contains(member)));
+    }
+
+    #[test]
+    fn remediation_statistical_selection_trace_seed_is_bounded_and_versioned() {
+        let seed = format!("{:064x}", 42);
+        assert!(valid_randomization_seed_hex(&seed));
+        assert!(!valid_randomization_seed_hex(&"a".repeat(63)));
+        assert!(!valid_randomization_seed_hex(&"A".repeat(64)));
+
+        let trace = NeurosemanticRemediationStatisticalSelectionTraceArtifact {
+            schema_version: NEUROSEMANTIC_REMEDIATION_STATISTICAL_SELECTION_TRACE_SCHEMA_VERSION,
+            selection_ref: "selection-trace-v2-test".into(),
+            sampling_frame_hash: content_hash(b"sampling-frame"),
+            selection_procedure_ref:
+                NEUROSEMANTIC_REMEDIATION_SIMPLE_RANDOM_WITHOUT_REPLACEMENT_PROCEDURE_REF.into(),
+            randomness_commitment_hash: content_hash(b"randomness-commitment"),
+            randomization_seed_hex: seed,
+            sample_size: 1,
+            selected_subject_artifact_hashes: vec![content_hash(b"subject-1")],
+            study_protocol_hash: content_hash(b"protocol"),
+            execution_revision: "c".repeat(40),
+        };
+        let bytes = serde_json::to_vec(&trace).unwrap();
+        assert_eq!(
+            NeurosemanticRemediationStatisticalSelectionTraceArtifact::from_json_bytes(&bytes)
+                .unwrap(),
+            trace
+        );
+
+        let mut stale_v1 = trace;
+        stale_v1.schema_version = 1;
+        assert!(
+            NeurosemanticRemediationStatisticalSelectionTraceArtifact::from_json_bytes(
+                &serde_json::to_vec(&stale_v1).unwrap()
+            )
+            .is_err()
+        );
     }
 
     #[test]
