@@ -1229,10 +1229,11 @@ fn evaluate_sequential_learning_response(
 
         let prior_before = learned_shocks
             .iter()
-            .map(|(state, prior_action, _baseline_mae)| {
+            .map(|(state, prior_action, baseline_mae)| {
                 (
                     *state,
                     *prior_action,
+                    *baseline_mae,
                     predictor
                         .predict(*state, *prior_action)
                         .mean_absolute_delta(transition(*state, *prior_action)),
@@ -1254,7 +1255,7 @@ fn evaluate_sequential_learning_response(
         let mut prior_max_regression = 0.0;
         let mut prior_retained = 0u64;
 
-        for (state, prior_action, before_current_update_mae) in &prior_before {
+        for (state, prior_action, baseline_mae, before_current_update_mae) in &prior_before {
             let after_current_update_mae = predictor
                 .predict(*state, *prior_action)
                 .mean_absolute_delta(transition(*state, *prior_action));
@@ -1262,15 +1263,7 @@ fn evaluate_sequential_learning_response(
             prior_sum_regression += regression;
             prior_max_regression = prior_max_regression.max(regression);
 
-            let baseline_mae = learned_shocks
-                .iter()
-                .find(|(learned_state, learned_action, _)| {
-                    learned_state == state && learned_action == prior_action
-                })
-                .map(|(_, _, baseline)| *baseline)
-                .unwrap_or(*before_current_update_mae);
-
-            if after_current_update_mae <= baseline_mae + 1e-12 {
+            if after_current_update_mae <= *baseline_mae + 1e-12 {
                 prior_retained += 1;
             }
         }
