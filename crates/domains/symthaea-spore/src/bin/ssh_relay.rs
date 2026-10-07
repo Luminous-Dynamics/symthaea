@@ -219,6 +219,13 @@ async fn spawn_privileged_background_process(
         ));
     };
 
+    let start_time = read_process_start_time_ticks(pid).map_err(|error| {
+        std::io::Error::new(
+            error.kind(),
+            format!("spawned child has no readable /proc start time: {error}"),
+        )
+    })?;
+
     let pid_write_result = (|| -> Result<(), std::io::Error> {
         let mut pid_file = std::fs::OpenOptions::new()
             .write(true)
