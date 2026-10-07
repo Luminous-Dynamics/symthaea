@@ -214,6 +214,78 @@ where
     }
 }
 
+/// Adapt a fresh predictor on one scenario, then evaluate it on the next scenario
+/// with learning disabled during evaluation. This makes cross-scenario transfer
+/// measurable instead of conflating it with within-episode online adaptation.
+pub fn evaluate_predictor_generalization<P, F>(
+    mut factory: F,
+    train_cycles: u64,
+    test_cycles: u64,
+) -> Vec<MicroWorldGeneralizationReport>
+where
+    P: MicroWorldPredictor,
+    F: FnMut() -> P,
+{
+    let scenarios = benchmark_scenarios();
+    let mut reports = Vec::with_capacity(scenarios.len());
+
+    for (index, train_scenario) in scenarios.iter().enumerate() {
+        let test_scenario = &scenarios[(index + 1) % scenarios.len()];
+        let mut predictor = factory();
+
+        let mut train_world = MicroWorld::new(train_scenario.initial, train_cycles);
+        let mut train_steps = 0u64;
+        while !train_world.done() && train_steps < train_cycles {
+            let before = train_world.observe();
+            let action = train_scenario.schedule[train_steps as usize % train_scenario.schedule.len()];
+            let _ = predictor.predict(before, action);
+            let after = train_world.step(action);
+            predictor.observe_transition(before, action, after);
+            train_steps += 1;
+        }
+
+        let mut test_world = MicroWorld::new(test_scenario.initial, test_cycles);
+        let mut baseline_error = 0.0;
+        let mut predictor_error = 0.0;
+        let mut test_steps = 0u64;
+
+        while !test_world.done() && test_steps < test_cycles {
+            let before = test_world.observe();
+            let action = test_scenario.schedule[test_steps as usize % test_scenario.schedule.len()];
+            let predicted = predictor.predict(before, action);
+            let after = test_world.step(action);
+
+            predictor_error += predicted.mean_absolute_delta(after);
+            baseline_error += PersistencePredictor::default()
+                .predict(before, action)
+                .mean_absolute_delta(after);
+
+            // Deliberately no observe_transition() here: the held-out score is frozen.
+            test_steps += 1;
+        }
+
+        let denom = test_steps.max(1) as f64;
+        let baseline_mae = baseline_error / denom;
+        let predictor_mae = predictor_error / denom;
+        let improvement = if baseline_mae <= f64::EPSILON {
+            0.0
+        } else {
+            (baseline_mae - predictor_mae) / baseline_mae
+        };
+
+        reports.push(MicroWorldGeneralizationReport {
+            train_steps,
+            test_steps,
+            baseline_mae,
+            predictor_mae,
+            improvement_over_baseline: improvement,
+            held_out_scenario: test_scenario.name,
+        });
+    }
+
+    reports
+}
+
 /// Ground-truth deterministic transition function.
 ///
 /// The action effects are intentionally simple enough that a learned predictor can
@@ -263,6 +335,24 @@ pub fn transition(state: MicroWorldObservation, action: MicroAction) -> MicroWor
     }
 
     next.clamp()
+}
+
+/// Generalization report: predictor is adapted on one scenario and evaluated on a
+/// different scenario without further updates during the test phase.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MicroWorldGeneralizationReport {
+    pub train_steps: u64,
+    pub test_steps: u64,
+    pub baseline_mae: f64,
+    pub predictor_mae: f64,
+    pub improvement_over_baseline: f64,
+    pub held_out_scenario: &'static str,
+}
+
+impl MicroWorldGeneralizationReport {
+    pub fn beat_persistence(&self) -> bool {
+        self.predictor_mae < self.baseline_mae
+    }
 }
 
 /// A deterministic benchmark scenario with a distinct initial state and action schedule.
@@ -798,7 +888,8 @@ fn evaluate_predictor_scenario<P: MicroWorldPredictor>(
 /// Aggregate report across several deterministic worlds.
 ///
 /// The suite prevents a future predictor from qualifying by memorizing one initial
-/// trajectory. Every predictor sees the same scenarios and schedules.
+/// trajectory for its headline score. It measures online adaptation across multiple
+/// scenarios; use evaluate_predictor_generalization for frozen held-out transfer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MicroWorldSuiteReport {
     pub episodes: usize,
@@ -970,6 +1061,19 @@ mod tests {
         let scenarios = benchmark_scenarios();
         assert!(scenarios.len() >= 4);
         assert!(scenarios.windows(2).any(|w| w[0].initial != w[1].initial));
+    }
+
+    #[test]
+    fn generalization_freezes_learning_during_test() {
+        let reports = evaluate_predictor_generalization::<WorldModelBridgePredictor, _>(
+            WorldModelBridgePredictor::default,
+            16,
+            16,
+        );
+        assert_eq!(reports.len(), 4);
+        assert!(reports.iter().all(|r| r.train_steps > 0));
+        assert!(reports.iter().all(|r| r.test_steps > 0));
+        assert!(reports.iter().all(|r| r.predictor_mae.is_finite()));
     }
 
     #[test]
