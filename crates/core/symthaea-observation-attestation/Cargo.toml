@@ -7,6 +7,7 @@ description = "Detached Ed25519 attestation adapter for Symthaea observation-fab
 
 [dependencies]
 blake3 = { workspace = true }
+thiserror = { workspace = true }
 ed25519-dalek = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 symthaea-core = { path = "../symthaea-core" }
