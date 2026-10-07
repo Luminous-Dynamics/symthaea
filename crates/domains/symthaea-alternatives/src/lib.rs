@@ -7709,6 +7709,138 @@ mod tests {
     }
 
     #[test]
+    fn lifecycle_qualification_does_not_require_basic_burden_measurements() {
+        let mut lifecycle_a = evidence(
+            "lca-a",
+            "authority-a",
+            EvidenceKind::LifecycleAssessed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut lifecycle_b = evidence(
+            "lca-b",
+            "authority-b",
+            EvidenceKind::LifecycleAssessed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let observed = evidence(
+            "functional",
+            "functional-authority",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        for (evidence, authority, admission_id, domain) in [
+            (&mut lifecycle_a, "authority-a", "admission-a", "domain-a"),
+            (&mut lifecycle_b, "authority-b", "admission-b", "domain-b"),
+        ] {
+            evidence.source.admission = Some(SourceAdmissionRef {
+                authority_id: authority.into(),
+                policy_id: "policy".into(),
+                policy_revision: "v1".into(),
+                policy_digest: "policy-digest".into(),
+                admission_id: admission_id.into(),
+                authority_epoch: "epoch-1".into(),
+                fault_domain_id: Some(domain.into()),
+                valid_from_epoch_seconds: None,
+                valid_until_epoch_seconds: None,
+            });
+        }
+        let mut c = candidate(
+            "pure-lifecycle-burdens",
+            PathwayKind::MaterialSubstitution,
+            2.0,
+            2.0,
+            vec![lifecycle_a, lifecycle_b, observed],
+        );
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["lca-a".into(), "lca-b".into()];
+        }
+        for estimate in c.performance.values_mut() {
+            estimate.evidence_ids = vec!["functional".into()];
+        }
+        for estimate in c.operating_capabilities.values_mut() {
+            estimate.evidence_ids = vec!["functional".into()];
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::LifecycleQualified
+        );
+    }
+
+    #[test]
+    fn manufacturing_qualification_does_not_require_basic_burden_measurements() {
+        let mut manufacturing_a = evidence(
+            "manufacturing-a",
+            "authority-a",
+            EvidenceKind::ManufacturingObserved,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut manufacturing_b = evidence(
+            "manufacturing-b",
+            "authority-b",
+            EvidenceKind::ManufacturingObserved,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let observed = evidence(
+            "functional",
+            "functional-authority",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        for (evidence, authority, admission_id, domain) in [
+            (&mut manufacturing_a, "authority-a", "admission-a", "domain-a"),
+            (&mut manufacturing_b, "authority-b", "admission-b", "domain-b"),
+        ] {
+            evidence.source.admission = Some(SourceAdmissionRef {
+                authority_id: authority.into(),
+                policy_id: "policy".into(),
+                policy_revision: "v1".into(),
+                policy_digest: "policy-digest".into(),
+                admission_id: admission_id.into(),
+                authority_epoch: "epoch-1".into(),
+                fault_domain_id: Some(domain.into()),
+                valid_from_epoch_seconds: None,
+                valid_until_epoch_seconds: None,
+            });
+        }
+        let mut c = candidate(
+            "pure-manufacturing-burdens",
+            PathwayKind::MaterialSubstitution,
+            2.0,
+            2.0,
+            vec![manufacturing_a, manufacturing_b, observed],
+        );
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["manufacturing-a".into(), "manufacturing-b".into()];
+        }
+        for estimate in c.performance.values_mut() {
+            estimate.evidence_ids = vec!["functional".into()];
+        }
+        for estimate in c.operating_capabilities.values_mut() {
+            estimate.evidence_ids = vec!["functional".into()];
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::ManufacturingQualified
+        );
+    }
+
+    #[test]
     fn lifecycle_tier_requires_two_admitted_lifecycle_authorities() {
         let lifecycle_a = evidence(
             "lca-a",
