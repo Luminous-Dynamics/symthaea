@@ -379,12 +379,23 @@ async fn spawn_privileged_background_process(
         ));
     };
 
-    let start_time = read_process_start_time_ticks(pid).map_err(|error| {
-        std::io::Error::new(
-            error.kind(),
-            format!("spawned child has no readable /proc start time: {error}"),
-        )
-    })?;
+    let start_time = match read_process_start_time_ticks(pid) {
+        Ok(start_time) => start_time,
+        Err(error) => {
+            // The child is already live, but its stable process identity could
+            // not be captured. Contain it before returning so no privileged
+            // mutation can continue without durable tracking.
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+            let _ = std::fs::remove_file(log_path);
+            let _ = std::fs::remove_file(status_path);
+            let _ = std::fs::remove_file(pid_path);
+            return Err(std::io::Error::new(
+                error.kind(),
+                format!("spawned child has no readable /proc start time: {error}"),
+            ));
+        }
+    };
 
     let pid_write_result = (|| -> Result<(), std::io::Error> {
         let mut pid_file = std::fs::OpenOptions::new()
