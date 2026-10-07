@@ -3194,6 +3194,22 @@ async fn commit_image_bundle(image_dir: &str) -> Result<(ArtifactCommitment, Art
     Ok((archive, configuration))
 }
 
+fn restore_artifact_step_for_committed_archive(
+    artifact_name: &str,
+) -> Result<&'static str, String> {
+    match artifact_name {
+        "system.btrfs.zst" => {
+            Ok("echo \"Restoring committed btrfs snapshot...\"; zstd -d - | btrfs receive /mnt/ 2>&1")
+        }
+        "system.tar.gz" => {
+            Ok("echo \"Restoring committed tar archive...\"; tar -xzf - -C /mnt/ 2>&1")
+        }
+        _ => Err(format!(
+            "image artifact commitment names unsupported restore artifact: {artifact_name}"
+        )),
+    }
+}
+
 async fn verify_image_artifact_commitment(
     image_dir: &str,
     expected: &ArtifactCommitment,
@@ -7615,17 +7631,10 @@ echo "COMPLETE"
                     transaction.log_line(),
                     image_path
                 );
-                let restore_artifact_step = match image_artifact_commitment.name.as_str() {
-                    "system.btrfs.zst" => {
-                        "echo \"Restoring committed btrfs snapshot...\"; zstd -d - | btrfs receive /mnt/ 2>&1"
-                    }
-                    "system.tar.gz" => {
-                        "echo \"Restoring committed tar archive...\"; tar -xzf - -C /mnt/ 2>&1"
-                    }
-                    _ => {
-                        unreachable!("artifact commitment validator must accept only supported image artifacts")
-                    }
-                };
+                let restore_artifact_step = restore_artifact_step_for_committed_archive(
+                    &image_artifact_commitment.name,
+                )
+                .expect("artifact commitment validator must accept only supported image artifacts");
                 let script = format!(
                     r#"
 set -eo pipefail
@@ -8992,25 +9001,59 @@ mod tests {
 
     #[test]
     fn restore_artifact_selection_is_bound_to_commitment_name() {
-        for (name, forbidden) in [
-            ("system.btrfs.zst", "system.tar.gz"),
-            ("system.tar.gz", "system.btrfs.zst"),
+        for (name, expected_fragment, forbidden) in [
+            (
+                "system.btrfs.zst",
+                "zstd -d - | btrfs receive /mnt/",
+                "system.tar.gz",
+            ),
+            ("system.tar.gz", "tar -xzf - -C /mnt/", "system.btrfs.zst"),
         ] {
-            let step = match name {
-                "system.btrfs.zst" => {
-                    "zstd -d \"/tmp/nixforhumanity-image-id/system.btrfs.zst\" | btrfs receive /mnt/"
-                }
-                "system.tar.gz" => {
-                    "tar -xzf \"/tmp/nixforhumanity-image-id/system.tar.gz\" -C /mnt/"
-                }
-                _ => unreachable!(),
-            };
-            assert!(step.contains(name));
+            let step = restore_artifact_step_for_committed_archive(name).unwrap();
+            assert!(step.contains(expected_fragment));
+            assert!(!step.contains(forbidden));
             assert!(
-                !step.contains(forbidden),
-                "restore selection for {name} must not reference an alternate artifact"
+                !step.contains("/tmp/nixforhumanity-image-"),
+                "restore must consume the already-open verified artifact, not reopen its pathname"
             );
         }
+        assert!(restore_artifact_step_for_committed_archive("unknown").is_err());
+    }
+
+    #[tokio::test]
+    async fn verified_image_artifact_descriptor_is_rewound_for_restore() {
+        use std::io::Write as _;
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-image-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let archive = dir.join("system.tar.gz");
+        let bytes = b"verified-archive-bytes";
+        std::fs::write(&archive, bytes).unwrap();
+        std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o400)).unwrap();
+
+        let (file, commitment) = open_image_artifact_with_commitment_blocking(
+            dir.to_str().unwrap(),
+            "system.tar.gz",
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(commitment.size, bytes.len() as u64);
+
+        let output = run_cmd_with_stdin("cat", file).await.unwrap();
+        assert_eq!(output.exit_status, 0);
+        assert_eq!(output.stdout.as_bytes(), bytes);
+
+        std::fs::set_permissions(&archive, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let mut replacement = std::fs::OpenOptions::new().write(true).open(&archive).unwrap();
+        replacement.write_all(b"replacement-bytes").unwrap();
+        drop(replacement);
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[tokio::test]
