@@ -582,6 +582,9 @@ pub struct NixPostStateReceiptV1 {
     pub observed_service_result: String,
     /// Unique D-Bus owner of systemd1 for the observed service-manager epoch.
     pub systemd_manager_owner: String,
+    /// D-Bus daemon incarnation for the observed service-manager epoch.
+    #[serde(default)]
+    pub systemd_bus_id: Option<String>,
     pub pre_invocation_id: Option<String>,
     pub post_invocation_id: Option<String>,
     pub postcondition: NixPostconditionAssessmentV1,
@@ -1049,6 +1052,9 @@ impl NixPostStateReceiptV1 {
         require_nonempty(&self.observed_sub_state, "observed service sub-state")?;
         require_nonempty(&self.observed_service_result, "observed service result")?;
         validate_unique_manager_owner(&self.systemd_manager_owner)?;
+        if let Some(bus_id) = self.systemd_bus_id.as_deref() {
+            validate_bus_id(bus_id)?;
+        }
         let recomputed_state_digest = semantic_state_digest(
             self.operation,
             &self.target_unit,
