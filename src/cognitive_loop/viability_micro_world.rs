@@ -562,6 +562,33 @@ impl MicroWorldPredictor for PersistencePredictor {
     }
 }
 
+/// Factorized view of the synthetic organism's state.
+///
+/// Internal variables are the quantities directly tied to persistence and regulation;
+/// external variables describe learned/world-facing consequences. Keeping the factors
+/// explicit prevents the benchmark from collapsing "world state" and "self state" into
+/// one undifferentiated scalar.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct MicroWorldFactorization {
+    pub internal_energy: f64,
+    pub internal_integrity: f64,
+    pub external_knowledge: f64,
+    pub external_threat: f64,
+    pub external_progress: f64,
+}
+
+impl MicroWorldObservation {
+    pub fn factorized(self) -> MicroWorldFactorization {
+        MicroWorldFactorization {
+            internal_energy: self.energy,
+            internal_integrity: self.integrity,
+            external_knowledge: self.knowledge,
+            external_threat: self.threat,
+            external_progress: self.progress,
+        }
+    }
+}
+
 /// Minimal homeostatic policy used to qualify whether a predictor can support
 /// survival-aware action selection.
 ///
@@ -608,6 +635,105 @@ impl HomeostaticPolicy {
         score
     }
 
+    /// Evaluate candidate actions over several predicted future steps.
+    ///
+    /// Prediction remains side-effect-free. Uncertainty is propagated by decaying
+    /// confidence over the horizon, so a distant low-confidence forecast cannot
+    /// dominate near-term evidence.
+    pub fn choose_horizon<P: MicroWorldPredictor>(
+        &self,
+        predictor: &P,
+        current: MicroWorldObservation,
+        horizon: usize,
+        discount: f64,
+    ) -> (MicroAction, MicroWorldObservation, CounterfactualRollout) {
+        let horizon = horizon.max(1);
+        let discount = discount.clamp(0.0, 1.0);
+
+        let mut best_action = MicroAction::Observe;
+        let mut best_state = current;
+        let mut best_rollout = CounterfactualRollout::default();
+        let mut best_utility = f64::NEG_INFINITY;
+
+        for first_action in MicroAction::ALL {
+            let mut state = current;
+            let mut actions = Vec::with_capacity(horizon);
+            let mut min_confidence = 1.0;
+            let mut min_viability_margin = f64::INFINITY;
+            let mut utility = 0.0;
+
+            for depth in 0..horizon {
+                let action = if depth == 0 {
+                    first_action
+                } else {
+                    self.greedy_future_action(predictor, state)
+                };
+                let raw = predictor.predict(&state, action);
+                let confidence = predictor.prediction_confidence(action).clamp(0.0, 1.0);
+                let blended = blend_prediction(state, raw, confidence);
+
+                min_confidence = min_confidence.min(confidence);
+                min_viability_margin =
+                    min_viability_margin.min(blended.energy.min(blended.integrity) - 0.08);
+
+                let depth_discount = discount.powi(depth as i32);
+                let immediate = Self::score(blended, state, action);
+                let uncertainty_penalty = (1.0 - confidence) * 0.35;
+                let viability_penalty =
+                    ((0.12 - (blended.energy.min(blended.integrity) - 0.08)).max(0.0) * 4.0);
+                utility += depth_discount * (immediate - uncertainty_penalty - viability_penalty);
+
+                actions.push(action);
+                state = blended;
+            }
+
+            let rollout = CounterfactualRollout {
+                actions,
+                terminal_state: state,
+                min_confidence,
+                min_viability_margin,
+                discounted_utility: utility,
+            };
+
+            if utility > best_utility
+                || (utility == best_utility
+                    && rollout.min_viability_margin > best_rollout.min_viability_margin)
+            {
+                best_utility = utility;
+                best_action = first_action;
+                best_state = rollout.terminal_state;
+                best_rollout = rollout;
+            }
+        }
+
+        (best_action, best_state, best_rollout)
+    }
+
+    fn greedy_future_action<P: MicroWorldPredictor>(
+        &self,
+        predictor: &P,
+        current: MicroWorldObservation,
+    ) -> MicroAction {
+        MicroAction::ALL
+            .into_iter()
+            .max_by(|&a, &b| {
+                let a_state = blend_prediction(
+                    current,
+                    predictor.predict(&current, a),
+                    predictor.prediction_confidence(a).clamp(0.0, 1.0),
+                );
+                let b_state = blend_prediction(
+                    current,
+                    predictor.predict(&current, b),
+                    predictor.prediction_confidence(b).clamp(0.0, 1.0),
+                );
+                Self::score(a_state, current, a)
+                    .partial_cmp(&Self::score(b_state, current, b))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .unwrap_or(MicroAction::Observe)
+    }
+
     pub fn choose<P: MicroWorldPredictor>(
         &self,
         predictor: &P,
@@ -643,6 +769,28 @@ impl HomeostaticPolicy {
         }
 
         (best_action, best_prediction)
+    }
+}
+
+/// Evidence produced by a counterfactual action rollout.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CounterfactualRollout {
+    pub actions: Vec<MicroAction>,
+    pub terminal_state: MicroWorldObservation,
+    pub min_confidence: f64,
+    pub min_viability_margin: f64,
+    pub discounted_utility: f64,
+}
+
+impl Default for CounterfactualRollout {
+    fn default() -> Self {
+        Self {
+            actions: Vec::new(),
+            terminal_state: MicroWorld::default().observe(),
+            min_confidence: 0.0,
+            min_viability_margin: f64::NEG_INFINITY,
+            discounted_utility: f64::NEG_INFINITY,
+        }
     }
 }
 
@@ -937,6 +1085,23 @@ pub fn evaluate_predictor_suite<P: MicroWorldPredictor>(
     }
 }
 
+fn blend_prediction(
+    current: MicroWorldObservation,
+    predicted: MicroWorldObservation,
+    confidence: f64,
+) -> MicroWorldObservation {
+    let confidence = confidence.clamp(0.0, 1.0);
+    MicroWorldObservation {
+        cycle: predicted.cycle.max(current.cycle.saturating_add(1)),
+        energy: current.energy + confidence * (predicted.energy - current.energy),
+        integrity: current.integrity + confidence * (predicted.integrity - current.integrity),
+        knowledge: current.knowledge + confidence * (predicted.knowledge - current.knowledge),
+        threat: current.threat + confidence * (predicted.threat - current.threat),
+        progress: current.progress + confidence * (predicted.progress - current.progress),
+    }
+    .clamp()
+}
+
 fn signed_delta(before: MicroWorldObservation, after: MicroWorldObservation) -> ViabilityDelta {
     signed_delta_with_confidence(before, after, 1.0)
 }
@@ -994,6 +1159,70 @@ mod tests {
             predictor.model().action_error(MicroAction::Explore.index()),
             error_before
         );
+    }
+
+    #[test]
+    fn state_factorization_is_explicit() {
+        let state = MicroWorld::default().observe();
+        let factors = state.factorized();
+        assert_eq!(factors.internal_energy, state.energy);
+        assert_eq!(factors.internal_integrity, state.integrity);
+        assert_eq!(factors.external_knowledge, state.knowledge);
+        assert_eq!(factors.external_threat, state.threat);
+        assert_eq!(factors.external_progress, state.progress);
+    }
+
+    #[test]
+    fn oracle_counterfactual_rollout_is_finite_and_side_effect_free() {
+        struct Oracle;
+        impl MicroWorldPredictor for Oracle {
+            fn predict(
+                &self,
+                state: MicroWorldObservation,
+                action: MicroAction,
+            ) -> MicroWorldObservation {
+                transition(state, action)
+            }
+
+            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
+                1.0
+            }
+        }
+
+        let predictor = Oracle;
+        let policy = HomeostaticPolicy;
+        let before = MicroWorld::default().observe();
+        let (_, terminal, rollout) = policy.choose_horizon(&predictor, before, 4, 0.8);
+
+        assert_eq!(rollout.actions.len(), 4);
+        assert!(rollout.discounted_utility.is_finite());
+        assert!(rollout.min_confidence >= 1.0 - 1e-12);
+        assert!(rollout.min_viability_margin.is_finite());
+        assert!(terminal.is_viable());
+    }
+
+    #[test]
+    fn uncertain_prediction_is_not_treated_as_certain() {
+        struct UncertainOracle;
+        impl MicroWorldPredictor for UncertainOracle {
+            fn predict(
+                &self,
+                state: MicroWorldObservation,
+                action: MicroAction,
+            ) -> MicroWorldObservation {
+                transition(state, action)
+            }
+
+            fn prediction_confidence(&self, _action: MicroAction) -> f64 {
+                0.1
+            }
+        }
+
+        let predictor = UncertainOracle;
+        let policy = HomeostaticPolicy;
+        let before = MicroWorld::default().observe();
+        let (_, _, rollout) = policy.choose_horizon(&predictor, before, 3, 0.8);
+        assert!(rollout.min_confidence <= 0.1 + 1e-12);
     }
 
     #[test]
