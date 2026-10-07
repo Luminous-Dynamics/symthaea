@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-observation-attestation"
+version = "0.1.0"
+edition = "2024"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Detached Ed25519 attestation adapter for Symthaea observation-fabric evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+serde = { workspace = true }
+symthaea-core = { workspace = true }
+thiserror = { workspace = true }
