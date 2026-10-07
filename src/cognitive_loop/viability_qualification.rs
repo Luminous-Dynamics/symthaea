@@ -429,6 +429,9 @@ pub struct GroundedWorldModelQualificationReport {
     /// Frozen transfer to a procedurally generated scenario family never used for adaptation.
     pub procedural_held_out_transfer: ProceduralHeldOutTransferReport,
 
+    /// Isolated response to perturbation-induced prediction error.
+    pub learning_response: LearningResponseReport,
+
     pub persistence_closed_loop_survived: bool,
     pub persistence_closed_loop_mean_oracle_horizon_regret: f64,
     pub persistence_recovery_rate: f64,
@@ -448,6 +451,30 @@ pub struct GroundedWorldModelQualificationReport {
     pub perturbation_recovery_steps: Vec<Option<u64>>,
     pub recovery_rate: f64,
     pub mean_recovery_steps: f64,
+}
+
+/// Measures prediction-error response to deterministic perturbation shocks.
+///
+/// Each shock is scored before learning, after exactly one observed transition update on the
+/// shock itself, and again on a nearby probe state. The nearby probe prevents an update that
+/// merely memorizes the exact observed tuple from being counted as full adaptation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LearningResponseReport {
+    pub shock_count: u64,
+    pub mean_shock_mae_before_update: f64,
+    pub mean_shock_mae_after_update: f64,
+    pub mean_same_transition_improvement: f64,
+    pub same_transition_improvement_rate: f64,
+    pub mean_neighbor_mae_before_update: f64,
+    pub mean_neighbor_mae_after_update: f64,
+    pub mean_neighbor_improvement: f64,
+    pub neighbor_improvement_rate: f64,
+}
+
+impl LearningResponseReport {
+    pub fn is_populated(&self) -> bool {
+        self.shock_count > 0
+    }
 }
 
 /// Frozen transfer result for one procedurally generated held-out scenario.
@@ -817,6 +844,116 @@ fn evaluate_frozen_scenario<P: MicroWorldPredictor>(
         calibration.finish(),
         world.observe().is_viable(),
     )
+}
+
+/// Replay deterministic perturbation shocks against isolated model clones and measure
+/// the immediate learning response plus transfer to a nearby state.
+fn evaluate_learning_response(
+    base_model: &super::goal_world::WorldModelBridge,
+    scenario: &MicroWorldScenario,
+    max_cycles: u64,
+) -> LearningResponseReport {
+    let mut world = MicroWorld::new(scenario.initial, max_cycles);
+    let mut shock_states = Vec::new();
+    let mut steps = 0u64;
+
+    while !world.done() && steps < max_cycles {
+        for (cycle, perturbation) in scenario.perturbations {
+            if *cycle == steps {
+                let before_shock = world.observe();
+                let shocked = perturbation.apply(before_shock);
+                let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+                shock_states.push((shocked, action));
+                world.perturb(*perturbation);
+            }
+        }
+        let action = scenario.schedule[steps as usize % scenario.schedule.len()];
+        world.step(action);
+        steps = steps.saturating_add(1);
+    }
+
+    let mut shock_mae_before = 0.0;
+    let mut shock_mae_after = 0.0;
+    let mut same_transition_improvements = 0.0;
+    let mut same_transition_improvement_count = 0u64;
+    let mut neighbor_mae_before = 0.0;
+    let mut neighbor_mae_after = 0.0;
+    let mut neighbor_improvements = 0.0;
+    let mut neighbor_improvement_count = 0u64;
+
+    for (shock_state, action) in &shock_states {
+        let mut model = base_model.clone();
+        let predictor = FepWorldModelPredictor {
+            bridge: &mut model,
+        };
+
+        let actual = transition(*shock_state, *action);
+        let before_prediction = predictor.predict(*shock_state, *action);
+        let before_mae = before_prediction.mean_absolute_delta(actual);
+
+        // This is the only adaptation update in this isolated shock fold.
+        predictor.observe_transition(*shock_state, *action, actual);
+
+        let after_prediction = predictor.predict(*shock_state, *action);
+        let after_mae = after_prediction.mean_absolute_delta(actual);
+        let same_improvement = before_mae - after_mae;
+
+        shock_mae_before += before_mae;
+        shock_mae_after += after_mae;
+        same_transition_improvements += same_improvement;
+        if same_improvement > 1e-12 {
+            same_transition_improvement_count =
+                same_transition_improvement_count.saturating_add(1);
+        }
+
+        // Nearby probe: perturb one observable channel deterministically after the shock.
+        // The update above did not see this neighboring state.
+        let neighbor_state = super::viability_micro_world::MicroPerturbation::ThreatSpike(0.01)
+            .apply(*shock_state);
+        let neighbor_actual = transition(neighbor_state, *action);
+        let neighbor_before = predictor.predict(neighbor_state, *action);
+        let neighbor_before_mae = neighbor_before.mean_absolute_delta(neighbor_actual);
+
+        // Re-test after the SAME single update; no second learning step is allowed.
+        let neighbor_after = predictor.predict(neighbor_state, *action);
+        let neighbor_after_mae = neighbor_after.mean_absolute_delta(neighbor_actual);
+        let neighbor_improvement = neighbor_before_mae - neighbor_after_mae;
+
+        neighbor_mae_before += neighbor_before_mae;
+        neighbor_mae_after += neighbor_after_mae;
+        neighbor_improvements += neighbor_improvement;
+        if neighbor_improvement > 1e-12 {
+            neighbor_improvement_count =
+                neighbor_improvement_count.saturating_add(1);
+        }
+    }
+
+    let count = shock_states.len() as f64;
+    if count <= 0.0 {
+        return LearningResponseReport {
+            shock_count: 0,
+            mean_shock_mae_before_update: 0.0,
+            mean_shock_mae_after_update: 0.0,
+            mean_same_transition_improvement: 0.0,
+            same_transition_improvement_rate: 0.0,
+            mean_neighbor_mae_before_update: 0.0,
+            mean_neighbor_mae_after_update: 0.0,
+            mean_neighbor_improvement: 0.0,
+            neighbor_improvement_rate: 0.0,
+        };
+    }
+
+    LearningResponseReport {
+        shock_count: shock_states.len() as u64,
+        mean_shock_mae_before_update: shock_mae_before / count,
+        mean_shock_mae_after_update: shock_mae_after / count,
+        mean_same_transition_improvement: same_transition_improvements / count,
+        same_transition_improvement_rate: same_transition_improvement_count as f64 / count,
+        mean_neighbor_mae_before_update: neighbor_mae_before / count,
+        mean_neighbor_mae_after_update: neighbor_mae_after / count,
+        mean_neighbor_improvement: neighbor_improvements / count,
+        neighbor_improvement_rate: neighbor_improvement_count as f64 / count,
+    }
 }
 
 /// Train an isolated copy of the exact starting world model on one scenario.
@@ -1702,6 +1839,9 @@ impl FepModule {
         let procedural_held_out_transfer =
             evaluate_procedural_held_out_transfer(predictor.bridge, held_out_cycles);
 
+        let learning_response =
+            evaluate_learning_response(predictor.bridge, held_out, held_out_cycles);
+
         let closed_loop = run_homeostatic_agent_horizon_scenario(
             &mut predictor,
             held_out,
@@ -1736,6 +1876,7 @@ impl FepModule {
             environment_query_report,
             cross_scenario_transfer,
             procedural_held_out_transfer,
+            learning_response,
             persistence_closed_loop_survived: persistence_closed_loop.survived,
             persistence_closed_loop_mean_oracle_horizon_regret:
                 persistence_closed_loop.mean_oracle_horizon_regret,
@@ -2032,6 +2173,33 @@ mod tests {
         assert_eq!(report.mean_changed_channel_f1, 0.0);
         assert_eq!(report.mean_terminal_mae, 0.0);
         assert_eq!(report.mean_min_viability_margin_error, 0.0);
+    }
+
+    #[test]
+    fn learning_response_is_populated_and_finite() {
+        let model = super::goal_world::WorldModelBridge::with_actions(MicroAction::ALL.len());
+        let report = evaluate_learning_response(
+            &model,
+            &benchmark_scenarios()[1],
+            12,
+        );
+
+        assert_eq!(report.shock_count, 2);
+        assert!(report.is_populated());
+        for value in [
+            report.mean_shock_mae_before_update,
+            report.mean_shock_mae_after_update,
+            report.mean_same_transition_improvement,
+            report.same_transition_improvement_rate,
+            report.mean_neighbor_mae_before_update,
+            report.mean_neighbor_mae_after_update,
+            report.mean_neighbor_improvement,
+            report.neighbor_improvement_rate,
+        ] {
+            assert!(value.is_finite());
+        }
+        assert!((0.0..=1.0).contains(&report.same_transition_improvement_rate));
+        assert!((0.0..=1.0).contains(&report.neighbor_improvement_rate));
     }
 
     #[test]
