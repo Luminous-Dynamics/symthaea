@@ -1659,6 +1659,71 @@ fn generator_basis_change_preserves_parity_check_and_decoder_semantics() {
 }
 
 #[test]
+fn composed_basis_and_coordinate_metamorphisms_preserve_decoder_semantics() {
+    let original = RandomLinearCode::generate(73, 8, 0xC0DE);
+    let permutation = (0..73usize)
+        .map(|index| (index * 17 + 11) % 73)
+        .collect::<Vec<_>>();
+
+    let mut transformed_basis = Vec::with_capacity(original.basis().len());
+    for index in (0..original.basis().len()).rev() {
+        let mut transformed = original.basis()[index].clone();
+        if index > 0 {
+            transformed.xor_assign(&original.basis()[index - 1]);
+        }
+        transformed_basis.push(transformed);
+    }
+    let basis_changed = RandomLinearCode::from_basis(transformed_basis)
+        .expect("equivalent basis must remain independent");
+
+    let coordinate_changed = permute_code(&original, &permutation);
+    let composed = permute_code(&basis_changed, &permutation);
+
+    assert_eq!(
+        canonicalize_words(coordinate_changed.enumerate()),
+        canonicalize_words(composed.enumerate()),
+        "basis change and coordinate permutation composition changed the code"
+    );
+
+    let coordinate_parity_check =
+        ParityCheckMatrix::from_code(&coordinate_changed).expect("coordinate decoder");
+    let composed_parity_check =
+        ParityCheckMatrix::from_code(&composed).expect("composed decoder");
+    assert_eq!(coordinate_parity_check.rows(), composed_parity_check.rows());
+    assert_eq!(coordinate_parity_check.columns(), composed_parity_check.columns());
+    assert_eq!(coordinate_parity_check.fingerprint(), composed_parity_check.fingerprint());
+
+    let coordinate_decoder =
+        BoundedDistanceSyndromeDecoder::from_code(&coordinate_changed).expect("coordinate decoder");
+    let composed_decoder =
+        BoundedDistanceSyndromeDecoder::from_code(&composed).expect("composed decoder");
+
+    let original_observations = deterministic_probe_masks(0xC0DE_CAFE, 64, 73)
+        .iter()
+        .map(|&mask| error_from_mask(mask as usize, 73))
+        .collect::<Vec<_>>();
+
+    for observation in &original_observations {
+        let coordinate_observation = permute_codeword(observation, &permutation);
+        let coordinate_result =
+            coordinate_decoder.decode_with_minimum_list(&coordinate_observation, 1, 128);
+        let composed_result =
+            composed_decoder.decode_with_minimum_list(&coordinate_observation, 1, 128);
+        assert_eq!(composed_result, coordinate_result);
+
+        let (coordinate_outcome, coordinate_work) =
+            coordinate_decoder.decode_with_work(&coordinate_observation, 1);
+        let (composed_outcome, composed_work) =
+            composed_decoder.decode_with_work(&coordinate_observation, 1);
+        assert_eq!(composed_outcome, coordinate_outcome);
+        assert_eq!(composed_work, coordinate_work);
+    }
+
+    println!(
+        "COMPOSED_METAMORPHIC_EQUIVARIANCE=dimension=73;rank=8;probes=64;basis_then_coordinate=true;codeword_set_equal=true;parity_check_equal=true;decoder_list_equal=true;work_ledger_equal=true"
+    );
+}
+#[test]
 fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
     let regimes = [
         (12usize, 4usize, 64u64, 0xE100_0000u64, 24usize),
