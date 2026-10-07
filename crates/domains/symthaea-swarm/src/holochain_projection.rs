@@ -121,7 +121,7 @@ impl ReceiptSelectionContext {
     #[cfg(feature = "semantic-receipts")]
     pub fn from_bound_decision(
         decision: &crate::rfc9942_selection::ReceiptSelectionDecision,
-        collection: &crate::Rfc9942ReceiptCollection,
+        collection: &crate::semantic_evidence_vds::Rfc9942ReceiptCollection,
     ) -> Result<Self, HolochainProjectionError> {
         decision
             .validate_against_collection(collection)
