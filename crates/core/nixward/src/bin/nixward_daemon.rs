@@ -997,6 +997,7 @@ impl DaemonState {
         &mut self,
         intent: &NixActionIntentV1,
         command: &nixward::action::executor::NixOSCommand,
+        definition_content: Option<&nixward::action::NixVerifiedServiceDefinitionContentV1>,
     ) -> Result<(), String> {
         let displayed_action = nixward::action::operator_visible_action_for_command(command);
         let intent_digest = intent.digest().map_err(|error| error.to_string())?;
@@ -1024,15 +1025,27 @@ impl DaemonState {
 
         let created_at = UnixMillisV1::new(now_secs().saturating_mul(1_000));
         let expires_at = UnixMillisV1::new(created_at.as_u64().saturating_add(60_000));
-        let installed = runtime
-            .create_pending_request(
+        let installed = match command {
+            nixward::action::executor::NixOSCommand::Service { .. } => runtime
+                .create_pending_service_request_with_definition_capture(
+                    intent,
+                    command,
+                    definition_content.ok_or_else(|| {
+                        "Service approval requires observer-sealed definition content".to_string()
+                    })?,
+                    nixward::action::RequiredApprovalProfileV1::SameUidProcessV1,
+                    created_at,
+                    expires_at,
+                ),
+            _ => runtime.create_pending_request(
                 intent,
                 command,
                 nixward::action::RequiredApprovalProfileV1::SameUidProcessV1,
                 created_at,
                 expires_at,
-            )
-            .map_err(|error| format!("cannot create local approval request: {error}"))?;
+            ),
+        }
+        .map_err(|error| format!("cannot create local approval request: {error}"))?;
         let projection = installed
             .operator_projection()
             .map_err(|error| format!("cannot create local approval projection: {error}"))?;
@@ -1051,6 +1064,7 @@ impl DaemonState {
         &mut self,
         _intent: &NixActionIntentV1,
         _command: &nixward::action::executor::NixOSCommand,
+        _definition_content: Option<&nixward::action::NixVerifiedServiceDefinitionContentV1>,
     ) -> Result<(), String> {
         Err("typed local approval runtime is only implemented on Linux".to_string())
     }
@@ -1397,8 +1411,8 @@ impl DaemonState {
                             // approval intent, so the content commitment becomes part of the
                             // exact action-intent digest that the operator approves.
                             let approval_definition_content = match &cmd {
-                                NixOSCommand::Service { unit, .. } => {
-                                    match capture_authoritative_service_definition_content(operation, unit) {
+                                NixOSCommand::Service { operation, unit } => {
+                                    match capture_authoritative_service_definition_content(*operation, unit) {
                                         Ok(content) => Some(content),
                                         Err(error) => {
                                             eprintln!(
@@ -1552,7 +1566,11 @@ impl DaemonState {
 
                                 // `intent` is the exact content-bound intent whose digest was approved.
                                 if let Err(error) =
-                                    self.ensure_local_approval_request(&intent, &cmd)
+                                    self.ensure_local_approval_request(
+                                        &intent,
+                                        &cmd,
+                                        approval_definition_content.as_ref(),
+                                    )
                                 {
                                     eprintln!(
                                         "nixward-daemon: refusing typed action because local approval runtime is unavailable: {error}"
