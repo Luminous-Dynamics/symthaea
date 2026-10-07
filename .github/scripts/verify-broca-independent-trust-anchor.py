@@ -43,6 +43,11 @@ EXPECTED_ACTION_REFS = [
     "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6",
     "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
 ]
+EXPECTED_TRUST_ANCHOR_ACTION_REFS = [
+    "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+    "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+]
+
 
 EXPECTED_BROCA_JOBS = [
     "symthaea-broca (no-default-features)",
@@ -257,6 +262,47 @@ def resolve_branch_tip(branch: str) -> str:
             f"base branch {branch!r} has a non-canonical commit SHA: {sha!r}"
         )
     return sha
+
+
+def verify_trust_anchor_workflow() -> str:
+    workflow_bytes, workflow_blob = get_file(
+        ".github/workflows/qual-broca-independent-trust-anchor.yml",
+        TRUST_ANCHOR_SHA,
+    )
+    workflow = workflow_bytes.decode("utf-8")
+    uses = [
+        match.group(1)
+        for line in workflow.splitlines()
+        if (match := re.match(r"^\s*(?:-\s*)?uses:\s+(\S+)", line))
+    ]
+    if uses != EXPECTED_TRUST_ANCHOR_ACTION_REFS:
+        raise VerificationError(
+            f"trust-anchor workflow Action refs mismatch: expected {EXPECTED_TRUST_ANCHOR_ACTION_REFS!r}, got {uses!r}"
+        )
+    require_fragments(
+        workflow,
+        [
+            "name: Broca Independent Trust Anchor",
+            "workflow_run:",
+            "types:",
+            "      - requested",
+            "      - in_progress",
+            "      - completed",
+            "workflow_dispatch:",
+            "workflow_run_id:",
+            "permissions:",
+            "  actions: read",
+            "  contents: read",
+            "  pull-requests: read",
+            "  statuses: write",
+            "github.ref == format('refs/heads/{0}', ${{ github.event.repository.default_branch }})",
+            "TRUST_ANCHOR_MODE: ${{ github.event_name }}",
+            "MANUAL_WORKFLOW_RUN_ID: ${{ inputs.workflow_run_id }}",
+            "persist-credentials: false",
+        ],
+        "trust-anchor workflow",
+    )
+    return workflow_blob
 
 
 def latest_required_runs(head_sha: str) -> dict[str, dict[str, Any] | None]:
@@ -550,6 +596,7 @@ def main() -> int:
     global TRIGGER_RUN_CONCLUSION, TRIGGER_RUN_ATTEMPT
 
     verifier_head = trusted_checkout_identity()
+    trust_workflow_blob = verify_trust_anchor_workflow()
     policy_blob = trusted_file_blob(POLICY_PATH.as_posix())
     target_url = ""
 
@@ -560,6 +607,7 @@ def main() -> int:
             "commit_sha": verifier_head,
             "policy_path": POLICY_PATH.as_posix(),
             "policy_blob_sha": policy_blob,
+            "workflow_blob_sha": trust_workflow_blob,
             "workflow_name": "Broca Independent Trust Anchor",
             "status_context": STATUS_CONTEXT,
         },
