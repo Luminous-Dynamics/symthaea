@@ -1114,6 +1114,7 @@ impl NixOSExecutor {
             }
         };
 
+        let intent = authority.intent().clone();
         let expectation = match authority.service_post_state_expectation() {
             Ok(expectation) => expectation,
             Err(error) => {
@@ -1166,13 +1167,7 @@ impl NixOSExecutor {
         };
 
         let receipt = NixPostStateReceiptV1::build_proven_from_live_execution_witness(
-            self
-                .latest_authorization_intent_for_receipt(&expectation)
-                .unwrap_or_else(|_| {
-                    // This branch is unreachable for a consumed authority that successfully
-                    // produced the observation, but it cannot be allowed to fabricate an intent.
-                    NixActionIntentV1::invalid_forbidden_placeholder()
-                }),
+            &intent,
             &authorization,
             &expectation,
             &final_observation,
