@@ -4432,6 +4432,39 @@ struct ConfigurationSwap {
     temp_name: String,
 }
 
+fn file_identity_at(
+    dir_fd: libc::c_int,
+    name: &std::ffi::CStr,
+) -> Result<FileIdentity, String> {
+    use std::os::fd::FromRawFd;
+    use std::os::unix::fs::MetadataExt;
+
+    let fd = unsafe {
+        libc::openat(
+            dir_fd,
+            name.as_ptr(),
+            libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if fd < 0 {
+        return Err(format!(
+            "unable to open configuration entry for identity check: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    let file = unsafe { std::fs::File::from_raw_fd(fd) };
+    let metadata = file.metadata().map_err(|error| {
+        format!("unable to inspect configuration entry identity: {error}")
+    })?;
+    if !metadata.file_type().is_file() {
+        return Err("configuration entry identity target is not a regular file".into());
+    }
+    Ok(FileIdentity {
+        device: metadata.dev(),
+        inode: metadata.ino(),
+    })
+}
+
 fn atomic_exchange_at(
     dir_fd: libc::c_int,
     first: &std::ffi::CString,
@@ -4465,6 +4498,7 @@ fn replace_configuration_atomically_blocking(
     use std::ffi::CString;
     use std::io::Read;
     use std::os::unix::fs::{AsRawFd, FromRawFd, OpenOptionsExt, PermissionsExt};
+    use std::os::unix::fs::MetadataExt;
 
     if transaction_id.len() != 32
         || !transaction_id.bytes().all(|byte| byte.is_ascii_hexdigit())
@@ -4501,6 +4535,10 @@ fn replace_configuration_atomically_blocking(
     if !metadata.is_file() {
         return Err("current configuration is not a regular file".into());
     }
+    let original_identity = FileIdentity {
+        device: metadata.dev(),
+        inode: metadata.ino(),
+    };
     let mut observed = Vec::new();
     current
         .read_to_end(&mut observed)
@@ -4545,6 +4583,23 @@ fn replace_configuration_atomically_blocking(
             format!("unable to synchronize configuration swap staging file: {error}")
         })?;
 
+    let temp_metadata = temp
+        .metadata()
+        .map_err(|error| format!("unable to inspect configuration swap staging identity: {error}"))?;
+    let replacement_identity = FileIdentity {
+        device: temp_metadata.dev(),
+        inode: temp_metadata.ino(),
+    };
+
+    let observed_identity = file_identity_at(dir_fd, &final_c)?;
+    if observed_identity != original_identity {
+        let _ = unsafe { libc::unlinkat(dir_fd, temp_c.as_ptr(), 0) };
+        return Err(
+            "configuration target inode changed after verification; refusing atomic overwrite"
+                .into(),
+        );
+    }
+
     // RENAME_EXCHANGE is itself the rollback handle: after the exchange,
     // the old configuration inode remains at temp_name until the transaction
     // is explicitly committed or reverted.
@@ -4560,6 +4615,8 @@ fn replace_configuration_atomically_blocking(
     Ok(ConfigurationSwap {
         target_dir,
         temp_name,
+        original_identity,
+        replacement_identity,
     })
 }
 
@@ -4587,6 +4644,14 @@ fn finalize_configuration_swap_blocking(
         }
     };
 
+    let current_identity = file_identity_at(dir_fd, &final_c)?;
+    if current_identity != swap.replacement_identity {
+        return Err(
+            "configuration target inode changed before transaction finalization; preserving swap artifact"
+                .into(),
+        );
+    }
+
     if commit {
         // The temp path contains the old inode. Removing it commits the swap.
         unlink(&temp_c)?;
@@ -4594,6 +4659,13 @@ fn finalize_configuration_swap_blocking(
         // The temp path still contains the old inode. Exchange it back to restore
         // the exact original file atomically, then remove the replacement inode.
         atomic_exchange_at(dir_fd, &temp_c, &final_c)?;
+        let restored_identity = file_identity_at(dir_fd, &final_c)?;
+        if restored_identity != swap.original_identity {
+            return Err(
+                "configuration rollback restored an unexpected inode; preserving swap artifact"
+                    .into(),
+            );
+        }
         unlink(&temp_c)?;
     }
 
