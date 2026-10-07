@@ -1,0 +1,37 @@
+name: GPU Fabric Vulkan Barrier Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-gpu-fabric/**'
+      - '.github/workflows/gpu-fabric-vulkan-barriers.yml'
+  workflow_dispatch:
+
+jobs:
+  vulkan-barriers:
+    name: Vulkan resource barrier workload qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vulkan runtime and validation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan1 mesa-vulkan-drivers vulkan-tools vulkan-validationlayers
+
+      - name: Verify validation layer
+        run: |
+          vulkaninfo --summary
+          vulkaninfo --summary | grep -q 'VK_LAYER_KHRONOS_validation'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Compile barrier workload harness
+        run: cargo test --locked -p symthaea-gpu-fabric --features vulkan --lib
+
+      - name: Execute real workload barrier qualification
+        run: cargo test --locked -p symthaea-gpu-fabric --features vulkan --lib -- --ignored --nocapture
