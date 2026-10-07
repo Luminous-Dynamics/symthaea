@@ -675,6 +675,28 @@ const NEUROSEMANTIC_REMEDIATION_WILSON_95_ASSUMPTIONS_REF: &str =
 const NEUROSEMANTIC_REMEDIATION_WILSON_95_ASSUMPTIONS_BYTES: &[u8] =
     b"independent Bernoulli trials; fixed binary outcome; no clustering correction declared";
 
+fn validate_uncertainty_method_application(
+    method_ref: &str,
+    unit_ref: &str,
+    aggregation_ref: &str,
+) -> Result<(), String> {
+    if method_ref != NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF {
+        return Ok(());
+    }
+    if unit_ref != "proportion"
+        || !matches!(
+            aggregation_ref,
+            "per-item-rate" | "attack-success-rate" | "probe-detection-rate"
+        )
+    {
+        return Err(
+            "neurosemantic remediation Wilson uncertainty method is only valid for single-proportion failure-rate metrics"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NeurosemanticRemediationMeasurementArtifact {
     pub schema_version: u16,
@@ -766,6 +788,11 @@ impl NeurosemanticRemediationMeasurementArtifact {
                     {
                         return Err("neurosemantic remediation measurement uncertainty is invalid".into());
                     }
+                    validate_uncertainty_method_application(
+                        uncertainty_method_ref.as_str(),
+                        definition.unit_ref.as_str(),
+                        definition.aggregation_ref.as_str(),
+                    )?;
                 }
             }
         }
@@ -1474,6 +1501,11 @@ impl NeurosemanticRemediationImpactArtifact {
                 }
 
                 if uncertainty.method_ref == NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF {
+                    validate_uncertainty_method_application(
+                        uncertainty.method_ref.as_str(),
+                        definition.unit_ref.as_str(),
+                        definition.aggregation_ref.as_str(),
+                    )?;
                     if uncertainty.confidence_level_bps != 9_500
                         || uncertainty.assumptions_ref
                             != NEUROSEMANTIC_REMEDIATION_WILSON_95_ASSUMPTIONS_REF
@@ -5036,6 +5068,28 @@ mod tests {
         assert!(definition.validate().is_err());
         definition.direction = NeurosemanticRemediationMetricDirection::LowerIsBetter;
         assert!(definition.validate().is_ok());
+    }
+
+    #[test]
+    fn remediation_wilson_method_cannot_target_non_proportion_estimands() {
+        assert!(validate_uncertainty_method_application(
+            NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF,
+            "proportion",
+            "worst-subgroup-gap",
+        )
+        .is_err());
+        assert!(validate_uncertainty_method_application(
+            NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF,
+            "count",
+            "per-item-rate",
+        )
+        .is_err());
+        assert!(validate_uncertainty_method_application(
+            NEUROSEMANTIC_REMEDIATION_WILSON_95_METHOD_REF,
+            "proportion",
+            "per-item-rate",
+        )
+        .is_ok());
     }
 
     #[test]
