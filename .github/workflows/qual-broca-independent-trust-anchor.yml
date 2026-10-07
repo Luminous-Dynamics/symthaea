@@ -7,6 +7,8 @@ on:
       - Workflow Syntax
       - PR Governance
     types:
+      - requested
+      - in_progress
       - completed
 
 permissions:
@@ -45,6 +47,7 @@ jobs:
           TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
           TRIGGER_RUN_NAME: ${{ github.event.workflow_run.name }}
           TRIGGER_RUN_EVENT: ${{ github.event.workflow_run.event }}
+          TRIGGER_ACTIVITY_TYPE: ${{ github.event.action }}
           TRIGGER_RUN_REPOSITORY_ID: ${{ github.event.workflow_run.repository.id }}
           TRIGGER_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           TRIGGER_RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
