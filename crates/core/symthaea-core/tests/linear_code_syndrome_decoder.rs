@@ -522,7 +522,6 @@ fn small_fixture_full_coset_distance_spectrum_is_syndrome_difference_invariant()
     );
 }
 
-
 #[test]
 fn small_fixture_spectrum_adversary_demonstrates_nonadditive_label_blind_spot() {
     let mut buckets: [Vec<u8>; 64] = std::array::from_fn(|_| Vec::new());

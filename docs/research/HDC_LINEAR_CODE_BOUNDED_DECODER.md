@@ -165,7 +165,9 @@ This boundary matters because a distance spectrum observes only Hamming weights 
 ambient differences. It can therefore certify a strong colored metric geometry
 without certifying the chosen syndrome labels form an additive coordinate system.
 
-The qualification suite now also executes this exact permutation as a negative guard: it must preserve all 4,096 pairwise weight-spectrum entries while failing XOR additivity. This is an anti-overclaim regression, not a positive algebraic certificate.\n\nThe next witness closes exactly that blind spot without claiming a new mathematical
+The qualification suite now also executes this exact permutation as a negative guard: it must preserve all 4,096 pairwise weight-spectrum entries while failing XOR additivity. This is an anti-overclaim regression, not a positive algebraic certificate.
+
+The next witness closes exactly that blind spot without claiming a new mathematical
 foundation. For every syndrome pair \(s,t\), every anchor \(x\in F_s\), and the complete
 target fiber, the qualification checks the exact finite identity
 \[
