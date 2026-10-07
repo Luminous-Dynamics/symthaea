@@ -38,22 +38,24 @@
     },
     {
       "id": "R6",
-      "when": "measured loss-dependence profile is valid, the separately prespecified small-sample adequacy policy admits the design, and the analysis remains within this fixed-horizon v1 scope",
-      "then": "nested-forecast-bootstrap-v1"
+      "when": "the qualification/binding and loss-dependence characterization are valid, the analysis remains within fixed-horizon v1 scope, the small-sample policy is small-sample-conservative-v1, the multiplicity policy is single-primary-comparison-v1, and the selected procedure bundle exactly matches the declared v1 nested forecast bootstrap",
+      "then": "nested-fixed-horizon-bootstrap"
     },
     {
       "id": "R7",
-      "when": "dependence characterization is missing/invalid, the small-sample adequacy policy rejects the design, a second unregistered inferential method is requested, or a joint multi-horizon analysis is introduced",
+      "when": "any R1-R6 prerequisite fails, dependence characterization is missing/invalid, a different or unregistered inferential bundle is requested, or a joint multi-horizon analysis is introduced",
       "then": "stop-assumption-failure"
     }
   ],
   "selected_method_bundle": {
     "procedure_id": "nested-forecast-bootstrap-v1",
     "dependence_method_id": "loss-dependence-bartlett-v1",
-    "resampling_method_id": "moving-block-bootstrap-v1"
+    "resampling_method_id": "moving-block-bootstrap-v1",
+    "small_sample_policy_id": "small-sample-conservative-v1",
+    "multiplicity_policy_id": "single-primary-comparison-v1"
   },
   "decision_semantics": {
-    "rule_execution": "external-procedural",
+    "rule_execution": "compiled-v1-rule-mirror",
     "branch_recording": "ForecastInferenceSelectionReceipt",
     "result_dependent_method_switching": false,
     "temporal_preregistration_proof_in_code": false,
