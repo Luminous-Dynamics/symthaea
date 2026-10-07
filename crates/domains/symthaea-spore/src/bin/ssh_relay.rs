@@ -4680,16 +4680,15 @@ async fn verify_restored_image_postcondition(
         return Err("restored configuration postcondition has invalid provenance".into());
     }
 
-    let target = tokio::fs::symlink_metadata("/mnt/etc/nixos/configuration.nix")
-        .await
-        .map_err(|error| format!("restored configuration postcondition probe failed: {error}"))?;
-    if !target.file_type().is_file() || target.len() != expected_configuration.size {
+    let actual = read_regular_file_bytes_at(
+        std::path::Path::new("/mnt/etc/nixos"),
+        "configuration.nix",
+    )
+    .await
+    .map_err(|error| format!("restored configuration postcondition probe failed: {error}"))?;
+    if actual.len() as u64 != expected_configuration.size {
         return Ok(false);
     }
-
-    let actual = tokio::fs::read("/mnt/etc/nixos/configuration.nix")
-        .await
-        .map_err(|error| format!("restored configuration read failed: {error}"))?;
     let digest = blake3::hash(&actual).to_hex().to_string();
     Ok(digest == expected_configuration.digest)
 }
@@ -4791,16 +4790,108 @@ fn configuration_bytes_match(actual: &[u8], expected: &[u8]) -> bool {
     blake3::hash(actual) == blake3::hash(expected)
 }
 
+fn read_regular_file_bytes_at_blocking(
+    directory_path: &std::path::Path,
+    file_name: &str,
+) -> Result<Vec<u8>, String> {
+    use std::ffi::CString;
+    use std::io::Read as _;
+    use std::os::fd::{AsRawFd, FromRawFd};
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let directory = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(directory_path)
+        .map_err(|error| {
+            format!(
+                "unable to open postcondition directory {}: {error}",
+                directory_path.display()
+            )
+        })?;
+
+    let name = CString::new(file_name)
+        .map_err(|_| format!("postcondition filename contains NUL: {file_name:?}"))?;
+    let fd = unsafe {
+        libc::openat(
+            directory.as_raw_fd(),
+            name.as_ptr(),
+            libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if fd < 0 {
+        return Err(format!(
+            "unable to open postcondition file {} under {}: {}",
+            file_name,
+            directory_path.display(),
+            std::io::Error::last_os_error()
+        ));
+    }
+
+    let mut file = unsafe { std::fs::File::from_raw_fd(fd) };
+    let metadata = file.metadata().map_err(|error| {
+        format!(
+            "unable to inspect postcondition file {} under {}: {error}",
+            file_name,
+            directory_path.display()
+        )
+    })?;
+    if !metadata.is_file() {
+        return Err(format!(
+            "postcondition file {} under {} is not a regular file",
+            file_name,
+            directory_path.display()
+        ));
+    }
+    if metadata.len() > 16 * 1024 * 1024 {
+        return Err(format!(
+            "postcondition file {} is unexpectedly large ({} bytes)",
+            file_name,
+            metadata.len()
+        ));
+    }
+
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.read_to_end(&mut bytes).map_err(|error| {
+        format!(
+            "unable to read postcondition file {} under {}: {error}",
+            file_name,
+            directory_path.display()
+        )
+    })?;
+    Ok(bytes)
+}
+
+async fn read_regular_file_bytes_at(
+    directory_path: &std::path::Path,
+    file_name: &str,
+) -> Result<Vec<u8>, String> {
+    let directory_path = directory_path.to_path_buf();
+    let file_name = file_name.to_string();
+    tokio::task::spawn_blocking(move || {
+        read_regular_file_bytes_at_blocking(&directory_path, &file_name)
+    })
+    .await
+    .map_err(|error| format!("postcondition read task failed: {error}"))?
+}
+
 async fn verify_active_configuration(expected: &[u8]) -> Result<bool, String> {
-    let actual = tokio::fs::read("/etc/nixos/configuration.nix")
-        .await
-        .map_err(|error| format!("active configuration postcondition probe failed: {error}"))?;
+    let actual = read_regular_file_bytes_at(
+        std::path::Path::new("/etc/nixos"),
+        "configuration.nix",
+    )
+    .await
+    .map_err(|error| format!("active configuration postcondition probe failed: {error}"))?;
     Ok(configuration_bytes_match(&actual, expected))
 }
+
 async fn verify_installed_configuration(expected: Option<&[u8]>) -> Result<bool, String> {
-    let actual = tokio::fs::read("/mnt/etc/nixos/configuration.nix")
-        .await
-        .map_err(|error| format!("installed configuration postcondition probe failed: {error}"))?;
+    let actual = read_regular_file_bytes_at(
+        std::path::Path::new("/mnt/etc/nixos"),
+        "configuration.nix",
+    )
+    .await
+    .map_err(|error| format!("installed configuration postcondition probe failed: {error}"))?;
     if actual.is_empty() {
         return Ok(false);
     }
