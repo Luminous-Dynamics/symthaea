@@ -176,9 +176,11 @@ impl VulkanBarrierExecutionReceipt {
                     self.resource_storage_sizes.get(*resource)
                         != expected_storage_sizes.get(*resource)
                 })
-                .cloned()
-                .expect("storage-size mismatch must identify a resource");
-            return Err(VulkanBarrierReceiptError::ResourceStorageSize(resource));
+                .cloned();
+            return match resource {
+                Some(resource) => Err(VulkanBarrierReceiptError::ResourceStorageSize(resource)),
+                None => Err(VulkanBarrierReceiptError::ResourceCount),
+            };
         }
         if self.barrier_lowering_digest
             != barrier_lowering_digest(plan, &expected_storage_sizes)
@@ -489,7 +491,7 @@ impl VulkanBarrierWorkloadRuntime {
         let signal_info = vk::SemaphoreSubmitInfo::default()
             .semaphore(semaphore)
             .value(completion_expected)
-            .stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
+            .stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
             .device_index(0);
         let submit = vk::SubmitInfo2::default()
             .command_buffer_infos(std::slice::from_ref(&command_buffer_info))
