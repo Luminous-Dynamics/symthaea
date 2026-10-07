@@ -534,7 +534,6 @@ impl Rfc9942ReceiptEnvelope {
             payload_sha256: sha256(payload),
             payload_mode,
             verification_key_sha256: sha256(public_key),
-            proof_sha256,
             protected_header_sha256: sha256(&self.protected_header_bytes()),
             external_aad_sha256: sha256(external_aad),
             signature_sha256: sha256(&self.signature),
