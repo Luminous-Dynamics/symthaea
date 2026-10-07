@@ -1591,32 +1591,31 @@ fn evaluate_regime_shift_adaptation(
 
     let validation_states = regime_shift_validation_states();
     let mut model = base_model.clone();
-    let mut predictor = FepWorldModelPredictor { bridge: &mut model };
-
-    let pre_revision_shifted_validation_mae =
-        measure_shifted_harvest_validation_mae(
-            &predictor,
-            &validation_states,
-            REGIME_SHIFT_HARVEST_YIELD_SCALE,
-        );
-
-    let initial_invariant_anchor_profile =
-        measure_invariant_anchor_profile(&predictor);
-    let initial_invariant_anchor_mean_mae =
-        if initial_invariant_anchor_profile.is_empty() {
-            0.0
-        } else {
-            initial_invariant_anchor_profile.iter().sum::<f64>()
-                / initial_invariant_anchor_profile.len() as f64
-        };
-
-    let target_error = pre_revision_shifted_validation_mae
-        * REGIME_SHIFT_TARGET_ERROR_FRACTION;
-    let mut revision_latency_updates = if pre_revision_shifted_validation_mae <= f64::EPSILON {
-        Some(0)
-    } else {
-        None
+    let mut predictor = FepWorldModelPredictor {
+        bridge: &mut model,
     };
+
+    let pre_revision_shifted_validation_mae = measure_shifted_harvest_validation_mae(
+        &predictor,
+        &validation_states,
+        REGIME_SHIFT_HARVEST_YIELD_SCALE,
+    );
+
+    let initial_invariant_anchor_profile = measure_invariant_anchor_profile(&predictor);
+    let initial_invariant_anchor_mean_mae = if initial_invariant_anchor_profile.is_empty() {
+        0.0
+    } else {
+        initial_invariant_anchor_profile.iter().sum::<f64>()
+            / initial_invariant_anchor_profile.len() as f64
+    };
+
+    let target_error = pre_revision_shifted_validation_mae * REGIME_SHIFT_TARGET_ERROR_FRACTION;
+    let mut revision_latency_updates =
+        if pre_revision_shifted_validation_mae <= f64::EPSILON {
+            Some(0)
+        } else {
+            None
+        };
 
     let mut events = Vec::new();
     let mut update_count = 0u64;
@@ -1630,12 +1629,11 @@ fn evaluate_regime_shift_adaptation(
         let cycle = stream_state.cycle;
         let action = ADAPTATION_SCHEDULE[stream_steps as usize % ADAPTATION_SCHEDULE.len()];
         let before = stream_state;
-        let after =
-            transition_with_harvest_yield_scale(
-                before,
-                action,
-                REGIME_SHIFT_HARVEST_YIELD_SCALE,
-            );
+        let after = transition_with_harvest_yield_scale(
+            before,
+            action,
+            REGIME_SHIFT_HARVEST_YIELD_SCALE,
+        );
 
         if action == MicroAction::Harvest {
             predictor.observe_transition(before, action, after);
@@ -1653,15 +1651,13 @@ fn evaluate_regime_shift_adaptation(
                     shifted_validation_mae / pre_revision_shifted_validation_mae
                 };
 
-            let current_invariant_anchor_profile =
-                measure_invariant_anchor_profile(&predictor);
-            let invariant_anchor_mean_mae =
-                if current_invariant_anchor_profile.is_empty() {
-                    0.0
-                } else {
-                    current_invariant_anchor_profile.iter().sum::<f64>()
-                        / current_invariant_anchor_profile.len() as f64
-                };
+            let current_invariant_anchor_profile = measure_invariant_anchor_profile(&predictor);
+            let invariant_anchor_mean_mae = if current_invariant_anchor_profile.is_empty() {
+                0.0
+            } else {
+                current_invariant_anchor_profile.iter().sum::<f64>()
+                    / current_invariant_anchor_profile.len() as f64
+            };
             let invariant_anchor_regressions = current_invariant_anchor_profile
                 .iter()
                 .zip(initial_invariant_anchor_profile.iter())
@@ -1669,15 +1665,12 @@ fn evaluate_regime_shift_adaptation(
                 .collect::<Vec<_>>();
             let invariant_anchor_regression =
                 invariant_anchor_mean_mae - initial_invariant_anchor_mean_mae;
-            let invariant_anchor_max_regression =
-                invariant_anchor_regressions
-                    .iter()
-                    .copied()
-                    .fold(0.0f64, f64::max);
+            let invariant_anchor_max_regression = invariant_anchor_regressions
+                .iter()
+                .copied()
+                .fold(0.0f64, f64::max);
 
-            if revision_latency_updates.is_none()
-                && shifted_validation_mae <= target_error
-            {
+            if revision_latency_updates.is_none() && shifted_validation_mae <= target_error {
                 revision_latency_updates = Some(update_count);
             }
 
@@ -1693,61 +1686,9 @@ fn evaluate_regime_shift_adaptation(
                 invariant_anchor_max_regression,
             });
         }
+
         stream_state = after;
         stream_steps = stream_steps.saturating_add(1);
-
-        /*
-            &predictor,
-            &validation_states,
-            REGIME_SHIFT_HARVEST_YIELD_SCALE,
-        );
-        let shifted_validation_error_ratio = if pre_revision_shifted_validation_mae <= f64::EPSILON {
-            0.0
-        } else {
-            (shifted_validation_mae / pre_revision_shifted_validation_mae).clamp(0.0, 1.0)
-        };
-
-        let current_invariant_anchor_profile =
-            measure_invariant_anchor_profile(&predictor);
-        let invariant_anchor_mean_mae =
-            if current_invariant_anchor_profile.is_empty() {
-                0.0
-            } else {
-                current_invariant_anchor_profile.iter().sum::<f64>()
-                    / current_invariant_anchor_profile.len() as f64
-            };
-        let invariant_anchor_regressions = current_invariant_anchor_profile
-            .iter()
-            .zip(initial_invariant_anchor_profile.iter())
-            .map(|(current, initial)| current - initial)
-            .collect::<Vec<_>>();
-        let invariant_anchor_regression =
-            invariant_anchor_mean_mae - initial_invariant_anchor_mean_mae;
-        let invariant_anchor_max_regression =
-            invariant_anchor_regressions
-                .iter()
-                .copied()
-                .fold(0.0f64, f64::max);
-
-        if revision_latency_updates.is_none()
-            && shifted_validation_mae <= target_error
-        {
-            revision_latency_updates = Some(update_count);
-        }
-
-        events.push(RegimeShiftAdaptationEvent {
-            update_ordinal: update_count,
-            cycle,
-            action,
-            state_digest: state_digest_seed.digest(),
-            shifted_validation_mae,
-            shifted_validation_error_ratio,
-            invariant_anchor_mean_mae,
-            invariant_anchor_regression,
-            invariant_anchor_max_regression,
-        });
-
-        let _ = world.step(action);
     }
 
     let final_shifted_validation_mae = events
@@ -1783,8 +1724,8 @@ fn evaluate_regime_shift_adaptation(
         revision_latency_updates,
         initial_invariant_anchor_mean_mae,
         final_invariant_anchor_mean_mae,
-        final_invariant_anchor_regression: final_invariant_anchor_mean_mae
-            - initial_invariant_anchor_mean_mae,
+        final_invariant_anchor_regression:
+            final_invariant_anchor_mean_mae - initial_invariant_anchor_mean_mae,
         max_invariant_anchor_regression,
         invariant_anchor_regression_event_rate,
     }
