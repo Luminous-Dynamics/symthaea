@@ -3110,19 +3110,24 @@ async fn image_artifact_commitment(
     .map_err(|error| format!("image artifact hashing task failed: {error}"))?
 }
 
-async fn commit_image_artifact(image_dir: &str) -> Result<ArtifactCommitment, String> {
-    let mut found = Vec::new();
+async fn commit_image_bundle(image_dir: &str) -> Result<(ArtifactCommitment, ArtifactCommitment), String> {
+    let mut archives = Vec::new();
     for artifact_name in ["system.btrfs.zst", "system.tar.gz"] {
         if let Some(commitment) = image_artifact_commitment(image_dir, artifact_name).await? {
-            found.push(commitment);
+            archives.push(commitment);
         }
     }
+    let archive = match archives.as_slice() {
+        [commitment] => commitment.clone(),
+        [] => return Err("image completed without a supported archive artifact".into()),
+        _ => return Err("image namespace contains multiple supported archive artifacts".into()),
+    };
 
-    match found.as_slice() {
-        [commitment] => Ok(commitment.clone()),
-        [] => Err("image completed without a supported archive artifact".into()),
-        _ => Err("image namespace contains multiple supported archive artifacts".into()),
-    }
+    let configuration = image_artifact_commitment(image_dir, "configuration.nix")
+        .await?
+        .ok_or_else(|| "image completed without configuration.nix provenance".to_string())?;
+
+    Ok((archive, configuration))
 }
 
 async fn verify_image_artifact_commitment(
@@ -3352,17 +3357,19 @@ fn finalize_transaction(
     }
 }
 
-fn finalize_transaction_with_artifact(
+fn finalize_transaction_with_artifacts(
     ledger: &TransactionLedger,
     transaction: &SystemTransaction,
     observed_outcome: TransactionOutcome,
     artifact_commitment: ArtifactCommitment,
+    configuration_commitment: ArtifactCommitment,
     peer_addr: &str,
 ) -> TransactionOutcome {
-    match ledger.mark_completed_with_artifact(
+    match ledger.mark_completed_with_image_artifacts(
         transaction,
         observed_outcome,
         Some(artifact_commitment),
+        Some(configuration_commitment),
     ) {
         Ok(()) => observed_outcome,
         Err(error) => {
@@ -7194,15 +7201,19 @@ echo "COMPLETE"
                     }
                     _ => None,
                 };
-                let (response_code, observed_outcome, artifact_commitment) = match image_exit_code {
+                let (response_code, observed_outcome, image_commitment) = match image_exit_code {
                     Some(0) => match verify_image_artifact(&image_dest).await {
-                        Ok(true) => match commit_image_artifact(&image_dest).await {
-                            Ok(commitment) => {
-                                (0, TransactionOutcome::ObservedSuccess, Some(commitment))
+                        Ok(true) => match commit_image_bundle(&image_dest).await {
+                            Ok((archive, configuration)) => {
+                                (
+                                    0,
+                                    TransactionOutcome::ObservedSuccess,
+                                    Some((archive, configuration)),
+                                )
                             }
                             Err(error) => {
                                 eprintln!(
-                                    "[{}] {} image artifact commitment failed: {}",
+                                    "[{}] {} image bundle commitment failed: {}",
                                     peer_addr, transaction.log_line(), error
                                 );
                                 (1, TransactionOutcome::Indeterminate, None)
@@ -7226,12 +7237,13 @@ echo "COMPLETE"
                     Some(code) => (code, TransactionOutcome::Failed, None),
                     None => (1, TransactionOutcome::Indeterminate, None),
                 };
-                let outcome = if let Some(commitment) = artifact_commitment.as_ref() {
-                    finalize_transaction_with_artifact(
+                let outcome = if let Some((archive, configuration)) = image_commitment.as_ref() {
+                    finalize_transaction_with_artifacts(
                         &transaction_ledger,
                         &transaction,
                         observed_outcome,
-                        commitment.clone(),
+                        archive.clone(),
+                        configuration.clone(),
                         &peer_addr,
                     )
                 } else {
@@ -7242,17 +7254,22 @@ echo "COMPLETE"
                         &peer_addr,
                     )
                 };
-                let durable_artifact_commitment =
-                    (outcome == TransactionOutcome::ObservedSuccess).then_some(artifact_commitment.clone());
+                let durable_image_commitment =
+                    (outcome == TransactionOutcome::ObservedSuccess).then_some(image_commitment.clone());
 
                 let _ = ws_tx
                     .send(Message::Text(
                         serde_json::json!({
                             "type": "exit",
                             "code": protocol_exit_code(response_code, outcome),
-                            "transaction": transaction.receipt_with_artifact(
+                            "transaction": transaction.receipt_with_image_artifacts(
                                 outcome,
-                                durable_artifact_commitment.flatten(),
+                                durable_image_commitment
+                                    .as_ref()
+                                    .map(|(archive, _)| archive.clone()),
+                                durable_image_commitment
+                                    .as_ref()
+                                    .map(|(_, configuration)| configuration.clone()),
                             )
                         })
                         .to_string(),
@@ -7408,6 +7425,104 @@ echo "COMPLETE"
                                 "type": "error",
                                 "message": format!(
                                     "Image restore refused: committed artifact identity does not match the image namespace: {}",
+                                    error
+                                ),
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                let image_configuration_commitment =
+                    match transaction_ledger.successful_image_configuration(
+                        &image_transaction_id,
+                        transaction.target_machine_digest.as_deref(),
+                    ) {
+                        Ok(Some(commitment)) => commitment,
+                        Ok(None) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Failed,
+                                &peer_addr,
+                            );
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type": "error",
+                                        "message": "Image restore refused: creator transaction has no committed configuration identity.",
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                            continue;
+                        }
+                        Err(error) => {
+                            let outcome = finalize_transaction(
+                                &transaction_ledger,
+                                &transaction,
+                                TransactionOutcome::Failed,
+                                &peer_addr,
+                            );
+                            let _ = ws_tx
+                                .send(Message::Text(
+                                    serde_json::json!({
+                                        "type": "error",
+                                        "message": format!(
+                                            "Unable to establish image configuration provenance: {}",
+                                            error
+                                        ),
+                                        "transaction": transaction.receipt(outcome)
+                                    })
+                                    .to_string(),
+                                ))
+                                .await;
+                            continue;
+                        }
+                    };
+
+                if image_configuration_commitment.name != "configuration.nix" {
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Failed,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type": "error",
+                                "message": "Image restore refused: creator configuration commitment is invalid.",
+                                "transaction": transaction.receipt(outcome)
+                            })
+                            .to_string(),
+                        ))
+                        .await;
+                    continue;
+                }
+
+                if let Err(error) =
+                    verify_image_artifact_commitment(
+                        &image_path,
+                        &image_configuration_commitment,
+                    )
+                    .await
+                {
+                    let outcome = finalize_transaction(
+                        &transaction_ledger,
+                        &transaction,
+                        TransactionOutcome::Failed,
+                        &peer_addr,
+                    );
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type": "error",
+                                "message": format!(
+                                    "Image restore refused: committed configuration identity does not match the image namespace: {}",
                                     error
                                 ),
                                 "transaction": transaction.receipt(outcome)
