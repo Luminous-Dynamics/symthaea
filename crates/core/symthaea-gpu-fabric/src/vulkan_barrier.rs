@@ -18,7 +18,8 @@ use crate::{
 const MAX_WORKLOAD_NODES: usize = 64;
 const WORKGROUP_SIZE: u32 = 64;
 const VULKAN_API_VERSION: u32 = vk::API_VERSION_1_3;
-const RECEIPT_VERSION: u16 = 1;
+const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
+const RECEIPT_VERSION: u16 = 2;
 
 const WGSL: &str = r#"
 @group(0) @binding(0)
@@ -72,8 +73,16 @@ pub enum VulkanBarrierError {
     AllocationOverflow,
     #[error("CPU oracle mismatch for resource {0}")]
     OracleMismatch(ResourceId),
-    #[error("Vulkan completion fence failed: {0:?}")]
-    Fence(vk::Result),
+    #[error("timeline semaphore creation failed: {0:?}")]
+    TimelineSemaphoreCreate(vk::Result),
+    #[error("timeline queue submission failed: {0:?}")]
+    TimelineSubmit(vk::Result),
+    #[error("timeline semaphore wait failed: {0:?}")]
+    TimelineWait(vk::Result),
+    #[error("timeline semaphore counter query failed: {0:?}")]
+    TimelineCounter(vk::Result),
+    #[error("timeline completion did not reach {expected}; observed {observed}")]
+    TimelineCompletionNotReached { expected: u64, observed: u64 },
     #[error("barrier receipt verification failed: {0}")]
     Receipt(VulkanBarrierReceiptError),
 }
@@ -102,6 +111,12 @@ pub enum VulkanBarrierReceiptError {
     ResourceStorageSize(ResourceId),
     #[error("missing concrete storage size for barrier resource {0}")]
     MissingResourceStorageSize(ResourceId),
+    #[error("receipt Vulkan API version does not match the qualified runtime")]
+    ApiVersion,
+    #[error("receipt expected timeline value does not match the synchronization plan")]
+    TimelineExpected,
+    #[error("receipt observed timeline value {observed} is below expected {expected}")]
+    TimelineCompletion { expected: u64, observed: u64 },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -116,6 +131,9 @@ pub struct VulkanBarrierExecutionReceipt {
     pub barrier_count: u32,
     pub resource_digests: BTreeMap<ResourceId, String>,
     pub resource_storage_sizes: BTreeMap<ResourceId, u64>,
+    pub completion_expected: u64,
+    pub completion_observed: u64,
+    pub vulkan_api_version: u32,
 }
 
 impl VulkanBarrierExecutionReceipt {
@@ -176,6 +194,24 @@ impl VulkanBarrierExecutionReceipt {
                 .ok_or_else(|| VulkanBarrierReceiptError::ResourceDigest(resource.clone()))?;
             if &actual != digest { return Err(VulkanBarrierReceiptError::ResourceDigest(resource.clone())); }
         }
+        if self.vulkan_api_version != VULKAN_API_VERSION {
+            return Err(VulkanBarrierReceiptError::ApiVersion);
+        }
+        let expected_completion = plan
+            .submissions
+            .iter()
+            .map(|submission| submission.signal.value)
+            .max()
+            .unwrap_or(0);
+        if self.completion_expected != expected_completion {
+            return Err(VulkanBarrierReceiptError::TimelineExpected);
+        }
+        if self.completion_observed < self.completion_expected {
+            return Err(VulkanBarrierReceiptError::TimelineCompletion {
+                expected: self.completion_expected,
+                observed: self.completion_observed,
+            });
+        }
         Ok(())
     }
 }
@@ -215,10 +251,13 @@ impl VulkanBarrierWorkloadRuntime {
         for physical in unsafe { instance.enumerate_physical_devices().map_err(VulkanBarrierError::Vk)? } {
             let props = unsafe { instance.get_physical_device_properties(physical) };
             if props.api_version < VULKAN_API_VERSION { continue; }
+            let mut timeline = vk::PhysicalDeviceTimelineSemaphoreFeatures::default();
             let mut sync2 = vk::PhysicalDeviceSynchronization2Features::default();
-            let mut features2 = vk::PhysicalDeviceFeatures2::default().push_next(&mut sync2);
+            let mut features2 = vk::PhysicalDeviceFeatures2::default()
+                .push_next(&mut timeline)
+                .push_next(&mut sync2);
             unsafe { instance.get_physical_device_features2(physical, &mut features2); }
-            if sync2.synchronization2 == 0 { continue; }
+            if timeline.timeline_semaphore == 0 || sync2.synchronization2 == 0 { continue; }
             let family = unsafe { instance.get_physical_device_queue_family_properties(physical) }
                 .iter().enumerate()
                 .find(|(_, q)| q.queue_flags.contains(vk::QueueFlags::COMPUTE))
@@ -232,9 +271,11 @@ impl VulkanBarrierWorkloadRuntime {
 
         let priorities = [1.0_f32];
         let queue_info = vk::DeviceQueueCreateInfo::default().queue_family_index(family).queue_priorities(&priorities);
+        let mut timeline = vk::PhysicalDeviceTimelineSemaphoreFeatures::default().timeline_semaphore(true);
         let mut sync2 = vk::PhysicalDeviceSynchronization2Features::default().synchronization2(true);
         let device_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(std::slice::from_ref(&queue_info))
+            .push_next(&mut timeline)
             .push_next(&mut sync2);
         let device = unsafe {
             instance.create_device(physical, &device_info, None).map_err(|e| {
@@ -410,28 +451,70 @@ impl VulkanBarrierWorkloadRuntime {
                 .end_command_buffer(command_guard.command())
                 .map_err(VulkanBarrierError::Vk)?;
         }
-        let fence = unsafe {
+        let completion_expected = plan
+            .submissions
+            .iter()
+            .map(|submission| submission.signal.value)
+            .max()
+            .unwrap_or(0);
+        if completion_expected == 0 && !schedule.nodes.is_empty() {
+            return Err(VulkanBarrierError::TimelineCompletionNotReached {
+                expected: 1,
+                observed: 0,
+            });
+        }
+
+        let mut timeline_info = vk::SemaphoreTypeCreateInfo::default()
+            .semaphore_type(vk::SemaphoreType::TIMELINE)
+            .initial_value(0);
+        let semaphore_info = vk::SemaphoreCreateInfo::default().push_next(&mut timeline_info);
+        let semaphore = unsafe {
             self.device
-                .create_fence(&vk::FenceCreateInfo::default(), None)
-                .map_err(VulkanBarrierError::Vk)?
+                .create_semaphore(&semaphore_info, None)
+                .map_err(VulkanBarrierError::TimelineSemaphoreCreate)?
         };
-        let command_buffers = [command_guard.command()];
-        let submit = vk::SubmitInfo::default().command_buffers(&command_buffers);
-        if let Err(error) = unsafe {
+        let mut semaphore_guard = TimelineSemaphoreGuard::new(self.device.clone(), semaphore);
+
+        let command_buffer_info = vk::CommandBufferSubmitInfo::default()
+            .command_buffer(command_guard.command())
+            .device_mask(1);
+        let signal_info = vk::SemaphoreSubmitInfo::default()
+            .semaphore(semaphore)
+            .value(completion_expected)
+            .stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
+            .device_index(0);
+        let submit = vk::SubmitInfo2::default()
+            .command_buffer_infos(std::slice::from_ref(&command_buffer_info))
+            .signal_semaphore_infos(std::slice::from_ref(&signal_info));
+
+        unsafe {
             self.device
-                .queue_submit(self.queue, std::slice::from_ref(&submit), fence)
-        } {
-            unsafe { self.device.destroy_fence(fence, None); }
-            return Err(VulkanBarrierError::Vk(error));
+                .queue_submit2(self.queue, std::slice::from_ref(&submit), vk::Fence::null())
+                .map_err(VulkanBarrierError::TimelineSubmit)?;
         }
-        if let Err(error) = unsafe { self.device.wait_for_fences(&[fence], true, u64::MAX) } {
-            unsafe {
-                let _ = self.device.device_wait_idle();
-                self.device.destroy_fence(fence, None);
-            }
-            return Err(VulkanBarrierError::Fence(error));
+        semaphore_guard.mark_submitted();
+
+        let wait_info = vk::SemaphoreWaitInfo::default()
+            .semaphores(std::slice::from_ref(&semaphore))
+            .values(std::slice::from_ref(&completion_expected));
+        unsafe {
+            self.device
+                .wait_semaphores(&wait_info, VULKAN_TIMELINE_TIMEOUT_NS)
+                .map_err(VulkanBarrierError::TimelineWait)?;
         }
-        unsafe { self.device.destroy_fence(fence, None); }
+        semaphore_guard.mark_completed();
+
+        let completion_observed = unsafe {
+            self.device
+                .get_semaphore_counter_value(semaphore)
+                .map_err(VulkanBarrierError::TimelineCounter)?
+        };
+        if completion_observed < completion_expected {
+            return Err(VulkanBarrierError::TimelineCompletionNotReached {
+                expected: completion_expected,
+                observed: completion_observed,
+            });
+        }
 
         let mut observed = BTreeMap::new();
         for (resource, value) in initial {
@@ -460,6 +543,9 @@ impl VulkanBarrierWorkloadRuntime {
             barrier_count: plan.submissions.iter().map(|s| s.barriers.len() as u32).sum(),
             resource_digests: digests,
             resource_storage_sizes: storage_sizes,
+            completion_expected,
+            completion_observed,
+            vulkan_api_version: VULKAN_API_VERSION,
         };
         receipt.verify_against(graph, schedule, plan, &observed).map_err(VulkanBarrierError::Receipt)?;
         Ok((observed, receipt))
@@ -825,6 +911,38 @@ fn barrier_digest(plan: &VulkanSyncPlan) -> String {
     h.finalize().to_hex().to_string()
 }
 
+struct TimelineSemaphoreGuard {
+    device: Device,
+    semaphore: vk::Semaphore,
+    submitted: bool,
+    completed: bool,
+}
+
+impl TimelineSemaphoreGuard {
+    fn new(device: Device, semaphore: vk::Semaphore) -> Self {
+        Self { device, semaphore, submitted: false, completed: false }
+    }
+
+    fn mark_submitted(&mut self) {
+        self.submitted = true;
+    }
+
+    fn mark_completed(&mut self) {
+        self.completed = true;
+    }
+}
+
+impl Drop for TimelineSemaphoreGuard {
+    fn drop(&mut self) {
+        unsafe {
+            if self.submitted && !self.completed {
+                let _ = self.device.device_wait_idle();
+            }
+            self.device.destroy_semaphore(self.semaphore, None);
+        }
+    }
+}
+
 impl Drop for VulkanBarrierWorkloadRuntime {
     fn drop(&mut self) {
         unsafe {
@@ -1009,6 +1127,79 @@ mod tests {
     }
 
     #[test]
+    fn receipt_rejects_unreached_timeline_completion() {
+        let (graph, schedule, plan, initial) = fixture();
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        let digests = final_state
+            .iter()
+            .map(|(resource, value)| (resource.clone(), resource_digest(value)))
+            .collect::<BTreeMap<_, _>>();
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| (
+                resource.clone(),
+                rounded_storage_bytes(value.as_bytes().len() as u64),
+            ))
+            .collect::<BTreeMap<_, _>>();
+        let receipt = VulkanBarrierExecutionReceipt {
+            version: RECEIPT_VERSION,
+            graph_digest: graph.digest_hex().unwrap(),
+            schedule_digest: schedule.digest_hex().unwrap(),
+            sync_plan_digest: plan.digest_hex().unwrap(),
+            barrier_digest: barrier_digest(&plan),
+            barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
+            node_count: schedule.nodes.len() as u32,
+            barrier_count: 1,
+            resource_digests: digests,
+            resource_storage_sizes: storage_sizes,
+            completion_expected: 1,
+            completion_observed: 0,
+            vulkan_api_version: VULKAN_API_VERSION,
+        };
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::TimelineCompletion { expected: 1, observed: 0 })
+        ));
+    }
+
+    #[test]
+    fn receipt_rejects_wrong_timeline_api_version() {
+        let (graph, schedule, plan, initial) = fixture();
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        let digests = final_state
+            .iter()
+            .map(|(resource, value)| (resource.clone(), resource_digest(value)))
+            .collect::<BTreeMap<_, _>>();
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| (
+                resource.clone(),
+                rounded_storage_bytes(value.as_bytes().len() as u64),
+            ))
+            .collect::<BTreeMap<_, _>>();
+        let mut receipt = VulkanBarrierExecutionReceipt {
+            version: RECEIPT_VERSION,
+            graph_digest: graph.digest_hex().unwrap(),
+            schedule_digest: schedule.digest_hex().unwrap(),
+            sync_plan_digest: plan.digest_hex().unwrap(),
+            barrier_digest: barrier_digest(&plan),
+            barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
+            node_count: schedule.nodes.len() as u32,
+            barrier_count: 1,
+            resource_digests: digests,
+            resource_storage_sizes: storage_sizes,
+            completion_expected: 1,
+            completion_observed: 1,
+            vulkan_api_version: VULKAN_API_VERSION,
+        };
+        receipt.vulkan_api_version = vk::API_VERSION_1_2;
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::ApiVersion)
+        ));
+    }
+
+    #[test]
     fn receipt_rejects_tampered_concrete_lowering_digest() {
         let (graph, schedule, plan, initial) = fixture();
         let final_state = simulate(&graph, &schedule, &initial).unwrap();
@@ -1037,6 +1228,9 @@ mod tests {
             barrier_count: 1,
             resource_digests: digests,
             resource_storage_sizes: storage_sizes,
+            completion_expected: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
+            completion_observed: plan.submissions.iter().map(|s| s.signal.value).max().unwrap_or(0),
+            vulkan_api_version: VULKAN_API_VERSION,
         };
         receipt.barrier_lowering_digest = String::from("tampered");
 
