@@ -175,12 +175,28 @@ A rising ratio indicates that the model becomes less reliable on states induced 
 This directly tests a control-specific failure mode: a planner can move the environment into states that
 were rare or absent during training.
 
+The same run separately calibrates confidence only on planner-selected actions. This is intentionally
+stricter than aggregate held-out calibration because selection can preferentially expose overconfident
+model errors.
+
 ### Planning quality
 
 The horizon-aware policy already computes deterministic oracle horizon regret.
 
 Lower regret means the selected action was closer to the best available action under the benchmark's
 explicit utility function.
+
+### Action ranking and exploitation
+
+The frozen held-out evaluator compares the model's one-step action ordering against the deterministic
+oracle ordering using both top-1 agreement and pairwise agreement.
+
+It also reports an **exploitation gap**: the mean model-assigned advantage on strict pairwise preference
+inversions. A high value means the model is not merely inaccurate; it is assigning strong preference
+to an action whose true consequence is worse than the alternative.
+
+This matters because model-based planners can actively search for precisely those model errors. The
+metric is therefore a negative-control/evidence metric, not a claim that exploitation is eliminated.
 
 ### Held-out transfer
 
@@ -199,6 +215,8 @@ not yet demonstrated robust predictive structure.
 | One-step MAE improves, continuous-rollout MAE remains high | the learned transition does not compose coherently over the temporal horizon |
 | Multi-horizon terminal error grows rapidly with horizon | the model has short-range predictive skill without reliable long-horizon dynamics |
 | Policy-induced error ratio rises above fixed-schedule error | the model is vulnerable to its own policy-induced distribution shift |
+| Planner-selected calibration is worse than aggregate calibration | the model becomes overconfident on the states/actions its policy prefers |
+| Action ranking improves but exploitation gap remains high | the model's score ordering contains strong, exploitable preference inversions |
 | Held-out MAE improves, confidence ECE worsens | prediction improves but confidence is not calibrated |
 | Held-out MAE improves, survival does not | predictive knowledge is not causally reaching useful action selection |
 | Survival improves, oracle regret does not | hard-coded homeostatic biases may dominate the benefit |
@@ -219,8 +237,9 @@ A future green qualification should report all of:
 4. model and policy configuration;
 5. one-step and multi-horizon temporal prediction accuracy;
 6. policy-induced distribution-shift error;
-7. confidence calibration;
-8. survival and minimum viability margin;
+7. aggregate and planner-selected confidence calibration;
+8. action-ranking agreement and exploitation gap;
+9. survival and minimum viability margin;
 9. perturbation recovery;
 10. oracle horizon regret;
 11. persistence comparator;
