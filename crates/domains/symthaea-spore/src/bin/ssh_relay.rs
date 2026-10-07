@@ -4106,6 +4106,8 @@ async fn restore_verified_archive(
     format: RestoreArchiveFormat,
     input: std::fs::File,
 ) -> Result<CmdResult, String> {
+    let restore_root = open_restore_target_directory()?;
+
     let (stdout, stderr, exit_status) = match format {
         RestoreArchiveFormat::TarGzip => {
             let mut command = trusted_typed_process("tar")?;
@@ -4114,8 +4116,9 @@ async fn restore_verified_archive(
                 .arg("-xzf")
                 .arg("-")
                 .arg("-C")
-                .arg("/mnt/")
+                .arg(".")
                 .stdin(std::process::Stdio::from(input));
+            bind_process_cwd_to_directory(&mut command, &restore_root)?;
             let output = command
                 .output()
                 .await
@@ -4133,6 +4136,7 @@ async fn restore_verified_archive(
                 .stdin(std::process::Stdio::from(input))
                 .stdout(std::process::Stdio::piped())
                 .stderr(std::process::Stdio::piped());
+            bind_process_cwd_to_directory(&mut decoder, &restore_root)?;
 
             let mut decoder_child = decoder
                 .spawn()
@@ -4145,13 +4149,20 @@ async fn restore_verified_archive(
             let mut receiver = trusted_typed_process("btrfs")?;
             receiver
                 .arg("receive")
-                .arg("/mnt/")
+                .arg(".")
                 .stdin(decoder_stdout)
                 .stdout(std::process::Stdio::piped())
                 .stderr(std::process::Stdio::piped());
-            let mut receiver_child = receiver
-                .spawn()
-                .map_err(|error| format!("unable to start typed btrfs receive: {error}"))?;
+            bind_process_cwd_to_directory(&mut receiver, &restore_root)?;
+
+            let mut receiver_child = match receiver.spawn() {
+                Ok(child) => child,
+                Err(error) => {
+                    let _ = decoder_child.kill().await;
+                    let _ = decoder_child.wait().await;
+                    return Err(format!("unable to start typed btrfs receive: {error}"));
+                }
+            };
 
             let (receiver_output, decoder_output) = tokio::join!(
                 receiver_child.wait_with_output(),
@@ -4180,12 +4191,17 @@ async fn restore_verified_archive(
         }
     };
 
+    // Keep the descriptor alive until all restore children have exited. The
+    // child processes used it only as a stable cwd capability.
+    drop(restore_root);
+
     Ok(CmdResult {
         stdout,
         stderr,
         exit_status,
     })
 }
+
 
 fn find_configuration_swap_orphans(
     target_dir_path: &std::path::Path,
