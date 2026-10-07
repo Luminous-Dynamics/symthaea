@@ -144,7 +144,51 @@ async fn run_privileged_args(program: &str, args: &[&str]) -> Result<CmdResult, 
     })
 }
 
-fn privileged_script_command(path: &str) -> tokio::process::Command {
+fn open_trusted_script(path: &str) -> Result<std::fs::File, std::io::Error> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)?;
+
+    let metadata = file.metadata()?;
+    if !metadata.file_type().is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("privileged script {path} is not a regular file"),
+        ));
+    }
+    if metadata.uid() != unsafe { libc::geteuid() } {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            format!("privileged script {path} is not owned by the relay user"),
+        ));
+    }
+    if metadata.permissions().mode() & 0o777 != 0o700 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            format!(
+                "privileged script {path} has unsafe permissions {:04o}; require 0700",
+                metadata.permissions().mode() & 0o777
+            ),
+        ));
+    }
+    if metadata.len() == 0 || metadata.len() > 256 * 1024 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("privileged script {path} has unsupported size {}", metadata.len()),
+        ));
+    }
+
+    Ok(file)
+}
+
+async fn run_privileged_script_with_args(
+    path: &str,
+    args: &[&str],
+) -> Result<CmdResult, std::io::Error> {
+    let script = open_trusted_script(path)?;
     let shell = if std::path::Path::new("/bin/bash").exists() {
         "/bin/bash"
     } else if std::path::Path::new("/run/current-system/sw/bin/bash").exists() {
@@ -152,19 +196,18 @@ fn privileged_script_command(path: &str) -> tokio::process::Command {
     } else {
         "/bin/sh"
     };
+
     let mut command = privileged_process(shell);
     if shell.ends_with("/bash") {
         command.arg("-p");
     }
-    command.arg(path);
     command
-}
-async fn run_privileged_script_with_args(
-    path: &str,
-    args: &[&str],
-) -> Result<CmdResult, std::io::Error> {
-    let mut command = privileged_script_command(path);
-    command.args(args);
+        .arg("-s")
+        .arg("--")
+        .arg("nixforhumanity-preflight")
+        .args(args)
+        .stdin(std::process::Stdio::from(script));
+
     let output = command.output().await?;
     Ok(CmdResult {
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
@@ -172,7 +215,6 @@ async fn run_privileged_script_with_args(
         exit_status: output.status.code().unwrap_or(1) as u32,
     })
 }
-
 
 
 fn create_private_runtime_file(path: &str, mode: u32) -> Result<std::fs::File, std::io::Error> {
