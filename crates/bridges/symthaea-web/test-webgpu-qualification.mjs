@@ -1361,6 +1361,25 @@ function runHarnessSelfTests() {
     throw new Error('qualification harness self-test failed: browser/wgpu format mapping drift');
   }
 
+  const browserSurfaceProvenance = {
+    adapter_name: null,
+    adapter_device_type: 'Other',
+    adapter_backend: 'BrowserWebGpu',
+  };
+  if (!browserSurfaceProvenance.adapter_device_type
+    || browserSurfaceProvenance.adapter_backend !== 'BrowserWebGpu') {
+    throw new Error('qualification harness self-test failed: browser WebGPU provenance fixture');
+  }
+  const hardwareSurfaceProvenance = {
+    adapter_name: 'Discrete GPU',
+    adapter_device_type: 'DiscreteGpu',
+    adapter_backend: 'Vulkan',
+  };
+  if (!hardwareSurfaceProvenance.adapter_name || !hardwareSurfaceProvenance.adapter_device_type) {
+    throw new Error('qualification harness self-test failed: hardware provenance fixture');
+  }
+
+
   const matchingBitmapSamples = [
     { name: 'background', rgba: [4, 6, 10, 255] },
     { name: 'polygon', rgba: [235, 122, 41, 255] },
@@ -1747,6 +1766,9 @@ async function runMode(mode) {
         }
       }
       for (const [canvas, configuration] of Object.entries(diagnostics.surface_configuration)) {
+        const adapterProvenanceOk = hardwareMode
+          ? Boolean(configuration.adapter_name && configuration.adapter_device_type)
+          : Boolean(configuration.adapter_device_type && configuration.adapter_backend === 'BrowserWebGpu');
         if (!configuration.selected_format_advertised
           || !configuration.selected_format_preferred
           || !configuration.selected_alpha_advertised
@@ -1754,13 +1776,16 @@ async function runMode(mode) {
           || configuration.format !== expectedRendererFormat
           || configuration.browser_configuration?.format !== diagnostics.browser_preferred_canvas_format
           || configuration.browser_configuration?.alpha_mode !== 'opaque'
-          || !configuration.adapter_name
-          || !configuration.adapter_device_type) {
+          || !adapterProvenanceOk) {
           throw new QualificationError(
             `WebGPU ${canvas} surface configuration is inconsistent with the browser-preferred format/capabilities: ${JSON.stringify({
               configuration,
               browser_preferred_canvas_format: diagnostics.browser_preferred_canvas_format,
               expected_renderer_format: expectedRendererFormat,
+              hardware_mode: hardwareMode,
+              adapter_provenance_required: hardwareMode
+                ? 'named-hardware-adapter'
+                : 'browser-webgpu-backend-and-device-type',
             })}`,
             'capability',
           );
