@@ -414,6 +414,32 @@ mod tests {
         ResourceId, ResourceUse, VulkanQueueAssignment, VulkanSyncPlan,
     };
 
+    fn test_schedule() -> crate::ExecutionSchedule {
+        let r = ResourceId::new("hv").unwrap();
+        let graph = ExecutionGraph::new(
+            vec![
+                ExecutionNode::new(
+                    1,
+                    GpuOperation::HdcBindXor { dimensions: 8 },
+                    vec![ResourceUse::new(r.clone(), AccessKind::Write)],
+                ),
+                ExecutionNode::new(
+                    2,
+                    GpuOperation::HdcBindXor { dimensions: 8 },
+                    vec![ResourceUse::new(r, AccessKind::Read)],
+                ),
+            ],
+            vec![DependencyEdge::new(
+                1,
+                2,
+                ResourceId::new("hv").unwrap(),
+                crate::DependencyKind::ReadAfterWrite,
+            )],
+        )
+        .unwrap();
+        crate::ExecutionSchedule::from_graph(&graph).unwrap()
+    }
+
     fn test_plan() -> VulkanSyncPlan {
         let r = ResourceId::new("hv").unwrap();
         let graph = ExecutionGraph::new(
@@ -535,8 +561,12 @@ mod tests {
     #[ignore = "requires a Vulkan 1.3 qualification runner"]
     fn real_vulkan_timeline_submission_reaches_completion() {
         let mut runtime = SingleQueueVulkanSyncRuntime::new().expect("qualified Vulkan 1.3 device");
+        let schedule = test_schedule();
         let plan = test_plan();
-        let final_values = runtime.execute(&plan).expect("timeline submissions complete");
+        let (_, receipt) = runtime
+            .execute_verified(&schedule, &plan)
+            .expect("canonical timeline submissions complete");
+        let final_values = receipt.expected_final_values.clone();
         assert_eq!(final_values.len(), 2);
         let second_values = runtime.execute(&plan).expect("runtime must be reusable");
         assert_eq!(second_values, final_values);
