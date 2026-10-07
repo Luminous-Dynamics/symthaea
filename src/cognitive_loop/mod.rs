@@ -512,6 +512,9 @@ pub struct CognitiveLoopService {
     /// Consolidated FEP / Active Inference subsystem (10 fields -> 1).
     fep: fep_module::FepModule,
 
+    /// Cross-organism viability state. Observational until its control influence is explicitly qualified.
+    pub(crate) viability: viability_fabric::ViabilityFabric,
+
     /// Innate traits derived from genome (Genesis Bridge).
     pub(crate) innate_traits: genesis_bridge::InnateTraits,
 
