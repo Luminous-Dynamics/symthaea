@@ -870,12 +870,20 @@ fn main() -> Result<(), String> {
         scale: 4,
         confidence_level_bps: 9_500,
         method_ref: "synthetic-structural-interval-v1".into(),
+        assumptions_hash: symthaea_communication::content_hash(
+            b"synthetic-structural uncertainty assumptions: no inferential coverage claim",
+        ),
+        assumptions_ref: "synthetic-structural-uncertainty-assumptions-v1".into(),
         execution_revision: execution_revision.clone(),
     };
     let uncertainty_computation_bytes =
         serde_json::to_vec(&uncertainty_computation).map_err(|e| e.to_string())?;
     let uncertainty_computation_byte_refs: Vec<&[u8]> =
         vec![uncertainty_computation_bytes.as_slice()];
+    let uncertainty_assumptions_bytes =
+        b"synthetic-structural uncertainty assumptions: no inferential coverage claim";
+    let uncertainty_assumption_byte_refs: Vec<&[u8]> =
+        vec![uncertainty_assumptions_bytes.as_slice()];
 
     let observation_set_bytes: Vec<Vec<u8>> = observation_sets
         .iter()
@@ -1048,6 +1056,7 @@ fn main() -> Result<(), String> {
                 &observation_set_byte_refs,
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
+                &uncertainty_assumption_byte_refs,
             )
             .is_ok();
     let remediation_metric_estimate_forgery_blocked = {
@@ -1063,6 +1072,7 @@ fn main() -> Result<(), String> {
                 &observation_set_byte_refs,
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
+                &uncertainty_assumption_byte_refs,
             )
             .is_err()
     };
@@ -1080,6 +1090,7 @@ fn main() -> Result<(), String> {
                 &supplied_refs,
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
+                &uncertainty_assumption_byte_refs,
             )
             .is_err()
     };
@@ -1097,6 +1108,7 @@ fn main() -> Result<(), String> {
                 &supplied_refs,
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
+                &uncertainty_assumption_byte_refs,
             )
             .is_err()
     };
@@ -1114,6 +1126,7 @@ fn main() -> Result<(), String> {
                 &supplied_refs,
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
+                &uncertainty_assumption_byte_refs,
             )
             .is_err()
     };
@@ -1131,6 +1144,7 @@ fn main() -> Result<(), String> {
                 &supplied_refs,
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
+                &uncertainty_assumption_byte_refs,
             )
             .is_err()
     };
@@ -1149,6 +1163,7 @@ fn main() -> Result<(), String> {
                 &supplied_refs,
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
+                &uncertainty_assumption_byte_refs,
             )
             .is_err()
     };
@@ -1166,6 +1181,7 @@ fn main() -> Result<(), String> {
                 &supplied_refs,
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
+                &uncertainty_assumption_byte_refs,
             )
             .is_err()
     };
@@ -1197,6 +1213,20 @@ fn main() -> Result<(), String> {
             )
             .is_err()
     };
+    let remediation_uncertainty_assumptions_substitution_blocked = {
+        let mut forged = uncertainty_assumptions_bytes.to_vec();
+        forged.extend_from_slice(b"-tampered");
+        remediation_impact
+            .verify_measurement_computation_bundle_bytes(
+                &measurement_bytes,
+                &computation_byte_refs,
+                &observation_set_byte_refs,
+                &population_manifest_byte_refs,
+                &uncertainty_computation_byte_refs,
+                &[forged.as_slice()],
+            )
+            .is_err()
+    };
     let remediation_computation_substitution_blocked = {
         let mut forged = computation_bytes.clone();
         forged.swap(0, 1);
@@ -1208,6 +1238,7 @@ fn main() -> Result<(), String> {
                 &observation_set_byte_refs,
                 &population_manifest_byte_refs,
                 &uncertainty_computation_byte_refs,
+                &uncertainty_assumption_byte_refs,
             )
             .is_err()
     };
@@ -1880,6 +1911,7 @@ fn main() -> Result<(), String> {
         "remediation_computation_substitution_blocked": remediation_computation_substitution_blocked,
         "remediation_uncertainty_substitution_blocked": remediation_uncertainty_substitution_blocked,
         "remediation_uncertainty_point_estimate_binding_blocked": remediation_uncertainty_point_estimate_binding_blocked,
+        "remediation_uncertainty_assumptions_substitution_blocked": remediation_uncertainty_assumptions_substitution_blocked,
         "remediation_observation_population_substitution_blocked": remediation_observation_population_substitution_blocked,
         "remediation_observation_membership_cherry_pick_blocked": remediation_observation_membership_cherry_pick_blocked,
         "remediation_measurement_worst_case_binding_blocked": remediation_measurement_worst_case_binding_blocked,
