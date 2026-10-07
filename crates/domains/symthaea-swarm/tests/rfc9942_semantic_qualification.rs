@@ -637,8 +637,7 @@ fn rfc9942_semantic_state_cannot_confuse_valid_signature_with_wrong_entry() {
     assert_eq!(state.algorithm_id(), COSE_ES256_ALGORITHM_ID);
     assert_eq!(state.vds_id(), 1);
     let expected_receipt_payload_sha256: [u8; 32] =
-        sha2::Sha256::digest(vds.tree_head(&[b"candidate".to_vec(), b"other-entry".to_vec()]).root())
-            .into();
+        sha2::Sha256::digest(receipt.payload().attached_root().unwrap()).into();
     assert_eq!(state.payload_sha256(), expected_receipt_payload_sha256);
     assert!(matches!(
         state.proof(),
