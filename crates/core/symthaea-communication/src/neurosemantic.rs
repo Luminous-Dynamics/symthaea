@@ -509,9 +509,6 @@ pub struct NeurosemanticRemediationUncertaintyComputationArtifact {
 
 impl NeurosemanticRemediationUncertaintyComputationArtifact {
     pub fn validate(&self) -> Result<(), String> {
-        let scale_factor = 10_i64
-            .checked_pow(self.scale)
-            .ok_or_else(|| "neurosemantic remediation uncertainty scale is out of range".to_string())?;
         if self.schema_version != NEUROSEMANTIC_REMEDIATION_UNCERTAINTY_COMPUTATION_SCHEMA_VERSION
             || !valid_identifier(&self.uncertainty_ref)
             || !valid_identifier(&self.metric_ref)
@@ -520,8 +517,6 @@ impl NeurosemanticRemediationUncertaintyComputationArtifact {
             || self.point_estimate_scale > 12
             || self.scale > 12
             || self.lower_numerator > self.upper_numerator
-            || self.lower_numerator < 0
-            || self.upper_numerator > scale_factor
             || self.point_estimate_numerator < self.lower_numerator
             || self.point_estimate_numerator > self.upper_numerator
             || self.scale != self.point_estimate_scale
@@ -891,12 +886,7 @@ impl NeurosemanticRemediationMeasurementArtifact {
                     uncertainty_method_ref,
                     uncertainty_computation_artifact_hash,
                 } => {
-                    let proportion_scale_factor = 10_i64
-                        .checked_pow(scale)
-                        .ok_or_else(|| "neurosemantic remediation uncertainty scale is out of range".to_string())?;
                     if lower_numerator > upper_numerator
-                        || lower_numerator < 0
-                        || upper_numerator > proportion_scale_factor
                         || scale > 12
                         || scale != measurement.estimate_scale
                         || measurement.estimate_numerator < lower_numerator
@@ -907,6 +897,20 @@ impl NeurosemanticRemediationMeasurementArtifact {
                         || !valid_blake3_digest(&uncertainty_computation_artifact_hash)
                     {
                         return Err("neurosemantic remediation measurement uncertainty is invalid".into());
+                    }
+                    if definition.unit_ref == "proportion" {
+                        let scale_factor = 10_i64
+                            .checked_pow(scale)
+                            .ok_or_else(|| {
+                                "neurosemantic remediation uncertainty proportion scale is out of range"
+                                    .to_string()
+                            })?;
+                        if lower_numerator < 0 || upper_numerator > scale_factor {
+                            return Err(
+                                "neurosemantic remediation proportion uncertainty is outside [0,1]"
+                                    .into(),
+                            );
+                        }
                     }
                     // The concrete uncertainty computation artifact is required to
                     // determine inference scope; method applicability is therefore checked
