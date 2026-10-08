@@ -45,7 +45,10 @@ use std::process::Stdio;
 use tokio::process::Command;
 use tracing::{info, warn};
 
-/// NixOS-specific commands with structured parameters
+/// NixOS-specific commands with structured parameters.
+///
+/// Deprecated compatibility surface: governed NixOS execution belongs to Nixward/SSC.
+#[deprecated(note = "legacy NixOS execution surface; use Nixward/SSC typed authorization and execution")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NixOSCommand {
     /// nixos-rebuild switch (system-wide change)
@@ -127,7 +130,8 @@ pub enum FlakeOperation {
     Check,
 }
 
-/// Safety levels for commands
+/// Safety levels for the legacy command executor.
+#[deprecated(note = "legacy NixOS execution surface; use Nixward/SSC authority semantics")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SafetyLevel {
     /// Read-only operations (search, list, show)
@@ -350,7 +354,8 @@ impl NixOSCommand {
     }
 }
 
-/// Result of NixOS command execution
+/// Result of legacy NixOS command execution.
+#[deprecated(note = "legacy NixOS execution surface; use Nixward/SSC execution receipts")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ExecutionResult {
     /// Command succeeded
@@ -383,7 +388,11 @@ pub enum ExecutionResult {
     },
 }
 
-/// NixOS-aware command executor with Φ integration
+/// Legacy NixOS-aware command executor with Φ integration.
+///
+/// This remains only as a migration compatibility surface; it is not the
+/// canonical NixOS authority. New privileged execution must terminate in Nixward/SSC.
+#[deprecated(note = "legacy NixOS executor; use Nixward/SSC governed execution")]
 pub struct NixOSExecutor {
     /// Current system generation (for rollback)
     current_generation: Option<u32>,
@@ -581,7 +590,11 @@ impl NixOSExecutor {
         }
     }
 
-    /// Force execution even if Φ is low (for confirmed actions)
+    /// Force execution even if Φ is low (for confirmed actions).
+    ///
+    /// Deprecated because this method intentionally bypasses the normal Φ gate
+    /// and is not a substitute for explicit SSC authorization consumption.
+    #[deprecated(note = "confirmation bypass; use Nixward/SSC consumed authorization instead")]
     pub async fn execute_confirmed(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
         // Skip Φ check since user confirmed
         let (cmd, args) = command.to_command();

@@ -11,6 +11,7 @@
 //! - `nixos_patterns`: NixOS-specific command patterns with rollback support
 
 pub mod bindings;
+#[deprecated(note = "legacy NixOS authority surface; use Nixward/SSC")]
 pub mod nixos_patterns;
 pub mod primitives;
 

@@ -56,6 +56,10 @@ pub mod parser;
 #[cfg(feature = "native")]
 pub mod observe;
 
+/// SSC bridge — exact NixOS realization observation and target snapshot construction
+#[cfg(feature = "native")]
+pub mod ssc_bridge;
+
 /// Layer 5: Motor output — Φ-gated command execution
 #[cfg(feature = "native")]
 pub mod action;

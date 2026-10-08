@@ -1,0 +1,11 @@
+[package]
+name = "sovereign-state-compiler-nix"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "NixOS target adapter for the Sovereign State Compiler"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+sovereign-state-compiler = { path = "../sovereign-state-compiler" }
+thiserror = { workspace = true }

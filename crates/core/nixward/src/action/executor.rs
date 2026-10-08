@@ -574,6 +574,12 @@ impl NixOSExecutor {
     /// not checked. Only call this when the command was already confirmed by
     /// a real gate elsewhere (e.g. an explicit human approval) — this
     /// function performs no safety check of its own.
+    ///
+    /// Deprecated migration surface: this bypass does not establish SSC
+    /// authorization consumption or execution-time target preflight.
+    #[deprecated(
+        note = "confirmation bypass; use governed Nixward/SSC authorization and preflight"
+    )]
     pub async fn execute_confirmed(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
         let (cmd, args) = command.to_command();
 
