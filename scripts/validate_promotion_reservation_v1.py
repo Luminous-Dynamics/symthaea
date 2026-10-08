@@ -1404,6 +1404,21 @@ def topology_binding_fixture(
             if provider_topology_cas_evidence is not None
             else None
         ),
+        attestation_trust_policy=(
+            _test_trust_policy(identity)
+            if provider_topology_cas_evidence is not None
+            else None
+        ),
+        expected_trust_policy_digest=(
+            _test_trust_policy(identity).digest()
+            if provider_topology_cas_evidence is not None
+            else None
+        ),
+        expected_trust_policy_generation=(
+            _test_trust_policy(identity).generation
+            if provider_topology_cas_evidence is not None
+            else None
+        ),
     )
 
 
@@ -1441,6 +1456,8 @@ def provider_topology_cas_evidence_fixture(
         predicate_digest=predicate.digest(),
         enforcement_result=enforcement_result,
     )
+    trust_root = _test_trust_root(identity)
+    trust_policy = _test_trust_policy(identity, trust_root)
     attestation = _test_sign_topology_statement(
         identity,
         observation,
@@ -1448,8 +1465,9 @@ def provider_topology_cas_evidence_fixture(
         request,
         submission,
         execution,
+        trust_root,
+        trust_policy,
     )
-    trust_root = _test_trust_root(identity)
     verification = verify_provider_topology_cas_attestation(
         attestation,
         trust_root,
@@ -1459,6 +1477,9 @@ def provider_topology_cas_evidence_fixture(
         request,
         submission,
         execution,
+        trust_policy,
+        trust_policy.digest(),
+        trust_policy.generation,
     )
     if verification is None:
         raise RuntimeError("test DSSE attestation did not verify")
@@ -1529,6 +1550,27 @@ def _test_trust_root(identity: PromotionOperationIdentityV1) -> ProviderTopology
     )
 
 
+def _test_trust_policy(
+    identity: PromotionOperationIdentityV1,
+    trust_root: ProviderTopologyCasTrustRootV1 | None = None,
+    *,
+    generation: int = 1,
+    repository: str | None = None,
+    revoked_key_ids: tuple[str, ...] = (),
+    revoked_signer_identities: tuple[str, ...] = (),
+    authorized_roots: tuple[ProviderTopologyCasTrustRootV1, ...] | None = None,
+) -> ProviderTopologyCasTrustPolicyV1:
+    root = trust_root or _test_trust_root(identity)
+    return ProviderTopologyCasTrustPolicyV1(
+        policy_id="test-only-topology-trust-policy-v1",
+        generation=generation,
+        repository=repository or identity.repository,
+        authorized_roots=authorized_roots if authorized_roots is not None else (root,),
+        revoked_key_ids=revoked_key_ids,
+        revoked_signer_identities=revoked_signer_identities,
+    )
+
+
 def _test_sign_dsse_payload(payload: bytes, payload_type: str = "application/vnd.in-toto+json") -> ProviderTopologyCasAttestationV1:
     private_pem, _, key_id = _test_signer_material()
     unsigned = ProviderTopologyCasDsseEnvelopeV1(
@@ -1580,8 +1622,9 @@ def _test_sign_topology_statement(
     request: ProviderTopologyCasRequestV1,
     submission: ProviderTopologyCasSubmissionV1,
     execution: ProviderTopologyCasExecutionV1,
+    trust_root: ProviderTopologyCasTrustRootV1,
+    trust_policy: ProviderTopologyCasTrustPolicyV1,
 ) -> ProviderTopologyCasAttestationV1:
-    trust_root = _test_trust_root(identity)
     payload = _canonical_json_bytes(
         _provider_topology_statement(
             identity,
@@ -1591,6 +1634,7 @@ def _test_sign_topology_statement(
             submission,
             execution,
             trust_root,
+            trust_policy,
         )
     )
     return _test_sign_dsse_payload(payload)
