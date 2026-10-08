@@ -1824,10 +1824,6 @@ pub enum NixPostStateErrorV1 {
     InvalidJobRemovedObservationTime,
     #[error("JobRemoved was observed after the post-state observation")]
     JobRemovedAfterObservation,
-    #[error("JobRemoved observation time is zero")]
-    InvalidJobRemovedObservationTime,
-    #[error("JobRemoved was observed after the post-state observation")]
-    JobRemovedAfterObservation,
     #[error("duplicate drop-in path")]
     DuplicateDropInPath,
     #[error("drop-in paths are not deterministically sorted")]
@@ -1870,8 +1866,6 @@ pub enum NixPostStateErrorV1 {
     MissingPostInvocationBinding,
     #[error("post InvocationID unit binding commitment does not match the observed identity")]
     PostInvocationBindingMismatch,
-    #[error("exact JobRemoved observation time is required for a Proven receipt")]
-    MissingJobRemovedObservationTime,
     #[error("exact JobRemoved observation time is required for a Proven receipt")]
     MissingJobRemovedObservationTime,
     #[error("live execution provenance does not match the bound authorization lineage")]
@@ -2861,6 +2855,107 @@ mod tests {
 
         let mut changed = receipt.clone();
         changed.systemd_job_removed_observed_at_monotonic_us = Some(1_600);
+
+        assert_ne!(baseline, changed.digest().unwrap());
+    }
+
+    #[test]
+    fn observation_rejects_post_invocation_object_rebinding() {
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.post_invocation_binding_digest = Some(
+            invocation_binding_digest(
+                Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+                "/org/freedesktop/systemd1/unit/other_2eservice",
+                Some(":1.123"),
+                Some("0123456789abcdef0123456789abcdef"),
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(
+            obs.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::PostInvocationBindingMismatch
+        );
+    }
+
+    #[test]
+    fn receipt_rejects_post_invocation_binding_tampering() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.post_invocation_binding_digest = Some(
+            invocation_binding_digest(
+                Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+                "/org/freedesktop/systemd1/unit/other_2eservice",
+                Some(":1.123"),
+                Some("0123456789abcdef0123456789abcdef"),
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::PostInvocationBindingMismatch
+        );
+    }
+
+    #[test]
+    fn proven_receipt_requires_post_invocation_binding() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_proven_receipt(
+            &exp,
+            &obs,
+            Some(stability(
+                &obs,
+                1_000,
+                1_000,
+                2_000,
+                &[1_000, 2_000],
+            )),
+        )
+        .unwrap();
+
+        receipt.post_invocation_binding_digest = None;
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::MissingPostInvocationBinding
+        );
+    }
+
+    #[test]
+    fn post_invocation_binding_changes_receipt_digest() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let receipt = build_receipt(&exp, &obs, None).unwrap();
+        let baseline = receipt.digest().unwrap();
+
+        let mut changed = receipt.clone();
+        changed.post_invocation_binding_digest = Some(
+            invocation_binding_digest(
+                Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+                "/org/freedesktop/systemd1/unit/other_2eservice",
+                Some(":1.123"),
+                Some("0123456789abcdef0123456789abcdef"),
+            )
+            .unwrap(),
+        );
 
         assert_ne!(baseline, changed.digest().unwrap());
     }
