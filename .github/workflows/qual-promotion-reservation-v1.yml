@@ -133,6 +133,7 @@ jobs:
               "clock-relation-source-challenge-mismatch",
               "clock-relation-source-response-mismatch",
               "clock-relation-source-attestation-invalid",
+              "clock-relation-operation-identity-mismatch",
               "clock-relation-trust-snapshot-after-dispatch",
               "clock-relation-established-after-dispatch",
               "clock-relation-outside-validity",
