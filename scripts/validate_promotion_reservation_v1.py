@@ -4706,6 +4706,11 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_local_temporal_sequence_evidence_rejects_invalid_generation,
+    test_local_temporal_sequence_evidence_binds_sequence_digest,
+    test_temporal_effect_without_sequence_provenance_is_not_admissible,
+    test_temporal_effect_with_foreign_sequence_operation_is_not_admissible,
+    test_temporal_effect_with_invalid_sequence_evidence_is_not_admissible,
     test_clock_source_challenge_rejects_wrong_nonce_length,
     test_clock_source_challenge_rejects_zero_nonce,
     test_clock_source_response_binds_exact_challenge,
