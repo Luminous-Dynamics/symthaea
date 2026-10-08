@@ -31,6 +31,8 @@ RUNNER_JOB = re.compile(r"^    (?:runs-on|uses):")
 DRAFT_FALSE = re.compile(
     r"github\.event\.pull_request\.draft\s*==\s*false"
 )
+
+READY_EVENT = re.compile(r"(?<![A-Za-z0-9_-])['\"]?ready_for_review['\"]?(?![A-Za-z0-9_-])")
 EVENT_EQ = {
     event: re.compile(
         rf"github\.event_name\s*==\s*['\"]{re.escape(event)}['\"]"
@@ -237,10 +239,25 @@ def has_draft_guard(expression: str | None) -> bool:
 
 
 def require_ready_event(path: Path, pr_block: list[str]) -> None:
-    if not any("ready_for_review" in line for line in pr_block):
-        raise SafetyError(
-            f"{path}: runner-capable pull_request workflow must include ready_for_review"
-        )
+    for index, line in enumerate(pr_block):
+        code = line.split("#", 1)[0]
+        match = re.search(r"\btypes\s*:\s*(.*)$", code)
+        if not match:
+            continue
+        payload = match.group(1).strip()
+        if payload and READY_EVENT.search(payload):
+            return
+        if payload:
+            continue
+        base_indent = indentation(line)
+        for candidate in pr_block[index + 1 :]:
+            if candidate.strip() and indentation(candidate) <= base_indent:
+                break
+            if READY_EVENT.search(candidate.split("#", 1)[0]):
+                return
+    raise SafetyError(
+        f"{path}: runner-capable pull_request workflow must include ready_for_review"
+    )
 
 
 def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, int]:
