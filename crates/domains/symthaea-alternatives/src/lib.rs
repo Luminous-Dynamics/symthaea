@@ -8872,20 +8872,44 @@ mod tests {
         };
         let topology_digest = topology.canonical_digest().unwrap();
 
-        let mut changed = topology.clone();
-        changed.input_bindings[0]
-            .input_result_ref
-            .as_mut()
-            .unwrap()
-            .result_revision = "v2".into();
+        let assert_topology_change =
+            |label: &str, mutate: fn(&mut MeasurementModelInputResultRef)| {
+                let mut changed = topology.clone();
+                mutate(
+                    changed.input_bindings[0]
+                        .input_result_ref
+                        .as_mut()
+                        .unwrap(),
+                );
+                assert_eq!(
+                    frontier_digest,
+                    canonical_measurement_model_input_frontier_digest(
+                        &changed.input_bindings
+                    )
+                    .unwrap(),
+                    "{label} must remain outside the semantic input frontier"
+                );
+                assert_ne!(
+                    topology_digest,
+                    changed.canonical_digest().unwrap(),
+                    "{label} must change the topology receipt"
+                );
+            };
 
-        assert_eq!(
-            frontier_digest,
-            canonical_measurement_model_input_frontier_digest(&changed.input_bindings).unwrap()
-        );
-        assert_ne!(topology_digest, changed.canonical_digest().unwrap());
+        assert_topology_change("input-result identity", |result| {
+            result.result_id = "fixture-temperature-result-v2".into();
+        });
+        assert_topology_change("input-result revision", |result| {
+            result.result_revision = "v2".into();
+        });
+        assert_topology_change("input-result digest", |result| {
+            result.result_record_digest = "temperature-result-v2".into();
+        });
+        assert_topology_change("input-result omission", |result| {
+            result.result_id.clear();
+        });
 
-        let mut malformed = changed;
+        let mut malformed = topology.clone();
         malformed.input_bindings[0]
             .input_result_ref
             .as_mut()
