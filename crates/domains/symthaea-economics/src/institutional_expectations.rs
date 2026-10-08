@@ -38,7 +38,7 @@ pub struct ExpectationRecord {
     pub belief_value: String,
     pub confidence: Option<u8>,
     pub signal_identity: Option<String>,
-    pub current: bool,
+    pub belief_current: bool,
     pub superseded_by: Option<String>,
 }
 
@@ -48,6 +48,14 @@ pub struct ActualInstitutionObservation {
     pub observation_time: u64,
     pub institution_hash: String,
     pub source: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReferencedInstitutionStatus {
+    Current,
+    Historical,
+    Future,
+    Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -157,13 +165,13 @@ impl ExpectationBook {
             belief_value: update.new_belief_value.clone(),
             confidence: existing.confidence,
             signal_identity: existing.signal_identity.clone(),
-            current: true,
+            belief_current: true,
             superseded_by: None,
         };
         validate_record(&updated)?;
 
         if let Some(previous) = self.records.get_mut(&update.superseded_expectation_id) {
-            previous.current = false;
+            previous.belief_current = false;
             previous.superseded_by = Some(update.expectation_id.clone());
         }
         self.records.insert(update.expectation_id.clone(), updated);
@@ -210,7 +218,7 @@ mod tests {
             belief_value: belief.into(),
             confidence: Some(80),
             signal_identity: None,
-            current: true,
+            belief_current: true,
             superseded_by: None,
         }
     }
@@ -250,10 +258,10 @@ mod tests {
             new_belief_value: "fail".into(),
             information_set: InformationSetIdentity { hash: "info-v1".into(), as_of: 20 },
         }).unwrap();
-        assert!(!book.records()["e1"].current);
+        assert!(!book.records()["e1"].belief_current);
         assert_eq!(book.records()["e1"].belief_value, "persist");
         assert_eq!(book.records()["e1"].superseded_by.as_deref(), Some("e2"));
-        assert!(book.records()["e2"].current);
+        assert!(book.records()["e2"].belief_current);
     }
 
 
