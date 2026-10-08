@@ -21,13 +21,15 @@ const MAX_WORKLOAD_NODES: usize = 64;
 const WORKGROUP_SIZE: u32 = 64;
 const VULKAN_API_VERSION: u32 = vk::API_VERSION_1_3;
 const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
-const RECEIPT_VERSION: u16 = 6;
+const RECEIPT_VERSION: u16 = 7;
 const VULKAN_IMPLEMENTATION_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-implementation.v1";
 const WGSL_ABI_MARKER: &str = "symthaea.hdc.bind_xor.storage-u32.v1";
 const VULKAN_ENTRY_POINT: &str = "main";
 const VULKAN_SHADER_STAGE: &str = "compute";
 const DRIVER_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-driver.v1";
 const QUEUE_FAMILY_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-queue-family.v1";
+const SYNCHRONIZATION_FEATURE_IDENTITY_VERSION: &str =
+    "symthaea.gpu-fabric.vulkan-sync-features.v1";
 
 #[cfg(test)]
 fn qualification_stage(label: &str) {
@@ -147,6 +149,10 @@ pub enum VulkanBarrierReceiptError {
     QueueFamilyIdentity,
     #[error("receipt queue-family identity does not match the execution runtime")]
     QueueFamilyIdentityBinding,
+    #[error("receipt synchronization feature profile is missing, malformed, or unqualified")]
+    SynchronizationFeatureIdentity,
+    #[error("receipt synchronization feature profile does not match the execution runtime")]
+    SynchronizationFeatureIdentityBinding,
     #[error("receipt physical-device UUID does not match the execution runtime")]
     DeviceUuidBinding,
     #[error("receipt expected timeline value does not match the synchronization plan")]
@@ -160,6 +166,59 @@ pub enum VulkanBarrierReceiptError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VulkanSynchronizationFeatureProfile {
+    pub timeline_semaphore_supported: bool,
+    pub synchronization2_supported: bool,
+    pub timeline_semaphore_enabled: bool,
+    pub synchronization2_enabled: bool,
+    pub identity_digest: String,
+}
+
+impl VulkanSynchronizationFeatureProfile {
+    fn new(
+        timeline_semaphore_supported: bool,
+        synchronization2_supported: bool,
+        timeline_semaphore_enabled: bool,
+        synchronization2_enabled: bool,
+    ) -> Self {
+        Self {
+            timeline_semaphore_supported,
+            synchronization2_supported,
+            timeline_semaphore_enabled,
+            synchronization2_enabled,
+            identity_digest: synchronization_feature_identity_digest(
+                timeline_semaphore_supported,
+                synchronization2_supported,
+                timeline_semaphore_enabled,
+                synchronization2_enabled,
+            ),
+        }
+    }
+
+    fn verify(&self) -> Result<(), VulkanBarrierReceiptError> {
+        if !self.timeline_semaphore_supported
+            || !self.synchronization2_supported
+            || !self.timeline_semaphore_enabled
+            || !self.synchronization2_enabled
+        {
+            return Err(VulkanBarrierReceiptError::SynchronizationFeatureIdentity);
+        }
+        if !is_sha256_hex(&self.identity_digest)
+            || self.identity_digest
+                != synchronization_feature_identity_digest(
+                    self.timeline_semaphore_supported,
+                    self.synchronization2_supported,
+                    self.timeline_semaphore_enabled,
+                    self.synchronization2_enabled,
+                )
+        {
+            return Err(VulkanBarrierReceiptError::SynchronizationFeatureIdentity);
+        }
+        Ok(())
+    }
+}
+
 pub struct VulkanBarrierExecutionReceipt {
     pub version: u16,
     pub graph_digest: String,
@@ -177,6 +236,7 @@ pub struct VulkanBarrierExecutionReceipt {
     pub vulkan_api_version: u32,
     pub physical_device_api_version: u32,
     pub queue_family_index: u32,
+    pub synchronization_features: VulkanSynchronizationFeatureProfile,
     pub queue_family_identity_digest: String,
     pub queue_family_queue_flags: u32,
     pub queue_family_queue_count: u32,
@@ -208,6 +268,7 @@ impl VulkanBarrierExecutionReceipt {
         if !is_sha256_hex(&self.driver_identity_digest) {
             return Err(VulkanBarrierReceiptError::DriverIdentity);
         }
+        self.synchronization_features.verify()?;
         if !is_sha256_hex(&self.queue_family_identity_digest)
             || self.queue_family_queue_count == 0
             || (self.queue_family_queue_flags & vk::QueueFlags::COMPUTE.as_raw()) == 0
@@ -310,6 +371,7 @@ impl VulkanBarrierExecutionReceipt {
     pub fn verify_runtime_binding(
         &self,
         physical_device_api_version: u32,
+            synchronization_features: test_synchronization_feature_profile(),
         queue_family_index: u32,
         device_uuid: [u8; 16],
         implementation_identity_digest: &str,
@@ -317,6 +379,7 @@ impl VulkanBarrierExecutionReceipt {
         driver_identity_digest: &str,
         driver_uuid: [u8; 16],
         driver_id: i32,
+        synchronization_features: &VulkanSynchronizationFeatureProfile,
         queue_family_identity_digest: &str,
         queue_family_queue_flags: u32,
         queue_family_queue_count: u32,
@@ -347,6 +410,9 @@ impl VulkanBarrierExecutionReceipt {
         if self.driver_id != driver_id {
             return Err(VulkanBarrierReceiptError::DriverIdBinding);
         }
+        if self.synchronization_features != *synchronization_features {
+            return Err(VulkanBarrierReceiptError::SynchronizationFeatureIdentityBinding);
+        }
         if self.queue_family_identity_digest != queue_family_identity_digest {
             return Err(VulkanBarrierReceiptError::QueueFamilyIdentityBinding);
         }
@@ -376,7 +442,9 @@ pub struct VulkanBarrierWorkloadRuntime {
     max_storage_buffer_range: u64,
     max_compute_workgroup_count_x: u32,
     physical_device_api_version: u32,
+            synchronization_features: test_synchronization_feature_profile(),
     queue_family_index: u32,
+    synchronization_features: VulkanSynchronizationFeatureProfile,
     queue_family_identity_digest: String,
     queue_family_queue_flags: u32,
     queue_family_queue_count: u32,
@@ -444,20 +512,45 @@ impl VulkanBarrierWorkloadRuntime {
             let family = unsafe { instance.get_physical_device_queue_family_properties(physical) }
                 .iter().enumerate()
                 .find(|(_, q)| q.queue_flags.contains(vk::QueueFlags::COMPUTE))
-                .map(|(i, q)| (i as u32, *q));
-            if let Some((family, queue_properties)) = family {
-                selected = Some((physical, family, queue_properties));
+                .map(|(i, q)| {
+                    (
+                        i as u32,
+                        *q,
+                        timeline.timeline_semaphore != 0,
+                        sync2.synchronization2 != 0,
+                    )
+                });
+            if let Some((family, queue_properties, timeline_supported, synchronization2_supported)) = family {
+                selected = Some((
+                    physical,
+                    family,
+                    queue_properties,
+                    timeline_supported,
+                    synchronization2_supported,
+                ));
                 break;
             }
         }
 
-        let (physical, family, queue_family_properties) = match selected {
+        let (
+            physical,
+            family,
+            queue_family_properties,
+            timeline_semaphore_supported,
+            synchronization2_supported,
+        ) = match selected {
             Some(value) => value,
             None => {
                 unsafe { instance.destroy_instance(None); }
                 return Err(VulkanBarrierError::NoQualifiedDevice);
             }
         };
+        let synchronization_features = VulkanSynchronizationFeatureProfile::new(
+            timeline_semaphore_supported,
+            synchronization2_supported,
+            true,
+            true,
+        );
         let props = unsafe { instance.get_physical_device_properties(physical) };
         let queue_family_identity_digest =
             queue_family_identity_digest(family, &queue_family_properties);
@@ -661,7 +754,9 @@ impl VulkanBarrierWorkloadRuntime {
             max_storage_buffer_range: u64::from(props.limits.max_storage_buffer_range),
             max_compute_workgroup_count_x: props.limits.max_compute_work_group_count[0],
             physical_device_api_version: props.api_version,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: family,
+            synchronization_features,
             queue_family_identity_digest,
             queue_family_queue_flags,
             queue_family_queue_count,
@@ -913,7 +1008,9 @@ impl VulkanBarrierWorkloadRuntime {
             completion_observed,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: self.physical_device_api_version,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: self.queue_family_index,
+            synchronization_features: self.synchronization_features,
             queue_family_identity_digest: self.queue_family_identity_digest.clone(),
             queue_family_queue_flags: self.queue_family_queue_flags,
             queue_family_queue_count: self.queue_family_queue_count,
@@ -938,6 +1035,7 @@ impl VulkanBarrierWorkloadRuntime {
                 &self.driver_identity_digest,
                 self.driver_uuid,
                 self.driver_id,
+                &self.synchronization_features,
                 &self.queue_family_identity_digest,
                 self.queue_family_queue_flags,
                 self.queue_family_queue_count,
@@ -1312,6 +1410,24 @@ fn physical_device_identity_digest(props: &vk::PhysicalDeviceProperties) -> Stri
     hasher.update(&props.api_version.to_le_bytes());
     hasher.update(&props.driver_version.to_le_bytes());
     sha256_len_prefixed_update(&mut hasher, device_name);
+    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn synchronization_feature_identity_digest(
+    timeline_semaphore_supported: bool,
+    synchronization2_supported: bool,
+    timeline_semaphore_enabled: bool,
+    synchronization2_enabled: bool,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(SYNCHRONIZATION_FEATURE_IDENTITY_VERSION.as_bytes());
+    hasher.update([0]);
+    hasher.update([
+        u8::from(timeline_semaphore_supported),
+        u8::from(synchronization2_supported),
+        u8::from(timeline_semaphore_enabled),
+        u8::from(synchronization2_enabled),
+    ]);
     hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
@@ -1942,6 +2058,7 @@ mod tests {
             completion_observed: 0,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
             queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
             queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
@@ -1996,6 +2113,7 @@ mod tests {
             completion_observed: 0,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
             queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
             queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
@@ -2054,6 +2172,7 @@ mod tests {
             completion_observed: 1,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
             queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
             queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
@@ -2109,6 +2228,7 @@ mod tests {
             completion_observed: 1,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: vk::API_VERSION_1_2,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
             queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
             queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
@@ -2166,6 +2286,7 @@ mod tests {
             completion_observed: expected_final_timeline_value(&plan),
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
             queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
             queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
@@ -2225,6 +2346,7 @@ mod tests {
             completion_observed: expected_final_timeline_value(&plan),
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
             queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
             queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
@@ -2287,6 +2409,7 @@ mod tests {
             completion_observed: expected_final_timeline_value(&plan),
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
             queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
             queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
@@ -2368,6 +2491,7 @@ mod tests {
             completion_observed: expected + 1,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
             queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
             queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
@@ -2434,6 +2558,7 @@ mod tests {
             completion_observed: expected,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
             queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
             queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
@@ -2488,6 +2613,7 @@ mod tests {
             completion_observed: expected_final_timeline_value(&plan),
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
             queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
             queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
@@ -2520,6 +2646,7 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 1,
+                &test_synchronization_feature_profile(),
                 TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
                 vk::QueueFlags::COMPUTE.as_raw(),
                 1,
@@ -2538,6 +2665,7 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 1,
+                &test_synchronization_feature_profile(),
                 TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
                 vk::QueueFlags::COMPUTE.as_raw(),
                 1,
@@ -2559,6 +2687,7 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 1,
+                &test_synchronization_feature_profile(),
                 TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
                 vk::QueueFlags::COMPUTE.as_raw(),
                 1,
@@ -2582,6 +2711,7 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 1,
+                &test_synchronization_feature_profile(),
                 TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
                 vk::QueueFlags::COMPUTE.as_raw(),
                 1,
@@ -2600,6 +2730,7 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 1,
+                &test_synchronization_feature_profile(),
                 TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
                 vk::QueueFlags::COMPUTE.as_raw(),
                 1,
@@ -2619,6 +2750,7 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 1,
+                &test_synchronization_feature_profile(),
                 TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
                 vk::QueueFlags::COMPUTE.as_raw(),
                 1,
@@ -2639,6 +2771,7 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 1,
+                &test_synchronization_feature_profile(),
                 TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
                 vk::QueueFlags::COMPUTE.as_raw(),
                 1,
@@ -2659,6 +2792,7 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [9; 16],
                 1,
+                &test_synchronization_feature_profile(),
                 TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
                 vk::QueueFlags::COMPUTE.as_raw(),
                 1,
@@ -2678,6 +2812,7 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 9,
+                &test_synchronization_feature_profile(),
                 TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
                 vk::QueueFlags::COMPUTE.as_raw(),
                 1,
@@ -2716,6 +2851,7 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 1,
+                &test_synchronization_feature_profile(),
                 TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
                 vk::QueueFlags::COMPUTE.as_raw(),
                 2,
@@ -2761,6 +2897,7 @@ mod tests {
             completion_observed: expected_final_timeline_value(&plan),
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 7,
             queue_family_identity_digest: queue_family_identity_digest_from_fields(
                 7,
@@ -2786,6 +2923,10 @@ mod tests {
         ));
     }
 
+    fn test_synchronization_feature_profile() -> VulkanSynchronizationFeatureProfile {
+        VulkanSynchronizationFeatureProfile::new(true, true, true, true)
+    }
+
     fn minimal_receipt_for_binding_tests() -> VulkanBarrierExecutionReceipt {
         VulkanBarrierExecutionReceipt {
             version: RECEIPT_VERSION,
@@ -2803,6 +2944,7 @@ mod tests {
             completion_observed: 0,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
             queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
             queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
@@ -2844,6 +2986,12 @@ mod tests {
         println!("vulkan_api_version={}", receipt.vulkan_api_version);
         println!("physical_device_api_version={}", receipt.physical_device_api_version);
         println!("queue_family_index={}", receipt.queue_family_index);
+        println!("synchronization_feature_identity_version=1");
+        println!("timeline_semaphore_supported={}", u8::from(receipt.synchronization_features.timeline_semaphore_supported));
+        println!("synchronization2_supported={}", u8::from(receipt.synchronization_features.synchronization2_supported));
+        println!("timeline_semaphore_enabled={}", u8::from(receipt.synchronization_features.timeline_semaphore_enabled));
+        println!("synchronization2_enabled={}", u8::from(receipt.synchronization_features.synchronization2_enabled));
+        println!("synchronization_feature_identity_sha256={}", receipt.synchronization_features.identity_digest);
         println!("queue_family_identity_version=1");
         println!("queue_family_identity_sha256={}", receipt.queue_family_identity_digest);
         println!("queue_family_queue_flags={}", receipt.queue_family_queue_flags);
@@ -2950,6 +3098,13 @@ mod tests {
         properties.timestamp_valid_bits = 64;
         assert_ne!(baseline, queue_family_identity_digest(3, &properties));
         properties.timestamp_valid_bits = 0;
+
+        let mut unsupported = test_synchronization_feature_profile();
+        unsupported.timeline_semaphore_supported = false;
+        assert_eq!(
+            unsupported.verify(),
+            Err(VulkanBarrierReceiptError::SynchronizationFeatureIdentity)
+        );
 
         properties.min_image_transfer_granularity.width = 2;
         assert_ne!(baseline, queue_family_identity_digest(3, &properties));
