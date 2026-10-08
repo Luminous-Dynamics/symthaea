@@ -76,6 +76,7 @@ jobs:
               "PromotionStackEffectEvidenceSetV1",
               "PromotionPrEffectStateV1",
               "ClockRelationV1",
+              "LocalTemporalSequenceV1",
               "ProviderWebhookEffectTimingV1",
               "PromotionStackEffectTimingV1",
               "PromotionStackEffectTimingSetV1",
@@ -166,8 +167,12 @@ jobs:
               "no-eligible-effect",
               "parse_provider_timestamp_ms",
               "ClockRelationV1",
+              "LocalTemporalSequenceV1",
               "ProviderWebhookEffectTimingV1",
               "PromotionStackEffectTimingSetV1",
+              "LocalTemporalSequenceV1(1, 2, 3)",
+              "local-monotonic-sequence-missing",
+              "invalid-local-monotonic-sequence",
           }
           for marker in stack_effect_derivation_markers:
               assert marker in source, f"Missing stack-effect derivation marker: {marker}"
