@@ -1,0 +1,66 @@
+{
+  "schema_version": "monetary-operational-workflow-v1",
+  "states": [
+    "requested",
+    "compliance_pending",
+    "authorized",
+    "source_reserved",
+    "settlement_ready",
+    "atomically_settled",
+    "redemption_pending",
+    "externally_finalized",
+    "rejected",
+    "timed_out",
+    "manual_intervention",
+    "reconciling",
+    "unresolved"
+  ],
+  "terminal_states": [
+    "externally_finalized",
+    "rejected",
+    "timed_out",
+    "unresolved"
+  ],
+  "experiment_factors": [
+    {"id":"compliance_latency","unit":"ticks","description":"Waiting time before compliance disposition."},
+    {"id":"approval_latency","unit":"ticks","description":"Waiting time for required authorization or maker-checker approval."},
+    {"id":"manual_breakpoint_probability","unit":"ppm","description":"Deterministic probability of an operational manual breakpoint."},
+    {"id":"external_system_availability","unit":"boolean","description":"Whether required external RTGS/core-banking/finalization infrastructure is available."},
+    {"id":"issuance_redemption_latency","unit":"ticks","description":"Delay for issuance, redemption, or equivalent target-side completion workflow."},
+    {"id":"quote_confirmation_latency","unit":"ticks","description":"Delay for cross-currency amount or quote confirmation."},
+    {"id":"fallback_activation","unit":"boolean","description":"Whether fallback/reconciliation procedures are enabled."},
+    {"id":"operator_capacity","unit":"requests","description":"Concurrent manual interventions an operator can service."},
+    {"id":"operating_window","unit":"ticks","description":"Latest tick by which the workflow may continue before an operating-window constraint applies."},
+    {"id":"asynchronous_delivery","unit":"ticks","description":"Message delivery delay between workflow stages."}
+  ],
+  "metrics": [
+    "end_to_end_completion_time",
+    "technical_settlement_time",
+    "operational_waiting_time",
+    "manual_intervention_rate",
+    "fallback_activation_rate",
+    "reconciliation_backlog",
+    "dependency_count"
+  ],
+  "adversarial_boundaries": [
+    "technically valid payment blocked by compliance",
+    "source reserve locked while approval expires",
+    "target issuer unavailable after source authorization",
+    "external RTGS outage after settlement",
+    "redemption approval delayed",
+    "operator misses fallback window",
+    "duplicate manual approval",
+    "stale cross-currency amount confirmation",
+    "end-of-day closure during queued transactions"
+  ],
+  "claim_ceiling": "Synthetic operational-workflow semantics only; settlement, legal finality, compliance, institutional viability and live-system behavior remain unqualified.",
+  "observation_binding": {
+    "required_fields": [
+      "scenario_id",
+      "policy_digest",
+      "settlement_receipt_digest",
+      "seed",
+      "trace_digest"
+    ]
+  }
+}
