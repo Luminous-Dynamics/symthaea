@@ -301,6 +301,11 @@ impl NixServicePostStateObservationV1 {
             if self.systemd_manager_owner.as_deref() != Some(job.manager_owner.as_str()) {
                 return Err(NixPostStateErrorV1::ManagerOwnerMismatch);
             }
+            if let Some(removed_at) = job.removed_at_monotonic_us {
+                if removed_at > self.observed_at_monotonic_us {
+                    return Err(NixPostStateErrorV1::JobRemovedAfterObservation);
+                }
+            }
         }
         validate_optional_invocation_id(self.invocation_id.as_deref(), "post-invocation id")?;
         if self.observed_at_monotonic_us < self.state_change_at_monotonic_us {
@@ -1668,6 +1673,16 @@ fn put_opt_u32(h: &mut Hasher, value: Option<u32>) {
     }
 }
 
+fn put_opt_u64(h: &mut Hasher, value: Option<u64>) {
+    match value {
+        Some(value) => {
+            put_u8(h, 1);
+            put_u64(h, value);
+        }
+        None => put_u8(h, 0),
+    }
+}
+
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum NixPostStateErrorV1 {
     #[error("empty required field: {0}")]
@@ -1738,6 +1753,10 @@ pub enum NixPostStateErrorV1 {
     InvalidJobRemovedObservationTime,
     #[error("JobRemoved was observed after the post-state observation")]
     JobRemovedAfterObservation,
+    #[error("JobRemoved observation time is zero")]
+    InvalidJobRemovedObservationTime,
+    #[error("JobRemoved was observed after the post-state observation")]
+    JobRemovedAfterObservation,
     #[error("duplicate drop-in path")]
     DuplicateDropInPath,
     #[error("drop-in paths are not deterministically sorted")]
@@ -1776,6 +1795,8 @@ pub enum NixPostStateErrorV1 {
     InvalidBoundPreState,
     #[error("live execution provenance is required for a Proven receipt")]
     MissingLiveExecutionWitness,
+    #[error("exact JobRemoved observation time is required for a Proven receipt")]
+    MissingJobRemovedObservationTime,
     #[error("exact JobRemoved observation time is required for a Proven receipt")]
     MissingJobRemovedObservationTime,
     #[error("live execution provenance does not match the bound authorization lineage")]
