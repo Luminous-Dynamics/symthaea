@@ -1,0 +1,88 @@
+{
+  "schema": "rh006-observational-equivalence-identification/v1",
+  "status": "research-diagnostic-only",
+  "selection": "stop-assumption-failure",
+  "formal_inference": false,
+  "source": {
+    "harness_path": "scripts/rh006_observational_equivalence.py",
+    "execution_mode": "independent-local-execution",
+    "draws_per_witness": 100000,
+    "note": "Analytic construction establishes observational equivalence; Gaussian simulation is a numerical sanity check and not the proof."
+  },
+  "observable_target": {
+    "var_F": 2.0,
+    "cov_FY": 0.5,
+    "var_Y": 1.5
+  },
+  "witness_models": [
+    {
+      "name": "A",
+      "var_q": 1.0,
+      "cov_e_q": 0.4,
+      "K": 0.4,
+      "C": 0.3368607684266076,
+      "b": 0.1,
+      "var_e": 1.41,
+      "var_v": 1.0,
+      "observable_covariance": [2.0, 0.5, 1.5]
+    },
+    {
+      "name": "B",
+      "var_q": 0.5,
+      "cov_e_q": -0.4,
+      "K": -0.8,
+      "C": -0.49236596391733095,
+      "b": 1.8,
+      "var_e": 1.32,
+      "var_v": 1.5,
+      "observable_covariance": [2.0, 0.5, 1.5000000000000002]
+    }
+  ],
+  "identified_sets": {
+    "Var(F)": "{2}",
+    "Cov(F,Y)": "{0.5}",
+    "Var(Y)": "{1.5}",
+    "Var(q)": "[1/6, 2] with boundary convention allowing Var(v)=0",
+    "Var(v)": "[0, 11/6]",
+    "Xi=Cov(e,q)": "R",
+    "K": "R",
+    "C": "[-1,1]",
+    "b": "R",
+    "branch_discriminant_0.25_minus_C2": "[-0.75,0.25]"
+  },
+  "classification": {
+    "observable_covariance_components": "O",
+    "Var(q)": "PI",
+    "Var(v)": "PI",
+    "Xi": "NI",
+    "K": "NI",
+    "C": "NI",
+    "b": "NI",
+    "Var(e)": "NI",
+    "branch_discriminant": "NI",
+    "branch_existence": "NI"
+  },
+  "branch_examples": {
+    "C=0": {"D": 0.25, "real_branch_count": 2},
+    "C=0.5": {"D": 0.0, "real_branch_count": 1},
+    "C=0.99": {"D": -0.7301, "real_branch_count": 0}
+  },
+  "identification_rescue": {
+    "added_structure": [
+      "two calibrated independent indicators of q with known unit loading",
+      "a valid excluded instrument Z with Cov(Z,e)=0 and Cov(Z,q)!=0",
+      "linear outcome relation with maintained finite second moments"
+    ],
+    "recovered_b": 0.1,
+    "recovered_Xi": 0.4,
+    "recovered_C": 0.3368607684266076,
+    "status": "point-identified-under-explicit-structure"
+  },
+  "nonclaims": [
+    "No claim that the current RH-006 experiment supplies a valid instrument.",
+    "No claim that the current latent nuisance is point identified.",
+    "No formal p-value or confidence interval.",
+    "No bootstrap validity theorem.",
+    "No exact-hosted-CI PASS claim."
+  ]
+}
