@@ -55,6 +55,22 @@ jobs:
               f"Ledger method signature drift: {methods}"
           )
 
+          expected_call_args = {
+              "prepare_dispatch": 4,    # self omitted; four explicit inputs
+              "record_unknown": 1,       # self omitted; operation identity
+              "reconcile_complete": 2,   # self omitted; operation + receipt
+          }
+          for node in ast.walk(tree):
+              if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+                  continue
+              expected = expected_call_args.get(node.func.attr)
+              if expected is None:
+                  continue
+              assert len(node.args) == expected and not node.keywords, (
+                  f"{node.func.attr} call-shape drift: args={len(node.args)} "
+                  f"keywords={len(node.keywords)}"
+              )
+
           defined = {
               node.name
               for node in tree.body

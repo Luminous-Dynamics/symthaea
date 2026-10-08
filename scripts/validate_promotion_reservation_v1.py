@@ -73,6 +73,36 @@ class PromotionOperationIdentityV1:
         return hashlib.sha256(self.canonical_bytes()).hexdigest()
 
 
+@dataclass(frozen=True)
+class PromotionStackEffectV1:
+    pr_number: int
+    expected_head_sha: str
+    observed_merge_commit: str
+
+
+@dataclass(frozen=True)
+class PromotionStackEffectSetV1:
+    operation_identity_digest: str
+    effects: tuple[PromotionStackEffectV1, ...]
+
+    def validates_complete(self, identity: PromotionOperationIdentityV1) -> bool:
+        if self.operation_identity_digest != identity.digest():
+            return False
+        expected = identity.ordered_stack
+        if len(self.effects) != len(expected):
+            return False
+        observed_prs = [effect.pr_number for effect in self.effects]
+        if len(observed_prs) != len(set(observed_prs)):
+            return False
+
+        return all(
+            observed.pr_number == entry.pr_number
+            and observed.expected_head_sha == entry.head_sha
+            and bool(observed.observed_merge_commit)
+            for entry, observed in zip(expected, self.effects)
+        )
+
+
 @dataclass
 class Reservation:
     reservation_id: str
@@ -423,6 +453,116 @@ def stack_identity_fixture() -> PromotionOperationIdentityV1:
     )
 
 
+def stack_effect_fixture(
+    identity: PromotionOperationIdentityV1 | None = None,
+) -> PromotionStackEffectSetV1:
+    identity = identity or stack_identity_fixture()
+    return PromotionStackEffectSetV1(
+        operation_identity_digest=identity.digest(),
+        effects=(
+            PromotionStackEffectV1(7085, "H1", "M1"),
+            PromotionStackEffectV1(7087, "H3", "M2"),
+        ),
+    )
+
+
+def test_stack_effect_set_exact_match_is_complete():
+    identity = stack_identity_fixture()
+    effects = stack_effect_fixture(identity)
+    assert effects.validates_complete(identity)
+
+
+def test_stack_effect_set_missing_bottom_entry_is_incomplete():
+    identity = stack_identity_fixture()
+    effects = PromotionStackEffectSetV1(
+        operation_identity_digest=identity.digest(),
+        effects=(PromotionStackEffectV1(7087, "H3", "M2"),),
+    )
+    assert not effects.validates_complete(identity)
+
+
+def test_stack_effect_set_missing_requested_entry_is_incomplete():
+    identity = stack_identity_fixture()
+    effects = PromotionStackEffectSetV1(
+        operation_identity_digest=identity.digest(),
+        effects=(PromotionStackEffectV1(7085, "H1", "M1"),),
+    )
+    assert not effects.validates_complete(identity)
+
+
+def test_stack_effect_set_rejects_extra_entry():
+    identity = stack_identity_fixture()
+    effects = PromotionStackEffectSetV1(
+        operation_identity_digest=identity.digest(),
+        effects=(
+            PromotionStackEffectV1(7085, "H1", "M1"),
+            PromotionStackEffectV1(7087, "H3", "M2"),
+            PromotionStackEffectV1(7090, "H9", "M3"),
+        ),
+    )
+    assert not effects.validates_complete(identity)
+
+
+def test_stack_effect_set_rejects_lower_stack_head_mismatch():
+    identity = stack_identity_fixture()
+    effects = stack_effect_fixture(identity)
+    changed = (
+        PromotionStackEffectV1(7085, "H1-CHANGED", "M1"),
+        effects.effects[1],
+    )
+    assert not PromotionStackEffectSetV1(identity.digest(), changed).validates_complete(identity)
+
+
+def test_stack_effect_set_rejects_requested_head_mismatch():
+    identity = stack_identity_fixture()
+    effects = stack_effect_fixture(identity)
+    changed = (
+        effects.effects[0],
+        PromotionStackEffectV1(7087, "H3-CHANGED", "M2"),
+    )
+    assert not PromotionStackEffectSetV1(identity.digest(), changed).validates_complete(identity)
+
+
+def test_stack_effect_set_rejects_empty_merge_commit():
+    identity = stack_identity_fixture()
+    effects = stack_effect_fixture(identity)
+    changed = (
+        effects.effects[0],
+        PromotionStackEffectV1(7087, "H3", ""),
+    )
+    assert not PromotionStackEffectSetV1(identity.digest(), changed).validates_complete(identity)
+
+
+def test_stack_effect_set_rejects_reordered_effects():
+    identity = stack_identity_fixture()
+    effects = stack_effect_fixture(identity)
+    reversed_effects = tuple(reversed(effects.effects))
+    assert not PromotionStackEffectSetV1(
+        identity.digest(), reversed_effects
+    ).validates_complete(identity)
+
+
+def test_stack_effect_set_rejects_duplicate_pr():
+    identity = stack_identity_fixture()
+    effects = stack_effect_fixture(identity)
+    duplicated = (
+        effects.effects[0],
+        PromotionStackEffectV1(7085, "H1", "M2"),
+    )
+    assert not PromotionStackEffectSetV1(identity.digest(), duplicated).validates_complete(identity)
+
+
+def test_stack_effect_set_rejects_operation_identity_mismatch():
+    identity = stack_identity_fixture()
+    effects = stack_effect_fixture(identity)
+    other_identity = PromotionOperationIdentityV1(
+        **{**identity.__dict__, "base_tip_sha": "T2"},
+    )
+    assert not PromotionStackEffectSetV1(
+        other_identity.digest(), effects.effects
+    ).validates_complete(identity)
+
+
 def test_stack_identity_is_deterministic():
     a = stack_identity_fixture()
     b = stack_identity_fixture()
@@ -750,8 +890,10 @@ def test_completion_requires_effect_receipt():
     assert ledger.prepare_dispatch("L1", 1, 1, 1)
     assert ledger.record_unknown(ledger.reservation.operation_id)
     op = ledger.reservation.operation_id
-    assert not ledger.reconcile_complete(PromotionEffectReceipt("wrong", "H1", "M1"))
-    assert ledger.reconcile_complete(PromotionEffectReceipt(op, "H1", "M1"))
+    assert not ledger.reconcile_complete(
+        "wrong", PromotionEffectReceipt("wrong", "H1", "M1")
+    )
+    assert ledger.reconcile_complete(op, PromotionEffectReceipt(op, "H1", "M1"))
     assert ledger.reservation.state == "PromotionCompleted"
 
 
@@ -764,6 +906,16 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_stack_effect_set_exact_match_is_complete,
+    test_stack_effect_set_missing_bottom_entry_is_incomplete,
+    test_stack_effect_set_missing_requested_entry_is_incomplete,
+    test_stack_effect_set_rejects_extra_entry,
+    test_stack_effect_set_rejects_lower_stack_head_mismatch,
+    test_stack_effect_set_rejects_requested_head_mismatch,
+    test_stack_effect_set_rejects_empty_merge_commit,
+    test_stack_effect_set_rejects_reordered_effects,
+    test_stack_effect_set_rejects_duplicate_pr,
+    test_stack_effect_set_rejects_operation_identity_mismatch,
     test_stack_identity_is_deterministic,
     test_stack_identity_binds_ordered_stack_topology,
     test_stack_identity_binds_lower_stack_head_sha,
