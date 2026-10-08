@@ -1900,22 +1900,37 @@ def effect_timing_fixture(
     observation_monotonic_ns: int | None = 9000000000000,
     monotonic_clock_id: str | None = "runtime-monotonic-1",
     clock_relation: ClockRelationV1 | None = None,
+    operation_identity: PromotionOperationIdentityV1 | None = None,
+    temporal_attempt_identity: PromotionTemporalAttemptIdentityV1 | None = None,
+    reservation_id: str = "RES-TEMPORAL-1",
+    promotion_operation_id: str = "OP-TEMPORAL-1",
+    reservation_head: str = "PROMOTION-RESERVATION-HEAD-1",
+    dispatch_attempt_id: str = "DISPATCH-ATTEMPT-1",
+    fencing_token: int = 1,
 ) -> ProviderWebhookEffectTimingV1:
+    identity = operation_identity or stack_identity_fixture()
+    policy = timestamp_policy if timestamp_policy is not None else timestamp_policy_fixture()
+    relation = clock_relation if clock_relation is not None else clock_relation_fixture()
+    attempt = temporal_attempt_identity or PromotionTemporalAttemptIdentityV1(
+        operation_identity_digest=identity.digest(),
+        reservation_id=reservation_id,
+        promotion_operation_id=promotion_operation_id,
+        reservation_head=reservation_head,
+        dispatch_attempt_id=dispatch_attempt_id,
+        fencing_token=fencing_token,
+        trust_root_generation=identity.trust_root_generation,
+        governance_generation=identity.governance_generation,
+        local_monotonic_clock_id=monotonic_clock_id or "",
+        reservation_time_ms=reservation_time_ms,
+        dispatch_time_ms=dispatch_time_ms,
+        reservation_monotonic_ns=reservation_monotonic_ns,
+        dispatch_monotonic_ns=dispatch_monotonic_ns,
+    )
     return ProviderWebhookEffectTimingV1(
         provider_event_time_ms=event_time_ms,
         provider_event_time_upper_ms=event_upper_time_ms,
-        provider_timestamp_policy=(
-            timestamp_policy
-            if timestamp_policy is not None
-            else timestamp_policy_fixture()
-        ),
-        provider_timestamp_policy_digest=(
-            (
-                timestamp_policy
-                if timestamp_policy is not None
-                else timestamp_policy_fixture()
-            ).identity_digest()
-        ),
+        provider_timestamp_policy=policy,
+        provider_timestamp_policy_digest=policy.identity_digest(),
         provider_delivery_time_ms=delivery_time_ms,
         local_reservation_time_ms=reservation_time_ms,
         local_dispatch_time_ms=dispatch_time_ms,
@@ -1924,9 +1939,8 @@ def effect_timing_fixture(
         local_dispatch_monotonic_ns=dispatch_monotonic_ns,
         local_observation_monotonic_ns=observation_monotonic_ns,
         local_monotonic_clock_id=monotonic_clock_id,
-        clock_relation=(
-            clock_relation if clock_relation is not None else clock_relation_fixture()
-        ),
+        temporal_attempt_identity=attempt,
+        clock_relation=relation,
     )
 
 
@@ -1944,6 +1958,8 @@ def webhook_effect_timing_from_observation(
         local_dispatch_time_ms=1791475195000,
         local_reservation_monotonic_ns=8999999000000,
         local_dispatch_monotonic_ns=8999999500000,
+        local_monotonic_clock_id="runtime-monotonic-1",
+        temporal_attempt_identity=temporal_attempt_fixture(identity),
         clock_relation=clock_relation_fixture(),
         timestamp_policy=timestamp_policy_fixture(),
     )
@@ -2151,6 +2167,7 @@ def test_temporal_effect_rejects_tampered_timestamp_policy_identity():
         local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
         local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
         local_monotonic_clock_id=timing.local_monotonic_clock_id,
+        temporal_attempt_identity=timing.temporal_attempt_identity,
         clock_relation=timing.clock_relation,
     )
     assert tampered.classify() == "provider-timestamp-policy-integrity-invalid"
@@ -2215,6 +2232,7 @@ def test_timing_identity_detects_interval_tampering():
         local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
         local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
         local_monotonic_clock_id=timing.local_monotonic_clock_id,
+        temporal_attempt_identity=timing.temporal_attempt_identity,
         clock_relation=timing.clock_relation,
     )
     assert tampered.identity_digest() != timing.identity_digest()
@@ -2342,6 +2360,7 @@ def test_temporal_effect_without_timestamp_policy_is_not_admissible():
         local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
         local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
         local_monotonic_clock_id=timing.local_monotonic_clock_id,
+        temporal_attempt_identity=timing.temporal_attempt_identity,
         clock_relation=timing.clock_relation,
     )
     assert timing.classify() == "provider-timestamp-policy-unusable"
@@ -4434,6 +4453,38 @@ def stack_identity_fixture() -> PromotionOperationIdentityV1:
         trust_root_generation=7,
         governance_generation=11,
     )
+
+def temporal_attempt_fixture(
+    identity: PromotionOperationIdentityV1 | None = None,
+    *,
+    reservation_id: str = "RES-TEMPORAL-1",
+    promotion_operation_id: str = "OP-TEMPORAL-1",
+    reservation_head: str = "PROMOTION-RESERVATION-HEAD-1",
+    dispatch_attempt_id: str = "DISPATCH-ATTEMPT-1",
+    fencing_token: int = 1,
+    reservation_time_ms: int | None = 1791475190000,
+    dispatch_time_ms: int | None = 1791475195000,
+    reservation_monotonic_ns: int | None = 8999999000000,
+    dispatch_monotonic_ns: int | None = 8999999500000,
+    local_monotonic_clock_id: str = "runtime-monotonic-1",
+) -> PromotionTemporalAttemptIdentityV1:
+    identity = identity or stack_identity_fixture()
+    return PromotionTemporalAttemptIdentityV1(
+        operation_identity_digest=identity.digest(),
+        reservation_id=reservation_id,
+        promotion_operation_id=promotion_operation_id,
+        reservation_head=reservation_head,
+        dispatch_attempt_id=dispatch_attempt_id,
+        fencing_token=fencing_token,
+        trust_root_generation=identity.trust_root_generation,
+        governance_generation=identity.governance_generation,
+        local_monotonic_clock_id=local_monotonic_clock_id,
+        reservation_time_ms=reservation_time_ms,
+        dispatch_time_ms=dispatch_time_ms,
+        reservation_monotonic_ns=reservation_monotonic_ns,
+        dispatch_monotonic_ns=dispatch_monotonic_ns,
+    )
+
 
 
 def stack_effect_fixture(
