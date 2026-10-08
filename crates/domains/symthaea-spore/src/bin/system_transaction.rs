@@ -374,10 +374,17 @@ fn validate_digest(value: &str, label: &str) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum JournalEventKind {
+    Started,
+    Completed,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct JournalEvent {
     schema_version: u16,
-    event: String,
+    event: JournalEventKind,
     request_id: String,
     transaction_id: String,
     mutation: MutationKind,
@@ -756,8 +763,8 @@ impl TransactionLedger {
                 );
             }
 
-            match event.event.as_str() {
-                "started" => {
+            match event.event {
+                JournalEventKind::Started => {
                     if event.outcome.is_some() {
                         return Err(format!(
                             "transaction ledger start event at line {} carries an outcome",
@@ -796,7 +803,7 @@ impl TransactionLedger {
                         records.insert(event.request_id, record);
                     }
                 }
-                "completed" => {
+                JournalEventKind::Completed => {
                     let outcome = event.outcome.ok_or_else(|| {
                         format!(
                             "transaction ledger completion at line {} is missing its outcome",
@@ -980,7 +987,7 @@ impl TransactionLedger {
 
         self.append(&JournalEvent {
             schema_version: SCHEMA_VERSION,
-            event: "started".into(),
+            event: JournalEventKind::Started,
             request_id: transaction.request_id.clone(),
             transaction_id: transaction.transaction_id.clone(),
             mutation: transaction.mutation,
@@ -1176,7 +1183,7 @@ impl TransactionLedger {
 
         self.append(&JournalEvent {
             schema_version: SCHEMA_VERSION,
-            event: "completed".into(),
+            event: JournalEventKind::Completed,
             request_id: transaction.request_id.clone(),
             transaction_id: transaction.transaction_id.clone(),
             mutation: transaction.mutation,
@@ -2055,6 +2062,36 @@ mod tests {
         let ledger = TransactionLedger::open_at(&path).unwrap();
         let error = ledger.load().expect_err("invalid request id must fail closed");
         assert!(error.contains("invalid request_id"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn ledger_rejects_unknown_event_kind() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-transaction-ledger-unknown-event-{name}.jsonl"));
+        let event = serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "event": "something_else",
+            "request_id": "unknown-event-0001",
+            "transaction_id": "0123456789abcdef0123456789abcdef",
+            "mutation": "install",
+            "target_machine_digest": null,
+            "request_digest": "a".repeat(64),
+            "outcome": null
+        });
+        std::fs::write(&path, format!("{event}\n")).unwrap();
+        std::fs::set_permissions(
+            &path,
+            std::os::unix::fs::PermissionsExt::from_mode(0o600),
+        )
+        .unwrap();
+
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let error = ledger
+            .load()
+            .expect_err("unknown journal event kind must fail closed");
+        assert!(error.contains("unknown variant") || error.contains("invalid type"));
         let _ = std::fs::remove_file(path);
     }
 
