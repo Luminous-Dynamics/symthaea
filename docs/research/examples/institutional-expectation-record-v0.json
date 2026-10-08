@@ -1,0 +1,18 @@
+{
+  "schema_version": "institutional-expectation-record-v0",
+  "expectation_id": "e1",
+  "subject_id": "agent-1",
+  "observation_time": 10,
+  "referenced_institution_hash": "profile-v0",
+  "expectation_rule_hash": "expect-rule-v0",
+  "information_set": {
+    "hash": "info-v0",
+    "as_of": 10
+  },
+  "representation": "categorical",
+  "belief_value": "persist",
+  "confidence": 80,
+  "signal_identity": "signal-001",
+  "belief_current": true,
+  "superseded_by": null
+}
