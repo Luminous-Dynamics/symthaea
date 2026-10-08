@@ -40,15 +40,15 @@ def fail(message: str) -> None:
 
 
 def main() -> None:
-    if "run_cmd(" in text:
-        fail("legacy run_cmd shell executor regressed into relay source")
-    if "privileged_shell_command(" in text:
-        fail("legacy privileged_shell_command shell executor regressed into relay source")
-
     if not SOURCE.is_file():
         fail(f"source file missing: {SOURCE}")
 
     text = SOURCE.read_text(encoding="utf-8")
+
+    if "run_cmd(" in text:
+        fail("legacy run_cmd shell executor regressed into relay source")
+    if "privileged_shell_command(" in text:
+        fail("legacy privileged_shell_command shell executor regressed into relay source")
     lines = text.splitlines()
 
     # Source-integrity sentinels: catch accidental partial-blob overwrites before
